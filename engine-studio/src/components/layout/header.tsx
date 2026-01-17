@@ -1,0 +1,250 @@
+"use client"
+
+import { useSession, signOut } from "next-auth/react"
+import { usePathname } from "next/navigation"
+import {
+  Bell,
+  Search,
+  Moon,
+  Sun,
+  LogOut,
+  User,
+  Settings,
+  HelpCircle,
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { useUIStore } from "@/stores/ui-store"
+import { USER_ROLE_LABELS } from "@/lib/utils"
+
+// 페이지별 제목 매핑
+const PAGE_TITLES: Record<string, string> = {
+  "/dashboard": "대시보드",
+  "/personas": "페르소나 목록",
+  "/personas/create": "새 페르소나 생성",
+  "/personas/incubator": "인큐베이터 관리",
+  "/user-insight/cold-start": "콜드 스타트 전략",
+  "/user-insight/psychometric": "심층 성향 분석",
+  "/user-insight/archetypes": "아키타입 관리",
+  "/matching-lab/simulator": "매칭 시뮬레이터",
+  "/matching-lab/algorithm-tuning": "알고리즘 튜닝",
+  "/matching-lab/performance": "성과 분석",
+  "/system-integration/deployment": "배포 파이프라인",
+  "/system-integration/version-control": "버전 관리",
+  "/system-integration/event-bus": "이벤트 버스 모니터링",
+  "/operations/monitoring": "시스템 모니터링",
+  "/operations/incidents": "장애 대응",
+  "/operations/backup": "백업 및 복구",
+  "/global-config/models": "모델 설정",
+  "/global-config/safety-filters": "안전 필터",
+  "/global-config/api-endpoints": "API 엔드포인트",
+  "/team/users": "사용자 관리",
+  "/team/roles": "역할 권한",
+  "/team/audit-logs": "감사 로그",
+}
+
+// Mock 알림 데이터
+const MOCK_NOTIFICATIONS = [
+  {
+    id: "1",
+    type: "info" as const,
+    title: "새 페르소나 승인 대기",
+    message: "인큐베이터에서 생성된 3개의 페르소나가 승인을 기다리고 있습니다.",
+    time: "5분 전",
+    read: false,
+  },
+  {
+    id: "2",
+    type: "warning" as const,
+    title: "A/B 테스트 결과",
+    message: "'알고리즘 v2.1' 테스트가 완료되었습니다. 결과를 확인해주세요.",
+    time: "1시간 전",
+    read: false,
+  },
+  {
+    id: "3",
+    type: "success" as const,
+    title: "배포 완료",
+    message: "페르소나 '논리적 평론가'가 프로덕션에 성공적으로 배포되었습니다.",
+    time: "3시간 전",
+    read: true,
+  },
+]
+
+export function Header() {
+  const { data: session } = useSession()
+  const pathname = usePathname()
+  const { theme, setTheme } = useUIStore()
+
+  const pageTitle = PAGE_TITLES[pathname] || "Engine Studio"
+  const unreadCount = MOCK_NOTIFICATIONS.filter((n) => !n.read).length
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
+  }
+
+  const handleSignOut = () => {
+    signOut({ callbackUrl: "/login" })
+  }
+
+  return (
+    <header className="flex h-16 items-center justify-between border-b bg-card px-6">
+      {/* Left: Page Title */}
+      <div>
+        <h1 className="text-xl font-semibold">{pageTitle}</h1>
+      </div>
+
+      {/* Center: Search */}
+      <div className="hidden md:flex flex-1 max-w-md mx-8">
+        <div className="relative w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="페르소나, 설정, 문서 검색..."
+            className="pl-9"
+          />
+        </div>
+      </div>
+
+      {/* Right: Actions */}
+      <div className="flex items-center gap-2">
+        {/* Theme Toggle */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        >
+          {theme === "dark" ? (
+            <Sun className="h-5 w-5" />
+          ) : (
+            <Moon className="h-5 w-5" />
+          )}
+        </Button>
+
+        {/* Help */}
+        <Button variant="ghost" size="icon">
+          <HelpCircle className="h-5 w-5" />
+        </Button>
+
+        {/* Notifications */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="icon" className="relative">
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
+                  {unreadCount}
+                </span>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-80">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">알림</h3>
+              <Button variant="ghost" size="sm">
+                모두 읽음
+              </Button>
+            </div>
+            <div className="space-y-3">
+              {MOCK_NOTIFICATIONS.map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`p-3 rounded-lg border ${
+                    notification.read ? "bg-background" : "bg-accent"
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    <Badge
+                      variant={
+                        notification.type === "warning"
+                          ? "warning"
+                          : notification.type === "success"
+                          ? "success"
+                          : "info"
+                      }
+                      className="mt-0.5"
+                    >
+                      {notification.type}
+                    </Badge>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm">{notification.title}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {notification.message}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {notification.time}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* User Menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="gap-2 px-2">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={session?.user?.image || undefined} />
+                <AvatarFallback>
+                  {getInitials(session?.user?.name || "U")}
+                </AvatarFallback>
+              </Avatar>
+              <div className="hidden md:block text-left">
+                <p className="text-sm font-medium">{session?.user?.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {USER_ROLE_LABELS[session?.user?.role || "ANALYST"]}
+                </p>
+              </div>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>
+              <div>
+                <p className="font-medium">{session?.user?.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {session?.user?.email}
+                </p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem>
+              <User className="mr-2 h-4 w-4" />
+              프로필
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <Settings className="mr-2 h-4 w-4" />
+              설정
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleSignOut} className="text-red-600">
+              <LogOut className="mr-2 h-4 w-4" />
+              로그아웃
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </header>
+  )
+}

@@ -1,0 +1,767 @@
+// DeepSight AI Engine Studio - Database Schema
+// v3.0 - 6D Vector System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// 인증 및 사용자 관리
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String?
+  image         String?
+  role          UserRole  @default(ANALYST)
+  isActive      Boolean   @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  sessions      Session[]
+  accounts      Account[]
+  createdPersonas Persona[] @relation("CreatedBy")
+  auditLogs     AuditLog[]
+  abTests       ABTest[]  @relation("CreatedBy")
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+enum UserRole {
+  ADMIN
+  AI_ENGINEER
+  CONTENT_MANAGER
+  ANALYST
+}
+
+// ============================================
+// 페르소나 관리
+// ============================================
+
+model Persona {
+  id              String          @id @default(cuid())
+  organizationId  String?
+  visibility      PersonaVisibility @default(PRIVATE)
+  sharedWithOrgs  String[]        @default([])
+
+  name            String
+  role            PersonaRole
+  expertise       String[]        @default([])
+  description     String?
+  profileImageUrl String?
+
+  promptTemplate  String          @db.Text
+  promptVersion   String          @default("1.0")
+
+  status          PersonaStatus   @default(DRAFT)
+  qualityScore    Decimal?        @db.Decimal(5, 2)
+  validationScore Decimal?        @db.Decimal(3, 2)
+  validationVersion Int?
+  lastValidationDate DateTime?
+
+  source          PersonaSource   @default(MANUAL)
+  parentPersonaId String?
+  parentPersona   Persona?        @relation("PersonaParent", fields: [parentPersonaId], references: [id])
+  childPersonas   Persona[]       @relation("PersonaParent")
+
+  createdById     String
+  createdBy       User            @relation("CreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  activatedAt     DateTime?
+  archivedAt      DateTime?
+
+  // Relations
+  vectors         PersonaVector[]
+  matchingLogs    MatchingLog[]
+  feedbacks       Feedback[]
+  testResults     PersonaTestResult[]
+
+  @@map("personas")
+}
+
+model PersonaVector {
+  id        String   @id @default(cuid())
+  personaId String
+  persona   Persona  @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  version   Int      @default(1)
+
+  // 6D Vector (v3.0)
+  depth     Decimal  @db.Decimal(3, 2)  // 분석 깊이: 직관적(0.0) ↔ 심층적(1.0)
+  lens      Decimal  @db.Decimal(3, 2)  // 판단 렌즈: 감성적(0.0) ↔ 논리적(1.0)
+  stance    Decimal  @db.Decimal(3, 2)  // 평가 태도: 수용적(0.0) ↔ 비판적(1.0)
+  scope     Decimal  @db.Decimal(3, 2)  // 관심 범위: 핵심만(0.0) ↔ 디테일(1.0)
+  taste     Decimal  @db.Decimal(3, 2)  // 취향 성향: 클래식(0.0) ↔ 실험적(1.0)
+  purpose   Decimal  @db.Decimal(3, 2)  // 소비 목적: 오락(0.0) ↔ 의미추구(1.0)
+
+  createdAt DateTime @default(now())
+
+  @@map("persona_vectors")
+}
+
+enum PersonaVisibility {
+  GLOBAL
+  PRIVATE
+  SHARED
+}
+
+enum PersonaRole {
+  REVIEWER
+  CURATOR
+  EDUCATOR
+  COMPANION
+  ANALYST
+}
+
+enum PersonaStatus {
+  DRAFT
+  REVIEW
+  ACTIVE
+  STANDARD
+  LEGACY
+  DEPRECATED
+  PAUSED
+  ARCHIVED
+}
+
+enum PersonaSource {
+  MANUAL
+  INCUBATOR
+  MUTATION
+}
+
+// ============================================
+// 사용자 벡터 및 아키타입
+// ============================================
+
+model UserVector {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  onboardingLevel OnboardingLevel @default(LIGHT)
+
+  // 6D Vector
+  depth           Decimal  @db.Decimal(3, 2)
+  lens            Decimal  @db.Decimal(3, 2)
+  stance          Decimal  @db.Decimal(3, 2)
+  scope           Decimal  @db.Decimal(3, 2)
+  taste           Decimal  @db.Decimal(3, 2)
+  purpose         Decimal  @db.Decimal(3, 2)
+
+  archetype       String?
+  confidenceScores Json?
+
+  updatedAt       DateTime @updatedAt
+
+  @@map("user_vectors")
+}
+
+model Archetype {
+  id              String   @id @default(cuid())
+  name            String   @unique
+  description     String?
+
+  // Vector ranges (min-max for each dimension)
+  depthMin        Decimal  @db.Decimal(3, 2)
+  depthMax        Decimal  @db.Decimal(3, 2)
+  lensMin         Decimal  @db.Decimal(3, 2)
+  lensMax         Decimal  @db.Decimal(3, 2)
+  stanceMin       Decimal  @db.Decimal(3, 2)
+  stanceMax       Decimal  @db.Decimal(3, 2)
+  scopeMin        Decimal  @db.Decimal(3, 2)
+  scopeMax        Decimal  @db.Decimal(3, 2)
+  tasteMin        Decimal  @db.Decimal(3, 2)
+  tasteMax        Decimal  @db.Decimal(3, 2)
+  purposeMin      Decimal  @db.Decimal(3, 2)
+  purposeMax      Decimal  @db.Decimal(3, 2)
+
+  recommendedPersonaIds String[] @default([])
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("archetypes")
+}
+
+enum OnboardingLevel {
+  LIGHT   // Quick Mode: 12 questions, 2min
+  MEDIUM  // Standard Mode: 30 questions, 5min
+  DEEP    // Deep Mode: 60 questions, 15min
+}
+
+// ============================================
+// 매칭 알고리즘
+// ============================================
+
+model MatchingAlgorithm {
+  id              String   @id @default(cuid())
+  name            String
+  version         String
+  algorithmType   AlgorithmType
+  parameters      Json?
+  weights         Json?
+  contextRules    Json?
+  status          AlgorithmStatus @default(DRAFT)
+  deployedEnv     String[] @default([])
+  performanceMetrics Json?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  versions        AlgorithmVersion[]
+  matchingLogs    MatchingLog[]
+  abTestsControl  ABTest[] @relation("ControlAlgorithm")
+  abTestsTest     ABTest[] @relation("TestAlgorithm")
+
+  @@map("matching_algorithms")
+}
+
+model AlgorithmVersion {
+  id              String   @id @default(cuid())
+  algorithmId     String
+  algorithm       MatchingAlgorithm @relation(fields: [algorithmId], references: [id], onDelete: Cascade)
+  version         String
+  parentVersion   String?
+  changeType      ChangeType
+  changeSummary   String
+  changeDetails   Json?
+  parametersSnapshot Json?
+  weightsSnapshot Json?
+  contextRulesSnapshot Json?
+  deployedTo      String[] @default([])
+
+  createdAt       DateTime @default(now())
+
+  @@map("algorithm_versions")
+}
+
+enum AlgorithmType {
+  COSINE
+  WEIGHTED
+  CONTEXT
+  HYBRID
+}
+
+enum AlgorithmStatus {
+  DRAFT
+  TESTING
+  ACTIVE
+  DEPRECATED
+}
+
+enum ChangeType {
+  MAJOR
+  MINOR
+  PATCH
+  ROLLBACK
+}
+
+// ============================================
+// 매칭 로그
+// ============================================
+
+model MatchingLog {
+  id              String   @id @default(cuid())
+  requestId       String   @unique @default(cuid())
+  userId          String
+  algorithmId     String?
+  algorithm       MatchingAlgorithm? @relation(fields: [algorithmId], references: [id])
+  algorithmVersion String?
+  context         Json?
+  matchedPersonas Json?    // [{persona_id, score, rank}]
+  selectedPersonaId String?
+  selectedPersona Persona? @relation(fields: [selectedPersonaId], references: [id])
+  feedback        FeedbackType?
+  responseTimeMs  Int?
+
+  createdAt       DateTime @default(now())
+  feedbackAt      DateTime?
+
+  @@map("matching_logs")
+}
+
+model Feedback {
+  id              String   @id @default(cuid())
+  userId          String
+  personaId       String
+  persona         Persona  @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  feedbackType    FeedbackType
+  contentId       String?
+  comment         String?
+
+  createdAt       DateTime @default(now())
+
+  @@map("feedbacks")
+}
+
+enum FeedbackType {
+  LIKE
+  DISLIKE
+  NONE
+}
+
+// ============================================
+// A/B 테스트
+// ============================================
+
+model ABTest {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  testType        ABTestType
+  status          ABTestStatus @default(DRAFT)
+
+  controlConfig   Json
+  controlAlgorithmId String?
+  controlAlgorithm MatchingAlgorithm? @relation("ControlAlgorithm", fields: [controlAlgorithmId], references: [id])
+
+  testConfig      Json
+  testAlgorithmId String?
+  testAlgorithm   MatchingAlgorithm? @relation("TestAlgorithm", fields: [testAlgorithmId], references: [id])
+
+  trafficSplit    Decimal  @db.Decimal(3, 2) @default(0.5)
+  startDate       DateTime?
+  endDate         DateTime?
+  results         Json?
+
+  createdById     String
+  createdBy       User     @relation("CreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("ab_tests")
+}
+
+enum ABTestType {
+  ALGORITHM
+  PERSONA
+  PARAMETER
+  WEIGHT
+  DIMENSION
+}
+
+enum ABTestStatus {
+  DRAFT
+  RUNNING
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+// ============================================
+// 심리 프로파일링 템플릿
+// ============================================
+
+model PsychProfileTemplate {
+  id              String   @id @default(cuid())
+  name            String
+  onboardingLevel OnboardingLevel
+  questionOrder   Int
+  questionText    String
+  questionType    QuestionType
+  options         Json?
+  targetDimensions String[] @default([])
+  weightFormula   Json?
+  isRequired      Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("psych_profile_templates")
+}
+
+enum QuestionType {
+  SLIDER
+  MULTIPLE_CHOICE
+  RANKING
+  TEXT
+  IMAGE
+}
+
+// ============================================
+// 골든 샘플 (테스트용)
+// ============================================
+
+model GoldenSample {
+  id              String   @id @default(cuid())
+  contentTitle    String
+  contentType     String?
+  genre           String?
+  description     String?
+  testQuestion    String
+  expectedReactions Json?
+  difficultyLevel DifficultyLevel @default(MEDIUM)
+  validationDimensions String[] @default([])
+  version         Int      @default(1)
+  isActive        Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("golden_samples")
+}
+
+enum DifficultyLevel {
+  EASY
+  MEDIUM
+  HARD
+}
+
+// ============================================
+// 인큐베이터 로그
+// ============================================
+
+model IncubatorLog {
+  id              String   @id @default(cuid())
+  batchId         String
+  batchDate       DateTime @db.Date
+  personaConfig   Json?
+  generatedVector Json?
+  generatedPrompt String?  @db.Text
+  testSampleIds   String[] @default([])
+  testResults     Json?
+  consistencyScore Decimal? @db.Decimal(3, 2)
+  vectorAlignmentScore Decimal? @db.Decimal(3, 2)
+  toneMatchScore  Decimal? @db.Decimal(3, 2)
+  reasoningQualityScore Decimal? @db.Decimal(3, 2)
+  status          IncubatorStatus @default(PENDING)
+
+  createdAt       DateTime @default(now())
+
+  @@map("incubator_logs")
+}
+
+enum IncubatorStatus {
+  PENDING
+  PASSED
+  FAILED
+  APPROVED
+  REJECTED
+}
+
+// ============================================
+// 리뷰 스타일 (v3.0)
+// ============================================
+
+model ReviewStyle {
+  id              String   @id // S01~S32
+  name            String
+  description     String?
+  depthLevel      String   // HIGH/LOW
+  lensLevel       String   // 감성/논리
+  stanceLevel     String   // 수용/비판
+  scopeLevel      String   // 핵심/디테일
+  tasteLevel      String   // 클래식/실험
+  systemPrompt    String   @db.Text
+
+  createdAt       DateTime @default(now())
+
+  // Relations
+  contentReviews  StyleContentReview[]
+
+  @@map("review_styles")
+}
+
+model StyleContentReview {
+  id              String   @id @default(cuid())
+  styleId         String
+  style           ReviewStyle @relation(fields: [styleId], references: [id], onDelete: Cascade)
+  contentId       String
+  contentType     String?
+  rating          Decimal? @db.Decimal(3, 1)
+  reviewText      String   @db.Text
+  reviewSummary   String?
+  keywords        String[] @default([])
+  generationTrigger String?
+
+  generatedAt     DateTime @default(now())
+
+  @@unique([styleId, contentId])
+  @@map("style_content_reviews")
+}
+
+model StyleReviewLog {
+  id              String   @id @default(cuid())
+  userId          String
+  personaId       String
+  styleId         String
+  contentId       String
+  styleCacheHit   Boolean
+  transformType   String?  // TEMPLATE, LLM, NULL
+  styleGenerationCost Decimal? @db.Decimal(10, 6)
+  transformCost   Decimal? @db.Decimal(10, 6)
+
+  createdAt       DateTime @default(now())
+
+  @@map("style_review_logs")
+}
+
+// ============================================
+// 페르소나 테스트 결과
+// ============================================
+
+model PersonaTestResult {
+  id              String   @id @default(cuid())
+  personaId       String
+  persona         Persona  @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  testType        String   // SINGLE, BATCH, GOLDEN
+  sampleContent   Json?
+  response        String?  @db.Text
+  consistencyScore Decimal? @db.Decimal(3, 2)
+  toneMatchScore  Decimal? @db.Decimal(3, 2)
+  reasoningScore  Decimal? @db.Decimal(3, 2)
+  overallScore    Decimal? @db.Decimal(3, 2)
+
+  createdAt       DateTime @default(now())
+
+  @@map("persona_test_results")
+}
+
+// ============================================
+// 시스템 설정
+// ============================================
+
+model SystemConfig {
+  id              String   @id @default(cuid())
+  category        String   // MODEL, SAFETY, API
+  key             String
+  value           Json
+  description     String?
+
+  updatedAt       DateTime @updatedAt
+
+  @@unique([category, key])
+  @@map("system_configs")
+}
+
+model SafetyFilter {
+  id              String   @id @default(cuid())
+  name            String
+  filterType      FilterType
+  pattern         String   // Regex pattern
+  isActive        Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("safety_filters")
+}
+
+enum FilterType {
+  PROFANITY
+  HATE_SPEECH
+  POLITICAL
+  RELIGIOUS
+  CUSTOM
+}
+
+// ============================================
+// 배포 관리
+// ============================================
+
+model Deployment {
+  id              String   @id @default(cuid())
+  targetType      DeploymentTarget
+  targetId        String
+  environment     DeploymentEnv
+  status          DeploymentStatus @default(PENDING)
+  version         String?
+  notes           String?
+  deployedById    String
+
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
+
+  @@map("deployments")
+}
+
+enum DeploymentTarget {
+  PERSONA
+  ALGORITHM
+  CONFIG
+}
+
+enum DeploymentEnv {
+  DEV
+  STG
+  PROD
+}
+
+enum DeploymentStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  ROLLED_BACK
+}
+
+// ============================================
+// 장애 관리
+// ============================================
+
+model Incident {
+  id              String   @id @default(cuid())
+  title           String
+  description     String   @db.Text
+  severity        IncidentSeverity
+  status          IncidentStatus @default(REPORTED)
+  affectedSystems String[] @default([])
+  resolution      String?  @db.Text
+  reportedById    String
+
+  createdAt       DateTime @default(now())
+  resolvedAt      DateTime?
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  timeline        IncidentTimeline[]
+
+  @@map("incidents")
+}
+
+model IncidentTimeline {
+  id              String   @id @default(cuid())
+  incidentId      String
+  incident        Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  action          String
+  description     String
+  performedById   String
+
+  createdAt       DateTime @default(now())
+
+  @@map("incident_timelines")
+}
+
+enum IncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentStatus {
+  REPORTED
+  INVESTIGATING
+  IDENTIFIED
+  FIXING
+  RESOLVED
+  CLOSED
+}
+
+// ============================================
+// 감사 로그
+// ============================================
+
+model AuditLog {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  action          String
+  targetType      String
+  targetId        String?
+  details         Json?
+  ipAddress       String?
+  userAgent       String?
+
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================
+// 시스템 모니터링
+// ============================================
+
+model SystemMetric {
+  id              String   @id @default(cuid())
+  metricType      String   // CPU, MEMORY, DISK, API_LATENCY, ERROR_RATE
+  value           Decimal  @db.Decimal(10, 4)
+  unit            String
+  tags            Json?
+
+  recordedAt      DateTime @default(now())
+
+  @@index([metricType, recordedAt])
+  @@map("system_metrics")
+}
+
+// ============================================
+// 백업 기록
+// ============================================
+
+model BackupRecord {
+  id              String   @id @default(cuid())
+  backupType      BackupType
+  status          BackupStatus @default(IN_PROGRESS)
+  size            BigInt?
+  location        String?
+  notes           String?
+
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+
+  @@map("backup_records")
+}
+
+enum BackupType {
+  FULL
+  INCREMENTAL
+  DIFFERENTIAL
+}
+
+enum BackupStatus {
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
