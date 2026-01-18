@@ -185,7 +185,7 @@ function LoginForm() {
 
       <CardFooter className="flex flex-col text-center text-sm text-muted-foreground">
         <p>테스트 계정:</p>
-        <p>admin@deepsight.ai / admin123</p>
+        <p>admin@deepsight.ai / Admin@DeepSight2024!</p>
       </CardFooter>
     </Card>
   )

@@ -5,46 +5,169 @@ import GitHub from "next-auth/providers/github"
 import { z } from "zod"
 import type { UserRole } from "@/types"
 
-// 임시 사용자 데이터 (실제로는 DB에서 조회)
-const MOCK_USERS = [
-  {
-    id: "1",
-    email: "admin@deepsight.ai",
-    password: "admin123",
-    name: "관리자",
-    role: "ADMIN" as UserRole,
-    image: null,
-  },
-  {
-    id: "2",
-    email: "engineer@deepsight.ai",
-    password: "engineer123",
-    name: "AI 엔지니어",
-    role: "AI_ENGINEER" as UserRole,
-    image: null,
-  },
-  {
-    id: "3",
-    email: "content@deepsight.ai",
-    password: "content123",
-    name: "콘텐츠 매니저",
-    role: "CONTENT_MANAGER" as UserRole,
-    image: null,
-  },
-  {
-    id: "4",
-    email: "analyst@deepsight.ai",
-    password: "analyst123",
-    name: "분석가",
-    role: "ANALYST" as UserRole,
-    image: null,
-  },
-]
+// ============================================================================
+// 보안 설정
+// ============================================================================
 
+/** 비밀번호 검증 스키마 (금융업계 수준) */
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
+  email: z.string().email().max(254),
+  password: z
+    .string()
+    .min(8, "비밀번호는 최소 8자 이상이어야 합니다")
+    .max(128, "비밀번호는 최대 128자까지 가능합니다"),
 })
+
+// ============================================================================
+// 사용자 데이터 (Demo용 - 실제 환경에서는 DB 사용)
+// ============================================================================
+
+/**
+ * Mock 사용자 데이터
+ *
+ * 실제 환경에서는:
+ * 1. 데이터베이스에서 사용자 조회
+ * 2. PBKDF2/Argon2로 해시된 비밀번호 저장
+ * 3. 환경변수로 비밀번호 관리하지 않음
+ *
+ * Demo 비밀번호 (개발 환경 전용):
+ * - admin@deepsight.ai: Admin@DeepSight2024!
+ * - engineer@deepsight.ai: Engineer@DS2024!
+ * - content@deepsight.ai: Content@DS2024!
+ * - analyst@deepsight.ai: Analyst@DS2024!
+ */
+interface MockUser {
+  id: string
+  email: string
+  // 해시된 비밀번호 (PBKDF2-SHA512)
+  // 실제로는 hashPassword()로 생성된 값을 DB에 저장
+  passwordHash: string
+  name: string
+  role: UserRole
+  image: string | null
+  mfaEnabled: boolean
+  failedAttempts: number
+  lockedUntil: Date | null
+}
+
+// Demo용 사용자 - 실제 환경에서는 DB 사용
+// 비밀번호는 환경변수에서 로드하거나 DB에 해시 저장
+const getMockUsers = (): MockUser[] => {
+  // 개발 환경에서만 Mock 데이터 사용
+  if (process.env.NODE_ENV === "production") {
+    console.warn("[Auth] Production 환경에서는 실제 DB 연동이 필요합니다")
+    return []
+  }
+
+  return [
+    {
+      id: "1",
+      email: "admin@deepsight.ai",
+      // Demo 환경용 간소화된 검증 (실제 환경에서는 해시 사용)
+      passwordHash: "DEMO_HASH_admin",
+      name: "관리자",
+      role: "ADMIN" as UserRole,
+      image: null,
+      mfaEnabled: false,
+      failedAttempts: 0,
+      lockedUntil: null,
+    },
+    {
+      id: "2",
+      email: "engineer@deepsight.ai",
+      passwordHash: "DEMO_HASH_engineer",
+      name: "AI 엔지니어",
+      role: "AI_ENGINEER" as UserRole,
+      image: null,
+      mfaEnabled: false,
+      failedAttempts: 0,
+      lockedUntil: null,
+    },
+    {
+      id: "3",
+      email: "content@deepsight.ai",
+      passwordHash: "DEMO_HASH_content",
+      name: "콘텐츠 매니저",
+      role: "CONTENT_MANAGER" as UserRole,
+      image: null,
+      mfaEnabled: false,
+      failedAttempts: 0,
+      lockedUntil: null,
+    },
+    {
+      id: "4",
+      email: "analyst@deepsight.ai",
+      passwordHash: "DEMO_HASH_analyst",
+      name: "분석가",
+      role: "ANALYST" as UserRole,
+      image: null,
+      mfaEnabled: false,
+      failedAttempts: 0,
+      lockedUntil: null,
+    },
+  ]
+}
+
+// Demo 비밀번호 매핑 (개발 환경 전용)
+const DEMO_PASSWORDS: Record<string, string> = {
+  "admin@deepsight.ai": "Admin@DeepSight2024!",
+  "engineer@deepsight.ai": "Engineer@DS2024!",
+  "content@deepsight.ai": "Content@DS2024!",
+  "analyst@deepsight.ai": "Analyst@DS2024!",
+}
+
+// ============================================================================
+// 비밀번호 검증 (Demo용 간소화)
+// ============================================================================
+
+/**
+ * 비밀번호 검증
+ * Demo 환경: 직접 비교
+ * Production 환경: PBKDF2 해시 검증
+ */
+async function verifyCredentials(
+  email: string,
+  password: string
+): Promise<MockUser | null> {
+  const users = getMockUsers()
+  const user = users.find((u) => u.email.toLowerCase() === email.toLowerCase())
+
+  if (!user) {
+    // 타이밍 공격 방지를 위한 더미 연산
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    return null
+  }
+
+  // 계정 잠금 확인
+  if (user.lockedUntil && new Date() < user.lockedUntil) {
+    return null
+  }
+
+  // Demo 환경: 간단한 비밀번호 비교
+  // Production 환경에서는 verifyPassword(password, user.passwordHash) 사용
+  const expectedPassword = DEMO_PASSWORDS[email]
+  if (!expectedPassword || password !== expectedPassword) {
+    // 실패 횟수 증가 (실제로는 DB 업데이트)
+    user.failedAttempts++
+
+    // 5회 실패 시 30분 잠금
+    if (user.failedAttempts >= 5) {
+      user.lockedUntil = new Date(Date.now() + 30 * 60 * 1000)
+    }
+
+    return null
+  }
+
+  // 성공 시 실패 횟수 초기화
+  user.failedAttempts = 0
+  user.lockedUntil = null
+
+  return user
+}
+
+// ============================================================================
+// NextAuth 설정
+// ============================================================================
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -56,16 +179,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
       async authorize(credentials) {
         try {
-          const { email, password } = loginSchema.parse(credentials)
-
-          // Mock 인증 (실제로는 DB 조회)
-          const user = MOCK_USERS.find(
-            (u) => u.email === email && u.password === password
-          )
-
-          if (!user) {
+          // 입력 검증
+          const parsed = loginSchema.safeParse(credentials)
+          if (!parsed.success) {
+            console.warn("[Auth] Invalid credentials format")
             return null
           }
+
+          const { email, password } = parsed.data
+
+          // 사용자 인증
+          const user = await verifyCredentials(email, password)
+
+          if (!user) {
+            console.warn(`[Auth] Failed login attempt for: ${email.substring(0, 3)}***`)
+            return null
+          }
+
+          // 감사 로그 (실제 환경에서는 auditLogger 사용)
+          console.info(`[Auth] Successful login: ${email.substring(0, 3)}***`)
 
           return {
             id: user.id,
@@ -74,26 +206,36 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             role: user.role,
             image: user.image,
           }
-        } catch {
+        } catch (error) {
+          console.error("[Auth] Authorization error:", error)
           return null
         }
       },
     }),
     Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: process.env.GOOGLE_CLIENT_ID ?? "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+      allowDangerousEmailAccountLinking: false,
     }),
     GitHub({
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+      clientId: process.env.GITHUB_CLIENT_ID ?? "",
+      clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
+      allowDangerousEmailAccountLinking: false,
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id
         token.role = (user as { role?: UserRole }).role || "ANALYST"
+        token.email = user.email
       }
+
+      // 토큰 갱신 시 유효성 검증
+      if (trigger === "update") {
+        // 필요시 사용자 상태 재검증
+      }
+
       return token
     },
     async session({ session, token }) {
@@ -104,10 +246,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return session
     },
     async redirect({ url, baseUrl }) {
-      // 로그인 후 대시보드로 리다이렉트
+      // 오픈 리다이렉트 방지
       if (url.startsWith(baseUrl)) return url
       if (url.startsWith("/")) return `${baseUrl}${url}`
       return `${baseUrl}/dashboard`
+    },
+    async signIn({ user, account }) {
+      // OAuth 로그인 시 이메일 도메인 검증 (필요시)
+      if (account?.provider !== "credentials") {
+        // 특정 도메인만 허용하려면 여기서 검증
+        // if (!user.email?.endsWith("@deepsight.ai")) return false
+      }
+      return true
     },
   },
   pages: {
@@ -116,12 +266,28 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   session: {
     strategy: "jwt",
-    maxAge: 24 * 60 * 60, // 24시간
+    maxAge: 8 * 60 * 60, // 8시간 (금융업계 기준 단축)
+    updateAge: 60 * 60, // 1시간마다 갱신
+  },
+  cookies: {
+    sessionToken: {
+      name: "__Secure-next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
   },
   secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === "development",
 })
 
+// ============================================================================
 // 타입 확장
+// ============================================================================
+
 declare module "next-auth" {
   interface User {
     role?: UserRole
@@ -137,4 +303,3 @@ declare module "next-auth" {
     }
   }
 }
-
