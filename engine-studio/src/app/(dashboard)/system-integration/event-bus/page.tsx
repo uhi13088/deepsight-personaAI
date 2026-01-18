@@ -61,7 +61,7 @@ interface Event {
   type: string
   source: string
   target: string
-  payload: Record<string, any>
+  payload: Record<string, unknown>
   status: EventStatus
   priority: EventPriority
   timestamp: string
@@ -90,7 +90,7 @@ interface DeadLetterEvent {
   error: string
   failedAt: string
   retries: number
-  payload: Record<string, any>
+  payload: Record<string, unknown>
 }
 
 // 목 데이터

@@ -54,6 +54,12 @@ import {
 // 파이프라인 상태 타입
 type PipelineStatus = "idle" | "running" | "success" | "failed" | "cancelled"
 type StageStatus = "pending" | "running" | "success" | "failed" | "skipped"
+type DeploymentEnvironment = "development" | "staging" | "production"
+
+// 타입 가드 함수
+function isDeploymentEnvironment(value: string): value is DeploymentEnvironment {
+  return ["development", "staging", "production"].includes(value)
+}
 
 interface PipelineStage {
   id: string
@@ -68,7 +74,7 @@ interface PipelineStage {
 interface Pipeline {
   id: string
   name: string
-  environment: "development" | "staging" | "production"
+  environment: DeploymentEnvironment
   status: PipelineStatus
   version: string
   triggeredBy: string
@@ -82,7 +88,7 @@ interface Pipeline {
 interface DeploymentTarget {
   id: string
   name: string
-  environment: "development" | "staging" | "production"
+  environment: DeploymentEnvironment
   url: string
   status: "healthy" | "degraded" | "offline"
   lastDeployed?: string
@@ -324,7 +330,11 @@ export default function DeploymentPipelinePage() {
                   <Label>배포 환경</Label>
                   <Select
                     value={deployConfig.environment}
-                    onValueChange={(v) => setDeployConfig({ ...deployConfig, environment: v as any })}
+                    onValueChange={(v) => {
+                      if (isDeploymentEnvironment(v)) {
+                        setDeployConfig({ ...deployConfig, environment: v })
+                      }
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue />
