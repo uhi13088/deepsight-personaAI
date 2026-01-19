@@ -223,7 +223,8 @@ const mockDeadLetters: DeadLetterEvent[] = [
 ]
 
 export default function EventBusMonitorPage() {
-  const [events, setEvents] = useState<Event[]>([])
+  // 초기 이벤트를 useState 초기화 함수로 로드
+  const [events, setEvents] = useState<Event[]>(() => generateMockEvents())
   const [channels] = useState<EventChannel[]>(mockChannels)
   const [deadLetters] = useState<DeadLetterEvent[]>(mockDeadLetters)
   const [isLiveMode, setIsLiveMode] = useState(true)
@@ -233,10 +234,8 @@ export default function EventBusMonitorPage() {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [isEventDetailOpen, setIsEventDetailOpen] = useState(false)
 
-  // 초기 이벤트 로드 및 라이브 모드 시뮬레이션
+  // 라이브 모드 시뮬레이션
   useEffect(() => {
-    setEvents(generateMockEvents())
-
     if (isLiveMode) {
       const interval = setInterval(() => {
         const newEvent: Event = {

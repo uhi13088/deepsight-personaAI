@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
       data: filteredUsers,
       total: filteredUsers.length,
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: "Failed to fetch users" },
       { status: 500 }
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       data: newUser,
       message: "Invitation sent successfully",
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: "Failed to invite user" },
       { status: 500 }

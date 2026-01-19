@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       success: true,
       data: healthCheck,
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       {
         success: false,

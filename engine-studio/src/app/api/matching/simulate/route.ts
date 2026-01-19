@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
         timestamp: new Date().toISOString(),
       },
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: "Failed to simulate matching" },
       { status: 500 }

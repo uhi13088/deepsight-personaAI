@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
         totalPages: Math.ceil(filteredPersonas.length / limit),
       },
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: "Failed to fetch personas" },
       { status: 500 }
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
       success: true,
       data: newPersona,
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: "Failed to create persona" },
       { status: 500 }

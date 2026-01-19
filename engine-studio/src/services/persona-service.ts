@@ -11,10 +11,9 @@ import type {
   PersonaFilters,
   PersonaVector,
   Vector6D,
-  ApiResponse,
   PaginationParams,
 } from "@/types"
-import { DEFAULT_VECTOR, PAGINATION_DEFAULTS } from "@/constants"
+import { PAGINATION_DEFAULTS } from "@/constants"
 
 // ============================================================================
 // 타입 정의

@@ -11,14 +11,6 @@ interface AuthState {
   logout: () => void
 }
 
-// 역할별 권한 매트릭스
-const ROLE_HIERARCHY: Record<UserRole, number> = {
-  ADMIN: 4,
-  AI_ENGINEER: 3,
-  CONTENT_MANAGER: 2,
-  ANALYST: 1,
-}
-
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({

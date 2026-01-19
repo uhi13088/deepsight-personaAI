@@ -65,7 +65,7 @@ export async function GET(
       success: true,
       data: persona,
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: "Failed to fetch persona" },
       { status: 500 }
@@ -73,7 +73,7 @@ export async function GET(
   }
 }
 
-// PUT /api/personas/[id] - 페르소나 수정
+// PUT /api/personas/[id] - 페르소나 전체 수정
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -102,7 +102,51 @@ export async function PUT(
       success: true,
       data: updatedPersona,
     })
-  } catch (error) {
+  } catch {
+    return NextResponse.json(
+      { success: false, error: "Failed to update persona" },
+      { status: 500 }
+    )
+  }
+}
+
+// PATCH /api/personas/[id] - 페르소나 부분 수정
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const body = await request.json()
+
+    const persona = PERSONAS[id]
+
+    if (!persona) {
+      return NextResponse.json(
+        { success: false, error: "Persona not found" },
+        { status: 404 }
+      )
+    }
+
+    // 부분 업데이트 (실제로는 DB에 저장)
+    const updatedPersona: PersonaData = {
+      ...persona,
+      ...(body.name !== undefined && { name: body.name }),
+      ...(body.role !== undefined && { role: body.role }),
+      ...(body.expertise !== undefined && { expertise: body.expertise }),
+      ...(body.status !== undefined && { status: body.status }),
+      ...(body.vector !== undefined && {
+        vector: { ...persona.vector, ...body.vector }
+      }),
+      ...(body.promptTemplate !== undefined && { promptTemplate: body.promptTemplate }),
+      updatedAt: new Date().toISOString(),
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: updatedPersona,
+    })
+  } catch {
     return NextResponse.json(
       { success: false, error: "Failed to update persona" },
       { status: 500 }
@@ -132,7 +176,7 @@ export async function DELETE(
       success: true,
       message: "Persona deleted successfully",
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: "Failed to delete persona" },
       { status: 500 }

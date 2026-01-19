@@ -3,7 +3,7 @@
  * AES-256-GCM, bcrypt, HMAC 등 구현
  */
 
-import { createHash, createHmac, randomBytes, createCipheriv, createDecipheriv } from "crypto"
+import { createHash, createHmac, randomBytes, createCipheriv, createDecipheriv, pbkdf2 } from "crypto"
 
 // ============================================================================
 // 상수 정의
@@ -40,7 +40,6 @@ export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(SALT_LENGTH).toString("hex")
 
   return new Promise((resolve, reject) => {
-    const { pbkdf2 } = require("crypto")
     pbkdf2(
       password,
       salt,
@@ -71,7 +70,6 @@ export async function verifyPassword(password: string, storedHash: string): Prom
   const iterations = parseInt(iterationsStr, 10)
 
   return new Promise((resolve, reject) => {
-    const { pbkdf2 } = require("crypto")
     pbkdf2(
       password,
       salt,
