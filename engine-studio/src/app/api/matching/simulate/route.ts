@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 
-// 코사인 유사도 계산
+// 코사인 유사도 계산 (division by zero 방지)
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
+  if (vecA.length !== vecB.length) {
+    throw new Error("Vectors must have the same length")
+  }
+
   let dotProduct = 0
   let normA = 0
   let normB = 0
@@ -12,7 +16,13 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
     normB += vecB[i] * vecB[i]
   }
 
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB))
+  // Prevent division by zero - return 0 if either vector is zero
+  const denominator = Math.sqrt(normA) * Math.sqrt(normB)
+  if (denominator === 0) {
+    return 0
+  }
+
+  return dotProduct / denominator
 }
 
 // 가중치 적용 유클리디안 거리

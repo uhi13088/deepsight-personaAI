@@ -24,6 +24,7 @@ const SelectTrigger = React.forwardRef<
       error && "border-red-500 focus:ring-red-500",
       className
     )}
+    aria-invalid={error || undefined}
     {...props}
   >
     {children}

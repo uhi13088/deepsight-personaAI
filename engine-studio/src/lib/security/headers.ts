@@ -15,10 +15,9 @@ export const CSP_DIRECTIVES = {
   "default-src": ["'self'"],
 
   // 스크립트 소스: Next.js에서 필요한 설정
+  // Note: 'unsafe-eval' and 'unsafe-inline' are added conditionally in generateCSP() for development only
   "script-src": [
     "'self'",
-    "'unsafe-eval'", // Next.js 개발 모드에서 필요 (프로덕션에서는 제거 권장)
-    "'unsafe-inline'", // Next.js inline scripts
     "https://www.googletagmanager.com", // Analytics (필요한 경우)
   ],
 
@@ -81,8 +80,9 @@ export function generateCSP(isDevelopment: boolean = false): string {
     directives[key] = [...value]
   }
 
-  // 개발 모드에서 추가 설정
+  // 개발 모드에서 추가 설정 (unsafe-eval/unsafe-inline은 프로덕션에서 보안 위험)
   if (isDevelopment) {
+    directives["script-src"].push("'unsafe-eval'", "'unsafe-inline'")
     directives["connect-src"].push("ws:", "wss:")
   }
 

@@ -74,30 +74,46 @@ const PATH_TRAVERSAL_PATTERNS = [
 
 /**
  * XSS 공격 패턴 검사
+ * Note: Reset lastIndex to avoid global regex state issues
  */
 export function containsXSS(input: string): boolean {
-  return XSS_PATTERNS.some((pattern) => pattern.test(input))
+  return XSS_PATTERNS.some((pattern) => {
+    pattern.lastIndex = 0 // Reset lastIndex to avoid false positives/negatives
+    return pattern.test(input)
+  })
 }
 
 /**
  * SQL Injection 패턴 검사
+ * Note: Reset lastIndex to avoid global regex state issues
  */
 export function containsSQLInjection(input: string): boolean {
-  return SQL_INJECTION_PATTERNS.some((pattern) => pattern.test(input))
+  return SQL_INJECTION_PATTERNS.some((pattern) => {
+    pattern.lastIndex = 0 // Reset lastIndex to avoid false positives/negatives
+    return pattern.test(input)
+  })
 }
 
 /**
  * Command Injection 패턴 검사
+ * Note: Reset lastIndex to avoid global regex state issues
  */
 export function containsCommandInjection(input: string): boolean {
-  return COMMAND_INJECTION_PATTERNS.some((pattern) => pattern.test(input))
+  return COMMAND_INJECTION_PATTERNS.some((pattern) => {
+    pattern.lastIndex = 0 // Reset lastIndex to avoid false positives/negatives
+    return pattern.test(input)
+  })
 }
 
 /**
  * Path Traversal 패턴 검사
+ * Note: Reset lastIndex to avoid global regex state issues
  */
 export function containsPathTraversal(input: string): boolean {
-  return PATH_TRAVERSAL_PATTERNS.some((pattern) => pattern.test(input))
+  return PATH_TRAVERSAL_PATTERNS.some((pattern) => {
+    pattern.lastIndex = 0 // Reset lastIndex to avoid false positives/negatives
+    return pattern.test(input)
+  })
 }
 
 /**
@@ -433,17 +449,17 @@ export const REGISTER_SCHEMA: ValidationSchema = {
 export const PERSONA_CREATE_SCHEMA: ValidationSchema = {
   name: { type: "string", required: true, minLength: 2, maxLength: 100, sanitize: true },
   description: { type: "string", maxLength: 1000, sanitize: true },
-  role: { type: "string", required: true, enum: ["analyst", "advisor", "educator", "entertainer", "assistant"] as const },
+  role: { type: "string", required: true, enum: ["REVIEWER", "CURATOR", "EDUCATOR", "COMPANION", "ANALYST"] as const },
   vector: {
     type: "object",
     required: true,
     properties: {
-      depth: { type: "number", required: true, min: 0, max: 100 },
-      lens: { type: "number", required: true, min: 0, max: 100 },
-      stance: { type: "number", required: true, min: 0, max: 100 },
-      scope: { type: "number", required: true, min: 0, max: 100 },
-      taste: { type: "number", required: true, min: 0, max: 100 },
-      purpose: { type: "number", required: true, min: 0, max: 100 },
+      depth: { type: "number", required: true, min: 0, max: 1 },
+      lens: { type: "number", required: true, min: 0, max: 1 },
+      stance: { type: "number", required: true, min: 0, max: 1 },
+      scope: { type: "number", required: true, min: 0, max: 1 },
+      taste: { type: "number", required: true, min: 0, max: 1 },
+      purpose: { type: "number", required: true, min: 0, max: 1 },
     },
   },
 }

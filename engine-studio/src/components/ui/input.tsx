@@ -16,6 +16,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           error && "border-red-500 focus-visible:ring-red-500",
           className
         )}
+        aria-invalid={error || undefined}
         ref={ref}
         {...props}
       />

@@ -166,6 +166,14 @@ export default function SafetyFiltersPage() {
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [testInput, setTestInput] = useState("")
   const [testResult, setTestResult] = useState<null | { safe: boolean; flags: string[] }>(null)
+  // Add Filter Dialog state
+  const [newFilterName, setNewFilterName] = useState("")
+  const [newFilterDescription, setNewFilterDescription] = useState("")
+  const [newFilterCategory, setNewFilterCategory] = useState("")
+  // Blocked words state
+  const [blockedWords, setBlockedWords] = useState(BLOCKED_WORDS)
+  const [newWord, setNewWord] = useState("")
+  const [bulkWords, setBulkWords] = useState("")
 
   const handleFilterToggle = (id: string) => {
     setFilters(filters.map(f =>
@@ -189,8 +197,61 @@ export default function SafetyFiltersPage() {
   }
 
   const handleAddFilter = () => {
+    if (!newFilterName.trim()) {
+      toast.error("필터 이름을 입력해주세요.")
+      return
+    }
+    const newFilter: SafetyFilter = {
+      id: String(Date.now()),
+      name: newFilterName,
+      description: newFilterDescription,
+      category: newFilterCategory || "custom",
+      enabled: true,
+      threshold: 0.8,
+      action: "flag",
+      triggeredCount: 0,
+      lastTriggered: null,
+    }
+    setFilters([...filters, newFilter])
     toast.success("새 필터가 추가되었습니다.")
     setShowAddDialog(false)
+    setNewFilterName("")
+    setNewFilterDescription("")
+    setNewFilterCategory("")
+  }
+
+  const handleAddWord = () => {
+    if (!newWord.trim()) {
+      toast.error("단어를 입력해주세요.")
+      return
+    }
+    if (blockedWords.includes(newWord.trim())) {
+      toast.error("이미 등록된 단어입니다.")
+      return
+    }
+    setBlockedWords([...blockedWords, newWord.trim()])
+    setNewWord("")
+    toast.success("단어가 추가되었습니다.")
+  }
+
+  const handleDeleteWord = (word: string) => {
+    setBlockedWords(blockedWords.filter(w => w !== word))
+    toast.success("단어가 삭제되었습니다.")
+  }
+
+  const handleBulkAddWords = () => {
+    if (!bulkWords.trim()) {
+      toast.error("단어를 입력해주세요.")
+      return
+    }
+    const words = bulkWords.split("\n").map(w => w.trim()).filter(w => w && !blockedWords.includes(w))
+    if (words.length === 0) {
+      toast.error("추가할 새 단어가 없습니다.")
+      return
+    }
+    setBlockedWords([...blockedWords, ...words])
+    setBulkWords("")
+    toast.success(`${words.length}개의 단어가 추가되었습니다.`)
   }
 
   const getActionBadge = (action: SafetyFilter["action"]) => {
@@ -239,11 +300,11 @@ export default function SafetyFiltersPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => toast.success("필터 설정을 동기화했습니다.")}>
             <RefreshCw className="mr-2 h-4 w-4" />
             동기화
           </Button>
-          <Button>
+          <Button onClick={() => toast.success("필터 설정이 저장되었습니다.")}>
             <Save className="mr-2 h-4 w-4" />
             설정 저장
           </Button>
@@ -337,15 +398,23 @@ export default function SafetyFiltersPage() {
                     <div className="grid gap-4 py-4">
                       <div className="grid gap-2">
                         <Label>필터 이름</Label>
-                        <Input placeholder="예: 커스텀 필터" />
+                        <Input
+                          placeholder="예: 커스텀 필터"
+                          value={newFilterName}
+                          onChange={(e) => setNewFilterName(e.target.value)}
+                        />
                       </div>
                       <div className="grid gap-2">
                         <Label>설명</Label>
-                        <Textarea placeholder="필터에 대한 설명" />
+                        <Textarea
+                          placeholder="필터에 대한 설명"
+                          value={newFilterDescription}
+                          onChange={(e) => setNewFilterDescription(e.target.value)}
+                        />
                       </div>
                       <div className="grid gap-2">
                         <Label>카테고리</Label>
-                        <Select>
+                        <Select value={newFilterCategory} onValueChange={setNewFilterCategory}>
                           <SelectTrigger>
                             <SelectValue placeholder="선택" />
                           </SelectTrigger>
@@ -468,24 +537,35 @@ export default function SafetyFiltersPage() {
                   <CardTitle>차단 단어 목록</CardTitle>
                   <CardDescription>직접 차단할 단어를 관리합니다.</CardDescription>
                 </div>
-                <Button size="sm">
-                  <Plus className="mr-2 h-4 w-4" />
-                  단어 추가
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="단어 입력"
+                    value={newWord}
+                    onChange={(e) => setNewWord(e.target.value)}
+                    className="w-40"
+                  />
+                  <Button size="sm" onClick={handleAddWord}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    단어 추가
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                {BLOCKED_WORDS.map((word, index) => (
+                {blockedWords.map((word) => (
                   <Badge
-                    key={index}
+                    key={word}
                     variant="secondary"
                     className="flex items-center gap-1 px-3 py-1"
                   >
                     <span className="blur-sm hover:blur-none transition-all cursor-pointer">
                       {word}
                     </span>
-                    <button className="ml-1 hover:text-destructive">
+                    <button
+                      className="ml-1 hover:text-destructive"
+                      onClick={() => handleDeleteWord(word)}
+                    >
                       <Trash2 className="h-3 w-3" />
                     </button>
                   </Badge>
@@ -500,9 +580,11 @@ export default function SafetyFiltersPage() {
                   <Textarea
                     placeholder="차단할 단어를 입력하세요..."
                     className="min-h-[100px]"
+                    value={bulkWords}
+                    onChange={(e) => setBulkWords(e.target.value)}
                   />
                 </div>
-                <Button variant="outline">
+                <Button variant="outline" onClick={handleBulkAddWords}>
                   <Plus className="mr-2 h-4 w-4" />
                   대량 추가
                 </Button>

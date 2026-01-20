@@ -47,7 +47,7 @@ export async function hashPassword(password: string): Promise<string> {
       KEY_LENGTH,
       "sha512",
       (err: Error | null, derivedKey: Buffer) => {
-        if (err) reject(err)
+        if (err) { reject(err); return }
         resolve(`${salt}$${HASH_ITERATIONS}$${derivedKey.toString("hex")}`)
       }
     )
@@ -77,7 +77,7 @@ export async function verifyPassword(password: string, storedHash: string): Prom
       KEY_LENGTH,
       "sha512",
       (err: Error | null, derivedKey: Buffer) => {
-        if (err) reject(err)
+        if (err) { reject(err); return }
         // 타이밍 공격 방지를 위한 constant-time 비교
         const derivedHash = derivedKey.toString("hex")
         resolve(timingSafeEqual(derivedHash, hash))
