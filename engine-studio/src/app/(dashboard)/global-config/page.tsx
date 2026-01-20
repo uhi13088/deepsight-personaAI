@@ -48,8 +48,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import Link from "next/link"
+import { EXTERNAL_URLS } from "@/config/app.config"
 
-// AI 모델 설정
+// TODO: Add MOCK_AI_MODELS to @/services/mock-data.service for centralized AI model configuration
+// AI 모델 설정 - simplified summary view
 const AI_MODELS = [
   {
     id: "gpt-4-turbo",
@@ -57,6 +59,7 @@ const AI_MODELS = [
     provider: "OpenAI",
     status: "active",
     usage: 78,
+    // Reference: EXTERNAL_URLS.openai for API configuration
   },
   {
     id: "claude-3-opus",
@@ -64,9 +67,11 @@ const AI_MODELS = [
     provider: "Anthropic",
     status: "active",
     usage: 22,
+    // Reference: EXTERNAL_URLS.anthropic for API configuration
   },
 ]
 
+// TODO: Move CONFIG_CATEGORIES to @/services/mock-data.service when configuration management is expanded
 // 설정 카테고리
 const CONFIG_CATEGORIES = [
   {

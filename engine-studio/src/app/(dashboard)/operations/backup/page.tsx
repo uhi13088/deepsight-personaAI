@@ -74,6 +74,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
+// TODO: Update MockBackup type in @/services/mock-data.service to include name, expiresAt, location fields
 // 백업 데이터
 interface Backup {
   id: string
@@ -87,6 +88,8 @@ interface Backup {
   location: "local" | "s3" | "gcs"
 }
 
+// TODO: Replace with extended MOCK_BACKUPS from @/services/mock-data.service
+// Current MOCK_BACKUPS has simpler structure without name, expiresAt, location fields
 const BACKUPS: Backup[] = [
   {
     id: "BKP-001",
@@ -134,6 +137,7 @@ const BACKUPS: Backup[] = [
   },
 ]
 
+// TODO: Add MOCK_BACKUP_STATS to @/services/mock-data.service
 const BACKUP_STATS = {
   totalBackups: 156,
   totalSize: "1.2 TB",
@@ -143,6 +147,7 @@ const BACKUP_STATS = {
   retentionDays: 30,
 }
 
+// TODO: Add MOCK_BACKUP_SCHEDULE to @/services/mock-data.service
 const BACKUP_SCHEDULE = {
   fullBackup: { enabled: true, frequency: "daily", time: "03:00" },
   incrementalBackup: { enabled: true, frequency: "6h", time: "매 6시간" },

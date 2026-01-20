@@ -67,6 +67,7 @@ import {
   Building,
   FolderKey,
 } from "lucide-react"
+import { MOCK_TEAM_MEMBERS } from "@/services/mock-data.service"
 
 // 타입 정의
 interface Permission {
@@ -167,6 +168,12 @@ const permissionGroups: PermissionGroup[] = [
   },
 ]
 
+// TODO: Move role definitions to centralized mock-data.service when RBAC module is expanded
+// Role user counts are dynamically calculated from MOCK_TEAM_MEMBERS
+const getRoleUserCount = (roleCode: string): number => {
+  return MOCK_TEAM_MEMBERS.filter(m => m.role === roleCode).length
+}
+
 // 역할 정의
 const mockRoles: Role[] = [
   {
@@ -175,7 +182,7 @@ const mockRoles: Role[] = [
     code: "ADMIN",
     description: "시스템 전체 관리 권한을 가진 관리자 역할",
     permissions: permissionGroups.flatMap((g) => g.permissions.map((p) => p.code)),
-    userCount: 3,
+    userCount: getRoleUserCount("ADMIN"),
     isSystem: true,
     createdAt: "2024-01-01T00:00:00Z",
     updatedAt: "2024-01-01T00:00:00Z",
@@ -191,7 +198,7 @@ const mockRoles: Role[] = [
       "matching:simulate", "matching:tune", "matching:performance",
       "config:model",
     ],
-    userCount: 8,
+    userCount: getRoleUserCount("AI_ENGINEER"),
     isSystem: true,
     createdAt: "2024-01-01T00:00:00Z",
     updatedAt: "2024-01-01T00:00:00Z",
@@ -205,7 +212,7 @@ const mockRoles: Role[] = [
       "persona:read", "persona:create", "persona:update",
       "insight:read",
     ],
-    userCount: 12,
+    userCount: getRoleUserCount("CONTENT_MANAGER"),
     isSystem: true,
     createdAt: "2024-01-01T00:00:00Z",
     updatedAt: "2024-01-01T00:00:00Z",
@@ -221,7 +228,7 @@ const mockRoles: Role[] = [
       "matching:performance",
       "ops:monitor",
     ],
-    userCount: 15,
+    userCount: getRoleUserCount("ANALYST"),
     isSystem: true,
     createdAt: "2024-01-01T00:00:00Z",
     updatedAt: "2024-01-01T00:00:00Z",
@@ -236,7 +243,7 @@ const mockRoles: Role[] = [
       "system:deploy", "system:version", "system:events",
       "ops:monitor", "ops:incident", "ops:backup",
     ],
-    userCount: 5,
+    userCount: getRoleUserCount("OPERATOR"),
     isSystem: false,
     createdAt: "2024-01-10T00:00:00Z",
     updatedAt: "2024-01-15T00:00:00Z",

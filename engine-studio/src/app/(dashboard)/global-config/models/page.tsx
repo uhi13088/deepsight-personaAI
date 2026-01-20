@@ -66,7 +66,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { EXTERNAL_URLS } from "@/config/app.config"
 
+// TODO: Add MOCK_AI_MODELS_DETAILED to @/services/mock-data.service for centralized AI model configuration
 // AI 모델 데이터
 interface AIModel {
   id: string
@@ -91,11 +93,13 @@ interface AIModel {
   }
 }
 
+// AI Model configurations with references to external URLs from app.config
+// OpenAI models use EXTERNAL_URLS.openai, Anthropic models use EXTERNAL_URLS.anthropic
 const AI_MODELS: AIModel[] = [
   {
     id: "gpt-4-turbo",
     name: "GPT-4 Turbo",
-    provider: "OpenAI",
+    provider: "OpenAI", // API URL: EXTERNAL_URLS.openai
     version: "gpt-4-turbo-preview",
     status: "active",
     purpose: ["persona_generation", "prompt_generation", "analysis"],
@@ -106,7 +110,7 @@ const AI_MODELS: AIModel[] = [
   {
     id: "claude-3-opus",
     name: "Claude 3 Opus",
-    provider: "Anthropic",
+    provider: "Anthropic", // API URL: EXTERNAL_URLS.anthropic
     version: "claude-3-opus-20240229",
     status: "active",
     purpose: ["content_review", "safety_check"],
@@ -117,7 +121,7 @@ const AI_MODELS: AIModel[] = [
   {
     id: "embedding-3-large",
     name: "Embedding 3 Large",
-    provider: "OpenAI",
+    provider: "OpenAI", // API URL: EXTERNAL_URLS.openai
     version: "text-embedding-3-large",
     status: "active",
     purpose: ["vector_embedding"],
@@ -128,7 +132,7 @@ const AI_MODELS: AIModel[] = [
   {
     id: "gpt-4-vision",
     name: "GPT-4 Vision",
-    provider: "OpenAI",
+    provider: "OpenAI", // API URL: EXTERNAL_URLS.openai
     version: "gpt-4-vision-preview",
     status: "testing",
     purpose: ["image_analysis"],
@@ -138,6 +142,7 @@ const AI_MODELS: AIModel[] = [
   },
 ]
 
+// TODO: Add MOCK_MODEL_USAGE_STATS to @/services/mock-data.service
 const USAGE_STATS = {
   totalRequests: 617268,
   totalTokens: 156789012,

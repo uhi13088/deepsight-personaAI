@@ -49,83 +49,43 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadarChart } from "@/components/charts/radar-chart"
+import {
+  MOCK_INCUBATOR_PERSONAS,
+  generateRandomVector,
+} from "@/services/mock-data.service"
 
-// Mock 데이터
+// TODO: Add MOCK_INCUBATOR_STATS to @/services/mock-data.service
 const INCUBATOR_STATS = {
   enabled: true,
   lastRunTime: "2024-01-17 03:00",
-  todayGenerated: 5,
-  todayPassed: 3,
-  todayFailed: 2,
+  todayGenerated: MOCK_INCUBATOR_PERSONAS.length,
+  todayPassed: MOCK_INCUBATOR_PERSONAS.filter(p => p.status === "READY").length,
+  todayFailed: MOCK_INCUBATOR_PERSONAS.filter(p => p.status === "FAILED").length,
   weeklyAvgScore: 78.5,
   weeklyPassRate: 65,
 }
 
-const TODAY_PERSONAS = [
-  {
-    id: "inc-001",
-    name: "분석적 비평가",
-    status: "PASSED",
-    consistencyScore: 0.85,
-    vectorAlignmentScore: 0.82,
-    toneMatchScore: 0.88,
-    reasoningScore: 0.79,
-    overallScore: 83,
-    vector: { depth: 0.88, lens: 0.75, stance: 0.72, scope: 0.80, taste: 0.35, purpose: 0.68 },
-    createdAt: "03:15",
-  },
-  {
-    id: "inc-002",
-    name: "감성 스토리텔러",
-    status: "PASSED",
-    consistencyScore: 0.78,
-    vectorAlignmentScore: 0.80,
-    toneMatchScore: 0.92,
-    reasoningScore: 0.75,
-    overallScore: 81,
-    vector: { depth: 0.55, lens: 0.22, stance: 0.38, scope: 0.48, taste: 0.62, purpose: 0.85 },
-    createdAt: "03:22",
-  },
-  {
-    id: "inc-003",
-    name: "트렌드 분석가",
-    status: "FAILED",
-    consistencyScore: 0.62,
-    vectorAlignmentScore: 0.58,
-    toneMatchScore: 0.71,
-    reasoningScore: 0.55,
-    overallScore: 62,
-    vector: { depth: 0.42, lens: 0.55, stance: 0.28, scope: 0.65, taste: 0.92, purpose: 0.38 },
-    createdAt: "03:30",
-    failReason: "일관성 점수 미달 (0.62 < 0.70)",
-  },
-  {
-    id: "inc-004",
-    name: "클래식 감정가",
-    status: "PASSED",
-    consistencyScore: 0.88,
-    vectorAlignmentScore: 0.85,
-    toneMatchScore: 0.90,
-    reasoningScore: 0.82,
-    overallScore: 86,
-    vector: { depth: 0.75, lens: 0.32, stance: 0.45, scope: 0.72, taste: 0.15, purpose: 0.78 },
-    createdAt: "03:38",
-  },
-  {
-    id: "inc-005",
-    name: "실험적 탐험가",
-    status: "FAILED",
-    consistencyScore: 0.55,
-    vectorAlignmentScore: 0.68,
-    toneMatchScore: 0.60,
-    reasoningScore: 0.52,
-    overallScore: 59,
-    vector: { depth: 0.35, lens: 0.48, stance: 0.22, scope: 0.55, taste: 0.95, purpose: 0.32 },
-    createdAt: "03:45",
-    failReason: "추론 품질 점수 미달 (0.52 < 0.70)",
-  },
-]
+// TODO: Extend MockIncubatorPersona in @/services/mock-data.service to include
+// validation scores (consistencyScore, vectorAlignmentScore, toneMatchScore, reasoningScore)
+// For now, we enhance the service data with additional computed fields
+const TODAY_PERSONAS = MOCK_INCUBATOR_PERSONAS.map((p, index) => {
+  const baseScore = p.testScore / 100
+  return {
+    id: p.id,
+    name: p.name,
+    status: p.status === "READY" ? "PASSED" : p.status === "FAILED" ? "FAILED" : "PENDING" as const,
+    consistencyScore: Math.min(0.95, baseScore + 0.05 * (index % 3)),
+    vectorAlignmentScore: Math.min(0.95, baseScore - 0.02 + 0.03 * (index % 2)),
+    toneMatchScore: Math.min(0.98, baseScore + 0.08),
+    reasoningScore: Math.min(0.92, baseScore - 0.05),
+    overallScore: p.testScore,
+    vector: generateRandomVector(),
+    createdAt: `03:${(15 + index * 7).toString().padStart(2, '0')}`,
+    failReason: p.status === "FAILED" ? `테스트 점수 미달 (${p.testScore} < 70)` : undefined,
+  }
+})
 
+// TODO: Add MOCK_INCUBATOR_HISTORY to @/services/mock-data.service
 const HISTORY_DATA = [
   { date: "01/16", generated: 5, passed: 4, avgScore: 82 },
   { date: "01/15", generated: 6, passed: 4, avgScore: 78 },

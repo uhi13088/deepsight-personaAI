@@ -81,116 +81,18 @@ import {
   Cell,
   Tooltip,
 } from "recharts"
+import {
+  MOCK_ARCHETYPES,
+  MOCK_ARCHETYPE_STATS,
+  type MockArchetype,
+} from "@/services/mock-data.service"
 
-// 아키타입 정의
-interface Archetype {
-  id: string
-  name: string
-  description: string
-  userCount: number
-  percentage: number
-  trend: "up" | "down" | "stable"
-  trendValue: number
-  vector: {
-    depth: number
-    lens: number
-    stance: number
-    scope: number
-    taste: number
-    purpose: number
-  }
-  color: string
-  status: "active" | "inactive"
-  createdAt: string
-}
+// Re-export type for local use
+type Archetype = MockArchetype
 
-const ARCHETYPES: Archetype[] = [
-  {
-    id: "1",
-    name: "분석적 탐험가",
-    description: "깊이 있는 분석과 다양한 장르 탐색을 추구하는 유형",
-    userCount: 23456,
-    percentage: 18.5,
-    trend: "up",
-    trendValue: 2.3,
-    vector: { depth: 0.85, lens: 0.7, stance: 0.65, scope: 0.8, taste: 0.6, purpose: 0.75 },
-    color: "#3b82f6",
-    status: "active",
-    createdAt: "2025-01-01",
-  },
-  {
-    id: "2",
-    name: "감성 몰입러",
-    description: "주관적 감정과 깊은 몰입을 중시하는 유형",
-    userCount: 31245,
-    percentage: 24.7,
-    trend: "up",
-    trendValue: 1.8,
-    vector: { depth: 0.7, lens: 0.25, stance: 0.35, scope: 0.45, taste: 0.7, purpose: 0.4 },
-    color: "#ec4899",
-    status: "active",
-    createdAt: "2025-01-01",
-  },
-  {
-    id: "3",
-    name: "트렌드 서퍼",
-    description: "인기 콘텐츠와 대중적 취향을 따르는 유형",
-    userCount: 28934,
-    percentage: 22.9,
-    trend: "stable",
-    trendValue: 0.2,
-    vector: { depth: 0.35, lens: 0.5, stance: 0.4, scope: 0.75, taste: 0.2, purpose: 0.3 },
-    color: "#f59e0b",
-    status: "active",
-    createdAt: "2025-01-01",
-  },
-  {
-    id: "4",
-    name: "까다로운 비평가",
-    description: "엄격한 기준과 깊은 분석으로 콘텐츠를 평가하는 유형",
-    userCount: 15678,
-    percentage: 12.4,
-    trend: "down",
-    trendValue: -0.8,
-    vector: { depth: 0.9, lens: 0.8, stance: 0.85, scope: 0.5, taste: 0.75, purpose: 0.7 },
-    color: "#ef4444",
-    status: "active",
-    createdAt: "2025-01-01",
-  },
-  {
-    id: "5",
-    name: "캐주얼 뷰어",
-    description: "가벼운 오락 목적으로 콘텐츠를 소비하는 유형",
-    userCount: 19234,
-    percentage: 15.2,
-    trend: "up",
-    trendValue: 3.1,
-    vector: { depth: 0.2, lens: 0.4, stance: 0.25, scope: 0.6, taste: 0.35, purpose: 0.15 },
-    color: "#10b981",
-    status: "active",
-    createdAt: "2025-01-01",
-  },
-  {
-    id: "6",
-    name: "니치 전문가",
-    description: "특정 장르에 깊이 몰입하고 전문 지식을 추구하는 유형",
-    userCount: 8012,
-    percentage: 6.3,
-    trend: "stable",
-    trendValue: 0.5,
-    vector: { depth: 0.95, lens: 0.75, stance: 0.7, scope: 0.15, taste: 0.9, purpose: 0.85 },
-    color: "#8b5cf6",
-    status: "active",
-    createdAt: "2025-01-01",
-  },
-]
-
-const ARCHETYPE_STATS = {
-  totalUsers: 126559,
-  avgMatchAccuracy: 89.3,
-  lastClusterUpdate: "2025-01-15 03:00",
-  nextScheduledUpdate: "2025-01-22 03:00",
-}
+// Use centralized mock data
+const ARCHETYPES = MOCK_ARCHETYPES
+const ARCHETYPE_STATS = MOCK_ARCHETYPE_STATS
 
 export default function ArchetypesPage() {
   const [searchQuery, setSearchQuery] = useState("")

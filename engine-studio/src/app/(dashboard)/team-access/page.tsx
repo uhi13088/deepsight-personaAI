@@ -67,8 +67,9 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from "next/link"
+import { MOCK_TEAM_MEMBERS, type MockTeamMember } from "@/services/mock-data.service"
 
-// 팀원 데이터
+// 팀원 데이터 - adapted from centralized mock data service
 interface TeamMember {
   id: string
   name: string
@@ -80,61 +81,28 @@ interface TeamMember {
   joinedAt: string
 }
 
-const TEAM_MEMBERS: TeamMember[] = [
-  {
-    id: "1",
-    name: "김관리자",
-    email: "admin@deepsight.ai",
-    role: "ADMIN",
-    status: "active",
-    lastActive: "방금 전",
-    joinedAt: "2024-01-01",
-  },
-  {
-    id: "2",
-    name: "이엔지니어",
-    email: "engineer@deepsight.ai",
-    role: "AI_ENGINEER",
-    status: "active",
-    lastActive: "10분 전",
-    joinedAt: "2024-03-15",
-  },
-  {
-    id: "3",
-    name: "박콘텐츠",
-    email: "content@deepsight.ai",
-    role: "CONTENT_MANAGER",
-    status: "active",
-    lastActive: "1시간 전",
-    joinedAt: "2024-06-01",
-  },
-  {
-    id: "4",
-    name: "최분석",
-    email: "analyst@deepsight.ai",
-    role: "ANALYST",
-    status: "active",
-    lastActive: "3시간 전",
-    joinedAt: "2024-09-01",
-  },
-  {
-    id: "5",
-    name: "정신규",
-    email: "new@deepsight.ai",
-    role: "AI_ENGINEER",
-    status: "pending",
-    lastActive: "-",
-    joinedAt: "2025-01-15",
-  },
-]
+// Transform centralized mock data to page-specific format
+const transformTeamMember = (member: MockTeamMember): TeamMember => ({
+  id: member.id,
+  name: member.name,
+  email: member.email,
+  role: member.role as TeamMember["role"],
+  status: member.status.toLowerCase() as TeamMember["status"],
+  avatar: member.avatar,
+  lastActive: new Date(member.lastActive).toLocaleString("ko-KR"),
+  joinedAt: new Date(member.joinedAt).toLocaleDateString("ko-KR"),
+})
 
+const TEAM_MEMBERS: TeamMember[] = MOCK_TEAM_MEMBERS.map(transformTeamMember)
+
+// TODO: Move ROLES to centralized mock-data.service when role management is expanded
 const ROLES = [
   {
     id: "ADMIN",
     name: "관리자",
     description: "모든 기능에 대한 전체 접근 권한",
     permissions: 24,
-    members: 1,
+    members: MOCK_TEAM_MEMBERS.filter(m => m.role === "ADMIN").length,
     color: "bg-red-500",
   },
   {
@@ -142,7 +110,7 @@ const ROLES = [
     name: "AI 엔지니어",
     description: "페르소나 및 알고리즘 관리",
     permissions: 18,
-    members: 2,
+    members: MOCK_TEAM_MEMBERS.filter(m => m.role === "AI_ENGINEER").length,
     color: "bg-purple-500",
   },
   {
@@ -150,7 +118,7 @@ const ROLES = [
     name: "콘텐츠 매니저",
     description: "콘텐츠 및 프롬프트 관리",
     permissions: 12,
-    members: 1,
+    members: MOCK_TEAM_MEMBERS.filter(m => m.role === "CONTENT_MANAGER").length,
     color: "bg-blue-500",
   },
   {
@@ -158,16 +126,17 @@ const ROLES = [
     name: "분석가",
     description: "데이터 분석 및 리포트 조회",
     permissions: 8,
-    members: 1,
+    members: MOCK_TEAM_MEMBERS.filter(m => m.role === "ANALYST").length,
     color: "bg-green-500",
   },
 ]
 
+// Dynamically computed team stats from centralized mock data
 const TEAM_STATS = {
-  totalMembers: 5,
-  activeMembers: 4,
-  pendingInvites: 1,
-  totalRoles: 4,
+  totalMembers: MOCK_TEAM_MEMBERS.length,
+  activeMembers: MOCK_TEAM_MEMBERS.filter(m => m.status === "ACTIVE").length,
+  pendingInvites: MOCK_TEAM_MEMBERS.filter(m => m.status === "PENDING").length,
+  totalRoles: ROLES.length,
 }
 
 export default function TeamAccessPage() {

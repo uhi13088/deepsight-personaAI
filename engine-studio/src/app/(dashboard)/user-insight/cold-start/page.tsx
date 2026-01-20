@@ -18,6 +18,7 @@ import {
   BarChart3,
   Info,
   AlertCircle,
+  LucideIcon,
 } from "lucide-react"
 import {
   Card,
@@ -65,9 +66,29 @@ import {
   AreaChart,
   Area,
 } from "recharts"
+import {
+  MOCK_COLD_START_STATS,
+  MOCK_COLD_START_TREND_DATA,
+  MOCK_COLD_START_QUESTION_SETS,
+} from "@/services/mock-data.service"
 
-// Cold Start 모드 정의
-const COLD_START_MODES = [
+// Cold Start mode configuration with icons (icons cannot be serialized in mock-data.service)
+// The base data comes from the centralized service, icons are added here
+interface ColdStartModeWithIcon {
+  id: string
+  name: string
+  nameKr: string
+  description: string
+  questions: number
+  accuracy: number
+  duration: string
+  icon: LucideIcon
+  color: string
+  bgColor: string
+  features: string[]
+}
+
+const COLD_START_MODES: ColdStartModeWithIcon[] = [
   {
     id: "quick",
     name: "Quick Mode",
@@ -121,63 +142,10 @@ const COLD_START_MODES = [
   },
 ]
 
-// Mock 데이터
-const COLD_START_STATS = {
-  totalNewUsers: 12456,
-  todayNewUsers: 342,
-  avgCompletionRate: 78.5,
-  avgTimeToComplete: "1분 42초",
-  modeDistribution: {
-    quick: 45,
-    standard: 38,
-    deep: 17,
-  },
-}
-
-const TREND_DATA = [
-  { date: "01/10", quick: 156, standard: 124, deep: 52 },
-  { date: "01/11", quick: 178, standard: 145, deep: 61 },
-  { date: "01/12", quick: 142, standard: 132, deep: 48 },
-  { date: "01/13", quick: 189, standard: 156, deep: 72 },
-  { date: "01/14", quick: 201, standard: 168, deep: 78 },
-  { date: "01/15", quick: 167, standard: 142, deep: 65 },
-  { date: "01/16", quick: 154, standard: 130, deep: 58 },
-]
-
-const QUESTION_SETS = {
-  quick: [
-    { id: 1, question: "콘텐츠를 선택할 때 가장 중요하게 생각하는 것은?", type: "single" },
-    { id: 2, question: "평소 선호하는 분위기/톤은?", type: "single" },
-    { id: 3, question: "새로운 콘텐츠 발견 방식은?", type: "single" },
-  ],
-  standard: [
-    { id: 1, question: "콘텐츠를 선택할 때 가장 중요하게 생각하는 것은?", type: "single" },
-    { id: 2, question: "평소 선호하는 분위기/톤은?", type: "single" },
-    { id: 3, question: "새로운 콘텐츠 발견 방식은?", type: "single" },
-    { id: 4, question: "콘텐츠 소비 시 집중하는 요소는?", type: "multi" },
-    { id: 5, question: "선호하는 콘텐츠 길이는?", type: "single" },
-    { id: 6, question: "비평/리뷰에 대한 태도는?", type: "single" },
-    { id: 7, question: "콘텐츠 소비 목적은?", type: "multi" },
-  ],
-  deep: [
-    // 15개 질문 (간략화)
-    { id: 1, question: "콘텐츠 선택 기준", type: "single" },
-    { id: 2, question: "분위기/톤 선호", type: "single" },
-    { id: 3, question: "발견 방식", type: "single" },
-    { id: 4, question: "집중 요소", type: "multi" },
-    { id: 5, question: "콘텐츠 길이", type: "single" },
-    { id: 6, question: "비평 태도", type: "single" },
-    { id: 7, question: "소비 목적", type: "multi" },
-    { id: 8, question: "장르 선호도", type: "ranking" },
-    { id: 9, question: "시청 패턴", type: "single" },
-    { id: 10, question: "공유 성향", type: "single" },
-    { id: 11, question: "재시청 패턴", type: "single" },
-    { id: 12, question: "트렌드 민감도", type: "scale" },
-    { id: 13, question: "깊이 vs 다양성", type: "scale" },
-    { id: 14, question: "감성 vs 논리", type: "scale" },
-    { id: 15, question: "모험 성향", type: "scale" },
-  ],
-}
+// Use centralized mock data
+const COLD_START_STATS = MOCK_COLD_START_STATS
+const TREND_DATA = MOCK_COLD_START_TREND_DATA
+const QUESTION_SETS = MOCK_COLD_START_QUESTION_SETS
 
 export default function ColdStartPage() {
   const [activeMode, setActiveMode] = useState("standard")

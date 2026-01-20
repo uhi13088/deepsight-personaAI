@@ -57,6 +57,7 @@ import {
   Area,
 } from "recharts"
 
+// TODO: Add MOCK_REALTIME_METRICS to @/services/mock-data.service
 // 실시간 메트릭 데이터
 const REALTIME_METRICS = {
   cpu: 45,
@@ -69,6 +70,7 @@ const REALTIME_METRICS = {
   uptime: 99.99,
 }
 
+// TODO: Add MOCK_SERVICES to @/services/mock-data.service
 // 서비스 상태
 const SERVICES = [
   { name: "API Gateway", status: "healthy", latency: 12, uptime: 99.99 },
@@ -81,6 +83,7 @@ const SERVICES = [
   { name: "ML Pipeline", status: "healthy", latency: 156, uptime: 99.90 },
 ]
 
+// TODO: Add generateTimeSeriesData to @/services/mock-data.service
 // 시계열 데이터
 const generateTimeSeriesData = () => {
   const data = []
@@ -98,6 +101,7 @@ const generateTimeSeriesData = () => {
   return data
 }
 
+// TODO: Add MOCK_MONITORING_ALERTS to @/services/mock-data.service
 const ALERTS = [
   {
     id: "1",

@@ -59,7 +59,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { MOCK_TEAM_MEMBERS } from "@/services/mock-data.service"
 
+// TODO: Add MOCK_AUDIT_LOGS to @/services/mock-data.service for centralized audit log management
 // 감사 로그 타입
 interface AuditLog {
   id: string
@@ -167,11 +169,12 @@ const AUDIT_LOGS: AuditLog[] = [
   },
 ]
 
+// TODO: Move AUDIT_STATS to @/services/mock-data.service
 const AUDIT_STATS = {
   totalLogs: 1234,
   todayLogs: 89,
   failedAttempts: 3,
-  uniqueUsers: 5,
+  uniqueUsers: MOCK_TEAM_MEMBERS.filter(m => m.status === "ACTIVE").length,
 }
 
 export default function AuditLogsPage() {

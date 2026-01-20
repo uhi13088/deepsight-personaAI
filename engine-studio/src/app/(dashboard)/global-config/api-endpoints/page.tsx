@@ -68,6 +68,8 @@ import {
   Lock,
   Unlock,
 } from "lucide-react"
+import { API_ENDPOINTS, RATE_LIMIT_CONFIG, TIMEOUT_CONFIG } from "@/config/app.config"
+import { MOCK_API_CONFIGS, type MockAPIConfig } from "@/services/mock-data.service"
 
 // 타입 정의
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
@@ -113,7 +115,9 @@ interface ApiKey {
   status: "active" | "revoked" | "expired"
 }
 
-// 목 데이터
+// TODO: Add MOCK_API_ENDPOINTS to @/services/mock-data.service for centralized API endpoint management
+// Note: MOCK_API_CONFIGS from mock-data.service provides basic API config, but this page needs detailed endpoint info
+// Endpoint paths reference API_ENDPOINTS from @/config/app.config
 const mockEndpoints: ApiEndpoint[] = [
   {
     id: "ep-001",
@@ -266,6 +270,8 @@ const mockEndpoints: ApiEndpoint[] = [
   },
 ]
 
+// TODO: Add MOCK_API_KEYS to @/services/mock-data.service for centralized API key management
+// Rate limits reference RATE_LIMIT_CONFIG from @/config/app.config
 const mockApiKeys: ApiKey[] = [
   {
     id: "key-001",
@@ -274,7 +280,7 @@ const mockApiKeys: ApiKey[] = [
     createdAt: "2024-01-01T00:00:00Z",
     lastUsed: "2024-01-15T10:30:00Z",
     permissions: ["read:personas", "write:personas", "read:matching", "write:matching"],
-    rateLimit: 1000,
+    rateLimit: RATE_LIMIT_CONFIG.maxRequests * 10, // Production has higher limits
     status: "active",
   },
   {
@@ -284,7 +290,7 @@ const mockApiKeys: ApiKey[] = [
     createdAt: "2024-01-05T00:00:00Z",
     lastUsed: "2024-01-15T09:00:00Z",
     permissions: ["read:personas", "read:matching"],
-    rateLimit: 100,
+    rateLimit: RATE_LIMIT_CONFIG.maxRequests,
     status: "active",
   },
   {
@@ -317,9 +323,17 @@ export default function ApiEndpointsPage() {
     rateLimit: 100,
     expiresIn: "never",
   })
-  const [globalSettings, setGlobalSettings] = useState({
-    defaultRateLimit: 100,
-    defaultTimeout: 30000,
+  // Initialize global settings from centralized app.config
+  const [globalSettings, setGlobalSettings] = useState<{
+    defaultRateLimit: number
+    defaultTimeout: number
+    corsEnabled: boolean
+    ipWhitelist: boolean
+    requestLogging: boolean
+    allowedDomains: string
+  }>({
+    defaultRateLimit: RATE_LIMIT_CONFIG.maxRequests,
+    defaultTimeout: TIMEOUT_CONFIG.apiRequest,
     corsEnabled: true,
     ipWhitelist: false,
     requestLogging: true,

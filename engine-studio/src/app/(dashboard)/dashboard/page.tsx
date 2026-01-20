@@ -40,29 +40,33 @@ import {
   BarChart,
   Bar,
 } from "recharts"
+import {
+  MOCK_MATCHING_TREND_DATA,
+  MOCK_KPI_DATA,
+  MOCK_PERSONAS,
+} from "@/services/mock-data.service"
 
-// Mock 데이터
+// TODO: Add MOCK_DASHBOARD_KPI_DATA to @/services/mock-data.service
+// This is a dashboard-specific aggregation format different from MOCK_KPI_DATA
 const KPI_DATA = {
   totalMatches: 156789,
   todayMatches: 3456,
-  matchingAccuracy: 94.2,
+  matchingAccuracy: MOCK_KPI_DATA.find(k => k.label === "평균 정확도")?.value ?? 94.2,
   avgMatchScore: 87.5,
   ctr: 23.8,
   nps: 72,
-  activePersonas: 48,
-  totalPersonas: 52,
+  activePersonas: MOCK_PERSONAS.filter(p => p.status === "ACTIVE").length,
+  totalPersonas: MOCK_PERSONAS.length,
 }
 
-const TREND_DATA = [
-  { date: "01/10", matches: 2800, accuracy: 93.1 },
-  { date: "01/11", matches: 3200, accuracy: 93.8 },
-  { date: "01/12", matches: 2950, accuracy: 94.0 },
-  { date: "01/13", matches: 3100, accuracy: 93.5 },
-  { date: "01/14", matches: 3400, accuracy: 94.2 },
-  { date: "01/15", matches: 3250, accuracy: 94.5 },
-  { date: "01/16", matches: 3456, accuracy: 94.2 },
-]
+// Transform MOCK_MATCHING_TREND_DATA to dashboard format
+const TREND_DATA = MOCK_MATCHING_TREND_DATA.map(item => ({
+  date: item.date.slice(5).replace("-", "/"), // Convert "2025-01-09" to "01/09"
+  matches: Math.round(item.matches / 40), // Scale down for daily view
+  accuracy: item.accuracy,
+}))
 
+// TODO: Add MOCK_ACTIVITY_LOG to @/services/mock-data.service
 const ACTIVITY_LOG = [
   {
     id: "1",
@@ -98,14 +102,19 @@ const ACTIVITY_LOG = [
   },
 ]
 
-const TOP_PERSONAS = [
-  { name: "논리적 평론가", matches: 12340, accuracy: 96.2, score: 92 },
-  { name: "감성 에세이스트", matches: 10890, accuracy: 94.8, score: 89 },
-  { name: "트렌드 헌터", matches: 9560, accuracy: 93.5, score: 87 },
-  { name: "균형 잡힌 가이드", matches: 8230, accuracy: 95.1, score: 85 },
-  { name: "시네필 평론가", matches: 7890, accuracy: 94.2, score: 83 },
-]
+// Derive TOP_PERSONAS from MOCK_PERSONAS
+const TOP_PERSONAS = MOCK_PERSONAS
+  .filter(p => p.status === "ACTIVE")
+  .sort((a, b) => b.matchCount - a.matchCount)
+  .slice(0, 5)
+  .map(p => ({
+    name: p.name,
+    matches: p.matchCount,
+    accuracy: p.accuracy,
+    score: Math.round(p.accuracy * 0.96), // Derive score from accuracy
+  }))
 
+// TODO: Add MOCK_SYSTEM_STATUS to @/services/mock-data.service
 const SYSTEM_STATUS = {
   api: { status: "healthy", latency: 142 },
   database: { status: "healthy", connections: 45 },

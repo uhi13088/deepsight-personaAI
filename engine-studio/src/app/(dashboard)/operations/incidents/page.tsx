@@ -70,6 +70,7 @@ import {
 } from "@/components/ui/table"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
+// TODO: Update MockIncident type in @/services/mock-data.service to include timeline, service, reporter, assignee fields
 // 인시던트 타입
 interface Incident {
   id: string
@@ -90,6 +91,8 @@ interface Incident {
   }[]
 }
 
+// TODO: Replace with extended MOCK_INCIDENTS from @/services/mock-data.service
+// Current MOCK_INCIDENTS has simpler structure without timeline, reporter, service fields
 const INCIDENTS: Incident[] = [
   {
     id: "INC-001",
@@ -150,6 +153,7 @@ const INCIDENTS: Incident[] = [
   },
 ]
 
+// TODO: Add MOCK_INCIDENT_STATS to @/services/mock-data.service
 const INCIDENT_STATS = {
   open: 2,
   mttr: "45분",

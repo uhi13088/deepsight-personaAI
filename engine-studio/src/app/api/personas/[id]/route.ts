@@ -1,49 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-
-interface PersonaData {
-  id: string
-  name: string
-  role: string
-  expertise: string[]
-  status: string
-  vector: {
-    depth: number
-    lens: number
-    stance: number
-    scope: number
-    taste: number
-    purpose: number
-  }
-  promptTemplate: string
-  matchCount: number
-  accuracy: number
-  createdAt: string
-  updatedAt: string
-}
-
-// Mock 페르소나 데이터 (실제로는 DB에서 조회)
-const PERSONAS: Record<string, PersonaData> = {
-  "1": {
-    id: "1",
-    name: "논리적 평론가",
-    role: "평론",
-    expertise: ["영화", "드라마"],
-    status: "ACTIVE",
-    vector: {
-      depth: 0.85,
-      lens: 0.78,
-      stance: 0.72,
-      scope: 0.45,
-      taste: 0.68,
-      purpose: 0.82,
-    },
-    promptTemplate: "당신은 논리적이고 분석적인 평론가입니다...",
-    matchCount: 12340,
-    accuracy: 96.2,
-    createdAt: "2025-01-01T00:00:00Z",
-    updatedAt: "2025-01-15T10:30:00Z",
-  },
-}
+import { getMockPersonaById, type MockPersona } from "@/services/mock-data.service"
 
 // GET /api/personas/[id] - 페르소나 상세 조회
 export async function GET(
@@ -52,7 +8,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const persona = PERSONAS[id]
+    const persona = getMockPersonaById(id)
 
     if (!persona) {
       return NextResponse.json(
@@ -82,7 +38,7 @@ export async function PUT(
     const { id } = await params
     const body = await request.json()
 
-    const persona = PERSONAS[id]
+    const persona = getMockPersonaById(id)
 
     if (!persona) {
       return NextResponse.json(
@@ -119,7 +75,7 @@ export async function PATCH(
     const { id } = await params
     const body = await request.json()
 
-    const persona = PERSONAS[id]
+    const persona = getMockPersonaById(id)
 
     if (!persona) {
       return NextResponse.json(
@@ -129,7 +85,7 @@ export async function PATCH(
     }
 
     // 부분 업데이트 (실제로는 DB에 저장)
-    const updatedPersona: PersonaData = {
+    const updatedPersona: MockPersona = {
       ...persona,
       ...(body.name !== undefined && { name: body.name }),
       ...(body.role !== undefined && { role: body.role }),
@@ -161,7 +117,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const persona = PERSONAS[id]
+    const persona = getMockPersonaById(id)
 
     if (!persona) {
       return NextResponse.json(

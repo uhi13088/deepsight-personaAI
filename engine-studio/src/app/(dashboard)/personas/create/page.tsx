@@ -39,6 +39,7 @@ import { toast } from "sonner"
 import type { Vector6D, PersonaRole } from "@/types"
 import { PERSONA_ROLE_LABELS, VECTOR_DIMENSION_LABELS } from "@/lib/utils"
 
+// UI wizard steps configuration
 const STEPS = [
   { id: 1, title: "기본 정보", description: "페르소나의 기본 정보를 입력합니다." },
   { id: 2, title: "성향 벡터", description: "6D 성향 벡터를 설정합니다." },
@@ -46,6 +47,8 @@ const STEPS = [
   { id: 4, title: "검증 및 배포", description: "최종 검증 후 배포합니다." },
 ]
 
+// TODO: Consider moving EXPERTISE_OPTIONS to @/config/app.config.ts as PERSONA_EXPERTISE_OPTIONS
+// This is domain configuration that could be centralized
 const EXPERTISE_OPTIONS = [
   "영화", "드라마", "음악", "도서", "게임", "패션", "여행", "음식", "테크", "스포츠", "예술", "교육"
 ]

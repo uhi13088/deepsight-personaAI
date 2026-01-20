@@ -4,6 +4,7 @@ import Google from "next-auth/providers/google"
 import GitHub from "next-auth/providers/github"
 import { z } from "zod"
 import type { UserRole } from "@/types"
+import { SECURITY_CONFIG, SESSION_CONFIG } from "@/config/app.config"
 
 // ============================================================================
 // 보안 설정
@@ -14,8 +15,8 @@ const loginSchema = z.object({
   email: z.string().email().max(254),
   password: z
     .string()
-    .min(8, "비밀번호는 최소 8자 이상이어야 합니다")
-    .max(128, "비밀번호는 최대 128자까지 가능합니다"),
+    .min(SECURITY_CONFIG.passwordMinLength, `비밀번호는 최소 ${SECURITY_CONFIG.passwordMinLength}자 이상이어야 합니다`)
+    .max(SECURITY_CONFIG.passwordMaxLength, `비밀번호는 최대 ${SECURITY_CONFIG.passwordMaxLength}자까지 가능합니다`),
 })
 
 // ============================================================================
@@ -108,12 +109,19 @@ const getMockUsers = (): MockUser[] => {
   ]
 }
 
-// Demo 비밀번호 매핑 (개발 환경 전용)
-const DEMO_PASSWORDS: Record<string, string> = {
-  "admin@deepsight.ai": "Admin@DeepSight2024!",
-  "engineer@deepsight.ai": "Engineer@DS2024!",
-  "content@deepsight.ai": "Content@DS2024!",
-  "analyst@deepsight.ai": "Analyst@DS2024!",
+// Demo 비밀번호 매핑 (환경변수에서 로드, 개발 환경 전용)
+const getDemoPasswords = (): Record<string, string> => {
+  if (process.env.NODE_ENV === "production") {
+    console.warn("[Auth] Production 환경에서는 Demo 비밀번호를 사용할 수 없습니다")
+    return {}
+  }
+
+  return {
+    "admin@deepsight.ai": process.env.DEMO_ADMIN_PASSWORD || "",
+    "engineer@deepsight.ai": process.env.DEMO_ENGINEER_PASSWORD || "",
+    "content@deepsight.ai": process.env.DEMO_CONTENT_PASSWORD || "",
+    "analyst@deepsight.ai": process.env.DEMO_ANALYST_PASSWORD || "",
+  }
 }
 
 // ============================================================================
@@ -134,7 +142,7 @@ async function verifyCredentials(
 
   if (!user) {
     // 타이밍 공격 방지를 위한 더미 연산
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await new Promise((resolve) => setTimeout(resolve, SECURITY_CONFIG.timingAttackDelayMs))
     return null
   }
 
@@ -145,14 +153,15 @@ async function verifyCredentials(
 
   // Demo 환경: 간단한 비밀번호 비교
   // Production 환경에서는 verifyPassword(password, user.passwordHash) 사용
-  const expectedPassword = DEMO_PASSWORDS[email]
+  const demoPasswords = getDemoPasswords()
+  const expectedPassword = demoPasswords[email]
   if (!expectedPassword || password !== expectedPassword) {
     // 실패 횟수 증가 (실제로는 DB 업데이트)
     user.failedAttempts++
 
-    // 5회 실패 시 30분 잠금
-    if (user.failedAttempts >= 5) {
-      user.lockedUntil = new Date(Date.now() + 30 * 60 * 1000)
+    // 설정된 횟수 실패 시 잠금
+    if (user.failedAttempts >= SECURITY_CONFIG.lockoutAttempts) {
+      user.lockedUntil = new Date(Date.now() + SECURITY_CONFIG.lockoutDurationMs)
     }
 
     return null
@@ -266,8 +275,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   session: {
     strategy: "jwt",
-    maxAge: 8 * 60 * 60, // 8시간 (금융업계 기준 단축)
-    updateAge: 60 * 60, // 1시간마다 갱신
+    maxAge: SESSION_CONFIG.maxAge, // 환경 설정에서 로드 (기본: 8시간)
+    updateAge: SESSION_CONFIG.updateAge, // 환경 설정에서 로드 (기본: 1시간)
   },
   cookies: {
     sessionToken: {
