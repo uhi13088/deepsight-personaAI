@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import {
   Snowflake,
   Zap,
@@ -182,12 +183,50 @@ export default function ColdStartPage() {
   const [activeMode, setActiveMode] = useState("standard")
   const [isEditing, setIsEditing] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [questionEditDialogOpen, setQuestionEditDialogOpen] = useState(false)
+  const [selectedQuestion, setSelectedQuestion] = useState<{ id: number; question: string; type: string } | null>(null)
   const [settings, setSettings] = useState({
     autoSelectMode: true,
     skipIfReturningUser: true,
     fallbackMode: "quick",
     minConfidenceThreshold: 70,
   })
+
+  const handleSaveSettings = async () => {
+    setIsSaving(true)
+    toast.loading("설정을 저장하는 중...", { id: "save-cold-start" })
+    // Simulate API call
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    setIsSaving(false)
+    toast.success("Cold Start 설정이 저장되었습니다.", { id: "save-cold-start" })
+  }
+
+  const handleTestFullFlow = () => {
+    setShowPreview(false)
+    toast.info("전체 흐름 테스트를 시작합니다...")
+    // Simulate test flow initiation
+    setTimeout(() => {
+      toast.success("테스트 흐름이 새 창에서 시작되었습니다.")
+    }, 500)
+  }
+
+  const handleAddQuestion = () => {
+    toast.success("새 질문이 추가되었습니다. 내용을 입력해주세요.")
+  }
+
+  const handleEditQuestion = (question: { id: number; question: string; type: string }) => {
+    setSelectedQuestion(question)
+    toast.info(`질문 ${question.id} 편집 모드`)
+  }
+
+  const handleToggleEditing = () => {
+    if (isEditing) {
+      // Saving
+      toast.success("질문 세트가 저장되었습니다.")
+    }
+    setIsEditing(!isEditing)
+  }
 
   return (
     <div className="space-y-6">
@@ -246,11 +285,11 @@ export default function ColdStartPage() {
                 <Button variant="outline" onClick={() => setShowPreview(false)}>
                   닫기
                 </Button>
-                <Button>전체 흐름 테스트</Button>
+                <Button onClick={handleTestFullFlow}>전체 흐름 테스트</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <Button>
+          <Button onClick={handleSaveSettings} disabled={isSaving}>
             <Settings className="mr-2 h-4 w-4" />
             설정 저장
           </Button>
@@ -396,7 +435,7 @@ export default function ColdStartPage() {
               <Button
                 variant={isEditing ? "default" : "outline"}
                 size="sm"
-                onClick={() => setIsEditing(!isEditing)}
+                onClick={handleToggleEditing}
               >
                 {isEditing ? "저장" : "편집"}
               </Button>
@@ -421,7 +460,7 @@ export default function ColdStartPage() {
                     </Badge>
                   </div>
                   {isEditing && (
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" onClick={() => handleEditQuestion(q)}>
                       <Settings className="h-4 w-4" />
                     </Button>
                   )}
@@ -429,7 +468,7 @@ export default function ColdStartPage() {
               ))}
             </div>
             {isEditing && (
-              <Button variant="outline" className="w-full mt-4">
+              <Button variant="outline" className="w-full mt-4" onClick={handleAddQuestion}>
                 + 질문 추가
               </Button>
             )}

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import {
   Users,
   Shield,
@@ -173,6 +174,52 @@ export default function TeamAccessPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [roleFilter, setRoleFilter] = useState("all")
   const [showInviteDialog, setShowInviteDialog] = useState(false)
+  const [showAddRoleDialog, setShowAddRoleDialog] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteRole, setInviteRole] = useState("")
+  const [inviteMessage, setInviteMessage] = useState("")
+  const [teamMembers, setTeamMembers] = useState(TEAM_MEMBERS)
+
+  const handleSendInvite = () => {
+    if (!inviteEmail) {
+      toast.error("이메일 주소를 입력해주세요")
+      return
+    }
+    if (!inviteRole) {
+      toast.error("역할을 선택해주세요")
+      return
+    }
+    toast.success(`${inviteEmail}로 초대가 발송되었습니다`)
+    setShowInviteDialog(false)
+    setInviteEmail("")
+    setInviteRole("")
+    setInviteMessage("")
+  }
+
+  const handleEditMember = (member: TeamMember) => {
+    toast.info(`${member.name} 편집 모드`)
+  }
+
+  const handleResetPassword = (member: TeamMember) => {
+    toast.success(`${member.email}로 비밀번호 재설정 링크가 발송되었습니다`)
+  }
+
+  const handleDeleteMember = (member: TeamMember) => {
+    setTeamMembers(teamMembers.filter(m => m.id !== member.id))
+    toast.success(`${member.name}이(가) 팀에서 삭제되었습니다`)
+  }
+
+  const handleAddRole = () => {
+    setShowAddRoleDialog(true)
+    toast.info("새 역할 추가 기능은 권한 관리 페이지에서 설정할 수 있습니다")
+  }
+
+  const handleRoleSettings = (roleId: string) => {
+    const role = ROLES.find(r => r.id === roleId)
+    if (role) {
+      toast.info(`${role.name} 역할 설정`)
+    }
+  }
 
   const getRoleBadge = (role: TeamMember["role"]) => {
     const roleInfo = ROLES.find((r) => r.id === role)
@@ -212,7 +259,7 @@ export default function TeamAccessPage() {
     }
   }
 
-  const filteredMembers = TEAM_MEMBERS.filter((member) => {
+  const filteredMembers = teamMembers.filter((member) => {
     const matchesSearch =
       member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       member.email.toLowerCase().includes(searchQuery.toLowerCase())
@@ -250,11 +297,16 @@ export default function TeamAccessPage() {
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label>이메일 주소</Label>
-                <Input type="email" placeholder="email@example.com" />
+                <Input
+                  type="email"
+                  placeholder="email@example.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                />
               </div>
               <div className="grid gap-2">
                 <Label>역할</Label>
-                <Select>
+                <Select value={inviteRole} onValueChange={setInviteRole}>
                   <SelectTrigger>
                     <SelectValue placeholder="역할 선택" />
                   </SelectTrigger>
@@ -269,14 +321,18 @@ export default function TeamAccessPage() {
               </div>
               <div className="grid gap-2">
                 <Label>메시지 (선택)</Label>
-                <Input placeholder="환영 메시지를 입력하세요" />
+                <Input
+                  placeholder="환영 메시지를 입력하세요"
+                  value={inviteMessage}
+                  onChange={(e) => setInviteMessage(e.target.value)}
+                />
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowInviteDialog(false)}>
                 취소
               </Button>
-              <Button>
+              <Button onClick={handleSendInvite}>
                 <Mail className="mr-2 h-4 w-4" />
                 초대 보내기
               </Button>
@@ -419,16 +475,19 @@ export default function TeamAccessPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditMember(member)}>
                               <Edit className="mr-2 h-4 w-4" />
                               편집
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleResetPassword(member)}>
                               <Key className="mr-2 h-4 w-4" />
                               비밀번호 재설정
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => handleDeleteMember(member)}
+                            >
                               <Trash2 className="mr-2 h-4 w-4" />
                               삭제
                             </DropdownMenuItem>
@@ -451,7 +510,7 @@ export default function TeamAccessPage() {
                   <CardTitle>역할 관리</CardTitle>
                   <CardDescription>역할과 권한을 설정합니다.</CardDescription>
                 </div>
-                <Button size="sm">
+                <Button size="sm" onClick={handleAddRole}>
                   <Plus className="mr-2 h-4 w-4" />
                   역할 추가
                 </Button>
@@ -474,7 +533,7 @@ export default function TeamAccessPage() {
                           </p>
                         </div>
                       </div>
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" onClick={() => handleRoleSettings(role.id)}>
                         <Settings className="h-4 w-4" />
                       </Button>
                     </div>

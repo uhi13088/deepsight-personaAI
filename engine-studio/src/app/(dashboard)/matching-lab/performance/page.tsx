@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import {
   BarChart3,
   TrendingUp,
@@ -156,7 +157,32 @@ export default function PerformancePage() {
 
   const handleRefresh = () => {
     setRefreshing(true)
-    setTimeout(() => setRefreshing(false), 1500)
+    setTimeout(() => {
+      setRefreshing(false)
+      toast.success("데이터가 새로고침되었습니다")
+    }, 1500)
+  }
+
+  const handleExportReport = () => {
+    const reportData = {
+      dateRange,
+      kpi: PERFORMANCE_KPI,
+      trendData: TREND_DATA,
+      algorithmPerformance: ALGORITHM_PERFORMANCE,
+      topPersonas: TOP_PERSONAS,
+      feedbackData: FEEDBACK_DATA,
+      exportedAt: new Date().toISOString(),
+    }
+    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `performance-report-${dateRange}-${Date.now()}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success("리포트가 다운로드되었습니다", {
+      description: `${dateRange === "1d" ? "오늘" : dateRange === "7d" ? "최근 7일" : dateRange === "30d" ? "최근 30일" : "최근 90일"} 성능 리포트`,
+    })
   }
 
   return (
@@ -189,7 +215,7 @@ export default function PerformancePage() {
             <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             새로고침
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportReport}>
             <Download className="mr-2 h-4 w-4" />
             리포트
           </Button>

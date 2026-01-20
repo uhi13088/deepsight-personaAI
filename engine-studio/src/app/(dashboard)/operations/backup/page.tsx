@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import {
   Database,
   HardDrive,
@@ -154,6 +155,8 @@ export default function BackupPage() {
   const [showRestoreDialog, setShowRestoreDialog] = useState(false)
   const [selectedBackup, setSelectedBackup] = useState<Backup | null>(null)
   const [settings, setSettings] = useState(BACKUP_SCHEDULE)
+  const [backupTypeFilter, setBackupTypeFilter] = useState("all")
+  const [isBackingUp, setIsBackingUp] = useState(false)
 
   const getStatusBadge = (status: Backup["status"]) => {
     switch (status) {
@@ -204,11 +207,32 @@ export default function BackupPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
+          <Button
+            variant="outline"
+            onClick={() => {
+              toast.success("새로고침 완료", {
+                description: "백업 목록이 갱신되었습니다.",
+              })
+            }}
+          >
             <RefreshCw className="mr-2 h-4 w-4" />
             새로고침
           </Button>
-          <Button>
+          <Button
+            disabled={isBackingUp}
+            onClick={() => {
+              setIsBackingUp(true)
+              toast.info("백업 시작", {
+                description: "즉시 백업이 시작되었습니다. 완료까지 몇 분 소요될 수 있습니다.",
+              })
+              setTimeout(() => {
+                setIsBackingUp(false)
+                toast.success("백업 완료", {
+                  description: "백업이 성공적으로 완료되었습니다.",
+                })
+              }, 3000)
+            }}
+          >
             <Play className="mr-2 h-4 w-4" />
             즉시 백업
           </Button>
@@ -284,7 +308,15 @@ export default function BackupPage() {
                   <CardDescription>최근 백업 기록 및 상태</CardDescription>
                 </div>
                 <div className="flex gap-2">
-                  <Select defaultValue="all">
+                  <Select
+                    value={backupTypeFilter}
+                    onValueChange={(value) => {
+                      setBackupTypeFilter(value)
+                      toast.info("필터 적용", {
+                        description: value === "all" ? "모든 백업을 표시합니다." : `${value === "full" ? "전체" : "증분"} 백업만 표시합니다.`,
+                      })
+                    }}
+                  >
                     <SelectTrigger className="w-32">
                       <SelectValue placeholder="유형" />
                     </SelectTrigger>
@@ -351,16 +383,35 @@ export default function BackupPage() {
                               <Upload className="mr-2 h-4 w-4" />
                               복구
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                toast.success("다운로드 시작", {
+                                  description: `${backup.name} (${backup.size}) 다운로드를 시작합니다.`,
+                                })
+                              }}
+                            >
                               <Download className="mr-2 h-4 w-4" />
                               다운로드
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                toast.info(`백업 상세정보: ${backup.id}`, {
+                                  description: `유형: ${backup.type}, 크기: ${backup.size}, 생성일: ${backup.createdAt}`,
+                                })
+                              }}
+                            >
                               <Eye className="mr-2 h-4 w-4" />
                               상세보기
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => {
+                                toast.error("백업 삭제", {
+                                  description: `${backup.name}이(가) 삭제되었습니다.`,
+                                })
+                              }}
+                            >
                               <Trash2 className="mr-2 h-4 w-4" />
                               삭제
                             </DropdownMenuItem>
@@ -525,7 +576,13 @@ export default function BackupPage() {
           </div>
 
           <div className="flex justify-end">
-            <Button>
+            <Button
+              onClick={() => {
+                toast.success("설정 저장됨", {
+                  description: "백업 스케줄 설정이 성공적으로 저장되었습니다.",
+                })
+              }}
+            >
               <Settings className="mr-2 h-4 w-4" />
               설정 저장
             </Button>
@@ -589,7 +646,15 @@ export default function BackupPage() {
                   <span className="text-sm">0 GB / 500 GB</span>
                 </div>
                 <Progress value={0} className="mt-2" />
-                <Button variant="outline" className="w-full">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    toast.success("로컬 백업 활성화", {
+                      description: "로컬 저장소가 보조 백업 대상으로 설정되었습니다.",
+                    })
+                  }}
+                >
                   <Shield className="mr-2 h-4 w-4" />
                   로컬 백업 활성화
                 </Button>
@@ -641,7 +706,20 @@ export default function BackupPage() {
             <Button variant="outline" onClick={() => setShowRestoreDialog(false)}>
               취소
             </Button>
-            <Button variant="destructive">
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setShowRestoreDialog(false)
+                toast.info("복구 시작됨", {
+                  description: `${selectedBackup?.name || "선택된 백업"}에서 복구를 시작합니다. 완료까지 시간이 소요될 수 있습니다.`,
+                })
+                setTimeout(() => {
+                  toast.success("복구 완료", {
+                    description: "데이터 복구가 성공적으로 완료되었습니다.",
+                  })
+                }, 3000)
+              }}
+            >
               <Upload className="mr-2 h-4 w-4" />
               복구 시작
             </Button>

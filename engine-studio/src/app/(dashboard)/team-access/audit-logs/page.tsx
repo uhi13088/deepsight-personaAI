@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import {
   FileText,
   Search,
@@ -178,6 +179,21 @@ export default function AuditLogsPage() {
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    // Simulate refresh delay
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    setIsRefreshing(false)
+    toast.success("로그가 새로고침되었습니다")
+  }
+
+  const handleExport = () => {
+    toast.success("감사 로그 내보내기가 시작되었습니다", {
+      description: "CSV 파일이 곧 다운로드됩니다"
+    })
+  }
 
   const getActionIcon = (action: string) => {
     switch (action) {
@@ -272,11 +288,11 @@ export default function AuditLogsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
-            <RefreshCw className="mr-2 h-4 w-4" />
+          <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
             새로고침
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
             내보내기
           </Button>

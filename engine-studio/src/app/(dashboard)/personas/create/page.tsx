@@ -35,7 +35,7 @@ import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { VectorSlider } from "@/components/persona/vector-slider"
 import { RadarChart } from "@/components/charts/radar-chart"
-import { useToast } from "@/stores/ui-store"
+import { toast } from "sonner"
 import type { Vector6D, PersonaRole } from "@/types"
 import { PERSONA_ROLE_LABELS, VECTOR_DIMENSION_LABELS } from "@/lib/utils"
 
@@ -52,7 +52,6 @@ const EXPERTISE_OPTIONS = [
 
 export default function CreatePersonaPage() {
   const router = useRouter()
-  const toast = useToast()
   const [currentStep, setCurrentStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
   const [isValidating, setIsValidating] = useState(false)
@@ -182,14 +181,16 @@ ${description ? `[추가 설명]\n${description}` : ""}`
 
       toast.success(
         deploy ? "페르소나 배포 완료" : "페르소나 저장 완료",
-        deploy
-          ? `'${name}' 페르소나가 프로덕션에 배포되었습니다.`
-          : `'${name}' 페르소나가 저장되었습니다.`
+        {
+          description: deploy
+            ? `'${name}' 페르소나가 프로덕션에 배포되었습니다.`
+            : `'${name}' 페르소나가 저장되었습니다.`
+        }
       )
 
       router.push("/personas")
     } catch {
-      toast.error("오류 발생", "페르소나 저장 중 문제가 발생했습니다.")
+      toast.error("오류 발생", { description: "페르소나 저장 중 문제가 발생했습니다." })
     } finally {
       setIsLoading(false)
     }

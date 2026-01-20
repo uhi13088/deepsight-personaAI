@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import {
   Sliders,
   Play,
@@ -183,6 +184,7 @@ const DAILY_METRICS = [
 ]
 
 export default function AlgorithmTuningPage() {
+  const [tests, setTests] = useState<ABTest[]>(AB_TESTS)
   const [selectedTest, setSelectedTest] = useState<ABTest | null>(AB_TESTS[0])
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [newTest, setNewTest] = useState({
@@ -192,6 +194,110 @@ export default function AlgorithmTuningPage() {
     testAlgorithm: "hybrid",
     trafficSplit: 50,
   })
+
+  const handleCreateTest = () => {
+    if (!newTest.name.trim()) {
+      toast.error("테스트 이름을 입력하세요")
+      return
+    }
+    if (!newTest.description.trim()) {
+      toast.error("테스트 설명을 입력하세요")
+      return
+    }
+    const newABTest: ABTest = {
+      id: String(tests.length + 1),
+      name: newTest.name,
+      description: newTest.description,
+      status: "draft",
+      controlAlgorithm: newTest.controlAlgorithm,
+      testAlgorithm: newTest.testAlgorithm,
+      trafficSplit: newTest.trafficSplit,
+      startDate: new Date().toISOString().split("T")[0],
+      endDate: null,
+      sampleSize: { control: 0, test: 0 },
+      metrics: {
+        ctr: { control: 0, test: 0, lift: 0 },
+        accuracy: { control: 0, test: 0, lift: 0 },
+        satisfaction: { control: 0, test: 0, lift: 0 },
+      },
+      significance: 0,
+      winner: null,
+    }
+    setTests([...tests, newABTest])
+    setShowCreateDialog(false)
+    setNewTest({
+      name: "",
+      description: "",
+      controlAlgorithm: "cosine",
+      testAlgorithm: "hybrid",
+      trafficSplit: 50,
+    })
+    toast.success("A/B 테스트가 생성되었습니다", {
+      description: `"${newTest.name}" 테스트가 초안으로 저장되었습니다.`,
+    })
+  }
+
+  const handlePauseTest = (test: ABTest) => {
+    setTests(tests.map((t) =>
+      t.id === test.id ? { ...t, status: "paused" as const } : t
+    ))
+    if (selectedTest?.id === test.id) {
+      setSelectedTest({ ...test, status: "paused" })
+    }
+    toast.warning("테스트가 일시정지되었습니다", {
+      description: `"${test.name}" 테스트가 일시정지되었습니다.`,
+    })
+  }
+
+  const handleResumeTest = (test: ABTest) => {
+    setTests(tests.map((t) =>
+      t.id === test.id ? { ...t, status: "running" as const } : t
+    ))
+    if (selectedTest?.id === test.id) {
+      setSelectedTest({ ...test, status: "running" })
+    }
+    toast.success("테스트가 재개되었습니다", {
+      description: `"${test.name}" 테스트가 재개되었습니다.`,
+    })
+  }
+
+  const handleViewAnalysis = (test: ABTest) => {
+    toast.info("상세 분석", {
+      description: `"${test.name}" 테스트의 상세 분석 페이지로 이동합니다.`,
+    })
+  }
+
+  const handleDuplicateTest = (test: ABTest) => {
+    const duplicatedTest: ABTest = {
+      ...test,
+      id: String(tests.length + 1),
+      name: `${test.name} (복사본)`,
+      status: "draft",
+      startDate: new Date().toISOString().split("T")[0],
+      endDate: null,
+      sampleSize: { control: 0, test: 0 },
+    }
+    setTests([...tests, duplicatedTest])
+    toast.success("테스트가 복제되었습니다", {
+      description: `"${test.name}" 테스트가 복제되었습니다.`,
+    })
+  }
+
+  const handleDeleteTest = (test: ABTest) => {
+    setTests(tests.filter((t) => t.id !== test.id))
+    if (selectedTest?.id === test.id) {
+      setSelectedTest(null)
+    }
+    toast.success("테스트가 삭제되었습니다", {
+      description: `"${test.name}" 테스트가 삭제되었습니다.`,
+    })
+  }
+
+  const handleApplyToProduction = (test: ABTest) => {
+    toast.success("프로덕션에 적용되었습니다", {
+      description: `"${test.testAlgorithm}" 알고리즘이 프로덕션에 적용되었습니다.`,
+    })
+  }
 
   const getStatusBadge = (status: ABTest["status"]) => {
     switch (status) {
@@ -314,7 +420,7 @@ export default function AlgorithmTuningPage() {
               <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
                 취소
               </Button>
-              <Button>테스트 생성</Button>
+              <Button onClick={handleCreateTest}>테스트 생성</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -329,10 +435,10 @@ export default function AlgorithmTuningPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {AB_TESTS.filter((t) => t.status === "running").length}
+              {tests.filter((t) => t.status === "running").length}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              총 {AB_TESTS.length}개 테스트
+              총 {tests.length}개 테스트
             </p>
           </CardContent>
         </Card>
@@ -385,7 +491,7 @@ export default function AlgorithmTuningPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {AB_TESTS.map((test) => (
+              {tests.map((test) => (
                 <div
                   key={test.id}
                   className={`p-3 border rounded-lg cursor-pointer transition-all hover:border-primary ${
@@ -425,12 +531,20 @@ export default function AlgorithmTuningPage() {
               {selectedTest && (
                 <div className="flex gap-2">
                   {selectedTest.status === "running" ? (
-                    <Button variant="outline" size="sm">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePauseTest(selectedTest)}
+                    >
                       <Pause className="mr-2 h-4 w-4" />
                       일시정지
                     </Button>
                   ) : selectedTest.status === "paused" ? (
-                    <Button variant="outline" size="sm">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleResumeTest(selectedTest)}
+                    >
                       <Play className="mr-2 h-4 w-4" />
                       재개
                     </Button>
@@ -442,16 +556,19 @@ export default function AlgorithmTuningPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleViewAnalysis(selectedTest)}>
                         <Eye className="mr-2 h-4 w-4" />
                         상세 분석
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDuplicateTest(selectedTest)}>
                         <Copy className="mr-2 h-4 w-4" />
                         복제
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive">
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => handleDeleteTest(selectedTest)}
+                      >
                         <Trash2 className="mr-2 h-4 w-4" />
                         삭제
                       </DropdownMenuItem>
@@ -635,7 +752,7 @@ export default function AlgorithmTuningPage() {
 
                 {/* Actions */}
                 {selectedTest.status === "completed" && selectedTest.winner === "test" && (
-                  <Button className="w-full">
+                  <Button className="w-full" onClick={() => handleApplyToProduction(selectedTest)}>
                     <CheckCircle className="mr-2 h-4 w-4" />
                     테스트 알고리즘을 프로덕션에 적용
                     <ArrowRight className="ml-2 h-4 w-4" />

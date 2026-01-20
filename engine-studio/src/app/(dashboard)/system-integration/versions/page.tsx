@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -251,6 +252,10 @@ export default function VersionControlPage() {
   const [isCreateTagDialogOpen, setIsCreateTagDialogOpen] = useState(false)
   const [isCompareDialogOpen, setIsCompareDialogOpen] = useState(false)
   const [selectedVersion, setSelectedVersion] = useState<Version | null>(null)
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [branchFilter, setBranchFilter] = useState("all")
+  const [compareBaseVersion, setCompareBaseVersion] = useState("")
+  const [compareTargetVersion, setCompareTargetVersion] = useState("")
   const [newTag, setNewTag] = useState({
     tag: "",
     name: "",
@@ -258,6 +263,120 @@ export default function VersionControlPage() {
     branch: "main",
     commitHash: "",
   })
+
+  const handleViewVersionDetails = (version: Version) => {
+    setSelectedVersion(version)
+    toast.info(`${version.tag} 상세 정보`, {
+      description: version.description,
+    })
+  }
+
+  const handleDownloadSource = (version: Version) => {
+    toast.promise(
+      new Promise((resolve) => setTimeout(resolve, 2000)),
+      {
+        loading: `${version.tag} 소스 다운로드 중...`,
+        success: `${version.tag} 소스 다운로드가 완료되었습니다.`,
+        error: "다운로드에 실패했습니다.",
+      }
+    )
+  }
+
+  const handleRollback = (version: Version) => {
+    toast.warning(`${version.tag} 버전으로 롤백하시겠습니까?`, {
+      description: "이 작업은 현재 배포를 되돌립니다.",
+      action: {
+        label: "롤백",
+        onClick: () => {
+          toast.promise(
+            new Promise((resolve) => setTimeout(resolve, 3000)),
+            {
+              loading: `${version.tag}로 롤백 중...`,
+              success: `${version.tag}로 롤백이 완료되었습니다.`,
+              error: "롤백에 실패했습니다.",
+            }
+          )
+        },
+      },
+    })
+  }
+
+  const handleDeleteVersion = (version: Version) => {
+    toast.error(`${version.tag} 버전을 삭제하시겠습니까?`, {
+      description: "이 작업은 되돌릴 수 없습니다.",
+      action: {
+        label: "삭제",
+        onClick: () => {
+          toast.success(`${version.tag} 버전이 삭제되었습니다.`)
+        },
+      },
+    })
+  }
+
+  const handleCompareVersions = () => {
+    if (!compareBaseVersion || !compareTargetVersion) {
+      toast.error("비교할 두 버전을 모두 선택해주세요.")
+      return
+    }
+    setIsCompareDialogOpen(false)
+    toast.success(`${compareBaseVersion}와 ${compareTargetVersion} 비교`, {
+      description: "버전 비교 결과를 불러옵니다.",
+    })
+  }
+
+  const handleViewCommit = (commit: Commit) => {
+    toast.info(`커밋 상세: ${commit.shortHash}`, {
+      description: commit.message,
+    })
+  }
+
+  const handleCreateBranch = () => {
+    toast.info("새 브랜치를 생성합니다.", {
+      description: "브랜치 이름과 기준 브랜치를 입력하세요.",
+    })
+  }
+
+  const handleViewBranchCommits = (branch: Branch) => {
+    toast.info(`${branch.name} 브랜치 커밋`, {
+      description: `최근 커밋: ${branch.lastCommit}`,
+    })
+  }
+
+  const handleCreatePR = (branch: Branch) => {
+    toast.success(`${branch.name} 브랜치에서 PR 생성`, {
+      description: "Pull Request 페이지로 이동합니다.",
+    })
+  }
+
+  const handleMergeBranch = (branch: Branch) => {
+    toast.warning(`${branch.name} 브랜치를 main에 병합하시겠습니까?`, {
+      action: {
+        label: "병합",
+        onClick: () => {
+          toast.promise(
+            new Promise((resolve) => setTimeout(resolve, 2000)),
+            {
+              loading: `${branch.name} 브랜치 병합 중...`,
+              success: `${branch.name} 브랜치가 병합되었습니다.`,
+              error: "병합에 실패했습니다.",
+            }
+          )
+        },
+      },
+    })
+  }
+
+  const handleDeleteBranch = (branch: Branch) => {
+    toast.error(`${branch.name} 브랜치를 삭제하시겠습니까?`, {
+      description: "이 작업은 되돌릴 수 없습니다.",
+      action: {
+        label: "삭제",
+        onClick: () => {
+          toast.success(`${branch.name} 브랜치가 삭제되었습니다.`)
+        },
+      },
+    })
+  }
 
   const getStatusBadge = (status: Version["status"]) => {
     const config = {
@@ -283,14 +402,28 @@ export default function VersionControlPage() {
   }
 
   const handleCreateTag = () => {
+    if (!newTag.tag || !newTag.name) {
+      toast.error("태그와 릴리즈 이름을 입력해주세요.")
+      return
+    }
     // 태그 생성 로직
-    console.log("Creating tag:", newTag)
+    toast.promise(
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+      {
+        loading: "릴리즈 생성 중...",
+        success: `${newTag.tag} 릴리즈가 생성되었습니다.`,
+        error: "릴리즈 생성에 실패했습니다.",
+      }
+    )
     setIsCreateTagDialogOpen(false)
     setNewTag({ tag: "", name: "", description: "", branch: "main", commitHash: "" })
   }
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
+    toast.success("클립보드에 복사되었습니다.", {
+      description: text,
+    })
   }
 
   return (
@@ -319,7 +452,7 @@ export default function VersionControlPage() {
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
                   <Label>기준 버전</Label>
-                  <Select>
+                  <Select value={compareBaseVersion} onValueChange={setCompareBaseVersion}>
                     <SelectTrigger>
                       <SelectValue placeholder="버전 선택" />
                     </SelectTrigger>
@@ -332,7 +465,7 @@ export default function VersionControlPage() {
                 </div>
                 <div className="grid gap-2">
                   <Label>비교 버전</Label>
-                  <Select>
+                  <Select value={compareTargetVersion} onValueChange={setCompareTargetVersion}>
                     <SelectTrigger>
                       <SelectValue placeholder="버전 선택" />
                     </SelectTrigger>
@@ -346,7 +479,7 @@ export default function VersionControlPage() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsCompareDialogOpen(false)}>취소</Button>
-                <Button>비교하기</Button>
+                <Button onClick={handleCompareVersions}>비교하기</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -445,7 +578,7 @@ export default function VersionControlPage() {
                 className="pl-9"
               />
             </div>
-            <Select defaultValue="all">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="상태" />
               </SelectTrigger>
@@ -482,20 +615,20 @@ export default function VersionControlPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewVersionDetails(version)}>
                             <Eye className="mr-2 h-4 w-4" />
                             상세 보기
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDownloadSource(version)}>
                             <Download className="mr-2 h-4 w-4" />
                             소스 다운로드
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleRollback(version)}>
                             <RotateCcw className="mr-2 h-4 w-4" />
                             이 버전으로 롤백
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive">
+                          <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteVersion(version)}>
                             <Trash2 className="mr-2 h-4 w-4" />
                             삭제
                           </DropdownMenuItem>
@@ -558,7 +691,7 @@ export default function VersionControlPage() {
                   <CardTitle>최근 커밋</CardTitle>
                   <CardDescription>저장소 커밋 이력</CardDescription>
                 </div>
-                <Select defaultValue="all">
+                <Select value={branchFilter} onValueChange={setBranchFilter}>
                   <SelectTrigger className="w-[150px]">
                     <SelectValue placeholder="브랜치" />
                   </SelectTrigger>
@@ -604,7 +737,7 @@ export default function VersionControlPage() {
                         </span>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" onClick={() => handleViewCommit(commit)}>
                       <Eye className="h-4 w-4" />
                     </Button>
                   </div>
@@ -623,7 +756,7 @@ export default function VersionControlPage() {
                   <CardTitle>브랜치</CardTitle>
                   <CardDescription>활성 브랜치 목록</CardDescription>
                 </div>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={handleCreateBranch}>
                   <Plus className="mr-2 h-4 w-4" />
                   새 브랜치
                 </Button>
@@ -689,22 +822,22 @@ export default function VersionControlPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleViewBranchCommits(branch)}>
                               <Eye className="mr-2 h-4 w-4" />
                               커밋 보기
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleCreatePR(branch)}>
                               <GitPullRequest className="mr-2 h-4 w-4" />
                               PR 생성
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleMergeBranch(branch)}>
                               <GitMerge className="mr-2 h-4 w-4" />
                               Merge
                             </DropdownMenuItem>
                             {!branch.isProtected && (
                               <>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-destructive">
+                                <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteBranch(branch)}>
                                   <Trash2 className="mr-2 h-4 w-4" />
                                   삭제
                                 </DropdownMenuItem>

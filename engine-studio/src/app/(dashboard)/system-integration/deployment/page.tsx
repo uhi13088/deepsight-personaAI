@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -195,6 +196,8 @@ export default function DeploymentPipelinePage() {
   const [selectedPipeline, setSelectedPipeline] = useState<Pipeline | null>(null)
   const [isDeployDialogOpen, setIsDeployDialogOpen] = useState(false)
   const [isLogsDialogOpen, setIsLogsDialogOpen] = useState(false)
+  const [isAddTargetDialogOpen, setIsAddTargetDialogOpen] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [deployConfig, setDeployConfig] = useState({
     environment: "staging" as "development" | "staging" | "production",
     version: "",
@@ -203,6 +206,58 @@ export default function DeploymentPipelinePage() {
     runTests: true,
     notifySlack: true,
   })
+
+  // Settings state
+  const [pipelineSettings, setPipelineSettings] = useState({
+    defaultBranch: "main",
+    concurrentPipelines: "3",
+    autoDeployStaging: true,
+    autoRollback: true,
+    productionApproval: true,
+    slackWebhookUrl: "",
+    notifyStart: true,
+    notifyComplete: true,
+    notifyFailed: true,
+  })
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    toast.loading("파이프라인 정보를 새로고침하는 중...")
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    setIsRefreshing(false)
+    toast.dismiss()
+    toast.success("파이프라인 정보가 새로고침되었습니다.")
+  }
+
+  const handleAddTarget = () => {
+    setIsAddTargetDialogOpen(true)
+    toast.info("새 배포 대상을 추가합니다.", {
+      description: "환경 및 서버 정보를 입력하세요.",
+    })
+  }
+
+  const handleViewTarget = (target: DeploymentTarget) => {
+    toast.info(`${target.name} 상세 정보`, {
+      description: `URL: ${target.url}\n상태: ${target.status}`,
+    })
+  }
+
+  const handleTargetSettings = (target: DeploymentTarget) => {
+    toast.info(`${target.name} 설정`, {
+      description: "배포 대상 설정을 수정할 수 있습니다.",
+    })
+  }
+
+  const handleSaveSettings = () => {
+    toast.promise(
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+      {
+        loading: "설정을 저장하는 중...",
+        success: "설정이 성공적으로 저장되었습니다.",
+        error: "설정 저장에 실패했습니다.",
+      }
+    )
+  }
 
   const getStatusBadge = (status: PipelineStatus | StageStatus) => {
     const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ReactNode }> = {
@@ -278,12 +333,16 @@ export default function DeploymentPipelinePage() {
     }
     setPipelines([newPipeline, ...pipelines])
     setIsDeployDialogOpen(false)
+    toast.success("배포가 시작되었습니다.", {
+      description: `${deployConfig.environment} 환경에 ${deployConfig.branch} 브랜치 배포 중`,
+    })
   }
 
   const handleCancelPipeline = (pipelineId: string) => {
     setPipelines(pipelines.map(p =>
       p.id === pipelineId ? { ...p, status: "cancelled" as PipelineStatus } : p
     ))
+    toast.info("파이프라인이 취소되었습니다.")
   }
 
   const handleRetryPipeline = (pipelineId: string) => {
@@ -294,6 +353,7 @@ export default function DeploymentPipelinePage() {
         stages: p.stages.map(s => ({ ...s, status: "pending" as StageStatus }))
       } : p
     ))
+    toast.success("파이프라인을 재시작합니다.")
   }
 
   return (
@@ -307,8 +367,8 @@ export default function DeploymentPipelinePage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <RefreshCw className="mr-2 h-4 w-4" />
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
             새로고침
           </Button>
           <Dialog open={isDeployDialogOpen} onOpenChange={setIsDeployDialogOpen}>
@@ -588,7 +648,7 @@ export default function DeploymentPipelinePage() {
                   <CardTitle>배포 대상</CardTitle>
                   <CardDescription>배포 환경 및 서버 상태</CardDescription>
                 </div>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={handleAddTarget}>
                   <Plus className="mr-2 h-4 w-4" />
                   대상 추가
                 </Button>
@@ -648,10 +708,10 @@ export default function DeploymentPipelinePage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" onClick={() => handleViewTarget(target)}>
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" onClick={() => handleTargetSettings(target)}>
                             <Settings className="h-4 w-4" />
                           </Button>
                         </div>
@@ -675,7 +735,10 @@ export default function DeploymentPipelinePage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>기본 브랜치</Label>
-                  <Select defaultValue="main">
+                  <Select
+                    value={pipelineSettings.defaultBranch}
+                    onValueChange={(value) => setPipelineSettings({ ...pipelineSettings, defaultBranch: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -687,7 +750,13 @@ export default function DeploymentPipelinePage() {
                 </div>
                 <div className="space-y-2">
                   <Label>동시 파이프라인 수</Label>
-                  <Input type="number" defaultValue={3} min={1} max={10} />
+                  <Input
+                    type="number"
+                    value={pipelineSettings.concurrentPipelines}
+                    onChange={(e) => setPipelineSettings({ ...pipelineSettings, concurrentPipelines: e.target.value })}
+                    min={1}
+                    max={10}
+                  />
                 </div>
               </div>
 
@@ -699,21 +768,30 @@ export default function DeploymentPipelinePage() {
                       <Label>자동 배포 (Staging)</Label>
                       <p className="text-sm text-muted-foreground">develop 브랜치 푸시 시 자동 배포</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch
+                      checked={pipelineSettings.autoDeployStaging}
+                      onCheckedChange={(checked) => setPipelineSettings({ ...pipelineSettings, autoDeployStaging: checked })}
+                    />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
                       <Label>자동 롤백</Label>
                       <p className="text-sm text-muted-foreground">헬스체크 실패 시 자동 롤백</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch
+                      checked={pipelineSettings.autoRollback}
+                      onCheckedChange={(checked) => setPipelineSettings({ ...pipelineSettings, autoRollback: checked })}
+                    />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
                       <Label>배포 승인 필요 (Production)</Label>
                       <p className="text-sm text-muted-foreground">프로덕션 배포 전 승인 필요</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch
+                      checked={pipelineSettings.productionApproval}
+                      onCheckedChange={(checked) => setPipelineSettings({ ...pipelineSettings, productionApproval: checked })}
+                    />
                   </div>
                 </div>
               </div>
@@ -724,29 +802,42 @@ export default function DeploymentPipelinePage() {
                   <div className="flex items-center justify-between">
                     <Label>Slack 웹훅 URL</Label>
                   </div>
-                  <Input placeholder="https://hooks.slack.com/services/..." />
+                  <Input
+                    placeholder="https://hooks.slack.com/services/..."
+                    value={pipelineSettings.slackWebhookUrl}
+                    onChange={(e) => setPipelineSettings({ ...pipelineSettings, slackWebhookUrl: e.target.value })}
+                  />
                   <div className="flex items-center justify-between">
                     <div>
                       <Label>배포 시작 알림</Label>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch
+                      checked={pipelineSettings.notifyStart}
+                      onCheckedChange={(checked) => setPipelineSettings({ ...pipelineSettings, notifyStart: checked })}
+                    />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
                       <Label>배포 완료 알림</Label>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch
+                      checked={pipelineSettings.notifyComplete}
+                      onCheckedChange={(checked) => setPipelineSettings({ ...pipelineSettings, notifyComplete: checked })}
+                    />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
                       <Label>배포 실패 알림</Label>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch
+                      checked={pipelineSettings.notifyFailed}
+                      onCheckedChange={(checked) => setPipelineSettings({ ...pipelineSettings, notifyFailed: checked })}
+                    />
                   </div>
                 </div>
               </div>
 
-              <Button>설정 저장</Button>
+              <Button onClick={handleSaveSettings}>설정 저장</Button>
             </CardContent>
           </Card>
         </TabsContent>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -225,14 +226,124 @@ const mockDeadLetters: DeadLetterEvent[] = [
 export default function EventBusMonitorPage() {
   // 초기 이벤트를 useState 초기화 함수로 로드
   const [events, setEvents] = useState<Event[]>(() => generateMockEvents())
-  const [channels] = useState<EventChannel[]>(mockChannels)
-  const [deadLetters] = useState<DeadLetterEvent[]>(mockDeadLetters)
+  const [channels, setChannels] = useState<EventChannel[]>(mockChannels)
+  const [deadLetters, setDeadLetters] = useState<DeadLetterEvent[]>(mockDeadLetters)
   const [isLiveMode, setIsLiveMode] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const [filterType, setFilterType] = useState<string>("all")
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [isEventDetailOpen, setIsEventDetailOpen] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [selectedDeadLetter, setSelectedDeadLetter] = useState<DeadLetterEvent | null>(null)
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    toast.loading("이벤트 정보를 새로고침하는 중...")
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+    setEvents(generateMockEvents())
+    setIsRefreshing(false)
+    toast.dismiss()
+    toast.success("이벤트 정보가 새로고침되었습니다.")
+  }
+
+  const handleOpenSettings = () => {
+    toast.info("이벤트 버스 설정", {
+      description: "이벤트 버스 설정 페이지로 이동합니다.",
+    })
+  }
+
+  const handlePauseChannel = (channel: EventChannel) => {
+    setChannels(channels.map(c =>
+      c.id === channel.id ? { ...c, status: "paused" as const } : c
+    ))
+    toast.info(`${channel.name} 채널이 일시중지되었습니다.`)
+  }
+
+  const handleResumeChannel = (channel: EventChannel) => {
+    setChannels(channels.map(c =>
+      c.id === channel.id ? { ...c, status: "active" as const } : c
+    ))
+    toast.success(`${channel.name} 채널이 재개되었습니다.`)
+  }
+
+  const handleChannelSettings = (channel: EventChannel) => {
+    toast.info(`${channel.name} 채널 설정`, {
+      description: "채널 설정을 수정할 수 있습니다.",
+    })
+  }
+
+  const handleRetryAllDeadLetters = () => {
+    toast.promise(
+      new Promise((resolve) => setTimeout(resolve, 2000)),
+      {
+        loading: "모든 실패 이벤트를 재시도하는 중...",
+        success: () => {
+          setDeadLetters([])
+          return "모든 실패 이벤트가 재시도되었습니다."
+        },
+        error: "일부 이벤트 재시도에 실패했습니다.",
+      }
+    )
+  }
+
+  const handleDeleteAllDeadLetters = () => {
+    toast.error("모든 실패 이벤트를 삭제하시겠습니까?", {
+      description: "이 작업은 되돌릴 수 없습니다.",
+      action: {
+        label: "삭제",
+        onClick: () => {
+          setDeadLetters([])
+          toast.success("모든 실패 이벤트가 삭제되었습니다.")
+        },
+      },
+    })
+  }
+
+  const handleRetryDeadLetter = (dl: DeadLetterEvent) => {
+    toast.promise(
+      new Promise((resolve) => setTimeout(resolve, 1000)),
+      {
+        loading: `${dl.id} 이벤트를 재시도하는 중...`,
+        success: () => {
+          setDeadLetters(deadLetters.filter(d => d.id !== dl.id))
+          return `${dl.id} 이벤트가 재시도되었습니다.`
+        },
+        error: "이벤트 재시도에 실패했습니다.",
+      }
+    )
+  }
+
+  const handleViewDeadLetter = (dl: DeadLetterEvent) => {
+    setSelectedDeadLetter(dl)
+    toast.info(`${dl.id} 이벤트 상세`, {
+      description: dl.error,
+    })
+  }
+
+  const handleDeleteDeadLetter = (dl: DeadLetterEvent) => {
+    toast.error(`${dl.id} 이벤트를 삭제하시겠습니까?`, {
+      action: {
+        label: "삭제",
+        onClick: () => {
+          setDeadLetters(deadLetters.filter(d => d.id !== dl.id))
+          toast.success(`${dl.id} 이벤트가 삭제되었습니다.`)
+        },
+      },
+    })
+  }
+
+  const handleRetryEvent = (event: Event) => {
+    toast.promise(
+      new Promise((resolve) => setTimeout(resolve, 1000)),
+      {
+        loading: `${event.id} 이벤트를 재시도하는 중...`,
+        success: `${event.id} 이벤트가 재시도되었습니다.`,
+        error: "이벤트 재시도에 실패했습니다.",
+      }
+    )
+    setIsEventDetailOpen(false)
+  }
 
   // 라이브 모드 시뮬레이션
   useEffect(() => {
@@ -352,11 +463,11 @@ export default function EventBusMonitorPage() {
               )}
             </Label>
           </div>
-          <Button variant="outline" size="sm">
-            <RefreshCw className="mr-2 h-4 w-4" />
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
             새로고침
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={handleOpenSettings}>
             <Settings className="mr-2 h-4 w-4" />
             설정
           </Button>
@@ -589,17 +700,17 @@ export default function EventBusMonitorPage() {
                     {/* 액션 버튼 */}
                     <div className="flex justify-end gap-2">
                       {channel.status === "active" ? (
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => handlePauseChannel(channel)}>
                           <Pause className="mr-2 h-4 w-4" />
                           일시중지
                         </Button>
                       ) : (
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => handleResumeChannel(channel)}>
                           <Play className="mr-2 h-4 w-4" />
                           재개
                         </Button>
                       )}
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" onClick={() => handleChannelSettings(channel)}>
                         <Settings className="h-4 w-4" />
                       </Button>
                     </div>
@@ -620,11 +731,11 @@ export default function EventBusMonitorPage() {
                   <CardDescription>처리 실패한 이벤트 목록</CardDescription>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={handleRetryAllDeadLetters}>
                     <RefreshCw className="mr-2 h-4 w-4" />
                     모두 재시도
                   </Button>
-                  <Button variant="destructive" size="sm">
+                  <Button variant="destructive" size="sm" onClick={handleDeleteAllDeadLetters}>
                     <Trash2 className="mr-2 h-4 w-4" />
                     모두 삭제
                   </Button>
@@ -669,13 +780,13 @@ export default function EventBusMonitorPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="icon" title="재시도">
+                            <Button variant="ghost" size="icon" title="재시도" onClick={() => handleRetryDeadLetter(dl)}>
                               <RefreshCw className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" title="상세 보기">
+                            <Button variant="ghost" size="icon" title="상세 보기" onClick={() => handleViewDeadLetter(dl)}>
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="text-destructive" title="삭제">
+                            <Button variant="ghost" size="icon" className="text-destructive" title="삭제" onClick={() => handleDeleteDeadLetter(dl)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
@@ -748,7 +859,7 @@ export default function EventBusMonitorPage() {
               닫기
             </Button>
             {selectedEvent?.status === "failed" && (
-              <Button>
+              <Button onClick={() => selectedEvent && handleRetryEvent(selectedEvent)}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 재시도
               </Button>

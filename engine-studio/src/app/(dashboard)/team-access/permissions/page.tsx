@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -280,6 +281,14 @@ export default function RolePermissionsPage() {
   }
 
   const handleCreateRole = () => {
+    if (!newRoleForm.name) {
+      toast.error("역할 이름을 입력해주세요")
+      return
+    }
+    if (!newRoleForm.code) {
+      toast.error("역할 코드를 입력해주세요")
+      return
+    }
     const newRole: Role = {
       id: `role-${Date.now()}`,
       name: newRoleForm.name,
@@ -294,6 +303,7 @@ export default function RolePermissionsPage() {
     setRoles([...roles, newRole])
     setIsCreateRoleDialogOpen(false)
     setNewRoleForm({ name: "", code: "", description: "", permissions: [] })
+    toast.success(`${newRole.name} 역할이 생성되었습니다`)
   }
 
   const handleEditRole = (role: Role) => {
@@ -323,11 +333,30 @@ export default function RolePermissionsPage() {
       setIsEditRoleDialogOpen(false)
       setSelectedRole(null)
       setNewRoleForm({ name: "", code: "", description: "", permissions: [] })
+      toast.success("역할이 수정되었습니다")
     }
   }
 
   const handleDeleteRole = (roleId: string) => {
+    const role = roles.find(r => r.id === roleId)
     setRoles(roles.filter((r) => r.id !== roleId))
+    toast.success(`${role?.name || "역할"}이(가) 삭제되었습니다`)
+  }
+
+  const handleDuplicateRole = (role: Role) => {
+    const duplicatedRole: Role = {
+      id: `role-${Date.now()}`,
+      name: `${role.name} (복사본)`,
+      code: `${role.code}_COPY`,
+      description: role.description,
+      permissions: [...role.permissions],
+      userCount: 0,
+      isSystem: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    setRoles([...roles, duplicatedRole])
+    toast.success(`${role.name} 역할이 복제되었습니다`)
   }
 
   const filteredRoles = roles.filter((role) =>
@@ -489,7 +518,7 @@ export default function RolePermissionsPage() {
                           <Edit className="mr-2 h-4 w-4" />
                           수정
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDuplicateRole(role)}>
                           <Copy className="mr-2 h-4 w-4" />
                           복제
                         </DropdownMenuItem>

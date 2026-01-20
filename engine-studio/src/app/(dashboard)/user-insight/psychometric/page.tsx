@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import {
   Brain,
   Settings,
@@ -171,9 +172,36 @@ export default function PsychometricPage() {
     decayRate: 0.05,
     minInteractions: 10,
   })
+  const [isRetraining, setIsRetraining] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
   const handleWeightChange = (key: string, value: number[]) => {
     setWeights({ ...weights, [key]: value[0] })
+  }
+
+  const handleRetrain = async () => {
+    setIsRetraining(true)
+    toast.loading("모델 재학습을 시작합니다...", { id: "retrain" })
+    // Simulate retraining process
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+    setIsRetraining(false)
+    toast.success("모델 재학습이 완료되었습니다.", { id: "retrain" })
+  }
+
+  const handleSaveSettings = async () => {
+    setIsSaving(true)
+    toast.loading("설정을 저장하는 중...", { id: "save-settings" })
+    // Simulate API call
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    setIsSaving(false)
+    toast.success("설정이 성공적으로 저장되었습니다.", { id: "save-settings" })
+  }
+
+  const handleSaveWeights = async () => {
+    toast.loading("가중치를 저장하는 중...", { id: "save-weights" })
+    // Simulate API call
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    toast.success("가중치가 성공적으로 저장되었습니다.", { id: "save-weights" })
   }
 
   return (
@@ -190,11 +218,11 @@ export default function PsychometricPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
-            <RefreshCw className="mr-2 h-4 w-4" />
+          <Button variant="outline" onClick={handleRetrain} disabled={isRetraining}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isRetraining ? "animate-spin" : ""}`} />
             모델 재학습
           </Button>
-          <Button>
+          <Button onClick={handleSaveSettings} disabled={isSaving}>
             <Save className="mr-2 h-4 w-4" />
             설정 저장
           </Button>
@@ -370,10 +398,11 @@ export default function PsychometricPage() {
                 <div className="flex justify-between">
                   <Button variant="outline" size="sm" onClick={() => {
                     setWeights(VECTOR_DIMENSIONS.reduce((acc, dim) => ({ ...acc, [dim.key]: 1.0 }), {}))
+                    toast.success("가중치가 기본값으로 복원되었습니다.")
                   }}>
                     기본값으로 복원
                   </Button>
-                  <Button size="sm">
+                  <Button size="sm" onClick={handleSaveWeights}>
                     가중치 저장
                   </Button>
                 </div>

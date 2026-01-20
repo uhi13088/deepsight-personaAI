@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import {
   Zap,
   User,
@@ -124,6 +125,57 @@ export default function SimulatorPage() {
   const [showDetails, setShowDetails] = useState<string | null>(null)
   const [isSimulating, setIsSimulating] = useState(false)
   const [results, setResults] = useState<MatchResult[] | null>(null)
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false)
+
+  const handleExportResults = () => {
+    if (!results) {
+      toast.error("내보낼 결과가 없습니다", {
+        description: "먼저 시뮬레이션을 실행하세요.",
+      })
+      return
+    }
+    const exportData = {
+      userVector,
+      algorithm,
+      results: results.map((r) => ({
+        persona: r.persona.name,
+        score: r.score,
+        breakdown: r.breakdown,
+      })),
+      exportedAt: new Date().toISOString(),
+    }
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `simulation-result-${Date.now()}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success("결과를 내보냈습니다", {
+      description: "JSON 파일이 다운로드되었습니다.",
+    })
+  }
+
+  const handleAdvancedSettings = () => {
+    setShowAdvancedSettings(!showAdvancedSettings)
+    toast.info("고급 설정", {
+      description: "고급 설정 기능은 준비 중입니다.",
+    })
+  }
+
+  const handleCopyVector = (persona: typeof SAMPLE_PERSONAS[0]) => {
+    const vectorString = JSON.stringify(persona.vector, null, 2)
+    navigator.clipboard.writeText(vectorString)
+    toast.success("벡터 복사 완료", {
+      description: `${persona.name}의 벡터가 클립보드에 복사되었습니다.`,
+    })
+  }
+
+  const handleViewDetails = (persona: typeof SAMPLE_PERSONAS[0]) => {
+    toast.info(`${persona.name} 상세 정보`, {
+      description: `ID: ${persona.id} | 상태: ${persona.status}`,
+    })
+  }
 
   const handleVectorChange = (key: string, value: number[]) => {
     setUserVector({ ...userVector, [key]: value[0] })
@@ -210,11 +262,11 @@ export default function SimulatorPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportResults}>
             <Download className="mr-2 h-4 w-4" />
             결과 내보내기
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleAdvancedSettings}>
             <Settings className="mr-2 h-4 w-4" />
             고급 설정
           </Button>
@@ -473,11 +525,21 @@ export default function SimulatorPage() {
                               <Separator className="my-2" />
 
                               <div className="flex gap-2">
-                                <Button variant="outline" size="sm" className="flex-1">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="flex-1"
+                                  onClick={() => handleCopyVector(result.persona)}
+                                >
                                   <Copy className="mr-2 h-3 w-3" />
                                   벡터 복사
                                 </Button>
-                                <Button variant="outline" size="sm" className="flex-1">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="flex-1"
+                                  onClick={() => handleViewDetails(result.persona)}
+                                >
                                   상세 보기
                                   <ArrowRight className="ml-2 h-3 w-3" />
                                 </Button>

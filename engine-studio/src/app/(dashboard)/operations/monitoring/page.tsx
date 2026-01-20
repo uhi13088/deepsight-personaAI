@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { toast } from "sonner"
 import {
   Activity,
   Server,
@@ -190,7 +191,14 @@ export default function MonitoringPage() {
               <SelectItem value="60">1분</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline">
+          <Button
+            variant="outline"
+            onClick={() => {
+              toast.success("로그 다운로드를 시작합니다", {
+                description: "로그 파일이 곧 다운로드됩니다.",
+              })
+            }}
+          >
             <Download className="mr-2 h-4 w-4" />
             로그 다운로드
           </Button>
@@ -442,7 +450,15 @@ export default function MonitoringPage() {
                 <CardTitle>최근 알림</CardTitle>
                 <CardDescription>시스템 이벤트 및 경고</CardDescription>
               </div>
-              <Button variant="outline" size="sm">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  toast.info("알림 설정", {
+                    description: "알림 설정 페이지로 이동합니다.",
+                  })
+                }}
+              >
                 <Bell className="mr-2 h-4 w-4" />
                 알림 설정
               </Button>

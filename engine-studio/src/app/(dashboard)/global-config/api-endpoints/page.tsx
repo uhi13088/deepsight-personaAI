@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -307,6 +308,8 @@ export default function ApiEndpointsPage() {
   const [expandedEndpoint, setExpandedEndpoint] = useState<string | null>(null)
   const [isCreateKeyDialogOpen, setIsCreateKeyDialogOpen] = useState(false)
   const [isTestDialogOpen, setIsTestDialogOpen] = useState(false)
+  const [isEditKeyDialogOpen, setIsEditKeyDialogOpen] = useState(false)
+  const [selectedKeyForEdit, setSelectedKeyForEdit] = useState<ApiKey | null>(null)
   const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpoint | null>(null)
   const [newKeyForm, setNewKeyForm] = useState({
     name: "",
@@ -314,6 +317,22 @@ export default function ApiEndpointsPage() {
     rateLimit: 100,
     expiresIn: "never",
   })
+  const [globalSettings, setGlobalSettings] = useState({
+    defaultRateLimit: 100,
+    defaultTimeout: 30000,
+    corsEnabled: true,
+    ipWhitelist: false,
+    requestLogging: true,
+    allowedDomains: "",
+  })
+  const [testForm, setTestForm] = useState({
+    selectedApiKey: "",
+    parameters: {} as Record<string, string>,
+    requestBody: "{}",
+    response: "",
+    isLoading: false,
+  })
+  const [isSavingSettings, setIsSavingSettings] = useState(false)
 
   const categories = [...new Set(endpoints.map((e) => e.category))]
 
@@ -363,9 +382,14 @@ export default function ApiEndpointsPage() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
+    toast.success("클립보드에 복사되었습니다")
   }
 
   const handleCreateKey = () => {
+    if (!newKeyForm.name.trim()) {
+      toast.error("키 이름을 입력해주세요")
+      return
+    }
     const newKey: ApiKey = {
       id: `key-${Date.now()}`,
       name: newKeyForm.name,
@@ -378,10 +402,98 @@ export default function ApiEndpointsPage() {
     setApiKeys([newKey, ...apiKeys])
     setIsCreateKeyDialogOpen(false)
     setNewKeyForm({ name: "", permissions: [], rateLimit: 100, expiresIn: "never" })
+    toast.success("새 API 키가 생성되었습니다")
   }
 
   const handleRevokeKey = (keyId: string) => {
     setApiKeys(apiKeys.map((k) => (k.id === keyId ? { ...k, status: "revoked" as const } : k)))
+    toast.success("API 키가 폐기되었습니다")
+  }
+
+  const handleEditKey = (key: ApiKey) => {
+    setSelectedKeyForEdit(key)
+    setIsEditKeyDialogOpen(true)
+  }
+
+  const handleSaveEditedKey = () => {
+    if (selectedKeyForEdit) {
+      setApiKeys(apiKeys.map((k) => (k.id === selectedKeyForEdit.id ? selectedKeyForEdit : k)))
+      setIsEditKeyDialogOpen(false)
+      setSelectedKeyForEdit(null)
+      toast.success("API 키가 수정되었습니다")
+    }
+  }
+
+  const handleOpenApiSpec = () => {
+    // Open OpenAPI spec in new tab or download
+    toast.info("OpenAPI 스펙을 다운로드합니다...")
+    // Simulate download
+    setTimeout(() => {
+      toast.success("OpenAPI 스펙 파일이 준비되었습니다")
+    }, 1000)
+  }
+
+  const handleSaveGlobalSettings = async () => {
+    setIsSavingSettings(true)
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      toast.success("전역 API 설정이 저장되었습니다")
+    } catch {
+      toast.error("설정 저장 중 오류가 발생했습니다")
+    } finally {
+      setIsSavingSettings(false)
+    }
+  }
+
+  const handleTestApiRequest = async () => {
+    if (!selectedEndpoint) return
+
+    setTestForm({ ...testForm, isLoading: true, response: "" })
+
+    try {
+      // Simulate API request
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      const mockResponse = {
+        status: 200,
+        statusText: "OK",
+        data: {
+          success: true,
+          message: "테스트 요청이 성공했습니다",
+          endpoint: selectedEndpoint.path,
+          method: selectedEndpoint.method,
+          timestamp: new Date().toISOString(),
+        },
+      }
+
+      setTestForm({
+        ...testForm,
+        isLoading: false,
+        response: JSON.stringify(mockResponse, null, 2),
+      })
+      toast.success("API 테스트 요청이 완료되었습니다")
+    } catch {
+      setTestForm({
+        ...testForm,
+        isLoading: false,
+        response: JSON.stringify({ error: "요청 실패" }, null, 2),
+      })
+      toast.error("API 테스트 요청이 실패했습니다")
+    }
+  }
+
+  const handleTestDialogClose = (open: boolean) => {
+    setIsTestDialogOpen(open)
+    if (!open) {
+      setTestForm({
+        selectedApiKey: apiKeys.find(k => k.status === "active")?.id || "",
+        parameters: {},
+        requestBody: "{}",
+        response: "",
+        isLoading: false,
+      })
+    }
   }
 
   return (
@@ -395,7 +507,7 @@ export default function ApiEndpointsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleOpenApiSpec}>
             <FileJson className="mr-2 h-4 w-4" />
             OpenAPI 스펙
           </Button>
@@ -743,7 +855,7 @@ export default function ApiEndpointsPage() {
                               <Copy className="mr-2 h-4 w-4" />
                               키 복사
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditKey(key)}>
                               <Edit className="mr-2 h-4 w-4" />
                               수정
                             </DropdownMenuItem>
@@ -779,12 +891,30 @@ export default function ApiEndpointsPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>기본 Rate Limit</Label>
-                  <Input type="number" defaultValue={100} />
+                  <Input
+                    type="number"
+                    value={globalSettings.defaultRateLimit}
+                    onChange={(e) =>
+                      setGlobalSettings({
+                        ...globalSettings,
+                        defaultRateLimit: parseInt(e.target.value) || 0,
+                      })
+                    }
+                  />
                   <p className="text-xs text-muted-foreground">분당 최대 요청 수</p>
                 </div>
                 <div className="space-y-2">
                   <Label>기본 Timeout</Label>
-                  <Input type="number" defaultValue={30000} />
+                  <Input
+                    type="number"
+                    value={globalSettings.defaultTimeout}
+                    onChange={(e) =>
+                      setGlobalSettings({
+                        ...globalSettings,
+                        defaultTimeout: parseInt(e.target.value) || 0,
+                      })
+                    }
+                  />
                   <p className="text-xs text-muted-foreground">밀리초 단위</p>
                 </div>
               </div>
@@ -797,39 +927,70 @@ export default function ApiEndpointsPage() {
                       <Label>CORS 활성화</Label>
                       <p className="text-sm text-muted-foreground">Cross-Origin 요청 허용</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch
+                      checked={globalSettings.corsEnabled}
+                      onCheckedChange={(checked) => {
+                        setGlobalSettings({ ...globalSettings, corsEnabled: checked })
+                        toast.success(checked ? "CORS가 활성화되었습니다" : "CORS가 비활성화되었습니다")
+                      }}
+                    />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
                       <Label>IP 화이트리스트</Label>
                       <p className="text-sm text-muted-foreground">특정 IP만 API 접근 허용</p>
                     </div>
-                    <Switch />
+                    <Switch
+                      checked={globalSettings.ipWhitelist}
+                      onCheckedChange={(checked) => {
+                        setGlobalSettings({ ...globalSettings, ipWhitelist: checked })
+                        toast.success(
+                          checked
+                            ? "IP 화이트리스트가 활성화되었습니다"
+                            : "IP 화이트리스트가 비활성화되었습니다"
+                        )
+                      }}
+                    />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
                       <Label>요청 로깅</Label>
                       <p className="text-sm text-muted-foreground">모든 API 요청 기록</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch
+                      checked={globalSettings.requestLogging}
+                      onCheckedChange={(checked) => {
+                        setGlobalSettings({ ...globalSettings, requestLogging: checked })
+                        toast.success(checked ? "요청 로깅이 활성화되었습니다" : "요청 로깅이 비활성화되었습니다")
+                      }}
+                    />
                   </div>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label>허용 도메인 (CORS)</Label>
-                <Textarea placeholder="https://example.com&#10;https://app.example.com" rows={3} />
+                <Textarea
+                  placeholder="https://example.com&#10;https://app.example.com"
+                  rows={3}
+                  value={globalSettings.allowedDomains}
+                  onChange={(e) =>
+                    setGlobalSettings({ ...globalSettings, allowedDomains: e.target.value })
+                  }
+                />
                 <p className="text-xs text-muted-foreground">한 줄에 하나의 도메인 입력</p>
               </div>
 
-              <Button>설정 저장</Button>
+              <Button onClick={handleSaveGlobalSettings} disabled={isSavingSettings}>
+                {isSavingSettings ? "저장 중..." : "설정 저장"}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
       {/* 테스트 다이얼로그 */}
-      <Dialog open={isTestDialogOpen} onOpenChange={setIsTestDialogOpen}>
+      <Dialog open={isTestDialogOpen} onOpenChange={handleTestDialogClose}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>API 테스트</DialogTitle>
@@ -845,7 +1006,10 @@ export default function ApiEndpointsPage() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>API Key</Label>
-                <Select defaultValue={apiKeys[0]?.id}>
+                <Select
+                  value={testForm.selectedApiKey}
+                  onValueChange={(value) => setTestForm({ ...testForm, selectedApiKey: value })}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="API 키 선택" />
                   </SelectTrigger>
@@ -868,7 +1032,17 @@ export default function ApiEndpointsPage() {
                         {param.name}
                         {param.required && <span className="text-red-500 ml-1">*</span>}
                       </Label>
-                      <Input className="col-span-2" placeholder={param.description} />
+                      <Input
+                        className="col-span-2"
+                        placeholder={param.description}
+                        value={testForm.parameters[param.name] || ""}
+                        onChange={(e) =>
+                          setTestForm({
+                            ...testForm,
+                            parameters: { ...testForm.parameters, [param.name]: e.target.value },
+                          })
+                        }
+                      />
                     </div>
                   ))}
                 </div>
@@ -881,26 +1055,117 @@ export default function ApiEndpointsPage() {
                     className="font-mono text-sm"
                     rows={6}
                     placeholder="{}"
+                    value={testForm.requestBody}
+                    onChange={(e) => setTestForm({ ...testForm, requestBody: e.target.value })}
                   />
                 </div>
               )}
 
               <div className="rounded bg-muted p-3">
                 <Label className="text-xs text-muted-foreground mb-2 block">Response</Label>
-                <pre className="text-xs font-mono text-muted-foreground">
-                  응답이 여기에 표시됩니다...
+                <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap max-h-48 overflow-auto">
+                  {testForm.response || "응답이 여기에 표시됩니다..."}
                 </pre>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsTestDialogOpen(false)}>
+            <Button variant="outline" onClick={() => handleTestDialogClose(false)}>
               닫기
             </Button>
-            <Button>
-              <Play className="mr-2 h-4 w-4" />
-              요청 전송
+            <Button onClick={handleTestApiRequest} disabled={testForm.isLoading}>
+              {testForm.isLoading ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  요청 중...
+                </>
+              ) : (
+                <>
+                  <Play className="mr-2 h-4 w-4" />
+                  요청 전송
+                </>
+              )}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* API 키 수정 다이얼로그 */}
+      <Dialog open={isEditKeyDialogOpen} onOpenChange={setIsEditKeyDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>API 키 수정</DialogTitle>
+            <DialogDescription>API 키 정보를 수정합니다.</DialogDescription>
+          </DialogHeader>
+          {selectedKeyForEdit && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label>키 이름</Label>
+                <Input
+                  value={selectedKeyForEdit.name}
+                  onChange={(e) =>
+                    setSelectedKeyForEdit({ ...selectedKeyForEdit, name: e.target.value })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Rate Limit (requests/min)</Label>
+                <Input
+                  type="number"
+                  value={selectedKeyForEdit.rateLimit}
+                  onChange={(e) =>
+                    setSelectedKeyForEdit({
+                      ...selectedKeyForEdit,
+                      rateLimit: parseInt(e.target.value) || 0,
+                    })
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>권한</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    "read:personas",
+                    "write:personas",
+                    "read:matching",
+                    "write:matching",
+                    "read:insights",
+                    "write:insights",
+                  ].map((perm) => (
+                    <div key={perm} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id={`edit-${perm}`}
+                        checked={selectedKeyForEdit.permissions.includes(perm)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedKeyForEdit({
+                              ...selectedKeyForEdit,
+                              permissions: [...selectedKeyForEdit.permissions, perm],
+                            })
+                          } else {
+                            setSelectedKeyForEdit({
+                              ...selectedKeyForEdit,
+                              permissions: selectedKeyForEdit.permissions.filter((p) => p !== perm),
+                            })
+                          }
+                        }}
+                        className="rounded"
+                      />
+                      <Label htmlFor={`edit-${perm}`} className="text-sm font-normal">
+                        {perm}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditKeyDialogOpen(false)}>
+              취소
+            </Button>
+            <Button onClick={handleSaveEditedKey}>저장</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

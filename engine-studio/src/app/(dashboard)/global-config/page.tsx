@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import {
   Settings,
   Brain,
@@ -120,6 +121,7 @@ const CONFIG_CATEGORIES = [
 
 export default function GlobalConfigPage() {
   const [activeTab, setActiveTab] = useState("general")
+  const [isSaving, setIsSaving] = useState(false)
   const [generalSettings, setGeneralSettings] = useState({
     systemName: "DeepSight Engine Studio",
     environment: "production",
@@ -128,6 +130,55 @@ export default function GlobalConfigPage() {
     debugMode: false,
     maintenanceMode: false,
   })
+  const [performanceSettings, setPerformanceSettings] = useState({
+    cacheTTL: 300,
+    maxConcurrentRequests: 100,
+    requestTimeout: 5000,
+    responseCompression: true,
+    queryCaching: true,
+  })
+  const [advancedSettings, setAdvancedSettings] = useState({
+    customHeaders: "",
+    envOverrides: "",
+    experimentalFeatures: false,
+  })
+
+  const handleResetSettings = () => {
+    setGeneralSettings({
+      systemName: "DeepSight Engine Studio",
+      environment: "production",
+      defaultLanguage: "ko",
+      timezone: "Asia/Seoul",
+      debugMode: false,
+      maintenanceMode: false,
+    })
+    setPerformanceSettings({
+      cacheTTL: 300,
+      maxConcurrentRequests: 100,
+      requestTimeout: 5000,
+      responseCompression: true,
+      queryCaching: true,
+    })
+    setAdvancedSettings({
+      customHeaders: "",
+      envOverrides: "",
+      experimentalFeatures: false,
+    })
+    toast.success("설정이 초기화되었습니다")
+  }
+
+  const handleSaveAllSettings = async () => {
+    setIsSaving(true)
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      toast.success("모든 설정이 저장되었습니다")
+    } catch {
+      toast.error("설정 저장 중 오류가 발생했습니다")
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -164,13 +215,13 @@ export default function GlobalConfigPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleResetSettings}>
             <RefreshCw className="mr-2 h-4 w-4" />
             초기화
           </Button>
-          <Button>
+          <Button onClick={handleSaveAllSettings} disabled={isSaving}>
             <Save className="mr-2 h-4 w-4" />
-            모든 설정 저장
+            {isSaving ? "저장 중..." : "모든 설정 저장"}
           </Button>
         </div>
       </div>
@@ -380,25 +431,49 @@ export default function GlobalConfigPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label>캐시 TTL (초)</Label>
-                    <span className="text-sm font-mono">300</span>
+                    <span className="text-sm font-mono">{performanceSettings.cacheTTL}</span>
                   </div>
-                  <Slider defaultValue={[300]} min={60} max={3600} step={60} />
+                  <Slider
+                    value={[performanceSettings.cacheTTL]}
+                    min={60}
+                    max={3600}
+                    step={60}
+                    onValueChange={(value) => {
+                      setPerformanceSettings({ ...performanceSettings, cacheTTL: value[0] })
+                    }}
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label>최대 동시 요청</Label>
-                    <span className="text-sm font-mono">100</span>
+                    <span className="text-sm font-mono">{performanceSettings.maxConcurrentRequests}</span>
                   </div>
-                  <Slider defaultValue={[100]} min={10} max={500} step={10} />
+                  <Slider
+                    value={[performanceSettings.maxConcurrentRequests]}
+                    min={10}
+                    max={500}
+                    step={10}
+                    onValueChange={(value) => {
+                      setPerformanceSettings({ ...performanceSettings, maxConcurrentRequests: value[0] })
+                    }}
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label>요청 타임아웃 (ms)</Label>
-                    <span className="text-sm font-mono">5000</span>
+                    <span className="text-sm font-mono">{performanceSettings.requestTimeout}</span>
                   </div>
-                  <Slider defaultValue={[5000]} min={1000} max={30000} step={1000} />
+                  <Slider
+                    value={[performanceSettings.requestTimeout]}
+                    min={1000}
+                    max={30000}
+                    step={1000}
+                    onValueChange={(value) => {
+                      setPerformanceSettings({ ...performanceSettings, requestTimeout: value[0] })
+                    }}
+                  />
                 </div>
               </div>
 
@@ -411,7 +486,13 @@ export default function GlobalConfigPage() {
                     GZIP 압축을 사용하여 응답 크기를 줄입니다.
                   </p>
                 </div>
-                <Switch defaultChecked />
+                <Switch
+                  checked={performanceSettings.responseCompression}
+                  onCheckedChange={(checked) => {
+                    setPerformanceSettings({ ...performanceSettings, responseCompression: checked })
+                    toast.success(checked ? "응답 압축이 활성화되었습니다" : "응답 압축이 비활성화되었습니다")
+                  }}
+                />
               </div>
 
               <div className="flex items-center justify-between">
@@ -421,7 +502,13 @@ export default function GlobalConfigPage() {
                     자주 사용되는 쿼리 결과를 캐시합니다.
                   </p>
                 </div>
-                <Switch defaultChecked />
+                <Switch
+                  checked={performanceSettings.queryCaching}
+                  onCheckedChange={(checked) => {
+                    setPerformanceSettings({ ...performanceSettings, queryCaching: checked })
+                    toast.success(checked ? "쿼리 캐싱이 활성화되었습니다" : "쿼리 캐싱이 비활성화되었습니다")
+                  }}
+                />
               </div>
             </CardContent>
           </Card>
@@ -454,6 +541,8 @@ export default function GlobalConfigPage() {
                   <Textarea
                     placeholder="X-Custom-Header: value"
                     className="font-mono text-sm"
+                    value={advancedSettings.customHeaders}
+                    onChange={(e) => setAdvancedSettings({ ...advancedSettings, customHeaders: e.target.value })}
                   />
                 </div>
 
@@ -462,6 +551,8 @@ export default function GlobalConfigPage() {
                   <Textarea
                     placeholder="KEY=value"
                     className="font-mono text-sm"
+                    value={advancedSettings.envOverrides}
+                    onChange={(e) => setAdvancedSettings({ ...advancedSettings, envOverrides: e.target.value })}
                   />
                 </div>
               </div>
@@ -475,7 +566,17 @@ export default function GlobalConfigPage() {
                     안정성이 검증되지 않은 실험적 기능을 활성화합니다.
                   </p>
                 </div>
-                <Switch />
+                <Switch
+                  checked={advancedSettings.experimentalFeatures}
+                  onCheckedChange={(checked) => {
+                    setAdvancedSettings({ ...advancedSettings, experimentalFeatures: checked })
+                    if (checked) {
+                      toast.warning("실험적 기능이 활성화되었습니다. 주의하세요!")
+                    } else {
+                      toast.info("실험적 기능이 비활성화되었습니다")
+                    }
+                  }}
+                />
               </div>
             </CardContent>
           </Card>
