@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, role, message } = body
+    const { email, role } = body
 
     if (!email || !role) {
       return NextResponse.json(

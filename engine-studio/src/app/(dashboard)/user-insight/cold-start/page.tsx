@@ -10,14 +10,10 @@ import {
   CheckCircle,
   Settings,
   Play,
-  Pause,
-  RefreshCw,
-  ChevronRight,
   Users,
   TrendingUp,
   BarChart3,
   Info,
-  AlertCircle,
   LucideIcon,
 } from "lucide-react"
 import {
@@ -33,7 +29,6 @@ import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Select,
   SelectContent,
@@ -56,8 +51,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -152,8 +145,7 @@ export default function ColdStartPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [questionEditDialogOpen, setQuestionEditDialogOpen] = useState(false)
-  const [selectedQuestion, setSelectedQuestion] = useState<{ id: number; question: string; type: string } | null>(null)
+  const [, setSelectedQuestion] = useState<{ id: number; question: string; type: string } | null>(null)
   const [settings, setSettings] = useState({
     autoSelectMode: true,
     skipIfReturningUser: true,

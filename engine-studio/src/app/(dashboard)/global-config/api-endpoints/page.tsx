@@ -41,35 +41,22 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import {
-  Globe,
   Plus,
   Search,
   MoreHorizontal,
-  Eye,
   Edit,
-  Trash2,
   Copy,
   CheckCircle2,
   XCircle,
   AlertTriangle,
-  Clock,
-  Zap,
-  Shield,
-  Key,
-  Link,
-  ExternalLink,
   ChevronDown,
   ChevronRight,
   Play,
   RefreshCw,
-  Settings,
-  Code,
   FileJson,
   Lock,
-  Unlock,
 } from "lucide-react"
-import { API_ENDPOINTS, RATE_LIMIT_CONFIG, TIMEOUT_CONFIG } from "@/config/app.config"
-import { MOCK_API_CONFIGS, type MockAPIConfig } from "@/services/mock-data.service"
+import { RATE_LIMIT_CONFIG, TIMEOUT_CONFIG } from "@/config/app.config"
 
 // 타입 정의
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE"

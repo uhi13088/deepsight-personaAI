@@ -5,15 +5,12 @@ import { toast } from "sonner"
 import {
   Zap,
   User,
-  Users,
   Play,
   RefreshCw,
   Settings,
   ArrowRight,
   ArrowLeftRight,
   Target,
-  BarChart3,
-  Info,
   Copy,
   Download,
   ChevronRight,
@@ -31,11 +28,9 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Slider } from "@/components/ui/slider"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Select,
   SelectContent,
@@ -49,11 +44,6 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import {
   RadarChart,
   PolarGrid,

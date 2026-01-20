@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 // GET /api/health - 시스템 헬스체크
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(request: NextRequest) {
   try {
     const healthCheck = {

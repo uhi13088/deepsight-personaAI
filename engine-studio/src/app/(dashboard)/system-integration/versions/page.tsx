@@ -49,13 +49,9 @@ import {
   Trash2,
   Plus,
   Search,
-  Filter,
   CheckCircle2,
-  AlertTriangle,
   FileCode,
-  ArrowUpRight,
   Copy,
-  History,
 } from "lucide-react"
 
 // 타입 정의
@@ -251,7 +247,7 @@ export default function VersionControlPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [isCreateTagDialogOpen, setIsCreateTagDialogOpen] = useState(false)
   const [isCompareDialogOpen, setIsCompareDialogOpen] = useState(false)
-  const [selectedVersion, setSelectedVersion] = useState<Version | null>(null)
+  const [, setSelectedVersion] = useState<Version | null>(null)
   const [statusFilter, setStatusFilter] = useState("all")
   const [branchFilter, setBranchFilter] = useState("all")
   const [compareBaseVersion, setCompareBaseVersion] = useState("")

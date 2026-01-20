@@ -4,22 +4,14 @@ import { useState } from "react"
 import { toast } from "sonner"
 import {
   Brain,
-  Settings,
   Save,
   RefreshCw,
-  Play,
-  Pause,
   TrendingUp,
-  TrendingDown,
-  AlertCircle,
   CheckCircle,
   Info,
-  Sliders,
   BarChart3,
-  PieChart,
   Target,
   Layers,
-  GitBranch,
   Zap,
 } from "lucide-react"
 import {
@@ -35,21 +27,8 @@ import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import {
   RadarChart,
   PolarGrid,

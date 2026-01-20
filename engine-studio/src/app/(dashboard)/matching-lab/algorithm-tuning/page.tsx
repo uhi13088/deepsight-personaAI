@@ -6,22 +6,15 @@ import {
   Sliders,
   Play,
   Pause,
-  BarChart3,
   TrendingUp,
-  TrendingDown,
-  Target,
   Users,
   Percent,
-  Clock,
   CheckCircle,
-  AlertCircle,
   Plus,
-  Settings,
   Eye,
   Trash2,
   Copy,
   MoreHorizontal,
-  RefreshCw,
   GitBranch,
   ArrowRight,
   Info,
@@ -38,10 +31,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
-import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
@@ -88,8 +78,6 @@ import {
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
   Legend,
-  BarChart,
-  Bar,
 } from "recharts"
 
 // A/B 테스트 타입

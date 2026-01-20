@@ -7,20 +7,15 @@ import {
   GitBranch,
   Webhook,
   Database,
-  Cloud,
   CheckCircle,
   AlertCircle,
   AlertTriangle,
   Clock,
   RefreshCw,
   Play,
-  Pause,
   Settings,
-  ArrowRight,
   Activity,
-  Zap,
   Link2,
-  ExternalLink,
   Copy,
 } from "lucide-react"
 import {
@@ -32,8 +27,6 @@ import {
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table,

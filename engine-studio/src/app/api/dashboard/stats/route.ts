@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 // GET /api/dashboard/stats - 대시보드 통계 조회
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(request: NextRequest) {
   try {
     // Mock 데이터 (실제로는 DB에서 조회)

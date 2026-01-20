@@ -10,8 +10,6 @@ import {
   Database,
   Bell,
   Lock,
-  Palette,
-  Languages,
   Save,
   RefreshCw,
   CheckCircle,
@@ -48,7 +46,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import Link from "next/link"
-import { EXTERNAL_URLS } from "@/config/app.config"
 
 // TODO: Add MOCK_AI_MODELS to @/services/mock-data.service for centralized AI model configuration
 // AI 모델 설정 - simplified summary view

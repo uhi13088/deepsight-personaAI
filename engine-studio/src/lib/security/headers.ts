@@ -338,7 +338,7 @@ export function applyCorsHeaders(headers: Headers, origin: string): void {
   }
 }
 
-export default {
+const headersUtils = {
   SECURITY_HEADERS,
   API_SECURITY_HEADERS,
   CSP_DIRECTIVES,
@@ -351,3 +351,5 @@ export default {
   applyAPISecurityHeaders,
   applyCorsHeaders,
 }
+
+export default headersUtils

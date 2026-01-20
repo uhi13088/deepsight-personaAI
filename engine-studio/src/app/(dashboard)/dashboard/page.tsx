@@ -3,11 +3,9 @@
 import { useSession } from "next-auth/react"
 import {
   TrendingUp,
-  TrendingDown,
   Users,
   Target,
   ThumbsUp,
-  Clock,
   AlertCircle,
   CheckCircle,
   ArrowRight,
@@ -37,8 +35,6 @@ import {
   ResponsiveContainer,
   AreaChart,
   Area,
-  BarChart,
-  Bar,
 } from "recharts"
 import {
   MOCK_MATCHING_TREND_DATA,

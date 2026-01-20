@@ -34,7 +34,6 @@ import {
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
 import {
   Collapsible,
   CollapsibleContent,
@@ -220,19 +219,6 @@ function NavItemComponent({ item, depth = 0 }: { item: NavItem; depth?: number }
       </Button>
     </Link>
   )
-}
-
-// Collapsible 컴포넌트 구현 (radix-ui)
-function CollapsibleComponent({
-  open,
-  onOpenChange,
-  children,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  children: React.ReactNode
-}) {
-  return <div data-state={open ? "open" : "closed"}>{children}</div>
 }
 
 export function Sidebar() {

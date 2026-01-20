@@ -8,7 +8,6 @@ import {
   FileText,
   Plus,
   Search,
-  Filter,
   MoreHorizontal,
   Edit,
   Trash2,
@@ -32,7 +31,6 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Select,
@@ -143,7 +141,7 @@ export default function TeamAccessPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [roleFilter, setRoleFilter] = useState("all")
   const [showInviteDialog, setShowInviteDialog] = useState(false)
-  const [showAddRoleDialog, setShowAddRoleDialog] = useState(false)
+  const [, setShowAddRoleDialog] = useState(false)
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteRole, setInviteRole] = useState("")
   const [inviteMessage, setInviteMessage] = useState("")

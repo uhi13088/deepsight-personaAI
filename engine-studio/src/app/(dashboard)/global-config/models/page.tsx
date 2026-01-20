@@ -5,18 +5,13 @@ import { toast } from "sonner"
 import {
   Brain,
   Plus,
-  Settings,
   Save,
-  RefreshCw,
-  CheckCircle,
-  AlertCircle,
   Zap,
   DollarSign,
   Activity,
   MoreHorizontal,
   Edit,
   Trash2,
-  Eye,
   TestTube,
 } from "lucide-react"
 import {
@@ -31,7 +26,6 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -58,15 +52,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { EXTERNAL_URLS } from "@/config/app.config"
 
 // TODO: Add MOCK_AI_MODELS_DETAILED to @/services/mock-data.service for centralized AI model configuration
 // AI 모델 데이터

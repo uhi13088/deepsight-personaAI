@@ -18,7 +18,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   Table,
@@ -30,7 +29,6 @@ import {
 } from "@/components/ui/table"
 import {
   Activity,
-  Zap,
   Clock,
   CheckCircle2,
   XCircle,
@@ -38,17 +36,13 @@ import {
   Play,
   Pause,
   RefreshCw,
-  Filter,
   Search,
   Eye,
   Trash2,
   Settings,
   ArrowRight,
-  ArrowDown,
   MessageSquare,
-  Database,
   Server,
-  Cpu,
   Box,
   Layers,
 } from "lucide-react"
@@ -235,7 +229,7 @@ export default function EventBusMonitorPage() {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
   const [isEventDetailOpen, setIsEventDetailOpen] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [selectedDeadLetter, setSelectedDeadLetter] = useState<DeadLetterEvent | null>(null)
+  const [, setSelectedDeadLetter] = useState<DeadLetterEvent | null>(null)
 
   const handleRefresh = async () => {
     setIsRefreshing(true)

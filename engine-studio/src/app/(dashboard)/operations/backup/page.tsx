@@ -10,7 +10,6 @@ import {
   Upload,
   RefreshCw,
   Play,
-  Pause,
   Clock,
   CheckCircle,
   AlertCircle,
@@ -51,7 +50,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   DropdownMenu,

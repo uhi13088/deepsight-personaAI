@@ -15,9 +15,6 @@ const ENCRYPTION_ALGORITHM = "aes-256-gcm"
 /** IV 길이 (bytes) */
 const IV_LENGTH = 16
 
-/** Auth Tag 길이 (bytes) */
-const AUTH_TAG_LENGTH = 16
-
 /** Salt 길이 (bytes) */
 const SALT_LENGTH = 32
 
@@ -398,7 +395,7 @@ export function validatePasswordStrength(password: string): PasswordStrengthResu
 export const hmacSign = createSignature
 export const hmacVerify = verifySignature
 
-export default {
+const encryptionUtils = {
   hashPassword,
   verifyPassword,
   encrypt,
@@ -417,3 +414,5 @@ export default {
   maskEmail,
   validatePasswordStrength,
 }
+
+export default encryptionUtils

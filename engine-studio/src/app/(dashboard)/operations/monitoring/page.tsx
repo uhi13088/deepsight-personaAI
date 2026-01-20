@@ -9,19 +9,13 @@ import {
   MemoryStick,
   HardDrive,
   Network,
-  RefreshCw,
   AlertCircle,
   CheckCircle,
   AlertTriangle,
   Clock,
   Zap,
-  Database,
   Globe,
   TrendingUp,
-  TrendingDown,
-  Pause,
-  Play,
-  Settings,
   Download,
   Bell,
 } from "lucide-react"
@@ -35,9 +29,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Select,
   SelectContent,

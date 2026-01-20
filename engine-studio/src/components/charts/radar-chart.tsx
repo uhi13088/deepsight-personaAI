@@ -29,7 +29,6 @@ interface RadarChartProps {
 export function RadarChart({
   data,
   compareData,
-  showLabels = true,
   showLegend = true,
   primaryColor = "hsl(var(--primary))",
   secondaryColor = "hsl(var(--chart-2))",

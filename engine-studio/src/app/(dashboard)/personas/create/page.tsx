@@ -32,12 +32,11 @@ import {
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Separator } from "@/components/ui/separator"
 import { VectorSlider } from "@/components/persona/vector-slider"
 import { RadarChart } from "@/components/charts/radar-chart"
 import { toast } from "sonner"
 import type { Vector6D, PersonaRole } from "@/types"
-import { PERSONA_ROLE_LABELS, VECTOR_DIMENSION_LABELS } from "@/lib/utils"
+import { PERSONA_ROLE_LABELS } from "@/lib/utils"
 
 // UI wizard steps configuration
 const STEPS = [

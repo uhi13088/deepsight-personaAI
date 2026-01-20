@@ -10,8 +10,6 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
-import { Progress } from "@/components/ui/progress"
 import {
   Dialog,
   DialogContent,
@@ -43,11 +41,9 @@ import {
   Cloud,
   Settings,
   Eye,
-  Trash2,
   Plus,
   RefreshCw,
   Terminal,
-  FileCode,
   ArrowRight,
   Loader2,
 } from "lucide-react"
@@ -196,7 +192,7 @@ export default function DeploymentPipelinePage() {
   const [selectedPipeline, setSelectedPipeline] = useState<Pipeline | null>(null)
   const [isDeployDialogOpen, setIsDeployDialogOpen] = useState(false)
   const [isLogsDialogOpen, setIsLogsDialogOpen] = useState(false)
-  const [isAddTargetDialogOpen, setIsAddTargetDialogOpen] = useState(false)
+  const [, setIsAddTargetDialogOpen] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [deployConfig, setDeployConfig] = useState({
     environment: "staging" as "development" | "staging" | "production",

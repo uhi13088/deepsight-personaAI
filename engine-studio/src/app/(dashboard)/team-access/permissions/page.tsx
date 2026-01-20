@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -46,26 +45,20 @@ import {
   Plus,
   Search,
   MoreHorizontal,
-  Eye,
   Edit,
   Trash2,
   Copy,
   Users,
   Key,
   Lock,
-  Unlock,
   CheckCircle2,
   XCircle,
-  AlertTriangle,
   Settings,
-  FileCode,
   Database,
   Server,
   Activity,
   BarChart,
   UserCog,
-  Building,
-  FolderKey,
 } from "lucide-react"
 import { MOCK_TEAM_MEMBERS } from "@/services/mock-data.service"
 

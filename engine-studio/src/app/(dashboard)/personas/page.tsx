@@ -7,7 +7,6 @@ import { toast } from "sonner"
 import {
   Plus,
   Search,
-  Filter,
   MoreHorizontal,
   Copy,
   Archive,
@@ -44,7 +43,6 @@ import {
 } from "@/components/ui/select"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { RadarChart } from "@/components/charts/radar-chart"
 import { PERSONA_STATUS_LABELS, PERSONA_ROLE_LABELS } from "@/lib/utils"
 import type { Persona, PersonaStatus, PersonaRole, Vector6D } from "@/types"

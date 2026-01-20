@@ -11,13 +11,10 @@ import {
   CheckCircle,
   AlertCircle,
   AlertTriangle,
-  Eye,
   EyeOff,
   Filter,
   Ban,
   Sparkles,
-  MoreHorizontal,
-  Edit,
   Trash2,
   TestTube,
 } from "lucide-react"
@@ -35,7 +32,6 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
-import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -54,19 +50,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 
 // 안전 필터 카테고리
 interface SafetyFilter {

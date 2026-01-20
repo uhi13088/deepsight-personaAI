@@ -260,7 +260,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (url.startsWith("/")) return `${baseUrl}${url}`
       return `${baseUrl}/dashboard`
     },
-    async signIn({ user, account }) {
+    async signIn({ account }) {
       // OAuth 로그인 시 이메일 도메인 검증 (필요시)
       if (account?.provider !== "credentials") {
         // 특정 도메인만 허용하려면 여기서 검증

@@ -9,17 +9,11 @@ import {
   CheckCircle,
   Clock,
   Plus,
-  Search,
-  Filter,
-  MoreHorizontal,
-  Eye,
   Edit,
-  Trash2,
   MessageSquare,
   User,
   Calendar,
   TrendingUp,
-  ArrowRight,
   RefreshCw,
 } from "lucide-react"
 import {
@@ -36,7 +30,6 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Select,
   SelectContent,
@@ -53,21 +46,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 // TODO: Update MockIncident type in @/services/mock-data.service to include timeline, service, reporter, assignee fields

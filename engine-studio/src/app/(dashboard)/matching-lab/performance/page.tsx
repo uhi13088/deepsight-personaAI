@@ -4,21 +4,14 @@ import { useState } from "react"
 import { toast } from "sonner"
 import {
   BarChart3,
-  TrendingUp,
-  TrendingDown,
   Target,
   Users,
-  Clock,
   ThumbsUp,
-  ThumbsDown,
-  Activity,
   Download,
   RefreshCw,
   Calendar,
-  Filter,
   ArrowUpRight,
   ArrowDownRight,
-  AlertTriangle,
   CheckCircle,
   Zap,
   Eye,
@@ -32,9 +25,6 @@ import {
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Select,
   SelectContent,
@@ -61,8 +51,6 @@ import {
   Legend,
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   PieChart,
   Pie,
   Cell,
@@ -86,14 +74,6 @@ const TREND_DATA = [
   { date: "01/14", matches: 154321, accuracy: 94.1, latency: 22, ctr: 28.4 },
   { date: "01/15", matches: 153456, accuracy: 94.2, latency: 23, ctr: 28.5 },
   { date: "01/16", matches: 156789, accuracy: 94.2, latency: 23, ctr: 28.6 },
-]
-
-const LATENCY_DISTRIBUTION = [
-  { range: "0-10ms", count: 12345, percentage: 15 },
-  { range: "10-20ms", count: 32456, percentage: 35 },
-  { range: "20-30ms", count: 28765, percentage: 30 },
-  { range: "30-50ms", count: 15432, percentage: 15 },
-  { range: "50ms+", count: 4567, percentage: 5 },
 ]
 
 const ALGORITHM_PERFORMANCE = [

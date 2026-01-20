@@ -5,10 +5,8 @@ import { toast } from "sonner"
 import {
   FileText,
   Search,
-  Filter,
   Download,
   RefreshCw,
-  Calendar,
   User,
   Activity,
   Settings,
@@ -18,8 +16,6 @@ import {
   Plus,
   LogIn,
   LogOut,
-  Key,
-  Shield,
   AlertCircle,
   CheckCircle,
 } from "lucide-react"
@@ -35,7 +31,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Select,
   SelectContent,
@@ -58,7 +54,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { MOCK_TEAM_MEMBERS } from "@/services/mock-data.service"
 
 // TODO: Add MOCK_AUDIT_LOGS to @/services/mock-data.service for centralized audit log management
