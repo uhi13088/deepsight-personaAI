@@ -67,7 +67,10 @@ export const useUIStore = create<UIState>((set, get) => ({
   // Toast
   toasts: [],
   addToast: (toast) => {
-    const id = Math.random().toString(36).substring(7)
+    // Use crypto.randomUUID() for guaranteed uniqueness
+    const id = typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).substring(7)}`
     const newToast = { ...toast, id }
     set((state) => ({ toasts: [...state.toasts, newToast] }))
 

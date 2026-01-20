@@ -136,7 +136,7 @@ const USAGE_STATS = {
 }
 
 export default function ModelsPage() {
-  const [selectedModel, setSelectedModel] = useState<AIModel | null>(AI_MODELS[0])
+  const [selectedModel, setSelectedModel] = useState<AIModel | null>(AI_MODELS.length > 0 ? AI_MODELS[0] : null)
   const [showAddDialog, setShowAddDialog] = useState(false)
 
   const getStatusBadge = (status: AIModel["status"]) => {

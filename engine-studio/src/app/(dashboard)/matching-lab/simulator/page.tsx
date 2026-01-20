@@ -204,7 +204,9 @@ export default function SimulatorPage() {
           breakdown[dim] = 1 - Math.abs(a - b)
         })
 
-        const score = dotProduct / (Math.sqrt(normA) * Math.sqrt(normB))
+        // Prevent division by zero - return 0 if either vector is zero
+        const denominator = Math.sqrt(normA) * Math.sqrt(normB)
+        const score = denominator === 0 ? 0 : dotProduct / denominator
 
         return {
           persona,

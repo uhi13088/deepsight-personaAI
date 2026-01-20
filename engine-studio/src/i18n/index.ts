@@ -34,11 +34,13 @@ export function t(key: string, locale: SupportedLocale = DEFAULT_LOCALE): string
   const trans = getTranslations(locale)
   const keys = key.split(".")
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let result: any = trans
+  // Type for nested translation object traversal
+  type TranslationValue = string | Record<string, unknown>
+  let result: TranslationValue = trans as unknown as TranslationValue
+
   for (const k of keys) {
     if (result && typeof result === "object" && k in result) {
-      result = result[k]
+      result = (result as Record<string, TranslationValue>)[k]
     } else {
       console.warn(`[i18n] Translation key not found: ${key}`)
       return key

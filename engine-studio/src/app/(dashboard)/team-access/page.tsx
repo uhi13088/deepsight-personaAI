@@ -190,12 +190,15 @@ export default function TeamAccessPage() {
 
   const getRoleBadge = (role: TeamMember["role"]) => {
     const roleInfo = ROLES.find((r) => r.id === role)
+    if (!roleInfo) {
+      return <Badge variant="outline">Unknown Role</Badge>
+    }
     return (
       <Badge
         variant="outline"
-        className={`${roleInfo?.color} bg-opacity-10 border-current`}
+        className={`${roleInfo.color} bg-opacity-10 border-current`}
       >
-        {roleInfo?.name}
+        {roleInfo.name}
       </Badge>
     )
   }
@@ -221,6 +224,12 @@ export default function TeamAccessPage() {
           <Badge className="bg-yellow-500 gap-1">
             <AlertCircle className="h-3 w-3" />
             대기
+          </Badge>
+        )
+      default:
+        return (
+          <Badge variant="outline" className="gap-1">
+            Unknown
           </Badge>
         )
     }

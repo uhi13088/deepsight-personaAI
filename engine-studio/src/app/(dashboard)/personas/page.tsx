@@ -146,11 +146,14 @@ export default function PersonasPage() {
   const handleArchive = async (personaId: string, personaName: string) => {
     if (!confirm(`"${personaName}"을(를) 보관하시겠습니까?`)) return
     try {
-      await fetch(`/api/personas/${personaId}`, {
+      const response = await fetch(`/api/personas/${personaId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "ARCHIVED" }),
       })
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
       toast.success(`"${personaName}"이(가) 보관되었습니다.`)
     } catch {
       toast.error("보관에 실패했습니다.")
@@ -161,9 +164,12 @@ export default function PersonasPage() {
   const handleDelete = async (personaId: string, personaName: string) => {
     if (!confirm(`"${personaName}"을(를) 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return
     try {
-      await fetch(`/api/personas/${personaId}`, {
+      const response = await fetch(`/api/personas/${personaId}`, {
         method: "DELETE",
       })
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
       toast.success(`"${personaName}"이(가) 삭제되었습니다.`)
       if (selectedPersona?.id === personaId) {
         setSelectedPersona(null)
@@ -185,7 +191,8 @@ export default function PersonasPage() {
   const getInitials = (name: string) => {
     return name
       .split(" ")
-      .map((n) => n[0])
+      .map((n) => n?.[0] || "")
+      .filter(Boolean)
       .join("")
       .toUpperCase()
       .slice(0, 2)

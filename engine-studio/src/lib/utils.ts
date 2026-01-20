@@ -43,7 +43,12 @@ export function formatCurrency(amount: number, currency: string = "USD"): string
 }
 
 export function generateId(): string {
-  return Math.random().toString(36).substring(2, 15)
+  // Use crypto.randomUUID() for guaranteed uniqueness
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  // Fallback for older environments
+  return `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 15)}`
 }
 
 export function sleep(ms: number): Promise<void> {

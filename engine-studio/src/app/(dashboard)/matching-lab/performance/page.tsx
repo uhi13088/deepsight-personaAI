@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { toast } from "sonner"
 import {
   BarChart3,
@@ -134,10 +134,24 @@ const FEEDBACK_COLORS = {
 export default function PerformancePage() {
   const [dateRange, setDateRange] = useState("7d")
   const [refreshing, setRefreshing] = useState(false)
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const handleRefresh = () => {
     setRefreshing(true)
-    setTimeout(() => {
+    // Clear any existing timeout before setting a new one
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current)
+    }
+    refreshTimeoutRef.current = setTimeout(() => {
       setRefreshing(false)
       toast.success("데이터가 새로고침되었습니다")
     }, 1500)

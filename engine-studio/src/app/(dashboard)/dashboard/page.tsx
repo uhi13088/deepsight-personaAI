@@ -57,7 +57,10 @@ const KPI_DATA = {
 
 // Transform MOCK_MATCHING_TREND_DATA to dashboard format
 const TREND_DATA = MOCK_MATCHING_TREND_DATA.map(item => ({
-  date: item.date.slice(5).replace("-", "/"), // Convert "2025-01-09" to "01/09"
+  // Safely convert date format (e.g., "2025-01-09" to "01/09") with fallback
+  date: item.date && item.date.length >= 10
+    ? item.date.slice(5).replace("-", "/")
+    : item.date || "N/A",
   matches: Math.round(item.matches / 40), // Scale down for daily view
   accuracy: item.accuracy,
 }))
