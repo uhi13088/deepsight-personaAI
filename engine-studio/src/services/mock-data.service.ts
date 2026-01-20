@@ -6,7 +6,7 @@
  * Production 환경에서는 실제 API를 통해 데이터를 가져옵니다.
  */
 
-import type { UserRole } from "@/types"
+import type { UserRole, PersonaRole, PersonaStatus, IncidentStatus } from "@/types"
 
 // =============================================================================
 // 타입 정의
@@ -15,9 +15,9 @@ import type { UserRole } from "@/types"
 export interface MockPersona {
   id: string
   name: string
-  role: string
+  role: PersonaRole  // DB enum과 일치
   expertise: string[]
-  status: string
+  status: PersonaStatus  // DB enum과 일치
   vector: {
     depth: number
     lens: number
@@ -27,8 +27,8 @@ export interface MockPersona {
     purpose: number
   }
   promptTemplate: string
-  matchCount: number
-  accuracy: number
+  matchCount: number  // 계산된 필드 (집계용)
+  accuracy: number  // 계산된 필드 (집계용)
   createdAt: string
   updatedAt: string
 }
@@ -59,10 +59,10 @@ export interface MockTeamMember {
 export interface MockIncubatorPersona {
   id: string
   name: string
-  role: string
+  role: PersonaRole  // DB enum과 일치
   progress: number
   testScore: number
-  status: "TESTING" | "READY" | "FAILED"
+  status: "TESTING" | "READY" | "FAILED"  // 인큐베이터 전용 상태
   createdAt: string
   author: string
 }
@@ -95,7 +95,7 @@ export interface MockIncident {
   id: string
   title: string
   severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
-  status: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED"
+  status: IncidentStatus  // DB enum과 일치: REPORTED, INVESTIGATING, IDENTIFIED, FIXING, RESOLVED, CLOSED
   createdAt: string
   assignee: string
   description: string
@@ -138,7 +138,7 @@ export const MOCK_PERSONAS: MockPersona[] = [
   {
     id: "1",
     name: "논리적 평론가",
-    role: "평론",
+    role: "REVIEWER",  // DB enum: REVIEWER, CURATOR, EDUCATOR, COMPANION, ANALYST
     expertise: ["영화", "드라마"],
     status: "ACTIVE",
     vector: {
@@ -158,7 +158,7 @@ export const MOCK_PERSONAS: MockPersona[] = [
   {
     id: "2",
     name: "감성적 스토리텔러",
-    role: "큐레이터",
+    role: "CURATOR",
     expertise: ["소설", "에세이"],
     status: "ACTIVE",
     vector: {
@@ -178,7 +178,7 @@ export const MOCK_PERSONAS: MockPersona[] = [
   {
     id: "3",
     name: "트렌드 분석가",
-    role: "분석가",
+    role: "ANALYST",
     expertise: ["음악", "예능"],
     status: "ACTIVE",
     vector: {
@@ -198,7 +198,7 @@ export const MOCK_PERSONAS: MockPersona[] = [
   {
     id: "4",
     name: "디테일 매니아",
-    role: "리뷰어",
+    role: "REVIEWER",
     expertise: ["게임", "애니메이션"],
     status: "REVIEW",
     vector: {
@@ -218,7 +218,7 @@ export const MOCK_PERSONAS: MockPersona[] = [
   {
     id: "5",
     name: "실험적 탐험가",
-    role: "큐레이터",
+    role: "CURATOR",
     expertise: ["아트하우스", "독립영화"],
     status: "DRAFT",
     vector: {
@@ -349,7 +349,7 @@ export const MOCK_INCUBATOR_PERSONAS: MockIncubatorPersona[] = [
   {
     id: "inc-1",
     name: "신규 평론가 A",
-    role: "평론",
+    role: "REVIEWER",  // DB enum과 일치
     progress: 85,
     testScore: 92,
     status: "READY",
@@ -359,7 +359,7 @@ export const MOCK_INCUBATOR_PERSONAS: MockIncubatorPersona[] = [
   {
     id: "inc-2",
     name: "큐레이터 후보 B",
-    role: "큐레이터",
+    role: "CURATOR",  // DB enum과 일치
     progress: 60,
     testScore: 78,
     status: "TESTING",
@@ -369,7 +369,7 @@ export const MOCK_INCUBATOR_PERSONAS: MockIncubatorPersona[] = [
   {
     id: "inc-3",
     name: "분석가 테스트 C",
-    role: "분석가",
+    role: "ANALYST",  // DB enum과 일치
     progress: 100,
     testScore: 65,
     status: "FAILED",
@@ -488,7 +488,7 @@ export const MOCK_INCIDENTS: MockIncident[] = [
     id: "inc-001",
     title: "API 응답 지연",
     severity: "MEDIUM",
-    status: "RESOLVED",
+    status: "RESOLVED",  // DB enum: REPORTED, INVESTIGATING, IDENTIFIED, FIXING, RESOLVED, CLOSED
     createdAt: "2025-01-15T08:30:00Z",
     assignee: "AI 엔지니어",
     description: "매칭 API 응답 시간이 평소보다 2배 이상 증가",
@@ -497,7 +497,7 @@ export const MOCK_INCIDENTS: MockIncident[] = [
     id: "inc-002",
     title: "데이터베이스 연결 오류",
     severity: "HIGH",
-    status: "IN_PROGRESS",
+    status: "INVESTIGATING",  // 변경: IN_PROGRESS → INVESTIGATING (DB enum)
     createdAt: "2025-01-15T10:15:00Z",
     assignee: "관리자",
     description: "간헐적인 DB 연결 실패 발생",
@@ -506,7 +506,7 @@ export const MOCK_INCIDENTS: MockIncident[] = [
     id: "inc-003",
     title: "메모리 사용량 경고",
     severity: "LOW",
-    status: "OPEN",
+    status: "REPORTED",  // 변경: OPEN → REPORTED (DB enum)
     createdAt: "2025-01-15T11:00:00Z",
     assignee: "미배정",
     description: "서버 메모리 사용량 80% 초과",
@@ -635,12 +635,12 @@ export const MOCK_USER_GROWTH_DATA = [
   { month: "2025-01", users: 45892 },
 ]
 
-export const MOCK_PERSONA_DISTRIBUTION_DATA = [
-  { role: "평론", count: 42, percentage: 33.1 },
-  { role: "큐레이터", count: 35, percentage: 27.6 },
-  { role: "분석가", count: 28, percentage: 22.0 },
-  { role: "리뷰어", count: 15, percentage: 11.8 },
-  { role: "동반자", count: 7, percentage: 5.5 },
+export const MOCK_PERSONA_DISTRIBUTION_DATA: { role: PersonaRole; count: number; percentage: number }[] = [
+  { role: "REVIEWER", count: 42, percentage: 33.1 },  // 평론가/리뷰어
+  { role: "CURATOR", count: 35, percentage: 27.6 },   // 큐레이터
+  { role: "ANALYST", count: 28, percentage: 22.0 },   // 분석가
+  { role: "EDUCATOR", count: 15, percentage: 11.8 },  // 교육자
+  { role: "COMPANION", count: 7, percentage: 5.5 },   // 동반자
 ]
 
 // =============================================================================

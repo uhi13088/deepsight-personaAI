@@ -45,30 +45,24 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { RadarChart } from "@/components/charts/radar-chart"
 import { PERSONA_STATUS_LABELS, PERSONA_ROLE_LABELS } from "@/lib/utils"
-import type { Persona, PersonaStatus, PersonaRole, Vector6D } from "@/types"
+import type { Persona, PersonaStatus, Vector6D } from "@/types"
 import { MOCK_PERSONAS as MOCK_PERSONAS_SERVICE } from "@/services/mock-data.service"
 
-// TODO: Extend MockPersona type in @/services/mock-data.service to include full Persona fields
-// The page requires full Persona type with organizationId, visibility, sharedWithOrgs, etc.
-// For now, we transform the service data and add missing fields
+// Transform MockPersona data to full Persona type with all required fields
+// MockPersona now uses DB enum values (PersonaRole, PersonaStatus)
 const MOCK_PERSONAS: (Persona & { vector: Vector6D })[] = MOCK_PERSONAS_SERVICE.map((p, index) => ({
   id: p.id,
   organizationId: null,
   visibility: index % 2 === 0 ? "GLOBAL" : "PRIVATE" as const,
   sharedWithOrgs: [],
   name: p.name,
-  role: (p.role === "평론" ? "REVIEWER" :
-         p.role === "큐레이터" ? "CURATOR" :
-         p.role === "분석가" ? "ANALYST" :
-         p.role === "리뷰어" ? "REVIEWER" : "EDUCATOR") as PersonaRole,
+  role: p.role,  // 이제 MockPersona가 DB enum (PersonaRole)을 직접 사용
   expertise: p.expertise,
   description: p.promptTemplate.slice(0, 60) + "...",
   profileImageUrl: null,
   promptTemplate: p.promptTemplate,
   promptVersion: "1.0",
-  status: (p.status === "ACTIVE" ? "ACTIVE" :
-           p.status === "REVIEW" ? "REVIEW" :
-           p.status === "DRAFT" ? "DRAFT" : "ACTIVE") as PersonaStatus,
+  status: p.status,  // 이제 MockPersona가 DB enum (PersonaStatus)을 직접 사용
   qualityScore: Math.round(p.accuracy),
   validationScore: p.accuracy / 100,
   validationVersion: 1,

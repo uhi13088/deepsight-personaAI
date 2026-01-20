@@ -90,6 +90,8 @@ export interface Vector6D {
   purpose: number
 }
 
+export type VectorDimension = keyof Vector6D
+
 export function calculateCosineSimilarity(v1: Vector6D, v2: Vector6D): number {
   const dimensions = ["depth", "lens", "stance", "scope", "taste", "purpose"] as const
 
@@ -267,3 +269,184 @@ export const VECTOR_PRESETS = {
     purpose: 0.5,
   },
 } as const
+
+// =============================================================================
+// DB ↔ Frontend 데이터 변환 유틸리티
+// =============================================================================
+
+/**
+ * DB UserVector 형식 (개별 칼럼)
+ * DB에서는 depth, lens, stance, scope, taste, purpose를 개별 칼럼으로 저장
+ */
+export interface DBUserVector {
+  id: string
+  userId: string
+  onboardingLevel: "LIGHT" | "MEDIUM" | "DEEP"
+  depth: number
+  lens: number
+  stance: number
+  scope: number
+  taste: number
+  purpose: number
+  archetype: string | null
+  confidenceDepth: number | null
+  confidenceLens: number | null
+  confidenceStance: number | null
+  confidenceScope: number | null
+  confidenceTaste: number | null
+  confidencePurpose: number | null
+  updatedAt: Date
+}
+
+/**
+ * Frontend UserVector 형식 (중첩 객체)
+ */
+export interface FrontendUserVector {
+  id: string
+  userId: string
+  onboardingLevel: "LIGHT" | "MEDIUM" | "DEEP"
+  vector: Vector6D
+  archetype: string | null
+  confidenceScores: Vector6D | null
+  updatedAt: Date
+}
+
+/**
+ * DB UserVector → Frontend UserVector 변환
+ */
+export function transformDBUserVectorToFrontend(db: DBUserVector): FrontendUserVector {
+  return {
+    id: db.id,
+    userId: db.userId,
+    onboardingLevel: db.onboardingLevel,
+    vector: {
+      depth: db.depth,
+      lens: db.lens,
+      stance: db.stance,
+      scope: db.scope,
+      taste: db.taste,
+      purpose: db.purpose,
+    },
+    archetype: db.archetype,
+    confidenceScores: db.confidenceDepth !== null ? {
+      depth: db.confidenceDepth ?? 0,
+      lens: db.confidenceLens ?? 0,
+      stance: db.confidenceStance ?? 0,
+      scope: db.confidenceScope ?? 0,
+      taste: db.confidenceTaste ?? 0,
+      purpose: db.confidencePurpose ?? 0,
+    } : null,
+    updatedAt: db.updatedAt,
+  }
+}
+
+/**
+ * Frontend UserVector → DB UserVector 변환
+ */
+export function transformFrontendUserVectorToDB(
+  frontend: FrontendUserVector
+): Omit<DBUserVector, "id" | "updatedAt"> {
+  return {
+    userId: frontend.userId,
+    onboardingLevel: frontend.onboardingLevel,
+    depth: frontend.vector.depth,
+    lens: frontend.vector.lens,
+    stance: frontend.vector.stance,
+    scope: frontend.vector.scope,
+    taste: frontend.vector.taste,
+    purpose: frontend.vector.purpose,
+    archetype: frontend.archetype,
+    confidenceDepth: frontend.confidenceScores?.depth ?? null,
+    confidenceLens: frontend.confidenceScores?.lens ?? null,
+    confidenceStance: frontend.confidenceScores?.stance ?? null,
+    confidenceScope: frontend.confidenceScores?.scope ?? null,
+    confidenceTaste: frontend.confidenceScores?.taste ?? null,
+    confidencePurpose: frontend.confidenceScores?.purpose ?? null,
+  }
+}
+
+/**
+ * DB Archetype 형식 (개별 min/max 칼럼)
+ */
+export interface DBArchetype {
+  id: string
+  name: string
+  description: string | null
+  depthMin: number
+  depthMax: number
+  lensMin: number
+  lensMax: number
+  stanceMin: number
+  stanceMax: number
+  scopeMin: number
+  scopeMax: number
+  tasteMin: number
+  tasteMax: number
+  purposeMin: number
+  purposeMax: number
+  recommendedPersonaIds: string[]
+  createdAt: Date
+  updatedAt: Date
+}
+
+/**
+ * Frontend Archetype 형식 (중첩 vectorRanges 객체)
+ */
+export interface FrontendArchetype {
+  id: string
+  name: string
+  description: string | null
+  vectorRanges: {
+    [K in VectorDimension]: { min: number; max: number }
+  }
+  recommendedPersonaIds: string[]
+  createdAt: Date
+  updatedAt: Date
+}
+
+/**
+ * DB Archetype → Frontend Archetype 변환
+ */
+export function transformDBArchetypeToFrontend(db: DBArchetype): FrontendArchetype {
+  return {
+    id: db.id,
+    name: db.name,
+    description: db.description,
+    vectorRanges: {
+      depth: { min: db.depthMin, max: db.depthMax },
+      lens: { min: db.lensMin, max: db.lensMax },
+      stance: { min: db.stanceMin, max: db.stanceMax },
+      scope: { min: db.scopeMin, max: db.scopeMax },
+      taste: { min: db.tasteMin, max: db.tasteMax },
+      purpose: { min: db.purposeMin, max: db.purposeMax },
+    },
+    recommendedPersonaIds: db.recommendedPersonaIds,
+    createdAt: db.createdAt,
+    updatedAt: db.updatedAt,
+  }
+}
+
+/**
+ * Frontend Archetype → DB Archetype 변환
+ */
+export function transformFrontendArchetypeToDB(
+  frontend: FrontendArchetype
+): Omit<DBArchetype, "id" | "createdAt" | "updatedAt"> {
+  return {
+    name: frontend.name,
+    description: frontend.description,
+    depthMin: frontend.vectorRanges.depth.min,
+    depthMax: frontend.vectorRanges.depth.max,
+    lensMin: frontend.vectorRanges.lens.min,
+    lensMax: frontend.vectorRanges.lens.max,
+    stanceMin: frontend.vectorRanges.stance.min,
+    stanceMax: frontend.vectorRanges.stance.max,
+    scopeMin: frontend.vectorRanges.scope.min,
+    scopeMax: frontend.vectorRanges.scope.max,
+    tasteMin: frontend.vectorRanges.taste.min,
+    tasteMax: frontend.vectorRanges.taste.max,
+    purposeMin: frontend.vectorRanges.purpose.min,
+    purposeMax: frontend.vectorRanges.purpose.max,
+    recommendedPersonaIds: frontend.recommendedPersonaIds,
+  }
+}
