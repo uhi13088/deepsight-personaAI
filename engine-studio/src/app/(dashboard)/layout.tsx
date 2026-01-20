@@ -3,6 +3,7 @@
 import { Sidebar } from "@/components/layout/sidebar"
 import { Header } from "@/components/layout/header"
 import { Toaster } from "@/components/layout/toaster"
+import { Toaster as SonnerToaster } from "sonner"
 
 export default function DashboardLayout({
   children,
@@ -27,6 +28,7 @@ export default function DashboardLayout({
 
       {/* Toast Notifications */}
       <Toaster />
+      <SonnerToaster position="top-right" richColors />
     </div>
   )
 }

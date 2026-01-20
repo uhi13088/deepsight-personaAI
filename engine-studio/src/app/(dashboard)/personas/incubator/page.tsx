@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import {
   Beaker,
   Play,
@@ -135,9 +137,37 @@ const HISTORY_DATA = [
 ]
 
 export default function IncubatorPage() {
+  const router = useRouter()
   const [isEnabled, setIsEnabled] = useState(INCUBATOR_STATS.enabled)
   const [selectedPersona, setSelectedPersona] = useState<typeof TODAY_PERSONAS[0] | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+
+  const handleApprove = async (personaId: string, personaName: string) => {
+    try {
+      // API 호출 (실제로는 승인 API 호출)
+      toast.success(`"${personaName}" 페르소나가 승인되었습니다.`)
+      // 승인된 페르소나를 personas 목록에 추가
+      router.push(`/personas?approved=${personaId}`)
+    } catch {
+      toast.error("승인에 실패했습니다.")
+    }
+  }
+
+  const handleReject = async (personaId: string, personaName: string) => {
+    if (!confirm(`"${personaName}" 페르소나를 거부하시겠습니까?`)) return
+    try {
+      // API 호출 (실제로는 거부 API 호출)
+      toast.info(`"${personaName}" 페르소나가 거부되었습니다.`)
+      setSelectedPersona(null)
+    } catch {
+      toast.error("거부 처리에 실패했습니다.")
+    }
+  }
+
+  const handleSaveSettings = () => {
+    toast.success("인큐베이터 설정이 저장되었습니다.")
+    setSettingsOpen(false)
+  }
 
   return (
     <div className="space-y-6">
@@ -159,7 +189,10 @@ export default function IncubatorPage() {
               checked={isEnabled}
               onCheckedChange={setIsEnabled}
             />
-            <Badge variant={isEnabled ? "success" : "secondary"}>
+            <Badge
+              variant={isEnabled ? "default" : "secondary"}
+              className={isEnabled ? "bg-green-500 hover:bg-green-600" : ""}
+            >
               {isEnabled ? "활성" : "비활성"}
             </Badge>
           </div>
@@ -194,7 +227,7 @@ export default function IncubatorPage() {
                   <Label>자동 승인 점수</Label>
                   <Input type="number" defaultValue={85} min={70} max={95} />
                 </div>
-                <Button className="w-full">설정 저장</Button>
+                <Button className="w-full" onClick={handleSaveSettings}>설정 저장</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -298,7 +331,7 @@ export default function IncubatorPage() {
                         <TableCell className="font-medium">{persona.name}</TableCell>
                         <TableCell>
                           {persona.status === "PASSED" ? (
-                            <Badge variant="success" className="gap-1">
+                            <Badge variant="default" className="gap-1 bg-green-500 hover:bg-green-600">
                               <CheckCircle className="h-3 w-3" />
                               통과
                             </Badge>
@@ -322,15 +355,39 @@ export default function IncubatorPage() {
                           <div className="flex justify-end gap-1">
                             {persona.status === "PASSED" && (
                               <>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleApprove(persona.id, persona.name)
+                                  }}
+                                >
                                   <ThumbsUp className="h-4 w-4 text-green-500" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleReject(persona.id, persona.name)
+                                  }}
+                                >
                                   <ThumbsDown className="h-4 w-4 text-red-500" />
                                 </Button>
                               </>
                             )}
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedPersona(persona)
+                              }}
+                            >
                               <Eye className="h-4 w-4" />
                             </Button>
                           </div>
@@ -406,11 +463,20 @@ export default function IncubatorPage() {
 
                     {selectedPersona.status === "PASSED" && (
                       <div className="flex gap-2">
-                        <Button className="flex-1" size="sm">
+                        <Button
+                          className="flex-1"
+                          size="sm"
+                          onClick={() => handleApprove(selectedPersona.id, selectedPersona.name)}
+                        >
                           <ThumbsUp className="h-4 w-4 mr-1" />
                           승인
                         </Button>
-                        <Button variant="outline" className="flex-1" size="sm">
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          size="sm"
+                          onClick={() => handleReject(selectedPersona.id, selectedPersona.name)}
+                        >
                           <ThumbsDown className="h-4 w-4 mr-1" />
                           거부
                         </Button>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import {
   AlertOctagon,
   AlertTriangle,
@@ -161,6 +162,11 @@ export default function IncidentsPage() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [showCreateDialog, setShowCreateDialog] = useState(false)
 
+  const handleCreateIncident = () => {
+    toast.success("인시던트가 생성되었습니다.")
+    setShowCreateDialog(false)
+  }
+
   const getSeverityBadge = (severity: Incident["severity"]) => {
     switch (severity) {
       case "critical":
@@ -277,7 +283,7 @@ export default function IncidentsPage() {
               <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
                 취소
               </Button>
-              <Button>생성</Button>
+              <Button onClick={handleCreateIncident}>생성</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

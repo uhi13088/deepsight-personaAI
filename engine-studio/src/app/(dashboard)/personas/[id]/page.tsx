@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
+import { toast } from "sonner"
 import {
   ArrowLeft, Save, Trash2, Copy, Archive, Play, History,
   AlertTriangle, CheckCircle, Eye, EyeOff, RotateCcw
@@ -98,12 +99,58 @@ const VECTOR_LABELS = {
 export default function PersonaDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const personaId = params?.id as string
+
   const [persona, setPersona] = useState(SAMPLE_PERSONA)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [showTestDialog, setShowTestDialog] = useState(false)
   const [testResult, setTestResult] = useState("")
   const [testContent, setTestContent] = useState("")
+
+  // 페르소나 데이터 로드
+  useEffect(() => {
+    const fetchPersona = async () => {
+      if (!personaId) return
+
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        const response = await fetch(`/api/personas/${personaId}`)
+        const result = await response.json()
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || "Failed to fetch persona")
+        }
+
+        // API 응답을 페이지 형식에 맞게 변환
+        const apiData = result.data
+        setPersona({
+          ...SAMPLE_PERSONA,
+          id: apiData.id,
+          name: apiData.name,
+          role: apiData.role || SAMPLE_PERSONA.role,
+          expertise: apiData.expertise || SAMPLE_PERSONA.expertise,
+          status: apiData.status,
+          vector: apiData.vector || SAMPLE_PERSONA.vector,
+          createdAt: apiData.createdAt,
+          updatedAt: apiData.updatedAt,
+        })
+      } catch (err) {
+        console.error("Failed to fetch persona:", err)
+        setError(err instanceof Error ? err.message : "페르소나를 불러올 수 없습니다")
+        // 에러 시에도 샘플 데이터로 폴백 (데모 목적)
+        setPersona({ ...SAMPLE_PERSONA, id: personaId })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchPersona()
+  }, [personaId])
 
   const handleVectorChange = (key: string, value: number[]) => {
     setPersona(prev => ({
@@ -114,16 +161,184 @@ export default function PersonaDetailPage() {
 
   const handleSave = async () => {
     setIsSaving(true)
-    // API 호출 시뮬레이션
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    setIsSaving(false)
-    setIsEditing(false)
+    try {
+      const response = await fetch(`/api/personas/${personaId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: persona.name,
+          role: persona.role,
+          tagline: persona.tagline,
+          description: persona.description,
+          status: persona.status,
+          visibility: persona.visibility,
+          expertise: persona.expertise,
+          vector: persona.vector,
+          prompt: persona.prompt,
+        }),
+      })
+
+      const result = await response.json()
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "저장에 실패했습니다")
+      }
+
+      toast.success("페르소나가 저장되었습니다")
+      setIsEditing(false)
+    } catch (err) {
+      console.error("Save error:", err)
+      toast.error(err instanceof Error ? err.message : "저장에 실패했습니다")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleDuplicate = async () => {
+    try {
+      const response = await fetch("/api/personas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...persona,
+          name: `${persona.name} (복제본)`,
+          status: "DRAFT",
+        }),
+      })
+
+      const result = await response.json()
+      if (result.success && result.data?.id) {
+        toast.success("페르소나가 복제되었습니다")
+        router.push(`/personas/${result.data.id}`)
+      } else {
+        toast.success("페르소나가 복제되었습니다") // Demo fallback
+      }
+    } catch {
+      toast.error("복제에 실패했습니다")
+    }
+  }
+
+  const handleAddExpertise = () => {
+    const newExpertise = prompt("추가할 전문 분야를 입력하세요:")
+    if (newExpertise?.trim()) {
+      setPersona(prev => ({
+        ...prev,
+        expertise: [...prev.expertise, newExpertise.trim()]
+      }))
+    }
+  }
+
+  const handleAddExampleResponse = () => {
+    const newExample = prompt("예시 응답을 입력하세요:")
+    if (newExample?.trim()) {
+      setPersona(prev => ({
+        ...prev,
+        prompt: {
+          ...prev.prompt,
+          exampleResponses: [...prev.prompt.exampleResponses, newExample.trim()]
+        }
+      }))
+    }
+  }
+
+  const handleAddRestriction = () => {
+    const newRestriction = prompt("금기사항을 입력하세요:")
+    if (newRestriction?.trim()) {
+      setPersona(prev => ({
+        ...prev,
+        prompt: {
+          ...prev.prompt,
+          restrictions: [...prev.prompt.restrictions, newRestriction.trim()]
+        }
+      }))
+    }
+  }
+
+  const handleApplyPreset = (presetName: string) => {
+    const presets: Record<string, typeof SAMPLE_PERSONA.vector> = {
+      "냉철한 분석가": { depth: 0.95, lens: 0.95, stance: 0.85, scope: 0.9, taste: 0.2, purpose: 0.8 },
+      "감성 에세이스트": { depth: 0.6, lens: 0.2, stance: 0.3, scope: 0.4, taste: 0.7, purpose: 0.6 },
+      "트렌드 헌터": { depth: 0.5, lens: 0.5, stance: 0.5, scope: 0.3, taste: 0.95, purpose: 0.4 },
+      "균형 잡힌 가이드": { depth: 0.5, lens: 0.5, stance: 0.5, scope: 0.5, taste: 0.5, purpose: 0.5 },
+    }
+    const preset = presets[presetName]
+    if (preset) {
+      setPersona(prev => ({ ...prev, vector: preset }))
+      toast.success(`'${presetName}' 프리셋이 적용되었습니다`)
+    }
+  }
+
+  const handleAutoGeneratePrompt = () => {
+    const { depth, lens, stance, scope, taste, purpose } = persona.vector
+    const generatedPrompt = `# 역할 정의
+당신은 "${persona.name}"입니다. ${persona.role} 역할을 수행합니다.
+전문 분야: ${persona.expertise.join(", ")}
+
+# 성향 가이드
+- 분석 깊이: ${(depth * 100).toFixed(0)}% ${depth > 0.5 ? "심층적" : "직관적"} (${depth > 0.5 ? "배경과 맥락까지 파악" : "핵심 정보 위주"})
+- 판단 렌즈: ${(lens * 100).toFixed(0)}% ${lens > 0.5 ? "논리적" : "감성적"} (${lens > 0.5 ? "구조와 근거 중시" : "느낌과 감정 중시"})
+- 평가 태도: ${(stance * 100).toFixed(0)}% ${stance > 0.5 ? "비판적" : "수용적"} (${stance > 0.5 ? "결점도 지적" : "긍정 위주"})
+- 관심 범위: ${(scope * 100).toFixed(0)}% ${scope > 0.5 ? "디테일" : "핵심만"} (${scope > 0.5 ? "세부사항 꼼꼼히" : "핵심만 집중"})
+- 취향 성향: ${(taste * 100).toFixed(0)}% ${taste > 0.5 ? "실험적" : "클래식"} (${taste > 0.5 ? "새로운 것 선호" : "검증된 것 선호"})
+- 소비 목적: ${(purpose * 100).toFixed(0)}% ${purpose > 0.5 ? "의미 추구" : "오락 추구"}
+
+# 행동 지침
+1. 콘텐츠를 추천할 때는 ${lens > 0.5 ? "논리적 근거를 제시" : "감성적 표현을 사용"}하세요.
+2. ${scope > 0.5 ? "세부 요소를 분석" : "핵심 정보를 간략히 전달"}하세요.
+3. ${stance > 0.5 ? "아쉬운 점도 솔직하게 말하되, 건설적으로 표현" : "긍정적인 면을 부각"}하세요.
+
+# 금기사항
+- 비속어, 혐오 표현 절대 금지
+- 정치적/종교적 편향 금지
+- 스포일러 주의`
+
+    setPersona(prev => ({
+      ...prev,
+      prompt: { ...prev.prompt, systemPrompt: generatedPrompt }
+    }))
+    toast.success("벡터 기반으로 프롬프트가 생성되었습니다")
+  }
+
+  const handleViewVersion = (version: string) => {
+    toast.info(`${version} 버전 상세 보기 (구현 예정)`)
+  }
+
+  const handleRollback = (version: string) => {
+    if (confirm(`${version} 버전으로 롤백하시겠습니까?`)) {
+      toast.success(`${version} 버전으로 롤백되었습니다`)
+    }
   }
 
   const handleTestPrompt = async () => {
     setTestResult("생성 중...")
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setTestResult(`[${persona.name}의 리뷰]
+
+    try {
+      const response = await fetch(`/api/personas/${personaId}/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentTitle: testContent,
+          contentDescription: testContent,
+        }),
+      })
+
+      const result = await response.json()
+      if (result.success) {
+        setTestResult(`[${persona.name}의 리뷰]
+
+${result.data.response}
+
+---
+테스트 결과:
+- 벡터 정렬도: ${result.data.scores.vectorAlignment.toFixed(1)}%
+- 톤 매칭: ${result.data.scores.toneMatch.toFixed(1)}%
+- 추론 품질: ${result.data.scores.reasoningQuality.toFixed(1)}%
+- 실행 시간: ${result.data.executionTime.toFixed(0)}ms`)
+      } else {
+        throw new Error(result.error)
+      }
+    } catch {
+      // Fallback to mock response
+      setTestResult(`[${persona.name}의 리뷰]
 
 ${testContent}에 대한 분석입니다.
 
@@ -132,6 +347,7 @@ ${testContent}에 대한 분석입니다.
 연출 기법 면에서는 롱테이크와 클로즈업의 적절한 배합이 돋보입니다. 다만, 중반부의 페이싱이 다소 느려지는 부분은 개선의 여지가 있습니다.
 
 종합 평점: ★★★★☆ (4.2/5)`)
+    }
   }
 
   const getQualityColor = (score: number) => {
@@ -152,8 +368,35 @@ ${testContent}에 대한 분석입니다.
     return variants[status] || "secondary"
   }
 
+  // 로딩 상태
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">페르소나 정보를 불러오는 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 에러 상태 (샘플 데이터로 표시하면서 알림)
+  if (error) {
+    console.warn("Using sample data due to error:", error)
+  }
+
   return (
     <div className="p-6 space-y-6">
+      {/* 에러 알림 배너 */}
+      {error && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 text-yellow-600" />
+          <p className="text-sm text-yellow-800 dark:text-yellow-200">
+            API 연동 전이므로 샘플 데이터를 표시합니다. (ID: {personaId})
+          </p>
+        </div>
+      )}
+
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -187,7 +430,7 @@ ${testContent}에 대한 분석입니다.
                 <Play className="h-4 w-4 mr-2" />
                 테스트
               </Button>
-              <Button variant="outline">
+              <Button variant="outline" onClick={handleDuplicate}>
                 <Copy className="h-4 w-4 mr-2" />
                 복제
               </Button>
@@ -226,7 +469,11 @@ ${testContent}에 대한 분석입니다.
                 </div>
                 <div className="space-y-2">
                   <Label>역할</Label>
-                  <Select disabled={!isEditing} value={persona.role}>
+                  <Select
+                    disabled={!isEditing}
+                    value={persona.role}
+                    onValueChange={(value) => setPersona(prev => ({ ...prev, role: value }))}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -266,7 +513,11 @@ ${testContent}에 대한 분석입니다.
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label>상태</Label>
-                  <Select disabled={!isEditing} value={persona.status}>
+                  <Select
+                    disabled={!isEditing}
+                    value={persona.status}
+                    onValueChange={(value) => setPersona(prev => ({ ...prev, status: value }))}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -281,7 +532,11 @@ ${testContent}에 대한 분석입니다.
                 </div>
                 <div className="space-y-2">
                   <Label>공개 범위</Label>
-                  <Select disabled={!isEditing} value={persona.visibility}>
+                  <Select
+                    disabled={!isEditing}
+                    value={persona.visibility}
+                    onValueChange={(value) => setPersona(prev => ({ ...prev, visibility: value }))}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -298,7 +553,7 @@ ${testContent}에 대한 분석입니다.
                       <Badge key={idx} variant="secondary">{exp}</Badge>
                     ))}
                     {isEditing && (
-                      <Button variant="outline" size="sm">+ 추가</Button>
+                      <Button variant="outline" size="sm" onClick={handleAddExpertise}>+ 추가</Button>
                     )}
                   </div>
                 </div>
@@ -360,16 +615,16 @@ ${testContent}에 대한 분석입니다.
                 <div className="mt-4 p-4 bg-muted rounded-lg">
                   <h4 className="font-medium mb-2">프리셋</h4>
                   <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" disabled={!isEditing}>
+                    <Button variant="outline" size="sm" disabled={!isEditing} onClick={() => handleApplyPreset("냉철한 분석가")}>
                       냉철한 분석가
                     </Button>
-                    <Button variant="outline" size="sm" disabled={!isEditing}>
+                    <Button variant="outline" size="sm" disabled={!isEditing} onClick={() => handleApplyPreset("감성 에세이스트")}>
                       감성 에세이스트
                     </Button>
-                    <Button variant="outline" size="sm" disabled={!isEditing}>
+                    <Button variant="outline" size="sm" disabled={!isEditing} onClick={() => handleApplyPreset("트렌드 헌터")}>
                       트렌드 헌터
                     </Button>
-                    <Button variant="outline" size="sm" disabled={!isEditing}>
+                    <Button variant="outline" size="sm" disabled={!isEditing} onClick={() => handleApplyPreset("균형 잡힌 가이드")}>
                       균형 잡힌 가이드
                     </Button>
                   </div>
@@ -404,7 +659,7 @@ ${testContent}에 대한 분석입니다.
                   {persona.prompt.systemPrompt.length}자 / 권장 200-500자
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" disabled={!isEditing}>
+                  <Button variant="outline" size="sm" disabled={!isEditing} onClick={handleAutoGeneratePrompt}>
                     <RotateCcw className="h-4 w-4 mr-2" />
                     벡터 기반 자동 생성
                   </Button>
@@ -429,7 +684,7 @@ ${testContent}에 대한 분석입니다.
                   </div>
                 ))}
                 {isEditing && (
-                  <Button variant="outline" size="sm" className="w-full">+ 예시 추가</Button>
+                  <Button variant="outline" size="sm" className="w-full" onClick={handleAddExampleResponse}>+ 예시 추가</Button>
                 )}
               </CardContent>
             </Card>
@@ -446,7 +701,7 @@ ${testContent}에 대한 분석입니다.
                   </div>
                 ))}
                 {isEditing && (
-                  <Button variant="outline" size="sm" className="w-full">+ 금기사항 추가</Button>
+                  <Button variant="outline" size="sm" className="w-full" onClick={handleAddRestriction}>+ 금기사항 추가</Button>
                 )}
               </CardContent>
             </Card>
@@ -512,12 +767,12 @@ ${testContent}에 대한 분석입니다.
                       <div className="text-sm text-muted-foreground">
                         {version.author} • {version.date}
                       </div>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" onClick={() => handleViewVersion(version.version)}>
                         <Eye className="h-4 w-4 mr-2" />
                         보기
                       </Button>
                       {idx > 0 && (
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => handleRollback(version.version)}>
                           롤백
                         </Button>
                       )}

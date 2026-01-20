@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import {
   Users,
   Plus,
@@ -201,6 +202,20 @@ export default function ArchetypesPage() {
     vector: { depth: 0.5, lens: 0.5, stance: 0.5, scope: 0.5, taste: 0.5, purpose: 0.5 },
   })
 
+  const handleCreateArchetype = () => {
+    if (!newArchetype.name.trim()) {
+      toast.error("아키타입 이름을 입력해주세요.")
+      return
+    }
+    toast.success(`"${newArchetype.name}" 아키타입이 생성되었습니다.`)
+    setShowCreateDialog(false)
+    setNewArchetype({
+      name: "",
+      description: "",
+      vector: { depth: 0.5, lens: 0.5, stance: 0.5, scope: 0.5, taste: 0.5, purpose: 0.5 },
+    })
+  }
+
   const filteredArchetypes = ARCHETYPES.filter(
     (a) =>
       a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -304,7 +319,7 @@ export default function ArchetypesPage() {
                 <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
                   취소
                 </Button>
-                <Button>생성</Button>
+                <Button onClick={handleCreateArchetype}>생성</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

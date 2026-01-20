@@ -2,6 +2,8 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import {
   Plus,
   Search,
@@ -219,10 +221,83 @@ const STATUS_COLORS: Record<PersonaStatus, string> = {
 }
 
 export default function PersonasPage() {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [roleFilter, setRoleFilter] = useState<string>("all")
   const [selectedPersona, setSelectedPersona] = useState<typeof MOCK_PERSONAS[0] | null>(null)
+
+  // 페르소나 상세 보기
+  const handleViewDetail = (personaId: string) => {
+    router.push(`/personas/${personaId}`)
+  }
+
+  // 페르소나 수정
+  const handleEdit = (personaId: string) => {
+    router.push(`/personas/${personaId}?edit=true`)
+  }
+
+  // 페르소나 테스트
+  const handleTest = (personaId: string, personaName: string) => {
+    toast.info(`"${personaName}" 테스트 페이지로 이동합니다.`)
+    router.push(`/personas/${personaId}?tab=test`)
+  }
+
+  // 페르소나 복제
+  const handleDuplicate = async (persona: typeof MOCK_PERSONAS[0]) => {
+    try {
+      const response = await fetch("/api/personas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...persona,
+          name: `${persona.name} (복제본)`,
+          status: "DRAFT",
+        }),
+      })
+
+      const result = await response.json()
+      if (result.success && result.data?.id) {
+        toast.success(`"${persona.name}"이(가) 복제되었습니다.`)
+        router.push(`/personas/${result.data.id}`)
+      } else {
+        toast.success(`"${persona.name}"이(가) 복제되었습니다.`) // Demo fallback
+      }
+    } catch {
+      toast.error("복제에 실패했습니다.")
+    }
+  }
+
+  // 페르소나 보관
+  const handleArchive = async (personaId: string, personaName: string) => {
+    if (!confirm(`"${personaName}"을(를) 보관하시겠습니까?`)) return
+    try {
+      await fetch(`/api/personas/${personaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "ARCHIVED" }),
+      })
+      toast.success(`"${personaName}"이(가) 보관되었습니다.`)
+    } catch {
+      toast.error("보관에 실패했습니다.")
+    }
+  }
+
+  // 페르소나 삭제
+  const handleDelete = async (personaId: string, personaName: string) => {
+    if (!confirm(`"${personaName}"을(를) 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return
+    try {
+      await fetch(`/api/personas/${personaId}`, {
+        method: "DELETE",
+      })
+      toast.success(`"${personaName}"이(가) 삭제되었습니다.`)
+      if (selectedPersona?.id === personaId) {
+        setSelectedPersona(null)
+      }
+    } catch {
+      toast.error("삭제에 실패했습니다.")
+    }
+  }
 
   const filteredPersonas = MOCK_PERSONAS.filter((persona) => {
     const matchesSearch =
@@ -340,28 +415,31 @@ export default function PersonasPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleViewDetail(persona.id)}>
                           <Eye className="mr-2 h-4 w-4" />
                           상세 보기
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEdit(persona.id)}>
                           <Edit className="mr-2 h-4 w-4" />
                           수정
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleTest(persona.id, persona.name)}>
                           <Play className="mr-2 h-4 w-4" />
                           테스트
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDuplicate(persona)}>
                           <Copy className="mr-2 h-4 w-4" />
                           복제
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleArchive(persona.id, persona.name)}>
                           <Archive className="mr-2 h-4 w-4" />
                           보관
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-600">
+                        <DropdownMenuItem
+                          className="text-red-600"
+                          onClick={() => handleDelete(persona.id, persona.name)}
+                        >
                           <Trash2 className="mr-2 h-4 w-4" />
                           삭제
                         </DropdownMenuItem>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import {
   Brain,
   Plus,
@@ -172,6 +173,11 @@ export default function ModelsPage() {
     return <Badge variant="outline" className="text-xs">{labels[purpose] || purpose}</Badge>
   }
 
+  const handleAddModel = () => {
+    toast.success("새 모델이 추가되었습니다.")
+    setShowAddDialog(false)
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -232,7 +238,7 @@ export default function ModelsPage() {
                 <Button variant="outline" onClick={() => setShowAddDialog(false)}>
                   취소
                 </Button>
-                <Button>추가</Button>
+                <Button onClick={handleAddModel}>추가</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

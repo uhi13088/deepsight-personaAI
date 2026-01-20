@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import {
   Shield,
   Plus,
@@ -187,6 +188,11 @@ export default function SafetyFiltersPage() {
     })
   }
 
+  const handleAddFilter = () => {
+    toast.success("새 필터가 추가되었습니다.")
+    setShowAddDialog(false)
+  }
+
   const getActionBadge = (action: SafetyFilter["action"]) => {
     switch (action) {
       case "block":
@@ -359,7 +365,7 @@ export default function SafetyFiltersPage() {
                       <Button variant="outline" onClick={() => setShowAddDialog(false)}>
                         취소
                       </Button>
-                      <Button>추가</Button>
+                      <Button onClick={handleAddFilter}>추가</Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
