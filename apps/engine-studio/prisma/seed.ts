@@ -12,15 +12,19 @@ async function main() {
   console.log("🌱 Starting database seed...")
 
   // 관리자 비밀번호 (환경변수 또는 기본값)
-  const adminPassword = process.env.ADMIN_PASSWORD || "Admin@DeepSight2024!"
+  const adminPassword = process.env.ADMIN_PASSWORD || "Ghrnfldks12!!@"
   const hashedPassword = await bcrypt.hash(adminPassword, 12)
 
   // 관리자 계정 생성
   const admin = await prisma.user.upsert({
-    where: { email: "admin@deepsight.ai" },
-    update: {},
+    where: { email: "uhi1308@naver.com" },
+    update: {
+      password: hashedPassword,
+      role: "ADMIN",
+      isActive: true,
+    },
     create: {
-      email: "admin@deepsight.ai",
+      email: "uhi1308@naver.com",
       name: "관리자",
       password: hashedPassword,
       role: "ADMIN",
