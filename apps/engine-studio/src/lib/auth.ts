@@ -5,9 +5,6 @@
 
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
-import Google from "next-auth/providers/google"
-import GitHub from "next-auth/providers/github"
-import { PrismaAdapter } from "@auth/prisma-adapter"
 import { z } from "zod"
 import bcrypt from "bcryptjs"
 import type { UserRole } from "@/types"
@@ -55,7 +52,8 @@ export async function verifyPassword(password: string, hashedPassword: string): 
 // ============================================================================
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  adapter: PrismaAdapter(prisma),
+  // Note: PrismaAdapter removed for Vercel Edge compatibility
+  // JWT strategy handles sessions without DB adapter
   providers: [
     Credentials({
       name: "Credentials",
@@ -126,16 +124,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       },
     }),
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID ?? "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-      allowDangerousEmailAccountLinking: false,
-    }),
-    GitHub({
-      clientId: process.env.GITHUB_CLIENT_ID ?? "",
-      clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
-      allowDangerousEmailAccountLinking: false,
-    }),
+    // OAuth providers disabled for now (require PrismaAdapter)
+    // Google({
+    //   clientId: process.env.GOOGLE_CLIENT_ID ?? "",
+    //   clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+    // }),
+    // GitHub({
+    //   clientId: process.env.GITHUB_CLIENT_ID ?? "",
+    //   clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
+    // }),
   ],
   callbacks: {
     async jwt({ token, user, trigger }) {
@@ -171,16 +168,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (url.startsWith("/")) return `${baseUrl}${url}`
       return `${baseUrl}/dashboard`
     },
-    async signIn({ user, account }) {
-      // OAuth 로그인 시 사용자 역할 설정
-      if (account?.provider !== "credentials" && user.email) {
-        const existingUser = await prisma.user.findUnique({
-          where: { email: user.email },
-        })
-        if (!existingUser) {
-          // 새 OAuth 사용자는 ANALYST 역할로 생성됨
-        }
-      }
+    async signIn() {
       return true
     },
   },
