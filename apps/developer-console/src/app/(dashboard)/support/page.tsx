@@ -295,7 +295,7 @@ export default function SupportPage() {
           {searchQuery && filteredFaqs.length === 0 && (
             <div className="text-muted-foreground py-12 text-center">
               <HelpCircle className="mx-auto mb-4 h-12 w-12 opacity-20" />
-              <p>No results found for "{searchQuery}"</p>
+              <p>No results found for &quot;{searchQuery}&quot;</p>
               <p className="mt-2 text-sm">Try different keywords or contact support</p>
             </div>
           )}

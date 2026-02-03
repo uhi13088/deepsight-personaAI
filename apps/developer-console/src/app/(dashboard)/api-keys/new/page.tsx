@@ -225,7 +225,10 @@ export default function NewApiKeyPage() {
                 <AlertDescription>
                   <ul className="mt-2 list-inside list-disc space-y-1">
                     <li>용도를 쉽게 파악할 수 있는 이름 사용</li>
-                    <li>예: "Production Server", "iOS App", "Development"</li>
+                    <li>
+                      예: &quot;Production Server&quot;, &quot;iOS App&quot;,
+                      &quot;Development&quot;
+                    </li>
                     <li>환경(Live/Test)은 다음 단계에서 선택합니다</li>
                   </ul>
                 </AlertDescription>

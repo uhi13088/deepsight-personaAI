@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
 import {
   Zap,
@@ -17,6 +17,8 @@ import {
   ChevronDown,
   Sparkles,
   Shuffle,
+  Loader2,
+  AlertCircle,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -43,40 +45,8 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts"
-
-// 샘플 페르소나 목록
-const SAMPLE_PERSONAS = [
-  {
-    id: "1",
-    name: "논리적 평론가",
-    vector: { depth: 0.85, lens: 0.78, stance: 0.72, scope: 0.45, taste: 0.68, purpose: 0.82 },
-    status: "active",
-  },
-  {
-    id: "2",
-    name: "감성 에세이스트",
-    vector: { depth: 0.62, lens: 0.25, stance: 0.35, scope: 0.58, taste: 0.75, purpose: 0.42 },
-    status: "active",
-  },
-  {
-    id: "3",
-    name: "트렌드 헌터",
-    vector: { depth: 0.45, lens: 0.55, stance: 0.48, scope: 0.85, taste: 0.32, purpose: 0.38 },
-    status: "active",
-  },
-  {
-    id: "4",
-    name: "균형 잡힌 가이드",
-    vector: { depth: 0.55, lens: 0.52, stance: 0.5, scope: 0.55, taste: 0.48, purpose: 0.52 },
-    status: "active",
-  },
-  {
-    id: "5",
-    name: "시네필 평론가",
-    vector: { depth: 0.92, lens: 0.72, stance: 0.78, scope: 0.22, taste: 0.88, purpose: 0.75 },
-    status: "active",
-  },
-]
+import { personaService } from "@/services/persona-service"
+import type { Vector6D } from "@/types"
 
 // 알고리즘 옵션
 const ALGORITHMS = [
@@ -86,14 +56,25 @@ const ALGORITHMS = [
   { id: "hybrid", name: "Hybrid", description: "복합 알고리즘" },
 ]
 
+interface PersonaForMatch {
+  id: string
+  name: string
+  vector: Vector6D
+  status: string
+}
+
 interface MatchResult {
-  persona: (typeof SAMPLE_PERSONAS)[0]
+  persona: PersonaForMatch
   score: number
   breakdown: Record<string, number>
 }
 
 export default function SimulatorPage() {
-  const [userVector, setUserVector] = useState({
+  // 페르소나 목록
+  const [personas, setPersonas] = useState<PersonaForMatch[]>([])
+  const [isLoadingPersonas, setIsLoadingPersonas] = useState(true)
+
+  const [userVector, setUserVector] = useState<Vector6D>({
     depth: 0.65,
     lens: 0.45,
     stance: 0.55,
@@ -106,6 +87,30 @@ export default function SimulatorPage() {
   const [isSimulating, setIsSimulating] = useState(false)
   const [results, setResults] = useState<MatchResult[] | null>(null)
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false)
+
+  // 페르소나 목록 로드
+  const fetchPersonas = useCallback(async () => {
+    setIsLoadingPersonas(true)
+    try {
+      const response = await personaService.getPersonas({ status: "ACTIVE" })
+      const personasForMatch: PersonaForMatch[] = response.personas.map((p) => ({
+        id: p.id,
+        name: p.name,
+        vector: p.vector,
+        status: p.status,
+      }))
+      setPersonas(personasForMatch)
+    } catch (err) {
+      console.error("Failed to fetch personas:", err)
+      toast.error("페르소나 목록을 불러오는데 실패했습니다")
+    } finally {
+      setIsLoadingPersonas(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchPersonas()
+  }, [fetchPersonas])
 
   const handleExportResults = () => {
     if (!results) {
@@ -143,7 +148,7 @@ export default function SimulatorPage() {
     })
   }
 
-  const handleCopyVector = (persona: (typeof SAMPLE_PERSONAS)[0]) => {
+  const handleCopyVector = (persona: PersonaForMatch) => {
     const vectorString = JSON.stringify(persona.vector, null, 2)
     navigator.clipboard.writeText(vectorString)
     toast.success("벡터 복사 완료", {
@@ -151,13 +156,13 @@ export default function SimulatorPage() {
     })
   }
 
-  const handleViewDetails = (persona: (typeof SAMPLE_PERSONAS)[0]) => {
+  const handleViewDetails = (persona: PersonaForMatch) => {
     toast.info(`${persona.name} 상세 정보`, {
       description: `ID: ${persona.id} | 상태: ${persona.status}`,
     })
   }
 
-  const handleVectorChange = (key: string, value: number[]) => {
+  const handleVectorChange = (key: keyof Vector6D, value: number[]) => {
     setUserVector({ ...userVector, [key]: value[0] })
   }
 
@@ -172,42 +177,59 @@ export default function SimulatorPage() {
     })
   }
 
-  const runSimulation = () => {
+  const runSimulation = async () => {
+    if (personas.length === 0) {
+      toast.error("매칭할 페르소나가 없습니다", {
+        description: "먼저 페르소나를 생성해주세요.",
+      })
+      return
+    }
+
     setIsSimulating(true)
 
-    // 시뮬레이션 결과 생성 (실제로는 API 호출)
-    setTimeout(() => {
-      const simulatedResults: MatchResult[] = SAMPLE_PERSONAS.map((persona) => {
-        // 간단한 코사인 유사도 계산 (실제로는 서버에서 계산)
-        const dims = ["depth", "lens", "stance", "scope", "taste", "purpose"] as const
-        let dotProduct = 0
-        let normA = 0
-        let normB = 0
-        const breakdown: Record<string, number> = {}
+    try {
+      // 시뮬레이션 결과 계산 (실제 API 연결 시 서버에서 계산)
+      const dims = ["depth", "lens", "stance", "scope", "taste", "purpose"] as const
+      const simulatedResults: MatchResult[] = personas
+        .map((persona) => {
+          let dotProduct = 0
+          let normA = 0
+          let normB = 0
+          const breakdown: Record<string, number> = {}
 
-        dims.forEach((dim) => {
-          const a = userVector[dim]
-          const b = persona.vector[dim]
-          dotProduct += a * b
-          normA += a * a
-          normB += b * b
-          breakdown[dim] = 1 - Math.abs(a - b)
+          dims.forEach((dim) => {
+            const a = userVector[dim]
+            const b = persona.vector[dim]
+            dotProduct += a * b
+            normA += a * a
+            normB += b * b
+            breakdown[dim] = 1 - Math.abs(a - b)
+          })
+
+          const denominator = Math.sqrt(normA) * Math.sqrt(normB)
+          const score = denominator === 0 ? 0 : dotProduct / denominator
+
+          return {
+            persona,
+            score: score * 100,
+            breakdown,
+          }
         })
+        .sort((a, b) => b.score - a.score)
 
-        // Prevent division by zero - return 0 if either vector is zero
-        const denominator = Math.sqrt(normA) * Math.sqrt(normB)
-        const score = denominator === 0 ? 0 : dotProduct / denominator
-
-        return {
-          persona,
-          score: score * 100,
-          breakdown,
-        }
-      }).sort((a, b) => b.score - a.score)
+      // 약간의 지연을 주어 시뮬레이션 느낌 연출
+      await new Promise((resolve) => setTimeout(resolve, 800))
 
       setResults(simulatedResults)
+      toast.success("시뮬레이션 완료", {
+        description: `${simulatedResults.length}개 페르소나 매칭 완료`,
+      })
+    } catch (err) {
+      console.error("Simulation failed:", err)
+      toast.error("시뮬레이션에 실패했습니다")
+    } finally {
       setIsSimulating(false)
-    }, 1000)
+    }
   }
 
   const getVectorData = () => {
@@ -223,9 +245,21 @@ export default function SimulatorPage() {
     return dims.map((d) => ({
       dimension: d.name,
       user: userVector[d.key as keyof typeof userVector],
-      ...(results?.[0] ? { top: results[0].persona.vector[d.key as keyof typeof userVector] } : {}),
+      ...(results?.[0] ? { top: results[0].persona.vector[d.key as keyof Vector6D] } : {}),
       fullMark: 1,
     }))
+  }
+
+  // 페르소나 로딩 중
+  if (isLoadingPersonas) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="text-primary mx-auto mb-4 h-8 w-8 animate-spin" />
+          <p className="text-muted-foreground">페르소나 목록을 불러오는 중...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -240,6 +274,9 @@ export default function SimulatorPage() {
           <p className="text-muted-foreground">사용자 벡터와 페르소나 간의 매칭을 테스트합니다.</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="icon" onClick={() => fetchPersonas()}>
+            <RefreshCw className="h-4 w-4" />
+          </Button>
           <Button variant="outline" onClick={handleExportResults}>
             <Download className="mr-2 h-4 w-4" />
             결과 내보내기
@@ -250,6 +287,18 @@ export default function SimulatorPage() {
           </Button>
         </div>
       </div>
+
+      {/* 페르소나 없을 때 경고 */}
+      {personas.length === 0 && (
+        <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20">
+          <CardContent className="flex items-center gap-3 py-4">
+            <AlertCircle className="h-5 w-5 text-yellow-600" />
+            <p className="text-yellow-800 dark:text-yellow-200">
+              활성화된 페르소나가 없습니다. 먼저 페르소나를 생성하고 활성화해주세요.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main 2-Panel Layout */}
       <div className="grid gap-6 md:grid-cols-2">
@@ -272,7 +321,7 @@ export default function SimulatorPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {Object.entries(userVector).map(([key, value]) => (
+              {(Object.entries(userVector) as [keyof Vector6D, number][]).map(([key, value]) => (
                 <div key={key} className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label className="font-medium uppercase">{key}</Label>
@@ -318,11 +367,11 @@ export default function SimulatorPage() {
                 className="mt-4 w-full"
                 size="lg"
                 onClick={runSimulation}
-                disabled={isSimulating}
+                disabled={isSimulating || personas.length === 0}
               >
                 {isSimulating ? (
                   <>
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     시뮬레이션 중...
                   </>
                 ) : (

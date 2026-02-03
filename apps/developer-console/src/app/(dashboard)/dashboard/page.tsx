@@ -367,7 +367,7 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-yellow-700 dark:text-yellow-300">
-            You've used 65% of your monthly API call quota. Consider upgrading to Pro for more
+            You&apos;ve used 65% of your monthly API call quota. Consider upgrading to Pro for more
             calls.
           </p>
           <Button variant="outline" size="sm" className="mt-3" asChild>

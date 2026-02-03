@@ -1,9 +1,19 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowLeft, Save, Copy, Play, History, AlertTriangle, Eye, RotateCcw } from "lucide-react"
+import {
+  ArrowLeft,
+  Save,
+  Copy,
+  Play,
+  History,
+  AlertTriangle,
+  Eye,
+  RotateCcw,
+  Trash2,
+} from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -28,7 +38,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { RadarChart } from "@/components/charts/radar-chart"
+import { personaService, type PersonaDetailResponse } from "@/services/persona-service"
+import type { PersonaRole, PersonaStatus, Vector6D } from "@/types"
 
 // 샘플 페르소나 데이터
 const SAMPLE_PERSONA = {
@@ -112,51 +134,67 @@ export default function PersonaDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [showTestDialog, setShowTestDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [testResult, setTestResult] = useState("")
   const [testContent, setTestContent] = useState("")
 
   // 페르소나 데이터 로드
-  useEffect(() => {
-    const fetchPersona = async () => {
-      if (!personaId) return
+  const fetchPersona = useCallback(async () => {
+    if (!personaId) return
 
-      setIsLoading(true)
-      setError(null)
+    setIsLoading(true)
+    setError(null)
 
-      try {
-        const response = await fetch(`/api/personas/${personaId}`)
-        const result = await response.json()
+    try {
+      const apiData: PersonaDetailResponse = await personaService.getPersonaById(personaId)
 
-        if (!response.ok || !result.success) {
-          throw new Error(result.error || "Failed to fetch persona")
-        }
-
-        // API 응답을 페이지 형식에 맞게 변환
-        const apiData = result.data
-        setPersona({
-          ...SAMPLE_PERSONA,
-          id: apiData.id,
-          name: apiData.name,
-          role: apiData.role || SAMPLE_PERSONA.role,
-          expertise: apiData.expertise || SAMPLE_PERSONA.expertise,
-          status: apiData.status,
-          vector: apiData.vector || SAMPLE_PERSONA.vector,
-          createdAt: apiData.createdAt,
-          updatedAt: apiData.updatedAt,
-        })
-      } catch (err) {
-        console.error("Failed to fetch persona:", err)
-        setError(err instanceof Error ? err.message : "페르소나를 불러올 수 없습니다")
-        // 에러 시에도 샘플 데이터로 폴백 (데모 목적)
-        setPersona({ ...SAMPLE_PERSONA, id: personaId })
-      } finally {
-        setIsLoading(false)
-      }
+      // API 응답을 페이지 형식에 맞게 변환
+      setPersona({
+        ...SAMPLE_PERSONA,
+        id: apiData.id,
+        name: apiData.name,
+        role: apiData.role || SAMPLE_PERSONA.role,
+        expertise: apiData.expertise || SAMPLE_PERSONA.expertise,
+        description: apiData.description || SAMPLE_PERSONA.description,
+        status: apiData.status,
+        vector: apiData.vector || SAMPLE_PERSONA.vector,
+        qualityScore: apiData.qualityScore ?? SAMPLE_PERSONA.qualityScore,
+        createdAt:
+          apiData.createdAt instanceof Date
+            ? apiData.createdAt.toISOString()
+            : (apiData.createdAt as unknown as string),
+        updatedAt:
+          apiData.updatedAt instanceof Date
+            ? apiData.updatedAt.toISOString()
+            : (apiData.updatedAt as unknown as string),
+        prompt: {
+          ...SAMPLE_PERSONA.prompt,
+          systemPrompt: apiData.promptTemplate || SAMPLE_PERSONA.prompt.systemPrompt,
+        },
+        metrics: apiData.metrics
+          ? {
+              impressionCount: apiData.metrics.impressions,
+              selectionCount: apiData.metrics.clicks,
+              avgRating: apiData.metrics.satisfactionRate / 20, // 100점 만점 → 5점 만점
+              matchAccuracy: apiData.metrics.ctr,
+            }
+          : SAMPLE_PERSONA.metrics,
+      })
+    } catch (err) {
+      console.error("Failed to fetch persona:", err)
+      setError(err instanceof Error ? err.message : "페르소나를 불러올 수 없습니다")
+      // 에러 시에도 샘플 데이터로 폴백 (데모 목적)
+      setPersona({ ...SAMPLE_PERSONA, id: personaId })
+    } finally {
+      setIsLoading(false)
     }
-
-    fetchPersona()
   }, [personaId])
+
+  useEffect(() => {
+    fetchPersona()
+  }, [fetchPersona])
 
   const handleVectorChange = (key: string, value: number[]) => {
     setPersona((prev) => ({
@@ -168,29 +206,19 @@ export default function PersonaDetailPage() {
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      const response = await fetch(`/api/personas/${personaId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: persona.name,
-          role: persona.role,
-          tagline: persona.tagline,
-          description: persona.description,
-          status: persona.status,
-          visibility: persona.visibility,
-          expertise: persona.expertise,
-          vector: persona.vector,
-          prompt: persona.prompt,
-        }),
+      await personaService.updatePersona(personaId, {
+        name: persona.name,
+        role: persona.role as PersonaRole,
+        description: persona.description || undefined,
+        status: persona.status as PersonaStatus,
+        expertise: persona.expertise,
+        vector: persona.vector as Vector6D,
+        promptTemplate: persona.prompt.systemPrompt,
       })
-
-      const result = await response.json()
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || "저장에 실패했습니다")
-      }
 
       toast.success("페르소나가 저장되었습니다")
       setIsEditing(false)
+      await fetchPersona() // 저장 후 새로고침
     } catch (err) {
       console.error("Save error:", err)
       toast.error(err instanceof Error ? err.message : "저장에 실패했습니다")
@@ -199,27 +227,37 @@ export default function PersonaDetailPage() {
     }
   }
 
+  const handleDelete = async () => {
+    setIsDeleting(true)
+    try {
+      await personaService.deletePersona(personaId)
+      toast.success("페르소나가 삭제되었습니다")
+      router.push("/personas")
+    } catch (err) {
+      console.error("Delete error:", err)
+      toast.error(err instanceof Error ? err.message : "삭제에 실패했습니다")
+    } finally {
+      setIsDeleting(false)
+      setShowDeleteDialog(false)
+    }
+  }
+
   const handleDuplicate = async () => {
     try {
-      const response = await fetch("/api/personas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...persona,
-          name: `${persona.name} (복제본)`,
-          status: "DRAFT",
-        }),
+      const newPersona = await personaService.createPersona({
+        name: `${persona.name} (복제본)`,
+        role: persona.role as PersonaRole,
+        description: persona.description || undefined,
+        expertise: persona.expertise,
+        vector: persona.vector as Vector6D,
+        promptTemplate: persona.prompt.systemPrompt,
       })
 
-      const result = await response.json()
-      if (result.success && result.data?.id) {
-        toast.success("페르소나가 복제되었습니다")
-        router.push(`/personas/${result.data.id}`)
-      } else {
-        toast.success("페르소나가 복제되었습니다") // Demo fallback
-      }
-    } catch {
-      toast.error("복제에 실패했습니다")
+      toast.success("페르소나가 복제되었습니다")
+      router.push(`/personas/${newPersona.id}`)
+    } catch (err) {
+      console.error("Duplicate error:", err)
+      toast.error(err instanceof Error ? err.message : "복제에 실패했습니다")
     }
   }
 
@@ -339,41 +377,26 @@ export default function PersonaDetailPage() {
     setTestResult("생성 중...")
 
     try {
-      const response = await fetch(`/api/personas/${personaId}/test`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contentTitle: testContent,
-          contentDescription: testContent,
-        }),
+      const result = await personaService.testPersona({
+        personaId: personaId,
+        contentTitle: testContent,
+        contentDescription: testContent,
       })
 
-      const result = await response.json()
-      if (result.success) {
-        setTestResult(`[${persona.name}의 리뷰]
+      setTestResult(`[${persona.name}의 리뷰]
 
-${result.data.response}
+${result.response}
 
 ---
 테스트 결과:
-- 벡터 정렬도: ${result.data.scores.vectorAlignment.toFixed(1)}%
-- 톤 매칭: ${result.data.scores.toneMatch.toFixed(1)}%
-- 추론 품질: ${result.data.scores.reasoningQuality.toFixed(1)}%
-- 실행 시간: ${result.data.executionTime.toFixed(0)}ms`)
-      } else {
-        throw new Error(result.error)
-      }
-    } catch {
-      // Fallback to mock response
-      setTestResult(`[${persona.name}의 리뷰]
-
-${testContent}에 대한 분석입니다.
-
-이 작품은 서사 구조 측면에서 탄탄한 기반을 갖추고 있습니다. 특히 2막에서의 갈등 고조가 자연스럽게 이루어지며, 캐릭터 아크가 명확하게 설정되어 있습니다.
-
-연출 기법 면에서는 롱테이크와 클로즈업의 적절한 배합이 돋보입니다. 다만, 중반부의 페이싱이 다소 느려지는 부분은 개선의 여지가 있습니다.
-
-종합 평점: ★★★★☆ (4.2/5)`)
+- 벡터 정렬도: ${result.scores.vectorAlignment.toFixed(1)}%
+- 톤 매칭: ${result.scores.toneMatch.toFixed(1)}%
+- 추론 품질: ${result.scores.reasoningQuality.toFixed(1)}%
+- 실행 시간: ${result.executionTime.toFixed(0)}ms`)
+    } catch (err) {
+      console.error("Test error:", err)
+      toast.error("테스트 실행에 실패했습니다")
+      setTestResult("")
     }
   }
 
@@ -464,6 +487,10 @@ ${testContent}에 대한 분석입니다.
                 복제
               </Button>
               <Button onClick={() => setIsEditing(true)}>수정</Button>
+              <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                삭제
+              </Button>
             </>
           )}
         </div>
@@ -899,6 +926,28 @@ ${testContent}에 대한 분석입니다.
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>페르소나 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              &apos;{persona.name}&apos; 페르소나를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "삭제 중..." : "삭제"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

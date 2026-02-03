@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -16,6 +16,8 @@ import {
   Play,
   Star,
   Users,
+  RefreshCw,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -39,37 +41,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { RadarChart } from "@/components/charts/radar-chart"
 import { PERSONA_STATUS_LABELS, PERSONA_ROLE_LABELS } from "@/lib/utils"
-import type { Persona, PersonaStatus, Vector6D } from "@/types"
-import { MOCK_PERSONAS as MOCK_PERSONAS_SERVICE } from "@/services/mock-data.service"
-
-// Transform MockPersona data to full Persona type with all required fields
-// MockPersona now uses DB enum values (PersonaRole, PersonaStatus)
-const MOCK_PERSONAS: (Persona & { vector: Vector6D })[] = MOCK_PERSONAS_SERVICE.map((p, index) => ({
-  id: p.id,
-  organizationId: null,
-  visibility: index % 2 === 0 ? "GLOBAL" : ("PRIVATE" as const),
-  sharedWithOrgs: [],
-  name: p.name,
-  role: p.role, // 이제 MockPersona가 DB enum (PersonaRole)을 직접 사용
-  expertise: p.expertise,
-  description: p.promptTemplate.slice(0, 60) + "...",
-  profileImageUrl: null,
-  promptTemplate: p.promptTemplate,
-  promptVersion: "1.0",
-  status: p.status, // 이제 MockPersona가 DB enum (PersonaStatus)을 직접 사용
-  qualityScore: Math.round(p.accuracy),
-  validationScore: p.accuracy / 100,
-  validationVersion: 1,
-  lastValidationDate: new Date(p.updatedAt),
-  source: "MANUAL" as const,
-  parentPersonaId: null,
-  createdById: "1",
-  createdAt: new Date(p.createdAt),
-  updatedAt: new Date(p.updatedAt),
-  activatedAt: p.status === "ACTIVE" ? new Date(p.createdAt) : null,
-  archivedAt: null,
-  vector: p.vector,
-}))
+import { personaService, type PersonaWithVector } from "@/services/persona-service"
+import type { PersonaStatus, PersonaFilters, PersonaRole } from "@/types"
 
 const STATUS_COLORS: Record<PersonaStatus, string> = {
   DRAFT: "draft",
@@ -87,7 +60,54 @@ export default function PersonasPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [roleFilter, setRoleFilter] = useState<string>("all")
-  const [selectedPersona, setSelectedPersona] = useState<(typeof MOCK_PERSONAS)[0] | null>(null)
+  const [selectedPersona, setSelectedPersona] = useState<PersonaWithVector | null>(null)
+
+  // 데이터 상태
+  const [personas, setPersonas] = useState<PersonaWithVector[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // 데이터 fetch
+  const fetchPersonas = useCallback(
+    async (showRefreshIndicator = false) => {
+      try {
+        if (showRefreshIndicator) {
+          setIsRefreshing(true)
+        } else {
+          setIsLoading(true)
+        }
+        setError(null)
+
+        const filters: PersonaFilters = {}
+
+        if (searchQuery) filters.search = searchQuery
+        if (statusFilter !== "all") filters.status = statusFilter as PersonaStatus
+        if (roleFilter !== "all") filters.role = roleFilter as PersonaRole
+
+        const response = await personaService.getPersonas(filters)
+        setPersonas(response.personas)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "데이터를 불러오는데 실패했습니다."
+        setError(message)
+        toast.error(message)
+      } finally {
+        setIsLoading(false)
+        setIsRefreshing(false)
+      }
+    },
+    [searchQuery, statusFilter, roleFilter]
+  )
+
+  // 초기 로드 및 필터 변경 시 데이터 fetch
+  useEffect(() => {
+    fetchPersonas()
+  }, [fetchPersonas])
+
+  // 새로고침
+  const handleRefresh = () => {
+    fetchPersonas(true)
+  }
 
   // 페르소나 상세 보기
   const handleViewDetail = (personaId: string) => {
@@ -106,25 +126,20 @@ export default function PersonasPage() {
   }
 
   // 페르소나 복제
-  const handleDuplicate = async (persona: (typeof MOCK_PERSONAS)[0]) => {
+  const handleDuplicate = async (persona: PersonaWithVector) => {
     try {
-      const response = await fetch("/api/personas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...persona,
-          name: `${persona.name} (복제본)`,
-          status: "DRAFT",
-        }),
+      const newPersona = await personaService.createPersona({
+        name: `${persona.name} (복제본)`,
+        role: persona.role,
+        expertise: persona.expertise,
+        description: persona.description || undefined,
+        promptTemplate: persona.promptTemplate,
+        vector: persona.vector,
       })
 
-      const result = await response.json()
-      if (result.success && result.data?.id) {
-        toast.success(`"${persona.name}"이(가) 복제되었습니다.`)
-        router.push(`/personas/${result.data.id}`)
-      } else {
-        toast.success(`"${persona.name}"이(가) 복제되었습니다.`) // Demo fallback
-      }
+      toast.success(`"${persona.name}"이(가) 복제되었습니다.`)
+      await fetchPersonas(true)
+      router.push(`/personas/${newPersona.id}`)
     } catch {
       toast.error("복제에 실패했습니다.")
     }
@@ -134,15 +149,12 @@ export default function PersonasPage() {
   const handleArchive = async (personaId: string, personaName: string) => {
     if (!confirm(`"${personaName}"을(를) 보관하시겠습니까?`)) return
     try {
-      const response = await fetch(`/api/personas/${personaId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "ARCHIVED" }),
-      })
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
+      await personaService.updatePersonaStatus(personaId, "ARCHIVED")
       toast.success(`"${personaName}"이(가) 보관되었습니다.`)
+      await fetchPersonas(true)
+      if (selectedPersona?.id === personaId) {
+        setSelectedPersona(null)
+      }
     } catch {
       toast.error("보관에 실패했습니다.")
     }
@@ -153,13 +165,9 @@ export default function PersonasPage() {
     if (!confirm(`"${personaName}"을(를) 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`))
       return
     try {
-      const response = await fetch(`/api/personas/${personaId}`, {
-        method: "DELETE",
-      })
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
+      await personaService.deletePersona(personaId)
       toast.success(`"${personaName}"이(가) 삭제되었습니다.`)
+      await fetchPersonas(true)
       if (selectedPersona?.id === personaId) {
         setSelectedPersona(null)
       }
@@ -167,15 +175,6 @@ export default function PersonasPage() {
       toast.error("삭제에 실패했습니다.")
     }
   }
-
-  const filteredPersonas = MOCK_PERSONAS.filter((persona) => {
-    const matchesSearch =
-      persona.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      persona.description?.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === "all" || persona.status === statusFilter
-    const matchesRole = roleFilter === "all" || persona.role === roleFilter
-    return matchesSearch && matchesStatus && matchesRole
-  })
 
   const getInitials = (name: string) => {
     return name
@@ -187,6 +186,30 @@ export default function PersonasPage() {
       .slice(0, 2)
   }
 
+  // 로딩 상태
+  if (isLoading) {
+    return (
+      <div className="flex h-[calc(100vh-8rem)] items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="text-primary h-8 w-8 animate-spin" />
+          <p className="text-muted-foreground">페르소나를 불러오는 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 에러 상태
+  if (error) {
+    return (
+      <div className="flex h-[calc(100vh-8rem)] items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <p className="text-destructive">{error}</p>
+          <Button onClick={() => fetchPersonas()}>다시 시도</Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-6">
       {/* Left: Persona List */}
@@ -195,15 +218,18 @@ export default function PersonasPage() {
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold">페르소나 목록</h2>
-            <p className="text-muted-foreground text-sm">
-              총 {filteredPersonas.length}개의 페르소나
-            </p>
+            <p className="text-muted-foreground text-sm">총 {personas.length}개의 페르소나</p>
           </div>
-          <Link href="/personas/create">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />새 페르소나
+          <div className="flex gap-2">
+            <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isRefreshing}>
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
             </Button>
-          </Link>
+            <Link href="/personas/create">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />새 페르소나
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Filters */}
@@ -247,105 +273,117 @@ export default function PersonasPage() {
 
         {/* Persona Grid */}
         <div className="flex-1 overflow-auto">
-          <div className="grid gap-4 sm:grid-cols-2">
-            {filteredPersonas.map((persona) => (
-              <Card
-                key={persona.id}
-                className={`hover:border-primary cursor-pointer transition-all ${
-                  selectedPersona?.id === persona.id ? "border-primary ring-primary ring-1" : ""
-                }`}
-                onClick={() => setSelectedPersona(persona)}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={persona.profileImageUrl || undefined} />
-                        <AvatarFallback className="bg-primary/10 text-primary">
-                          {getInitials(persona.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <CardTitle className="flex items-center gap-2 text-base">
-                          {persona.name}
-                          {persona.status === "STANDARD" && (
-                            <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
-                          )}
-                        </CardTitle>
-                        <CardDescription className="text-xs">
-                          {PERSONA_ROLE_LABELS[persona.role]}
-                        </CardDescription>
+          {personas.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center text-center">
+              <Users className="text-muted-foreground mb-4 h-12 w-12 opacity-50" />
+              <p className="text-muted-foreground mb-4">페르소나가 없습니다.</p>
+              <Link href="/personas/create">
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />첫 페르소나 만들기
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {personas.map((persona) => (
+                <Card
+                  key={persona.id}
+                  className={`hover:border-primary cursor-pointer transition-all ${
+                    selectedPersona?.id === persona.id ? "border-primary ring-primary ring-1" : ""
+                  }`}
+                  onClick={() => setSelectedPersona(persona)}
+                >
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={persona.profileImageUrl || undefined} />
+                          <AvatarFallback className="bg-primary/10 text-primary">
+                            {getInitials(persona.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <CardTitle className="flex items-center gap-2 text-base">
+                            {persona.name}
+                            {persona.status === "STANDARD" && (
+                              <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
+                            )}
+                          </CardTitle>
+                          <CardDescription className="text-xs">
+                            {PERSONA_ROLE_LABELS[persona.role]}
+                          </CardDescription>
+                        </div>
                       </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleViewDetail(persona.id)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            상세 보기
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEdit(persona.id)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            수정
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleTest(persona.id, persona.name)}>
+                            <Play className="mr-2 h-4 w-4" />
+                            테스트
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDuplicate(persona)}>
+                            <Copy className="mr-2 h-4 w-4" />
+                            복제
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleArchive(persona.id, persona.name)}>
+                            <Archive className="mr-2 h-4 w-4" />
+                            보관
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-600"
+                            onClick={() => handleDelete(persona.id, persona.name)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            삭제
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleViewDetail(persona.id)}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          상세 보기
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEdit(persona.id)}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          수정
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleTest(persona.id, persona.name)}>
-                          <Play className="mr-2 h-4 w-4" />
-                          테스트
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDuplicate(persona)}>
-                          <Copy className="mr-2 h-4 w-4" />
-                          복제
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleArchive(persona.id, persona.name)}>
-                          <Archive className="mr-2 h-4 w-4" />
-                          보관
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-600"
-                          onClick={() => handleDelete(persona.id, persona.name)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          삭제
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground mb-3 line-clamp-2 text-sm">
-                    {persona.description}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-wrap gap-1">
-                      {persona.expertise.slice(0, 3).map((exp) => (
-                        <Badge key={exp} variant="secondary" className="text-xs">
-                          {exp}
-                        </Badge>
-                      ))}
-                      {persona.expertise.length > 3 && (
-                        <Badge variant="secondary" className="text-xs">
-                          +{persona.expertise.length - 3}
-                        </Badge>
-                      )}
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground mb-3 line-clamp-2 text-sm">
+                      {persona.description}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap gap-1">
+                        {persona.expertise.slice(0, 3).map((exp) => (
+                          <Badge key={exp} variant="secondary" className="text-xs">
+                            {exp}
+                          </Badge>
+                        ))}
+                        {persona.expertise.length > 3 && (
+                          <Badge variant="secondary" className="text-xs">
+                            +{persona.expertise.length - 3}
+                          </Badge>
+                        )}
+                      </div>
+                      <Badge variant={STATUS_COLORS[persona.status] as "default"}>
+                        {PERSONA_STATUS_LABELS[persona.status]}
+                      </Badge>
                     </div>
-                    <Badge variant={STATUS_COLORS[persona.status] as "default"}>
-                      {PERSONA_STATUS_LABELS[persona.status]}
-                    </Badge>
-                  </div>
-                  <div className="mt-3 flex items-center gap-2">
-                    <span className="text-muted-foreground text-xs">품질</span>
-                    <Progress value={persona.qualityScore || 0} className="h-1.5 flex-1" />
-                    <span className="text-xs font-medium">{persona.qualityScore}점</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    <div className="mt-3 flex items-center gap-2">
+                      <span className="text-muted-foreground text-xs">품질</span>
+                      <Progress value={persona.qualityScore || 0} className="h-1.5 flex-1" />
+                      <span className="text-xs font-medium">{persona.qualityScore || 0}점</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -356,11 +394,14 @@ export default function PersonasPage() {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">상세 정보</h3>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={() => handleEdit(selectedPersona.id)}>
                   <Edit className="mr-1 h-4 w-4" />
                   수정
                 </Button>
-                <Button size="sm">
+                <Button
+                  size="sm"
+                  onClick={() => handleTest(selectedPersona.id, selectedPersona.name)}
+                >
                   <Play className="mr-1 h-4 w-4" />
                   테스트
                 </Button>
@@ -440,7 +481,7 @@ export default function PersonasPage() {
               <CardContent className="space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">품질 점수</span>
-                  <span className="font-medium">{selectedPersona.qualityScore}점</span>
+                  <span className="font-medium">{selectedPersona.qualityScore || 0}점</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">검증 점수</span>
@@ -451,7 +492,7 @@ export default function PersonasPage() {
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">생성일</span>
                   <span className="font-medium">
-                    {selectedPersona.createdAt.toLocaleDateString("ko-KR")}
+                    {new Date(selectedPersona.createdAt).toLocaleDateString("ko-KR")}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
