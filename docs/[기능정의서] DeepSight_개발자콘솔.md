@@ -1709,7 +1709,7 @@ Authorization: Bearer sk_live_xxxxxxxxxxxxx
 
 **Query Parameter 방식 (비권장):**
 
-[https://api.deepsight.ai/v1/match?api\\\_key=sk\\\_live\\\_xxxxxxxxxxxxx](https://api.deepsight.ai/v1/match?api\_key=sk\_live\_xxxxxxxxxxxxx)
+[https://api.deepsight.ai/v1/match?api\\\_key=sk\\\_live\\\_xxxxxxxxxxxxx](https://api.deepsight.ai/v1/match?api_key=sk_live_xxxxxxxxxxxxx)
 
 ### 9.2.2 멀티테넌시 데이터 격리 ← v2.1 추가
 

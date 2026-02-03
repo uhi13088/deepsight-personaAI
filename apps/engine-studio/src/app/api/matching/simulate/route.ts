@@ -1,132 +1,183 @@
 import { NextRequest, NextResponse } from "next/server"
+import { z } from "zod"
+import { prisma } from "@/lib/prisma"
+import { auth } from "@/lib/auth"
+import {
+  calculateMatchingScore,
+  selectTopNWithDiversity,
+  type Vector6D,
+  type AlgorithmType,
+  type MatchingContext,
+} from "@/lib/matching/algorithms"
 
-// 코사인 유사도 계산 (division by zero 방지)
-function cosineSimilarity(vecA: number[], vecB: number[]): number {
-  if (vecA.length !== vecB.length) {
-    throw new Error("Vectors must have the same length")
-  }
-
-  let dotProduct = 0
-  let normA = 0
-  let normB = 0
-
-  for (let i = 0; i < vecA.length; i++) {
-    dotProduct += vecA[i] * vecB[i]
-    normA += vecA[i] * vecA[i]
-    normB += vecB[i] * vecB[i]
-  }
-
-  // Prevent division by zero - return 0 if either vector is zero
-  const denominator = Math.sqrt(normA) * Math.sqrt(normB)
-  if (denominator === 0) {
-    return 0
-  }
-
-  return dotProduct / denominator
-}
-
-// 가중치 적용 유클리디안 거리
-function weightedEuclidean(vecA: number[], vecB: number[], weights: number[]): number {
-  let sum = 0
-  for (let i = 0; i < vecA.length; i++) {
-    sum += weights[i] * Math.pow(vecA[i] - vecB[i], 2)
-  }
-  return 1 - Math.sqrt(sum) / Math.sqrt(weights.reduce((a, b) => a + b, 0))
-}
-
-// Mock 페르소나 데이터
-const PERSONAS = [
-  {
-    id: "1",
-    name: "논리적 평론가",
-    vector: { depth: 0.85, lens: 0.78, stance: 0.72, scope: 0.45, taste: 0.68, purpose: 0.82 },
-  },
-  {
-    id: "2",
-    name: "감성 에세이스트",
-    vector: { depth: 0.62, lens: 0.25, stance: 0.35, scope: 0.58, taste: 0.75, purpose: 0.42 },
-  },
-  {
-    id: "3",
-    name: "트렌드 헌터",
-    vector: { depth: 0.45, lens: 0.55, stance: 0.48, scope: 0.85, taste: 0.32, purpose: 0.38 },
-  },
-  {
-    id: "4",
-    name: "균형 잡힌 가이드",
-    vector: { depth: 0.55, lens: 0.52, stance: 0.5, scope: 0.55, taste: 0.48, purpose: 0.52 },
-  },
-  {
-    id: "5",
-    name: "시네필 평론가",
-    vector: { depth: 0.92, lens: 0.72, stance: 0.78, scope: 0.22, taste: 0.88, purpose: 0.75 },
-  },
-]
+// 입력 검증 스키마
+const simulateSchema = z.object({
+  userVector: z.object({
+    depth: z.number().min(0).max(1),
+    lens: z.number().min(0).max(1),
+    stance: z.number().min(0).max(1),
+    scope: z.number().min(0).max(1),
+    taste: z.number().min(0).max(1),
+    purpose: z.number().min(0).max(1),
+  }),
+  algorithm: z.enum(["COSINE", "WEIGHTED", "CONTEXT", "HYBRID"]).default("COSINE"),
+  weights: z.array(z.number()).length(6).optional(),
+  context: z
+    .object({
+      timeOfDay: z.enum(["morning", "afternoon", "evening", "night"]).optional(),
+      mood: z.enum(["relaxed", "focused", "adventurous", "contemplative"]).optional(),
+      contentType: z.string().optional(),
+      genre: z.string().optional(),
+    })
+    .optional(),
+  topN: z.number().min(1).max(20).default(5),
+  diversityFactor: z.number().min(0).max(1).default(0.3),
+  personaIds: z.array(z.string()).optional(), // 특정 페르소나만 대상으로 테스트
+})
 
 // POST /api/matching/simulate - 매칭 시뮬레이션
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { userVector, algorithm = "cosine", weights } = body
-
-    if (!userVector) {
+    const session = await auth()
+    if (!session?.user) {
       return NextResponse.json(
-        { success: false, error: "User vector is required" },
+        { success: false, error: { code: "UNAUTHORIZED", message: "로그인이 필요합니다" } },
+        { status: 401 }
+      )
+    }
+
+    const body = await request.json()
+    const parsed = simulateSchema.safeParse(body)
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0].message },
+        },
         { status: 400 }
       )
     }
 
-    const dims = ["depth", "lens", "stance", "scope", "taste", "purpose"] as const
-    const userVec = dims.map((d) => userVector[d] || 0)
-    const defaultWeights = [1, 1, 1, 1, 1, 1]
+    const { userVector, algorithm, weights, context, topN, diversityFactor, personaIds } =
+      parsed.data
 
-    // 각 페르소나와의 매칭 점수 계산
-    const results = PERSONAS.map((persona) => {
-      const personaVec = dims.map((d) => persona.vector[d])
+    // 페르소나 조회 (ACTIVE 상태만)
+    const whereClause: { id?: { in: string[] }; status: "ACTIVE" | "STANDARD" } = {
+      status: "ACTIVE",
+    }
 
-      let score: number
-      switch (algorithm) {
-        case "weighted":
-          score = weightedEuclidean(userVec, personaVec, weights || defaultWeights)
-          break
-        case "cosine":
-        default:
-          score = cosineSimilarity(userVec, personaVec)
-          break
-      }
+    if (personaIds && personaIds.length > 0) {
+      whereClause.id = { in: personaIds }
+    }
 
-      // 차원별 유사도 계산
-      const breakdown: Record<string, number> = {}
-      dims.forEach((d, i) => {
-        breakdown[d] = 1 - Math.abs(userVec[i] - personaVec[i])
-      })
-
-      return {
-        persona: {
-          id: persona.id,
-          name: persona.name,
-          vector: persona.vector,
+    const personas = await prisma.persona.findMany({
+      where: {
+        OR: [{ status: "ACTIVE" }, { status: "STANDARD" }],
+        ...(personaIds && personaIds.length > 0 ? { id: { in: personaIds } } : {}),
+      },
+      include: {
+        vectors: {
+          orderBy: { version: "desc" },
+          take: 1,
         },
-        score: score * 100,
-        breakdown,
-      }
+      },
     })
 
-    // 점수순 정렬
-    results.sort((a, b) => b.score - a.score)
+    if (personas.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          algorithm,
+          userVector,
+          results: [],
+          message: "매칭 가능한 페르소나가 없습니다",
+          timestamp: new Date().toISOString(),
+        },
+      })
+    }
+
+    // 각 페르소나와 매칭 점수 계산
+    const matchResults = personas
+      .filter((p) => p.vectors.length > 0)
+      .map((persona) => {
+        const personaVector: Vector6D = {
+          depth: Number(persona.vectors[0].depth),
+          lens: Number(persona.vectors[0].lens),
+          stance: Number(persona.vectors[0].stance),
+          scope: Number(persona.vectors[0].scope),
+          taste: Number(persona.vectors[0].taste),
+          purpose: Number(persona.vectors[0].purpose),
+        }
+
+        const matchResult = calculateMatchingScore(
+          userVector as Vector6D,
+          personaVector,
+          algorithm as AlgorithmType,
+          context as MatchingContext,
+          weights
+        )
+
+        return {
+          persona: {
+            id: persona.id,
+            name: persona.name,
+            role: persona.role,
+            expertise: persona.expertise,
+            description: persona.description,
+          },
+          vector: personaVector,
+          score: matchResult.score,
+          breakdown: matchResult.breakdown,
+        }
+      })
+
+    // 다양성을 고려한 Top-N 선택
+    const topResults = selectTopNWithDiversity(matchResults, topN, diversityFactor)
+
+    // 매칭 로그 저장 (선택적)
+    if (session.user.id) {
+      await prisma.matchingLog.create({
+        data: {
+          userId: session.user.id,
+          context: {
+            userVector,
+            algorithm,
+            weights,
+            matchingContext: context,
+          },
+          matchedPersonas: topResults.map((r, idx) => ({
+            personaId: r.persona.id,
+            score: r.score,
+            rank: idx + 1,
+          })),
+        },
+      })
+    }
 
     return NextResponse.json({
       success: true,
       data: {
         algorithm,
         userVector,
-        results,
+        context,
+        results: topResults.map((r) => ({
+          persona: r.persona,
+          vector: r.vector,
+          score: Math.round(r.score * 100) / 100,
+          breakdown: r.breakdown,
+        })),
+        totalCandidates: personas.length,
         timestamp: new Date().toISOString(),
       },
     })
-  } catch {
+  } catch (error) {
+    console.error("[API] POST /api/matching/simulate error:", error)
     return NextResponse.json(
-      { success: false, error: "Failed to simulate matching" },
+      {
+        success: false,
+        error: { code: "INTERNAL_ERROR", message: "매칭 시뮬레이션에 실패했습니다" },
+      },
       { status: 500 }
     )
   }
