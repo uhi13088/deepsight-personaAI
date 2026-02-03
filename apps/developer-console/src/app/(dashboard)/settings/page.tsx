@@ -644,7 +644,7 @@ export default function SettingsPage() {
             </AlertDescription>
           </Alert>
           <div className="space-y-2">
-            <Label>확인을 위해 "DELETE"를 입력하세요</Label>
+            <Label>확인을 위해 &quot;DELETE&quot;를 입력하세요</Label>
             <Input placeholder="DELETE" />
           </div>
           <DialogFooter>
