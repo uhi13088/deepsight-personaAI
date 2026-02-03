@@ -42,7 +42,6 @@ import {
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
-// TODO: Update MockIncident type in @/services/mock-data.service to include timeline, service, reporter, assignee fields
 // 인시던트 타입
 interface Incident {
   id: string
@@ -63,75 +62,15 @@ interface Incident {
   }[]
 }
 
-// TODO: Replace with extended MOCK_INCIDENTS from @/services/mock-data.service
-// Current MOCK_INCIDENTS has simpler structure without timeline, reporter, service fields
-const INCIDENTS: Incident[] = [
-  {
-    id: "INC-001",
-    title: "매칭 엔진 응답 지연",
-    description:
-      "매칭 엔진의 평균 응답 시간이 50ms를 초과하여 사용자 경험에 영향을 미치고 있습니다.",
-    severity: "high",
-    status: "investigating",
-    service: "Matching Engine",
-    reporter: "System Monitor",
-    assignee: "김개발",
-    createdAt: "2025-01-16 14:30",
-    updatedAt: "2025-01-16 15:15",
-    resolvedAt: null,
-    timeline: [
-      { time: "14:30", event: "인시던트 감지 - 자동 알림", user: "System" },
-      { time: "14:35", event: "담당자 할당됨", user: "운영팀" },
-      { time: "14:45", event: "원인 조사 시작", user: "김개발" },
-      { time: "15:15", event: "DB 커넥션 풀 포화 확인", user: "김개발" },
-    ],
-  },
-  {
-    id: "INC-002",
-    title: "Analytics 서비스 부분 장애",
-    description: "일부 분석 데이터가 지연되어 수집되고 있습니다.",
-    severity: "medium",
-    status: "identified",
-    service: "Analytics",
-    reporter: "박운영",
-    assignee: "이엔지니어",
-    createdAt: "2025-01-16 10:00",
-    updatedAt: "2025-01-16 11:30",
-    resolvedAt: null,
-    timeline: [
-      { time: "10:00", event: "인시던트 보고", user: "박운영" },
-      { time: "10:15", event: "담당자 할당됨", user: "운영팀" },
-      { time: "11:30", event: "카프카 컨슈머 지연 원인 확인", user: "이엔지니어" },
-    ],
-  },
-  {
-    id: "INC-003",
-    title: "API 게이트웨이 502 에러 급증",
-    description: "오전 9시경 5분간 502 에러가 발생했습니다.",
-    severity: "critical",
-    status: "resolved",
-    service: "API Gateway",
-    reporter: "System Monitor",
-    assignee: "최시스템",
-    createdAt: "2025-01-15 09:00",
-    updatedAt: "2025-01-15 09:45",
-    resolvedAt: "2025-01-15 09:45",
-    timeline: [
-      { time: "09:00", event: "502 에러 급증 감지", user: "System" },
-      { time: "09:05", event: "긴급 대응 시작", user: "최시스템" },
-      { time: "09:20", event: "업스트림 서버 과부하 확인", user: "최시스템" },
-      { time: "09:35", event: "오토스케일링 트리거", user: "최시스템" },
-      { time: "09:45", event: "서비스 정상화 확인", user: "최시스템" },
-    ],
-  },
-]
+// Incidents - empty by default, will be loaded from API
+const INCIDENTS: Incident[] = []
 
-// TODO: Add MOCK_INCIDENT_STATS to @/services/mock-data.service
+// Incident stats - default empty values
 const INCIDENT_STATS = {
-  open: 2,
-  mttr: "45분",
-  totalThisMonth: 8,
-  resolvedThisMonth: 6,
+  open: 0,
+  mttr: "-",
+  totalThisMonth: 0,
+  resolvedThisMonth: 0,
 }
 
 export default function IncidentsPage() {
@@ -340,31 +279,41 @@ export default function IncidentsPage() {
           </CardHeader>
           <CardContent>
             <ScrollArea className="h-[500px]">
-              <div className="space-y-2">
-                {filteredIncidents.map((incident) => (
-                  <div
-                    key={incident.id}
-                    className={`hover:border-primary cursor-pointer rounded-lg border p-3 transition-all ${
-                      selectedIncident?.id === incident.id ? "border-primary bg-primary/5" : ""
-                    }`}
-                    onClick={() => setSelectedIncident(incident)}
-                  >
-                    <div className="flex items-start gap-3">
-                      {getSeverityIcon(incident.severity)}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-muted-foreground text-xs">{incident.id}</span>
-                          {getStatusBadge(incident.status)}
+              {filteredIncidents.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center py-16 text-center">
+                  <CheckCircle className="text-muted-foreground mb-4 h-12 w-12" />
+                  <h3 className="mb-2 text-lg font-medium">인시던트가 없습니다</h3>
+                  <p className="text-muted-foreground text-sm">
+                    시스템이 정상적으로 운영되고 있습니다.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredIncidents.map((incident) => (
+                    <div
+                      key={incident.id}
+                      className={`hover:border-primary cursor-pointer rounded-lg border p-3 transition-all ${
+                        selectedIncident?.id === incident.id ? "border-primary bg-primary/5" : ""
+                      }`}
+                      onClick={() => setSelectedIncident(incident)}
+                    >
+                      <div className="flex items-start gap-3">
+                        {getSeverityIcon(incident.severity)}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-muted-foreground text-xs">{incident.id}</span>
+                            {getStatusBadge(incident.status)}
+                          </div>
+                          <p className="mt-1 truncate text-sm font-medium">{incident.title}</p>
+                          <p className="text-muted-foreground mt-1 text-xs">
+                            {incident.service} • {incident.createdAt}
+                          </p>
                         </div>
-                        <p className="mt-1 truncate text-sm font-medium">{incident.title}</p>
-                        <p className="text-muted-foreground mt-1 text-xs">
-                          {incident.service} • {incident.createdAt}
-                        </p>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </ScrollArea>
           </CardContent>
         </Card>

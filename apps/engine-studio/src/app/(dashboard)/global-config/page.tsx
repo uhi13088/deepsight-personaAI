@@ -37,26 +37,9 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import Link from "next/link"
 
-// TODO: Add MOCK_AI_MODELS to @/services/mock-data.service for centralized AI model configuration
-// AI 모델 설정 - simplified summary view
-const AI_MODELS = [
-  {
-    id: "gpt-4-turbo",
-    name: "GPT-4 Turbo",
-    provider: "OpenAI",
-    status: "active",
-    usage: 78,
-    // Reference: EXTERNAL_URLS.openai for API configuration
-  },
-  {
-    id: "claude-3-opus",
-    name: "Claude 3 Opus",
-    provider: "Anthropic",
-    status: "active",
-    usage: 22,
-    // Reference: EXTERNAL_URLS.anthropic for API configuration
-  },
-]
+// AI models - empty by default, will be loaded from API
+const AI_MODELS: { id: string; name: string; provider: string; status: string; usage: number }[] =
+  []
 
 // TODO: Move CONFIG_CATEGORIES to @/services/mock-data.service when configuration management is expanded
 // 설정 카테고리
@@ -382,29 +365,45 @@ export default function GlobalConfigPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {AI_MODELS.map((model) => (
-                  <div
-                    key={model.id}
-                    className="flex items-center justify-between rounded-lg border p-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Brain className="text-primary h-5 w-5" />
-                      <div>
-                        <p className="font-medium">{model.name}</p>
-                        <p className="text-muted-foreground text-sm">{model.provider}</p>
+              {AI_MODELS.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <Brain className="text-muted-foreground mb-4 h-10 w-10" />
+                  <h3 className="mb-2 font-medium">등록된 AI 모델이 없습니다</h3>
+                  <p className="text-muted-foreground mb-4 text-sm">
+                    모델 관리 페이지에서 AI 모델을 추가하세요.
+                  </p>
+                  <Link href="/global-config/models">
+                    <Button variant="outline" size="sm">
+                      모델 추가하기
+                      <ChevronRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {AI_MODELS.map((model) => (
+                    <div
+                      key={model.id}
+                      className="flex items-center justify-between rounded-lg border p-3"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Brain className="text-primary h-5 w-5" />
+                        <div>
+                          <p className="font-medium">{model.name}</p>
+                          <p className="text-muted-foreground text-sm">{model.provider}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-sm font-medium">{model.usage}%</p>
+                          <p className="text-muted-foreground text-xs">사용량</p>
+                        </div>
+                        <Badge className="bg-green-500">활성</Badge>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="text-sm font-medium">{model.usage}%</p>
-                        <p className="text-muted-foreground text-xs">사용량</p>
-                      </div>
-                      <Badge className="bg-green-500">활성</Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

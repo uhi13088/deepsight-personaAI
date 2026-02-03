@@ -62,7 +62,6 @@ import {
 } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
-// TODO: Update MockBackup type in @/services/mock-data.service to include name, expiresAt, location fields
 // 백업 데이터
 interface Backup {
   id: string
@@ -76,66 +75,20 @@ interface Backup {
   location: "local" | "s3" | "gcs"
 }
 
-// TODO: Replace with extended MOCK_BACKUPS from @/services/mock-data.service
-// Current MOCK_BACKUPS has simpler structure without name, expiresAt, location fields
-const BACKUPS: Backup[] = [
-  {
-    id: "BKP-001",
-    name: "일일 전체 백업",
-    type: "full",
-    status: "completed",
-    size: "45.2 GB",
-    duration: "12분 34초",
-    createdAt: "2025-01-16 03:00",
-    expiresAt: "2025-01-23",
-    location: "s3",
-  },
-  {
-    id: "BKP-002",
-    name: "증분 백업 #1",
-    type: "incremental",
-    status: "completed",
-    size: "2.1 GB",
-    duration: "1분 45초",
-    createdAt: "2025-01-16 09:00",
-    expiresAt: "2025-01-19",
-    location: "s3",
-  },
-  {
-    id: "BKP-003",
-    name: "증분 백업 #2",
-    type: "incremental",
-    status: "completed",
-    size: "1.8 GB",
-    duration: "1분 32초",
-    createdAt: "2025-01-16 15:00",
-    expiresAt: "2025-01-19",
-    location: "s3",
-  },
-  {
-    id: "BKP-004",
-    name: "증분 백업 #3",
-    type: "incremental",
-    status: "in_progress",
-    size: "~ 2 GB",
-    duration: "진행중...",
-    createdAt: "2025-01-16 21:00",
-    expiresAt: "2025-01-19",
-    location: "s3",
-  },
-]
+// Backups - empty by default, will be loaded from API
+const BACKUPS: Backup[] = []
 
-// TODO: Add MOCK_BACKUP_STATS to @/services/mock-data.service
+// Backup stats - default empty values
 const BACKUP_STATS = {
-  totalBackups: 156,
-  totalSize: "1.2 TB",
-  lastBackup: "2025-01-16 15:00",
-  nextBackup: "2025-01-16 21:00",
-  successRate: 99.8,
+  totalBackups: 0,
+  totalSize: "0 GB",
+  lastBackup: "-",
+  nextBackup: "-",
+  successRate: 0,
   retentionDays: 30,
 }
 
-// TODO: Add MOCK_BACKUP_SCHEDULE to @/services/mock-data.service
+// Default backup schedule
 const BACKUP_SCHEDULE = {
   fullBackup: { enabled: true, frequency: "daily", time: "03:00" },
   incrementalBackup: { enabled: true, frequency: "6h", time: "매 6시간" },
@@ -318,94 +271,121 @@ export default function BackupPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>백업 ID</TableHead>
-                    <TableHead>이름</TableHead>
-                    <TableHead>유형</TableHead>
-                    <TableHead>크기</TableHead>
-                    <TableHead>소요 시간</TableHead>
-                    <TableHead>생성일</TableHead>
-                    <TableHead>저장소</TableHead>
-                    <TableHead className="text-right">상태</TableHead>
-                    <TableHead className="w-10"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {BACKUPS.map((backup) => (
-                    <TableRow key={backup.id}>
-                      <TableCell className="font-mono text-sm">{backup.id}</TableCell>
-                      <TableCell className="font-medium">{backup.name}</TableCell>
-                      <TableCell>{getTypeBadge(backup.type)}</TableCell>
-                      <TableCell>{backup.size}</TableCell>
-                      <TableCell>{backup.duration}</TableCell>
-                      <TableCell>{backup.createdAt}</TableCell>
-                      <TableCell>
-                        <Tooltip>
-                          <TooltipTrigger>{getLocationIcon(backup.location)}</TooltipTrigger>
-                          <TooltipContent>
-                            {backup.location === "s3" ? "AWS S3" : backup.location}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TableCell>
-                      <TableCell className="text-right">{getStatusBadge(backup.status)}</TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedBackup(backup)
-                                setShowRestoreDialog(true)
-                              }}
-                            >
-                              <Upload className="mr-2 h-4 w-4" />
-                              복구
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                toast.success("다운로드 시작", {
-                                  description: `${backup.name} (${backup.size}) 다운로드를 시작합니다.`,
-                                })
-                              }}
-                            >
-                              <Download className="mr-2 h-4 w-4" />
-                              다운로드
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                toast.info(`백업 상세정보: ${backup.id}`, {
-                                  description: `유형: ${backup.type}, 크기: ${backup.size}, 생성일: ${backup.createdAt}`,
-                                })
-                              }}
-                            >
-                              <Eye className="mr-2 h-4 w-4" />
-                              상세보기
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => {
-                                toast.error("백업 삭제", {
-                                  description: `${backup.name}이(가) 삭제되었습니다.`,
-                                })
-                              }}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              삭제
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+              {BACKUPS.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <Database className="text-muted-foreground mb-4 h-12 w-12" />
+                  <h3 className="mb-2 text-lg font-medium">백업 이력이 없습니다</h3>
+                  <p className="text-muted-foreground mb-4 text-sm">
+                    백업을 실행하면 여기에 이력이 표시됩니다.
+                  </p>
+                  <Button
+                    onClick={() => {
+                      setIsBackingUp(true)
+                      toast.info("백업 시작", {
+                        description: "즉시 백업이 시작되었습니다.",
+                      })
+                      setTimeout(() => {
+                        setIsBackingUp(false)
+                        toast.success("백업 완료")
+                      }, 3000)
+                    }}
+                    disabled={isBackingUp}
+                  >
+                    <Play className="mr-2 h-4 w-4" />첫 백업 실행
+                  </Button>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>백업 ID</TableHead>
+                      <TableHead>이름</TableHead>
+                      <TableHead>유형</TableHead>
+                      <TableHead>크기</TableHead>
+                      <TableHead>소요 시간</TableHead>
+                      <TableHead>생성일</TableHead>
+                      <TableHead>저장소</TableHead>
+                      <TableHead className="text-right">상태</TableHead>
+                      <TableHead className="w-10"></TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {BACKUPS.map((backup) => (
+                      <TableRow key={backup.id}>
+                        <TableCell className="font-mono text-sm">{backup.id}</TableCell>
+                        <TableCell className="font-medium">{backup.name}</TableCell>
+                        <TableCell>{getTypeBadge(backup.type)}</TableCell>
+                        <TableCell>{backup.size}</TableCell>
+                        <TableCell>{backup.duration}</TableCell>
+                        <TableCell>{backup.createdAt}</TableCell>
+                        <TableCell>
+                          <Tooltip>
+                            <TooltipTrigger>{getLocationIcon(backup.location)}</TooltipTrigger>
+                            <TooltipContent>
+                              {backup.location === "s3" ? "AWS S3" : backup.location}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {getStatusBadge(backup.status)}
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedBackup(backup)
+                                  setShowRestoreDialog(true)
+                                }}
+                              >
+                                <Upload className="mr-2 h-4 w-4" />
+                                복구
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  toast.success("다운로드 시작", {
+                                    description: `${backup.name} (${backup.size}) 다운로드를 시작합니다.`,
+                                  })
+                                }}
+                              >
+                                <Download className="mr-2 h-4 w-4" />
+                                다운로드
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  toast.info(`백업 상세정보: ${backup.id}`, {
+                                    description: `유형: ${backup.type}, 크기: ${backup.size}, 생성일: ${backup.createdAt}`,
+                                  })
+                                }}
+                              >
+                                <Eye className="mr-2 h-4 w-4" />
+                                상세보기
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => {
+                                  toast.error("백업 삭제", {
+                                    description: `${backup.name}이(가) 삭제되었습니다.`,
+                                  })
+                                }}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                삭제
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

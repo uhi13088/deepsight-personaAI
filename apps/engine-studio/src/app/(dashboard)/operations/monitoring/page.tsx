@@ -43,74 +43,34 @@ import {
   Area,
 } from "recharts"
 
-// TODO: Add MOCK_REALTIME_METRICS to @/services/mock-data.service
-// 실시간 메트릭 데이터
+// Default realtime metrics (will be updated from API)
 const REALTIME_METRICS = {
-  cpu: 45,
-  memory: 62,
-  disk: 38,
-  network: 234,
-  requests: 1234,
-  latency: 23,
-  errors: 0.02,
-  uptime: 99.99,
+  cpu: 0,
+  memory: 0,
+  disk: 0,
+  network: 0,
+  requests: 0,
+  latency: 0,
+  errors: 0,
+  uptime: 0,
 }
 
-// TODO: Add MOCK_SERVICES to @/services/mock-data.service
-// 서비스 상태
-const SERVICES = [
-  { name: "API Gateway", status: "healthy", latency: 12, uptime: 99.99 },
-  { name: "Matching Engine", status: "healthy", latency: 23, uptime: 99.95 },
-  { name: "Persona Service", status: "healthy", latency: 18, uptime: 99.98 },
-  { name: "User Service", status: "healthy", latency: 15, uptime: 99.97 },
-  { name: "Analytics", status: "warning", latency: 45, uptime: 99.85 },
-  { name: "Cache (Redis)", status: "healthy", latency: 2, uptime: 99.99 },
-  { name: "Database (PostgreSQL)", status: "healthy", latency: 8, uptime: 99.99 },
-  { name: "ML Pipeline", status: "healthy", latency: 156, uptime: 99.9 },
-]
+// Services - empty by default, will be loaded from API
+const SERVICES: { name: string; status: string; latency: number; uptime: number }[] = []
 
-// TODO: Add generateTimeSeriesData to @/services/mock-data.service
-// 시계열 데이터
+// 시계열 데이터 (빈 상태에서는 빈 배열 반환)
 const generateTimeSeriesData = () => {
-  const data = []
-  const now = new Date()
-  for (let i = 60; i >= 0; i--) {
-    const time = new Date(now.getTime() - i * 60000)
-    data.push({
-      time: time.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }),
-      cpu: 40 + Math.random() * 20,
-      memory: 55 + Math.random() * 15,
-      requests: 1000 + Math.random() * 500,
-      latency: 20 + Math.random() * 10,
-    })
-  }
-  return data
+  return []
 }
 
-// TODO: Add MOCK_MONITORING_ALERTS to @/services/mock-data.service
-const ALERTS = [
-  {
-    id: "1",
-    severity: "warning",
-    message: "Analytics 서비스 응답 지연 (>40ms)",
-    time: "5분 전",
-    acknowledged: false,
-  },
-  {
-    id: "2",
-    severity: "info",
-    message: "ML Pipeline 스케줄 작업 완료",
-    time: "15분 전",
-    acknowledged: true,
-  },
-  {
-    id: "3",
-    severity: "info",
-    message: "시스템 자동 백업 완료",
-    time: "1시간 전",
-    acknowledged: true,
-  },
-]
+// Alerts - empty by default, will be loaded from API
+const ALERTS: {
+  id: string
+  severity: string
+  message: string
+  time: string
+  acknowledged: boolean
+}[] = []
 
 export default function MonitoringPage() {
   const [timeSeriesData, setTimeSeriesData] = useState(generateTimeSeriesData())
@@ -408,32 +368,42 @@ export default function MonitoringPage() {
             <CardDescription>모든 마이크로서비스 헬스체크</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {SERVICES.map((service) => (
-                <div
-                  key={service.name}
-                  className="flex items-center justify-between rounded-lg border p-3"
-                >
-                  <div className="flex items-center gap-3">
-                    {getStatusIcon(service.status)}
-                    <div>
-                      <p className="text-sm font-medium">{service.name}</p>
-                      <p className="text-muted-foreground text-xs">
-                        {service.latency}ms • {service.uptime}% uptime
-                      </p>
-                    </div>
-                  </div>
-                  <Badge
-                    variant={service.status === "healthy" ? "secondary" : "outline"}
-                    className={
-                      service.status === "warning" ? "border-yellow-500 text-yellow-600" : ""
-                    }
+            {SERVICES.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Server className="text-muted-foreground mb-4 h-10 w-10" />
+                <h3 className="mb-2 font-medium">등록된 서비스가 없습니다</h3>
+                <p className="text-muted-foreground text-sm">
+                  서비스가 연결되면 상태가 표시됩니다.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {SERVICES.map((service) => (
+                  <div
+                    key={service.name}
+                    className="flex items-center justify-between rounded-lg border p-3"
                   >
-                    {service.status}
-                  </Badge>
-                </div>
-              ))}
-            </div>
+                    <div className="flex items-center gap-3">
+                      {getStatusIcon(service.status)}
+                      <div>
+                        <p className="text-sm font-medium">{service.name}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {service.latency}ms • {service.uptime}% uptime
+                        </p>
+                      </div>
+                    </div>
+                    <Badge
+                      variant={service.status === "healthy" ? "secondary" : "outline"}
+                      className={
+                        service.status === "warning" ? "border-yellow-500 text-yellow-600" : ""
+                      }
+                    >
+                      {service.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -460,27 +430,37 @@ export default function MonitoringPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {ALERTS.map((alert) => (
-                <div
-                  key={alert.id}
-                  className={`flex items-start gap-3 rounded-lg border p-3 ${
-                    !alert.acknowledged ? "bg-muted/50" : ""
-                  }`}
-                >
-                  {alert.severity === "warning" ? (
-                    <AlertTriangle className="mt-0.5 h-4 w-4 text-yellow-500" />
-                  ) : (
-                    <CheckCircle className="mt-0.5 h-4 w-4 text-blue-500" />
-                  )}
-                  <div className="flex-1">
-                    <p className="text-sm">{alert.message}</p>
-                    <p className="text-muted-foreground mt-1 text-xs">{alert.time}</p>
+            {ALERTS.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Bell className="text-muted-foreground mb-4 h-10 w-10" />
+                <h3 className="mb-2 font-medium">알림이 없습니다</h3>
+                <p className="text-muted-foreground text-sm">
+                  새로운 알림이 발생하면 여기에 표시됩니다.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {ALERTS.map((alert) => (
+                  <div
+                    key={alert.id}
+                    className={`flex items-start gap-3 rounded-lg border p-3 ${
+                      !alert.acknowledged ? "bg-muted/50" : ""
+                    }`}
+                  >
+                    {alert.severity === "warning" ? (
+                      <AlertTriangle className="mt-0.5 h-4 w-4 text-yellow-500" />
+                    ) : (
+                      <CheckCircle className="mt-0.5 h-4 w-4 text-blue-500" />
+                    )}
+                    <div className="flex-1">
+                      <p className="text-sm">{alert.message}</p>
+                      <p className="text-muted-foreground mt-1 text-xs">{alert.time}</p>
+                    </div>
+                    {getSeverityBadge(alert.severity)}
                   </div>
-                  {getSeverityBadge(alert.severity)}
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

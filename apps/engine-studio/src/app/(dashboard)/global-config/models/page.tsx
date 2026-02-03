@@ -47,7 +47,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-// TODO: Add MOCK_AI_MODELS_DETAILED to @/services/mock-data.service for centralized AI model configuration
 // AI 모델 데이터
 interface AIModel {
   id: string
@@ -72,61 +71,15 @@ interface AIModel {
   }
 }
 
-// AI Model configurations with references to external URLs from app.config
-// OpenAI models use EXTERNAL_URLS.openai, Anthropic models use EXTERNAL_URLS.anthropic
-const AI_MODELS: AIModel[] = [
-  {
-    id: "gpt-4-turbo",
-    name: "GPT-4 Turbo",
-    provider: "OpenAI", // API URL: EXTERNAL_URLS.openai
-    version: "gpt-4-turbo-preview",
-    status: "active",
-    purpose: ["persona_generation", "prompt_generation", "analysis"],
-    config: { temperature: 0.7, maxTokens: 4096, topP: 0.95 },
-    usage: { requests: 125678, tokens: 45678901, cost: 1234.56 },
-    performance: { latency: 1245, successRate: 99.8 },
-  },
-  {
-    id: "claude-3-opus",
-    name: "Claude 3 Opus",
-    provider: "Anthropic", // API URL: EXTERNAL_URLS.anthropic
-    version: "claude-3-opus-20240229",
-    status: "active",
-    purpose: ["content_review", "safety_check"],
-    config: { temperature: 0.5, maxTokens: 4096, topP: 0.9 },
-    usage: { requests: 34567, tokens: 12345678, cost: 567.89 },
-    performance: { latency: 1890, successRate: 99.9 },
-  },
-  {
-    id: "embedding-3-large",
-    name: "Embedding 3 Large",
-    provider: "OpenAI", // API URL: EXTERNAL_URLS.openai
-    version: "text-embedding-3-large",
-    status: "active",
-    purpose: ["vector_embedding"],
-    config: { temperature: 0, maxTokens: 8192, topP: 1 },
-    usage: { requests: 456789, tokens: 98765432, cost: 234.56 },
-    performance: { latency: 156, successRate: 99.99 },
-  },
-  {
-    id: "gpt-4-vision",
-    name: "GPT-4 Vision",
-    provider: "OpenAI", // API URL: EXTERNAL_URLS.openai
-    version: "gpt-4-vision-preview",
-    status: "testing",
-    purpose: ["image_analysis"],
-    config: { temperature: 0.7, maxTokens: 4096, topP: 0.95 },
-    usage: { requests: 1234, tokens: 234567, cost: 45.67 },
-    performance: { latency: 2345, successRate: 98.5 },
-  },
-]
+// AI models - empty by default, will be loaded from API
+const AI_MODELS: AIModel[] = []
 
-// TODO: Add MOCK_MODEL_USAGE_STATS to @/services/mock-data.service
+// Usage stats - default empty values
 const USAGE_STATS = {
-  totalRequests: 617268,
-  totalTokens: 156789012,
-  totalCost: 2082.68,
-  avgLatency: 1409,
+  totalRequests: 0,
+  totalTokens: 0,
+  totalCost: 0,
+  avgLatency: 0,
 }
 
 export default function ModelsPage() {
@@ -289,34 +242,46 @@ export default function ModelsPage() {
             <CardDescription>클릭하여 상세 설정</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {AI_MODELS.map((model) => (
-                <div
-                  key={model.id}
-                  className={`hover:border-primary cursor-pointer rounded-lg border p-3 transition-all ${
-                    selectedModel?.id === model.id ? "border-primary bg-primary/5" : ""
-                  }`}
-                  onClick={() => setSelectedModel(model)}
-                >
-                  <div className="mb-2 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Brain className="text-primary h-4 w-4" />
-                      <span className="text-sm font-medium">{model.name}</span>
+            {AI_MODELS.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Brain className="text-muted-foreground mb-4 h-12 w-12" />
+                <h3 className="mb-2 text-lg font-medium">등록된 모델이 없습니다</h3>
+                <p className="text-muted-foreground mb-4 text-sm">AI 모델을 추가하여 시작하세요.</p>
+                <Button onClick={() => setShowAddDialog(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  모델 추가
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {AI_MODELS.map((model) => (
+                  <div
+                    key={model.id}
+                    className={`hover:border-primary cursor-pointer rounded-lg border p-3 transition-all ${
+                      selectedModel?.id === model.id ? "border-primary bg-primary/5" : ""
+                    }`}
+                    onClick={() => setSelectedModel(model)}
+                  >
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Brain className="text-primary h-4 w-4" />
+                        <span className="text-sm font-medium">{model.name}</span>
+                      </div>
+                      {getStatusBadge(model.status)}
                     </div>
-                    {getStatusBadge(model.status)}
+                    <p className="text-muted-foreground text-xs">{model.provider}</p>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {model.purpose.slice(0, 2).map((p) => getPurposeBadge(p))}
+                      {model.purpose.length > 2 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{model.purpose.length - 2}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-muted-foreground text-xs">{model.provider}</p>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {model.purpose.slice(0, 2).map((p) => getPurposeBadge(p))}
-                    {model.purpose.length > 2 && (
-                      <Badge variant="outline" className="text-xs">
-                        +{model.purpose.length - 2}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 

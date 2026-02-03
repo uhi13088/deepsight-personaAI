@@ -104,206 +104,11 @@ interface ApiKey {
   status: "active" | "revoked" | "expired"
 }
 
-// TODO: Add MOCK_API_ENDPOINTS to @/services/mock-data.service for centralized API endpoint management
-// Note: MOCK_API_CONFIGS from mock-data.service provides basic API config, but this page needs detailed endpoint info
-// Endpoint paths reference API_ENDPOINTS from @/config/app.config
-const mockEndpoints: ApiEndpoint[] = [
-  {
-    id: "ep-001",
-    path: "/api/v1/personas",
-    method: "GET",
-    name: "List Personas",
-    description: "페르소나 목록을 조회합니다. 페이지네이션 및 필터링을 지원합니다.",
-    version: "v1",
-    status: "active",
-    category: "Persona",
-    requiresAuth: true,
-    rateLimit: 100,
-    timeout: 30000,
-    lastCalled: "2024-01-15T10:30:00Z",
-    callCount: 45892,
-    avgResponseTime: 120,
-    errorRate: 0.02,
-    parameters: [
-      { name: "page", type: "integer", required: false, description: "페이지 번호 (기본값: 1)" },
-      {
-        name: "limit",
-        type: "integer",
-        required: false,
-        description: "페이지당 항목 수 (기본값: 20, 최대: 100)",
-      },
-      {
-        name: "status",
-        type: "string",
-        required: false,
-        description: "상태 필터 (active, inactive, draft)",
-      },
-    ],
-    responses: [
-      { code: 200, description: "성공" },
-      { code: 401, description: "인증 실패" },
-      { code: 429, description: "요청 한도 초과" },
-    ],
-  },
-  {
-    id: "ep-002",
-    path: "/api/v1/personas",
-    method: "POST",
-    name: "Create Persona",
-    description: "새로운 페르소나를 생성합니다.",
-    version: "v1",
-    status: "active",
-    category: "Persona",
-    requiresAuth: true,
-    rateLimit: 50,
-    timeout: 60000,
-    lastCalled: "2024-01-15T10:25:00Z",
-    callCount: 12456,
-    avgResponseTime: 350,
-    errorRate: 0.05,
-    parameters: [
-      { name: "name", type: "string", required: true, description: "페르소나 이름" },
-      { name: "description", type: "string", required: false, description: "페르소나 설명" },
-      { name: "vector", type: "object", required: true, description: "6D 벡터 값" },
-    ],
-    responses: [
-      { code: 201, description: "생성 성공" },
-      { code: 400, description: "잘못된 요청" },
-      { code: 401, description: "인증 실패" },
-    ],
-  },
-  {
-    id: "ep-003",
-    path: "/api/v1/personas/{id}",
-    method: "GET",
-    name: "Get Persona",
-    description: "특정 페르소나의 상세 정보를 조회합니다.",
-    version: "v1",
-    status: "active",
-    category: "Persona",
-    requiresAuth: true,
-    rateLimit: 100,
-    timeout: 30000,
-    lastCalled: "2024-01-15T10:28:00Z",
-    callCount: 89234,
-    avgResponseTime: 85,
-    errorRate: 0.01,
-    parameters: [{ name: "id", type: "string", required: true, description: "페르소나 ID" }],
-    responses: [
-      { code: 200, description: "성공" },
-      { code: 404, description: "페르소나를 찾을 수 없음" },
-    ],
-  },
-  {
-    id: "ep-004",
-    path: "/api/v1/matching/compute",
-    method: "POST",
-    name: "Compute Match",
-    description: "사용자와 페르소나 간의 매칭 점수를 계산합니다.",
-    version: "v1",
-    status: "active",
-    category: "Matching",
-    requiresAuth: true,
-    rateLimit: 30,
-    timeout: 120000,
-    lastCalled: "2024-01-15T10:29:00Z",
-    callCount: 234567,
-    avgResponseTime: 450,
-    errorRate: 0.03,
-    parameters: [
-      { name: "userId", type: "string", required: true, description: "사용자 ID" },
-      { name: "personaIds", type: "array", required: true, description: "매칭할 페르소나 ID 목록" },
-      {
-        name: "algorithm",
-        type: "string",
-        required: false,
-        description: "매칭 알고리즘 (cosine, euclidean)",
-      },
-    ],
-    responses: [
-      { code: 200, description: "매칭 결과" },
-      { code: 400, description: "잘못된 요청" },
-    ],
-  },
-  {
-    id: "ep-005",
-    path: "/api/v1/insights/analyze",
-    method: "POST",
-    name: "Analyze User",
-    description: "사용자 데이터를 분석하여 인사이트를 생성합니다.",
-    version: "v1",
-    status: "active",
-    category: "Insight",
-    requiresAuth: true,
-    rateLimit: 20,
-    timeout: 180000,
-    lastCalled: "2024-01-15T10:15:00Z",
-    callCount: 45678,
-    avgResponseTime: 1200,
-    errorRate: 0.08,
-    parameters: [
-      { name: "userId", type: "string", required: true, description: "분석할 사용자 ID" },
-      { name: "dataTypes", type: "array", required: false, description: "분석할 데이터 유형" },
-    ],
-    responses: [
-      { code: 200, description: "분석 결과" },
-      { code: 202, description: "비동기 처리 시작" },
-    ],
-  },
-  {
-    id: "ep-006",
-    path: "/api/v0/personas",
-    method: "GET",
-    name: "List Personas (Legacy)",
-    description: "[Deprecated] v1 API를 사용하세요.",
-    version: "v0",
-    status: "deprecated",
-    category: "Persona",
-    requiresAuth: true,
-    rateLimit: 50,
-    timeout: 30000,
-    callCount: 1234,
-    avgResponseTime: 200,
-    errorRate: 0.1,
-    parameters: [],
-    responses: [{ code: 200, description: "성공" }],
-  },
-]
+// API endpoints - empty by default, will be loaded from API
+const mockEndpoints: ApiEndpoint[] = []
 
-// TODO: Add MOCK_API_KEYS to @/services/mock-data.service for centralized API key management
-// Rate limits reference RATE_LIMIT_CONFIG from @/config/app.config
-const mockApiKeys: ApiKey[] = [
-  {
-    id: "key-001",
-    name: "Production API Key",
-    key: "sk-prod-xxxxxxxxxxxxxxxxxxxx",
-    createdAt: "2024-01-01T00:00:00Z",
-    lastUsed: "2024-01-15T10:30:00Z",
-    permissions: ["read:personas", "write:personas", "read:matching", "write:matching"],
-    rateLimit: RATE_LIMIT_CONFIG.maxRequests * 10, // Production has higher limits
-    status: "active",
-  },
-  {
-    id: "key-002",
-    name: "Development API Key",
-    key: "sk-dev-xxxxxxxxxxxxxxxxxxxx",
-    createdAt: "2024-01-05T00:00:00Z",
-    lastUsed: "2024-01-15T09:00:00Z",
-    permissions: ["read:personas", "read:matching"],
-    rateLimit: RATE_LIMIT_CONFIG.maxRequests,
-    status: "active",
-  },
-  {
-    id: "key-003",
-    name: "Test API Key",
-    key: "sk-test-xxxxxxxxxxxxxxxxxxxx",
-    createdAt: "2023-12-01T00:00:00Z",
-    expiresAt: "2024-01-01T00:00:00Z",
-    permissions: ["read:personas"],
-    rateLimit: 10,
-    status: "expired",
-  },
-]
+// API keys - empty by default, will be loaded from API
+const mockApiKeys: ApiKey[] = []
 
 export default function ApiEndpointsPage() {
   const [endpoints] = useState<ApiEndpoint[]>(mockEndpoints)
@@ -575,157 +380,167 @@ export default function ApiEndpointsPage() {
           {/* 엔드포인트 목록 */}
           <Card>
             <CardContent className="p-0">
-              <div className="divide-y">
-                {filteredEndpoints.map((endpoint) => (
-                  <Collapsible
-                    key={endpoint.id}
-                    open={expandedEndpoint === endpoint.id}
-                    onOpenChange={() =>
-                      setExpandedEndpoint(expandedEndpoint === endpoint.id ? null : endpoint.id)
-                    }
-                  >
-                    <CollapsibleTrigger asChild>
-                      <div className="hover:bg-muted/50 flex cursor-pointer items-center justify-between p-4">
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2">
-                            {expandedEndpoint === endpoint.id ? (
-                              <ChevronDown className="text-muted-foreground h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="text-muted-foreground h-4 w-4" />
-                            )}
-                            {getMethodBadge(endpoint.method)}
-                          </div>
-                          <div>
+              {filteredEndpoints.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <FileJson className="text-muted-foreground mb-4 h-12 w-12" />
+                  <h3 className="mb-2 text-lg font-medium">등록된 엔드포인트가 없습니다</h3>
+                  <p className="text-muted-foreground text-sm">
+                    API 엔드포인트가 등록되면 여기에 표시됩니다.
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {filteredEndpoints.map((endpoint) => (
+                    <Collapsible
+                      key={endpoint.id}
+                      open={expandedEndpoint === endpoint.id}
+                      onOpenChange={() =>
+                        setExpandedEndpoint(expandedEndpoint === endpoint.id ? null : endpoint.id)
+                      }
+                    >
+                      <CollapsibleTrigger asChild>
+                        <div className="hover:bg-muted/50 flex cursor-pointer items-center justify-between p-4">
+                          <div className="flex items-center gap-4">
                             <div className="flex items-center gap-2">
-                              <code className="font-mono text-sm">{endpoint.path}</code>
-                              {getStatusBadge(endpoint.status)}
-                              {endpoint.requiresAuth && (
-                                <Lock className="text-muted-foreground h-3 w-3" />
+                              {expandedEndpoint === endpoint.id ? (
+                                <ChevronDown className="text-muted-foreground h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="text-muted-foreground h-4 w-4" />
                               )}
+                              {getMethodBadge(endpoint.method)}
                             </div>
-                            <p className="text-muted-foreground text-sm">{endpoint.name}</p>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <code className="font-mono text-sm">{endpoint.path}</code>
+                                {getStatusBadge(endpoint.status)}
+                                {endpoint.requiresAuth && (
+                                  <Lock className="text-muted-foreground h-3 w-3" />
+                                )}
+                              </div>
+                              <p className="text-muted-foreground text-sm">{endpoint.name}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right text-sm">
+                              <p className="text-muted-foreground">
+                                {endpoint.callCount.toLocaleString()} calls
+                              </p>
+                              <p className="text-muted-foreground">
+                                avg {endpoint.avgResponseTime}ms
+                              </p>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedEndpoint(endpoint)
+                                setIsTestDialogOpen(true)
+                              }}
+                            >
+                              <Play className="mr-2 h-4 w-4" />
+                              테스트
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right text-sm">
-                            <p className="text-muted-foreground">
-                              {endpoint.callCount.toLocaleString()} calls
-                            </p>
-                            <p className="text-muted-foreground">
-                              avg {endpoint.avgResponseTime}ms
-                            </p>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setSelectedEndpoint(endpoint)
-                              setIsTestDialogOpen(true)
-                            }}
-                          >
-                            <Play className="mr-2 h-4 w-4" />
-                            테스트
-                          </Button>
-                        </div>
-                      </div>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <div className="bg-muted/30 space-y-4 border-t p-4">
-                        <p className="text-sm">{endpoint.description}</p>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="bg-muted/30 space-y-4 border-t p-4">
+                          <p className="text-sm">{endpoint.description}</p>
 
-                        <div className="grid grid-cols-4 gap-4 text-sm">
-                          <div>
-                            <Label className="text-muted-foreground text-xs">Rate Limit</Label>
-                            <p>{endpoint.rateLimit} req/min</p>
+                          <div className="grid grid-cols-4 gap-4 text-sm">
+                            <div>
+                              <Label className="text-muted-foreground text-xs">Rate Limit</Label>
+                              <p>{endpoint.rateLimit} req/min</p>
+                            </div>
+                            <div>
+                              <Label className="text-muted-foreground text-xs">Timeout</Label>
+                              <p>{endpoint.timeout / 1000}s</p>
+                            </div>
+                            <div>
+                              <Label className="text-muted-foreground text-xs">Error Rate</Label>
+                              <p className={endpoint.errorRate > 0.05 ? "text-red-600" : ""}>
+                                {(endpoint.errorRate * 100).toFixed(2)}%
+                              </p>
+                            </div>
+                            <div>
+                              <Label className="text-muted-foreground text-xs">Version</Label>
+                              <p>{endpoint.version}</p>
+                            </div>
                           </div>
-                          <div>
-                            <Label className="text-muted-foreground text-xs">Timeout</Label>
-                            <p>{endpoint.timeout / 1000}s</p>
-                          </div>
-                          <div>
-                            <Label className="text-muted-foreground text-xs">Error Rate</Label>
-                            <p className={endpoint.errorRate > 0.05 ? "text-red-600" : ""}>
-                              {(endpoint.errorRate * 100).toFixed(2)}%
-                            </p>
-                          </div>
-                          <div>
-                            <Label className="text-muted-foreground text-xs">Version</Label>
-                            <p>{endpoint.version}</p>
-                          </div>
-                        </div>
 
-                        {endpoint.parameters.length > 0 && (
+                          {endpoint.parameters.length > 0 && (
+                            <div>
+                              <Label className="text-muted-foreground mb-2 block text-xs">
+                                Parameters
+                              </Label>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Type</TableHead>
+                                    <TableHead>Required</TableHead>
+                                    <TableHead>Description</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {endpoint.parameters.map((param) => (
+                                    <TableRow key={param.name}>
+                                      <TableCell className="font-mono text-xs">
+                                        {param.name}
+                                      </TableCell>
+                                      <TableCell>
+                                        <Badge variant="outline" className="text-xs">
+                                          {param.type}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell>
+                                        {param.required ? (
+                                          <Badge className="bg-red-100 text-xs text-red-800">
+                                            Required
+                                          </Badge>
+                                        ) : (
+                                          <span className="text-muted-foreground text-xs">
+                                            Optional
+                                          </span>
+                                        )}
+                                      </TableCell>
+                                      <TableCell className="text-sm">{param.description}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          )}
+
                           <div>
                             <Label className="text-muted-foreground mb-2 block text-xs">
-                              Parameters
+                              Responses
                             </Label>
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Name</TableHead>
-                                  <TableHead>Type</TableHead>
-                                  <TableHead>Required</TableHead>
-                                  <TableHead>Description</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {endpoint.parameters.map((param) => (
-                                  <TableRow key={param.name}>
-                                    <TableCell className="font-mono text-xs">
-                                      {param.name}
-                                    </TableCell>
-                                    <TableCell>
-                                      <Badge variant="outline" className="text-xs">
-                                        {param.type}
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                      {param.required ? (
-                                        <Badge className="bg-red-100 text-xs text-red-800">
-                                          Required
-                                        </Badge>
-                                      ) : (
-                                        <span className="text-muted-foreground text-xs">
-                                          Optional
-                                        </span>
-                                      )}
-                                    </TableCell>
-                                    <TableCell className="text-sm">{param.description}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </div>
-                        )}
-
-                        <div>
-                          <Label className="text-muted-foreground mb-2 block text-xs">
-                            Responses
-                          </Label>
-                          <div className="flex gap-2">
-                            {endpoint.responses.map((res) => (
-                              <Badge
-                                key={res.code}
-                                variant="outline"
-                                className={
-                                  res.code < 300
-                                    ? "border-green-500 text-green-700"
-                                    : res.code < 500
-                                      ? "border-yellow-500 text-yellow-700"
-                                      : "border-red-500 text-red-700"
-                                }
-                              >
-                                {res.code}: {res.description}
-                              </Badge>
-                            ))}
+                            <div className="flex gap-2">
+                              {endpoint.responses.map((res) => (
+                                <Badge
+                                  key={res.code}
+                                  variant="outline"
+                                  className={
+                                    res.code < 300
+                                      ? "border-green-500 text-green-700"
+                                      : res.code < 500
+                                        ? "border-yellow-500 text-yellow-700"
+                                        : "border-red-500 text-red-700"
+                                  }
+                                >
+                                  {res.code}: {res.description}
+                                </Badge>
+                              ))}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                ))}
-              </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -836,75 +651,88 @@ export default function ApiEndpointsPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>이름</TableHead>
-                    <TableHead>키</TableHead>
-                    <TableHead>상태</TableHead>
-                    <TableHead>Rate Limit</TableHead>
-                    <TableHead>마지막 사용</TableHead>
-                    <TableHead>생성일</TableHead>
-                    <TableHead className="text-right">작업</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {apiKeys.map((key) => (
-                    <TableRow key={key.id}>
-                      <TableCell className="font-medium">{key.name}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <code className="bg-muted rounded px-2 py-1 text-xs">{key.key}</code>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() => copyToClipboard(key.key)}
-                          >
-                            <Copy className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                      <TableCell>{getKeyStatusBadge(key.status)}</TableCell>
-                      <TableCell>{key.rateLimit}/min</TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {key.lastUsed ? new Date(key.lastUsed).toLocaleString("ko-KR") : "-"}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {new Date(key.createdAt).toLocaleDateString("ko-KR")}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => copyToClipboard(key.key)}>
-                              <Copy className="mr-2 h-4 w-4" />키 복사
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditKey(key)}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              수정
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            {key.status === "active" && (
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={() => handleRevokeKey(key.id)}
-                              >
-                                <XCircle className="mr-2 h-4 w-4" />
-                                폐기
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+              {apiKeys.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <Lock className="text-muted-foreground mb-4 h-12 w-12" />
+                  <h3 className="mb-2 text-lg font-medium">등록된 API 키가 없습니다</h3>
+                  <p className="text-muted-foreground mb-4 text-sm">
+                    새 API 키를 생성하여 API에 접근하세요.
+                  </p>
+                  <Button onClick={() => setIsCreateKeyDialogOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" />새 API 키
+                  </Button>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>이름</TableHead>
+                      <TableHead>키</TableHead>
+                      <TableHead>상태</TableHead>
+                      <TableHead>Rate Limit</TableHead>
+                      <TableHead>마지막 사용</TableHead>
+                      <TableHead>생성일</TableHead>
+                      <TableHead className="text-right">작업</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {apiKeys.map((key) => (
+                      <TableRow key={key.id}>
+                        <TableCell className="font-medium">{key.name}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <code className="bg-muted rounded px-2 py-1 text-xs">{key.key}</code>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => copyToClipboard(key.key)}
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                        <TableCell>{getKeyStatusBadge(key.status)}</TableCell>
+                        <TableCell>{key.rateLimit}/min</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {key.lastUsed ? new Date(key.lastUsed).toLocaleString("ko-KR") : "-"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {new Date(key.createdAt).toLocaleDateString("ko-KR")}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => copyToClipboard(key.key)}>
+                                <Copy className="mr-2 h-4 w-4" />키 복사
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditKey(key)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                수정
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              {key.status === "active" && (
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onClick={() => handleRevokeKey(key.id)}
+                                >
+                                  <XCircle className="mr-2 h-4 w-4" />
+                                  폐기
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
