@@ -1,14 +1,12 @@
-import { auth } from "@/lib/auth"
 import { NextResponse, type NextRequest } from "next/server"
-import { checkRateLimit, RATE_LIMIT_CONFIGS } from "@/lib/security/rate-limiter"
-import { SECURITY_HEADERS, applyCorsHeaders, CORS_CONFIG } from "@/lib/security/headers"
+import { getToken } from "next-auth/jwt"
 
 // ============================================================================
 // 경로 설정
 // ============================================================================
 
 /** 인증이 필요하지 않은 경로 */
-const PUBLIC_PATHS = ["/login", "/api/auth", "/_next", "/favicon.ico"]
+const PUBLIC_PATHS = ["/login", "/api/auth", "/api/admin/seed"]
 
 /** 역할별 접근 가능 경로 */
 const ROLE_PERMISSIONS: Record<string, string[]> = {
@@ -26,133 +24,35 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
 }
 
 // ============================================================================
-// 보안 헤더 적용
+// 메인 미들웨어 (Edge Runtime 호환)
 // ============================================================================
 
-function applySecurityHeadersToResponse(response: NextResponse): NextResponse {
-  Object.entries(SECURITY_HEADERS).forEach(([key, value]) => {
-    response.headers.set(key, value)
-  })
-  return response
-}
-
-// ============================================================================
-// Rate Limiting 체크
-// ============================================================================
-
-function getClientIdentifier(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for")
-  const realIp = request.headers.get("x-real-ip")
-  const ip = forwarded?.split(",")[0]?.trim() || realIp || "unknown"
-  return ip
-}
-
-function getRateLimitConfig(pathname: string): {
-  maxRequests: number
-  windowMs: number
-  blockDurationMs?: number
-} {
-  if (pathname.startsWith("/api/auth")) {
-    return RATE_LIMIT_CONFIGS.AUTH
-  }
-  if (pathname.startsWith("/api/admin")) {
-    return RATE_LIMIT_CONFIGS.ADMIN
-  }
-  if (pathname.startsWith("/api/")) {
-    return RATE_LIMIT_CONFIGS.API
-  }
-  return RATE_LIMIT_CONFIGS.GENERAL
-}
-
-// ============================================================================
-// API Route 미들웨어
-// ============================================================================
-
-async function handleApiRoute(request: NextRequest): Promise<NextResponse> {
-  const pathname = request.nextUrl.pathname
-  const clientId = getClientIdentifier(request)
-  const config = getRateLimitConfig(pathname)
-
-  // Rate Limit 체크
-  const rateLimitKey = `${pathname}:${clientId}`
-  const rateLimitResult = checkRateLimit(rateLimitKey, config)
-
-  // Rate Limit 초과 시
-  if (!rateLimitResult.allowed) {
-    const response = NextResponse.json(
-      {
-        error: "Too Many Requests",
-        message: "Rate limit exceeded. Please try again later.",
-        retryAfter: rateLimitResult.retryAfter,
-      },
-      { status: 429 }
-    )
-
-    response.headers.set("Retry-After", String(rateLimitResult.retryAfter))
-    response.headers.set("X-RateLimit-Limit", String(config.maxRequests))
-    response.headers.set("X-RateLimit-Remaining", "0")
-    response.headers.set("X-RateLimit-Reset", String(rateLimitResult.resetTime))
-
-    return applySecurityHeadersToResponse(response)
-  }
-
-  // CORS Preflight 처리
-  if (request.method === "OPTIONS") {
-    const response = new NextResponse(null, { status: 204 })
-    applyCorsHeaders(response.headers, request.headers.get("origin") || "")
-    return applySecurityHeadersToResponse(response)
-  }
-
-  // API 요청 통과
-  const response = NextResponse.next()
-
-  // Rate Limit 헤더 추가
-  response.headers.set("X-RateLimit-Limit", String(config.maxRequests))
-  response.headers.set("X-RateLimit-Remaining", String(rateLimitResult.remaining))
-  response.headers.set("X-RateLimit-Reset", String(rateLimitResult.resetTime))
-
-  // CORS 헤더 적용
-  const origin = request.headers.get("origin") || ""
-  if (CORS_CONFIG.allowedOrigins.includes("*") || CORS_CONFIG.allowedOrigins.includes(origin)) {
-    applyCorsHeaders(response.headers, origin)
-  }
-
-  return applySecurityHeadersToResponse(response)
-}
-
-// ============================================================================
-// 메인 미들웨어
-// ============================================================================
-
-export default auth(async (req) => {
+export default async function middleware(req: NextRequest) {
   const { nextUrl } = req
   const pathname = nextUrl.pathname
 
-  // API 라우트 처리
-  if (pathname.startsWith("/api/")) {
-    // 인증 관련 API는 통과
-    if (pathname.startsWith("/api/auth")) {
-      const response = await handleApiRoute(req)
-      return response
-    }
-
-    // 기타 API는 Rate Limit + 보안 헤더 적용
-    return handleApiRoute(req)
+  // 정적 리소스는 통과
+  if (
+    pathname.startsWith("/_next/") ||
+    pathname === "/favicon.ico" ||
+    pathname.startsWith("/api/auth")
+  ) {
+    return NextResponse.next()
   }
-
-  // 정적 리소스는 보안 헤더만 적용
-  if (pathname.startsWith("/_next/") || pathname === "/favicon.ico") {
-    return applySecurityHeadersToResponse(NextResponse.next())
-  }
-
-  const isLoggedIn = !!req.auth
 
   // 공개 경로 확인
   const isPublicPath = PUBLIC_PATHS.some((path) => pathname.startsWith(path))
-
   if (isPublicPath) {
-    return applySecurityHeadersToResponse(NextResponse.next())
+    return NextResponse.next()
   }
+
+  // JWT 토큰 확인 (Edge Runtime 호환)
+  const token = await getToken({
+    req,
+    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+  })
+
+  const isLoggedIn = !!token
 
   // 로그인 필요
   if (!isLoggedIn) {
@@ -167,11 +67,11 @@ export default auth(async (req) => {
   }
 
   // 역할 기반 접근 제어
-  const userRole = req.auth?.user?.role || "ANALYST"
+  const userRole = (token.role as string) || "ANALYST"
   const allowedPaths = ROLE_PERMISSIONS[userRole] || []
 
   if (allowedPaths.includes("*")) {
-    return applySecurityHeadersToResponse(NextResponse.next())
+    return NextResponse.next()
   }
 
   const hasAccess = allowedPaths.some((path) => pathname.startsWith(path))
@@ -180,8 +80,8 @@ export default auth(async (req) => {
     return NextResponse.redirect(new URL("/dashboard", nextUrl))
   }
 
-  return applySecurityHeadersToResponse(NextResponse.next())
-})
+  return NextResponse.next()
+}
 
 export const config = {
   matcher: [
