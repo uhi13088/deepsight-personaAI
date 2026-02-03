@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import {
   TrendingUp,
@@ -12,6 +13,8 @@ import {
   Sparkles,
   Activity,
   Zap,
+  RefreshCw,
+  Loader2,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -31,91 +34,61 @@ import {
   Area,
 } from "recharts"
 import {
-  MOCK_MATCHING_TREND_DATA,
-  MOCK_KPI_DATA,
-  MOCK_PERSONAS,
-} from "@/services/mock-data.service"
-
-// TODO: Add MOCK_DASHBOARD_KPI_DATA to @/services/mock-data.service
-// This is a dashboard-specific aggregation format different from MOCK_KPI_DATA
-const KPI_DATA = {
-  totalMatches: 156789,
-  todayMatches: 3456,
-  matchingAccuracy: MOCK_KPI_DATA.find((k) => k.label === "평균 정확도")?.value ?? 94.2,
-  avgMatchScore: 87.5,
-  ctr: 23.8,
-  nps: 72,
-  activePersonas: MOCK_PERSONAS.filter((p) => p.status === "ACTIVE").length,
-  totalPersonas: MOCK_PERSONAS.length,
-}
-
-// Transform MOCK_MATCHING_TREND_DATA to dashboard format
-const TREND_DATA = MOCK_MATCHING_TREND_DATA.map((item) => ({
-  // Safely convert date format (e.g., "2025-01-09" to "01/09") with fallback
-  date:
-    item.date && item.date.length >= 10 ? item.date.slice(5).replace("-", "/") : item.date || "N/A",
-  matches: Math.round(item.matches / 40), // Scale down for daily view
-  accuracy: item.accuracy,
-}))
-
-// TODO: Add MOCK_ACTIVITY_LOG to @/services/mock-data.service
-const ACTIVITY_LOG = [
-  {
-    id: "1",
-    type: "PERSONA_DEPLOYED",
-    title: "페르소나 배포 완료",
-    description: "'논리적 평론가' 페르소나가 프로덕션에 배포되었습니다.",
-    time: "10분 전",
-    status: "success",
-  },
-  {
-    id: "2",
-    type: "AB_TEST_COMPLETED",
-    title: "A/B 테스트 완료",
-    description:
-      "'알고리즘 v2.1' 테스트가 종료되었습니다. 테스트 그룹이 5.2% 더 높은 CTR을 기록했습니다.",
-    time: "1시간 전",
-    status: "info",
-  },
-  {
-    id: "3",
-    type: "INCUBATOR",
-    title: "인큐베이터 결과",
-    description: "오늘 생성된 3개의 페르소나 중 2개가 품질 검증을 통과했습니다.",
-    time: "3시간 전",
-    status: "warning",
-  },
-  {
-    id: "4",
-    type: "PERSONA_CREATED",
-    title: "새 페르소나 생성",
-    description: "'감성 에세이스트' 페르소나가 생성되어 리뷰 대기 중입니다.",
-    time: "5시간 전",
-    status: "info",
-  },
-]
-
-// Derive TOP_PERSONAS from MOCK_PERSONAS
-const TOP_PERSONAS = MOCK_PERSONAS.filter((p) => p.status === "ACTIVE")
-  .sort((a, b) => b.matchCount - a.matchCount)
-  .slice(0, 5)
-  .map((p) => ({
-    name: p.name,
-    matches: p.matchCount,
-    accuracy: p.accuracy,
-    score: Math.round(p.accuracy * 0.96), // Derive score from accuracy
-  }))
-
-// TODO: Add MOCK_SYSTEM_STATUS to @/services/mock-data.service
-const SYSTEM_STATUS = {
-  api: { status: "healthy", latency: 142 },
-  database: { status: "healthy", connections: 45 },
-  matchingEngine: { status: "healthy", qps: 234 },
-  incubator: { status: "idle", lastRun: "03:00 AM" },
-}
+  dashboardService,
+  type DashboardKPI,
+  type TrendDataPoint,
+  type ActivityLogItem,
+  type TopPersona,
+  type SystemStatus,
+} from "@/services/dashboard-service"
 
 export default function DashboardPage() {
   const { data: session } = useSession()
+
+  // 상태 관리
+  const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [kpiData, setKpiData] = useState<DashboardKPI | null>(null)
+  const [trendData, setTrendData] = useState<TrendDataPoint[]>([])
+  const [activityLog, setActivityLog] = useState<ActivityLogItem[]>([])
+  const [topPersonas, setTopPersonas] = useState<TopPersona[]>([])
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null)
+
+  // 데이터 로드 함수
+  const fetchDashboardData = useCallback(async (showRefreshIndicator = false) => {
+    if (showRefreshIndicator) {
+      setIsRefreshing(true)
+    } else {
+      setIsLoading(true)
+    }
+    setError(null)
+
+    try {
+      const data = await dashboardService.getDashboardData()
+      setKpiData(data.kpi)
+      setTrendData(data.trendData)
+      setActivityLog(data.activityLog)
+      setTopPersonas(data.topPersonas)
+      setSystemStatus(data.systemStatus)
+    } catch (err) {
+      console.error("Failed to fetch dashboard data:", err)
+      setError(err instanceof Error ? err.message : "데이터를 불러올 수 없습니다")
+    } finally {
+      setIsLoading(false)
+      setIsRefreshing(false)
+    }
+  }, [])
+
+  // 초기 데이터 로드
+  useEffect(() => {
+    fetchDashboardData()
+  }, [fetchDashboardData])
+
+  // 새로고침 핸들러
+  const handleRefresh = () => {
+    fetchDashboardData(true)
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -143,17 +116,47 @@ export default function DashboardPage() {
     }
   }
 
+  // 로딩 상태
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="text-primary mx-auto mb-4 h-8 w-8 animate-spin" />
+          <p className="text-muted-foreground">대시보드를 불러오는 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 에러 상태
+  if (error || !kpiData) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="text-destructive mx-auto mb-4 h-8 w-8" />
+          <p className="text-destructive">{error || "데이터를 불러올 수 없습니다"}</p>
+          <Button variant="outline" className="mt-4" onClick={() => fetchDashboardData()}>
+            다시 시도
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Welcome Message */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">
-            안녕하세요, {session?.user?.name}님!
+            안녕하세요, {session?.user?.name || "사용자"}님!
           </h2>
           <p className="text-muted-foreground">오늘의 매칭 현황과 시스템 상태를 확인하세요.</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+          </Button>
           <Link href="/personas/create">
             <Button>
               <Sparkles className="mr-2 h-4 w-4" />새 페르소나 생성
@@ -176,7 +179,7 @@ export default function DashboardPage() {
             <Target className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{KPI_DATA.todayMatches.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{kpiData.todayMatches.toLocaleString()}</div>
             <div className="mt-1 flex items-center text-xs text-green-600">
               <TrendingUp className="mr-1 h-3 w-3" />
               +12.5% from yesterday
@@ -190,7 +193,7 @@ export default function DashboardPage() {
             <ThumbsUp className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{KPI_DATA.matchingAccuracy}%</div>
+            <div className="text-2xl font-bold">{kpiData.matchingAccuracy}%</div>
             <div className="mt-1 flex items-center text-xs text-green-600">
               <TrendingUp className="mr-1 h-3 w-3" />
               +0.7% from last week
@@ -204,8 +207,8 @@ export default function DashboardPage() {
             <Activity className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{KPI_DATA.avgMatchScore}</div>
-            <Progress value={KPI_DATA.avgMatchScore} className="mt-2" />
+            <div className="text-2xl font-bold">{kpiData.avgMatchScore}</div>
+            <Progress value={kpiData.avgMatchScore} className="mt-2" />
           </CardContent>
         </Card>
 
@@ -216,10 +219,14 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {KPI_DATA.activePersonas} / {KPI_DATA.totalPersonas}
+              {kpiData.activePersonas} / {kpiData.totalPersonas}
             </div>
             <Progress
-              value={(KPI_DATA.activePersonas / KPI_DATA.totalPersonas) * 100}
+              value={
+                kpiData.totalPersonas > 0
+                  ? (kpiData.activePersonas / kpiData.totalPersonas) * 100
+                  : 0
+              }
               className="mt-2"
             />
           </CardContent>
@@ -237,7 +244,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={TREND_DATA}>
+                <AreaChart data={trendData}>
                   <defs>
                     <linearGradient id="colorMatches" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
@@ -276,7 +283,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={TREND_DATA}>
+                <LineChart data={trendData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="date" className="text-xs" />
                   <YAxis domain={[90, 100]} className="text-xs" />
@@ -311,7 +318,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {TOP_PERSONAS.map((persona, index) => (
+              {topPersonas.map((persona, index) => (
                 <div key={persona.name} className="flex items-center gap-3">
                   <span className="bg-primary/10 flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium">
                     {index + 1}
@@ -344,7 +351,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {ACTIVITY_LOG.map((activity) => (
+              {activityLog.map((activity) => (
                 <div key={activity.id} className="flex gap-3">
                   {getActivityIcon(activity.status)}
                   <div className="min-w-0 flex-1">
@@ -367,51 +374,55 @@ export default function DashboardPage() {
             <CardDescription>실시간 서비스 모니터링</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`h-2 w-2 rounded-full ${getStatusColor(SYSTEM_STATUS.api.status)} bg-current`}
-                  />
-                  <span className="text-sm">API 서버</span>
+            {systemStatus && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`h-2 w-2 rounded-full ${getStatusColor(systemStatus.api.status)} bg-current`}
+                    />
+                    <span className="text-sm">API 서버</span>
+                  </div>
+                  <span className="text-muted-foreground text-sm">
+                    {systemStatus.api.latency}ms
+                  </span>
                 </div>
-                <span className="text-muted-foreground text-sm">{SYSTEM_STATUS.api.latency}ms</span>
-              </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`h-2 w-2 rounded-full ${getStatusColor(SYSTEM_STATUS.database.status)} bg-current`}
-                  />
-                  <span className="text-sm">데이터베이스</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`h-2 w-2 rounded-full ${getStatusColor(systemStatus.database.status)} bg-current`}
+                    />
+                    <span className="text-sm">데이터베이스</span>
+                  </div>
+                  <span className="text-muted-foreground text-sm">
+                    {systemStatus.database.connections} 연결
+                  </span>
                 </div>
-                <span className="text-muted-foreground text-sm">
-                  {SYSTEM_STATUS.database.connections} 연결
-                </span>
-              </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`h-2 w-2 rounded-full ${getStatusColor(SYSTEM_STATUS.matchingEngine.status)} bg-current`}
-                  />
-                  <span className="text-sm">매칭 엔진</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`h-2 w-2 rounded-full ${getStatusColor(systemStatus.matchingEngine.status)} bg-current`}
+                    />
+                    <span className="text-sm">매칭 엔진</span>
+                  </div>
+                  <span className="text-muted-foreground text-sm">
+                    {systemStatus.matchingEngine.qps} QPS
+                  </span>
                 </div>
-                <span className="text-muted-foreground text-sm">
-                  {SYSTEM_STATUS.matchingEngine.qps} QPS
-                </span>
-              </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-current text-gray-400" />
-                  <span className="text-sm">인큐베이터</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-current text-gray-400" />
+                    <span className="text-sm">인큐베이터</span>
+                  </div>
+                  <span className="text-muted-foreground text-sm">
+                    마지막 실행: {systemStatus.incubator.lastRun}
+                  </span>
                 </div>
-                <span className="text-muted-foreground text-sm">
-                  마지막 실행: {SYSTEM_STATUS.incubator.lastRun}
-                </span>
               </div>
-            </div>
+            )}
 
             <Separator className="my-4" />
 
