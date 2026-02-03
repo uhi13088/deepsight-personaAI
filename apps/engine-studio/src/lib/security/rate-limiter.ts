@@ -103,16 +103,15 @@ export type RateLimitInfo = {
 
 class RateLimitStore {
   private store: Map<string, RateLimitEntry> = new Map()
-  private cleanupInterval: NodeJS.Timeout | null = null
+  private lastCleanup: number = Date.now()
 
   constructor() {
-    // 10분마다 만료된 엔트리 정리
-    if (typeof setInterval !== "undefined") {
-      this.cleanupInterval = setInterval(() => this.cleanup(), 10 * 60 * 1000)
-    }
+    // Edge Runtime 호환: setInterval 대신 요청 시 정리
   }
 
   get(key: string): RateLimitEntry | undefined {
+    // 요청 시 오래된 엔트리 정리 (10분마다)
+    this.maybeCleanup()
     return this.store.get(key)
   }
 
@@ -122,6 +121,16 @@ class RateLimitStore {
 
   delete(key: string): void {
     this.store.delete(key)
+  }
+
+  private maybeCleanup(): void {
+    const now = Date.now()
+    // 10분마다 정리
+    if (now - this.lastCleanup < 10 * 60 * 1000) {
+      return
+    }
+    this.lastCleanup = now
+    this.cleanup()
   }
 
   private cleanup(): void {
@@ -136,9 +145,6 @@ class RateLimitStore {
   }
 
   destroy(): void {
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval)
-    }
     this.store.clear()
   }
 }
