@@ -1,86 +1,199 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getMockPersonaById, type MockPersona } from "@/services/mock-data.service"
+import { z } from "zod"
+import { prisma } from "@/lib/prisma"
+import { auth } from "@/lib/auth"
+import type { PersonaRole, PersonaStatus } from "@prisma/client"
+
+// 업데이트 스키마
+const updatePersonaSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  role: z.enum(["REVIEWER", "CURATOR", "EDUCATOR", "COMPANION", "ANALYST"]).optional(),
+  expertise: z.array(z.string()).optional(),
+  description: z.string().optional(),
+  promptTemplate: z.string().optional(),
+  status: z
+    .enum(["DRAFT", "REVIEW", "ACTIVE", "STANDARD", "LEGACY", "DEPRECATED", "PAUSED", "ARCHIVED"])
+    .optional(),
+  vector: z
+    .object({
+      depth: z.number().min(0).max(1),
+      lens: z.number().min(0).max(1),
+      stance: z.number().min(0).max(1),
+      scope: z.number().min(0).max(1),
+      taste: z.number().min(0).max(1),
+      purpose: z.number().min(0).max(1),
+    })
+    .optional(),
+})
+
+// 응답 데이터 변환 헬퍼
+function transformPersona(persona: Awaited<ReturnType<typeof getPersonaWithRelations>>) {
+  if (!persona) return null
+  return {
+    id: persona.id,
+    name: persona.name,
+    role: persona.role,
+    expertise: persona.expertise,
+    description: persona.description,
+    status: persona.status,
+    qualityScore: persona.qualityScore ? Number(persona.qualityScore) : null,
+    vector: persona.vectors[0]
+      ? {
+          depth: Number(persona.vectors[0].depth),
+          lens: Number(persona.vectors[0].lens),
+          stance: Number(persona.vectors[0].stance),
+          scope: Number(persona.vectors[0].scope),
+          taste: Number(persona.vectors[0].taste),
+          purpose: Number(persona.vectors[0].purpose),
+        }
+      : null,
+    promptTemplate: persona.promptTemplate,
+    createdBy: persona.createdBy,
+    createdAt: persona.createdAt.toISOString(),
+    updatedAt: persona.updatedAt.toISOString(),
+  }
+}
+
+async function getPersonaWithRelations(id: string) {
+  return prisma.persona.findUnique({
+    where: { id },
+    include: {
+      vectors: { orderBy: { version: "desc" }, take: 1 },
+      createdBy: { select: { id: true, name: true, email: true } },
+    },
+  })
+}
 
 // GET /api/personas/[id] - 페르소나 상세 조회
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await auth()
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: { code: "UNAUTHORIZED", message: "로그인이 필요합니다" } },
+        { status: 401 }
+      )
+    }
+
     const { id } = await params
-    const persona = getMockPersonaById(id)
+    const persona = await getPersonaWithRelations(id)
 
     if (!persona) {
-      return NextResponse.json({ success: false, error: "Persona not found" }, { status: 404 })
+      return NextResponse.json(
+        { success: false, error: { code: "NOT_FOUND", message: "페르소나를 찾을 수 없습니다" } },
+        { status: 404 }
+      )
     }
 
     return NextResponse.json({
       success: true,
-      data: persona,
+      data: transformPersona(persona),
     })
-  } catch {
-    return NextResponse.json({ success: false, error: "Failed to fetch persona" }, { status: 500 })
+  } catch (error) {
+    console.error("[API] GET /api/personas/[id] error:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: "INTERNAL_ERROR", message: "페르소나 조회에 실패했습니다" },
+      },
+      { status: 500 }
+    )
   }
 }
 
 // PUT /api/personas/[id] - 페르소나 전체 수정
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await auth()
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: { code: "UNAUTHORIZED", message: "로그인이 필요합니다" } },
+        { status: 401 }
+      )
+    }
+
     const { id } = await params
     const body = await request.json()
+    const parsed = updatePersonaSchema.safeParse(body)
 
-    const persona = getMockPersonaById(id)
-
-    if (!persona) {
-      return NextResponse.json({ success: false, error: "Persona not found" }, { status: 404 })
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0].message },
+        },
+        { status: 400 }
+      )
     }
 
-    // 업데이트 (실제로는 DB에 저장)
-    const updatedPersona = {
-      ...persona,
-      ...body,
-      updatedAt: new Date().toISOString(),
+    const existing = await prisma.persona.findUnique({ where: { id } })
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: { code: "NOT_FOUND", message: "페르소나를 찾을 수 없습니다" } },
+        { status: 404 }
+      )
     }
+
+    const { vector, ...personaData } = parsed.data
+
+    // 트랜잭션으로 업데이트
+    await prisma.$transaction(async (tx) => {
+      // 페르소나 업데이트
+      await tx.persona.update({
+        where: { id },
+        data: {
+          ...(personaData.name && { name: personaData.name }),
+          ...(personaData.role && { role: personaData.role as PersonaRole }),
+          ...(personaData.expertise && { expertise: personaData.expertise }),
+          ...(personaData.description !== undefined && { description: personaData.description }),
+          ...(personaData.promptTemplate && { promptTemplate: personaData.promptTemplate }),
+          ...(personaData.status && { status: personaData.status as PersonaStatus }),
+        },
+      })
+
+      // 벡터 업데이트 (새 버전 생성)
+      if (vector) {
+        const latestVector = await tx.personaVector.findFirst({
+          where: { personaId: id },
+          orderBy: { version: "desc" },
+        })
+
+        await tx.personaVector.create({
+          data: {
+            personaId: id,
+            version: (latestVector?.version ?? 0) + 1,
+            depth: vector.depth,
+            lens: vector.lens,
+            stance: vector.stance,
+            scope: vector.scope,
+            taste: vector.taste,
+            purpose: vector.purpose,
+          },
+        })
+      }
+    })
+
+    const updatedPersona = await getPersonaWithRelations(id)
 
     return NextResponse.json({
       success: true,
-      data: updatedPersona,
+      data: transformPersona(updatedPersona),
     })
-  } catch {
-    return NextResponse.json({ success: false, error: "Failed to update persona" }, { status: 500 })
+  } catch (error) {
+    console.error("[API] PUT /api/personas/[id] error:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: "INTERNAL_ERROR", message: "페르소나 수정에 실패했습니다" },
+      },
+      { status: 500 }
+    )
   }
 }
 
 // PATCH /api/personas/[id] - 페르소나 부분 수정
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const { id } = await params
-    const body = await request.json()
-
-    const persona = getMockPersonaById(id)
-
-    if (!persona) {
-      return NextResponse.json({ success: false, error: "Persona not found" }, { status: 404 })
-    }
-
-    // 부분 업데이트 (실제로는 DB에 저장)
-    const updatedPersona: MockPersona = {
-      ...persona,
-      ...(body.name !== undefined && { name: body.name }),
-      ...(body.role !== undefined && { role: body.role }),
-      ...(body.expertise !== undefined && { expertise: body.expertise }),
-      ...(body.status !== undefined && { status: body.status }),
-      ...(body.vector !== undefined && {
-        vector: { ...persona.vector, ...body.vector },
-      }),
-      ...(body.promptTemplate !== undefined && { promptTemplate: body.promptTemplate }),
-      updatedAt: new Date().toISOString(),
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: updatedPersona,
-    })
-  } catch {
-    return NextResponse.json({ success: false, error: "Failed to update persona" }, { status: 500 })
-  }
+  return PUT(request, { params })
 }
 
 // DELETE /api/personas/[id] - 페르소나 삭제
@@ -89,20 +202,53 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-    const persona = getMockPersonaById(id)
-
-    if (!persona) {
-      return NextResponse.json({ success: false, error: "Persona not found" }, { status: 404 })
+    const session = await auth()
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: { code: "UNAUTHORIZED", message: "로그인이 필요합니다" } },
+        { status: 401 }
+      )
     }
 
-    // 삭제 (실제로는 DB에서 삭제)
+    const { id } = await params
+
+    const existing = await prisma.persona.findUnique({ where: { id } })
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: { code: "NOT_FOUND", message: "페르소나를 찾을 수 없습니다" } },
+        { status: 404 }
+      )
+    }
+
+    // 권한 체크: 생성자 또는 관리자만 삭제 가능
+    if (existing.createdById !== session.user.id && session.user.role !== "ADMIN") {
+      return NextResponse.json(
+        { success: false, error: { code: "FORBIDDEN", message: "삭제 권한이 없습니다" } },
+        { status: 403 }
+      )
+    }
+
+    // 소프트 삭제 (ARCHIVED 상태로 변경)
+    await prisma.persona.update({
+      where: { id },
+      data: {
+        status: "ARCHIVED",
+        archivedAt: new Date(),
+      },
+    })
 
     return NextResponse.json({
       success: true,
-      message: "Persona deleted successfully",
+      message: "페르소나가 삭제되었습니다",
     })
-  } catch {
-    return NextResponse.json({ success: false, error: "Failed to delete persona" }, { status: 500 })
+  } catch (error) {
+    console.error("[API] DELETE /api/personas/[id] error:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: "INTERNAL_ERROR", message: "페르소나 삭제에 실패했습니다" },
+      },
+      { status: 500 }
+    )
   }
 }
