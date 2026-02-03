@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -14,6 +14,8 @@ import {
   Calendar,
   TrendingUp,
   AlertCircle,
+  RefreshCw,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -33,6 +35,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -40,82 +43,183 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadarChart } from "@/components/charts/radar-chart"
-import { MOCK_INCUBATOR_PERSONAS, generateRandomVector } from "@/services/mock-data.service"
-
-// TODO: Add MOCK_INCUBATOR_STATS to @/services/mock-data.service
-const INCUBATOR_STATS = {
-  enabled: true,
-  lastRunTime: "2024-01-17 03:00",
-  todayGenerated: MOCK_INCUBATOR_PERSONAS.length,
-  todayPassed: MOCK_INCUBATOR_PERSONAS.filter((p) => p.status === "READY").length,
-  todayFailed: MOCK_INCUBATOR_PERSONAS.filter((p) => p.status === "FAILED").length,
-  weeklyAvgScore: 78.5,
-  weeklyPassRate: 65,
-}
-
-// TODO: Extend MockIncubatorPersona in @/services/mock-data.service to include
-// validation scores (consistencyScore, vectorAlignmentScore, toneMatchScore, reasoningScore)
-// For now, we enhance the service data with additional computed fields
-const TODAY_PERSONAS = MOCK_INCUBATOR_PERSONAS.map((p, index) => {
-  const baseScore = p.testScore / 100
-  return {
-    id: p.id,
-    name: p.name,
-    status:
-      p.status === "READY" ? "PASSED" : p.status === "FAILED" ? "FAILED" : ("PENDING" as const),
-    consistencyScore: Math.min(0.95, baseScore + 0.05 * (index % 3)),
-    vectorAlignmentScore: Math.min(0.95, baseScore - 0.02 + 0.03 * (index % 2)),
-    toneMatchScore: Math.min(0.98, baseScore + 0.08),
-    reasoningScore: Math.min(0.92, baseScore - 0.05),
-    overallScore: p.testScore,
-    vector: generateRandomVector(),
-    createdAt: `03:${(15 + index * 7).toString().padStart(2, "0")}`,
-    failReason: p.status === "FAILED" ? `테스트 점수 미달 (${p.testScore} < 70)` : undefined,
-  }
-})
-
-// TODO: Add MOCK_INCUBATOR_HISTORY to @/services/mock-data.service
-const HISTORY_DATA = [
-  { date: "01/16", generated: 5, passed: 4, avgScore: 82 },
-  { date: "01/15", generated: 6, passed: 4, avgScore: 78 },
-  { date: "01/14", generated: 4, passed: 3, avgScore: 81 },
-  { date: "01/13", generated: 5, passed: 3, avgScore: 75 },
-  { date: "01/12", generated: 5, passed: 4, avgScore: 80 },
-  { date: "01/11", generated: 6, passed: 5, avgScore: 84 },
-  { date: "01/10", generated: 4, passed: 2, avgScore: 72 },
-]
+import {
+  incubatorService,
+  type IncubatorStats,
+  type IncubatorPersona,
+  type IncubatorHistoryItem,
+  type IncubatorSettings,
+} from "@/services/incubator-service"
 
 export default function IncubatorPage() {
   const router = useRouter()
-  const [isEnabled, setIsEnabled] = useState(INCUBATOR_STATS.enabled)
-  const [selectedPersona, setSelectedPersona] = useState<(typeof TODAY_PERSONAS)[0] | null>(null)
+
+  // 상태 관리
+  const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [stats, setStats] = useState<IncubatorStats | null>(null)
+  const [personas, setPersonas] = useState<IncubatorPersona[]>([])
+  const [history, setHistory] = useState<IncubatorHistoryItem[]>([])
+  const [settings, setSettings] = useState<IncubatorSettings | null>(null)
+  const [selectedPersona, setSelectedPersona] = useState<IncubatorPersona | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [isSavingSettings, setIsSavingSettings] = useState(false)
+  const [isApproving, setIsApproving] = useState<string | null>(null)
+  const [isRejecting, setIsRejecting] = useState<string | null>(null)
 
-  const handleApprove = async (personaId: string, personaName: string) => {
+  // 설정 폼 상태
+  const [formRunTime, setFormRunTime] = useState("03:00")
+  const [formDailyLimit, setFormDailyLimit] = useState(5)
+  const [formMinPassScore, setFormMinPassScore] = useState(70)
+  const [formAutoApproveScore, setFormAutoApproveScore] = useState(85)
+
+  // 데이터 로드
+  const fetchData = useCallback(async (showRefreshIndicator = false) => {
+    if (showRefreshIndicator) {
+      setIsRefreshing(true)
+    } else {
+      setIsLoading(true)
+    }
+
     try {
-      // API 호출 (실제로는 승인 API 호출)
-      toast.success(`"${personaName}" 페르소나가 승인되었습니다.`)
-      // 승인된 페르소나를 personas 목록에 추가
-      router.push(`/personas?approved=${personaId}`)
-    } catch {
-      toast.error("승인에 실패했습니다.")
+      const [statsData, personasData, historyData, settingsData] = await Promise.all([
+        incubatorService.getStats(),
+        incubatorService.getTodayPersonas(),
+        incubatorService.getHistory(),
+        incubatorService.getSettings(),
+      ])
+
+      setStats(statsData)
+      setPersonas(personasData.personas)
+      setHistory(historyData)
+      setSettings(settingsData)
+
+      // 설정 폼 초기화
+      setFormRunTime(settingsData.runTime)
+      setFormDailyLimit(settingsData.dailyLimit)
+      setFormMinPassScore(settingsData.minPassScore)
+      setFormAutoApproveScore(settingsData.autoApproveScore)
+    } catch (err) {
+      console.error("Failed to fetch incubator data:", err)
+      toast.error("인큐베이터 데이터를 불러오는데 실패했습니다")
+    } finally {
+      setIsLoading(false)
+      setIsRefreshing(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  const handleRefresh = () => {
+    fetchData(true)
+  }
+
+  const handleToggleEnabled = async (enabled: boolean) => {
+    try {
+      const updatedSettings = await incubatorService.updateSettings({ enabled })
+      setSettings(updatedSettings)
+      toast.success(enabled ? "인큐베이터가 활성화되었습니다" : "인큐베이터가 비활성화되었습니다")
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "설정 변경에 실패했습니다"
+      toast.error(message)
     }
   }
 
-  const handleReject = async (personaId: string, personaName: string) => {
-    if (!confirm(`"${personaName}" 페르소나를 거부하시겠습니까?`)) return
+  const handleApprove = async (persona: IncubatorPersona) => {
+    setIsApproving(persona.id)
     try {
-      // API 호출 (실제로는 거부 API 호출)
-      toast.info(`"${personaName}" 페르소나가 거부되었습니다.`)
-      setSelectedPersona(null)
-    } catch {
-      toast.error("거부 처리에 실패했습니다.")
+      await incubatorService.approvePersona(persona.id)
+      toast.success(`"${persona.name}" 페르소나가 승인되었습니다.`)
+      // 목록에서 제거
+      setPersonas((prev) => prev.filter((p) => p.id !== persona.id))
+      if (selectedPersona?.id === persona.id) {
+        setSelectedPersona(null)
+      }
+      // 페르소나 목록 페이지로 이동
+      router.push(`/personas?approved=${persona.id}`)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "승인에 실패했습니다"
+      toast.error(message)
+    } finally {
+      setIsApproving(null)
     }
   }
 
-  const handleSaveSettings = () => {
-    toast.success("인큐베이터 설정이 저장되었습니다.")
-    setSettingsOpen(false)
+  const handleReject = async (persona: IncubatorPersona) => {
+    if (!confirm(`"${persona.name}" 페르소나를 거부하시겠습니까?`)) return
+
+    setIsRejecting(persona.id)
+    try {
+      await incubatorService.rejectPersona(persona.id)
+      toast.info(`"${persona.name}" 페르소나가 거부되었습니다.`)
+      // 상태 업데이트
+      setPersonas((prev) =>
+        prev.map((p) =>
+          p.id === persona.id ? { ...p, status: "FAILED" as const, failReason: "수동 거부됨" } : p
+        )
+      )
+      if (selectedPersona?.id === persona.id) {
+        setSelectedPersona({
+          ...selectedPersona,
+          status: "FAILED",
+          failReason: "수동 거부됨",
+        })
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "거부 처리에 실패했습니다"
+      toast.error(message)
+    } finally {
+      setIsRejecting(null)
+    }
+  }
+
+  const handleSaveSettings = async () => {
+    setIsSavingSettings(true)
+    try {
+      const updatedSettings = await incubatorService.updateSettings({
+        runTime: formRunTime,
+        dailyLimit: formDailyLimit,
+        minPassScore: formMinPassScore,
+        autoApproveScore: formAutoApproveScore,
+      })
+      setSettings(updatedSettings)
+      toast.success("인큐베이터 설정이 저장되었습니다.")
+      setSettingsOpen(false)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "설정 저장에 실패했습니다"
+      toast.error(message)
+    } finally {
+      setIsSavingSettings(false)
+    }
+  }
+
+  // 로딩 상태
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="text-primary mx-auto mb-4 h-8 w-8 animate-spin" />
+          <p className="text-muted-foreground">인큐베이터 데이터를 불러오는 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 에러 상태
+  if (!stats) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="text-destructive mx-auto mb-4 h-8 w-8" />
+          <p className="text-destructive">데이터를 불러올 수 없습니다</p>
+          <Button variant="outline" className="mt-4" onClick={() => fetchData()}>
+            다시 시도
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -130,14 +234,17 @@ export default function IncubatorPage() {
           <p className="text-muted-foreground">자동 페르소나 생성 및 검증 시스템</p>
         </div>
         <div className="flex items-center gap-4">
+          <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+          </Button>
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground text-sm">자동 생성</span>
-            <Switch checked={isEnabled} onCheckedChange={setIsEnabled} />
+            <Switch checked={settings?.enabled ?? false} onCheckedChange={handleToggleEnabled} />
             <Badge
-              variant={isEnabled ? "default" : "secondary"}
-              className={isEnabled ? "bg-green-500 hover:bg-green-600" : ""}
+              variant={settings?.enabled ? "default" : "secondary"}
+              className={settings?.enabled ? "bg-green-500 hover:bg-green-600" : ""}
             >
-              {isEnabled ? "활성" : "비활성"}
+              {settings?.enabled ? "활성" : "비활성"}
             </Badge>
           </div>
           <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
@@ -155,24 +262,52 @@ export default function IncubatorPage() {
               <div className="space-y-4 pt-4">
                 <div className="space-y-2">
                   <Label>배치 실행 시간</Label>
-                  <Input type="time" defaultValue="03:00" />
+                  <Input
+                    type="time"
+                    value={formRunTime}
+                    onChange={(e) => setFormRunTime(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>일일 생성 수</Label>
-                  <Input type="number" defaultValue={5} min={1} max={10} />
+                  <Input
+                    type="number"
+                    value={formDailyLimit}
+                    onChange={(e) => setFormDailyLimit(Number(e.target.value))}
+                    min={1}
+                    max={10}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>최소 통과 점수</Label>
-                  <Input type="number" defaultValue={70} min={50} max={90} />
+                  <Input
+                    type="number"
+                    value={formMinPassScore}
+                    onChange={(e) => setFormMinPassScore(Number(e.target.value))}
+                    min={50}
+                    max={90}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>자동 승인 점수</Label>
-                  <Input type="number" defaultValue={85} min={70} max={95} />
+                  <Input
+                    type="number"
+                    value={formAutoApproveScore}
+                    onChange={(e) => setFormAutoApproveScore(Number(e.target.value))}
+                    min={70}
+                    max={95}
+                  />
                 </div>
-                <Button className="w-full" onClick={handleSaveSettings}>
-                  설정 저장
-                </Button>
               </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSettingsOpen(false)}>
+                  취소
+                </Button>
+                <Button onClick={handleSaveSettings} disabled={isSavingSettings}>
+                  {isSavingSettings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  {isSavingSettings ? "저장 중..." : "설정 저장"}
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
@@ -188,8 +323,8 @@ export default function IncubatorPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{INCUBATOR_STATS.lastRunTime}</div>
-            <p className="text-muted-foreground text-xs">다음 실행: 내일 03:00</p>
+            <div className="text-2xl font-bold">{stats.lastRunTime}</div>
+            <p className="text-muted-foreground text-xs">다음 실행: {stats.nextRunTime}</p>
           </CardContent>
         </Card>
 
@@ -201,9 +336,9 @@ export default function IncubatorPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{INCUBATOR_STATS.todayGenerated}개</div>
+            <div className="text-2xl font-bold">{stats.todayGenerated}개</div>
             <p className="text-muted-foreground text-xs">
-              통과 {INCUBATOR_STATS.todayPassed} / 실패 {INCUBATOR_STATS.todayFailed}
+              통과 {stats.todayPassed} / 실패 {stats.todayFailed}
             </p>
           </CardContent>
         </Card>
@@ -216,8 +351,8 @@ export default function IncubatorPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{INCUBATOR_STATS.weeklyAvgScore}점</div>
-            <Progress value={INCUBATOR_STATS.weeklyAvgScore} className="mt-2" />
+            <div className="text-2xl font-bold">{stats.weeklyAvgScore}점</div>
+            <Progress value={stats.weeklyAvgScore} className="mt-2" />
           </CardContent>
         </Card>
 
@@ -229,8 +364,8 @@ export default function IncubatorPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{INCUBATOR_STATS.weeklyPassRate}%</div>
-            <Progress value={INCUBATOR_STATS.weeklyPassRate} className="mt-2" />
+            <div className="text-2xl font-bold">{stats.weeklyPassRate}%</div>
+            <Progress value={stats.weeklyPassRate} className="mt-2" />
           </CardContent>
         </Card>
       </div>
@@ -248,97 +383,119 @@ export default function IncubatorPage() {
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle>오늘 생성된 페르소나</CardTitle>
-                <CardDescription>
-                  {INCUBATOR_STATS.todayGenerated}개 생성됨 · 승인 대기 중
-                </CardDescription>
+                <CardDescription>{personas.length}개 생성됨 · 승인 대기 중</CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>이름</TableHead>
-                      <TableHead>상태</TableHead>
-                      <TableHead>점수</TableHead>
-                      <TableHead>생성 시간</TableHead>
-                      <TableHead className="text-right">액션</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {TODAY_PERSONAS.map((persona) => (
-                      <TableRow
-                        key={persona.id}
-                        className={`cursor-pointer ${selectedPersona?.id === persona.id ? "bg-muted" : ""}`}
-                        onClick={() => setSelectedPersona(persona)}
-                      >
-                        <TableCell className="font-medium">{persona.name}</TableCell>
-                        <TableCell>
-                          {persona.status === "PASSED" ? (
-                            <Badge
-                              variant="default"
-                              className="gap-1 bg-green-500 hover:bg-green-600"
-                            >
-                              <CheckCircle className="h-3 w-3" />
-                              통과
-                            </Badge>
-                          ) : (
-                            <Badge variant="destructive" className="gap-1">
-                              <XCircle className="h-3 w-3" />
-                              실패
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Progress value={persona.overallScore} className="h-2 w-16" />
-                            <span className="text-sm">{persona.overallScore}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{persona.createdAt}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            {persona.status === "PASSED" && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleApprove(persona.id, persona.name)
-                                  }}
-                                >
-                                  <ThumbsUp className="h-4 w-4 text-green-500" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleReject(persona.id, persona.name)
-                                  }}
-                                >
-                                  <ThumbsDown className="h-4 w-4 text-red-500" />
-                                </Button>
-                              </>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setSelectedPersona(persona)
-                              }}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                {personas.length === 0 ? (
+                  <div className="text-muted-foreground py-8 text-center">
+                    <Beaker className="mx-auto mb-4 h-12 w-12 opacity-50" />
+                    <p>오늘 생성된 페르소나가 없습니다.</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>이름</TableHead>
+                        <TableHead>상태</TableHead>
+                        <TableHead>점수</TableHead>
+                        <TableHead>생성 시간</TableHead>
+                        <TableHead className="text-right">액션</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {personas.map((persona) => (
+                        <TableRow
+                          key={persona.id}
+                          className={`cursor-pointer ${selectedPersona?.id === persona.id ? "bg-muted" : ""}`}
+                          onClick={() => setSelectedPersona(persona)}
+                        >
+                          <TableCell className="font-medium">{persona.name}</TableCell>
+                          <TableCell>
+                            {persona.status === "PASSED" ? (
+                              <Badge
+                                variant="default"
+                                className="gap-1 bg-green-500 hover:bg-green-600"
+                              >
+                                <CheckCircle className="h-3 w-3" />
+                                통과
+                              </Badge>
+                            ) : persona.status === "PENDING" ? (
+                              <Badge variant="secondary" className="gap-1">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                검증 중
+                              </Badge>
+                            ) : (
+                              <Badge variant="destructive" className="gap-1">
+                                <XCircle className="h-3 w-3" />
+                                실패
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Progress value={persona.overallScore} className="h-2 w-16" />
+                              <span className="text-sm">{persona.overallScore}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {persona.createdAt}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              {persona.status === "PASSED" && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    disabled={isApproving === persona.id}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleApprove(persona)
+                                    }}
+                                  >
+                                    {isApproving === persona.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <ThumbsUp className="h-4 w-4 text-green-500" />
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    disabled={isRejecting === persona.id}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleReject(persona)
+                                    }}
+                                  >
+                                    {isRejecting === persona.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <ThumbsDown className="h-4 w-4 text-red-500" />
+                                    )}
+                                  </Button>
+                                </>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSelectedPersona(persona)
+                                }}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
 
@@ -411,18 +568,28 @@ export default function IncubatorPage() {
                         <Button
                           className="flex-1"
                           size="sm"
-                          onClick={() => handleApprove(selectedPersona.id, selectedPersona.name)}
+                          disabled={isApproving === selectedPersona.id}
+                          onClick={() => handleApprove(selectedPersona)}
                         >
-                          <ThumbsUp className="mr-1 h-4 w-4" />
+                          {isApproving === selectedPersona.id ? (
+                            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                          ) : (
+                            <ThumbsUp className="mr-1 h-4 w-4" />
+                          )}
                           승인
                         </Button>
                         <Button
                           variant="outline"
                           className="flex-1"
                           size="sm"
-                          onClick={() => handleReject(selectedPersona.id, selectedPersona.name)}
+                          disabled={isRejecting === selectedPersona.id}
+                          onClick={() => handleReject(selectedPersona)}
                         >
-                          <ThumbsDown className="mr-1 h-4 w-4" />
+                          {isRejecting === selectedPersona.id ? (
+                            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                          ) : (
+                            <ThumbsDown className="mr-1 h-4 w-4" />
+                          )}
                           거부
                         </Button>
                       </div>
@@ -458,7 +625,7 @@ export default function IncubatorPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {HISTORY_DATA.map((day) => (
+                  {history.map((day) => (
                     <TableRow key={day.date}>
                       <TableCell className="font-medium">{day.date}</TableCell>
                       <TableCell>{day.generated}개</TableCell>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
 import {
   Users,
@@ -19,6 +19,8 @@ import {
   AlertCircle,
   Clock,
   ChevronRight,
+  RefreshCw,
+  Loader2,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -59,79 +61,51 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from "next/link"
-import { MOCK_TEAM_MEMBERS, type MockTeamMember } from "@/services/mock-data.service"
+import { teamService, type TeamMember, type TeamStats } from "@/services/team-service"
+import type { UserRole } from "@/types"
 
-// 팀원 데이터 - adapted from centralized mock data service
-interface TeamMember {
-  id: string
-  name: string
-  email: string
-  role: "ADMIN" | "AI_ENGINEER" | "CONTENT_MANAGER" | "ANALYST"
-  status: "active" | "inactive" | "pending"
-  avatar?: string
-  lastActive: string
-  joinedAt: string
-}
-
-// Transform centralized mock data to page-specific format
-const transformTeamMember = (member: MockTeamMember): TeamMember => ({
-  id: member.id,
-  name: member.name,
-  email: member.email,
-  role: member.role as TeamMember["role"],
-  status: member.status.toLowerCase() as TeamMember["status"],
-  avatar: member.avatar,
-  lastActive: new Date(member.lastActive).toLocaleString("ko-KR"),
-  joinedAt: new Date(member.joinedAt).toLocaleDateString("ko-KR"),
-})
-
-const TEAM_MEMBERS: TeamMember[] = MOCK_TEAM_MEMBERS.map(transformTeamMember)
-
-// TODO: Move ROLES to centralized mock-data.service when role management is expanded
-const ROLES = [
+// 역할 정의 (팀 멤버 수는 동적으로 계산)
+const getRoles = (members: TeamMember[]) => [
   {
-    id: "ADMIN",
+    id: "ADMIN" as UserRole,
     name: "관리자",
     description: "모든 기능에 대한 전체 접근 권한",
     permissions: 24,
-    members: MOCK_TEAM_MEMBERS.filter((m) => m.role === "ADMIN").length,
+    members: members.filter((m) => m.role === "ADMIN").length,
     color: "bg-red-500",
   },
   {
-    id: "AI_ENGINEER",
+    id: "AI_ENGINEER" as UserRole,
     name: "AI 엔지니어",
     description: "페르소나 및 알고리즘 관리",
     permissions: 18,
-    members: MOCK_TEAM_MEMBERS.filter((m) => m.role === "AI_ENGINEER").length,
+    members: members.filter((m) => m.role === "AI_ENGINEER").length,
     color: "bg-purple-500",
   },
   {
-    id: "CONTENT_MANAGER",
+    id: "CONTENT_MANAGER" as UserRole,
     name: "콘텐츠 매니저",
     description: "콘텐츠 및 프롬프트 관리",
     permissions: 12,
-    members: MOCK_TEAM_MEMBERS.filter((m) => m.role === "CONTENT_MANAGER").length,
+    members: members.filter((m) => m.role === "CONTENT_MANAGER").length,
     color: "bg-blue-500",
   },
   {
-    id: "ANALYST",
+    id: "ANALYST" as UserRole,
     name: "분석가",
     description: "데이터 분석 및 리포트 조회",
     permissions: 8,
-    members: MOCK_TEAM_MEMBERS.filter((m) => m.role === "ANALYST").length,
+    members: members.filter((m) => m.role === "ANALYST").length,
     color: "bg-green-500",
   },
 ]
 
-// Dynamically computed team stats from centralized mock data
-const TEAM_STATS = {
-  totalMembers: MOCK_TEAM_MEMBERS.length,
-  activeMembers: MOCK_TEAM_MEMBERS.filter((m) => m.status === "ACTIVE").length,
-  pendingInvites: MOCK_TEAM_MEMBERS.filter((m) => m.status === "PENDING").length,
-  totalRoles: ROLES.length,
-}
-
 export default function TeamAccessPage() {
+  // 상태 관리
+  const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [teamStats, setTeamStats] = useState<TeamStats | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [roleFilter, setRoleFilter] = useState("all")
   const [showInviteDialog, setShowInviteDialog] = useState(false)
@@ -139,9 +113,44 @@ export default function TeamAccessPage() {
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteRole, setInviteRole] = useState("")
   const [inviteMessage, setInviteMessage] = useState("")
-  const [teamMembers, setTeamMembers] = useState(TEAM_MEMBERS)
+  const [isInviting, setIsInviting] = useState(false)
 
-  const handleSendInvite = () => {
+  // 역할 목록 (멤버 수 동적 계산)
+  const ROLES = getRoles(teamMembers)
+
+  // 데이터 로드
+  const fetchTeamData = useCallback(async (showRefreshIndicator = false) => {
+    if (showRefreshIndicator) {
+      setIsRefreshing(true)
+    } else {
+      setIsLoading(true)
+    }
+
+    try {
+      const [membersResponse, stats] = await Promise.all([
+        teamService.getMembers(),
+        teamService.getStats(),
+      ])
+      setTeamMembers(membersResponse.members)
+      setTeamStats(stats)
+    } catch (err) {
+      console.error("Failed to fetch team data:", err)
+      toast.error("팀 데이터를 불러오는데 실패했습니다")
+    } finally {
+      setIsLoading(false)
+      setIsRefreshing(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchTeamData()
+  }, [fetchTeamData])
+
+  const handleRefresh = () => {
+    fetchTeamData(true)
+  }
+
+  const handleSendInvite = async () => {
     if (!inviteEmail) {
       toast.error("이메일 주소를 입력해주세요")
       return
@@ -150,24 +159,51 @@ export default function TeamAccessPage() {
       toast.error("역할을 선택해주세요")
       return
     }
-    toast.success(`${inviteEmail}로 초대가 발송되었습니다`)
-    setShowInviteDialog(false)
-    setInviteEmail("")
-    setInviteRole("")
-    setInviteMessage("")
+
+    setIsInviting(true)
+    try {
+      await teamService.inviteMember({
+        email: inviteEmail,
+        role: inviteRole as UserRole,
+        message: inviteMessage || undefined,
+      })
+      toast.success(`${inviteEmail}로 초대가 발송되었습니다`)
+      setShowInviteDialog(false)
+      setInviteEmail("")
+      setInviteRole("")
+      setInviteMessage("")
+      await fetchTeamData(true)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "초대 발송에 실패했습니다"
+      toast.error(message)
+    } finally {
+      setIsInviting(false)
+    }
   }
 
   const handleEditMember = (member: TeamMember) => {
-    toast.info(`${member.name} 편집 모드`)
+    toast.info(`${member.name} 편집 기능은 준비 중입니다`)
   }
 
-  const handleResetPassword = (member: TeamMember) => {
-    toast.success(`${member.email}로 비밀번호 재설정 링크가 발송되었습니다`)
+  const handleResetPassword = async (member: TeamMember) => {
+    try {
+      await teamService.resetPassword(member.id)
+      toast.success(`${member.email}로 비밀번호 재설정 링크가 발송되었습니다`)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "비밀번호 재설정에 실패했습니다"
+      toast.error(message)
+    }
   }
 
-  const handleDeleteMember = (member: TeamMember) => {
-    setTeamMembers(teamMembers.filter((m) => m.id !== member.id))
-    toast.success(`${member.name}이(가) 팀에서 삭제되었습니다`)
+  const handleDeleteMember = async (member: TeamMember) => {
+    try {
+      await teamService.deleteMember(member.id)
+      toast.success(`${member.name}이(가) 팀에서 삭제되었습니다`)
+      await fetchTeamData(true)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "삭제에 실패했습니다"
+      toast.error(message)
+    }
   }
 
   const handleAddRole = () => {
@@ -196,21 +232,21 @@ export default function TeamAccessPage() {
 
   const getStatusBadge = (status: TeamMember["status"]) => {
     switch (status) {
-      case "active":
+      case "ACTIVE":
         return (
           <Badge variant="secondary" className="gap-1">
             <CheckCircle className="h-3 w-3" />
             활성
           </Badge>
         )
-      case "inactive":
+      case "INACTIVE":
         return (
           <Badge variant="outline" className="gap-1">
             <Clock className="h-3 w-3" />
             비활성
           </Badge>
         )
-      case "pending":
+      case "PENDING":
         return (
           <Badge className="gap-1 bg-yellow-500">
             <AlertCircle className="h-3 w-3" />
@@ -234,6 +270,18 @@ export default function TeamAccessPage() {
     return matchesSearch && matchesRole
   })
 
+  // 로딩 상태
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="text-primary mx-auto mb-4 h-8 w-8 animate-spin" />
+          <p className="text-muted-foreground">팀 데이터를 불러오는 중...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -244,63 +292,76 @@ export default function TeamAccessPage() {
           </h2>
           <p className="text-muted-foreground">팀원을 관리하고 권한을 설정합니다.</p>
         </div>
-        <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
-          <DialogTrigger asChild>
-            <Button>
-              <UserPlus className="mr-2 h-4 w-4" />
-              팀원 초대
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>새 팀원 초대</DialogTitle>
-              <DialogDescription>이메일로 새로운 팀원을 초대합니다.</DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label>이메일 주소</Label>
-                <Input
-                  type="email"
-                  placeholder="email@example.com"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>역할</Label>
-                <Select value={inviteRole} onValueChange={setInviteRole}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="역할 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ROLES.map((role) => (
-                      <SelectItem key={role.id} value={role.id}>
-                        {role.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label>메시지 (선택)</Label>
-                <Input
-                  placeholder="환영 메시지를 입력하세요"
-                  value={inviteMessage}
-                  onChange={(e) => setInviteMessage(e.target.value)}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowInviteDialog(false)}>
-                취소
+        <div className="flex gap-2">
+          <Button variant="outline" size="icon" onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+          </Button>
+          <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
+            <DialogTrigger asChild>
+              <Button>
+                <UserPlus className="mr-2 h-4 w-4" />
+                팀원 초대
               </Button>
-              <Button onClick={handleSendInvite}>
-                <Mail className="mr-2 h-4 w-4" />
-                초대 보내기
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>새 팀원 초대</DialogTitle>
+                <DialogDescription>이메일로 새로운 팀원을 초대합니다.</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label>이메일 주소</Label>
+                  <Input
+                    type="email"
+                    placeholder="email@example.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>역할</Label>
+                  <Select value={inviteRole} onValueChange={setInviteRole}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="역할 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ROLES.map((role) => (
+                        <SelectItem key={role.id} value={role.id}>
+                          {role.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label>메시지 (선택)</Label>
+                  <Input
+                    placeholder="환영 메시지를 입력하세요"
+                    value={inviteMessage}
+                    onChange={(e) => setInviteMessage(e.target.value)}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowInviteDialog(false)}
+                  disabled={isInviting}
+                >
+                  취소
+                </Button>
+                <Button onClick={handleSendInvite} disabled={isInviting}>
+                  {isInviting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Mail className="mr-2 h-4 w-4" />
+                  )}
+                  {isInviting ? "발송 중..." : "초대 보내기"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Stats */}
@@ -311,8 +372,10 @@ export default function TeamAccessPage() {
             <Users className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{TEAM_STATS.totalMembers}</div>
-            <p className="text-muted-foreground mt-1 text-xs">{TEAM_STATS.activeMembers}명 활성</p>
+            <div className="text-2xl font-bold">{teamStats?.totalMembers ?? 0}</div>
+            <p className="text-muted-foreground mt-1 text-xs">
+              {teamStats?.activeMembers ?? 0}명 활성
+            </p>
           </CardContent>
         </Card>
 
@@ -322,7 +385,7 @@ export default function TeamAccessPage() {
             <Mail className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{TEAM_STATS.pendingInvites}</div>
+            <div className="text-2xl font-bold">{teamStats?.pendingInvites ?? 0}</div>
             <p className="text-muted-foreground mt-1 text-xs">응답 대기</p>
           </CardContent>
         </Card>
@@ -333,7 +396,7 @@ export default function TeamAccessPage() {
             <Shield className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{TEAM_STATS.totalRoles}</div>
+            <div className="text-2xl font-bold">{teamStats?.totalRoles ?? 0}</div>
             <p className="text-muted-foreground mt-1 text-xs">정의된 역할</p>
           </CardContent>
         </Card>
