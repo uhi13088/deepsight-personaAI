@@ -225,7 +225,9 @@ class ApiClient {
     endpoint: string,
     params?: Record<string, string | number | boolean | undefined>
   ): string {
-    const url = new URL(endpoint.startsWith("http") ? endpoint : `${this.baseUrl}${endpoint}`)
+    const fullPath = endpoint.startsWith("http") ? endpoint : `${this.baseUrl}${endpoint}`
+    const base = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"
+    const url = new URL(fullPath, fullPath.startsWith("http") ? undefined : base)
 
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
