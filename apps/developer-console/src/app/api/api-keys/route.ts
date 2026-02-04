@@ -1,39 +1,52 @@
 import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
+import prisma from "@/lib/prisma"
+import { auth } from "@/lib/auth"
 
 // GET /api/api-keys - List all API keys
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    // TODO: Get organization ID from session/auth
-    const organizationId = "org_xyz789"
+    const session = await auth()
 
-    // Mock data - replace with database query
-    const apiKeys = [
-      {
-        id: "key_1",
-        name: "Production Server",
-        prefix: "pk_live_",
-        lastFour: "xyz8",
-        environment: "live",
-        status: "active",
-        permissions: ["match", "personas", "feedback"],
-        createdAt: "2025-01-01T00:00:00Z",
-        lastUsedAt: new Date(Date.now() - 120000).toISOString(),
-        rateLimit: 1000,
+    // Get organization (use first one for now if no session)
+    let organization
+    if (session?.user?.id) {
+      // Find user's organization membership
+      const membership = await prisma.organizationMember.findFirst({
+        where: { userId: session.user.id },
+        include: { organization: true },
+      })
+      organization = membership?.organization
+    }
+    if (!organization) {
+      organization = await prisma.organization.findFirst()
+    }
+
+    if (!organization) {
+      return NextResponse.json({ apiKeys: [], total: 0 })
+    }
+
+    // Fetch API keys from database
+    const dbApiKeys = await prisma.apiKey.findMany({
+      where: {
+        organizationId: organization.id,
+        status: "ACTIVE",
       },
-      {
-        id: "key_2",
-        name: "Development",
-        prefix: "pk_test_",
-        lastFour: "abc3",
-        environment: "test",
-        status: "active",
-        permissions: ["match", "personas", "feedback"],
-        createdAt: "2025-01-05T00:00:00Z",
-        lastUsedAt: new Date(Date.now() - 3600000).toISOString(),
-        rateLimit: 100,
-      },
-    ]
+      orderBy: { createdAt: "desc" },
+    })
+
+    const apiKeys = dbApiKeys.map((key) => ({
+      id: key.id,
+      name: key.name,
+      prefix: key.keyPrefix,
+      lastFour: key.lastFour,
+      environment: key.environment.toLowerCase(),
+      status: key.status.toLowerCase(),
+      permissions: key.permissions,
+      createdAt: key.createdAt.toISOString(),
+      lastUsedAt: key.lastUsedAt?.toISOString() || null,
+      rateLimit: key.rateLimit,
+    }))
 
     return NextResponse.json({ apiKeys, total: apiKeys.length })
   } catch (error) {
@@ -48,6 +61,45 @@ export async function GET(request: NextRequest) {
 // POST /api/api-keys - Create a new API key
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth()
+
+    // Get organization and user
+    let organization
+    let userId: string
+
+    if (session?.user?.id) {
+      // Find user's organization membership
+      const membership = await prisma.organizationMember.findFirst({
+        where: { userId: session.user.id },
+        include: { organization: true },
+      })
+      organization = membership?.organization
+      userId = session.user.id
+    }
+
+    // Fallback for development
+    if (!organization) {
+      organization = await prisma.organization.findFirst()
+    }
+
+    if (!userId!) {
+      const user = await prisma.user.findFirst()
+      if (!user) {
+        return NextResponse.json(
+          { error: { code: "NO_USER", message: "No user found. Please run database seed." } },
+          { status: 400 }
+        )
+      }
+      userId = user.id
+    }
+
+    if (!organization) {
+      return NextResponse.json(
+        { error: { code: "NO_ORGANIZATION", message: "No organization found" } },
+        { status: 400 }
+      )
+    }
+
     const body = await request.json()
     const { name, environment, permissions } = body
 
@@ -80,17 +132,32 @@ export async function POST(request: NextRequest) {
     const keyHash = crypto.createHash("sha256").update(fullKey).digest("hex")
     const lastFour = randomPart.slice(-4)
 
-    // Mock response - replace with database insert
+    // Insert into database
+    const dbApiKey = await prisma.apiKey.create({
+      data: {
+        name,
+        keyPrefix: prefix,
+        keyHash,
+        lastFour,
+        environment: environment.toUpperCase() as "TEST" | "LIVE",
+        status: "ACTIVE",
+        permissions,
+        rateLimit: environment === "live" ? 1000 : 100,
+        userId,
+        organizationId: organization.id,
+      },
+    })
+
     const newApiKey = {
-      id: "key_" + crypto.randomBytes(8).toString("hex"),
-      name,
-      prefix,
-      lastFour,
-      environment,
-      status: "active",
-      permissions,
-      createdAt: new Date().toISOString(),
-      rateLimit: environment === "live" ? 1000 : 100,
+      id: dbApiKey.id,
+      name: dbApiKey.name,
+      prefix: dbApiKey.keyPrefix,
+      lastFour: dbApiKey.lastFour,
+      environment: dbApiKey.environment.toLowerCase(),
+      status: dbApiKey.status.toLowerCase(),
+      permissions: dbApiKey.permissions,
+      createdAt: dbApiKey.createdAt.toISOString(),
+      rateLimit: dbApiKey.rateLimit,
     }
 
     return NextResponse.json({
