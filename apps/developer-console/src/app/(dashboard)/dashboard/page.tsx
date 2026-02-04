@@ -41,7 +41,7 @@ import {
 
 const quickActions = [
   { title: "새 API Key 생성", href: "/api-keys/new", icon: Key },
-  { title: "문서 보기", href: "/docs/getting-started", icon: FileText },
+  { title: "문서 보기", href: "/docs", icon: FileText },
   { title: "Playground 열기", href: "/playground", icon: Play },
 ]
 
