@@ -16,8 +16,8 @@ import {
   CheckCircle,
   Clock,
   Shield,
-  Filter,
   Search,
+  Loader2,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -56,45 +56,36 @@ import {
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn, formatNumber, formatRelativeTime, maskApiKey } from "@/lib/utils"
-
-// Empty data - will be fetched from API
-type ApiKeyData = {
-  id: string
-  name: string
-  prefix: string
-  key: string
-  environment: "live" | "test"
-  status: "active" | "revoked" | "expired"
-  permissions: string[]
-  createdAt: string
-  lastUsed: string
-  totalCalls: number
-  callsThisMonth: number
-  rateLimit: number
-}
-
-const apiKeys: ApiKeyData[] = []
-
-type ActivityData = {
-  id: string
-  keyName: string
-  action: string
-  endpoint: string
-  status: number
-  timestamp: string
-}
-
-const recentActivity: ActivityData[] = []
+import { toast } from "sonner"
+import { apiKeysService, type ApiKey } from "@/services/api-keys-service"
 
 export default function ApiKeysPage() {
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [apiKeys, setApiKeys] = React.useState<ApiKey[]>([])
   const [showKey, setShowKey] = React.useState<Record<string, boolean>>({})
   const [searchQuery, setSearchQuery] = React.useState("")
   const [environmentFilter, setEnvironmentFilter] = React.useState<string>("all")
   const [statusFilter, setStatusFilter] = React.useState<string>("all")
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
   const [rotateDialogOpen, setRotateDialogOpen] = React.useState(false)
-  const [selectedKey, setSelectedKey] = React.useState<(typeof apiKeys)[0] | null>(null)
+  const [selectedKey, setSelectedKey] = React.useState<ApiKey | null>(null)
   const [copiedKey, setCopiedKey] = React.useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = React.useState(false)
+
+  React.useEffect(() => {
+    const fetchApiKeys = async () => {
+      try {
+        const data = await apiKeysService.getKeys()
+        setApiKeys(data.apiKeys)
+      } catch (error) {
+        console.error("Failed to fetch API keys:", error)
+        toast.error("API 키 목록을 불러오는데 실패했습니다.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchApiKeys()
+  }, [])
 
   const toggleKeyVisibility = (keyId: string) => {
     setShowKey((prev) => ({ ...prev, [keyId]: !prev[keyId] }))
@@ -103,7 +94,25 @@ export default function ApiKeysPage() {
   const copyToClipboard = async (key: string, keyId: string) => {
     await navigator.clipboard.writeText(key)
     setCopiedKey(keyId)
+    toast.success("API 키가 복사되었습니다.")
     setTimeout(() => setCopiedKey(null), 2000)
+  }
+
+  const handleRevokeKey = async () => {
+    if (!selectedKey) return
+    setIsDeleting(true)
+    try {
+      await apiKeysService.revokeKey(selectedKey.id)
+      setApiKeys((prev) => prev.filter((k) => k.id !== selectedKey.id))
+      toast.success("API 키가 폐기되었습니다.")
+      setDeleteDialogOpen(false)
+      setSelectedKey(null)
+    } catch (error) {
+      console.error("Failed to revoke API key:", error)
+      toast.error("API 키 폐기에 실패했습니다.")
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   const filteredKeys = apiKeys.filter((key) => {
@@ -116,6 +125,8 @@ export default function ApiKeysPage() {
   const activeKeys = apiKeys.filter((k) => k.status === "active")
   const liveKeys = apiKeys.filter((k) => k.environment === "live" && k.status === "active")
   const testKeys = apiKeys.filter((k) => k.environment === "test" && k.status === "active")
+  const totalCallsThisMonth = apiKeys.reduce((sum, k) => sum + (k.stats?.callsThisMonth ?? 0), 0)
+  const maxRateLimit = activeKeys.length > 0 ? Math.max(...activeKeys.map((k) => k.rateLimit)) : 0
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -151,6 +162,14 @@ export default function ApiKeysPage() {
       default:
         return <Badge variant="outline">{env}</Badge>
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+      </div>
+    )
   }
 
   return (
@@ -189,9 +208,7 @@ export default function ApiKeysPage() {
             <Activity className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {formatNumber(apiKeys.reduce((sum, k) => sum + k.callsThisMonth, 0))}
-            </div>
+            <div className="text-2xl font-bold">{formatNumber(totalCallsThisMonth)}</div>
             <p className="text-muted-foreground text-xs">This month</p>
           </CardContent>
         </Card>
@@ -202,11 +219,7 @@ export default function ApiKeysPage() {
             <Shield className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {activeKeys.length > 0
-                ? formatNumber(Math.max(...activeKeys.map((k) => k.rateLimit)))
-                : 0}
-            </div>
+            <div className="text-2xl font-bold">{formatNumber(maxRateLimit)}</div>
             <p className="text-muted-foreground text-xs">requests/min (max)</p>
           </CardContent>
         </Card>
@@ -218,10 +231,12 @@ export default function ApiKeysPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {recentActivity.length > 0 ? formatRelativeTime(recentActivity[0].timestamp) : "-"}
+              {activeKeys.length > 0 && activeKeys[0].lastUsedAt
+                ? formatRelativeTime(activeKeys[0].lastUsedAt)
+                : "-"}
             </div>
             <p className="text-muted-foreground text-xs">
-              {recentActivity.length > 0 ? "" : "활동 없음"}
+              {activeKeys.length === 0 || !activeKeys[0].lastUsedAt ? "활동 없음" : ""}
             </p>
           </CardContent>
         </Card>
@@ -303,7 +318,9 @@ export default function ApiKeysPage() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <code className="bg-muted rounded px-2 py-1 font-mono text-xs">
-                            {showKey[key.id] ? key.key : maskApiKey(key.key)}
+                            {showKey[key.id]
+                              ? `${key.prefix}...${key.lastFour}`
+                              : maskApiKey(`${key.prefix}...${key.lastFour}`)}
                           </code>
                           <Button
                             variant="ghost"
@@ -321,7 +338,9 @@ export default function ApiKeysPage() {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
-                            onClick={() => copyToClipboard(key.key, key.id)}
+                            onClick={() =>
+                              copyToClipboard(`${key.prefix}...${key.lastFour}`, key.id)
+                            }
                           >
                             {copiedKey === key.id ? (
                               <CheckCircle className="h-3.5 w-3.5 text-green-500" />
@@ -343,10 +362,10 @@ export default function ApiKeysPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {formatRelativeTime(key.lastUsed)}
+                        {key.lastUsedAt ? formatRelativeTime(key.lastUsedAt) : "Never"}
                       </TableCell>
                       <TableCell className="text-right">
-                        {formatNumber(key.callsThisMonth)}
+                        {formatNumber(key.stats?.callsThisMonth ?? 0)}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -358,7 +377,11 @@ export default function ApiKeysPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => copyToClipboard(key.key, key.id)}>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                copyToClipboard(`${key.prefix}...${key.lastFour}`, key.id)
+                              }
+                            >
                               <Copy className="mr-2 h-4 w-4" />
                               Copy Key
                             </DropdownMenuItem>
@@ -411,51 +434,13 @@ export default function ApiKeysPage() {
               <CardDescription>최근 API 호출 활동을 확인하세요</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Key</TableHead>
-                    <TableHead>Endpoint</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Time</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentActivity.map((activity) => (
-                    <TableRow key={activity.id}>
-                      <TableCell className="font-medium">{activity.keyName}</TableCell>
-                      <TableCell>
-                        <code className="bg-muted rounded px-2 py-1 font-mono text-xs">
-                          {activity.endpoint}
-                        </code>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            activity.status >= 200 && activity.status < 300
-                              ? "success"
-                              : activity.status >= 400
-                                ? "destructive"
-                                : "secondary"
-                          }
-                        >
-                          {activity.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatRelativeTime(activity.timestamp)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-
-              {recentActivity.length === 0 && (
-                <div className="py-12 text-center">
-                  <Activity className="text-muted-foreground/30 mx-auto mb-2 h-12 w-12" />
-                  <p className="text-muted-foreground">최근 활동이 없습니다</p>
-                </div>
-              )}
+              <div className="py-12 text-center">
+                <Activity className="text-muted-foreground/30 mx-auto mb-2 h-12 w-12" />
+                <p className="text-muted-foreground">최근 활동이 없습니다</p>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  API 키를 생성하고 사용하면 여기에 활동이 표시됩니다
+                </p>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -479,7 +464,9 @@ export default function ApiKeysPage() {
                 <ul className="text-muted-foreground mt-1 list-inside list-disc">
                   <li>이 키를 사용하는 모든 API 호출이 즉시 실패합니다</li>
                   <li>삭제된 키는 복구할 수 없습니다</li>
-                  <li>이 달 사용량: {formatNumber(selectedKey?.callsThisMonth || 0)} calls</li>
+                  <li>
+                    이 달 사용량: {formatNumber(selectedKey?.stats?.callsThisMonth || 0)} calls
+                  </li>
                 </ul>
               </div>
             </div>
@@ -488,14 +475,8 @@ export default function ApiKeysPage() {
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
               취소
             </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                // Handle delete
-                setDeleteDialogOpen(false)
-                setSelectedKey(null)
-              }}
-            >
+            <Button variant="destructive" onClick={handleRevokeKey} disabled={isDeleting}>
+              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               삭제
             </Button>
           </DialogFooter>
@@ -532,7 +513,7 @@ export default function ApiKeysPage() {
             </Button>
             <Button
               onClick={() => {
-                // Handle rotation
+                toast.info("Key 로테이션 기능은 준비 중입니다.")
                 setRotateDialogOpen(false)
                 setSelectedKey(null)
               }}

@@ -180,10 +180,9 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{kpiData.todayMatches.toLocaleString()}</div>
-            <div className="mt-1 flex items-center text-xs text-green-600">
-              <TrendingUp className="mr-1 h-3 w-3" />
-              +12.5% from yesterday
-            </div>
+            <p className="text-muted-foreground mt-1 text-xs">
+              전체: {kpiData.totalMatches.toLocaleString()}
+            </p>
           </CardContent>
         </Card>
 
@@ -194,10 +193,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{kpiData.matchingAccuracy}%</div>
-            <div className="mt-1 flex items-center text-xs text-green-600">
-              <TrendingUp className="mr-1 h-3 w-3" />
-              +0.7% from last week
-            </div>
+            <Progress value={kpiData.matchingAccuracy} className="mt-2" />
           </CardContent>
         </Card>
 
@@ -317,22 +313,30 @@ export default function DashboardPage() {
             <CardDescription>이번 주 가장 많이 매칭된 페르소나</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {topPersonas.map((persona, index) => (
-                <div key={persona.name} className="flex items-center gap-3">
-                  <span className="bg-primary/10 flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium">
-                    {index + 1}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{persona.name}</p>
-                    <p className="text-muted-foreground text-xs">
-                      {persona.matches.toLocaleString()} 매칭 · {persona.accuracy}% 정확도
-                    </p>
+            {topPersonas.length === 0 ? (
+              <div className="py-8 text-center">
+                <Users className="text-muted-foreground mx-auto h-8 w-8" />
+                <p className="text-muted-foreground mt-2 text-sm">매칭 데이터가 없습니다</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {topPersonas.map((persona, index) => (
+                  <div key={persona.name} className="flex items-center gap-3">
+                    <span className="bg-primary/10 flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium">
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{persona.name}</p>
+                      <p className="text-muted-foreground text-xs">
+                        {persona.matches.toLocaleString()} 매칭 · {persona.accuracy.toFixed(1)}%
+                        정확도
+                      </p>
+                    </div>
+                    <Badge variant="secondary">{persona.score}점</Badge>
                   </div>
-                  <Badge variant="secondary">{persona.score}점</Badge>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
             <Separator className="my-4" />
             <Link href="/personas">
               <Button variant="ghost" className="w-full" size="sm">
@@ -350,20 +354,27 @@ export default function DashboardPage() {
             <CardDescription>시스템 이벤트 및 변경 사항</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {activityLog.map((activity) => (
-                <div key={activity.id} className="flex gap-3">
-                  {getActivityIcon(activity.status)}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{activity.title}</p>
-                    <p className="text-muted-foreground line-clamp-2 text-xs">
-                      {activity.description}
-                    </p>
-                    <p className="text-muted-foreground mt-1 text-xs">{activity.time}</p>
+            {activityLog.length === 0 ? (
+              <div className="py-8 text-center">
+                <Activity className="text-muted-foreground mx-auto h-8 w-8" />
+                <p className="text-muted-foreground mt-2 text-sm">최근 활동이 없습니다</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {activityLog.map((activity) => (
+                  <div key={activity.id} className="flex gap-3">
+                    {getActivityIcon(activity.status)}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">{activity.title}</p>
+                      <p className="text-muted-foreground line-clamp-2 text-xs">
+                        {activity.description}
+                      </p>
+                      <p className="text-muted-foreground mt-1 text-xs">{activity.time}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 

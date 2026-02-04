@@ -2,11 +2,47 @@ import { NextResponse, type NextRequest } from "next/server"
 import { getToken } from "next-auth/jwt"
 
 // ============================================================================
+// CORS 설정
+// ============================================================================
+
+const ALLOWED_ORIGINS = [
+  process.env.NEXT_PUBLIC_APP_URL,
+  process.env.NEXT_PUBLIC_DEVELOPER_CONSOLE_URL,
+  ...(process.env.NODE_ENV === "development"
+    ? [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+      ]
+    : []),
+].filter(Boolean) as string[]
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, X-API-Key",
+    "Access-Control-Expose-Headers": "X-Request-ID, X-RateLimit-Limit, X-RateLimit-Remaining",
+    "Access-Control-Max-Age": "86400",
+    "Access-Control-Allow-Credentials": "true",
+  }
+
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin
+  }
+
+  return headers
+}
+
+// ============================================================================
 // 경로 설정
 // ============================================================================
 
 /** 인증이 필요하지 않은 경로 */
 const PUBLIC_PATHS = ["/login", "/api/auth", "/api/admin/seed"]
+
+/** CORS 허용 API 경로 (외부에서 접근 가능) */
+const CORS_API_PATHS = ["/api/personas", "/api/matching", "/api/v1"]
 
 /** 역할별 접근 가능 경로 */
 const ROLE_PERMISSIONS: Record<string, string[]> = {
@@ -30,6 +66,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
 export default async function middleware(req: NextRequest) {
   const { nextUrl } = req
   const pathname = nextUrl.pathname
+  const origin = req.headers.get("origin")
 
   // 정적 리소스는 통과
   if (
@@ -38,6 +75,27 @@ export default async function middleware(req: NextRequest) {
     pathname.startsWith("/api/auth")
   ) {
     return NextResponse.next()
+  }
+
+  // CORS API 경로 확인
+  const isCorsApiPath = CORS_API_PATHS.some((path) => pathname.startsWith(path))
+
+  // CORS Preflight (OPTIONS) 요청 처리
+  if (req.method === "OPTIONS" && isCorsApiPath) {
+    return new NextResponse(null, {
+      status: 204,
+      headers: getCorsHeaders(origin),
+    })
+  }
+
+  // CORS API 경로에 CORS 헤더 추가
+  if (isCorsApiPath) {
+    const response = NextResponse.next()
+    const corsHeaders = getCorsHeaders(origin)
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      response.headers.set(key, value)
+    })
+    return response
   }
 
   // 공개 경로 확인

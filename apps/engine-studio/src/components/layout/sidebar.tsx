@@ -94,7 +94,7 @@ const navigation: NavItem[] = [
     icon: Link2,
     children: [
       { title: "배포 파이프라인", href: "/system-integration/deployment", icon: Rocket },
-      { title: "버전 관리", href: "/system-integration/version-control", icon: GitBranch },
+      { title: "버전 관리", href: "/system-integration/versions", icon: GitBranch },
       { title: "이벤트 버스", href: "/system-integration/event-bus", icon: Radio },
     ],
   },

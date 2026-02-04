@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
+import { toast } from "sonner"
 import {
   User,
   Bell,
@@ -21,7 +21,9 @@ import {
   LogOut,
   Trash2,
   Lock,
+  Loader2,
 } from "lucide-react"
+import { settingsService, type SettingsData } from "@/services/settings-service"
 import {
   Card,
   CardContent,
@@ -56,58 +58,31 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { cn } from "@/lib/utils"
 
-// Empty/default user data - will be fetched from API
-const userData = {
-  id: "",
-  name: "",
-  email: "",
-  avatar: null as string | null,
-  phone: "",
-  company: "",
-  timezone: "Asia/Seoul",
-  language: "ko",
-  twoFactorEnabled: false,
-  lastPasswordChange: "",
-}
+export default function SettingsPage() {
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [settingsData, setSettingsData] = React.useState<SettingsData | null>(null)
 
-const notificationSettings = {
-  email: {
+  const [name, setName] = React.useState("")
+  const [email, setEmail] = React.useState("")
+  const [phone, setPhone] = React.useState("")
+  const [company, setCompany] = React.useState("")
+  const [timezone, setTimezone] = React.useState("Asia/Seoul")
+  const [language, setLanguage] = React.useState("ko")
+  const [emailNotifications, setEmailNotifications] = React.useState({
     apiAlerts: true,
     usageReports: false,
     billing: true,
     security: true,
     marketing: false,
     productUpdates: false,
-  },
-  push: {
+  })
+  const [pushNotifications, setPushNotifications] = React.useState({
     apiAlerts: true,
     usageReports: false,
     billing: true,
     security: true,
-  },
-}
-
-type SessionData = {
-  id: string
-  device: string
-  ip: string
-  location: string
-  lastActive: string
-  current: boolean
-}
-
-const activeSessions: SessionData[] = []
-
-export default function SettingsPage() {
-  const [name, setName] = React.useState(userData.name)
-  const [email, setEmail] = React.useState(userData.email)
-  const [phone, setPhone] = React.useState(userData.phone)
-  const [company, setCompany] = React.useState(userData.company)
-  const [timezone, setTimezone] = React.useState(userData.timezone)
-  const [language, setLanguage] = React.useState(userData.language)
-  const [emailNotifications, setEmailNotifications] = React.useState(notificationSettings.email)
-  const [pushNotifications, setPushNotifications] = React.useState(notificationSettings.push)
-  const [twoFactorEnabled, setTwoFactorEnabled] = React.useState(userData.twoFactorEnabled)
+  })
+  const [twoFactorEnabled, setTwoFactorEnabled] = React.useState(false)
 
   const [passwordDialogOpen, setPasswordDialogOpen] = React.useState(false)
   const [twoFactorDialogOpen, setTwoFactorDialogOpen] = React.useState(false)
@@ -116,10 +91,59 @@ export default function SettingsPage() {
   const [showCurrentPassword, setShowCurrentPassword] = React.useState(false)
   const [showNewPassword, setShowNewPassword] = React.useState(false)
 
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await settingsService.getSettings()
+        setSettingsData(data)
+        // Initialize form state from fetched data
+        setName(data.profile.name)
+        setEmail(data.profile.email)
+        setPhone(data.profile.phone)
+        setCompany(data.profile.company)
+        setTimezone(data.profile.timezone)
+        setLanguage(data.profile.language)
+        setEmailNotifications(data.notifications.email)
+        setPushNotifications(data.notifications.push)
+        setTwoFactorEnabled(data.profile.twoFactorEnabled)
+      } catch (error) {
+        console.error("Failed to fetch settings:", error)
+        toast.error("설정을 불러오는데 실패했습니다.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
+  const activeSessions = settingsData?.sessions ?? []
+
   const handleSave = async () => {
     setIsSaving(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsSaving(false)
+    try {
+      await settingsService.updateProfile({
+        name,
+        email,
+        phone,
+        company,
+        timezone,
+        language,
+      })
+      toast.success("설정이 저장되었습니다.")
+    } catch (error) {
+      console.error("Failed to save settings:", error)
+      toast.error("설정 저장에 실패했습니다.")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+      </div>
+    )
   }
 
   return (
@@ -158,9 +182,9 @@ export default function SettingsPage() {
               {/* Avatar */}
               <div className="flex items-center gap-6">
                 <Avatar className="h-20 w-20">
-                  <AvatarImage src={userData.avatar || undefined} />
+                  <AvatarImage src={settingsData?.profile.avatar || undefined} />
                   <AvatarFallback className="text-2xl">
-                    {userData.name.slice(0, 2).toUpperCase()}
+                    {(settingsData?.profile.name || name || "U").slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="space-y-2">

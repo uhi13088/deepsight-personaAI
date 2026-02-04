@@ -18,7 +18,16 @@ import {
   Building2,
   Key,
   Edit,
+  Loader2,
 } from "lucide-react"
+import { toast } from "sonner"
+import {
+  teamService,
+  type TeamData,
+  type Member as ServiceMember,
+  type PendingInvite as ServicePendingInvite,
+  type MemberRole,
+} from "@/services/team-service"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -61,40 +70,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { cn, formatRelativeTime } from "@/lib/utils"
 
-// Empty data - will be fetched from API
-const organization = {
-  id: "",
-  name: "My Organization",
-  plan: "Free",
-  createdAt: new Date().toISOString(),
-  memberCount: 0,
-  maxMembers: 5,
-}
-
-type Member = {
-  id: string
-  name: string
-  email: string
-  avatar: string | null
-  role: "owner" | "admin" | "developer" | "viewer"
-  status: "active" | "pending" | "inactive"
-  joinedAt: string
-  lastActive: string | null
-}
-
-const members: Member[] = []
-
-type PendingInvite = {
-  id: string
-  email: string
-  role: "admin" | "developer" | "viewer"
-  invitedBy: string
-  invitedAt: string
-  expiresAt: string
-}
-
-const pendingInvites: PendingInvite[] = []
-
 const roles = [
   {
     id: "owner",
@@ -135,9 +110,37 @@ export default function TeamPage() {
   const [inviteDialogOpen, setInviteDialogOpen] = React.useState(false)
   const [editMemberDialogOpen, setEditMemberDialogOpen] = React.useState(false)
   const [removeMemberDialogOpen, setRemoveMemberDialogOpen] = React.useState(false)
-  const [selectedMember, setSelectedMember] = React.useState<(typeof members)[0] | null>(null)
+  const [selectedMember, setSelectedMember] = React.useState<ServiceMember | null>(null)
   const [inviteEmail, setInviteEmail] = React.useState("")
   const [inviteRole, setInviteRole] = React.useState("developer")
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [teamData, setTeamData] = React.useState<TeamData | null>(null)
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await teamService.getTeam()
+        setTeamData(data)
+      } catch (error) {
+        console.error("Failed to fetch team data:", error)
+        toast.error("팀 데이터를 불러오는데 실패했습니다.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
+  const organization = teamData?.organization ?? {
+    id: "",
+    name: "My Organization",
+    plan: "Free",
+    createdAt: new Date().toISOString(),
+    memberCount: 0,
+    maxMembers: 5,
+  }
+  const members = teamData?.members ?? []
+  const pendingInvites = teamData?.pendingInvites ?? []
 
   const filteredMembers = members.filter(
     (member) =>
@@ -171,11 +174,28 @@ export default function TeamPage() {
     }
   }
 
-  const handleInvite = () => {
-    // Handle invite logic
-    setInviteDialogOpen(false)
-    setInviteEmail("")
-    setInviteRole("developer")
+  const handleInvite = async () => {
+    try {
+      await teamService.inviteMember({ email: inviteEmail, role: inviteRole as MemberRole })
+      toast.success("초대가 발송되었습니다.")
+      // Refresh team data
+      const data = await teamService.getTeam()
+      setTeamData(data)
+      setInviteDialogOpen(false)
+      setInviteEmail("")
+      setInviteRole("developer")
+    } catch (error) {
+      console.error("Failed to invite member:", error)
+      toast.error("초대 발송에 실패했습니다.")
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+      </div>
+    )
   }
 
   return (

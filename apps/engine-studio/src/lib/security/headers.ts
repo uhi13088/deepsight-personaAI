@@ -189,9 +189,16 @@ export const API_SECURITY_HEADERS = {
 export const ALLOWED_ORIGINS = [
   // 프로덕션 도메인 (환경변수에서 설정)
   process.env.NEXT_PUBLIC_APP_URL,
+  // Developer Console URL (cross-app communication)
+  process.env.NEXT_PUBLIC_DEVELOPER_CONSOLE_URL,
   // 개발 환경
   ...(process.env.NODE_ENV === "development"
-    ? ["http://localhost:3000", "http://127.0.0.1:3000"]
+    ? [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+      ]
     : []),
 ].filter(Boolean) as string[]
 
@@ -202,8 +209,16 @@ export const CORS_CONFIG = {
   // 허용된 Origin 목록
   allowedOrigins: [
     ...(process.env.NEXT_PUBLIC_APP_URL ? [process.env.NEXT_PUBLIC_APP_URL] : []),
+    ...(process.env.NEXT_PUBLIC_DEVELOPER_CONSOLE_URL
+      ? [process.env.NEXT_PUBLIC_DEVELOPER_CONSOLE_URL]
+      : []),
     ...(process.env.NODE_ENV === "development"
-      ? ["http://localhost:3000", "http://127.0.0.1:3000", "*"]
+      ? [
+          "http://localhost:3000",
+          "http://localhost:3001",
+          "http://127.0.0.1:3000",
+          "http://127.0.0.1:3001",
+        ]
       : []),
   ],
 
