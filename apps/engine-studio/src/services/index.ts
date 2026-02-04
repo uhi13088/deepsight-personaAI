@@ -15,3 +15,17 @@ export type {
   PersonaTestRequest,
   PersonaTestResponse,
 } from "./persona-service"
+
+export { versionsService } from "./versions-service"
+export type { Version, Commit, Branch, VersionsData, CreateVersionInput } from "./versions-service"
+
+export { eventBusService } from "./event-bus-service"
+export type {
+  Event,
+  EventChannel,
+  DeadLetterEvent,
+  EventBusData,
+  EventStatus,
+  EventPriority,
+  ChannelStatus,
+} from "./event-bus-service"
