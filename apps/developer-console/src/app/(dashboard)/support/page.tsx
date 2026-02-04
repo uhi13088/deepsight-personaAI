@@ -158,25 +158,25 @@ const resources = [
     title: "API Documentation",
     description: "전체 API 레퍼런스 문서",
     icon: Book,
-    href: "/docs/api-reference",
+    href: "/docs#api",
   },
   {
     title: "Quick Start Guide",
     description: "5분 만에 시작하기",
     icon: Zap,
-    href: "/docs/getting-started",
+    href: "/docs#quickstart",
   },
   {
     title: "Video Tutorials",
     description: "단계별 비디오 가이드",
     icon: Video,
-    href: "/docs/tutorials",
+    href: "/playground",
   },
   {
     title: "SDK & Examples",
     description: "SDK 및 예제 코드",
     icon: FileText,
-    href: "/docs/sdk",
+    href: "/docs#quickstart",
   },
 ]
 

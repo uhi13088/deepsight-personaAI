@@ -511,7 +511,7 @@ export default function NewApiKeyPage() {
         ) : (
           <div className="flex gap-2">
             <Button variant="outline" asChild>
-              <Link href="/docs/getting-started">문서 보기</Link>
+              <Link href="/docs">문서 보기</Link>
             </Button>
             <Button asChild>
               <Link href="/api-keys">API Keys 목록</Link>
