@@ -33,6 +33,7 @@ model User {
   createdPersonas Persona[] @relation("CreatedBy")
   auditLogs     AuditLog[]
   abTests       ABTest[]  @relation("CreatedBy")
+  createdVersions Version[] @relation("VersionCreatedBy")
 
   @@map("users")
 }
@@ -765,4 +766,150 @@ enum BackupStatus {
   IN_PROGRESS
   COMPLETED
   FAILED
+}
+
+// ============================================
+// 버전 관리
+// ============================================
+
+model Version {
+  id              String   @id @default(cuid())
+  tag             String   @unique
+  name            String
+  description     String   @default("")
+  commitHash      String
+  branch          String   @default("main")
+  environment     String?  // development, staging, production
+  status          VersionStatus @default(ACTIVE)
+  addedCount      Int      @default(0)
+  modifiedCount   Int      @default(0)
+  deletedCount    Int      @default(0)
+  components      String[] @default([])
+
+  createdById     String
+  createdByUser   User     @relation("VersionCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime @default(now())
+
+  @@map("versions")
+}
+
+model Commit {
+  id              String   @id @default(cuid())
+  hash            String   @unique
+  message         String
+  author          String
+  authorEmail     String
+  branch          String   @default("main")
+  filesChanged    Int      @default(0)
+
+  createdAt       DateTime @default(now())
+
+  @@map("commits")
+}
+
+model Branch {
+  id              String   @id @default(cuid())
+  name            String   @unique
+  lastCommitMessage String @default("")
+  lastCommitDate  DateTime @default(now())
+  lastCommitAuthor String  @default("")
+  isProtected     Boolean  @default(false)
+  isDefault       Boolean  @default(false)
+  aheadCount      Int      @default(0)
+  behindCount     Int      @default(0)
+
+  createdAt       DateTime @default(now())
+
+  @@map("branches")
+}
+
+enum VersionStatus {
+  ACTIVE
+  DEPRECATED
+  ARCHIVED
+}
+
+// ============================================
+// 이벤트 버스
+// ============================================
+
+model EventChannel {
+  id              String   @id @default(cuid())
+  name            String
+  description     String   @default("")
+  source          String
+  target          String
+  eventTypes      String[] @default([])
+  status          EventChannelStatus @default(ACTIVE)
+  messagesPerSecond Decimal @db.Decimal(10, 2) @default(0)
+  totalMessages   BigInt   @default(0)
+  errorRate       Decimal  @db.Decimal(5, 2) @default(0)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  events          Event[]
+  deadLetters     DeadLetterEvent[]
+
+  @@map("event_channels")
+}
+
+model Event {
+  id              String   @id @default(cuid())
+  type            String
+  source          String
+  target          String
+  payload         Json?
+  status          EventStatus @default(PENDING)
+  priority        EventPriority @default(NORMAL)
+  processingTime  Int?
+  error           String?
+  retryCount      Int      @default(0)
+
+  channelId       String?
+  channel         EventChannel? @relation(fields: [channelId], references: [id])
+
+  createdAt       DateTime @default(now())
+
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+  @@map("events")
+}
+
+model DeadLetterEvent {
+  id              String   @id @default(cuid())
+  originalEventId String
+  eventType       String
+  error           String
+  payload         Json?
+  retries         Int      @default(0)
+
+  channelId       String?
+  channel         EventChannel? @relation(fields: [channelId], references: [id])
+
+  failedAt        DateTime @default(now())
+
+  @@map("dead_letter_events")
+}
+
+enum EventChannelStatus {
+  ACTIVE
+  PAUSED
+  ERROR
+}
+
+enum EventStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+}
+
+enum EventPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
 }

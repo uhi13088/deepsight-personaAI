@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
+import { apiClient } from "@/services"
 import {
   Settings,
   Brain,
@@ -142,11 +143,75 @@ export default function GlobalConfigPage() {
     toast.success("설정이 초기화되었습니다")
   }
 
+  const fetchSettings = useCallback(async () => {
+    try {
+      const response = await apiClient.get<{
+        general?: Array<{ key: string; value: unknown }>
+        performance?: Array<{ key: string; value: unknown }>
+        advanced?: Array<{ key: string; value: unknown }>
+      }>("/api/system-config")
+
+      if (response.success && response.data) {
+        // Apply fetched settings
+        const data = response.data
+        if (data.general) {
+          const general = data.general.reduce(
+            (acc, item) => ({ ...acc, [item.key]: item.value }),
+            {}
+          )
+          setGeneralSettings((prev) => ({ ...prev, ...general }))
+        }
+        if (data.performance) {
+          const performance = data.performance.reduce(
+            (acc, item) => ({ ...acc, [item.key]: item.value }),
+            {}
+          )
+          setPerformanceSettings((prev) => ({ ...prev, ...performance }))
+        }
+        if (data.advanced) {
+          const advanced = data.advanced.reduce(
+            (acc, item) => ({ ...acc, [item.key]: item.value }),
+            {}
+          )
+          setAdvancedSettings((prev) => ({ ...prev, ...advanced }))
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch settings:", error)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchSettings()
+  }, [fetchSettings])
+
   const handleSaveAllSettings = async () => {
     setIsSaving(true)
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      // Save all settings to API
+      const settingsToSave = [
+        ...Object.entries(generalSettings).map(([key, value]) => ({
+          category: "general",
+          key,
+          value,
+        })),
+        ...Object.entries(performanceSettings).map(([key, value]) => ({
+          category: "performance",
+          key,
+          value,
+        })),
+        ...Object.entries(advancedSettings).map(([key, value]) => ({
+          category: "advanced",
+          key,
+          value,
+        })),
+      ]
+
+      // Save each setting
+      for (const setting of settingsToSave) {
+        await apiClient.post("/api/system-config", setting)
+      }
+
       toast.success("모든 설정이 저장되었습니다")
     } catch {
       toast.error("설정 저장 중 오류가 발생했습니다")

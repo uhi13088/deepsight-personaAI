@@ -184,16 +184,70 @@ export default function PlaygroundPage() {
     setIsLoading(true)
     setResponse(null)
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 800 + Math.random() * 500))
+    const startTime = Date.now()
 
-    const mockResponse = sampleResponses[selectedEndpoint.id] || sampleResponses.match
-    const latency = Math.round(100 + Math.random() * 200)
+    try {
+      // Build URL with path parameters
+      let url = `/api${selectedEndpoint.path}`
+      if (Object.keys(pathParams).length > 0) {
+        for (const [key, value] of Object.entries(pathParams)) {
+          url = url.replace(`:${key}`, encodeURIComponent(value))
+        }
+      }
 
-    setResponse(JSON.stringify(mockResponse, null, 2))
-    setResponseStatus(200)
-    setResponseTime(latency)
-    setIsLoading(false)
+      // Build request options
+      const options: RequestInit = {
+        method: selectedEndpoint.method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${selectedApiKey}`,
+        },
+      }
+
+      // Add body for non-GET requests
+      if (selectedEndpoint.method !== "GET" && requestBody) {
+        try {
+          options.body = requestBody
+        } catch {
+          setResponse(
+            JSON.stringify(
+              { error: { code: "INVALID_JSON", message: "Invalid JSON in request body" } },
+              null,
+              2
+            )
+          )
+          setResponseStatus(400)
+          setResponseTime(Date.now() - startTime)
+          setIsLoading(false)
+          return
+        }
+      }
+
+      const res = await fetch(url, options)
+      const data = await res.json()
+
+      setResponse(JSON.stringify(data, null, 2))
+      setResponseStatus(res.status)
+      setResponseTime(Date.now() - startTime)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
+      setResponse(
+        JSON.stringify(
+          {
+            error: {
+              code: "REQUEST_FAILED",
+              message: errorMessage,
+            },
+          },
+          null,
+          2
+        )
+      )
+      setResponseStatus(500)
+      setResponseTime(Date.now() - startTime)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleReset = () => {

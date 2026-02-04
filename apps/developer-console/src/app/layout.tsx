@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import "./globals.css"
 import { cn } from "@/lib/utils"
+import { Providers } from "@/components/providers"
 
 export const metadata: Metadata = {
   title: "DeepSight Developer Console",
@@ -15,7 +16,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" suppressHydrationWarning>
-      <body className={cn("bg-background min-h-screen font-sans antialiased")}>{children}</body>
+      <body className={cn("bg-background min-h-screen font-sans antialiased")}>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   )
 }

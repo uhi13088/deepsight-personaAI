@@ -120,9 +120,9 @@ const navigation: NavItem[] = [
     title: "Team & Access",
     icon: UsersRound,
     children: [
-      { title: "사용자 관리", href: "/team/users", icon: UserCog },
-      { title: "역할 권한", href: "/team/roles", icon: KeyRound },
-      { title: "감사 로그", href: "/team/audit-logs", icon: ScrollText },
+      { title: "사용자 관리", href: "/team-access", icon: UserCog },
+      { title: "역할 권한", href: "/team-access/permissions", icon: KeyRound },
+      { title: "감사 로그", href: "/team-access/audit-logs", icon: ScrollText },
     ],
   },
 ]

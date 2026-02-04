@@ -55,19 +55,12 @@ const managementNavItems: NavItem[] = [
   {
     title: "Usage",
     icon: BarChart3,
-    children: [
-      { title: "사용량 대시보드", href: "/usage" },
-      { title: "상세 분석", href: "/usage/analytics" },
-      { title: "리포트", href: "/usage/reports" },
-    ],
+    href: "/usage",
   },
   {
     title: "Logs",
     icon: ScrollText,
-    children: [
-      { title: "API 로그", href: "/logs" },
-      { title: "에러 로그", href: "/logs/errors" },
-    ],
+    href: "/logs",
   },
 ]
 
@@ -75,20 +68,13 @@ const billingNavItems: NavItem[] = [
   {
     title: "Billing",
     icon: CreditCard,
-    children: [
-      { title: "현재 플랜", href: "/billing" },
-      { title: "결제 수단", href: "/billing/payment-methods" },
-      { title: "청구서", href: "/billing/invoices" },
-    ],
+    href: "/billing",
   },
   {
     title: "Webhooks",
     icon: Webhook,
     badge: "v2.0",
-    children: [
-      { title: "Webhook 목록", href: "/webhooks" },
-      { title: "이벤트 로그", href: "/webhooks/events" },
-    ],
+    href: "/webhooks",
   },
 ]
 
@@ -96,12 +82,7 @@ const docsNavItems: NavItem[] = [
   {
     title: "Documentation",
     icon: BookOpen,
-    children: [
-      { title: "시작하기", href: "/docs/getting-started" },
-      { title: "API Reference", href: "/docs/api-reference" },
-      { title: "SDK 가이드", href: "/docs/sdk" },
-      { title: "샘플 코드", href: "/docs/examples" },
-    ],
+    href: "/docs",
   },
   {
     title: "Playground",
@@ -114,28 +95,17 @@ const settingsNavItems: NavItem[] = [
   {
     title: "Team",
     icon: Users,
-    children: [
-      { title: "팀원 관리", href: "/team" },
-      { title: "권한 설정", href: "/team/roles" },
-    ],
+    href: "/team",
   },
   {
     title: "Settings",
     icon: Settings,
-    children: [
-      { title: "계정 설정", href: "/settings" },
-      { title: "알림 설정", href: "/settings/notifications" },
-      { title: "보안 설정", href: "/settings/security" },
-    ],
+    href: "/settings",
   },
   {
     title: "Support",
     icon: HelpCircle,
-    children: [
-      { title: "문의하기", href: "/support" },
-      { title: "FAQ", href: "/support/faq" },
-      { title: "커뮤니티", href: "/support/community" },
-    ],
+    href: "/support",
   },
 ]
 
@@ -206,9 +176,7 @@ function NavItemComponent({ item, collapsed }: { item: NavItem; collapsed: boole
                 href={child.href}
                 className={cn(
                   "block rounded-md px-2 py-1.5 text-sm",
-                  pathname === child.href || pathname.startsWith(child.href + "/")
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-accent"
+                  pathname === child.href ? "bg-primary text-primary-foreground" : "hover:bg-accent"
                 )}
               >
                 {child.title}
@@ -248,7 +216,7 @@ function NavItemComponent({ item, collapsed }: { item: NavItem; collapsed: boole
             href={child.href}
             className={cn(
               "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-              pathname === child.href || pathname.startsWith(child.href + "/")
+              pathname === child.href
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             )}

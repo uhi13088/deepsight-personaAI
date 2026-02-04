@@ -217,11 +217,9 @@ export default function BillingPage() {
           <h1 className="text-2xl font-bold tracking-tight">Billing & Plans</h1>
           <p className="text-muted-foreground">구독 플랜과 결제 정보를 관리하세요</p>
         </div>
-        <Button variant="outline" asChild>
-          <Link href="/billing/invoices">
-            <FileText className="mr-2 h-4 w-4" />
-            View All Invoices
-          </Link>
+        <Button variant="outline" disabled>
+          <FileText className="mr-2 h-4 w-4" />
+          View All Invoices
         </Button>
       </div>
 
@@ -327,8 +325,8 @@ export default function BillingPage() {
                 <p className="text-muted-foreground text-sm">등록된 결제 수단이 없습니다</p>
               </div>
             )}
-            <Button variant="outline" className="w-full" asChild>
-              <Link href="/billing/payment-methods">Manage Payment Methods</Link>
+            <Button variant="outline" className="w-full" disabled>
+              Manage Payment Methods
             </Button>
           </CardContent>
         </Card>
@@ -435,11 +433,9 @@ export default function BillingPage() {
             <CardTitle>Recent Invoices</CardTitle>
             <CardDescription>최근 결제 내역</CardDescription>
           </div>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/billing/invoices" className="gap-1">
-              View All
-              <ChevronRight className="h-4 w-4" />
-            </Link>
+          <Button variant="ghost" size="sm" disabled className="gap-1">
+            View All
+            <ChevronRight className="h-4 w-4" />
           </Button>
         </CardHeader>
         <CardContent>

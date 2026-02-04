@@ -1,7 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
+import { versionsService } from "@/services"
+import type { Version, Commit, Branch } from "@/services"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -60,64 +62,34 @@ import {
   Copy,
 } from "lucide-react"
 
-// 타입 정의
-interface Version {
-  id: string
-  tag: string
-  name: string
-  description: string
-  commitHash: string
-  branch: string
-  createdBy: string
-  createdAt: string
-  environment: "development" | "staging" | "production" | null
-  status: "active" | "deprecated" | "archived"
-  changes: {
-    added: number
-    modified: number
-    deleted: number
-  }
-  components: string[]
-}
-
-interface Commit {
-  hash: string
-  shortHash: string
-  message: string
-  author: string
-  authorEmail: string
-  date: string
-  branch: string
-  filesChanged: number
-}
-
-interface Branch {
-  name: string
-  lastCommit: string
-  lastCommitDate: string
-  author: string
-  isProtected: boolean
-  isDefault: boolean
-  aheadBehind: {
-    ahead: number
-    behind: number
-  }
-}
-
-// TODO: API 연동 시 실제 데이터로 교체
-const mockVersions: Version[] = []
-const mockCommits: Commit[] = []
-const mockBranches: Branch[] = []
-
 export default function VersionControlPage() {
-  const [versions] = useState<Version[]>(mockVersions)
-  const [commits] = useState<Commit[]>(mockCommits)
-  const [branches] = useState<Branch[]>(mockBranches)
+  const [versions, setVersions] = useState<Version[]>([])
+  const [commits, setCommits] = useState<Commit[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [isCreateTagDialogOpen, setIsCreateTagDialogOpen] = useState(false)
   const [isCompareDialogOpen, setIsCompareDialogOpen] = useState(false)
   const [, setSelectedVersion] = useState<Version | null>(null)
   const [statusFilter, setStatusFilter] = useState("all")
+
+  const fetchData = useCallback(async () => {
+    try {
+      const data = await versionsService.getVersions()
+      setVersions(data.versions)
+      setCommits(data.commits)
+      setBranches(data.branches)
+    } catch (error) {
+      console.error("Failed to fetch versions:", error)
+      toast.error("버전 데이터를 불러오는데 실패했습니다.")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
   const [branchFilter, setBranchFilter] = useState("all")
   const [compareBaseVersion, setCompareBaseVersion] = useState("")
   const [compareTargetVersion, setCompareTargetVersion] = useState("")
@@ -137,11 +109,23 @@ export default function VersionControlPage() {
   }
 
   const handleDownloadSource = (version: Version) => {
-    toast.promise(new Promise((resolve) => setTimeout(resolve, 2000)), {
-      loading: `${version.tag} 소스 다운로드 중...`,
-      success: `${version.tag} 소스 다운로드가 완료되었습니다.`,
-      error: "다운로드에 실패했습니다.",
-    })
+    toast.promise(
+      versionsService.downloadSource(version.id).then((blob) => {
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `${version.tag}-source.zip`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+      }),
+      {
+        loading: `${version.tag} 소스 다운로드 중...`,
+        success: `${version.tag} 소스 다운로드가 완료되었습니다.`,
+        error: "다운로드에 실패했습니다.",
+      }
+    )
   }
 
   const handleRollback = (version: Version) => {
@@ -150,9 +134,12 @@ export default function VersionControlPage() {
       action: {
         label: "롤백",
         onClick: () => {
-          toast.promise(new Promise((resolve) => setTimeout(resolve, 3000)), {
+          toast.promise(versionsService.rollbackVersion(version.id), {
             loading: `${version.tag}로 롤백 중...`,
-            success: `${version.tag}로 롤백이 완료되었습니다.`,
+            success: () => {
+              fetchData()
+              return `${version.tag}로 롤백이 완료되었습니다.`
+            },
             error: "롤백에 실패했습니다.",
           })
         },
@@ -166,7 +153,14 @@ export default function VersionControlPage() {
       action: {
         label: "삭제",
         onClick: () => {
-          toast.success(`${version.tag} 버전이 삭제되었습니다.`)
+          toast.promise(versionsService.deleteVersion(version.id), {
+            loading: "버전 삭제 중...",
+            success: () => {
+              fetchData()
+              return `${version.tag} 버전이 삭제되었습니다.`
+            },
+            error: "버전 삭제에 실패했습니다.",
+          })
         },
       },
     })
@@ -212,9 +206,12 @@ export default function VersionControlPage() {
       action: {
         label: "병합",
         onClick: () => {
-          toast.promise(new Promise((resolve) => setTimeout(resolve, 2000)), {
+          toast.promise(versionsService.mergeBranch(branch.name), {
             loading: `${branch.name} 브랜치 병합 중...`,
-            success: `${branch.name} 브랜치가 병합되었습니다.`,
+            success: () => {
+              fetchData()
+              return `${branch.name} 브랜치가 병합되었습니다.`
+            },
             error: "병합에 실패했습니다.",
           })
         },
@@ -228,7 +225,14 @@ export default function VersionControlPage() {
       action: {
         label: "삭제",
         onClick: () => {
-          toast.success(`${branch.name} 브랜치가 삭제되었습니다.`)
+          toast.promise(versionsService.deleteBranch(branch.name), {
+            loading: "브랜치 삭제 중...",
+            success: () => {
+              fetchData()
+              return `${branch.name} 브랜치가 삭제되었습니다.`
+            },
+            error: "브랜치 삭제에 실패했습니다.",
+          })
         },
       },
     })
@@ -257,19 +261,30 @@ export default function VersionControlPage() {
     return <Badge className={colors[env]}>{env}</Badge>
   }
 
-  const handleCreateTag = () => {
+  const handleCreateTag = async () => {
     if (!newTag.tag || !newTag.name) {
       toast.error("태그와 릴리즈 이름을 입력해주세요.")
       return
     }
-    // 태그 생성 로직
-    toast.promise(new Promise((resolve) => setTimeout(resolve, 1500)), {
-      loading: "릴리즈 생성 중...",
-      success: `${newTag.tag} 릴리즈가 생성되었습니다.`,
-      error: "릴리즈 생성에 실패했습니다.",
-    })
-    setIsCreateTagDialogOpen(false)
-    setNewTag({ tag: "", name: "", description: "", branch: "main", commitHash: "" })
+    toast.promise(
+      versionsService.createVersion({
+        tag: newTag.tag,
+        name: newTag.name,
+        description: newTag.description,
+        branch: newTag.branch,
+        commitHash: newTag.commitHash || undefined,
+      }),
+      {
+        loading: "릴리즈 생성 중...",
+        success: () => {
+          fetchData()
+          setIsCreateTagDialogOpen(false)
+          setNewTag({ tag: "", name: "", description: "", branch: "main", commitHash: "" })
+          return `${newTag.tag} 릴리즈가 생성되었습니다.`
+        },
+        error: "릴리즈 생성에 실패했습니다.",
+      }
+    )
   }
 
   const copyToClipboard = (text: string) => {

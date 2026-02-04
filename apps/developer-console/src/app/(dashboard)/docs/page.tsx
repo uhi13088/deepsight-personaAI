@@ -127,71 +127,39 @@ const docSections = [
     title: "Getting Started",
     icon: Zap,
     items: [
-      { name: "Quick Start", href: "/docs/getting-started", description: "5분 만에 시작하기" },
-      { name: "Authentication", href: "/docs/authentication", description: "API 인증 가이드" },
-      { name: "API Keys", href: "/docs/api-keys", description: "API 키 관리" },
+      { name: "Quick Start", description: "5분 만에 시작하기", badge: "아래 참조" },
+      { name: "Authentication", description: "API 인증 가이드" },
+      { name: "API Keys", description: "API 키 관리" },
     ],
   },
   {
     title: "API Reference",
     icon: Book,
     items: [
-      { name: "Match API", href: "/docs/api-reference/match", description: "콘텐츠 매칭 API" },
-      {
-        name: "Personas API",
-        href: "/docs/api-reference/personas",
-        description: "페르소나 조회 API",
-      },
-      {
-        name: "Feedback API",
-        href: "/docs/api-reference/feedback",
-        description: "피드백 제출 API",
-      },
-      {
-        name: "Analytics API",
-        href: "/docs/api-reference/analytics",
-        description: "분석 데이터 API",
-      },
+      { name: "Match API", description: "콘텐츠 매칭 API" },
+      { name: "Personas API", description: "페르소나 조회 API" },
+      { name: "Feedback API", description: "피드백 제출 API" },
+      { name: "Analytics API", description: "분석 데이터 API", badge: "Pro" },
     ],
   },
   {
     title: "Guides",
     icon: FileText,
     items: [
-      {
-        name: "6D Vector System",
-        href: "/docs/guides/6d-vector",
-        description: "6차원 벡터 이해하기",
-      },
-      {
-        name: "Best Practices",
-        href: "/docs/guides/best-practices",
-        description: "API 활용 모범 사례",
-      },
-      {
-        name: "Rate Limiting",
-        href: "/docs/guides/rate-limiting",
-        description: "Rate Limit 이해하기",
-      },
-      {
-        name: "Error Handling",
-        href: "/docs/guides/error-handling",
-        description: "에러 처리 가이드",
-      },
+      { name: "6D Vector System", description: "6차원 벡터 이해하기" },
+      { name: "Best Practices", description: "API 활용 모범 사례" },
+      { name: "Rate Limiting", description: "Rate Limit 이해하기" },
+      { name: "Error Handling", description: "에러 처리 가이드" },
     ],
   },
   {
     title: "SDKs & Tools",
     icon: Code,
     items: [
-      {
-        name: "JavaScript/TypeScript",
-        href: "/docs/sdk/javascript",
-        description: "Node.js & Browser",
-      },
-      { name: "Python", href: "/docs/sdk/python", description: "Python 3.8+" },
-      { name: "Go", href: "/docs/sdk/go", description: "Go 1.18+" },
-      { name: "REST API", href: "/docs/sdk/rest", description: "직접 HTTP 호출" },
+      { name: "JavaScript/TypeScript", description: "Node.js & Browser" },
+      { name: "Python", description: "Python 3.8+" },
+      { name: "Go", description: "Go 1.18+" },
+      { name: "REST API", description: "직접 HTTP 호출" },
     ],
   },
 ]
@@ -222,7 +190,7 @@ export default function DocsPage() {
           { title: "Quick Start", description: "5분 만에 시작", icon: Zap, href: "#quickstart" },
           { title: "API Reference", description: "전체 API 문서", icon: Book, href: "#api" },
           { title: "Playground", description: "API 테스트", icon: Terminal, href: "/playground" },
-          { title: "Examples", description: "예제 코드", icon: Code, href: "/docs/examples" },
+          { title: "Examples", description: "예제 코드", icon: Code, href: "#quickstart" },
         ].map((item) => {
           const Icon = item.icon
           return (
@@ -352,11 +320,9 @@ export default function DocsPage() {
                 <Book className="text-primary h-5 w-5" />
                 <CardTitle>API Endpoints</CardTitle>
               </div>
-              <Button variant="outline" asChild>
-                <Link href="/docs/api-reference">
-                  Full Reference
-                  <ExternalLink className="ml-2 h-4 w-4" />
-                </Link>
+              <Button variant="outline" disabled>
+                Full Reference
+                <ExternalLink className="ml-2 h-4 w-4" />
               </Button>
             </div>
             <CardDescription>사용 가능한 API 엔드포인트</CardDescription>
@@ -364,10 +330,9 @@ export default function DocsPage() {
           <CardContent>
             <div className="space-y-2">
               {apiEndpoints.map((endpoint) => (
-                <Link
+                <div
                   key={`${endpoint.method}-${endpoint.path}`}
-                  href={`/docs/api-reference/${endpoint.name.toLowerCase().replace(" ", "-")}`}
-                  className="hover:bg-muted/50 flex items-center justify-between rounded-lg border p-4 transition-colors"
+                  className="flex items-center justify-between rounded-lg border p-4"
                 >
                   <div className="flex items-center gap-4">
                     <Badge
@@ -387,11 +352,8 @@ export default function DocsPage() {
                       </Badge>
                     )}
                   </div>
-                  <div className="text-muted-foreground flex items-center gap-2">
-                    <span className="text-sm">{endpoint.description}</span>
-                    <ChevronRight className="h-4 w-4" />
-                  </div>
-                </Link>
+                  <span className="text-muted-foreground text-sm">{endpoint.description}</span>
+                </div>
               ))}
             </div>
           </CardContent>
@@ -413,17 +375,20 @@ export default function DocsPage() {
               <CardContent>
                 <div className="space-y-2">
                   {section.items.map((item) => (
-                    <Link
+                    <div
                       key={item.name}
-                      href={item.href}
-                      className="hover:bg-muted flex items-center justify-between rounded-lg p-3 transition-colors"
+                      className="flex items-center justify-between rounded-lg border p-3"
                     >
                       <div>
                         <p className="font-medium">{item.name}</p>
                         <p className="text-muted-foreground text-sm">{item.description}</p>
                       </div>
-                      <ChevronRight className="text-muted-foreground h-4 w-4" />
-                    </Link>
+                      {item.badge && (
+                        <Badge variant="secondary" className="text-xs">
+                          {item.badge}
+                        </Badge>
+                      )}
+                    </div>
                   ))}
                 </div>
               </CardContent>
@@ -459,11 +424,9 @@ export default function DocsPage() {
             ))}
           </div>
           <div className="mt-6 text-center">
-            <Button variant="outline" asChild>
-              <Link href="/docs/guides/6d-vector">
-                Learn More about 6D Vector
-                <ChevronRight className="ml-1 h-4 w-4" />
-              </Link>
+            <Button variant="outline" disabled>
+              Learn More about 6D Vector
+              <ChevronRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
         </CardContent>

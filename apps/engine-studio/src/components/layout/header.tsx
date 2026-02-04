@@ -1,8 +1,10 @@
 "use client"
 
+import { useState } from "react"
 import { useSession, signOut } from "next-auth/react"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Bell, Search, Moon, Sun, LogOut, User, Settings, HelpCircle } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -16,6 +18,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { useUIStore } from "@/stores/ui-store"
 import { USER_ROLE_LABELS } from "@/lib/utils"
 
@@ -40,9 +49,9 @@ const PAGE_TITLES: Record<string, string> = {
   "/global-config/models": "모델 설정",
   "/global-config/safety-filters": "안전 필터",
   "/global-config/api-endpoints": "API 엔드포인트",
-  "/team/users": "사용자 관리",
-  "/team/roles": "역할 권한",
-  "/team/audit-logs": "감사 로그",
+  "/team-access": "사용자 관리",
+  "/team-access/permissions": "역할 권한",
+  "/team-access/audit-logs": "감사 로그",
 }
 
 // 알림 데이터 (API 연동 필요)
@@ -58,7 +67,10 @@ const notifications: {
 export function Header() {
   const { data: session } = useSession()
   const pathname = usePathname()
+  const router = useRouter()
   const { theme, setTheme } = useUIStore()
+  const [searchQuery, setSearchQuery] = useState("")
+  const [helpOpen, setHelpOpen] = useState(false)
 
   const pageTitle = PAGE_TITLES[pathname] || "Engine Studio"
   const unreadCount = notifications.filter((n) => !n.read).length
@@ -76,6 +88,19 @@ export function Header() {
     signOut({ callbackUrl: "/login" })
   }
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      toast.info(`"${searchQuery}" 검색 중...`, {
+        description: "검색 기능은 준비 중입니다.",
+      })
+    }
+  }
+
+  const handleHelp = () => {
+    setHelpOpen(true)
+  }
+
   return (
     <header className="bg-card flex h-16 items-center justify-between border-b px-6">
       {/* Left: Page Title */}
@@ -84,12 +109,17 @@ export function Header() {
       </div>
 
       {/* Center: Search */}
-      <div className="mx-8 hidden max-w-md flex-1 md:flex">
+      <form onSubmit={handleSearch} className="mx-8 hidden max-w-md flex-1 md:flex">
         <div className="relative w-full">
           <Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-          <Input placeholder="페르소나, 설정, 문서 검색..." className="pl-9" />
+          <Input
+            placeholder="페르소나, 설정, 문서 검색..."
+            className="pl-9"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
-      </div>
+      </form>
 
       {/* Right: Actions */}
       <div className="flex items-center gap-2">
@@ -103,9 +133,36 @@ export function Header() {
         </Button>
 
         {/* Help */}
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" size="icon" onClick={handleHelp}>
           <HelpCircle className="h-5 w-5" />
         </Button>
+
+        {/* Help Dialog */}
+        <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>도움말</DialogTitle>
+              <DialogDescription>Engine Studio 사용 가이드</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <h4 className="font-medium">단축키</h4>
+                <ul className="text-muted-foreground space-y-1 text-sm">
+                  <li>
+                    <kbd className="bg-muted rounded px-1">Ctrl + K</kbd> - 검색
+                  </li>
+                  <li>
+                    <kbd className="bg-muted rounded px-1">Ctrl + /</kbd> - 도움말
+                  </li>
+                </ul>
+              </div>
+              <div className="space-y-2">
+                <h4 className="font-medium">문의</h4>
+                <p className="text-muted-foreground text-sm">기술 지원: support@deepsight.ai</p>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Notifications */}
         <Popover>

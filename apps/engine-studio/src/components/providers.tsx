@@ -3,6 +3,7 @@
 import { QueryClientProvider } from "@tanstack/react-query"
 import { SessionProvider } from "next-auth/react"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { ThemeProvider } from "@/components/theme-provider"
 import { getQueryClient } from "@/lib/query-client"
 
 interface ProvidersProps {
@@ -15,7 +16,9 @@ export function Providers({ children }: ProvidersProps) {
   return (
     <SessionProvider>
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider delayDuration={300}>{children}</TooltipProvider>
+        <ThemeProvider>
+          <TooltipProvider delayDuration={300}>{children}</TooltipProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     </SessionProvider>
   )

@@ -1,7 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
+import { eventBusService } from "@/services"
+import type { Event, EventChannel, DeadLetterEvent, EventStatus, EventPriority } from "@/services"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -53,188 +55,14 @@ import {
   Layers,
 } from "lucide-react"
 
-// 타입 정의
-type EventStatus = "success" | "failed" | "pending" | "processing"
-type EventPriority = "low" | "normal" | "high" | "critical"
-
-interface Event {
-  id: string
-  type: string
-  source: string
-  target: string
-  payload: Record<string, unknown>
-  status: EventStatus
-  priority: EventPriority
-  timestamp: string
-  processingTime?: number
-  error?: string
-  retryCount: number
-}
-
-interface EventChannel {
-  id: string
-  name: string
-  description: string
-  source: string
-  target: string
-  eventTypes: string[]
-  status: "active" | "paused" | "error"
-  messagesPerSecond: number
-  totalMessages: number
-  errorRate: number
-}
-
-interface DeadLetterEvent {
-  id: string
-  originalEventId: string
-  eventType: string
-  error: string
-  failedAt: string
-  retries: number
-  payload: Record<string, unknown>
-}
-
-// 목 데이터
-const generateMockEvents = (): Event[] => {
-  const types = [
-    "persona.created",
-    "persona.updated",
-    "matching.completed",
-    "user.analyzed",
-    "archetype.assigned",
-    "insight.generated",
-    "model.trained",
-    "alert.triggered",
-  ]
-  const sources = [
-    "persona-service",
-    "matching-engine",
-    "insight-engine",
-    "archetype-service",
-    "ml-pipeline",
-  ]
-  const targets = ["notification-service", "analytics-service", "storage-service", "audit-service"]
-  const statuses: EventStatus[] = ["success", "failed", "pending", "processing"]
-  const priorities: EventPriority[] = ["low", "normal", "high", "critical"]
-
-  return Array.from({ length: 50 }, (_, i) => ({
-    id: `evt-${String(i + 1).padStart(5, "0")}`,
-    type: types[Math.floor(Math.random() * types.length)],
-    source: sources[Math.floor(Math.random() * sources.length)],
-    target: targets[Math.floor(Math.random() * targets.length)],
-    payload: {
-      entityId: `entity-${Math.floor(Math.random() * 1000)}`,
-      action: "process",
-      data: { value: Math.random() },
-    },
-    status: statuses[Math.floor(Math.random() * statuses.length)],
-    priority: priorities[Math.floor(Math.random() * priorities.length)],
-    timestamp: new Date(Date.now() - Math.floor(Math.random() * 3600000)).toISOString(),
-    processingTime: Math.floor(Math.random() * 500),
-    retryCount: Math.floor(Math.random() * 3),
-    error: Math.random() > 0.8 ? "Connection timeout" : undefined,
-  }))
-}
-
-const mockChannels: EventChannel[] = [
-  {
-    id: "ch-001",
-    name: "Persona Events",
-    description: "페르소나 생성/수정 이벤트 채널",
-    source: "persona-service",
-    target: "notification-service",
-    eventTypes: ["persona.created", "persona.updated", "persona.deleted"],
-    status: "active",
-    messagesPerSecond: 45.2,
-    totalMessages: 125840,
-    errorRate: 0.02,
-  },
-  {
-    id: "ch-002",
-    name: "Matching Pipeline",
-    description: "매칭 결과 이벤트 채널",
-    source: "matching-engine",
-    target: "analytics-service",
-    eventTypes: ["matching.started", "matching.completed", "matching.failed"],
-    status: "active",
-    messagesPerSecond: 128.7,
-    totalMessages: 458921,
-    errorRate: 0.05,
-  },
-  {
-    id: "ch-003",
-    name: "User Insight Stream",
-    description: "사용자 인사이트 분석 스트림",
-    source: "insight-engine",
-    target: "storage-service",
-    eventTypes: ["insight.generated", "profile.updated"],
-    status: "active",
-    messagesPerSecond: 67.3,
-    totalMessages: 234567,
-    errorRate: 0.01,
-  },
-  {
-    id: "ch-004",
-    name: "ML Training Events",
-    description: "ML 모델 학습 이벤트",
-    source: "ml-pipeline",
-    target: "notification-service",
-    eventTypes: ["model.training.started", "model.training.completed"],
-    status: "paused",
-    messagesPerSecond: 0,
-    totalMessages: 12456,
-    errorRate: 0.08,
-  },
-  {
-    id: "ch-005",
-    name: "Alert Notifications",
-    description: "시스템 알림 이벤트",
-    source: "monitoring-service",
-    target: "notification-service",
-    eventTypes: ["alert.triggered", "alert.resolved"],
-    status: "error",
-    messagesPerSecond: 2.1,
-    totalMessages: 8934,
-    errorRate: 15.2,
-  },
-]
-
-const mockDeadLetters: DeadLetterEvent[] = [
-  {
-    id: "dl-001",
-    originalEventId: "evt-00042",
-    eventType: "matching.completed",
-    error: "Target service unavailable: connection refused",
-    failedAt: "2024-01-15T10:30:00Z",
-    retries: 3,
-    payload: { matchId: "m-123", score: 0.87 },
-  },
-  {
-    id: "dl-002",
-    originalEventId: "evt-00089",
-    eventType: "insight.generated",
-    error: "Payload validation failed: missing required field 'userId'",
-    failedAt: "2024-01-15T09:45:00Z",
-    retries: 1,
-    payload: { insightType: "preference", data: {} },
-  },
-  {
-    id: "dl-003",
-    originalEventId: "evt-00156",
-    eventType: "persona.updated",
-    error: "Database transaction timeout",
-    failedAt: "2024-01-15T08:20:00Z",
-    retries: 3,
-    payload: { personaId: "p-456", changes: ["name", "vector"] },
-  },
-]
+// 타입은 서비스에서 import
 
 export default function EventBusMonitorPage() {
-  // 초기 이벤트를 useState 초기화 함수로 로드
-  const [events, setEvents] = useState<Event[]>(() => generateMockEvents())
-  const [channels, setChannels] = useState<EventChannel[]>(mockChannels)
-  const [deadLetters, setDeadLetters] = useState<DeadLetterEvent[]>(mockDeadLetters)
-  const [isLiveMode, setIsLiveMode] = useState(true)
+  const [events, setEvents] = useState<Event[]>([])
+  const [channels, setChannels] = useState<EventChannel[]>([])
+  const [deadLetters, setDeadLetters] = useState<DeadLetterEvent[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isLiveMode, setIsLiveMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const [filterType, setFilterType] = useState<string>("all")
@@ -243,11 +71,28 @@ export default function EventBusMonitorPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [, setSelectedDeadLetter] = useState<DeadLetterEvent | null>(null)
 
+  const fetchData = useCallback(async () => {
+    try {
+      const data = await eventBusService.getEventBusData()
+      setEvents(data.events)
+      setChannels(data.channels)
+      setDeadLetters(data.deadLetters)
+    } catch (error) {
+      console.error("Failed to fetch event bus data:", error)
+      toast.error("이벤트 버스 데이터를 불러오는데 실패했습니다.")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
   const handleRefresh = async () => {
     setIsRefreshing(true)
     toast.loading("이벤트 정보를 새로고침하는 중...")
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    setEvents(generateMockEvents())
+    await fetchData()
     setIsRefreshing(false)
     toast.dismiss()
     toast.success("이벤트 정보가 새로고침되었습니다.")
@@ -259,18 +104,30 @@ export default function EventBusMonitorPage() {
     })
   }
 
-  const handlePauseChannel = (channel: EventChannel) => {
-    setChannels(
-      channels.map((c) => (c.id === channel.id ? { ...c, status: "paused" as const } : c))
-    )
-    toast.info(`${channel.name} 채널이 일시중지되었습니다.`)
+  const handlePauseChannel = async (channel: EventChannel) => {
+    toast.promise(eventBusService.pauseChannel(channel.id), {
+      loading: `${channel.name} 채널 일시중지 중...`,
+      success: () => {
+        setChannels(
+          channels.map((c) => (c.id === channel.id ? { ...c, status: "paused" as const } : c))
+        )
+        return `${channel.name} 채널이 일시중지되었습니다.`
+      },
+      error: "채널 일시중지에 실패했습니다.",
+    })
   }
 
-  const handleResumeChannel = (channel: EventChannel) => {
-    setChannels(
-      channels.map((c) => (c.id === channel.id ? { ...c, status: "active" as const } : c))
-    )
-    toast.success(`${channel.name} 채널이 재개되었습니다.`)
+  const handleResumeChannel = async (channel: EventChannel) => {
+    toast.promise(eventBusService.resumeChannel(channel.id), {
+      loading: `${channel.name} 채널 재개 중...`,
+      success: () => {
+        setChannels(
+          channels.map((c) => (c.id === channel.id ? { ...c, status: "active" as const } : c))
+        )
+        return `${channel.name} 채널이 재개되었습니다.`
+      },
+      error: "채널 재개에 실패했습니다.",
+    })
   }
 
   const handleChannelSettings = (channel: EventChannel) => {
@@ -280,10 +137,10 @@ export default function EventBusMonitorPage() {
   }
 
   const handleRetryAllDeadLetters = () => {
-    toast.promise(new Promise((resolve) => setTimeout(resolve, 2000)), {
+    toast.promise(eventBusService.retryAllDeadLetters(), {
       loading: "모든 실패 이벤트를 재시도하는 중...",
       success: () => {
-        setDeadLetters([])
+        fetchData()
         return "모든 실패 이벤트가 재시도되었습니다."
       },
       error: "일부 이벤트 재시도에 실패했습니다.",
@@ -296,15 +153,21 @@ export default function EventBusMonitorPage() {
       action: {
         label: "삭제",
         onClick: () => {
-          setDeadLetters([])
-          toast.success("모든 실패 이벤트가 삭제되었습니다.")
+          toast.promise(eventBusService.deleteAllDeadLetters(), {
+            loading: "삭제 중...",
+            success: () => {
+              fetchData()
+              return "모든 실패 이벤트가 삭제되었습니다."
+            },
+            error: "삭제에 실패했습니다.",
+          })
         },
       },
     })
   }
 
   const handleRetryDeadLetter = (dl: DeadLetterEvent) => {
-    toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
+    toast.promise(eventBusService.retryDeadLetter(dl.id), {
       loading: `${dl.id} 이벤트를 재시도하는 중...`,
       success: () => {
         setDeadLetters(deadLetters.filter((d) => d.id !== dl.id))
@@ -326,48 +189,41 @@ export default function EventBusMonitorPage() {
       action: {
         label: "삭제",
         onClick: () => {
-          setDeadLetters(deadLetters.filter((d) => d.id !== dl.id))
-          toast.success(`${dl.id} 이벤트가 삭제되었습니다.`)
+          toast.promise(eventBusService.deleteDeadLetter(dl.id), {
+            loading: "삭제 중...",
+            success: () => {
+              setDeadLetters(deadLetters.filter((d) => d.id !== dl.id))
+              return `${dl.id} 이벤트가 삭제되었습니다.`
+            },
+            error: "삭제에 실패했습니다.",
+          })
         },
       },
     })
   }
 
   const handleRetryEvent = (event: Event) => {
-    toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
+    toast.promise(eventBusService.retryEvent(event.id), {
       loading: `${event.id} 이벤트를 재시도하는 중...`,
-      success: `${event.id} 이벤트가 재시도되었습니다.`,
+      success: () => {
+        fetchData()
+        setIsEventDetailOpen(false)
+        return `${event.id} 이벤트가 재시도되었습니다.`
+      },
       error: "이벤트 재시도에 실패했습니다.",
     })
-    setIsEventDetailOpen(false)
   }
 
-  // 라이브 모드 시뮬레이션
+  // 라이브 모드 - API 폴링
   useEffect(() => {
     if (isLiveMode) {
       const interval = setInterval(() => {
-        const newEvent: Event = {
-          id: `evt-${Date.now()}`,
-          type: ["persona.created", "matching.completed", "insight.generated"][
-            Math.floor(Math.random() * 3)
-          ],
-          source: ["persona-service", "matching-engine", "insight-engine"][
-            Math.floor(Math.random() * 3)
-          ],
-          target: ["notification-service", "analytics-service"][Math.floor(Math.random() * 2)],
-          payload: { entityId: `entity-${Math.floor(Math.random() * 1000)}` },
-          status: ["success", "processing"][Math.floor(Math.random() * 2)] as EventStatus,
-          priority: "normal",
-          timestamp: new Date().toISOString(),
-          processingTime: Math.floor(Math.random() * 100),
-          retryCount: 0,
-        }
-        setEvents((prev) => [newEvent, ...prev.slice(0, 49)])
-      }, 2000)
+        fetchData()
+      }, 5000)
 
       return () => clearInterval(interval)
     }
-  }, [isLiveMode])
+  }, [isLiveMode, fetchData])
 
   const getStatusBadge = (status: EventStatus) => {
     const config = {
