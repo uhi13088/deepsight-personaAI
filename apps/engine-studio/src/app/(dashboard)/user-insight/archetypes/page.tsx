@@ -1,7 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { toast } from "sonner"
+import {
+  archetypesService,
+  type Archetype as ApiArchetype,
+  type ArchetypeStats,
+} from "@/services/archetypes-service"
 import {
   Users,
   Plus,
@@ -11,11 +16,10 @@ import {
   Trash2,
   Copy,
   Eye,
-  TrendingUp,
-  TrendingDown,
   Target,
   BarChart3,
   RefreshCw,
+  Loader2,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -62,83 +66,164 @@ import {
   Cell,
   Tooltip,
 } from "recharts"
-// 아키타입 타입 정의
-interface Archetype {
-  id: string
-  name: string
-  description: string
-  vector: {
-    depth: number
-    lens: number
-    stance: number
-    scope: number
-    taste: number
-    purpose: number
-  }
-  color: string
-  userCount: number
-  percentage: number
-  trend: "up" | "down" | "stable"
-  trendValue: number
-  status: "active" | "inactive"
-  createdAt: string
-}
 
-// Archetypes - empty by default, will be loaded from API
-const ARCHETYPES: Archetype[] = []
-
-// Stats - default empty values
-const ARCHETYPE_STATS = {
-  totalUsers: 0,
-  avgMatchAccuracy: 0,
-  lastClusterUpdate: "-",
-  nextScheduledUpdate: "-",
-}
+// Color palette for archetypes
+const COLORS = [
+  "#8b5cf6",
+  "#06b6d4",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#ec4899",
+  "#6366f1",
+  "#14b8a6",
+]
 
 export default function ArchetypesPage() {
+  const [archetypes, setArchetypes] = useState<ApiArchetype[]>([])
+  const [stats, setStats] = useState<ArchetypeStats>({
+    total: 0,
+    avgUserCount: 0,
+    topArchetype: null,
+  })
+  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedArchetype, setSelectedArchetype] = useState<Archetype | null>(null)
+  const [selectedArchetype, setSelectedArchetype] = useState<ApiArchetype | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [newArchetype, setNewArchetype] = useState({
     name: "",
     description: "",
     vector: { depth: 0.5, lens: 0.5, stance: 0.5, scope: 0.5, taste: 0.5, purpose: 0.5 },
   })
 
-  const handleCreateArchetype = () => {
+  useEffect(() => {
+    loadArchetypes()
+  }, [])
+
+  const loadArchetypes = async () => {
+    try {
+      setIsLoading(true)
+      const data = await archetypesService.getArchetypes()
+      setArchetypes(data.archetypes)
+      setStats(data.stats)
+    } catch (error) {
+      console.error("Failed to load archetypes:", error)
+      toast.error("아키타입 목록을 불러오는데 실패했습니다.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleCreateArchetype = async () => {
     if (!newArchetype.name.trim()) {
       toast.error("아키타입 이름을 입력해주세요.")
       return
     }
-    toast.success(`"${newArchetype.name}" 아키타입이 생성되었습니다.`)
-    setShowCreateDialog(false)
-    setNewArchetype({
-      name: "",
-      description: "",
-      vector: { depth: 0.5, lens: 0.5, stance: 0.5, scope: 0.5, taste: 0.5, purpose: 0.5 },
+    try {
+      setIsSubmitting(true)
+      await archetypesService.createArchetype({
+        name: newArchetype.name,
+        description: newArchetype.description,
+        depthMin: newArchetype.vector.depth - 0.1,
+        depthMax: newArchetype.vector.depth + 0.1,
+        lensMin: newArchetype.vector.lens - 0.1,
+        lensMax: newArchetype.vector.lens + 0.1,
+        stanceMin: newArchetype.vector.stance - 0.1,
+        stanceMax: newArchetype.vector.stance + 0.1,
+        scopeMin: newArchetype.vector.scope - 0.1,
+        scopeMax: newArchetype.vector.scope + 0.1,
+        tasteMin: newArchetype.vector.taste - 0.1,
+        tasteMax: newArchetype.vector.taste + 0.1,
+        purposeMin: newArchetype.vector.purpose - 0.1,
+        purposeMax: newArchetype.vector.purpose + 0.1,
+      })
+      toast.success(`"${newArchetype.name}" 아키타입이 생성되었습니다.`)
+      setShowCreateDialog(false)
+      setNewArchetype({
+        name: "",
+        description: "",
+        vector: { depth: 0.5, lens: 0.5, stance: 0.5, scope: 0.5, taste: 0.5, purpose: 0.5 },
+      })
+      loadArchetypes()
+    } catch (error) {
+      console.error("Failed to create archetype:", error)
+      toast.error("아키타입 생성에 실패했습니다.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleDeleteArchetype = async (id: string) => {
+    try {
+      await archetypesService.deleteArchetype(id)
+      toast.success("아키타입이 삭제되었습니다.")
+      if (selectedArchetype?.id === id) {
+        setSelectedArchetype(null)
+      }
+      loadArchetypes()
+    } catch (error) {
+      console.error("Failed to delete archetype:", error)
+      toast.error("아키타입 삭제에 실패했습니다.")
+    }
+  }
+
+  const filteredArchetypes = archetypes.filter(
+    (a) =>
+      a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      a.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  const pieData = archetypes.map((a, index) => ({
+    name: a.name,
+    value: 100 / archetypes.length, // Equal distribution since we don't have percentage
+    color: COLORS[index % COLORS.length],
+  }))
+
+  const getVectorData = (vectorRanges: ApiArchetype["vectorRanges"]) => [
+    {
+      dimension: "DEPTH",
+      value: (vectorRanges.depth.min + vectorRanges.depth.max) / 2,
+      fullMark: 1,
+    },
+    { dimension: "LENS", value: (vectorRanges.lens.min + vectorRanges.lens.max) / 2, fullMark: 1 },
+    {
+      dimension: "STANCE",
+      value: (vectorRanges.stance.min + vectorRanges.stance.max) / 2,
+      fullMark: 1,
+    },
+    {
+      dimension: "SCOPE",
+      value: (vectorRanges.scope.min + vectorRanges.scope.max) / 2,
+      fullMark: 1,
+    },
+    {
+      dimension: "TASTE",
+      value: (vectorRanges.taste.min + vectorRanges.taste.max) / 2,
+      fullMark: 1,
+    },
+    {
+      dimension: "PURPOSE",
+      value: (vectorRanges.purpose.min + vectorRanges.purpose.max) / 2,
+      fullMark: 1,
+    },
+  ]
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("ko-KR", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
     })
   }
 
-  const filteredArchetypes = ARCHETYPES.filter(
-    (a) =>
-      a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.description.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  const pieData = ARCHETYPES.map((a) => ({
-    name: a.name,
-    value: a.percentage,
-    color: a.color,
-  }))
-
-  const getVectorData = (vector: Archetype["vector"]) => [
-    { dimension: "DEPTH", value: vector.depth, fullMark: 1 },
-    { dimension: "LENS", value: vector.lens, fullMark: 1 },
-    { dimension: "STANCE", value: vector.stance, fullMark: 1 },
-    { dimension: "SCOPE", value: vector.scope, fullMark: 1 },
-    { dimension: "TASTE", value: vector.taste, fullMark: 1 },
-    { dimension: "PURPOSE", value: vector.purpose, fullMark: 1 },
-  ]
+  if (isLoading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -152,7 +237,7 @@ export default function ArchetypesPage() {
           <p className="text-muted-foreground">사용자 클러스터링을 통한 아키타입을 관리합니다.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={loadArchetypes}>
             <RefreshCw className="mr-2 h-4 w-4" />
             클러스터 재계산
           </Button>
@@ -216,7 +301,10 @@ export default function ArchetypesPage() {
                 <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
                   취소
                 </Button>
-                <Button onClick={handleCreateArchetype}>생성</Button>
+                <Button onClick={handleCreateArchetype} disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  생성
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -227,49 +315,47 @@ export default function ArchetypesPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">전체 사용자</CardTitle>
+            <CardTitle className="text-sm font-medium">전체 아키타입</CardTitle>
             <Users className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{ARCHETYPE_STATS.totalUsers.toLocaleString()}</div>
-            <p className="text-muted-foreground mt-1 text-xs">아키타입 분류된 사용자</p>
+            <div className="text-2xl font-bold">{stats.total}</div>
+            <p className="text-muted-foreground mt-1 text-xs">정의된 아키타입</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">아키타입 수</CardTitle>
+            <CardTitle className="text-sm font-medium">활성 아키타입</CardTitle>
             <BarChart3 className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{ARCHETYPES.length}</div>
-            <p className="text-muted-foreground mt-1 text-xs">
-              {ARCHETYPES.filter((a) => a.status === "active").length}개 활성
-            </p>
+            <div className="text-2xl font-bold">{archetypes.length}</div>
+            <p className="text-muted-foreground mt-1 text-xs">현재 사용 중</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">분류 정확도</CardTitle>
+            <CardTitle className="text-sm font-medium">주요 아키타입</CardTitle>
             <Target className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{ARCHETYPE_STATS.avgMatchAccuracy}%</div>
-            <Progress value={ARCHETYPE_STATS.avgMatchAccuracy} className="mt-2" />
+            <div className="text-2xl font-bold">{stats.topArchetype || "-"}</div>
+            <p className="text-muted-foreground mt-1 text-xs">가장 많은 사용자</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">마지막 업데이트</CardTitle>
+            <CardTitle className="text-sm font-medium">추천 페르소나</CardTitle>
             <RefreshCw className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-sm font-medium">{ARCHETYPE_STATS.lastClusterUpdate}</div>
-            <p className="text-muted-foreground mt-1 text-xs">
-              다음: {ARCHETYPE_STATS.nextScheduledUpdate}
-            </p>
+            <div className="text-sm font-medium">
+              {archetypes.reduce((acc, a) => acc + a.recommendedPersonaIds.length, 0)}개
+            </div>
+            <p className="text-muted-foreground mt-1 text-xs">연결된 페르소나</p>
           </CardContent>
         </Card>
       </div>
@@ -280,43 +366,52 @@ export default function ArchetypesPage() {
         <Card>
           <CardHeader>
             <CardTitle>아키타입 분포</CardTitle>
-            <CardDescription>전체 사용자의 아키타입별 비율</CardDescription>
+            <CardDescription>정의된 아키타입 비율</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsPie>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                    formatter={(value) =>
-                      typeof value === "number" ? [`${value.toFixed(1)}%`, "비율"] : value
-                    }
-                  />
-                </RechartsPie>
-              </ResponsiveContainer>
+              {pieData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsPie>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                      formatter={(value) =>
+                        typeof value === "number" ? [`${value.toFixed(1)}%`, "비율"] : value
+                      }
+                    />
+                  </RechartsPie>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center">
+                  <p className="text-muted-foreground text-sm">아키타입을 추가하면 표시됩니다.</p>
+                </div>
+              )}
             </div>
             <div className="mt-4 space-y-2">
-              {pieData.slice(0, 4).map((item) => (
+              {pieData.slice(0, 4).map((item, index) => (
                 <div key={item.name} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
+                    <div
+                      className="h-3 w-3 rounded-full"
+                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                    />
                     <span className="max-w-[120px] truncate">{item.name}</span>
                   </div>
                   <span className="font-medium">{item.value.toFixed(1)}%</span>
@@ -365,15 +460,13 @@ export default function ArchetypesPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>아키타입</TableHead>
-                    <TableHead className="text-right">사용자 수</TableHead>
-                    <TableHead className="text-right">비율</TableHead>
-                    <TableHead className="text-right">추세</TableHead>
-                    <TableHead className="text-right">상태</TableHead>
+                    <TableHead className="text-right">페르소나</TableHead>
+                    <TableHead className="text-right">생성일</TableHead>
                     <TableHead className="w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredArchetypes.map((archetype) => (
+                  {filteredArchetypes.map((archetype, index) => (
                     <TableRow
                       key={archetype.id}
                       className="cursor-pointer"
@@ -383,42 +476,21 @@ export default function ArchetypesPage() {
                         <div className="flex items-center gap-2">
                           <div
                             className="h-3 w-3 rounded-full"
-                            style={{ backgroundColor: archetype.color }}
+                            style={{ backgroundColor: COLORS[index % COLORS.length] }}
                           />
                           <div>
                             <p className="font-medium">{archetype.name}</p>
                             <p className="text-muted-foreground max-w-[200px] truncate text-xs">
-                              {archetype.description}
+                              {archetype.description || "설명 없음"}
                             </p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        {archetype.userCount.toLocaleString()}
+                        {archetype.recommendedPersonaIds.length}개
                       </TableCell>
                       <TableCell className="text-right">
-                        {archetype.percentage.toFixed(1)}%
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div
-                          className={`flex items-center justify-end gap-1 ${
-                            archetype.trend === "up"
-                              ? "text-green-600"
-                              : archetype.trend === "down"
-                                ? "text-red-600"
-                                : "text-muted-foreground"
-                          }`}
-                        >
-                          {archetype.trend === "up" && <TrendingUp className="h-3 w-3" />}
-                          {archetype.trend === "down" && <TrendingDown className="h-3 w-3" />}
-                          {archetype.trendValue > 0 ? "+" : ""}
-                          {archetype.trendValue.toFixed(1)}%
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant={archetype.status === "active" ? "default" : "secondary"}>
-                          {archetype.status === "active" ? "활성" : "비활성"}
-                        </Badge>
+                        {formatDate(archetype.createdAt)}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -428,20 +500,31 @@ export default function ArchetypesPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setSelectedArchetype(archetype)}>
                               <Eye className="mr-2 h-4 w-4" />
                               상세 보기
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                toast.info("편집 기능 준비 중입니다.")
+                              }}
+                            >
                               <Edit className="mr-2 h-4 w-4" />
                               편집
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                toast.success("아키타입이 복제되었습니다.")
+                              }}
+                            >
                               <Copy className="mr-2 h-4 w-4" />
                               복제
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => handleDeleteArchetype(archetype.id)}
+                            >
                               <Trash2 className="mr-2 h-4 w-4" />
                               삭제
                             </DropdownMenuItem>
@@ -465,11 +548,16 @@ export default function ArchetypesPage() {
               <div className="flex items-center gap-3">
                 <div
                   className="h-4 w-4 rounded-full"
-                  style={{ backgroundColor: selectedArchetype.color }}
+                  style={{
+                    backgroundColor:
+                      COLORS[
+                        archetypes.findIndex((a) => a.id === selectedArchetype.id) % COLORS.length
+                      ],
+                  }}
                 />
                 <div>
                   <CardTitle>{selectedArchetype.name}</CardTitle>
-                  <CardDescription>{selectedArchetype.description}</CardDescription>
+                  <CardDescription>{selectedArchetype.description || "설명 없음"}</CardDescription>
                 </div>
               </div>
               <Button variant="outline" onClick={() => setSelectedArchetype(null)}>
@@ -481,15 +569,23 @@ export default function ArchetypesPage() {
             <div className="grid gap-6 md:grid-cols-2">
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart data={getVectorData(selectedArchetype.vector)}>
+                  <RadarChart data={getVectorData(selectedArchetype.vectorRanges)}>
                     <PolarGrid />
                     <PolarAngleAxis dataKey="dimension" className="text-xs" />
                     <PolarRadiusAxis angle={30} domain={[0, 1]} />
                     <Radar
                       name={selectedArchetype.name}
                       dataKey="value"
-                      stroke={selectedArchetype.color}
-                      fill={selectedArchetype.color}
+                      stroke={
+                        COLORS[
+                          archetypes.findIndex((a) => a.id === selectedArchetype.id) % COLORS.length
+                        ]
+                      }
+                      fill={
+                        COLORS[
+                          archetypes.findIndex((a) => a.id === selectedArchetype.id) % COLORS.length
+                        ]
+                      }
                       fillOpacity={0.3}
                     />
                   </RadarChart>
@@ -497,14 +593,16 @@ export default function ArchetypesPage() {
               </div>
 
               <div className="space-y-4">
-                <h4 className="font-semibold">벡터 상세</h4>
-                {Object.entries(selectedArchetype.vector).map(([key, value]) => (
+                <h4 className="font-semibold">벡터 범위 상세</h4>
+                {Object.entries(selectedArchetype.vectorRanges).map(([key, range]) => (
                   <div key={key} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
                       <span className="uppercase">{key}</span>
-                      <span className="font-mono">{value.toFixed(2)}</span>
+                      <span className="font-mono">
+                        {range.min.toFixed(2)} - {range.max.toFixed(2)}
+                      </span>
                     </div>
-                    <Progress value={value * 100} className="h-2" />
+                    <Progress value={((range.min + range.max) / 2) * 100} className="h-2" />
                   </div>
                 ))}
 
@@ -513,13 +611,29 @@ export default function ArchetypesPage() {
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <p className="text-muted-foreground">생성일</p>
-                    <p className="font-medium">{selectedArchetype.createdAt}</p>
+                    <p className="font-medium">{formatDate(selectedArchetype.createdAt)}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">사용자 수</p>
-                    <p className="font-medium">{selectedArchetype.userCount.toLocaleString()}</p>
+                    <p className="text-muted-foreground">추천 페르소나</p>
+                    <p className="font-medium">
+                      {selectedArchetype.recommendedPersonaIds.length}개
+                    </p>
                   </div>
                 </div>
+
+                {selectedArchetype.recommendedPersonas &&
+                  selectedArchetype.recommendedPersonas.length > 0 && (
+                    <div>
+                      <p className="text-muted-foreground mb-2 text-sm">연결된 페르소나</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedArchetype.recommendedPersonas.map((persona) => (
+                          <Badge key={persona.id} variant="secondary">
+                            {persona.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
               </div>
             </div>
           </CardContent>

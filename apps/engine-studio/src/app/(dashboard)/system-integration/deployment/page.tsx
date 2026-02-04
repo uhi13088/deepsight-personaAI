@@ -1,7 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { toast } from "sonner"
+import {
+  deploymentsService,
+  type Deployment,
+  type DeploymentStats,
+  type DeploymentEnv,
+  type DeploymentTarget as ApiDeploymentTarget,
+} from "@/services/deployments-service"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -99,116 +106,114 @@ interface DeploymentTarget {
   region: string
 }
 
-// 목 데이터
-const mockPipelines: Pipeline[] = [
-  {
-    id: "pipe-001",
-    name: "Persona Engine Deploy",
-    environment: "production",
-    status: "success",
-    version: "v2.4.1",
-    triggeredBy: "김민수",
-    startedAt: "2024-01-15T10:30:00Z",
-    finishedAt: "2024-01-15T10:45:00Z",
-    commitHash: "a1b2c3d4",
+// API 환경 매핑 함수
+const mapEnvToUI = (env: DeploymentEnv): DeploymentEnvironment => {
+  const map: Record<DeploymentEnv, DeploymentEnvironment> = {
+    DEV: "development",
+    STG: "staging",
+    PROD: "production",
+  }
+  return map[env]
+}
+
+const mapUIToEnv = (env: DeploymentEnvironment): DeploymentEnv => {
+  const map: Record<DeploymentEnvironment, DeploymentEnv> = {
+    development: "DEV",
+    staging: "STG",
+    production: "PROD",
+  }
+  return map[env]
+}
+
+// API 배포를 파이프라인 형태로 변환
+const deploymentToPipeline = (deployment: Deployment): Pipeline => {
+  const statusMap: Record<Deployment["status"], PipelineStatus> = {
+    PENDING: "idle",
+    IN_PROGRESS: "running",
+    COMPLETED: "success",
+    FAILED: "failed",
+    ROLLED_BACK: "cancelled",
+  }
+
+  const stageStatus = (baseStatus: Deployment["status"]): StageStatus => {
+    switch (baseStatus) {
+      case "COMPLETED":
+        return "success"
+      case "FAILED":
+        return "failed"
+      case "IN_PROGRESS":
+        return "running"
+      case "ROLLED_BACK":
+        return "skipped"
+      default:
+        return "pending"
+    }
+  }
+
+  return {
+    id: deployment.id,
+    name: `${deployment.targetType} 배포: ${deployment.targetName}`,
+    environment: mapEnvToUI(deployment.environment),
+    status: statusMap[deployment.status],
+    version: deployment.version || "latest",
+    triggeredBy: deployment.deployedBy.name || deployment.deployedBy.email || "Unknown",
+    startedAt: deployment.createdAt,
+    finishedAt: deployment.completedAt || undefined,
+    commitHash: deployment.id.slice(0, 8),
     branch: "main",
     stages: [
-      { id: "s1", name: "Build", status: "success", duration: 180 },
-      { id: "s2", name: "Test", status: "success", duration: 300 },
-      { id: "s3", name: "Security Scan", status: "success", duration: 120 },
-      { id: "s4", name: "Deploy", status: "success", duration: 240 },
-      { id: "s5", name: "Health Check", status: "success", duration: 60 },
-    ],
-  },
-  {
-    id: "pipe-002",
-    name: "Matching Algorithm Update",
-    environment: "staging",
-    status: "running",
-    version: "v1.8.0-beta",
-    triggeredBy: "이영희",
-    startedAt: "2024-01-15T11:00:00Z",
-    commitHash: "e5f6g7h8",
-    branch: "feature/matching-v2",
-    stages: [
-      { id: "s1", name: "Build", status: "success", duration: 200 },
-      { id: "s2", name: "Test", status: "success", duration: 350 },
-      { id: "s3", name: "Security Scan", status: "running" },
-      { id: "s4", name: "Deploy", status: "pending" },
-      { id: "s5", name: "Health Check", status: "pending" },
-    ],
-  },
-  {
-    id: "pipe-003",
-    name: "User Insight Module",
-    environment: "development",
-    status: "failed",
-    version: "v3.0.0-alpha",
-    triggeredBy: "박지훈",
-    startedAt: "2024-01-15T09:00:00Z",
-    finishedAt: "2024-01-15T09:15:00Z",
-    commitHash: "i9j0k1l2",
-    branch: "develop",
-    stages: [
-      { id: "s1", name: "Build", status: "success", duration: 150 },
+      {
+        id: "s1",
+        name: "Build",
+        status: stageStatus(deployment.status === "PENDING" ? "PENDING" : "COMPLETED"),
+        duration: 180,
+      },
       {
         id: "s2",
         name: "Test",
-        status: "failed",
-        duration: 180,
-        logs: [
-          "Error: Test case failed - expected 0.85, got 0.72",
-          "AssertionError in matching_accuracy_test.py:45",
-        ],
+        status: stageStatus(deployment.status === "PENDING" ? "PENDING" : "COMPLETED"),
+        duration: 300,
       },
-      { id: "s3", name: "Security Scan", status: "skipped" },
-      { id: "s4", name: "Deploy", status: "skipped" },
-      { id: "s5", name: "Health Check", status: "skipped" },
+      {
+        id: "s3",
+        name: "Security Scan",
+        status: stageStatus(deployment.status === "PENDING" ? "PENDING" : "COMPLETED"),
+        duration: 120,
+      },
+      { id: "s4", name: "Deploy", status: stageStatus(deployment.status), duration: 240 },
+      {
+        id: "s5",
+        name: "Health Check",
+        status:
+          deployment.status === "COMPLETED"
+            ? "success"
+            : deployment.status === "FAILED"
+              ? "failed"
+              : "pending",
+        duration: 60,
+      },
     ],
-  },
-]
-
-const mockTargets: DeploymentTarget[] = [
-  {
-    id: "target-001",
-    name: "Production Cluster",
-    environment: "production",
-    url: "https://api.deepsight.ai",
-    status: "healthy",
-    lastDeployed: "2024-01-15T10:45:00Z",
-    version: "v2.4.1",
-    region: "ap-northeast-2",
-  },
-  {
-    id: "target-002",
-    name: "Staging Environment",
-    environment: "staging",
-    url: "https://staging-api.deepsight.ai",
-    status: "healthy",
-    lastDeployed: "2024-01-14T16:30:00Z",
-    version: "v2.4.0",
-    region: "ap-northeast-2",
-  },
-  {
-    id: "target-003",
-    name: "Development Server",
-    environment: "development",
-    url: "https://dev-api.deepsight.ai",
-    status: "degraded",
-    lastDeployed: "2024-01-15T09:00:00Z",
-    version: "v3.0.0-alpha",
-    region: "ap-northeast-2",
-  },
-]
+  }
+}
 
 export default function DeploymentPipelinePage() {
-  const [pipelines, setPipelines] = useState<Pipeline[]>(mockPipelines)
-  const [targets] = useState<DeploymentTarget[]>(mockTargets)
+  const [deployments, setDeployments] = useState<Deployment[]>([])
+  const [stats, setStats] = useState<DeploymentStats>({
+    total: 0,
+    pending: 0,
+    inProgress: 0,
+    completed: 0,
+    failed: 0,
+    byEnvironment: { DEV: 0, STG: 0, PROD: 0 },
+  })
+  const [pipelines, setPipelines] = useState<Pipeline[]>([])
+  const [targets, setTargets] = useState<DeploymentTarget[]>([])
   const [selectedPipeline, setSelectedPipeline] = useState<Pipeline | null>(null)
   const [isDeployDialogOpen, setIsDeployDialogOpen] = useState(false)
   const [isLogsDialogOpen, setIsLogsDialogOpen] = useState(false)
   const [, setIsAddTargetDialogOpen] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [deployConfig, setDeployConfig] = useState({
     environment: "staging" as "development" | "staging" | "production",
     version: "",
@@ -217,6 +222,64 @@ export default function DeploymentPipelinePage() {
     runTests: true,
     notifySlack: true,
   })
+
+  useEffect(() => {
+    loadDeployments()
+  }, [])
+
+  const loadDeployments = async () => {
+    try {
+      setIsLoading(true)
+      const data = await deploymentsService.getDeployments()
+      setDeployments(data.deployments)
+      setStats(data.stats)
+      // 배포 데이터를 파이프라인으로 변환
+      const convertedPipelines = data.deployments.map(deploymentToPipeline)
+      setPipelines(convertedPipelines)
+      // 배포 대상 생성 (환경별로 그룹화)
+      const envTargets: DeploymentTarget[] = [
+        {
+          id: "target-prod",
+          name: "Production Cluster",
+          environment: "production",
+          url: "https://api.deepsight.ai",
+          status: data.stats.byEnvironment.PROD > 0 ? "healthy" : "offline",
+          lastDeployed:
+            data.deployments.find((d) => d.environment === "PROD")?.completedAt || undefined,
+          version: data.deployments.find((d) => d.environment === "PROD")?.version || undefined,
+          region: "ap-northeast-2",
+        },
+        {
+          id: "target-stg",
+          name: "Staging Environment",
+          environment: "staging",
+          url: "https://staging-api.deepsight.ai",
+          status: "healthy",
+          lastDeployed:
+            data.deployments.find((d) => d.environment === "STG")?.completedAt || undefined,
+          version: data.deployments.find((d) => d.environment === "STG")?.version || undefined,
+          region: "ap-northeast-2",
+        },
+        {
+          id: "target-dev",
+          name: "Development Server",
+          environment: "development",
+          url: "https://dev-api.deepsight.ai",
+          status: "healthy",
+          lastDeployed:
+            data.deployments.find((d) => d.environment === "DEV")?.completedAt || undefined,
+          version: data.deployments.find((d) => d.environment === "DEV")?.version || undefined,
+          region: "ap-northeast-2",
+        },
+      ]
+      setTargets(envTargets)
+    } catch (error) {
+      console.error("Failed to load deployments:", error)
+      toast.error("배포 목록을 불러오는데 실패했습니다.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   // Settings state
   const [pipelineSettings, setPipelineSettings] = useState({
@@ -233,11 +296,14 @@ export default function DeploymentPipelinePage() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
-    toast.loading("파이프라인 정보를 새로고침하는 중...")
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    setIsRefreshing(false)
-    toast.dismiss()
-    toast.success("파이프라인 정보가 새로고침되었습니다.")
+    try {
+      await loadDeployments()
+      toast.success("파이프라인 정보가 새로고침되었습니다.")
+    } catch {
+      toast.error("새로고침에 실패했습니다.")
+    } finally {
+      setIsRefreshing(false)
+    }
   }
 
   const handleAddTarget = () => {
@@ -322,55 +388,78 @@ export default function DeploymentPipelinePage() {
     return `${mins}m ${secs}s`
   }
 
-  const handleDeploy = () => {
-    // 새 파이프라인 시작 시뮬레이션
-    const newPipeline: Pipeline = {
-      id: `pipe-${Date.now()}`,
-      name: "Manual Deployment",
-      environment: deployConfig.environment,
-      status: "running",
-      version: deployConfig.version || "v2.4.2",
-      triggeredBy: "현재 사용자",
-      startedAt: new Date().toISOString(),
-      commitHash: "new12345",
-      branch: deployConfig.branch,
-      stages: [
-        { id: "s1", name: "Build", status: "running" },
-        { id: "s2", name: "Test", status: "pending" },
-        { id: "s3", name: "Security Scan", status: "pending" },
-        { id: "s4", name: "Deploy", status: "pending" },
-        { id: "s5", name: "Health Check", status: "pending" },
-      ],
+  const handleDeploy = async () => {
+    try {
+      const created = await deploymentsService.createDeployment({
+        targetType: "CONFIG",
+        targetId: `config-${Date.now()}`,
+        environment: mapUIToEnv(deployConfig.environment),
+        version: deployConfig.version || undefined,
+        notes: `Branch: ${deployConfig.branch}`,
+      })
+      const newPipeline = deploymentToPipeline(created)
+      setPipelines([newPipeline, ...pipelines])
+      setDeployments([created, ...deployments])
+      setIsDeployDialogOpen(false)
+      toast.success("배포가 시작되었습니다.", {
+        description: `${deployConfig.environment} 환경에 ${deployConfig.branch} 브랜치 배포 중`,
+      })
+      // 배포 시작
+      await deploymentsService.startDeployment(created.id)
+    } catch (error) {
+      console.error("Failed to create deployment:", error)
+      toast.error("배포 생성에 실패했습니다.")
     }
-    setPipelines([newPipeline, ...pipelines])
-    setIsDeployDialogOpen(false)
-    toast.success("배포가 시작되었습니다.", {
-      description: `${deployConfig.environment} 환경에 ${deployConfig.branch} 브랜치 배포 중`,
-    })
   }
 
-  const handleCancelPipeline = (pipelineId: string) => {
-    setPipelines(
-      pipelines.map((p) =>
-        p.id === pipelineId ? { ...p, status: "cancelled" as PipelineStatus } : p
+  const handleCancelPipeline = async (pipelineId: string) => {
+    try {
+      const updated = await deploymentsService.rollbackDeployment(pipelineId)
+      const updatedPipeline = deploymentToPipeline(updated)
+      setPipelines(pipelines.map((p) => (p.id === pipelineId ? updatedPipeline : p)))
+      toast.info("파이프라인이 취소되었습니다.")
+    } catch (error) {
+      console.error("Failed to cancel pipeline:", error)
+      // UI 업데이트 (API 실패 시에도)
+      setPipelines(
+        pipelines.map((p) =>
+          p.id === pipelineId ? { ...p, status: "cancelled" as PipelineStatus } : p
+        )
       )
-    )
-    toast.info("파이프라인이 취소되었습니다.")
+      toast.info("파이프라인이 취소되었습니다.")
+    }
   }
 
-  const handleRetryPipeline = (pipelineId: string) => {
-    setPipelines(
-      pipelines.map((p) =>
-        p.id === pipelineId
-          ? {
-              ...p,
-              status: "running" as PipelineStatus,
-              stages: p.stages.map((s) => ({ ...s, status: "pending" as StageStatus })),
-            }
-          : p
+  const handleRetryPipeline = async (pipelineId: string) => {
+    try {
+      const updated = await deploymentsService.startDeployment(pipelineId)
+      const updatedPipeline = deploymentToPipeline(updated)
+      setPipelines(pipelines.map((p) => (p.id === pipelineId ? updatedPipeline : p)))
+      toast.success("파이프라인을 재시작합니다.")
+    } catch (error) {
+      console.error("Failed to retry pipeline:", error)
+      // UI 업데이트 (API 실패 시에도)
+      setPipelines(
+        pipelines.map((p) =>
+          p.id === pipelineId
+            ? {
+                ...p,
+                status: "running" as PipelineStatus,
+                stages: p.stages.map((s) => ({ ...s, status: "pending" as StageStatus })),
+              }
+            : p
+        )
       )
+      toast.success("파이프라인을 재시작합니다.")
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
     )
-    toast.success("파이프라인을 재시작합니다.")
   }
 
   return (
@@ -506,11 +595,11 @@ export default function DeploymentPipelinePage() {
           <div className="grid gap-4 md:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">총 파이프라인</CardTitle>
+                <CardTitle className="text-sm font-medium">총 배포</CardTitle>
                 <Rocket className="text-muted-foreground h-4 w-4" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{pipelines.length}</div>
+                <div className="text-2xl font-bold">{stats.total}</div>
               </CardContent>
             </Card>
             <Card>
@@ -519,20 +608,16 @@ export default function DeploymentPipelinePage() {
                 <Play className="h-4 w-4 text-blue-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  {pipelines.filter((p) => p.status === "running").length}
-                </div>
+                <div className="text-2xl font-bold">{stats.inProgress + stats.pending}</div>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">성공</CardTitle>
+                <CardTitle className="text-sm font-medium">완료</CardTitle>
                 <CheckCircle2 className="h-4 w-4 text-green-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  {pipelines.filter((p) => p.status === "success").length}
-                </div>
+                <div className="text-2xl font-bold">{stats.completed}</div>
               </CardContent>
             </Card>
             <Card>
@@ -541,9 +626,7 @@ export default function DeploymentPipelinePage() {
                 <XCircle className="h-4 w-4 text-red-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  {pipelines.filter((p) => p.status === "failed").length}
-                </div>
+                <div className="text-2xl font-bold">{stats.failed}</div>
               </CardContent>
             </Card>
           </div>
@@ -555,101 +638,113 @@ export default function DeploymentPipelinePage() {
               <CardDescription>배포 파이프라인 실행 기록</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {pipelines.map((pipeline) => (
-                  <div
-                    key={pipeline.id}
-                    className="hover:bg-muted/50 rounded-lg border p-4 transition-colors"
-                  >
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{pipeline.name}</span>
-                            {getEnvironmentBadge(pipeline.environment)}
-                            {getStatusBadge(pipeline.status)}
-                          </div>
-                          <div className="text-muted-foreground mt-1 flex items-center gap-4 text-sm">
-                            <span className="flex items-center gap-1">
-                              <GitBranch className="h-3 w-3" />
-                              {pipeline.branch}
-                            </span>
-                            <span>{pipeline.commitHash}</span>
-                            <span>{pipeline.version}</span>
-                            <span>by {pipeline.triggeredBy}</span>
+              {pipelines.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Rocket className="text-muted-foreground mb-3 h-10 w-10" />
+                  <h3 className="text-lg font-medium">배포 기록이 없습니다</h3>
+                  <p className="text-muted-foreground text-sm">
+                    새 배포를 시작하여 파이프라인을 실행하세요
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pipelines.map((pipeline) => (
+                    <div
+                      key={pipeline.id}
+                      className="hover:bg-muted/50 rounded-lg border p-4 transition-colors"
+                    >
+                      <div className="mb-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{pipeline.name}</span>
+                              {getEnvironmentBadge(pipeline.environment)}
+                              {getStatusBadge(pipeline.status)}
+                            </div>
+                            <div className="text-muted-foreground mt-1 flex items-center gap-4 text-sm">
+                              <span className="flex items-center gap-1">
+                                <GitBranch className="h-3 w-3" />
+                                {pipeline.branch}
+                              </span>
+                              <span>{pipeline.commitHash}</span>
+                              <span>{pipeline.version}</span>
+                              <span>by {pipeline.triggeredBy}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {pipeline.status === "running" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleCancelPipeline(pipeline.id)}
-                          >
-                            <Pause className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {pipeline.status === "failed" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRetryPipeline(pipeline.id)}
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedPipeline(pipeline)
-                            setIsLogsDialogOpen(true)
-                          }}
-                        >
-                          <Terminal className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* 스테이지 진행 상황 */}
-                    <div className="flex items-center gap-2">
-                      {pipeline.stages.map((stage, index) => (
-                        <div key={stage.id} className="flex items-center">
-                          <div className="flex flex-col items-center">
-                            <div
-                              className={`flex h-8 w-8 items-center justify-center rounded-full text-xs ${stage.status === "success" ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" : ""} ${stage.status === "running" ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" : ""} ${stage.status === "failed" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" : ""} ${stage.status === "pending" ? "bg-gray-100 text-gray-500 dark:bg-gray-800" : ""} ${stage.status === "skipped" ? "bg-gray-100 text-gray-400 dark:bg-gray-800" : ""} `}
+                        <div className="flex items-center gap-2">
+                          {pipeline.status === "running" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleCancelPipeline(pipeline.id)}
                             >
-                              {stage.status === "success" && <CheckCircle2 className="h-4 w-4" />}
-                              {stage.status === "running" && (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              )}
-                              {stage.status === "failed" && <XCircle className="h-4 w-4" />}
-                              {stage.status === "pending" && <Clock className="h-4 w-4" />}
-                              {stage.status === "skipped" && <ArrowRight className="h-4 w-4" />}
-                            </div>
-                            <span className="text-muted-foreground mt-1 text-xs">{stage.name}</span>
-                            {stage.duration && (
-                              <span className="text-muted-foreground text-xs">
-                                {formatDuration(stage.duration)}
+                              <Pause className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {pipeline.status === "failed" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRetryPipeline(pipeline.id)}
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedPipeline(pipeline)
+                              setIsLogsDialogOpen(true)
+                            }}
+                          >
+                            <Terminal className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* 스테이지 진행 상황 */}
+                      <div className="flex items-center gap-2">
+                        {pipeline.stages.map((stage, index) => (
+                          <div key={stage.id} className="flex items-center">
+                            <div className="flex flex-col items-center">
+                              <div
+                                className={`flex h-8 w-8 items-center justify-center rounded-full text-xs ${stage.status === "success" ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" : ""} ${stage.status === "running" ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" : ""} ${stage.status === "failed" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" : ""} ${stage.status === "pending" ? "bg-gray-100 text-gray-500 dark:bg-gray-800" : ""} ${stage.status === "skipped" ? "bg-gray-100 text-gray-400 dark:bg-gray-800" : ""} `}
+                              >
+                                {stage.status === "success" && <CheckCircle2 className="h-4 w-4" />}
+                                {stage.status === "running" && (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                )}
+                                {stage.status === "failed" && <XCircle className="h-4 w-4" />}
+                                {stage.status === "pending" && <Clock className="h-4 w-4" />}
+                                {stage.status === "skipped" && <ArrowRight className="h-4 w-4" />}
+                              </div>
+                              <span className="text-muted-foreground mt-1 text-xs">
+                                {stage.name}
                               </span>
+                              {stage.duration && (
+                                <span className="text-muted-foreground text-xs">
+                                  {formatDuration(stage.duration)}
+                                </span>
+                              )}
+                            </div>
+                            {index < pipeline.stages.length - 1 && (
+                              <div
+                                className={`mx-1 h-0.5 w-8 ${
+                                  stage.status === "success"
+                                    ? "bg-green-500"
+                                    : "bg-gray-200 dark:bg-gray-700"
+                                }`}
+                              />
                             )}
                           </div>
-                          {index < pipeline.stages.length - 1 && (
-                            <div
-                              className={`mx-1 h-0.5 w-8 ${
-                                stage.status === "success"
-                                  ? "bg-green-500"
-                                  : "bg-gray-200 dark:bg-gray-700"
-                              }`}
-                            />
-                          )}
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

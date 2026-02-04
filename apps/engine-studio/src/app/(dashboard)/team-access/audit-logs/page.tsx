@@ -1,7 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { toast } from "sonner"
+import {
+  auditLogsService,
+  type AuditLog as ApiAuditLog,
+  type AuditLogStats,
+} from "@/services/audit-logs-service"
 import {
   FileText,
   Search,
@@ -18,6 +23,7 @@ import {
   LogOut,
   AlertCircle,
   CheckCircle,
+  Loader2,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -48,45 +54,49 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-// 감사 로그 타입
-interface AuditLog {
-  id: string
-  timestamp: string
-  user: {
-    name: string
-    email: string
-  }
-  action: string
-  category: "auth" | "persona" | "config" | "user" | "system"
-  resource: string
-  details: string
-  ip: string
-  status: "success" | "failure" | "warning"
-}
-
-// TODO: API 연동 시 실제 데이터로 교체
-const AUDIT_LOGS: AuditLog[] = []
-
-const AUDIT_STATS = {
-  totalLogs: 0,
-  todayLogs: 0,
-  failedAttempts: 0,
-  uniqueUsers: 0,
-}
 
 export default function AuditLogsPage() {
+  const [logs, setLogs] = useState<ApiAuditLog[]>([])
+  const [stats, setStats] = useState<AuditLogStats>({
+    total: 0,
+    today: 0,
+    byAction: {},
+    byTargetType: {},
+  })
+  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
-  const [statusFilter, setStatusFilter] = useState("all")
-  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
+  const [selectedLog, setSelectedLog] = useState<ApiAuditLog | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+
+  useEffect(() => {
+    loadLogs()
+  }, [])
+
+  const loadLogs = async () => {
+    try {
+      setIsLoading(true)
+      const data = await auditLogsService.getLogs()
+      setLogs(data.logs)
+      setStats(data.stats)
+    } catch (error) {
+      console.error("Failed to load audit logs:", error)
+      toast.error("감사 로그를 불러오는데 실패했습니다.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
-    // Simulate refresh delay
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsRefreshing(false)
-    toast.success("로그가 새로고침되었습니다")
+    try {
+      await loadLogs()
+      toast.success("로그가 새로고침되었습니다")
+    } catch {
+      toast.error("새로고침에 실패했습니다")
+    } finally {
+      setIsRefreshing(false)
+    }
   }
 
   const handleExport = () => {
@@ -96,79 +106,62 @@ export default function AuditLogsPage() {
   }
 
   const getActionIcon = (action: string) => {
-    switch (action) {
-      case "LOGIN":
-        return <LogIn className="h-4 w-4" />
-      case "LOGOUT":
-        return <LogOut className="h-4 w-4" />
-      case "CREATE":
-        return <Plus className="h-4 w-4" />
-      case "UPDATE":
-        return <Edit className="h-4 w-4" />
-      case "DELETE":
-        return <Trash2 className="h-4 w-4" />
-      case "VIEW":
-        return <Eye className="h-4 w-4" />
-      case "DEPLOY":
-        return <Activity className="h-4 w-4" />
-      default:
-        return <Settings className="h-4 w-4" />
-    }
+    const actionUpper = action.toUpperCase()
+    if (actionUpper.includes("LOGIN")) return <LogIn className="h-4 w-4" />
+    if (actionUpper.includes("LOGOUT")) return <LogOut className="h-4 w-4" />
+    if (actionUpper.includes("CREATE")) return <Plus className="h-4 w-4" />
+    if (actionUpper.includes("UPDATE")) return <Edit className="h-4 w-4" />
+    if (actionUpper.includes("DELETE")) return <Trash2 className="h-4 w-4" />
+    if (actionUpper.includes("VIEW")) return <Eye className="h-4 w-4" />
+    if (actionUpper.includes("DEPLOY")) return <Activity className="h-4 w-4" />
+    return <Settings className="h-4 w-4" />
   }
 
-  const getCategoryBadge = (category: AuditLog["category"]) => {
+  const getCategoryBadge = (targetType: string) => {
     const colors: Record<string, string> = {
-      auth: "bg-blue-500",
-      persona: "bg-purple-500",
-      config: "bg-orange-500",
-      user: "bg-green-500",
-      system: "bg-gray-500",
+      AUTH: "bg-blue-500",
+      USER: "bg-green-500",
+      PERSONA: "bg-purple-500",
+      ARCHETYPE: "bg-indigo-500",
+      ALGORITHM: "bg-orange-500",
+      DEPLOYMENT: "bg-red-500",
+      SAFETY_FILTER: "bg-yellow-500",
+      INCIDENT: "bg-pink-500",
     }
-    const labels: Record<string, string> = {
-      auth: "인증",
-      persona: "페르소나",
-      config: "설정",
-      user: "사용자",
-      system: "시스템",
-    }
-    return <Badge className={colors[category]}>{labels[category]}</Badge>
+    return <Badge className={colors[targetType] || "bg-gray-500"}>{targetType}</Badge>
   }
 
-  const getStatusBadge = (status: AuditLog["status"]) => {
-    switch (status) {
-      case "success":
-        return (
-          <Badge variant="secondary" className="gap-1">
-            <CheckCircle className="h-3 w-3" />
-            성공
-          </Badge>
-        )
-      case "failure":
-        return (
-          <Badge variant="destructive" className="gap-1">
-            <AlertCircle className="h-3 w-3" />
-            실패
-          </Badge>
-        )
-      case "warning":
-        return (
-          <Badge className="gap-1 bg-yellow-500">
-            <AlertCircle className="h-3 w-3" />
-            주의
-          </Badge>
-        )
-    }
-  }
-
-  const filteredLogs = AUDIT_LOGS.filter((log) => {
+  const filteredLogs = logs.filter((log) => {
     const matchesSearch =
-      log.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.resource.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.details.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = categoryFilter === "all" || log.category === categoryFilter
-    const matchesStatus = statusFilter === "all" || log.status === statusFilter
-    return matchesSearch && matchesCategory && matchesStatus
+      log.user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.targetType.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesCategory = categoryFilter === "all" || log.targetType === categoryFilter
+    return matchesSearch && matchesCategory
   })
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString("ko-KR", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+  }
+
+  // Get unique target types for filter
+  const targetTypes = [...new Set(logs.map((log) => log.targetType))]
+
+  if (isLoading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -201,7 +194,7 @@ export default function AuditLogsPage() {
             <FileText className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{AUDIT_STATS.totalLogs.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{stats.total.toLocaleString()}</div>
             <p className="text-muted-foreground mt-1 text-xs">이번 달</p>
           </CardContent>
         </Card>
@@ -212,30 +205,32 @@ export default function AuditLogsPage() {
             <Activity className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{AUDIT_STATS.todayLogs}</div>
+            <div className="text-2xl font-bold">{stats.today}</div>
             <p className="text-muted-foreground mt-1 text-xs">기록된 활동</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">실패한 시도</CardTitle>
+            <CardTitle className="text-sm font-medium">주요 작업</CardTitle>
             <AlertCircle className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{AUDIT_STATS.failedAttempts}</div>
-            <p className="text-muted-foreground mt-1 text-xs">오늘</p>
+            <div className="text-2xl font-bold">
+              {Object.entries(stats.byAction).sort((a, b) => b[1] - a[1])[0]?.[0] || "-"}
+            </div>
+            <p className="text-muted-foreground mt-1 text-xs">가장 많은 작업 유형</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">활성 사용자</CardTitle>
+            <CardTitle className="text-sm font-medium">대상 유형</CardTitle>
             <User className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{AUDIT_STATS.uniqueUsers}</div>
-            <p className="text-muted-foreground mt-1 text-xs">오늘</p>
+            <div className="text-2xl font-bold">{Object.keys(stats.byTargetType).length}</div>
+            <p className="text-muted-foreground mt-1 text-xs">고유 대상 유형</p>
           </CardContent>
         </Card>
       </div>
@@ -259,27 +254,16 @@ export default function AuditLogsPage() {
                 />
               </div>
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-32">
-                  <SelectValue placeholder="카테고리" />
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="대상 유형" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">전체</SelectItem>
-                  <SelectItem value="auth">인증</SelectItem>
-                  <SelectItem value="persona">페르소나</SelectItem>
-                  <SelectItem value="config">설정</SelectItem>
-                  <SelectItem value="user">사용자</SelectItem>
-                  <SelectItem value="system">시스템</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-32">
-                  <SelectValue placeholder="상태" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">전체</SelectItem>
-                  <SelectItem value="success">성공</SelectItem>
-                  <SelectItem value="failure">실패</SelectItem>
-                  <SelectItem value="warning">주의</SelectItem>
+                  {targetTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -292,16 +276,15 @@ export default function AuditLogsPage() {
                 <TableHead>시간</TableHead>
                 <TableHead>사용자</TableHead>
                 <TableHead>작업</TableHead>
-                <TableHead>카테고리</TableHead>
-                <TableHead>리소스</TableHead>
+                <TableHead>대상 유형</TableHead>
+                <TableHead>대상 ID</TableHead>
                 <TableHead>IP</TableHead>
-                <TableHead className="text-right">상태</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredLogs.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center">
+                  <TableCell colSpan={6} className="h-32 text-center">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <FileText className="text-muted-foreground h-8 w-8" />
                       <p className="text-muted-foreground">감사 로그가 없습니다</p>
@@ -318,15 +301,15 @@ export default function AuditLogsPage() {
                     className="cursor-pointer"
                     onClick={() => setSelectedLog(log)}
                   >
-                    <TableCell className="font-mono text-xs">{log.timestamp}</TableCell>
+                    <TableCell className="font-mono text-xs">{formatDate(log.createdAt)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Avatar className="h-6 w-6">
                           <AvatarFallback className="text-xs">
-                            {log.user.name.charAt(0)}
+                            {(log.user.name || log.user.email).charAt(0).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="text-sm">{log.user.name}</span>
+                        <span className="text-sm">{log.user.name || log.user.email}</span>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -335,10 +318,11 @@ export default function AuditLogsPage() {
                         <span>{log.action}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{getCategoryBadge(log.category)}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{log.resource}</TableCell>
-                    <TableCell className="font-mono text-xs">{log.ip}</TableCell>
-                    <TableCell className="text-right">{getStatusBadge(log.status)}</TableCell>
+                    <TableCell>{getCategoryBadge(log.targetType)}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {log.targetId?.slice(0, 8) || "-"}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{log.ipAddress || "-"}</TableCell>
                   </TableRow>
                 ))
               )}
@@ -352,19 +336,21 @@ export default function AuditLogsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>로그 상세</DialogTitle>
-            <DialogDescription>{selectedLog?.timestamp}</DialogDescription>
+            <DialogDescription>
+              {selectedLog && formatDate(selectedLog.createdAt)}
+            </DialogDescription>
           </DialogHeader>
           {selectedLog && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-muted-foreground">사용자</Label>
-                  <p className="font-medium">{selectedLog.user.name}</p>
+                  <p className="font-medium">{selectedLog.user.name || "알 수 없음"}</p>
                   <p className="text-muted-foreground text-sm">{selectedLog.user.email}</p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">IP 주소</Label>
-                  <p className="font-mono">{selectedLog.ip}</p>
+                  <p className="font-mono">{selectedLog.ipAddress || "-"}</p>
                 </div>
               </div>
 
@@ -379,24 +365,35 @@ export default function AuditLogsPage() {
                   </div>
                 </div>
                 <div>
-                  <Label className="text-muted-foreground">카테고리</Label>
-                  <div className="mt-1">{getCategoryBadge(selectedLog.category)}</div>
+                  <Label className="text-muted-foreground">대상 유형</Label>
+                  <div className="mt-1">{getCategoryBadge(selectedLog.targetType)}</div>
                 </div>
               </div>
 
               <div>
-                <Label className="text-muted-foreground">리소스</Label>
-                <p className="font-medium">{selectedLog.resource}</p>
+                <Label className="text-muted-foreground">대상 ID</Label>
+                <p className="font-mono">{selectedLog.targetId || "-"}</p>
               </div>
 
-              <div>
-                <Label className="text-muted-foreground">상세 내용</Label>
-                <p>{selectedLog.details}</p>
-              </div>
+              {selectedLog.details && Object.keys(selectedLog.details).length > 0 && (
+                <div>
+                  <Label className="text-muted-foreground">상세 내용</Label>
+                  <pre className="bg-muted mt-1 max-h-40 overflow-auto rounded p-2 text-xs">
+                    {JSON.stringify(selectedLog.details, null, 2)}
+                  </pre>
+                </div>
+              )}
 
-              <div>
-                <Label className="text-muted-foreground">상태</Label>
-                <div className="mt-1">{getStatusBadge(selectedLog.status)}</div>
+              {selectedLog.userAgent && (
+                <div>
+                  <Label className="text-muted-foreground">User Agent</Label>
+                  <p className="text-muted-foreground mt-1 text-xs">{selectedLog.userAgent}</p>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                <span className="text-sm">기록됨</span>
               </div>
             </div>
           )}

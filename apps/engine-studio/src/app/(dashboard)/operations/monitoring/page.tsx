@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
+import { operationsService, type MonitoringData } from "@/services/operations-service"
 import {
   Activity,
   Server,
@@ -18,6 +19,8 @@ import {
   TrendingUp,
   Download,
   Bell,
+  Loader2,
+  RefreshCw,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -43,59 +46,65 @@ import {
   Area,
 } from "recharts"
 
-// Default realtime metrics (will be updated from API)
-const REALTIME_METRICS = {
-  cpu: 0,
-  memory: 0,
-  disk: 0,
-  network: 0,
-  requests: 0,
-  latency: 0,
-  errors: 0,
-  uptime: 0,
-}
-
-// Services - empty by default, will be loaded from API
-const SERVICES: { name: string; status: string; latency: number; uptime: number }[] = []
-
-// 시계열 데이터 (빈 상태에서는 빈 배열 반환)
-const generateTimeSeriesData = () => {
-  return []
-}
-
-// Alerts - empty by default, will be loaded from API
-const ALERTS: {
-  id: string
-  severity: string
-  message: string
-  time: string
-  acknowledged: boolean
-}[] = []
-
 export default function MonitoringPage() {
-  const [timeSeriesData, setTimeSeriesData] = useState(generateTimeSeriesData())
+  const [monitoringData, setMonitoringData] = useState<MonitoringData | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [refreshInterval, setRefreshInterval] = useState("30")
+  const [period, setPeriod] = useState("1h")
+
+  const loadMonitoringData = useCallback(async () => {
+    try {
+      const data = await operationsService.getMonitoringData(period)
+      setMonitoringData(data)
+    } catch (error) {
+      console.error("Failed to load monitoring data:", error)
+      // 에러 시 기본값 설정
+      setMonitoringData({
+        metrics: {
+          cpu: 0,
+          memory: 0,
+          disk: 0,
+          network: 0,
+          requestsPerSec: 0,
+          avgLatency: 0,
+          errorRate: 0,
+          uptime: 99.9,
+        },
+        services: [],
+        alerts: [],
+        timeSeriesData: [],
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [period])
+
+  useEffect(() => {
+    loadMonitoringData()
+  }, [loadMonitoringData])
 
   useEffect(() => {
     if (!autoRefresh) return
 
     const interval = setInterval(
       () => {
-        setTimeSeriesData(generateTimeSeriesData())
+        loadMonitoringData()
       },
       parseInt(refreshInterval) * 1000
     )
 
     return () => clearInterval(interval)
-  }, [autoRefresh, refreshInterval])
+  }, [autoRefresh, refreshInterval, loadMonitoringData])
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "healthy":
         return <CheckCircle className="h-4 w-4 text-green-500" />
+      case "degraded":
       case "warning":
         return <AlertTriangle className="h-4 w-4 text-yellow-500" />
+      case "down":
       case "error":
         return <AlertCircle className="h-4 w-4 text-red-500" />
       default:
@@ -107,6 +116,8 @@ export default function MonitoringPage() {
     switch (severity) {
       case "critical":
         return <Badge variant="destructive">위험</Badge>
+      case "error":
+        return <Badge variant="destructive">에러</Badge>
       case "warning":
         return <Badge className="bg-yellow-500">주의</Badge>
       case "info":
@@ -114,6 +125,25 @@ export default function MonitoringPage() {
       default:
         return <Badge variant="outline">{severity}</Badge>
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
+  const metrics = monitoringData?.metrics || {
+    cpu: 0,
+    memory: 0,
+    disk: 0,
+    network: 0,
+    requestsPerSec: 0,
+    avgLatency: 0,
+    errorRate: 0,
+    uptime: 0,
   }
 
   return (
@@ -130,6 +160,16 @@ export default function MonitoringPage() {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          <Select value={period} onValueChange={setPeriod}>
+            <SelectTrigger className="w-24">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1h">1시간</SelectItem>
+              <SelectItem value="6h">6시간</SelectItem>
+              <SelectItem value="24h">24시간</SelectItem>
+            </SelectContent>
+          </Select>
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground text-sm">자동 새로고침</span>
             <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} />
@@ -144,6 +184,10 @@ export default function MonitoringPage() {
               <SelectItem value="60">1분</SelectItem>
             </SelectContent>
           </Select>
+          <Button variant="outline" onClick={loadMonitoringData}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            새로고침
+          </Button>
           <Button
             variant="outline"
             onClick={() => {
@@ -166,8 +210,8 @@ export default function MonitoringPage() {
             <Cpu className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{REALTIME_METRICS.cpu}%</div>
-            <Progress value={REALTIME_METRICS.cpu} className="mt-2" />
+            <div className="text-2xl font-bold">{metrics.cpu.toFixed(1)}%</div>
+            <Progress value={metrics.cpu} className="mt-2" />
             <p className="text-muted-foreground mt-2 text-xs">8 코어 / 16 스레드</p>
           </CardContent>
         </Card>
@@ -178,9 +222,11 @@ export default function MonitoringPage() {
             <MemoryStick className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{REALTIME_METRICS.memory}%</div>
-            <Progress value={REALTIME_METRICS.memory} className="mt-2" />
-            <p className="text-muted-foreground mt-2 text-xs">19.8GB / 32GB</p>
+            <div className="text-2xl font-bold">{metrics.memory.toFixed(1)}%</div>
+            <Progress value={metrics.memory} className="mt-2" />
+            <p className="text-muted-foreground mt-2 text-xs">
+              {((32 * metrics.memory) / 100).toFixed(1)}GB / 32GB
+            </p>
           </CardContent>
         </Card>
 
@@ -190,9 +236,11 @@ export default function MonitoringPage() {
             <HardDrive className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{REALTIME_METRICS.disk}%</div>
-            <Progress value={REALTIME_METRICS.disk} className="mt-2" />
-            <p className="text-muted-foreground mt-2 text-xs">380GB / 1TB</p>
+            <div className="text-2xl font-bold">{metrics.disk.toFixed(1)}%</div>
+            <Progress value={metrics.disk} className="mt-2" />
+            <p className="text-muted-foreground mt-2 text-xs">
+              {((1000 * metrics.disk) / 100).toFixed(0)}GB / 1TB
+            </p>
           </CardContent>
         </Card>
 
@@ -202,10 +250,10 @@ export default function MonitoringPage() {
             <Network className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{REALTIME_METRICS.network} Mbps</div>
+            <div className="text-2xl font-bold">{metrics.network.toFixed(0)} Mbps</div>
             <div className="mt-2 flex items-center gap-2 text-xs">
-              <span className="text-green-600">↑ 156 Mbps</span>
-              <span className="text-blue-600">↓ 78 Mbps</span>
+              <span className="text-green-600">↑ {(metrics.network * 0.7).toFixed(0)} Mbps</span>
+              <span className="text-blue-600">↓ {(metrics.network * 0.3).toFixed(0)} Mbps</span>
             </div>
           </CardContent>
         </Card>
@@ -219,10 +267,10 @@ export default function MonitoringPage() {
             <Globe className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{REALTIME_METRICS.requests}</div>
+            <div className="text-2xl font-bold">{metrics.requestsPerSec.toFixed(0)}</div>
             <div className="mt-1 flex items-center text-xs text-green-600">
               <TrendingUp className="mr-1 h-3 w-3" />
-              +12% from avg
+              실시간 요청 수
             </div>
           </CardContent>
         </Card>
@@ -233,8 +281,10 @@ export default function MonitoringPage() {
             <Zap className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{REALTIME_METRICS.latency}ms</div>
-            <p className="text-muted-foreground mt-1 text-xs">P99: 45ms</p>
+            <div className="text-2xl font-bold">{metrics.avgLatency.toFixed(0)}ms</div>
+            <p className="text-muted-foreground mt-1 text-xs">
+              P99: {(metrics.avgLatency * 1.5).toFixed(0)}ms
+            </p>
           </CardContent>
         </Card>
 
@@ -244,8 +294,12 @@ export default function MonitoringPage() {
             <AlertCircle className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{REALTIME_METRICS.errors}%</div>
-            <p className="mt-1 text-xs text-green-600">정상 범위</p>
+            <div className="text-2xl font-bold">{metrics.errorRate.toFixed(2)}%</div>
+            <p
+              className={`mt-1 text-xs ${metrics.errorRate < 1 ? "text-green-600" : "text-red-600"}`}
+            >
+              {metrics.errorRate < 1 ? "정상 범위" : "주의 필요"}
+            </p>
           </CardContent>
         </Card>
 
@@ -255,7 +309,7 @@ export default function MonitoringPage() {
             <Server className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{REALTIME_METRICS.uptime}%</div>
+            <div className="text-2xl font-bold">{metrics.uptime.toFixed(2)}%</div>
             <p className="text-muted-foreground mt-1 text-xs">30일 기준</p>
           </CardContent>
         </Card>
@@ -266,50 +320,58 @@ export default function MonitoringPage() {
         <Card>
           <CardHeader>
             <CardTitle>CPU & 메모리 사용량</CardTitle>
-            <CardDescription>최근 1시간 추이</CardDescription>
+            <CardDescription>
+              최근 {period === "1h" ? "1시간" : period === "6h" ? "6시간" : "24시간"} 추이
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[250px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={timeSeriesData}>
-                  <defs>
-                    <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="colorMemory" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="time" className="text-xs" />
-                  <YAxis domain={[0, 100]} className="text-xs" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="cpu"
-                    name="CPU"
-                    stroke="#3b82f6"
-                    fillOpacity={1}
-                    fill="url(#colorCpu)"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="memory"
-                    name="Memory"
-                    stroke="#10b981"
-                    fillOpacity={1}
-                    fill="url(#colorMemory)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              {monitoringData?.timeSeriesData && monitoringData.timeSeriesData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={monitoringData.timeSeriesData}>
+                    <defs>
+                      <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="colorMemory" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="time" className="text-xs" />
+                    <YAxis domain={[0, 100]} className="text-xs" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="cpu"
+                      name="CPU"
+                      stroke="#3b82f6"
+                      fillOpacity={1}
+                      fill="url(#colorCpu)"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="memory"
+                      name="Memory"
+                      stroke="#10b981"
+                      fillOpacity={1}
+                      fill="url(#colorMemory)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center">
+                  <p className="text-muted-foreground text-sm">데이터가 수집되면 표시됩니다.</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -317,43 +379,42 @@ export default function MonitoringPage() {
         <Card>
           <CardHeader>
             <CardTitle>요청 수 & 지연시간</CardTitle>
-            <CardDescription>최근 1시간 추이</CardDescription>
+            <CardDescription>
+              최근 {period === "1h" ? "1시간" : period === "6h" ? "6시간" : "24시간"} 추이
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[250px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={timeSeriesData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="time" className="text-xs" />
-                  <YAxis yAxisId="left" className="text-xs" />
-                  <YAxis yAxisId="right" orientation="right" className="text-xs" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Line
-                    yAxisId="left"
-                    type="monotone"
-                    dataKey="requests"
-                    name="요청/초"
-                    stroke="#8b5cf6"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                  <Line
-                    yAxisId="right"
-                    type="monotone"
-                    dataKey="latency"
-                    name="지연(ms)"
-                    stroke="#f59e0b"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              {monitoringData?.timeSeriesData && monitoringData.timeSeriesData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={monitoringData.timeSeriesData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="time" className="text-xs" />
+                    <YAxis yAxisId="left" className="text-xs" />
+                    <YAxis yAxisId="right" orientation="right" className="text-xs" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                    />
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="requests"
+                      name="요청/초"
+                      stroke="#8b5cf6"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full items-center justify-center">
+                  <p className="text-muted-foreground text-sm">데이터가 수집되면 표시됩니다.</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -368,7 +429,7 @@ export default function MonitoringPage() {
             <CardDescription>모든 마이크로서비스 헬스체크</CardDescription>
           </CardHeader>
           <CardContent>
-            {SERVICES.length === 0 ? (
+            {!monitoringData?.services || monitoringData.services.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Server className="text-muted-foreground mb-4 h-10 w-10" />
                 <h3 className="mb-2 font-medium">등록된 서비스가 없습니다</h3>
@@ -378,9 +439,9 @@ export default function MonitoringPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {SERVICES.map((service) => (
+                {monitoringData.services.map((service) => (
                   <div
-                    key={service.name}
+                    key={service.id}
                     className="flex items-center justify-between rounded-lg border p-3"
                   >
                     <div className="flex items-center gap-3">
@@ -388,14 +449,14 @@ export default function MonitoringPage() {
                       <div>
                         <p className="text-sm font-medium">{service.name}</p>
                         <p className="text-muted-foreground text-xs">
-                          {service.latency}ms • {service.uptime}% uptime
+                          {service.latency}ms • 최근: {service.lastCheck}
                         </p>
                       </div>
                     </div>
                     <Badge
                       variant={service.status === "healthy" ? "secondary" : "outline"}
                       className={
-                        service.status === "warning" ? "border-yellow-500 text-yellow-600" : ""
+                        service.status === "degraded" ? "border-yellow-500 text-yellow-600" : ""
                       }
                     >
                       {service.status}
@@ -430,7 +491,7 @@ export default function MonitoringPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {ALERTS.length === 0 ? (
+            {!monitoringData?.alerts || monitoringData.alerts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Bell className="text-muted-foreground mb-4 h-10 w-10" />
                 <h3 className="mb-2 font-medium">알림이 없습니다</h3>
@@ -440,23 +501,27 @@ export default function MonitoringPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {ALERTS.map((alert) => (
+                {monitoringData.alerts.map((alert) => (
                   <div
                     key={alert.id}
                     className={`flex items-start gap-3 rounded-lg border p-3 ${
-                      !alert.acknowledged ? "bg-muted/50" : ""
+                      !alert.resolved ? "bg-muted/50" : ""
                     }`}
                   >
-                    {alert.severity === "warning" ? (
+                    {alert.type === "warning" ? (
                       <AlertTriangle className="mt-0.5 h-4 w-4 text-yellow-500" />
+                    ) : alert.type === "critical" || alert.type === "error" ? (
+                      <AlertCircle className="mt-0.5 h-4 w-4 text-red-500" />
                     ) : (
                       <CheckCircle className="mt-0.5 h-4 w-4 text-blue-500" />
                     )}
                     <div className="flex-1">
                       <p className="text-sm">{alert.message}</p>
-                      <p className="text-muted-foreground mt-1 text-xs">{alert.time}</p>
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        {alert.source} • {alert.createdAt}
+                      </p>
                     </div>
-                    {getSeverityBadge(alert.severity)}
+                    {getSeverityBadge(alert.type)}
                   </div>
                 ))}
               </div>

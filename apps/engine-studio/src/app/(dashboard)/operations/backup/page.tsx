@@ -1,7 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { toast } from "sonner"
+import {
+  operationsService,
+  type Backup as ApiBackup,
+  type BackupStats,
+} from "@/services/operations-service"
 import {
   Database,
   HardDrive,
@@ -20,6 +25,7 @@ import {
   MoreHorizontal,
   Shield,
   Lock,
+  Loader2,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -62,32 +68,6 @@ import {
 } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
-// 백업 데이터
-interface Backup {
-  id: string
-  name: string
-  type: "full" | "incremental" | "differential"
-  status: "completed" | "in_progress" | "failed" | "scheduled"
-  size: string
-  duration: string
-  createdAt: string
-  expiresAt: string
-  location: "local" | "s3" | "gcs"
-}
-
-// Backups - empty by default, will be loaded from API
-const BACKUPS: Backup[] = []
-
-// Backup stats - default empty values
-const BACKUP_STATS = {
-  totalBackups: 0,
-  totalSize: "0 GB",
-  lastBackup: "-",
-  nextBackup: "-",
-  successRate: 0,
-  retentionDays: 30,
-}
-
 // Default backup schedule
 const BACKUP_SCHEDULE = {
   fullBackup: { enabled: true, frequency: "daily", time: "03:00" },
@@ -97,46 +77,123 @@ const BACKUP_SCHEDULE = {
 }
 
 export default function BackupPage() {
+  const [backups, setBackups] = useState<ApiBackup[]>([])
+  const [stats, setStats] = useState<BackupStats>({
+    totalBackups: 0,
+    totalSize: 0,
+    lastBackup: null,
+    nextScheduled: null,
+  })
+  const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("backups")
   const [showRestoreDialog, setShowRestoreDialog] = useState(false)
-  const [selectedBackup, setSelectedBackup] = useState<Backup | null>(null)
+  const [selectedBackup, setSelectedBackup] = useState<ApiBackup | null>(null)
   const [settings, setSettings] = useState(BACKUP_SCHEDULE)
   const [backupTypeFilter, setBackupTypeFilter] = useState("all")
   const [isBackingUp, setIsBackingUp] = useState(false)
 
-  const getStatusBadge = (status: Backup["status"]) => {
+  useEffect(() => {
+    loadBackups()
+  }, [])
+
+  const loadBackups = async () => {
+    try {
+      setIsLoading(true)
+      const data = await operationsService.getBackups()
+      setBackups(data.backups)
+      setStats(data.stats)
+    } catch (error) {
+      console.error("Failed to load backups:", error)
+      toast.error("백업 목록을 불러오는데 실패했습니다.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleStartBackup = async (type: ApiBackup["type"]) => {
+    try {
+      setIsBackingUp(true)
+      await operationsService.startBackup(type)
+      toast.success("백업이 시작되었습니다.", {
+        description: "완료까지 몇 분 소요될 수 있습니다.",
+      })
+      loadBackups()
+    } catch (error) {
+      console.error("Failed to start backup:", error)
+      toast.error("백업 시작에 실패했습니다.")
+    } finally {
+      setIsBackingUp(false)
+    }
+  }
+
+  const getStatusBadge = (status: ApiBackup["status"]) => {
     switch (status) {
-      case "completed":
+      case "COMPLETED":
         return <Badge className="bg-green-500">완료</Badge>
-      case "in_progress":
+      case "IN_PROGRESS":
         return <Badge className="bg-blue-500">진행중</Badge>
-      case "failed":
+      case "FAILED":
         return <Badge variant="destructive">실패</Badge>
-      case "scheduled":
+      case "SCHEDULED":
         return <Badge variant="secondary">예정</Badge>
     }
   }
 
-  const getTypeBadge = (type: Backup["type"]) => {
+  const getTypeBadge = (type: ApiBackup["type"]) => {
     switch (type) {
-      case "full":
+      case "FULL":
         return <Badge variant="outline">전체</Badge>
-      case "incremental":
+      case "INCREMENTAL":
         return <Badge variant="outline">증분</Badge>
-      case "differential":
+      case "DIFFERENTIAL":
         return <Badge variant="outline">차등</Badge>
     }
   }
 
-  const getLocationIcon = (location: Backup["location"]) => {
-    switch (location) {
-      case "local":
-        return <HardDrive className="h-4 w-4" />
-      case "s3":
-        return <Cloud className="h-4 w-4" />
-      case "gcs":
-        return <Cloud className="h-4 w-4" />
+  const getLocationIcon = (location: string) => {
+    if (location.startsWith("s3://")) {
+      return <Cloud className="h-4 w-4" />
     }
+    return <HardDrive className="h-4 w-4" />
+  }
+
+  const formatSize = (bytes: number) => {
+    if (bytes === 0) return "0 B"
+    const k = 1024
+    const sizes = ["B", "KB", "MB", "GB", "TB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+  }
+
+  const formatDuration = (seconds: number | null) => {
+    if (!seconds) return "-"
+    if (seconds < 60) return `${seconds}초`
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}분 ${seconds % 60}초`
+    return `${Math.floor(seconds / 3600)}시간 ${Math.floor((seconds % 3600) / 60)}분`
+  }
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "-"
+    return new Date(dateString).toLocaleString("ko-KR", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  const filteredBackups = backups.filter((backup) => {
+    if (backupTypeFilter === "all") return true
+    return backup.type.toLowerCase() === backupTypeFilter
+  })
+
+  if (isLoading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
   }
 
   return (
@@ -151,33 +208,16 @@ export default function BackupPage() {
           <p className="text-muted-foreground">시스템 데이터 백업을 관리하고 복구합니다.</p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => {
-              toast.success("새로고침 완료", {
-                description: "백업 목록이 갱신되었습니다.",
-              })
-            }}
-          >
+          <Button variant="outline" onClick={loadBackups}>
             <RefreshCw className="mr-2 h-4 w-4" />
             새로고침
           </Button>
-          <Button
-            disabled={isBackingUp}
-            onClick={() => {
-              setIsBackingUp(true)
-              toast.info("백업 시작", {
-                description: "즉시 백업이 시작되었습니다. 완료까지 몇 분 소요될 수 있습니다.",
-              })
-              setTimeout(() => {
-                setIsBackingUp(false)
-                toast.success("백업 완료", {
-                  description: "백업이 성공적으로 완료되었습니다.",
-                })
-              }, 3000)
-            }}
-          >
-            <Play className="mr-2 h-4 w-4" />
+          <Button disabled={isBackingUp} onClick={() => handleStartBackup("FULL")}>
+            {isBackingUp ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="mr-2 h-4 w-4" />
+            )}
             즉시 백업
           </Button>
         </div>
@@ -191,8 +231,8 @@ export default function BackupPage() {
             <Database className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{BACKUP_STATS.totalBackups}</div>
-            <p className="text-muted-foreground mt-1 text-xs">총 {BACKUP_STATS.totalSize}</p>
+            <div className="text-2xl font-bold">{stats.totalBackups}</div>
+            <p className="text-muted-foreground mt-1 text-xs">총 {formatSize(stats.totalSize)}</p>
           </CardContent>
         </Card>
 
@@ -202,8 +242,15 @@ export default function BackupPage() {
             <Clock className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">15:00</div>
-            <p className="text-muted-foreground mt-1 text-xs">{BACKUP_STATS.lastBackup}</p>
+            <div className="text-2xl font-bold">
+              {stats.lastBackup
+                ? new Date(stats.lastBackup).toLocaleTimeString("ko-KR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "-"}
+            </div>
+            <p className="text-muted-foreground mt-1 text-xs">{formatDate(stats.lastBackup)}</p>
           </CardContent>
         </Card>
 
@@ -213,8 +260,15 @@ export default function BackupPage() {
             <Calendar className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">21:00</div>
-            <p className="text-muted-foreground mt-1 text-xs">{BACKUP_STATS.nextBackup}</p>
+            <div className="text-2xl font-bold">
+              {stats.nextScheduled
+                ? new Date(stats.nextScheduled).toLocaleTimeString("ko-KR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "-"}
+            </div>
+            <p className="text-muted-foreground mt-1 text-xs">{formatDate(stats.nextScheduled)}</p>
           </CardContent>
         </Card>
 
@@ -224,8 +278,24 @@ export default function BackupPage() {
             <CheckCircle className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{BACKUP_STATS.successRate}%</div>
-            <Progress value={BACKUP_STATS.successRate} className="mt-2" />
+            <div className="text-2xl font-bold">
+              {stats.totalBackups > 0
+                ? Math.round(
+                    (backups.filter((b) => b.status === "COMPLETED").length / stats.totalBackups) *
+                      100
+                  )
+                : 0}
+              %
+            </div>
+            <Progress
+              value={
+                stats.totalBackups > 0
+                  ? (backups.filter((b) => b.status === "COMPLETED").length / stats.totalBackups) *
+                    100
+                  : 0
+              }
+              className="mt-2"
+            />
           </CardContent>
         </Card>
       </div>
@@ -246,18 +316,7 @@ export default function BackupPage() {
                   <CardDescription>최근 백업 기록 및 상태</CardDescription>
                 </div>
                 <div className="flex gap-2">
-                  <Select
-                    value={backupTypeFilter}
-                    onValueChange={(value) => {
-                      setBackupTypeFilter(value)
-                      toast.info("필터 적용", {
-                        description:
-                          value === "all"
-                            ? "모든 백업을 표시합니다."
-                            : `${value === "full" ? "전체" : "증분"} 백업만 표시합니다.`,
-                      })
-                    }}
-                  >
+                  <Select value={backupTypeFilter} onValueChange={setBackupTypeFilter}>
                     <SelectTrigger className="w-32">
                       <SelectValue placeholder="유형" />
                     </SelectTrigger>
@@ -271,27 +330,20 @@ export default function BackupPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {BACKUPS.length === 0 ? (
+              {filteredBackups.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <Database className="text-muted-foreground mb-4 h-12 w-12" />
                   <h3 className="mb-2 text-lg font-medium">백업 이력이 없습니다</h3>
                   <p className="text-muted-foreground mb-4 text-sm">
                     백업을 실행하면 여기에 이력이 표시됩니다.
                   </p>
-                  <Button
-                    onClick={() => {
-                      setIsBackingUp(true)
-                      toast.info("백업 시작", {
-                        description: "즉시 백업이 시작되었습니다.",
-                      })
-                      setTimeout(() => {
-                        setIsBackingUp(false)
-                        toast.success("백업 완료")
-                      }, 3000)
-                    }}
-                    disabled={isBackingUp}
-                  >
-                    <Play className="mr-2 h-4 w-4" />첫 백업 실행
+                  <Button onClick={() => handleStartBackup("FULL")} disabled={isBackingUp}>
+                    {isBackingUp ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Play className="mr-2 h-4 w-4" />
+                    )}
+                    첫 백업 실행
                   </Button>
                 </div>
               ) : (
@@ -299,7 +351,6 @@ export default function BackupPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>백업 ID</TableHead>
-                      <TableHead>이름</TableHead>
                       <TableHead>유형</TableHead>
                       <TableHead>크기</TableHead>
                       <TableHead>소요 시간</TableHead>
@@ -310,19 +361,18 @@ export default function BackupPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {BACKUPS.map((backup) => (
+                    {filteredBackups.map((backup) => (
                       <TableRow key={backup.id}>
-                        <TableCell className="font-mono text-sm">{backup.id}</TableCell>
-                        <TableCell className="font-medium">{backup.name}</TableCell>
+                        <TableCell className="font-mono text-sm">{backup.id.slice(0, 8)}</TableCell>
                         <TableCell>{getTypeBadge(backup.type)}</TableCell>
-                        <TableCell>{backup.size}</TableCell>
-                        <TableCell>{backup.duration}</TableCell>
-                        <TableCell>{backup.createdAt}</TableCell>
+                        <TableCell>{formatSize(backup.size)}</TableCell>
+                        <TableCell>{formatDuration(backup.duration)}</TableCell>
+                        <TableCell>{formatDate(backup.createdAt)}</TableCell>
                         <TableCell>
                           <Tooltip>
                             <TooltipTrigger>{getLocationIcon(backup.location)}</TooltipTrigger>
                             <TooltipContent>
-                              {backup.location === "s3" ? "AWS S3" : backup.location}
+                              {backup.location.startsWith("s3://") ? "AWS S3" : backup.location}
                             </TooltipContent>
                           </Tooltip>
                         </TableCell>
@@ -349,7 +399,7 @@ export default function BackupPage() {
                               <DropdownMenuItem
                                 onClick={() => {
                                   toast.success("다운로드 시작", {
-                                    description: `${backup.name} (${backup.size}) 다운로드를 시작합니다.`,
+                                    description: `${backup.id.slice(0, 8)} (${formatSize(backup.size)}) 다운로드를 시작합니다.`,
                                   })
                                 }}
                               >
@@ -358,8 +408,8 @@ export default function BackupPage() {
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => {
-                                  toast.info(`백업 상세정보: ${backup.id}`, {
-                                    description: `유형: ${backup.type}, 크기: ${backup.size}, 생성일: ${backup.createdAt}`,
+                                  toast.info(`백업 상세정보: ${backup.id.slice(0, 8)}`, {
+                                    description: `유형: ${backup.type}, 크기: ${formatSize(backup.size)}, 생성일: ${formatDate(backup.createdAt)}`,
                                   })
                                 }}
                               >
@@ -371,7 +421,7 @@ export default function BackupPage() {
                                 className="text-destructive"
                                 onClick={() => {
                                   toast.error("백업 삭제", {
-                                    description: `${backup.name}이(가) 삭제되었습니다.`,
+                                    description: `${backup.id.slice(0, 8)}이(가) 삭제되었습니다.`,
                                   })
                                 }}
                               >
@@ -578,9 +628,12 @@ export default function BackupPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm">사용량</span>
-                  <span className="text-sm">892 GB / 2 TB</span>
+                  <span className="text-sm">{formatSize(stats.totalSize)} / 2 TB</span>
                 </div>
-                <Progress value={44.6} className="mt-2" />
+                <Progress
+                  value={(stats.totalSize / (2 * 1024 * 1024 * 1024 * 1024)) * 100}
+                  className="mt-2"
+                />
                 <div className="text-muted-foreground flex items-center gap-2 text-sm">
                   <Lock className="h-4 w-4" />
                   AES-256 암호화 적용
@@ -642,15 +695,15 @@ export default function BackupPage() {
               <div className="bg-muted/30 space-y-2 rounded-lg border p-4">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground text-sm">백업 ID</span>
-                  <span className="font-mono">{selectedBackup.id}</span>
+                  <span className="font-mono">{selectedBackup.id.slice(0, 8)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground text-sm">생성일</span>
-                  <span>{selectedBackup.createdAt}</span>
+                  <span>{formatDate(selectedBackup.createdAt)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground text-sm">크기</span>
-                  <span>{selectedBackup.size}</span>
+                  <span>{formatSize(selectedBackup.size)}</span>
                 </div>
               </div>
               <div className="mt-4 rounded-lg border border-yellow-500 bg-yellow-500/10 p-4">
@@ -675,7 +728,7 @@ export default function BackupPage() {
               onClick={() => {
                 setShowRestoreDialog(false)
                 toast.info("복구 시작됨", {
-                  description: `${selectedBackup?.name || "선택된 백업"}에서 복구를 시작합니다. 완료까지 시간이 소요될 수 있습니다.`,
+                  description: `${selectedBackup?.id.slice(0, 8) || "선택된 백업"}에서 복구를 시작합니다. 완료까지 시간이 소요될 수 있습니다.`,
                 })
                 setTimeout(() => {
                   toast.success("복구 완료", {

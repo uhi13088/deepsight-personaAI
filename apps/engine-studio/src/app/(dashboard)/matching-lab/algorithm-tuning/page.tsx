@@ -1,7 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { toast } from "sonner"
+import {
+  abTestsService,
+  type ABTest as ApiABTest,
+  type ABTestStats,
+} from "@/services/ab-tests-service"
 import {
   Sliders,
   Play,
@@ -18,6 +23,7 @@ import {
   GitBranch,
   ArrowRight,
   Info,
+  Loader2,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -70,128 +76,25 @@ import {
   Legend,
 } from "recharts"
 
-// A/B 테스트 타입
-interface ABTest {
-  id: string
-  name: string
-  description: string
-  status: "draft" | "running" | "completed" | "paused"
-  controlAlgorithm: string
-  testAlgorithm: string
-  trafficSplit: number
-  startDate: string
-  endDate: string | null
-  sampleSize: { control: number; test: number }
-  metrics: {
-    ctr: { control: number; test: number; lift: number }
-    accuracy: { control: number; test: number; lift: number }
-    satisfaction: { control: number; test: number; lift: number }
-  }
-  significance: number
-  winner: "control" | "test" | null
+// UI에서 사용할 metrics 타입
+interface TestMetrics {
+  ctr: { control: number; test: number; lift: number }
+  accuracy: { control: number; test: number; lift: number }
+  satisfaction: { control: number; test: number; lift: number }
 }
 
-const AB_TESTS: ABTest[] = [
-  {
-    id: "1",
-    name: "Hybrid vs Cosine 비교",
-    description: "Hybrid 알고리즘과 기존 Cosine 유사도 성능 비교",
-    status: "running",
-    controlAlgorithm: "Cosine Similarity",
-    testAlgorithm: "Hybrid Algorithm v2.1",
-    trafficSplit: 50,
-    startDate: "2025-01-10",
-    endDate: null,
-    sampleSize: { control: 12456, test: 12389 },
-    metrics: {
-      ctr: { control: 23.4, test: 28.6, lift: 22.2 },
-      accuracy: { control: 89.2, test: 92.1, lift: 3.2 },
-      satisfaction: { control: 4.2, test: 4.5, lift: 7.1 },
-    },
-    significance: 97.2,
-    winner: "test",
-  },
-  {
-    id: "2",
-    name: "Context Weight 조정 테스트",
-    description: "컨텍스트 가중치 0.3 vs 0.5 비교",
-    status: "completed",
-    controlAlgorithm: "Context-Aware (w=0.3)",
-    testAlgorithm: "Context-Aware (w=0.5)",
-    trafficSplit: 50,
-    startDate: "2025-01-01",
-    endDate: "2025-01-08",
-    sampleSize: { control: 25678, test: 25432 },
-    metrics: {
-      ctr: { control: 24.1, test: 25.8, lift: 7.1 },
-      accuracy: { control: 90.5, test: 91.2, lift: 0.8 },
-      satisfaction: { control: 4.3, test: 4.4, lift: 2.3 },
-    },
-    significance: 94.5,
-    winner: "test",
-  },
-  {
-    id: "3",
-    name: "새 가중치 벡터 테스트",
-    description: "PURPOSE 차원 가중치 증가 효과 테스트",
-    status: "paused",
-    controlAlgorithm: "Weighted (default)",
-    testAlgorithm: "Weighted (PURPOSE x1.5)",
-    trafficSplit: 30,
-    startDate: "2025-01-12",
-    endDate: null,
-    sampleSize: { control: 8234, test: 3521 },
-    metrics: {
-      ctr: { control: 22.8, test: 21.5, lift: -5.7 },
-      accuracy: { control: 88.9, test: 87.2, lift: -1.9 },
-      satisfaction: { control: 4.1, test: 4.0, lift: -2.4 },
-    },
-    significance: 82.3,
-    winner: null,
-  },
-]
+interface TestResults {
+  sampleSize?: { control: number; test: number }
+  metrics?: TestMetrics
+  significance?: number
+  winner?: "control" | "test" | null
+  dailyMetrics?: Array<{ date: string; control: number; test: number }>
+}
 
-const DAILY_METRICS = [
-  { date: "01/10", control: 23.1, test: 27.5 },
-  { date: "01/11", control: 23.4, test: 28.2 },
-  { date: "01/12", control: 23.2, test: 28.8 },
-  { date: "01/13", control: 23.5, test: 29.1 },
-  { date: "01/14", control: 23.3, test: 28.5 },
-  { date: "01/15", control: 23.6, test: 28.9 },
-  { date: "01/16", control: 23.4, test: 28.6 },
-]
-
-export default function AlgorithmTuningPage() {
-  const [tests, setTests] = useState<ABTest[]>(AB_TESTS)
-  const [selectedTest, setSelectedTest] = useState<ABTest | null>(AB_TESTS[0])
-  const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [newTest, setNewTest] = useState({
-    name: "",
-    description: "",
-    controlAlgorithm: "cosine",
-    testAlgorithm: "hybrid",
-    trafficSplit: 50,
-  })
-
-  const handleCreateTest = () => {
-    if (!newTest.name.trim()) {
-      toast.error("테스트 이름을 입력하세요")
-      return
-    }
-    if (!newTest.description.trim()) {
-      toast.error("테스트 설명을 입력하세요")
-      return
-    }
-    const newABTest: ABTest = {
-      id: String(tests.length + 1),
-      name: newTest.name,
-      description: newTest.description,
-      status: "draft",
-      controlAlgorithm: newTest.controlAlgorithm,
-      testAlgorithm: newTest.testAlgorithm,
-      trafficSplit: newTest.trafficSplit,
-      startDate: new Date().toISOString().split("T")[0],
-      endDate: null,
+// API 결과에서 metrics 추출
+const getTestResults = (results: Record<string, unknown> | null): TestResults => {
+  if (!results) {
+    return {
       sampleSize: { control: 0, test: 0 },
       metrics: {
         ctr: { control: 0, test: 0, lift: 0 },
@@ -200,102 +103,220 @@ export default function AlgorithmTuningPage() {
       },
       significance: 0,
       winner: null,
+      dailyMetrics: [],
     }
-    setTests([...tests, newABTest])
-    setShowCreateDialog(false)
-    setNewTest({
-      name: "",
-      description: "",
-      controlAlgorithm: "cosine",
-      testAlgorithm: "hybrid",
-      trafficSplit: 50,
-    })
-    toast.success("A/B 테스트가 생성되었습니다", {
-      description: `"${newTest.name}" 테스트가 초안으로 저장되었습니다.`,
-    })
+  }
+  return results as TestResults
+}
+
+// 상태 변환 (API -> UI)
+const mapStatusToUI = (
+  status: ApiABTest["status"]
+): "draft" | "running" | "completed" | "paused" => {
+  const map: Record<ApiABTest["status"], "draft" | "running" | "completed" | "paused"> = {
+    DRAFT: "draft",
+    RUNNING: "running",
+    PAUSED: "paused",
+    COMPLETED: "completed",
+    CANCELLED: "completed",
+  }
+  return map[status]
+}
+
+export default function AlgorithmTuningPage() {
+  const [tests, setTests] = useState<ApiABTest[]>([])
+  const [stats, setStats] = useState<ABTestStats>({
+    total: 0,
+    running: 0,
+    completed: 0,
+    draft: 0,
+  })
+  const [selectedTest, setSelectedTest] = useState<ApiABTest | null>(null)
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [newTest, setNewTest] = useState({
+    name: "",
+    description: "",
+    controlAlgorithm: "cosine",
+    testAlgorithm: "hybrid",
+    trafficSplit: 50,
+  })
+
+  useEffect(() => {
+    loadTests()
+  }, [])
+
+  const loadTests = async () => {
+    try {
+      setIsLoading(true)
+      const data = await abTestsService.getTests()
+      setTests(data.tests)
+      setStats(data.stats)
+      if (data.tests.length > 0 && !selectedTest) {
+        setSelectedTest(data.tests[0])
+      }
+    } catch (error) {
+      console.error("Failed to load A/B tests:", error)
+      toast.error("A/B 테스트 목록을 불러오는데 실패했습니다.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const handlePauseTest = (test: ABTest) => {
-    setTests(tests.map((t) => (t.id === test.id ? { ...t, status: "paused" as const } : t)))
-    if (selectedTest?.id === test.id) {
-      setSelectedTest({ ...test, status: "paused" })
+  const handleCreateTest = async () => {
+    if (!newTest.name.trim()) {
+      toast.error("테스트 이름을 입력하세요")
+      return
     }
-    toast.warning("테스트가 일시정지되었습니다", {
-      description: `"${test.name}" 테스트가 일시정지되었습니다.`,
-    })
+    if (!newTest.description.trim()) {
+      toast.error("테스트 설명을 입력하세요")
+      return
+    }
+    try {
+      const created = await abTestsService.createTest({
+        name: newTest.name,
+        description: newTest.description,
+        testType: "ALGORITHM",
+        controlConfig: { algorithm: newTest.controlAlgorithm },
+        testConfig: { algorithm: newTest.testAlgorithm },
+        trafficSplit: newTest.trafficSplit,
+      })
+      setTests([...tests, created])
+      setShowCreateDialog(false)
+      setNewTest({
+        name: "",
+        description: "",
+        controlAlgorithm: "cosine",
+        testAlgorithm: "hybrid",
+        trafficSplit: 50,
+      })
+      toast.success("A/B 테스트가 생성되었습니다", {
+        description: `"${newTest.name}" 테스트가 초안으로 저장되었습니다.`,
+      })
+    } catch (error) {
+      console.error("Failed to create A/B test:", error)
+      toast.error("A/B 테스트 생성에 실패했습니다.")
+    }
   }
 
-  const handleResumeTest = (test: ABTest) => {
-    setTests(tests.map((t) => (t.id === test.id ? { ...t, status: "running" as const } : t)))
-    if (selectedTest?.id === test.id) {
-      setSelectedTest({ ...test, status: "running" })
+  const handlePauseTest = async (test: ApiABTest) => {
+    try {
+      const updated = await abTestsService.pauseTest(test.id)
+      setTests(tests.map((t) => (t.id === test.id ? updated : t)))
+      if (selectedTest?.id === test.id) {
+        setSelectedTest(updated)
+      }
+      toast.warning("테스트가 일시정지되었습니다", {
+        description: `"${test.name}" 테스트가 일시정지되었습니다.`,
+      })
+    } catch (error) {
+      console.error("Failed to pause test:", error)
+      toast.error("테스트 일시정지에 실패했습니다.")
     }
-    toast.success("테스트가 재개되었습니다", {
-      description: `"${test.name}" 테스트가 재개되었습니다.`,
-    })
   }
 
-  const handleViewAnalysis = (test: ABTest) => {
+  const handleResumeTest = async (test: ApiABTest) => {
+    try {
+      const updated = await abTestsService.startTest(test.id)
+      setTests(tests.map((t) => (t.id === test.id ? updated : t)))
+      if (selectedTest?.id === test.id) {
+        setSelectedTest(updated)
+      }
+      toast.success("테스트가 재개되었습니다", {
+        description: `"${test.name}" 테스트가 재개되었습니다.`,
+      })
+    } catch (error) {
+      console.error("Failed to resume test:", error)
+      toast.error("테스트 재개에 실패했습니다.")
+    }
+  }
+
+  const handleViewAnalysis = (test: ApiABTest) => {
     toast.info("상세 분석", {
       description: `"${test.name}" 테스트의 상세 분석 페이지로 이동합니다.`,
     })
   }
 
-  const handleDuplicateTest = (test: ABTest) => {
-    const duplicatedTest: ABTest = {
-      ...test,
-      id: String(tests.length + 1),
-      name: `${test.name} (복사본)`,
-      status: "draft",
-      startDate: new Date().toISOString().split("T")[0],
-      endDate: null,
-      sampleSize: { control: 0, test: 0 },
+  const handleDuplicateTest = async (test: ApiABTest) => {
+    try {
+      const created = await abTestsService.createTest({
+        name: `${test.name} (복사본)`,
+        description: test.description || undefined,
+        testType: test.testType,
+        controlConfig: test.controlConfig,
+        testConfig: test.testConfig,
+        trafficSplit: test.trafficSplit,
+      })
+      setTests([...tests, created])
+      toast.success("테스트가 복제되었습니다", {
+        description: `"${test.name}" 테스트가 복제되었습니다.`,
+      })
+    } catch (error) {
+      console.error("Failed to duplicate test:", error)
+      toast.error("테스트 복제에 실패했습니다.")
     }
-    setTests([...tests, duplicatedTest])
-    toast.success("테스트가 복제되었습니다", {
-      description: `"${test.name}" 테스트가 복제되었습니다.`,
-    })
   }
 
-  const handleDeleteTest = (test: ABTest) => {
-    setTests(tests.filter((t) => t.id !== test.id))
-    if (selectedTest?.id === test.id) {
-      setSelectedTest(null)
+  const handleDeleteTest = async (test: ApiABTest) => {
+    try {
+      await abTestsService.deleteTest(test.id)
+      setTests(tests.filter((t) => t.id !== test.id))
+      if (selectedTest?.id === test.id) {
+        setSelectedTest(null)
+      }
+      toast.success("테스트가 삭제되었습니다", {
+        description: `"${test.name}" 테스트가 삭제되었습니다.`,
+      })
+    } catch (error) {
+      console.error("Failed to delete test:", error)
+      toast.error("테스트 삭제에 실패했습니다.")
     }
-    toast.success("테스트가 삭제되었습니다", {
-      description: `"${test.name}" 테스트가 삭제되었습니다.`,
-    })
   }
 
-  const handleApplyToProduction = (test: ABTest) => {
+  const handleApplyToProduction = (test: ApiABTest) => {
+    const algorithmName =
+      test.testAlgorithm?.name ||
+      (test.testConfig as { algorithm?: string })?.algorithm ||
+      "테스트 알고리즘"
     toast.success("프로덕션에 적용되었습니다", {
-      description: `"${test.testAlgorithm}" 알고리즘이 프로덕션에 적용되었습니다.`,
+      description: `"${algorithmName}" 알고리즘이 프로덕션에 적용되었습니다.`,
     })
   }
 
-  const getStatusBadge = (status: ABTest["status"]) => {
+  const getStatusBadge = (status: ApiABTest["status"]) => {
     switch (status) {
-      case "running":
+      case "RUNNING":
         return <Badge className="bg-green-500">실행 중</Badge>
-      case "completed":
+      case "COMPLETED":
         return <Badge variant="secondary">완료</Badge>
-      case "paused":
+      case "PAUSED":
         return (
           <Badge variant="outline" className="border-yellow-600 text-yellow-600">
             일시정지
           </Badge>
         )
-      case "draft":
+      case "DRAFT":
         return <Badge variant="outline">초안</Badge>
+      case "CANCELLED":
+        return <Badge variant="destructive">취소됨</Badge>
     }
   }
 
-  const getWinnerBadge = (test: ABTest) => {
-    if (!test.winner) return null
-    if (test.winner === "test") {
+  const getWinnerBadge = (test: ApiABTest) => {
+    const results = getTestResults(test.results)
+    if (!results.winner) return null
+    if (results.winner === "test") {
       return <Badge className="bg-green-500">테스트 승리</Badge>
     }
     return <Badge variant="secondary">컨트롤 승리</Badge>
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
   }
 
   return (
@@ -411,10 +432,8 @@ export default function AlgorithmTuningPage() {
             <GitBranch className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {tests.filter((t) => t.status === "running").length}
-            </div>
-            <p className="text-muted-foreground mt-1 text-xs">총 {tests.length}개 테스트</p>
+            <div className="text-2xl font-bold">{stats.running}</div>
+            <p className="text-muted-foreground mt-1 text-xs">총 {stats.total}개 테스트</p>
           </CardContent>
         </Card>
 
@@ -461,27 +480,42 @@ export default function AlgorithmTuningPage() {
             <CardDescription>클릭하여 상세 정보 확인</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {tests.map((test) => (
-                <div
-                  key={test.id}
-                  className={`hover:border-primary cursor-pointer rounded-lg border p-3 transition-all ${
-                    selectedTest?.id === test.id ? "border-primary bg-primary/5" : ""
-                  }`}
-                  onClick={() => setSelectedTest(test)}
-                >
-                  <div className="mb-2 flex items-center justify-between">
-                    <h4 className="text-sm font-medium">{test.name}</h4>
-                    {getStatusBadge(test.status)}
+            {tests.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <GitBranch className="text-muted-foreground mb-2 h-8 w-8" />
+                <p className="text-muted-foreground text-sm">A/B 테스트가 없습니다</p>
+                <p className="text-muted-foreground text-xs">새 테스트를 생성해 주세요</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {tests.map((test) => (
+                  <div
+                    key={test.id}
+                    className={`hover:border-primary cursor-pointer rounded-lg border p-3 transition-all ${
+                      selectedTest?.id === test.id ? "border-primary bg-primary/5" : ""
+                    }`}
+                    onClick={() => setSelectedTest(test)}
+                  >
+                    <div className="mb-2 flex items-center justify-between">
+                      <h4 className="text-sm font-medium">{test.name}</h4>
+                      {getStatusBadge(test.status)}
+                    </div>
+                    <p className="text-muted-foreground line-clamp-1 text-xs">
+                      {test.description || "설명 없음"}
+                    </p>
+                    <div className="text-muted-foreground mt-2 flex items-center justify-between text-xs">
+                      <span>
+                        시작:{" "}
+                        {test.startDate
+                          ? new Date(test.startDate).toLocaleDateString("ko-KR")
+                          : "-"}
+                      </span>
+                      {getWinnerBadge(test)}
+                    </div>
                   </div>
-                  <p className="text-muted-foreground line-clamp-1 text-xs">{test.description}</p>
-                  <div className="text-muted-foreground mt-2 flex items-center justify-between text-xs">
-                    <span>시작: {test.startDate}</span>
-                    {getWinnerBadge(test)}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -497,7 +531,7 @@ export default function AlgorithmTuningPage() {
               </div>
               {selectedTest && (
                 <div className="flex gap-2">
-                  {selectedTest.status === "running" ? (
+                  {selectedTest.status === "RUNNING" ? (
                     <Button
                       variant="outline"
                       size="sm"
@@ -506,14 +540,14 @@ export default function AlgorithmTuningPage() {
                       <Pause className="mr-2 h-4 w-4" />
                       일시정지
                     </Button>
-                  ) : selectedTest.status === "paused" ? (
+                  ) : selectedTest.status === "PAUSED" || selectedTest.status === "DRAFT" ? (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleResumeTest(selectedTest)}
                     >
                       <Play className="mr-2 h-4 w-4" />
-                      재개
+                      {selectedTest.status === "DRAFT" ? "시작" : "재개"}
                     </Button>
                   ) : null}
                   <DropdownMenu>
@@ -547,179 +581,205 @@ export default function AlgorithmTuningPage() {
           </CardHeader>
           <CardContent>
             {selectedTest ? (
-              <div className="space-y-6">
-                {/* Algorithm Comparison */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="rounded-lg border p-4">
-                    <div className="mb-2 flex items-center justify-between">
-                      <Badge variant="outline">Control (A)</Badge>
-                      <span className="text-muted-foreground text-xs">
-                        {selectedTest.sampleSize.control.toLocaleString()} 샘플
-                      </span>
-                    </div>
-                    <p className="font-medium">{selectedTest.controlAlgorithm}</p>
-                  </div>
-                  <div className="border-primary rounded-lg border p-4">
-                    <div className="mb-2 flex items-center justify-between">
-                      <Badge>Test (B)</Badge>
-                      <span className="text-muted-foreground text-xs">
-                        {selectedTest.sampleSize.test.toLocaleString()} 샘플
-                      </span>
-                    </div>
-                    <p className="font-medium">{selectedTest.testAlgorithm}</p>
-                  </div>
-                </div>
-
-                {/* Metrics Comparison */}
-                <div>
-                  <h4 className="mb-3 font-semibold">핵심 지표 비교</h4>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>지표</TableHead>
-                        <TableHead className="text-right">Control</TableHead>
-                        <TableHead className="text-right">Test</TableHead>
-                        <TableHead className="text-right">Lift</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <TableRow>
-                        <TableCell>CTR</TableCell>
-                        <TableCell className="text-right">
-                          {selectedTest.metrics.ctr.control}%
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {selectedTest.metrics.ctr.test}%
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span
-                            className={
-                              selectedTest.metrics.ctr.lift > 0 ? "text-green-600" : "text-red-600"
-                            }
-                          >
-                            {selectedTest.metrics.ctr.lift > 0 ? "+" : ""}
-                            {selectedTest.metrics.ctr.lift}%
+              (() => {
+                const results = getTestResults(selectedTest.results)
+                const controlAlgName =
+                  selectedTest.controlAlgorithm?.name ||
+                  (selectedTest.controlConfig as { algorithm?: string })?.algorithm ||
+                  "Control"
+                const testAlgName =
+                  selectedTest.testAlgorithm?.name ||
+                  (selectedTest.testConfig as { algorithm?: string })?.algorithm ||
+                  "Test"
+                return (
+                  <div className="space-y-6">
+                    {/* Algorithm Comparison */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="rounded-lg border p-4">
+                        <div className="mb-2 flex items-center justify-between">
+                          <Badge variant="outline">Control (A)</Badge>
+                          <span className="text-muted-foreground text-xs">
+                            {(results.sampleSize?.control || 0).toLocaleString()} 샘플
                           </span>
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>정확도</TableCell>
-                        <TableCell className="text-right">
-                          {selectedTest.metrics.accuracy.control}%
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {selectedTest.metrics.accuracy.test}%
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span
-                            className={
-                              selectedTest.metrics.accuracy.lift > 0
-                                ? "text-green-600"
-                                : "text-red-600"
-                            }
-                          >
-                            {selectedTest.metrics.accuracy.lift > 0 ? "+" : ""}
-                            {selectedTest.metrics.accuracy.lift}%
+                        </div>
+                        <p className="font-medium">{controlAlgName}</p>
+                      </div>
+                      <div className="border-primary rounded-lg border p-4">
+                        <div className="mb-2 flex items-center justify-between">
+                          <Badge>Test (B)</Badge>
+                          <span className="text-muted-foreground text-xs">
+                            {(results.sampleSize?.test || 0).toLocaleString()} 샘플
                           </span>
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>만족도</TableCell>
-                        <TableCell className="text-right">
-                          {selectedTest.metrics.satisfaction.control}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {selectedTest.metrics.satisfaction.test}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span
-                            className={
-                              selectedTest.metrics.satisfaction.lift > 0
-                                ? "text-green-600"
-                                : "text-red-600"
-                            }
-                          >
-                            {selectedTest.metrics.satisfaction.lift > 0 ? "+" : ""}
-                            {selectedTest.metrics.satisfaction.lift}%
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </div>
-
-                {/* Chart */}
-                <div>
-                  <h4 className="mb-3 font-semibold">일별 CTR 추이</h4>
-                  <div className="h-[200px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={DAILY_METRICS}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                        <XAxis dataKey="date" className="text-xs" />
-                        <YAxis domain={[20, 32]} className="text-xs" />
-                        <RechartsTooltip
-                          contentStyle={{
-                            backgroundColor: "hsl(var(--card))",
-                            border: "1px solid hsl(var(--border))",
-                            borderRadius: "8px",
-                          }}
-                        />
-                        <Legend />
-                        <Line
-                          type="monotone"
-                          dataKey="control"
-                          name="Control"
-                          stroke="#94a3b8"
-                          strokeWidth={2}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="test"
-                          name="Test"
-                          stroke="#3b82f6"
-                          strokeWidth={2}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                {/* Statistical Significance */}
-                <div className="bg-muted/30 rounded-lg p-4">
-                  <div className="mb-2 flex items-center justify-between">
-                    <h4 className="flex items-center gap-2 font-semibold">
-                      통계적 유의성
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Info className="text-muted-foreground h-4 w-4" />
-                        </TooltipTrigger>
-                        <TooltipContent>95% 이상이면 결과가 통계적으로 유의합니다.</TooltipContent>
-                      </Tooltip>
-                    </h4>
-                    <span className="text-lg font-bold">{selectedTest.significance}%</span>
-                  </div>
-                  <Progress value={selectedTest.significance} className="h-2" />
-                  {selectedTest.significance >= 95 && selectedTest.winner && (
-                    <div className="mt-3 flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      <span className="text-sm">
-                        {selectedTest.winner === "test"
-                          ? "테스트 알고리즘이 통계적으로 유의하게 더 좋은 성능을 보입니다."
-                          : "컨트롤 알고리즘이 통계적으로 유의하게 더 좋은 성능을 보입니다."}
-                      </span>
+                        </div>
+                        <p className="font-medium">{testAlgName}</p>
+                      </div>
                     </div>
-                  )}
-                </div>
 
-                {/* Actions */}
-                {selectedTest.status === "completed" && selectedTest.winner === "test" && (
-                  <Button className="w-full" onClick={() => handleApplyToProduction(selectedTest)}>
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    테스트 알고리즘을 프로덕션에 적용
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                )}
-              </div>
+                    {/* Metrics Comparison */}
+                    <div>
+                      <h4 className="mb-3 font-semibold">핵심 지표 비교</h4>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>지표</TableHead>
+                            <TableHead className="text-right">Control</TableHead>
+                            <TableHead className="text-right">Test</TableHead>
+                            <TableHead className="text-right">Lift</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          <TableRow>
+                            <TableCell>CTR</TableCell>
+                            <TableCell className="text-right">
+                              {results.metrics?.ctr.control || 0}%
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {results.metrics?.ctr.test || 0}%
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span
+                                className={
+                                  (results.metrics?.ctr.lift || 0) > 0
+                                    ? "text-green-600"
+                                    : "text-red-600"
+                                }
+                              >
+                                {(results.metrics?.ctr.lift || 0) > 0 ? "+" : ""}
+                                {results.metrics?.ctr.lift || 0}%
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell>정확도</TableCell>
+                            <TableCell className="text-right">
+                              {results.metrics?.accuracy.control || 0}%
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {results.metrics?.accuracy.test || 0}%
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span
+                                className={
+                                  (results.metrics?.accuracy.lift || 0) > 0
+                                    ? "text-green-600"
+                                    : "text-red-600"
+                                }
+                              >
+                                {(results.metrics?.accuracy.lift || 0) > 0 ? "+" : ""}
+                                {results.metrics?.accuracy.lift || 0}%
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell>만족도</TableCell>
+                            <TableCell className="text-right">
+                              {results.metrics?.satisfaction.control || 0}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {results.metrics?.satisfaction.test || 0}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span
+                                className={
+                                  (results.metrics?.satisfaction.lift || 0) > 0
+                                    ? "text-green-600"
+                                    : "text-red-600"
+                                }
+                              >
+                                {(results.metrics?.satisfaction.lift || 0) > 0 ? "+" : ""}
+                                {results.metrics?.satisfaction.lift || 0}%
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    {/* Chart */}
+                    <div>
+                      <h4 className="mb-3 font-semibold">일별 CTR 추이</h4>
+                      <div className="h-[200px]">
+                        {results.dailyMetrics && results.dailyMetrics.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={results.dailyMetrics}>
+                              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                              <XAxis dataKey="date" className="text-xs" />
+                              <YAxis domain={["auto", "auto"]} className="text-xs" />
+                              <RechartsTooltip
+                                contentStyle={{
+                                  backgroundColor: "hsl(var(--card))",
+                                  border: "1px solid hsl(var(--border))",
+                                  borderRadius: "8px",
+                                }}
+                              />
+                              <Legend />
+                              <Line
+                                type="monotone"
+                                dataKey="control"
+                                name="Control"
+                                stroke="#94a3b8"
+                                strokeWidth={2}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="test"
+                                name="Test"
+                                stroke="#3b82f6"
+                                strokeWidth={2}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="text-muted-foreground flex h-full items-center justify-center">
+                            테스트 실행 후 데이터가 수집됩니다
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Statistical Significance */}
+                    <div className="bg-muted/30 rounded-lg p-4">
+                      <div className="mb-2 flex items-center justify-between">
+                        <h4 className="flex items-center gap-2 font-semibold">
+                          통계적 유의성
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Info className="text-muted-foreground h-4 w-4" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              95% 이상이면 결과가 통계적으로 유의합니다.
+                            </TooltipContent>
+                          </Tooltip>
+                        </h4>
+                        <span className="text-lg font-bold">{results.significance || 0}%</span>
+                      </div>
+                      <Progress value={results.significance || 0} className="h-2" />
+                      {(results.significance || 0) >= 95 && results.winner && (
+                        <div className="mt-3 flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span className="text-sm">
+                            {results.winner === "test"
+                              ? "테스트 알고리즘이 통계적으로 유의하게 더 좋은 성능을 보입니다."
+                              : "컨트롤 알고리즘이 통계적으로 유의하게 더 좋은 성능을 보입니다."}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    {selectedTest.status === "COMPLETED" && results.winner === "test" && (
+                      <Button
+                        className="w-full"
+                        onClick={() => handleApplyToProduction(selectedTest)}
+                      >
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        테스트 알고리즘을 프로덕션에 적용
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                )
+              })()
             ) : (
               <div className="flex h-[400px] flex-col items-center justify-center text-center">
                 <div className="bg-muted mb-4 flex h-16 w-16 items-center justify-center rounded-full">
