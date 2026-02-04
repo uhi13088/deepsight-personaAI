@@ -199,9 +199,7 @@ function NavItemComponent({ item, collapsed }: { item: NavItem; collapsed: boole
                 href={child.href}
                 className={cn(
                   "block rounded-md px-2 py-1.5 text-sm",
-                  pathname === child.href || pathname.startsWith(child.href + "/")
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-accent"
+                  pathname === child.href ? "bg-primary text-primary-foreground" : "hover:bg-accent"
                 )}
               >
                 {child.title}
@@ -241,7 +239,7 @@ function NavItemComponent({ item, collapsed }: { item: NavItem; collapsed: boole
             href={child.href}
             className={cn(
               "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-              pathname === child.href || pathname.startsWith(child.href + "/")
+              pathname === child.href
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
             )}
