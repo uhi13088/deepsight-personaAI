@@ -4,9 +4,9 @@ import prisma from "@/lib/prisma"
 import crypto from "crypto"
 
 const createWebhookSchema = z.object({
-  url: z.string().url(),
+  url: z.string().url("올바른 URL 형식이 아닙니다"),
   description: z.string().optional(),
-  events: z.array(z.string()).min(1),
+  events: z.array(z.string()).min(1, "최소 1개 이상의 이벤트를 선택해주세요"),
 })
 
 // ============================================================================
