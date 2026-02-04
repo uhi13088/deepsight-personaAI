@@ -84,75 +84,25 @@ export async function POST(request: NextRequest) {
     const threshold = Math.max(Math.min(options.threshold || 0.0, 1.0), 0.0)
     const includeScores = options.include_scores !== false
 
-    // Mock persona matching - in production, this would use the 6D vector system
-    const mockPersonas = [
-      {
-        id: "persona_tech_innovator",
-        name: "Tech Innovator",
-        category: "Technology",
-        description: "Early adopters who embrace cutting-edge technology",
-      },
-      {
-        id: "persona_early_adopter",
-        name: "Early Adopter",
-        category: "Consumer",
-        description: "Users who quickly adopt new products and services",
-      },
-      {
-        id: "persona_budget_conscious",
-        name: "Budget Conscious",
-        category: "Finance",
-        description: "Value-oriented consumers who prioritize cost-effectiveness",
-      },
-      {
-        id: "persona_quality_seeker",
-        name: "Quality Seeker",
-        category: "Premium",
-        description: "Consumers who prioritize quality over price",
-      },
-      {
-        id: "persona_eco_warrior",
-        name: "Eco Warrior",
-        category: "Sustainability",
-        description: "Environmentally conscious consumers",
-      },
-    ]
+    // Persona matching - will be connected to the actual 6D vector matching engine
+    // Currently returns empty results as the matching engine is not yet configured
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _unusedVars = { limit, threshold, includeScores }
 
-    // Generate mock scores with 6D dimensions
-    const matches = mockPersonas
-      .slice(0, limit)
-      .map((persona, index) => {
-        const baseScore = 0.95 - index * 0.08 + (Math.random() * 0.05 - 0.025)
-        const score = Math.max(Math.min(baseScore, 1.0), 0.0)
-
-        const dimensions = {
-          depth: Math.random() * 0.3 + 0.7,
-          lens: Math.random() * 0.3 + 0.7,
-          stance: Math.random() * 0.3 + 0.7,
-          scope: Math.random() * 0.3 + 0.7,
-          taste: Math.random() * 0.3 + 0.7,
-          purpose: Math.random() * 0.3 + 0.7,
-        }
-
-        return {
-          persona_id: persona.id,
-          name: persona.name,
-          category: persona.category,
-          score: Math.round(score * 1000) / 1000,
-          ...(includeScores && {
-            dimensions: {
-              depth: Math.round(dimensions.depth * 1000) / 1000,
-              lens: Math.round(dimensions.lens * 1000) / 1000,
-              stance: Math.round(dimensions.stance * 1000) / 1000,
-              scope: Math.round(dimensions.scope * 1000) / 1000,
-              taste: Math.round(dimensions.taste * 1000) / 1000,
-              purpose: Math.round(dimensions.purpose * 1000) / 1000,
-            },
-          }),
-        }
-      })
-      .filter((match) => match.score >= threshold)
-      .sort((a, b) => b.score - a.score)
+    const matches: {
+      persona_id: string
+      name: string
+      category: string
+      score: number
+      dimensions?: {
+        depth: number
+        lens: number
+        stance: number
+        scope: number
+        taste: number
+        purpose: number
+      }
+    }[] = []
 
     const processingTime = Date.now() - startTime
 
