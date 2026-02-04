@@ -32,83 +32,42 @@ import {
 } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
-// 시스템 상태 데이터
-const SYSTEM_STATUS = {
-  apiGateway: { status: "healthy", latency: 12, uptime: 99.99 },
-  matchingEngine: { status: "healthy", latency: 23, uptime: 99.95 },
-  database: { status: "healthy", connections: 45, uptime: 99.99 },
-  cache: { status: "healthy", hitRate: 94.2, uptime: 99.98 },
-  eventBus: { status: "healthy", qps: 1234, uptime: 99.97 },
-  mlPipeline: { status: "warning", jobs: 3, uptime: 99.85 },
-}
+// 시스템 상태 데이터 (API 연동 필요)
+const SYSTEM_STATUS: Record<
+  string,
+  {
+    status: string
+    uptime: number
+    latency?: number
+    connections?: number
+    hitRate?: number
+    qps?: number
+    jobs?: number
+  }
+> = {}
 
-const DEPLOYMENTS = [
-  {
-    id: "1",
-    component: "Matching Engine",
-    version: "v2.4.1",
-    environment: "production",
-    status: "running",
-    deployedAt: "2025-01-15 14:30",
-    deployedBy: "AI Engineer",
-  },
-  {
-    id: "2",
-    component: "Persona Service",
-    version: "v1.8.2",
-    environment: "production",
-    status: "running",
-    deployedAt: "2025-01-14 10:15",
-    deployedBy: "System Admin",
-  },
-  {
-    id: "3",
-    component: "User Insight API",
-    version: "v3.1.0",
-    environment: "staging",
-    status: "pending",
-    deployedAt: "2025-01-16 09:00",
-    deployedBy: "AI Engineer",
-  },
-]
+// 배포 데이터 (API 연동 필요)
+const DEPLOYMENTS: {
+  id: string
+  component: string
+  version: string
+  environment: string
+  status: string
+  deployedAt: string
+  deployedBy: string
+}[] = []
 
-const INTEGRATIONS = [
-  {
-    name: "Developer Console",
-    type: "Internal",
-    status: "connected",
-    endpoint: "https://console.deepsight.ai/api",
-    lastSync: "2분 전",
-  },
-  {
-    name: "Content Platform",
-    type: "External",
-    status: "connected",
-    endpoint: "https://api.content-platform.com/v2",
-    lastSync: "5분 전",
-  },
-  {
-    name: "Analytics Pipeline",
-    type: "Internal",
-    status: "connected",
-    endpoint: "https://analytics.deepsight.ai/ingest",
-    lastSync: "1분 전",
-  },
-  {
-    name: "Notification Service",
-    type: "Internal",
-    status: "degraded",
-    endpoint: "https://notify.deepsight.ai/webhook",
-    lastSync: "15분 전",
-  },
-]
+// 연동 데이터 (API 연동 필요)
+const INTEGRATIONS: {
+  name: string
+  type: string
+  status: string
+  endpoint: string
+  lastSync: string
+}[] = []
 
-const WEBHOOKS = [
-  { event: "persona.deployed", subscribers: 5, lastTriggered: "10분 전" },
-  { event: "persona.updated", subscribers: 8, lastTriggered: "25분 전" },
-  { event: "algorithm.tested", subscribers: 3, lastTriggered: "1시간 전" },
-  { event: "matching.completed", subscribers: 12, lastTriggered: "방금 전" },
-]
+// 웹훅 데이터 (API 연동 필요)
+const WEBHOOKS: { event: string; subscribers: number; lastTriggered: string }[] = []
 
 export default function SystemIntegrationPage() {
   const [activeTab, setActiveTab] = useState("overview")
@@ -274,34 +233,46 @@ export default function SystemIntegrationPage() {
       </div>
 
       {/* System Health Overview */}
-      <div className="grid gap-4 md:grid-cols-6">
-        {Object.entries(SYSTEM_STATUS).map(([key, value]) => (
-          <Card key={key}>
-            <CardContent className="pt-6">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-medium capitalize">
-                  {key.replace(/([A-Z])/g, " $1").trim()}
-                </span>
-                {getStatusIcon(value.status)}
-              </div>
-              <div className="text-2xl font-bold">{value.uptime}%</div>
-              <p className="text-muted-foreground mt-1 text-xs">
-                {"latency" in value && value.latency
-                  ? `${value.latency}ms`
-                  : "connections" in value && value.connections
-                    ? `${value.connections} conn`
-                    : "hitRate" in value && value.hitRate
-                      ? `${value.hitRate}% hit`
-                      : "qps" in value && value.qps
-                        ? `${value.qps} QPS`
-                        : "jobs" in value && value.jobs
-                          ? `${value.jobs} jobs`
-                          : ""}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {Object.keys(SYSTEM_STATUS).length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Server className="text-muted-foreground mx-auto h-12 w-12" />
+            <p className="text-muted-foreground mt-4">시스템 상태 데이터가 없습니다</p>
+            <p className="text-muted-foreground mt-1 text-sm">
+              API 연동 후 실시간 상태를 확인할 수 있습니다
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-6">
+          {Object.entries(SYSTEM_STATUS).map(([key, value]) => (
+            <Card key={key}>
+              <CardContent className="pt-6">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-sm font-medium capitalize">
+                    {key.replace(/([A-Z])/g, " $1").trim()}
+                  </span>
+                  {getStatusIcon(value.status)}
+                </div>
+                <div className="text-2xl font-bold">{value.uptime}%</div>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  {"latency" in value && value.latency
+                    ? `${value.latency}ms`
+                    : "connections" in value && value.connections
+                      ? `${value.connections} conn`
+                      : "hitRate" in value && value.hitRate
+                        ? `${value.hitRate}% hit`
+                        : "qps" in value && value.qps
+                          ? `${value.qps} QPS`
+                          : "jobs" in value && value.jobs
+                            ? `${value.jobs} jobs`
+                            : ""}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
@@ -323,22 +294,29 @@ export default function SystemIntegrationPage() {
                 <CardDescription>최근 배포된 컴포넌트 목록</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {DEPLOYMENTS.slice(0, 3).map((deploy) => (
-                    <div
-                      key={deploy.id}
-                      className="flex items-center justify-between rounded-lg border p-3"
-                    >
-                      <div>
-                        <p className="font-medium">{deploy.component}</p>
-                        <p className="text-muted-foreground text-sm">
-                          {deploy.version} • {deploy.environment}
-                        </p>
+                {DEPLOYMENTS.length === 0 ? (
+                  <div className="py-8 text-center">
+                    <GitBranch className="text-muted-foreground mx-auto h-8 w-8" />
+                    <p className="text-muted-foreground mt-2 text-sm">배포 이력이 없습니다</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {DEPLOYMENTS.slice(0, 3).map((deploy) => (
+                      <div
+                        key={deploy.id}
+                        className="flex items-center justify-between rounded-lg border p-3"
+                      >
+                        <div>
+                          <p className="font-medium">{deploy.component}</p>
+                          <p className="text-muted-foreground text-sm">
+                            {deploy.version} • {deploy.environment}
+                          </p>
+                        </div>
+                        {getStatusBadge(deploy.status)}
                       </div>
-                      {getStatusBadge(deploy.status)}
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -352,25 +330,32 @@ export default function SystemIntegrationPage() {
                 <CardDescription>외부 시스템 연동 상태</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {INTEGRATIONS.slice(0, 3).map((integration) => (
-                    <div
-                      key={integration.name}
-                      className="flex items-center justify-between rounded-lg border p-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        {getStatusIcon(integration.status)}
-                        <div>
-                          <p className="font-medium">{integration.name}</p>
-                          <p className="text-muted-foreground text-xs">
-                            {integration.type} • {integration.lastSync}
-                          </p>
+                {INTEGRATIONS.length === 0 ? (
+                  <div className="py-8 text-center">
+                    <Link2 className="text-muted-foreground mx-auto h-8 w-8" />
+                    <p className="text-muted-foreground mt-2 text-sm">연동된 시스템이 없습니다</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {INTEGRATIONS.slice(0, 3).map((integration) => (
+                      <div
+                        key={integration.name}
+                        className="flex items-center justify-between rounded-lg border p-3"
+                      >
+                        <div className="flex items-center gap-3">
+                          {getStatusIcon(integration.status)}
+                          <div>
+                            <p className="font-medium">{integration.name}</p>
+                            <p className="text-muted-foreground text-xs">
+                              {integration.type} • {integration.lastSync}
+                            </p>
+                          </div>
                         </div>
+                        <Badge variant="outline">{integration.status}</Badge>
                       </div>
-                      <Badge variant="outline">{integration.status}</Badge>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -434,38 +419,48 @@ export default function SystemIntegrationPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>컴포넌트</TableHead>
-                    <TableHead>버전</TableHead>
-                    <TableHead>환경</TableHead>
-                    <TableHead>배포일시</TableHead>
-                    <TableHead>배포자</TableHead>
-                    <TableHead className="text-right">상태</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {DEPLOYMENTS.map((deploy) => (
-                    <TableRow key={deploy.id}>
-                      <TableCell className="font-medium">{deploy.component}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{deploy.version}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={deploy.environment === "production" ? "default" : "secondary"}
-                        >
-                          {deploy.environment}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{deploy.deployedAt}</TableCell>
-                      <TableCell>{deploy.deployedBy}</TableCell>
-                      <TableCell className="text-right">{getStatusBadge(deploy.status)}</TableCell>
+              {DEPLOYMENTS.length === 0 ? (
+                <div className="py-12 text-center">
+                  <GitBranch className="text-muted-foreground mx-auto h-12 w-12" />
+                  <p className="text-muted-foreground mt-4">배포 이력이 없습니다</p>
+                  <p className="text-muted-foreground mt-1 text-sm">새 배포를 시작해보세요</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>컴포넌트</TableHead>
+                      <TableHead>버전</TableHead>
+                      <TableHead>환경</TableHead>
+                      <TableHead>배포일시</TableHead>
+                      <TableHead>배포자</TableHead>
+                      <TableHead className="text-right">상태</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {DEPLOYMENTS.map((deploy) => (
+                      <TableRow key={deploy.id}>
+                        <TableCell className="font-medium">{deploy.component}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{deploy.version}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={deploy.environment === "production" ? "default" : "secondary"}
+                          >
+                            {deploy.environment}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{deploy.deployedAt}</TableCell>
+                        <TableCell>{deploy.deployedBy}</TableCell>
+                        <TableCell className="text-right">
+                          {getStatusBadge(deploy.status)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -485,60 +480,68 @@ export default function SystemIntegrationPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {INTEGRATIONS.map((integration) => (
-                  <div key={integration.name} className="rounded-lg border p-4">
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {getStatusIcon(integration.status)}
-                        <div>
-                          <h4 className="font-semibold">{integration.name}</h4>
-                          <Badge variant="outline" className="mt-1">
-                            {integration.type}
-                          </Badge>
+              {INTEGRATIONS.length === 0 ? (
+                <div className="py-12 text-center">
+                  <Link2 className="text-muted-foreground mx-auto h-12 w-12" />
+                  <p className="text-muted-foreground mt-4">연동된 시스템이 없습니다</p>
+                  <p className="text-muted-foreground mt-1 text-sm">외부 시스템을 연동해보세요</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {INTEGRATIONS.map((integration) => (
+                    <div key={integration.name} className="rounded-lg border p-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {getStatusIcon(integration.status)}
+                          <div>
+                            <h4 className="font-semibold">{integration.name}</h4>
+                            <Badge variant="outline" className="mt-1">
+                              {integration.type}
+                            </Badge>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRefreshIntegration(integration.name)}
-                        >
-                          <RefreshCw className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleIntegrationSettings(integration.name)}
-                        >
-                          <Settings className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                      <span className="bg-muted rounded px-2 py-1 font-mono text-xs">
-                        {integration.endpoint}
-                      </span>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
+                        <div className="flex gap-2">
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-6 w-6 p-0"
-                            onClick={() => handleCopyEndpoint(integration.endpoint)}
+                            onClick={() => handleRefreshIntegration(integration.name)}
                           >
-                            <Copy className="h-3 w-3" />
+                            <RefreshCw className="h-4 w-4" />
                           </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>복사</TooltipContent>
-                      </Tooltip>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleIntegrationSettings(integration.name)}
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                        <span className="bg-muted rounded px-2 py-1 font-mono text-xs">
+                          {integration.endpoint}
+                        </span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={() => handleCopyEndpoint(integration.endpoint)}
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>복사</TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <p className="text-muted-foreground mt-2 text-xs">
+                        마지막 동기화: {integration.lastSync}
+                      </p>
                     </div>
-                    <p className="text-muted-foreground mt-2 text-xs">
-                      마지막 동기화: {integration.lastSync}
-                    </p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -558,38 +561,48 @@ export default function SystemIntegrationPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>이벤트</TableHead>
-                    <TableHead className="text-center">구독자</TableHead>
-                    <TableHead>마지막 트리거</TableHead>
-                    <TableHead className="text-right">작업</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {WEBHOOKS.map((webhook) => (
-                    <TableRow key={webhook.event}>
-                      <TableCell>
-                        <code className="bg-muted rounded px-2 py-1 text-sm">{webhook.event}</code>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="secondary">{webhook.subscribers}</Badge>
-                      </TableCell>
-                      <TableCell>{webhook.lastTriggered}</TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleWebhookSettings(webhook.event)}
-                        >
-                          <Settings className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
+              {WEBHOOKS.length === 0 ? (
+                <div className="py-12 text-center">
+                  <Webhook className="text-muted-foreground mx-auto h-12 w-12" />
+                  <p className="text-muted-foreground mt-4">등록된 웹훅이 없습니다</p>
+                  <p className="text-muted-foreground mt-1 text-sm">이벤트 웹훅을 추가해보세요</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>이벤트</TableHead>
+                      <TableHead className="text-center">구독자</TableHead>
+                      <TableHead>마지막 트리거</TableHead>
+                      <TableHead className="text-right">작업</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {WEBHOOKS.map((webhook) => (
+                      <TableRow key={webhook.event}>
+                        <TableCell>
+                          <code className="bg-muted rounded px-2 py-1 text-sm">
+                            {webhook.event}
+                          </code>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="secondary">{webhook.subscribers}</Badge>
+                        </TableCell>
+                        <TableCell>{webhook.lastTriggered}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleWebhookSettings(webhook.event)}
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

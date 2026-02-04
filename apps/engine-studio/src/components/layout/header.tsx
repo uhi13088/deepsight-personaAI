@@ -32,7 +32,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/matching-lab/algorithm-tuning": "알고리즘 튜닝",
   "/matching-lab/performance": "성과 분석",
   "/system-integration/deployment": "배포 파이프라인",
-  "/system-integration/version-control": "버전 관리",
+  "/system-integration/versions": "버전 관리",
   "/system-integration/event-bus": "이벤트 버스 모니터링",
   "/operations/monitoring": "시스템 모니터링",
   "/operations/incidents": "장애 대응",
@@ -45,33 +45,15 @@ const PAGE_TITLES: Record<string, string> = {
   "/team/audit-logs": "감사 로그",
 }
 
-// Mock 알림 데이터
-const MOCK_NOTIFICATIONS = [
-  {
-    id: "1",
-    type: "info" as const,
-    title: "새 페르소나 승인 대기",
-    message: "인큐베이터에서 생성된 3개의 페르소나가 승인을 기다리고 있습니다.",
-    time: "5분 전",
-    read: false,
-  },
-  {
-    id: "2",
-    type: "warning" as const,
-    title: "A/B 테스트 결과",
-    message: "'알고리즘 v2.1' 테스트가 완료되었습니다. 결과를 확인해주세요.",
-    time: "1시간 전",
-    read: false,
-  },
-  {
-    id: "3",
-    type: "success" as const,
-    title: "배포 완료",
-    message: "페르소나 '논리적 평론가'가 프로덕션에 성공적으로 배포되었습니다.",
-    time: "3시간 전",
-    read: true,
-  },
-]
+// 알림 데이터 (API 연동 필요)
+const notifications: {
+  id: string
+  type: "info" | "warning" | "success"
+  title: string
+  message: string
+  time: string
+  read: boolean
+}[] = []
 
 export function Header() {
   const { data: session } = useSession()
@@ -79,7 +61,7 @@ export function Header() {
   const { theme, setTheme } = useUIStore()
 
   const pageTitle = PAGE_TITLES[pathname] || "Engine Studio"
-  const unreadCount = MOCK_NOTIFICATIONS.filter((n) => !n.read).length
+  const unreadCount = notifications.filter((n) => !n.read).length
 
   const getInitials = (name: string) => {
     return name
@@ -145,34 +127,41 @@ export function Header() {
               </Button>
             </div>
             <div className="space-y-3">
-              {MOCK_NOTIFICATIONS.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`rounded-lg border p-3 ${
-                    notification.read ? "bg-background" : "bg-accent"
-                  }`}
-                >
-                  <div className="flex items-start gap-2">
-                    <Badge
-                      variant={
-                        notification.type === "warning"
-                          ? "warning"
-                          : notification.type === "success"
-                            ? "success"
-                            : "info"
-                      }
-                      className="mt-0.5"
-                    >
-                      {notification.type}
-                    </Badge>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium">{notification.title}</p>
-                      <p className="text-muted-foreground mt-1 text-xs">{notification.message}</p>
-                      <p className="text-muted-foreground mt-1 text-xs">{notification.time}</p>
+              {notifications.length === 0 ? (
+                <div className="py-8 text-center">
+                  <Bell className="text-muted-foreground mx-auto h-8 w-8" />
+                  <p className="text-muted-foreground mt-2 text-sm">알림이 없습니다</p>
+                </div>
+              ) : (
+                notifications.map((notification) => (
+                  <div
+                    key={notification.id}
+                    className={`rounded-lg border p-3 ${
+                      notification.read ? "bg-background" : "bg-accent"
+                    }`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <Badge
+                        variant={
+                          notification.type === "warning"
+                            ? "warning"
+                            : notification.type === "success"
+                              ? "success"
+                              : "info"
+                        }
+                        className="mt-0.5"
+                      >
+                        {notification.type}
+                      </Badge>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">{notification.title}</p>
+                        <p className="text-muted-foreground mt-1 text-xs">{notification.message}</p>
+                        <p className="text-muted-foreground mt-1 text-xs">{notification.time}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </PopoverContent>
         </Popover>
