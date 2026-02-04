@@ -47,9 +47,14 @@ export default async function middleware(req: NextRequest) {
   }
 
   // JWT 토큰 확인 (Edge Runtime 호환)
+  // 프로덕션에서는 __Secure- prefix 쿠키 사용
+  const isProduction = process.env.NODE_ENV === "production"
+  const cookieName = isProduction ? "__Secure-next-auth.session-token" : "next-auth.session-token"
+
   const token = await getToken({
     req,
     secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+    cookieName,
   })
 
   const isLoggedIn = !!token
