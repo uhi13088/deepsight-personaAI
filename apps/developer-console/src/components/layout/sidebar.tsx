@@ -55,19 +55,12 @@ const managementNavItems: NavItem[] = [
   {
     title: "Usage",
     icon: BarChart3,
-    children: [
-      { title: "사용량 대시보드", href: "/usage" },
-      { title: "상세 분석", href: "/usage/analytics" },
-      { title: "리포트", href: "/usage/reports" },
-    ],
+    href: "/usage",
   },
   {
     title: "Logs",
     icon: ScrollText,
-    children: [
-      { title: "API 로그", href: "/logs" },
-      { title: "에러 로그", href: "/logs/errors" },
-    ],
+    href: "/logs",
   },
 ]
 
