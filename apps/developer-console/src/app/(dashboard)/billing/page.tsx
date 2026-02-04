@@ -18,6 +18,7 @@ import {
   Building2,
   Star,
   ChevronRight,
+  Loader2,
 } from "lucide-react"
 import {
   Card,
@@ -49,6 +50,14 @@ import {
 } from "@/components/ui/dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { cn, formatNumber, formatCurrency } from "@/lib/utils"
+import { toast } from "sonner"
+import {
+  billingService,
+  type BillingData,
+  type Plan,
+  type Invoice as ServiceInvoice,
+  type PaymentMethod as ServicePaymentMethod,
+} from "@/services/billing-service"
 
 // Plan data based on documentation (static content)
 const plans = [
@@ -70,7 +79,7 @@ const plans = [
       { name: "우선 처리", included: false },
     ],
     recommended: false,
-    current: true, // Default to Free plan
+    current: false,
   },
   {
     id: "starter",
@@ -134,43 +143,70 @@ const plans = [
   },
 ]
 
-const currentUsage = {
-  used: 0,
-  limit: 3000,
-  percentUsed: 0,
-  estimatedCost: 0,
-  billingCycle: "",
-  daysRemaining: 0,
-}
-
-type Invoice = {
-  id: string
-  date: string
-  amount: number
-  status: string
-  description: string
-}
-
-const invoices: Invoice[] = []
-
-type PaymentMethod = {
-  id: string
-  type: string
-  brand: string
-  last4: string
-  expiry: string
-  isDefault: boolean
-}
-
-const paymentMethods: PaymentMethod[] = []
-
 export default function BillingPage() {
   const [upgradeDialogOpen, setUpgradeDialogOpen] = React.useState(false)
   const [selectedPlan, setSelectedPlan] = React.useState<(typeof plans)[0] | null>(null)
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [billingData, setBillingData] = React.useState<BillingData | null>(null)
 
-  const handleUpgrade = (plan: (typeof plans)[0]) => {
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await billingService.getBillingInfo()
+        setBillingData(data)
+      } catch (error) {
+        console.error("Failed to fetch billing data:", error)
+        toast.error("결제 정보를 불러오는데 실패했습니다.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
+  const currentUsage = billingData?.usage ?? {
+    used: 0,
+    limit: 3000,
+    percentUsed: 0,
+    estimatedCost: 0,
+    billingCycle: "",
+    daysRemaining: 0,
+  }
+  const invoices = billingData?.invoices ?? []
+  const paymentMethods = billingData?.paymentMethods ?? []
+  const currentPlan = billingData?.currentPlan
+
+  const displayPlans = plans.map((plan) => ({
+    ...plan,
+    current: currentPlan?.id === plan.id,
+  }))
+
+  const handleUpgrade = async (plan: (typeof plans)[0]) => {
     setSelectedPlan(plan)
     setUpgradeDialogOpen(true)
+  }
+
+  const confirmUpgrade = async () => {
+    if (!selectedPlan) return
+    try {
+      await billingService.upgradePlan(selectedPlan.id as "free" | "starter" | "pro" | "enterprise")
+      toast.success("플랜이 업그레이드되었습니다.")
+      // Refresh data
+      const data = await billingService.getBillingInfo()
+      setBillingData(data)
+      setUpgradeDialogOpen(false)
+    } catch (error) {
+      console.error("Failed to upgrade plan:", error)
+      toast.error("플랜 업그레이드에 실패했습니다.")
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+      </div>
+    )
   }
 
   return (
@@ -199,7 +235,7 @@ export default function BillingPage() {
                 <CardDescription>현재 구독 중인 플랜</CardDescription>
               </div>
               <Badge variant="default" className="px-3 py-1 text-lg">
-                Free
+                {currentPlan?.name ?? "Free"}
               </Badge>
             </div>
           </CardHeader>
@@ -207,15 +243,15 @@ export default function BillingPage() {
             <div className="grid gap-4 md:grid-cols-3">
               <div className="rounded-lg border p-4">
                 <p className="text-muted-foreground text-sm">월 요금</p>
-                <p className="text-2xl font-bold">{formatCurrency(0)}</p>
+                <p className="text-2xl font-bold">{formatCurrency(currentPlan?.price ?? 0)}</p>
               </div>
               <div className="rounded-lg border p-4">
                 <p className="text-muted-foreground text-sm">API 호출 한도</p>
-                <p className="text-2xl font-bold">{formatNumber(3000)}</p>
+                <p className="text-2xl font-bold">{formatNumber(currentPlan?.calls ?? 3000)}</p>
               </div>
               <div className="rounded-lg border p-4">
                 <p className="text-muted-foreground text-sm">Rate Limit</p>
-                <p className="text-2xl font-bold">10/min</p>
+                <p className="text-2xl font-bold">{currentPlan?.rateLimit ?? 10}/min</p>
               </div>
             </div>
 
@@ -246,7 +282,10 @@ export default function BillingPage() {
           <CardFooter className="flex justify-between border-t pt-6">
             <div>
               <p className="text-muted-foreground text-sm">현재 플랜</p>
-              <p className="font-medium">Free (무료)</p>
+              <p className="font-medium">
+                {currentPlan?.name ?? "Free"} (
+                {currentPlan?.price === 0 ? "무료" : `$${currentPlan?.price}/월`})
+              </p>
             </div>
             <Button onClick={() => handleUpgrade(plans[1])}>
               Upgrade to Starter
@@ -303,7 +342,7 @@ export default function BillingPage() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {plans.map((plan) => (
+            {displayPlans.map((plan) => (
               <div
                 key={plan.id}
                 className={cn(
@@ -492,7 +531,7 @@ export default function BillingPage() {
             <Button variant="outline" onClick={() => setUpgradeDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={() => setUpgradeDialogOpen(false)}>Confirm Upgrade</Button>
+            <Button onClick={confirmUpgrade}>Confirm Upgrade</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

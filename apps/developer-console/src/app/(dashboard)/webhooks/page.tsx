@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import {
-  Webhook,
+  Webhook as WebhookIcon,
   Plus,
   MoreHorizontal,
   CheckCircle,
@@ -19,7 +19,15 @@ import {
   Shield,
   Zap,
   Activity,
+  Loader2,
 } from "lucide-react"
+import { toast } from "sonner"
+import {
+  webhooksService,
+  type Webhook,
+  type DeliveryLog as ServiceDeliveryLog,
+  type WebhooksData,
+} from "@/services/webhooks-service"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -56,30 +64,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { cn, formatRelativeTime } from "@/lib/utils"
 
-// Empty data - will be fetched from API
-type WebhookData = {
-  id: string
-  url: string
-  description: string
-  status: "active" | "disabled"
-  events: string[]
-  secret: string
-  createdAt: string
-  lastDelivery: {
-    timestamp: string
-    status: string
-    statusCode: number
-    latency: number
-  }
-  stats: {
-    totalDeliveries: number
-    successRate: number
-    avgLatency: number
-  }
-}
-
-const webhooks: WebhookData[] = []
-
 const eventTypes = [
   { id: "match.completed", name: "Match Completed", description: "매칭 분석 완료 시" },
   { id: "batch.completed", name: "Batch Completed", description: "배치 매칭 완료 시" },
@@ -89,27 +73,33 @@ const eventTypes = [
   { id: "api_key.revoked", name: "API Key Revoked", description: "API 키 폐기 시" },
 ]
 
-type DeliveryLog = {
-  id: string
-  webhookId: string
-  event: string
-  status: string
-  statusCode: number
-  latency: number
-  timestamp: string
-  requestId: string
-}
-
-const deliveryLogs: DeliveryLog[] = []
-
 export default function WebhooksPage() {
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [webhooks, setWebhooks] = React.useState<Webhook[]>([])
+  const [deliveryLogs, setDeliveryLogs] = React.useState<ServiceDeliveryLog[]>([])
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
-  const [selectedWebhook, setSelectedWebhook] = React.useState<(typeof webhooks)[0] | null>(null)
+  const [selectedWebhook, setSelectedWebhook] = React.useState<Webhook | null>(null)
   const [newWebhookUrl, setNewWebhookUrl] = React.useState("")
   const [newWebhookDescription, setNewWebhookDescription] = React.useState("")
   const [selectedEvents, setSelectedEvents] = React.useState<string[]>([])
   const [copiedSecret, setCopiedSecret] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await webhooksService.getWebhooks()
+        setWebhooks(data.webhooks)
+        setDeliveryLogs(data.deliveryLogs)
+      } catch (error) {
+        console.error("Failed to fetch webhooks:", error)
+        toast.error("웹훅 데이터를 불러오는데 실패했습니다.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
 
   const copySecret = async (secret: string, webhookId: string) => {
     await navigator.clipboard.writeText(secret)
@@ -149,6 +139,53 @@ export default function WebhooksPage() {
     return <Badge variant="destructive">{statusCode}</Badge>
   }
 
+  const handleCreateWebhook = async () => {
+    try {
+      await webhooksService.createWebhook({
+        url: newWebhookUrl,
+        description: newWebhookDescription,
+        events: selectedEvents,
+      })
+      toast.success("웹훅이 생성되었습니다.")
+      // Refresh data
+      const data = await webhooksService.getWebhooks()
+      setWebhooks(data.webhooks)
+      setDeliveryLogs(data.deliveryLogs)
+      setCreateDialogOpen(false)
+      setNewWebhookUrl("")
+      setNewWebhookDescription("")
+      setSelectedEvents([])
+    } catch (error) {
+      console.error("Failed to create webhook:", error)
+      toast.error("웹훅 생성에 실패했습니다.")
+    }
+  }
+
+  const handleDeleteWebhook = async () => {
+    if (!selectedWebhook) return
+    try {
+      await webhooksService.deleteWebhook(selectedWebhook.id)
+      toast.success("웹훅이 삭제되었습니다.")
+      // Refresh data
+      const data = await webhooksService.getWebhooks()
+      setWebhooks(data.webhooks)
+      setDeliveryLogs(data.deliveryLogs)
+      setDeleteDialogOpen(false)
+      setSelectedWebhook(null)
+    } catch (error) {
+      console.error("Failed to delete webhook:", error)
+      toast.error("웹훅 삭제에 실패했습니다.")
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -178,7 +215,7 @@ export default function WebhooksPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Webhooks</CardTitle>
-            <Webhook className="text-muted-foreground h-4 w-4" />
+            <WebhookIcon className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
@@ -363,7 +400,7 @@ export default function WebhooksPage() {
 
               {webhooks.length === 0 && (
                 <div className="py-12 text-center">
-                  <Webhook className="text-muted-foreground/30 mx-auto mb-2 h-12 w-12" />
+                  <WebhookIcon className="text-muted-foreground/30 mx-auto mb-2 h-12 w-12" />
                   <p className="text-muted-foreground">등록된 웹훅이 없습니다</p>
                   <p className="text-muted-foreground mt-1 text-sm">
                     Add Webhook 버튼을 클릭하여 웹훅을 추가하세요
@@ -554,7 +591,7 @@ function verifyWebhookSignature(payload, signature, secret) {
               Cancel
             </Button>
             <Button
-              onClick={() => setCreateDialogOpen(false)}
+              onClick={handleCreateWebhook}
               disabled={!newWebhookUrl || selectedEvents.length === 0}
             >
               Create Webhook
@@ -587,7 +624,7 @@ function verifyWebhookSignature(payload, signature, secret) {
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={() => setDeleteDialogOpen(false)}>
+            <Button variant="destructive" onClick={handleDeleteWebhook}>
               Delete Webhook
             </Button>
           </DialogFooter>

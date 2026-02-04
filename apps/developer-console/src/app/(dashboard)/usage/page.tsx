@@ -18,7 +18,10 @@ import {
   CheckCircle,
   XCircle,
   Globe,
+  Loader2,
 } from "lucide-react"
+import { toast } from "sonner"
+import { usageService, type UsageData } from "@/services/usage-service"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -41,42 +44,71 @@ import {
 } from "@/components/ui/table"
 import { cn, formatNumber, formatCurrency } from "@/lib/utils"
 
-// Empty data - will be fetched from API
-const usageOverview = {
-  totalCalls: 0,
-  successfulCalls: 0,
-  failedCalls: 0,
-  averageLatency: 0,
-  p95Latency: 0,
-  p99Latency: 0,
-  totalCost: 0,
-  quotaUsed: 0,
-  quotaLimit: 50000,
+// Helper function to get HTTP status code descriptions
+function getStatusCodeDescription(code: number): string {
+  const descriptions: Record<number, string> = {
+    400: "Bad Request",
+    401: "Unauthorized",
+    403: "Forbidden",
+    404: "Not Found",
+    408: "Request Timeout",
+    429: "Too Many Requests",
+    500: "Internal Server Error",
+    502: "Bad Gateway",
+    503: "Service Unavailable",
+    504: "Gateway Timeout",
+  }
+  return descriptions[code] ?? `HTTP ${code}`
 }
-
-const dailyUsage: { date: string; calls: number; success: number; failed: number; cost: number }[] =
-  []
-
-const endpointUsage: {
-  endpoint: string
-  calls: number
-  percentage: number
-  avgLatency: number
-  successRate: number
-}[] = []
-
-const errorBreakdown: { code: number; count: number; description: string; percentage: number }[] =
-  []
-
-const hourlyDistribution: { hour: string; calls: number }[] = []
-
-const regionUsage: { region: string; calls: number; percentage: number }[] = []
 
 export default function UsagePage() {
   const [dateRange, setDateRange] = React.useState("7d")
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [usageData, setUsageData] = React.useState<UsageData | null>(null)
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await usageService.getUsage(dateRange)
+        setUsageData(data)
+      } catch (error) {
+        console.error("Failed to fetch usage data:", error)
+        toast.error("사용량 데이터를 불러오는데 실패했습니다.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchData()
+  }, [dateRange])
+
+  const usageOverview = usageData?.overview ?? {
+    totalCalls: 0,
+    successfulCalls: 0,
+    failedCalls: 0,
+    averageLatency: 0,
+    p95Latency: 0,
+    p99Latency: 0,
+    totalCost: 0,
+    quotaUsed: 0,
+    quotaLimit: 50000,
+  }
+  const dailyUsage = usageData?.dailyUsage ?? []
+  const endpointUsage = usageData?.byEndpoint ?? []
+  const errorBreakdown = usageData?.byStatusCode ?? []
+  const hourlyDistribution = usageData?.hourlyDistribution ?? []
+  const regionUsage = usageData?.byRegion ?? []
+
   const maxDailyCalls = dailyUsage.length > 0 ? Math.max(...dailyUsage.map((d) => d.calls)) : 0
   const maxHourlyCalls =
     hourlyDistribution.length > 0 ? Math.max(...hourlyDistribution.map((h) => h.calls)) : 0
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -130,7 +162,10 @@ export default function UsagePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {((usageOverview.successfulCalls / usageOverview.totalCalls) * 100).toFixed(2)}%
+              {usageOverview.totalCalls > 0
+                ? ((usageOverview.successfulCalls / usageOverview.totalCalls) * 100).toFixed(2)
+                : "0.00"}
+              %
             </div>
             <div className="text-muted-foreground mt-1 flex items-center gap-2 text-xs">
               <span className="text-green-500">
@@ -322,7 +357,7 @@ export default function UsagePage() {
                           {formatNumber(day.failed)}
                         </TableCell>
                         <TableCell className="text-right">
-                          {((day.success / day.calls) * 100).toFixed(2)}%
+                          {day.calls > 0 ? ((day.success / day.calls) * 100).toFixed(2) : "0.00"}%
                         </TableCell>
                         <TableCell className="text-right">{formatCurrency(day.cost)}</TableCell>
                       </TableRow>
@@ -504,7 +539,7 @@ export default function UsagePage() {
                 </div>
                 <p className="text-muted-foreground mt-1 text-xs">
                   {errorBreakdown.length > 0
-                    ? `${errorBreakdown[0].description} (${errorBreakdown[0].percentage}%)`
+                    ? `${getStatusCodeDescription(errorBreakdown[0].code)} (${errorBreakdown[0].percentage}%)`
                     : "에러 없음"}
                 </p>
               </CardContent>
@@ -546,7 +581,9 @@ export default function UsagePage() {
                         <TableCell>
                           <Badge variant="destructive">{error.code}</Badge>
                         </TableCell>
-                        <TableCell className="font-medium">{error.description}</TableCell>
+                        <TableCell className="font-medium">
+                          {getStatusCodeDescription(error.code)}
+                        </TableCell>
                         <TableCell className="text-right">{formatNumber(error.count)}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">

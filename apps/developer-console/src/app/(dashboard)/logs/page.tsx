@@ -17,7 +17,10 @@ import {
   ExternalLink,
   Calendar,
   Activity,
+  Loader2,
 } from "lucide-react"
+import { toast } from "sonner"
+import { logsService, type ApiLog as ServiceApiLog, type LogsStats } from "@/services/logs-service"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -56,35 +59,34 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { cn, formatRelativeTime, getHttpStatusColor } from "@/lib/utils"
 
-// Empty data - will be fetched from API
-type ApiLog = {
-  id: string
-  timestamp: string
-  method: string
-  endpoint: string
-  status: number
-  latency: number
-  apiKey: string
-  apiKeyName: string
-  ip: string
-  userAgent: string
-  requestBody: Record<string, unknown> | null
-  responseBody: Record<string, unknown>
-  requestHeaders: Record<string, string>
-  responseHeaders: Record<string, string>
-}
-
-const apiLogs: ApiLog[] = []
-
 export default function LogsPage() {
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [apiLogs, setApiLogs] = React.useState<ServiceApiLog[]>([])
+  const [stats, setStats] = React.useState<LogsStats | null>(null)
   const [searchQuery, setSearchQuery] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState<string>("all")
   const [endpointFilter, setEndpointFilter] = React.useState<string>("all")
   const [apiKeyFilter, setApiKeyFilter] = React.useState<string>("all")
-  const [selectedLog, setSelectedLog] = React.useState<(typeof apiLogs)[0] | null>(null)
+  const [selectedLog, setSelectedLog] = React.useState<ServiceApiLog | null>(null)
   const [isRefreshing, setIsRefreshing] = React.useState(false)
   const [expandedRows, setExpandedRows] = React.useState<Set<string>>(new Set())
   const [showFilters, setShowFilters] = React.useState(false)
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await logsService.getLogs()
+        setApiLogs(data.logs)
+        setStats(data.stats)
+      } catch (error) {
+        console.error("Failed to fetch logs:", error)
+        toast.error("로그를 불러오는데 실패했습니다.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
 
   const filteredLogs = apiLogs.filter((log) => {
     const matchesSearch =
@@ -107,8 +109,17 @@ export default function LogsPage() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsRefreshing(false)
+    try {
+      const data = await logsService.getLogs()
+      setApiLogs(data.logs)
+      setStats(data.stats)
+      toast.success("로그가 새로고침되었습니다.")
+    } catch (error) {
+      console.error("Failed to refresh logs:", error)
+      toast.error("로그 새로고침에 실패했습니다.")
+    } finally {
+      setIsRefreshing(false)
+    }
   }
 
   const toggleRowExpansion = (logId: string) => {
@@ -150,6 +161,14 @@ export default function LogsPage() {
   const endpoints = [...new Set(apiLogs.map((log) => log.endpoint))]
   const apiKeyNames = [...new Set(apiLogs.map((log) => log.apiKeyName))]
 
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -177,7 +196,7 @@ export default function LogsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-muted-foreground text-sm">Total Requests</p>
-                <p className="text-2xl font-bold">{apiLogs.length}</p>
+                <p className="text-2xl font-bold">{stats?.total ?? apiLogs.length}</p>
               </div>
               <Activity className="text-muted-foreground/20 h-8 w-8" />
             </div>
@@ -189,7 +208,8 @@ export default function LogsPage() {
               <div>
                 <p className="text-muted-foreground text-sm">Success (2xx)</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {apiLogs.filter((l) => l.status >= 200 && l.status < 300).length}
+                  {stats?.success ??
+                    apiLogs.filter((l) => l.status >= 200 && l.status < 300).length}
                 </p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-500/20" />
@@ -202,7 +222,8 @@ export default function LogsPage() {
               <div>
                 <p className="text-muted-foreground text-sm">Client Errors (4xx)</p>
                 <p className="text-2xl font-bold text-yellow-600">
-                  {apiLogs.filter((l) => l.status >= 400 && l.status < 500).length}
+                  {stats?.clientError ??
+                    apiLogs.filter((l) => l.status >= 400 && l.status < 500).length}
                 </p>
               </div>
               <AlertTriangle className="h-8 w-8 text-yellow-500/20" />
@@ -215,9 +236,10 @@ export default function LogsPage() {
               <div>
                 <p className="text-muted-foreground text-sm">Avg Latency</p>
                 <p className="text-2xl font-bold">
-                  {apiLogs.length > 0
-                    ? Math.round(apiLogs.reduce((sum, l) => sum + l.latency, 0) / apiLogs.length)
-                    : 0}
+                  {stats?.avgLatency ??
+                    (apiLogs.length > 0
+                      ? Math.round(apiLogs.reduce((sum, l) => sum + l.latency, 0) / apiLogs.length)
+                      : 0)}
                   ms
                 </p>
               </div>

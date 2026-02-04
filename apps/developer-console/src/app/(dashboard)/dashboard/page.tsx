@@ -15,6 +15,7 @@ import {
   TrendingUp,
   AlertCircle,
   ExternalLink,
+  Loader2,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -28,32 +29,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { cn, formatNumber, formatCurrency, formatRelativeTime } from "@/lib/utils"
+import { toast } from "sonner"
 import {
-  cn,
-  formatNumber,
-  formatCurrency,
-  formatRelativeTime,
-  getHttpStatusColor,
-} from "@/lib/utils"
-
-// Empty data - will be fetched from API
-const dashboardMetrics = {
-  apiCalls: { today: 0, change: 0 },
-  successRate: { value: 0, change: 0 },
-  latency: { p95: 0, change: 0 },
-  cost: { thisMonth: 0, percentUsed: 0 },
-}
-
-const usageData: { date: string; calls: number }[] = []
-
-const recentLogs: {
-  id: string
-  timestamp: string
-  endpoint: string
-  status: number
-  latency: number
-  requestId: string
-}[] = []
+  dashboardService,
+  type DashboardStats,
+  type RecentActivity,
+  type UsageByDay,
+  type UsageByEndpoint,
+} from "@/services/dashboard-service"
 
 const quickActions = [
   { title: "새 API Key 생성", href: "/api-keys/new", icon: Key },
@@ -62,7 +46,51 @@ const quickActions = [
 ]
 
 export default function DashboardPage() {
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [stats, setStats] = React.useState<DashboardStats | null>(null)
+  const [recentLogs, setRecentLogs] = React.useState<RecentActivity[]>([])
+  const [usageData, setUsageData] = React.useState<UsageByDay[]>([])
+  const [usageByEndpoint, setUsageByEndpoint] = React.useState<UsageByEndpoint[]>([])
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await dashboardService.getStats()
+        setStats(data.stats)
+        setRecentLogs(data.recentActivity)
+        setUsageData(data.usageByDay)
+        setUsageByEndpoint(data.usageByEndpoint)
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error)
+        toast.error("대시보드 데이터를 불러오는데 실패했습니다.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
   const userName = "Developer" // Replace with actual user name
+
+  const dashboardMetrics = {
+    apiCalls: { today: stats?.apiCalls.today ?? 0, change: stats?.apiCalls.change ?? 0 },
+    successRate: { value: stats?.successRate.value ?? 0, change: stats?.successRate.change ?? 0 },
+    latency: { p95: stats?.latency.p95 ?? 0, change: stats?.latency.change ?? 0 },
+    cost: {
+      thisMonth: stats?.cost.thisMonth ?? 0,
+      percentUsed: stats?.cost.quotaLimit
+        ? Math.round((stats.cost.quotaUsed / stats.cost.quotaLimit) * 100)
+        : 0,
+    },
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -72,7 +100,7 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold tracking-tight">안녕하세요, {userName}님!</h1>
           <p className="text-muted-foreground">
             오늘의 API 사용량: {formatNumber(dashboardMetrics.apiCalls.today)} calls | 이번 달:{" "}
-            {formatNumber(45678)} calls
+            {formatNumber(stats?.apiCalls.thisMonth ?? 0)} calls
           </p>
         </div>
         <div className="flex gap-2">
@@ -237,7 +265,7 @@ export default function DashboardPage() {
                         {log.status}
                       </Badge>
                       <span className="text-muted-foreground max-w-[120px] truncate font-mono text-xs">
-                        {log.endpoint.split(" ")[1]}
+                        {log.endpoint.includes(" ") ? log.endpoint.split(" ")[1] : log.endpoint}
                       </span>
                     </div>
                     <div className="text-muted-foreground flex items-center gap-2 text-xs">
@@ -274,21 +302,32 @@ export default function DashboardPage() {
             </Button>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Environment</TableHead>
-                  <TableHead>Last Used</TableHead>
-                  <TableHead className="text-right">Calls</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody></TableBody>
-            </Table>
-            <div className="py-8 text-center">
-              <Key className="text-muted-foreground/30 mx-auto mb-2 h-8 w-8" />
-              <p className="text-muted-foreground text-sm">등록된 API Key가 없습니다</p>
-            </div>
+            {stats?.activeKeys && stats.activeKeys.total > 0 ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <p className="text-2xl font-bold">{stats.activeKeys.total}</p>
+                    <p className="text-muted-foreground text-xs">Total Keys</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-green-600">{stats.activeKeys.live}</p>
+                    <p className="text-muted-foreground text-xs">Live</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-yellow-600">{stats.activeKeys.test}</p>
+                    <p className="text-muted-foreground text-xs">Test</p>
+                  </div>
+                </div>
+                <Button variant="outline" className="w-full" asChild>
+                  <Link href="/api-keys">Manage Keys</Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <Key className="text-muted-foreground/30 mx-auto mb-2 h-8 w-8" />
+                <p className="text-muted-foreground text-sm">등록된 API Key가 없습니다</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -299,10 +338,26 @@ export default function DashboardPage() {
             <CardDescription>API calls distribution</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="py-8 text-center">
-              <TrendingUp className="text-muted-foreground/30 mx-auto mb-2 h-8 w-8" />
-              <p className="text-muted-foreground text-sm">사용 기록이 없습니다</p>
-            </div>
+            {usageByEndpoint.length > 0 ? (
+              <div className="space-y-4">
+                {usageByEndpoint.map((ep) => (
+                  <div key={ep.endpoint} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <code className="font-mono">{ep.endpoint}</code>
+                      <span className="text-muted-foreground">
+                        {formatNumber(ep.calls)} ({ep.percentage}%)
+                      </span>
+                    </div>
+                    <Progress value={ep.percentage} className="h-2" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <TrendingUp className="text-muted-foreground/30 mx-auto mb-2 h-8 w-8" />
+                <p className="text-muted-foreground text-sm">사용 기록이 없습니다</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
