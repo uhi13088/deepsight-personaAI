@@ -26,6 +26,7 @@ export interface ApiLog {
 }
 
 export interface LogsFilters {
+  search?: string
   status?: string
   endpoint?: string
   apiKeyId?: string
@@ -56,6 +57,7 @@ export interface LogsResponse {
 class LogsService {
   async getLogs(filters?: LogsFilters): Promise<LogsResponse> {
     const params: Record<string, string | number | boolean | undefined> = {}
+    if (filters?.search) params.search = filters.search
     if (filters?.status) params.status = filters.status
     if (filters?.endpoint) params.endpoint = filters.endpoint
     if (filters?.apiKeyId) params.apiKeyId = filters.apiKeyId

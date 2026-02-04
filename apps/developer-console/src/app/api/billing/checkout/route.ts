@@ -1,55 +1,30 @@
 import { NextRequest, NextResponse } from "next/server"
-import { z } from "zod"
 import Stripe from "stripe"
-
-const upgradeSchema = z.object({
-  planId: z.enum(["free", "starter", "pro", "enterprise"]),
-})
 
 // Stripe price IDs (configure in Stripe Dashboard)
 const PRICE_IDS: Record<string, string> = {
-  starter: process.env.STRIPE_PRICE_STARTER || "",
-  pro: process.env.STRIPE_PRICE_PRO || "",
-  enterprise: process.env.STRIPE_PRICE_ENTERPRISE || "",
+  starter: process.env.STRIPE_PRICE_STARTER || "price_starter",
+  pro: process.env.STRIPE_PRICE_PRO || "price_pro",
+  enterprise: process.env.STRIPE_PRICE_ENTERPRISE || "price_enterprise",
 }
 
-// ============================================================================
-// POST /api/billing/upgrade - 플랜 업그레이드 (Stripe Checkout)
-// ============================================================================
-
+// POST /api/billing/checkout - Create Stripe Checkout Session
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const parsed = upgradeSchema.safeParse(body)
+    const { planId } = await request.json()
 
-    if (!parsed.success) {
+    if (!planId || !PRICE_IDS[planId]) {
       return NextResponse.json(
         {
           success: false,
-          error: {
-            code: "VALIDATION_ERROR",
-            message: parsed.error.issues[0].message,
-          },
+          error: { code: "INVALID_PLAN", message: "유효하지 않은 플랜입니다" },
         },
         { status: 400 }
       )
     }
 
-    const { planId } = parsed.data
-
-    // Free plan doesn't need payment
-    if (planId === "free") {
-      return NextResponse.json({
-        success: true,
-        data: {
-          planId,
-          message: "Free 플랜으로 변경되었습니다.",
-        },
-      })
-    }
-
     // Check if Stripe is configured
-    if (!process.env.STRIPE_SECRET_KEY || !PRICE_IDS[planId]) {
+    if (!process.env.STRIPE_SECRET_KEY) {
       return NextResponse.json(
         {
           success: false,
@@ -77,7 +52,7 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${baseUrl}/billing?success=true&plan=${planId}`,
+      success_url: `${baseUrl}/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/billing?canceled=true`,
       metadata: {
         planId,
@@ -86,19 +61,16 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: {
-        checkoutUrl: session.url,
-        planId,
-      },
+      data: { url: session.url },
     })
   } catch (error) {
-    console.error("Error upgrading plan:", error)
+    console.error("Stripe checkout error:", error)
     return NextResponse.json(
       {
         success: false,
         error: {
-          code: "INTERNAL_ERROR",
-          message: "플랜 업그레이드에 실패했습니다.",
+          code: "CHECKOUT_ERROR",
+          message: "결제 세션 생성에 실패했습니다",
         },
       },
       { status: 500 }
