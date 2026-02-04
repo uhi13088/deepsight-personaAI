@@ -109,11 +109,23 @@ export default function VersionControlPage() {
   }
 
   const handleDownloadSource = (version: Version) => {
-    toast.promise(new Promise((resolve) => setTimeout(resolve, 2000)), {
-      loading: `${version.tag} 소스 다운로드 중...`,
-      success: `${version.tag} 소스 다운로드가 완료되었습니다.`,
-      error: "다운로드에 실패했습니다.",
-    })
+    toast.promise(
+      versionsService.downloadSource(version.id).then((blob) => {
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `${version.tag}-source.zip`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+      }),
+      {
+        loading: `${version.tag} 소스 다운로드 중...`,
+        success: `${version.tag} 소스 다운로드가 완료되었습니다.`,
+        error: "다운로드에 실패했습니다.",
+      }
+    )
   }
 
   const handleRollback = (version: Version) => {
@@ -194,9 +206,12 @@ export default function VersionControlPage() {
       action: {
         label: "병합",
         onClick: () => {
-          toast.promise(new Promise((resolve) => setTimeout(resolve, 2000)), {
+          toast.promise(versionsService.mergeBranch(branch.name), {
             loading: `${branch.name} 브랜치 병합 중...`,
-            success: `${branch.name} 브랜치가 병합되었습니다.`,
+            success: () => {
+              fetchData()
+              return `${branch.name} 브랜치가 병합되었습니다.`
+            },
             error: "병합에 실패했습니다.",
           })
         },
@@ -210,7 +225,14 @@ export default function VersionControlPage() {
       action: {
         label: "삭제",
         onClick: () => {
-          toast.success(`${branch.name} 브랜치가 삭제되었습니다.`)
+          toast.promise(versionsService.deleteBranch(branch.name), {
+            loading: "브랜치 삭제 중...",
+            success: () => {
+              fetchData()
+              return `${branch.name} 브랜치가 삭제되었습니다.`
+            },
+            error: "브랜치 삭제에 실패했습니다.",
+          })
         },
       },
     })
