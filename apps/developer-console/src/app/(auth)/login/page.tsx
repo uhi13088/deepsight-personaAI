@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
+import { signIn } from "next-auth/react"
 import { Eye, EyeOff, Mail, Lock, ArrowRight, Github, Chrome } from "lucide-react"
 import {
   Card,
@@ -22,6 +23,7 @@ import { cn } from "@/lib/utils"
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [showPassword, setShowPassword] = React.useState(false)
@@ -29,25 +31,50 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
+  // URL 파라미터에서 에러 확인
+  React.useEffect(() => {
+    const errorParam = searchParams.get("error")
+    if (errorParam === "CredentialsSignin") {
+      setError("이메일 또는 비밀번호가 올바르지 않습니다")
+    } else if (errorParam) {
+      setError("로그인 중 오류가 발생했습니다")
+    }
+  }, [searchParams])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
 
-    // Simulate login
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      })
 
-    // For demo purposes, always succeed
-    setIsLoading(false)
-    router.push("/dashboard")
+      if (result?.error) {
+        setError("이메일 또는 비밀번호가 올바르지 않습니다")
+        setIsLoading(false)
+        return
+      }
+
+      router.push("/dashboard")
+      router.refresh()
+    } catch {
+      setError("로그인 중 오류가 발생했습니다")
+      setIsLoading(false)
+    }
   }
 
   const handleOAuthLogin = async (provider: string) => {
     setIsLoading(true)
-    // Simulate OAuth login
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsLoading(false)
-    router.push("/dashboard")
+    try {
+      await signIn(provider, { callbackUrl: "/dashboard" })
+    } catch {
+      setError("OAuth 로그인 중 오류가 발생했습니다")
+      setIsLoading(false)
+    }
   }
 
   return (

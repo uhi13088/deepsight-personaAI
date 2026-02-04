@@ -1,5 +1,6 @@
 "use client"
 
+import { SessionProvider } from "next-auth/react"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "sonner"
 
@@ -9,9 +10,11 @@ interface ProvidersProps {
 
 export function Providers({ children }: ProvidersProps) {
   return (
-    <ThemeProvider>
-      {children}
-      <Toaster position="top-right" richColors />
-    </ThemeProvider>
+    <SessionProvider>
+      <ThemeProvider>
+        {children}
+        <Toaster position="top-right" richColors />
+      </ThemeProvider>
+    </SessionProvider>
   )
 }
