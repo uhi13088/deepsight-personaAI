@@ -93,10 +93,9 @@ class ApiClient {
     endpoint: string,
     options?: { body?: unknown; params?: Record<string, string | number | boolean | undefined> }
   ): Promise<ApiResponse<T>> {
-    const url = new URL(
-      endpoint.startsWith("http") ? endpoint : `${this.baseUrl}${endpoint}`,
-      window.location.origin
-    )
+    const fullPath = endpoint.startsWith("http") ? endpoint : `${this.baseUrl}${endpoint}`
+    const base = typeof window !== "undefined" ? window.location.origin : "http://localhost:3001"
+    const url = new URL(fullPath, fullPath.startsWith("http") ? undefined : base)
 
     if (options?.params) {
       Object.entries(options.params).forEach(([key, value]) => {
