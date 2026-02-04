@@ -56,151 +56,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { cn, formatRelativeTime, getHttpStatusColor } from "@/lib/utils"
 
-// Mock data
-const apiLogs = [
-  {
-    id: "req_abc123def456",
-    timestamp: new Date().toISOString(),
-    method: "POST",
-    endpoint: "/v1/match",
-    status: 200,
-    latency: 145,
-    apiKey: "pk_live_***xyz",
-    apiKeyName: "Production Server",
-    ip: "203.0.113.42",
-    userAgent: "Mozilla/5.0 (compatible; MyApp/1.0)",
-    requestBody: {
-      content: "Sample content for matching...",
-      options: { limit: 5, threshold: 0.7 },
-    },
-    responseBody: {
-      matches: [
-        { persona_id: "persona_1", score: 0.92 },
-        { persona_id: "persona_2", score: 0.85 },
-      ],
-    },
-    requestHeaders: {
-      "Content-Type": "application/json",
-      Authorization: "Bearer pk_live_***xyz",
-    },
-    responseHeaders: {
-      "Content-Type": "application/json",
-      "X-Request-Id": "req_abc123def456",
-    },
-  },
-  {
-    id: "req_def456ghi789",
-    timestamp: new Date(Date.now() - 30000).toISOString(),
-    method: "POST",
-    endpoint: "/v1/match",
-    status: 200,
-    latency: 132,
-    apiKey: "pk_live_***xyz",
-    apiKeyName: "Production Server",
-    ip: "203.0.113.42",
-    userAgent: "Mozilla/5.0 (compatible; MyApp/1.0)",
-    requestBody: { content: "Another content..." },
-    responseBody: { matches: [] },
-    requestHeaders: {},
-    responseHeaders: {},
-  },
-  {
-    id: "req_ghi789jkl012",
-    timestamp: new Date(Date.now() - 60000).toISOString(),
-    method: "POST",
-    endpoint: "/v1/feedback",
-    status: 201,
-    latency: 45,
-    apiKey: "pk_live_***xyz",
-    apiKeyName: "Production Server",
-    ip: "203.0.113.42",
-    userAgent: "Mozilla/5.0 (compatible; MyApp/1.0)",
-    requestBody: { match_id: "match_123", feedback: "positive" },
-    responseBody: { success: true },
-    requestHeaders: {},
-    responseHeaders: {},
-  },
-  {
-    id: "req_jkl012mno345",
-    timestamp: new Date(Date.now() - 90000).toISOString(),
-    method: "POST",
-    endpoint: "/v1/match",
-    status: 400,
-    latency: 12,
-    apiKey: "pk_test_***abc",
-    apiKeyName: "Development",
-    ip: "192.168.1.100",
-    userAgent: "curl/7.68.0",
-    requestBody: { content: "" },
-    responseBody: { error: { code: "INVALID_CONTENT", message: "Content cannot be empty" } },
-    requestHeaders: {},
-    responseHeaders: {},
-  },
-  {
-    id: "req_mno345pqr678",
-    timestamp: new Date(Date.now() - 120000).toISOString(),
-    method: "GET",
-    endpoint: "/v1/personas",
-    status: 200,
-    latency: 78,
-    apiKey: "pk_live_***xyz",
-    apiKeyName: "Production Server",
-    ip: "203.0.113.42",
-    userAgent: "Mozilla/5.0 (compatible; MyApp/1.0)",
-    requestBody: null,
-    responseBody: { personas: [], total: 12 },
-    requestHeaders: {},
-    responseHeaders: {},
-  },
-  {
-    id: "req_pqr678stu901",
-    timestamp: new Date(Date.now() - 180000).toISOString(),
-    method: "POST",
-    endpoint: "/v1/match",
-    status: 429,
-    latency: 5,
-    apiKey: "pk_test_***abc",
-    apiKeyName: "Development",
-    ip: "192.168.1.100",
-    userAgent: "curl/7.68.0",
-    requestBody: { content: "Rate limited request" },
-    responseBody: { error: { code: "RATE_LIMITED", message: "Too many requests" } },
-    requestHeaders: {},
-    responseHeaders: {},
-  },
-  {
-    id: "req_stu901vwx234",
-    timestamp: new Date(Date.now() - 240000).toISOString(),
-    method: "POST",
-    endpoint: "/v1/batch-match",
-    status: 200,
-    latency: 892,
-    apiKey: "pk_live_***xyz",
-    apiKeyName: "Production Server",
-    ip: "203.0.113.42",
-    userAgent: "Mozilla/5.0 (compatible; MyApp/1.0)",
-    requestBody: { contents: ["Content 1", "Content 2", "Content 3"] },
-    responseBody: { results: [] },
-    requestHeaders: {},
-    responseHeaders: {},
-  },
-  {
-    id: "req_vwx234yza567",
-    timestamp: new Date(Date.now() - 300000).toISOString(),
-    method: "POST",
-    endpoint: "/v1/match",
-    status: 401,
-    latency: 3,
-    apiKey: "pk_invalid_***",
-    apiKeyName: "Unknown",
-    ip: "198.51.100.23",
-    userAgent: "python-requests/2.28.0",
-    requestBody: { content: "Unauthorized request" },
-    responseBody: { error: { code: "UNAUTHORIZED", message: "Invalid API key" } },
-    requestHeaders: {},
-    responseHeaders: {},
-  },
-]
+// Empty data - will be fetched from API
+type ApiLog = {
+  id: string
+  timestamp: string
+  method: string
+  endpoint: string
+  status: number
+  latency: number
+  apiKey: string
+  apiKeyName: string
+  ip: string
+  userAgent: string
+  requestBody: Record<string, unknown> | null
+  responseBody: Record<string, unknown>
+  requestHeaders: Record<string, string>
+  responseHeaders: Record<string, string>
+}
+
+const apiLogs: ApiLog[] = []
 
 export default function LogsPage() {
   const [searchQuery, setSearchQuery] = React.useState("")
@@ -341,7 +215,10 @@ export default function LogsPage() {
               <div>
                 <p className="text-muted-foreground text-sm">Avg Latency</p>
                 <p className="text-2xl font-bold">
-                  {Math.round(apiLogs.reduce((sum, l) => sum + l.latency, 0) / apiLogs.length)}ms
+                  {apiLogs.length > 0
+                    ? Math.round(apiLogs.reduce((sum, l) => sum + l.latency, 0) / apiLogs.length)
+                    : 0}
+                  ms
                 </p>
               </div>
               <Clock className="text-muted-foreground/20 h-8 w-8" />

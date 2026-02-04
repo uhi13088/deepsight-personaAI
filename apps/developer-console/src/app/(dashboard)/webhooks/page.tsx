@@ -56,69 +56,29 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { cn, formatRelativeTime } from "@/lib/utils"
 
-// Mock data
-const webhooks = [
-  {
-    id: "wh_1",
-    url: "https://api.myapp.com/webhooks/deepsight",
-    description: "Production webhook",
-    status: "active" as const,
-    events: ["match.completed", "batch.completed", "feedback.received"],
-    secret: "whsec_abc123...",
-    createdAt: "2025-01-01T00:00:00Z",
-    lastDelivery: {
-      timestamp: new Date(Date.now() - 60000).toISOString(),
-      status: "success",
-      statusCode: 200,
-      latency: 145,
-    },
-    stats: {
-      totalDeliveries: 1234,
-      successRate: 99.2,
-      avgLatency: 132,
-    },
-  },
-  {
-    id: "wh_2",
-    url: "https://staging.myapp.com/webhooks/deepsight",
-    description: "Staging webhook",
-    status: "active" as const,
-    events: ["match.completed"],
-    secret: "whsec_def456...",
-    createdAt: "2025-01-10T00:00:00Z",
-    lastDelivery: {
-      timestamp: new Date(Date.now() - 3600000).toISOString(),
-      status: "success",
-      statusCode: 200,
-      latency: 89,
-    },
-    stats: {
-      totalDeliveries: 567,
-      successRate: 98.5,
-      avgLatency: 95,
-    },
-  },
-  {
-    id: "wh_3",
-    url: "https://old.myapp.com/webhooks",
-    description: "Legacy (disabled)",
-    status: "disabled" as const,
-    events: ["match.completed"],
-    secret: "whsec_ghi789...",
-    createdAt: "2024-06-01T00:00:00Z",
-    lastDelivery: {
-      timestamp: "2024-12-01T00:00:00Z",
-      status: "failed",
-      statusCode: 500,
-      latency: 5000,
-    },
-    stats: {
-      totalDeliveries: 8900,
-      successRate: 85.2,
-      avgLatency: 456,
-    },
-  },
-]
+// Empty data - will be fetched from API
+type WebhookData = {
+  id: string
+  url: string
+  description: string
+  status: "active" | "disabled"
+  events: string[]
+  secret: string
+  createdAt: string
+  lastDelivery: {
+    timestamp: string
+    status: string
+    statusCode: number
+    latency: number
+  }
+  stats: {
+    totalDeliveries: number
+    successRate: number
+    avgLatency: number
+  }
+}
+
+const webhooks: WebhookData[] = []
 
 const eventTypes = [
   { id: "match.completed", name: "Match Completed", description: "매칭 분석 완료 시" },
@@ -129,48 +89,18 @@ const eventTypes = [
   { id: "api_key.revoked", name: "API Key Revoked", description: "API 키 폐기 시" },
 ]
 
-const deliveryLogs = [
-  {
-    id: "del_1",
-    webhookId: "wh_1",
-    event: "match.completed",
-    status: "success",
-    statusCode: 200,
-    latency: 145,
-    timestamp: new Date().toISOString(),
-    requestId: "req_abc123",
-  },
-  {
-    id: "del_2",
-    webhookId: "wh_1",
-    event: "feedback.received",
-    status: "success",
-    statusCode: 200,
-    latency: 89,
-    timestamp: new Date(Date.now() - 30000).toISOString(),
-    requestId: "req_def456",
-  },
-  {
-    id: "del_3",
-    webhookId: "wh_1",
-    event: "match.completed",
-    status: "failed",
-    statusCode: 500,
-    latency: 5000,
-    timestamp: new Date(Date.now() - 60000).toISOString(),
-    requestId: "req_ghi789",
-  },
-  {
-    id: "del_4",
-    webhookId: "wh_2",
-    event: "match.completed",
-    status: "success",
-    statusCode: 200,
-    latency: 95,
-    timestamp: new Date(Date.now() - 3600000).toISOString(),
-    requestId: "req_jkl012",
-  },
-]
+type DeliveryLog = {
+  id: string
+  webhookId: string
+  event: string
+  status: string
+  statusCode: number
+  latency: number
+  timestamp: string
+  requestId: string
+}
+
+const deliveryLogs: DeliveryLog[] = []
 
 export default function WebhooksPage() {
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
@@ -278,9 +208,11 @@ export default function WebhooksPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {(
-                webhooks.reduce((sum, w) => sum + w.stats.successRate, 0) / webhooks.length
-              ).toFixed(1)}
+              {webhooks.length > 0
+                ? (
+                    webhooks.reduce((sum, w) => sum + w.stats.successRate, 0) / webhooks.length
+                  ).toFixed(1)
+                : 0}
               %
             </div>
             <p className="text-muted-foreground text-xs">average</p>
@@ -294,9 +226,11 @@ export default function WebhooksPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {Math.round(
-                webhooks.reduce((sum, w) => sum + w.stats.avgLatency, 0) / webhooks.length
-              )}
+              {webhooks.length > 0
+                ? Math.round(
+                    webhooks.reduce((sum, w) => sum + w.stats.avgLatency, 0) / webhooks.length
+                  )
+                : 0}
               ms
             </div>
             <p className="text-muted-foreground text-xs">response time</p>
@@ -426,6 +360,16 @@ export default function WebhooksPage() {
                   ))}
                 </TableBody>
               </Table>
+
+              {webhooks.length === 0 && (
+                <div className="py-12 text-center">
+                  <Webhook className="text-muted-foreground/30 mx-auto mb-2 h-12 w-12" />
+                  <p className="text-muted-foreground">등록된 웹훅이 없습니다</p>
+                  <p className="text-muted-foreground mt-1 text-sm">
+                    Add Webhook 버튼을 클릭하여 웹훅을 추가하세요
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -484,6 +428,13 @@ export default function WebhooksPage() {
                   })}
                 </TableBody>
               </Table>
+
+              {deliveryLogs.length === 0 && (
+                <div className="py-12 text-center">
+                  <Activity className="text-muted-foreground/30 mx-auto mb-2 h-12 w-12" />
+                  <p className="text-muted-foreground">전송 기록이 없습니다</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

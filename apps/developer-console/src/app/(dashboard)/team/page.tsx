@@ -61,69 +61,39 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { cn, formatRelativeTime } from "@/lib/utils"
 
-// Mock data
+// Empty data - will be fetched from API
 const organization = {
-  id: "org_abc123",
-  name: "Acme Corp",
-  plan: "Starter",
-  createdAt: "2024-06-15T00:00:00Z",
-  memberCount: 4,
-  maxMembers: 10,
+  id: "",
+  name: "My Organization",
+  plan: "Free",
+  createdAt: new Date().toISOString(),
+  memberCount: 0,
+  maxMembers: 5,
 }
 
-const members = [
-  {
-    id: "user_1",
-    name: "김개발",
-    email: "dev@acme.com",
-    avatar: null,
-    role: "owner" as const,
-    status: "active" as const,
-    joinedAt: "2024-06-15T00:00:00Z",
-    lastActive: new Date().toISOString(),
-  },
-  {
-    id: "user_2",
-    name: "이관리",
-    email: "admin@acme.com",
-    avatar: null,
-    role: "admin" as const,
-    status: "active" as const,
-    joinedAt: "2024-07-01T00:00:00Z",
-    lastActive: new Date(Date.now() - 3600000).toISOString(),
-  },
-  {
-    id: "user_3",
-    name: "박프론트",
-    email: "frontend@acme.com",
-    avatar: null,
-    role: "developer" as const,
-    status: "active" as const,
-    joinedAt: "2024-08-15T00:00:00Z",
-    lastActive: new Date(Date.now() - 86400000).toISOString(),
-  },
-  {
-    id: "user_4",
-    name: "최백엔드",
-    email: "backend@acme.com",
-    avatar: null,
-    role: "developer" as const,
-    status: "pending" as const,
-    joinedAt: "2025-01-10T00:00:00Z",
-    lastActive: null,
-  },
-]
+type Member = {
+  id: string
+  name: string
+  email: string
+  avatar: string | null
+  role: "owner" | "admin" | "developer" | "viewer"
+  status: "active" | "pending" | "inactive"
+  joinedAt: string
+  lastActive: string | null
+}
 
-const pendingInvites = [
-  {
-    id: "invite_1",
-    email: "newdev@acme.com",
-    role: "developer" as const,
-    invitedBy: "김개발",
-    invitedAt: new Date(Date.now() - 86400000).toISOString(),
-    expiresAt: new Date(Date.now() + 6 * 86400000).toISOString(),
-  },
-]
+const members: Member[] = []
+
+type PendingInvite = {
+  id: string
+  email: string
+  role: "admin" | "developer" | "viewer"
+  invitedBy: string
+  invitedAt: string
+  expiresAt: string
+}
+
+const pendingInvites: PendingInvite[] = []
 
 const roles = [
   {
@@ -363,6 +333,13 @@ export default function TeamPage() {
                   ))}
                 </TableBody>
               </Table>
+
+              {filteredMembers.length === 0 && (
+                <div className="py-12 text-center">
+                  <Users className="text-muted-foreground/30 mx-auto mb-2 h-12 w-12" />
+                  <p className="text-muted-foreground">팀원이 없습니다</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

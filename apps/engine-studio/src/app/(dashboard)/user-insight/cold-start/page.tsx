@@ -49,11 +49,6 @@ import {
   AreaChart,
   Area,
 } from "recharts"
-import {
-  MOCK_COLD_START_STATS,
-  MOCK_COLD_START_TREND_DATA,
-  MOCK_COLD_START_QUESTION_SETS,
-} from "@/services/mock-data.service"
 
 // Cold Start mode configuration with icons (icons cannot be serialized in mock-data.service)
 // The base data comes from the centralized service, icons are added here
@@ -113,10 +108,23 @@ const COLD_START_MODES: ColdStartModeWithIcon[] = [
   },
 ]
 
-// Use centralized mock data
-const COLD_START_STATS = MOCK_COLD_START_STATS
-const TREND_DATA = MOCK_COLD_START_TREND_DATA
-const QUESTION_SETS = MOCK_COLD_START_QUESTION_SETS
+// Cold Start stats - default empty values
+const COLD_START_STATS = {
+  todayNewUsers: 0,
+  avgCompletionRate: 0,
+  avgTimeToComplete: "-",
+  modeDistribution: { quick: 0, standard: 0, deep: 0 },
+}
+
+// Trend data - empty by default
+const TREND_DATA: { date: string; quick: number; standard: number; deep: number }[] = []
+
+// Question sets - empty by default
+const QUESTION_SETS: Record<string, { id: number; question: string; type: string }[]> = {
+  quick: [],
+  standard: [],
+  deep: [],
+}
 
 export default function ColdStartPage() {
   const [activeMode, setActiveMode] = useState("standard")
@@ -383,33 +391,46 @@ export default function ColdStartPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {QUESTION_SETS[activeMode as keyof typeof QUESTION_SETS]?.map((q, idx) => (
-                <div key={q.id} className="flex items-center gap-3 rounded-lg border p-3">
-                  <span className="bg-primary/10 flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium">
-                    {idx + 1}
-                  </span>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{q.question}</p>
-                    <Badge variant="secondary" className="mt-1 text-xs">
-                      {q.type === "single"
-                        ? "단일 선택"
-                        : q.type === "multi"
-                          ? "복수 선택"
-                          : q.type === "ranking"
-                            ? "순위"
-                            : "척도"}
-                    </Badge>
+            {QUESTION_SETS[activeMode as keyof typeof QUESTION_SETS]?.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Target className="text-muted-foreground mb-4 h-10 w-10" />
+                <h3 className="mb-2 font-medium">등록된 질문이 없습니다</h3>
+                <p className="text-muted-foreground mb-4 text-sm">
+                  질문을 추가하여 사용자 프로필 수집을 시작하세요.
+                </p>
+                <Button variant="outline" onClick={handleAddQuestion}>
+                  + 질문 추가
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {QUESTION_SETS[activeMode as keyof typeof QUESTION_SETS]?.map((q, idx) => (
+                  <div key={q.id} className="flex items-center gap-3 rounded-lg border p-3">
+                    <span className="bg-primary/10 flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium">
+                      {idx + 1}
+                    </span>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{q.question}</p>
+                      <Badge variant="secondary" className="mt-1 text-xs">
+                        {q.type === "single"
+                          ? "단일 선택"
+                          : q.type === "multi"
+                            ? "복수 선택"
+                            : q.type === "ranking"
+                              ? "순위"
+                              : "척도"}
+                      </Badge>
+                    </div>
+                    {isEditing && (
+                      <Button variant="ghost" size="sm" onClick={() => handleEditQuestion(q)}>
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
-                  {isEditing && (
-                    <Button variant="ghost" size="sm" onClick={() => handleEditQuestion(q)}>
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-            {isEditing && (
+                ))}
+              </div>
+            )}
+            {isEditing && QUESTION_SETS[activeMode as keyof typeof QUESTION_SETS]?.length > 0 && (
               <Button variant="outline" className="mt-4 w-full" onClick={handleAddQuestion}>
                 + 질문 추가
               </Button>

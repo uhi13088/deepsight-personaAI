@@ -104,147 +104,10 @@ interface Branch {
   }
 }
 
-// 목 데이터
-const mockVersions: Version[] = [
-  {
-    id: "v-001",
-    tag: "v2.4.1",
-    name: "Persona Matching Hotfix",
-    description: "매칭 알고리즘 정확도 개선 및 성능 최적화",
-    commitHash: "a1b2c3d4e5f6",
-    branch: "main",
-    createdBy: "김민수",
-    createdAt: "2024-01-15T10:30:00Z",
-    environment: "production",
-    status: "active",
-    changes: { added: 12, modified: 45, deleted: 8 },
-    components: ["Matching Engine", "Persona Builder"],
-  },
-  {
-    id: "v-002",
-    tag: "v2.4.0",
-    name: "User Insight v2",
-    description: "사용자 인사이트 엔진 v2 릴리즈 - 심리 분석 강화",
-    commitHash: "b2c3d4e5f6g7",
-    branch: "main",
-    createdBy: "이영희",
-    createdAt: "2024-01-10T14:00:00Z",
-    environment: "staging",
-    status: "active",
-    changes: { added: 89, modified: 156, deleted: 34 },
-    components: ["User Insight", "Psychometric Engine", "Dashboard"],
-  },
-  {
-    id: "v-003",
-    tag: "v2.3.5",
-    name: "Performance Optimization",
-    description: "전반적인 성능 최적화 및 메모리 사용량 개선",
-    commitHash: "c3d4e5f6g7h8",
-    branch: "main",
-    createdBy: "박지훈",
-    createdAt: "2024-01-05T09:00:00Z",
-    environment: null,
-    status: "deprecated",
-    changes: { added: 23, modified: 67, deleted: 12 },
-    components: ["Core Engine", "API Gateway"],
-  },
-  {
-    id: "v-004",
-    tag: "v2.3.0",
-    name: "Archetype System",
-    description: "새로운 아키타입 분류 시스템 도입",
-    commitHash: "d4e5f6g7h8i9",
-    branch: "main",
-    createdBy: "최수진",
-    createdAt: "2023-12-20T16:00:00Z",
-    environment: null,
-    status: "archived",
-    changes: { added: 234, modified: 89, deleted: 45 },
-    components: ["Archetype Engine", "User Insight"],
-  },
-]
-
-const mockCommits: Commit[] = [
-  {
-    hash: "a1b2c3d4e5f6g7h8i9j0",
-    shortHash: "a1b2c3d",
-    message: "fix: improve matching algorithm accuracy for edge cases",
-    author: "김민수",
-    authorEmail: "minsu.kim@deepsight.ai",
-    date: "2024-01-15T10:25:00Z",
-    branch: "main",
-    filesChanged: 8,
-  },
-  {
-    hash: "b2c3d4e5f6g7h8i9j0k1",
-    shortHash: "b2c3d4e",
-    message: "feat: add new psychometric analysis module",
-    author: "이영희",
-    authorEmail: "younghee.lee@deepsight.ai",
-    date: "2024-01-14T16:30:00Z",
-    branch: "develop",
-    filesChanged: 23,
-  },
-  {
-    hash: "c3d4e5f6g7h8i9j0k1l2",
-    shortHash: "c3d4e5f",
-    message: "refactor: optimize database queries for persona loading",
-    author: "박지훈",
-    authorEmail: "jihun.park@deepsight.ai",
-    date: "2024-01-14T11:00:00Z",
-    branch: "develop",
-    filesChanged: 12,
-  },
-  {
-    hash: "d4e5f6g7h8i9j0k1l2m3",
-    shortHash: "d4e5f6g",
-    message: "docs: update API documentation for v2.4",
-    author: "최수진",
-    authorEmail: "sujin.choi@deepsight.ai",
-    date: "2024-01-13T14:00:00Z",
-    branch: "main",
-    filesChanged: 5,
-  },
-]
-
-const mockBranches: Branch[] = [
-  {
-    name: "main",
-    lastCommit: "fix: improve matching algorithm accuracy",
-    lastCommitDate: "2024-01-15T10:25:00Z",
-    author: "김민수",
-    isProtected: true,
-    isDefault: true,
-    aheadBehind: { ahead: 0, behind: 0 },
-  },
-  {
-    name: "develop",
-    lastCommit: "feat: add new psychometric analysis",
-    lastCommitDate: "2024-01-14T16:30:00Z",
-    author: "이영희",
-    isProtected: true,
-    isDefault: false,
-    aheadBehind: { ahead: 5, behind: 0 },
-  },
-  {
-    name: "feature/matching-v2",
-    lastCommit: "wip: implementing new matching algo",
-    lastCommitDate: "2024-01-14T09:00:00Z",
-    author: "박지훈",
-    isProtected: false,
-    isDefault: false,
-    aheadBehind: { ahead: 12, behind: 3 },
-  },
-  {
-    name: "feature/user-insight-v2",
-    lastCommit: "feat: complete insight dashboard",
-    lastCommitDate: "2024-01-13T18:00:00Z",
-    author: "최수진",
-    isProtected: false,
-    isDefault: false,
-    aheadBehind: { ahead: 8, behind: 1 },
-  },
-]
+// TODO: API 연동 시 실제 데이터로 교체
+const mockVersions: Version[] = []
+const mockCommits: Commit[] = []
+const mockBranches: Branch[] = []
 
 export default function VersionControlPage() {
   const [versions] = useState<Version[]>(mockVersions)
@@ -590,97 +453,112 @@ export default function VersionControlPage() {
 
           {/* 버전 목록 */}
           <div className="space-y-4">
-            {versions
-              .filter((v) => v.tag.includes(searchQuery) || v.name.includes(searchQuery))
-              .map((version) => (
-                <Card key={version.id}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Tag className="text-primary h-5 w-5" />
-                          <CardTitle className="text-xl">{version.tag}</CardTitle>
-                          {getStatusBadge(version.status)}
-                          {getEnvironmentBadge(version.environment)}
+            {versions.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Tag className="text-muted-foreground mb-4 h-12 w-12" />
+                  <h3 className="mb-2 text-lg font-semibold">릴리즈가 없습니다</h3>
+                  <p className="text-muted-foreground mb-4 text-center text-sm">
+                    새 릴리즈를 생성하면 여기에 표시됩니다
+                  </p>
+                  <Button onClick={() => setIsCreateTagDialogOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" />새 릴리즈 생성
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              versions
+                .filter((v) => v.tag.includes(searchQuery) || v.name.includes(searchQuery))
+                .map((version) => (
+                  <Card key={version.id}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Tag className="text-primary h-5 w-5" />
+                            <CardTitle className="text-xl">{version.tag}</CardTitle>
+                            {getStatusBadge(version.status)}
+                            {getEnvironmentBadge(version.environment)}
+                          </div>
+                          <CardDescription className="text-base">{version.name}</CardDescription>
                         </div>
-                        <CardDescription className="text-base">{version.name}</CardDescription>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleViewVersionDetails(version)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              상세 보기
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDownloadSource(version)}>
+                              <Download className="mr-2 h-4 w-4" />
+                              소스 다운로드
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleRollback(version)}>
+                              <RotateCcw className="mr-2 h-4 w-4" />이 버전으로 롤백
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => handleDeleteVersion(version)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              삭제
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewVersionDetails(version)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            상세 보기
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDownloadSource(version)}>
-                            <Download className="mr-2 h-4 w-4" />
-                            소스 다운로드
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleRollback(version)}>
-                            <RotateCcw className="mr-2 h-4 w-4" />이 버전으로 롤백
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => handleDeleteVersion(version)}
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-muted-foreground mb-4 text-sm">{version.description}</p>
+                      <div className="flex flex-wrap items-center gap-4 text-sm">
+                        <div className="text-muted-foreground flex items-center gap-1">
+                          <GitBranch className="h-4 w-4" />
+                          {version.branch}
+                        </div>
+                        <div className="text-muted-foreground flex items-center gap-1">
+                          <GitCommit className="h-4 w-4" />
+                          <button
+                            onClick={() => copyToClipboard(version.commitHash)}
+                            className="hover:text-foreground"
                           >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            삭제
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground mb-4 text-sm">{version.description}</p>
-                    <div className="flex flex-wrap items-center gap-4 text-sm">
-                      <div className="text-muted-foreground flex items-center gap-1">
-                        <GitBranch className="h-4 w-4" />
-                        {version.branch}
+                            {version.commitHash.substring(0, 7)}
+                          </button>
+                          <Copy
+                            className="hover:text-foreground h-3 w-3 cursor-pointer"
+                            onClick={() => copyToClipboard(version.commitHash)}
+                          />
+                        </div>
+                        <div className="text-muted-foreground flex items-center gap-1">
+                          <User className="h-4 w-4" />
+                          {version.createdBy}
+                        </div>
+                        <div className="text-muted-foreground flex items-center gap-1">
+                          <Clock className="h-4 w-4" />
+                          {new Date(version.createdAt).toLocaleDateString("ko-KR")}
+                        </div>
                       </div>
-                      <div className="text-muted-foreground flex items-center gap-1">
-                        <GitCommit className="h-4 w-4" />
-                        <button
-                          onClick={() => copyToClipboard(version.commitHash)}
-                          className="hover:text-foreground"
-                        >
-                          {version.commitHash.substring(0, 7)}
-                        </button>
-                        <Copy
-                          className="hover:text-foreground h-3 w-3 cursor-pointer"
-                          onClick={() => copyToClipboard(version.commitHash)}
-                        />
+                      <div className="mt-4 flex items-center gap-4">
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-green-600">+{version.changes.added}</span>
+                          <span className="text-yellow-600">~{version.changes.modified}</span>
+                          <span className="text-red-600">-{version.changes.deleted}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {version.components.map((comp) => (
+                            <Badge key={comp} variant="outline" className="text-xs">
+                              {comp}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
-                      <div className="text-muted-foreground flex items-center gap-1">
-                        <User className="h-4 w-4" />
-                        {version.createdBy}
-                      </div>
-                      <div className="text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        {new Date(version.createdAt).toLocaleDateString("ko-KR")}
-                      </div>
-                    </div>
-                    <div className="mt-4 flex items-center gap-4">
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="text-green-600">+{version.changes.added}</span>
-                        <span className="text-yellow-600">~{version.changes.modified}</span>
-                        <span className="text-red-600">-{version.changes.deleted}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {version.components.map((comp) => (
-                          <Badge key={comp} variant="outline" className="text-xs">
-                            {comp}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                ))
+            )}
           </div>
         </TabsContent>
 
@@ -709,44 +587,54 @@ export default function VersionControlPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {commits.map((commit) => (
-                  <div
-                    key={commit.hash}
-                    className="hover:bg-muted/50 flex items-start gap-4 rounded-lg border p-4 transition-colors"
-                  >
-                    <GitCommit className="text-muted-foreground mt-0.5 h-5 w-5" />
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-1 flex items-center gap-2">
-                        <span className="truncate font-medium">{commit.message}</span>
-                      </div>
-                      <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-sm">
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => copyToClipboard(commit.hash)}
-                            className="bg-muted hover:bg-muted/80 rounded px-1.5 py-0.5 font-mono text-xs"
-                          >
-                            {commit.shortHash}
-                          </button>
+              {commits.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <GitCommit className="text-muted-foreground mb-4 h-12 w-12" />
+                  <h3 className="mb-2 text-lg font-semibold">커밋 이력이 없습니다</h3>
+                  <p className="text-muted-foreground text-center text-sm">
+                    저장소가 연동되면 커밋 이력이 표시됩니다
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {commits.map((commit) => (
+                    <div
+                      key={commit.hash}
+                      className="hover:bg-muted/50 flex items-start gap-4 rounded-lg border p-4 transition-colors"
+                    >
+                      <GitCommit className="text-muted-foreground mt-0.5 h-5 w-5" />
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex items-center gap-2">
+                          <span className="truncate font-medium">{commit.message}</span>
                         </div>
-                        <Badge variant="outline" className="text-xs">
-                          <GitBranch className="mr-1 h-3 w-3" />
-                          {commit.branch}
-                        </Badge>
-                        <span>{commit.author}</span>
-                        <span>{new Date(commit.date).toLocaleString("ko-KR")}</span>
-                        <span className="flex items-center gap-1">
-                          <FileCode className="h-3 w-3" />
-                          {commit.filesChanged} files
-                        </span>
+                        <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-sm">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => copyToClipboard(commit.hash)}
+                              className="bg-muted hover:bg-muted/80 rounded px-1.5 py-0.5 font-mono text-xs"
+                            >
+                              {commit.shortHash}
+                            </button>
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            <GitBranch className="mr-1 h-3 w-3" />
+                            {commit.branch}
+                          </Badge>
+                          <span>{commit.author}</span>
+                          <span>{new Date(commit.date).toLocaleString("ko-KR")}</span>
+                          <span className="flex items-center gap-1">
+                            <FileCode className="h-3 w-3" />
+                            {commit.filesChanged} files
+                          </span>
+                        </div>
                       </div>
+                      <Button variant="ghost" size="sm" onClick={() => handleViewCommit(commit)}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => handleViewCommit(commit)}>
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -766,98 +654,111 @@ export default function VersionControlPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>브랜치</TableHead>
-                    <TableHead>최근 커밋</TableHead>
-                    <TableHead>작성자</TableHead>
-                    <TableHead>업데이트</TableHead>
-                    <TableHead>상태</TableHead>
-                    <TableHead className="text-right">작업</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {branches.map((branch) => (
-                    <TableRow key={branch.name}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <GitBranch className="text-muted-foreground h-4 w-4" />
-                          <span className="font-medium">{branch.name}</span>
-                          {branch.isDefault && (
-                            <Badge variant="secondary" className="text-xs">
-                              default
-                            </Badge>
-                          )}
-                          {branch.isProtected && (
-                            <Badge variant="outline" className="text-xs">
-                              <CheckCircle2 className="mr-1 h-3 w-3" />
-                              protected
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground max-w-[300px] truncate text-sm">
-                        {branch.lastCommit}
-                      </TableCell>
-                      <TableCell>{branch.author}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {new Date(branch.lastCommitDate).toLocaleDateString("ko-KR")}
-                      </TableCell>
-                      <TableCell>
-                        {branch.aheadBehind.ahead > 0 && (
-                          <span className="mr-2 text-sm text-green-600">
-                            +{branch.aheadBehind.ahead} ahead
-                          </span>
-                        )}
-                        {branch.aheadBehind.behind > 0 && (
-                          <span className="text-sm text-red-600">
-                            -{branch.aheadBehind.behind} behind
-                          </span>
-                        )}
-                        {branch.aheadBehind.ahead === 0 && branch.aheadBehind.behind === 0 && (
-                          <span className="text-muted-foreground text-sm">up to date</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleViewBranchCommits(branch)}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              커밋 보기
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleCreatePR(branch)}>
-                              <GitPullRequest className="mr-2 h-4 w-4" />
-                              PR 생성
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleMergeBranch(branch)}>
-                              <GitMerge className="mr-2 h-4 w-4" />
-                              Merge
-                            </DropdownMenuItem>
-                            {!branch.isProtected && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="text-destructive"
-                                  onClick={() => handleDeleteBranch(branch)}
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  삭제
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+              {branches.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <GitBranch className="text-muted-foreground mb-4 h-12 w-12" />
+                  <h3 className="mb-2 text-lg font-semibold">브랜치가 없습니다</h3>
+                  <p className="text-muted-foreground mb-4 text-center text-sm">
+                    저장소가 연동되면 브랜치 목록이 표시됩니다
+                  </p>
+                  <Button variant="outline" onClick={handleCreateBranch}>
+                    <Plus className="mr-2 h-4 w-4" />새 브랜치 생성
+                  </Button>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>브랜치</TableHead>
+                      <TableHead>최근 커밋</TableHead>
+                      <TableHead>작성자</TableHead>
+                      <TableHead>업데이트</TableHead>
+                      <TableHead>상태</TableHead>
+                      <TableHead className="text-right">작업</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {branches.map((branch) => (
+                      <TableRow key={branch.name}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <GitBranch className="text-muted-foreground h-4 w-4" />
+                            <span className="font-medium">{branch.name}</span>
+                            {branch.isDefault && (
+                              <Badge variant="secondary" className="text-xs">
+                                default
+                              </Badge>
+                            )}
+                            {branch.isProtected && (
+                              <Badge variant="outline" className="text-xs">
+                                <CheckCircle2 className="mr-1 h-3 w-3" />
+                                protected
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground max-w-[300px] truncate text-sm">
+                          {branch.lastCommit}
+                        </TableCell>
+                        <TableCell>{branch.author}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {new Date(branch.lastCommitDate).toLocaleDateString("ko-KR")}
+                        </TableCell>
+                        <TableCell>
+                          {branch.aheadBehind.ahead > 0 && (
+                            <span className="mr-2 text-sm text-green-600">
+                              +{branch.aheadBehind.ahead} ahead
+                            </span>
+                          )}
+                          {branch.aheadBehind.behind > 0 && (
+                            <span className="text-sm text-red-600">
+                              -{branch.aheadBehind.behind} behind
+                            </span>
+                          )}
+                          {branch.aheadBehind.ahead === 0 && branch.aheadBehind.behind === 0 && (
+                            <span className="text-muted-foreground text-sm">up to date</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleViewBranchCommits(branch)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                커밋 보기
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleCreatePR(branch)}>
+                                <GitPullRequest className="mr-2 h-4 w-4" />
+                                PR 생성
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleMergeBranch(branch)}>
+                                <GitMerge className="mr-2 h-4 w-4" />
+                                Merge
+                              </DropdownMenuItem>
+                              {!branch.isProtected && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive"
+                                    onClick={() => handleDeleteBranch(branch)}
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    삭제
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

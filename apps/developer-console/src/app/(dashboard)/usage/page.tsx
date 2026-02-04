@@ -41,81 +41,42 @@ import {
 } from "@/components/ui/table"
 import { cn, formatNumber, formatCurrency } from "@/lib/utils"
 
-// Mock data
+// Empty data - will be fetched from API
 const usageOverview = {
-  totalCalls: 156789,
-  successfulCalls: 155234,
-  failedCalls: 1555,
-  averageLatency: 142,
-  p95Latency: 285,
-  p99Latency: 412,
-  totalCost: 312.45,
-  quotaUsed: 65,
-  quotaLimit: 500000,
+  totalCalls: 0,
+  successfulCalls: 0,
+  failedCalls: 0,
+  averageLatency: 0,
+  p95Latency: 0,
+  p99Latency: 0,
+  totalCost: 0,
+  quotaUsed: 0,
+  quotaLimit: 50000,
 }
 
-const dailyUsage = [
-  { date: "Jan 10", calls: 22100, success: 21890, failed: 210, cost: 44.2 },
-  { date: "Jan 11", calls: 24250, success: 24100, failed: 150, cost: 48.5 },
-  { date: "Jan 12", calls: 19800, success: 19650, failed: 150, cost: 39.6 },
-  { date: "Jan 13", calls: 26400, success: 26200, failed: 200, cost: 52.8 },
-  { date: "Jan 14", calls: 25380, success: 25100, failed: 280, cost: 50.76 },
-  { date: "Jan 15", calls: 21200, success: 21050, failed: 150, cost: 42.4 },
-  { date: "Jan 16", calls: 17659, success: 17244, failed: 415, cost: 33.32 },
-]
+const dailyUsage: { date: string; calls: number; success: number; failed: number; cost: number }[] =
+  []
 
-const endpointUsage = [
-  { endpoint: "/v1/match", calls: 98500, percentage: 62.8, avgLatency: 156, successRate: 99.1 },
-  { endpoint: "/v1/personas", calls: 35200, percentage: 22.4, avgLatency: 45, successRate: 99.8 },
-  { endpoint: "/v1/feedback", calls: 18400, percentage: 11.7, avgLatency: 32, successRate: 99.5 },
-  { endpoint: "/v1/batch-match", calls: 4689, percentage: 3.0, avgLatency: 890, successRate: 98.2 },
-]
+const endpointUsage: {
+  endpoint: string
+  calls: number
+  percentage: number
+  avgLatency: number
+  successRate: number
+}[] = []
 
-const errorBreakdown = [
-  { code: 400, count: 890, description: "Bad Request", percentage: 57.2 },
-  { code: 401, count: 234, description: "Unauthorized", percentage: 15.0 },
-  { code: 429, count: 312, description: "Rate Limited", percentage: 20.1 },
-  { code: 500, count: 119, description: "Internal Error", percentage: 7.7 },
-]
+const errorBreakdown: { code: number; count: number; description: string; percentage: number }[] =
+  []
 
-const hourlyDistribution = [
-  { hour: "00", calls: 2100 },
-  { hour: "01", calls: 1800 },
-  { hour: "02", calls: 1500 },
-  { hour: "03", calls: 1200 },
-  { hour: "04", calls: 1100 },
-  { hour: "05", calls: 1300 },
-  { hour: "06", calls: 2500 },
-  { hour: "07", calls: 4200 },
-  { hour: "08", calls: 6800 },
-  { hour: "09", calls: 9200 },
-  { hour: "10", calls: 11500 },
-  { hour: "11", calls: 12100 },
-  { hour: "12", calls: 10800 },
-  { hour: "13", calls: 11200 },
-  { hour: "14", calls: 12500 },
-  { hour: "15", calls: 11800 },
-  { hour: "16", calls: 10200 },
-  { hour: "17", calls: 8500 },
-  { hour: "18", calls: 7200 },
-  { hour: "19", calls: 6100 },
-  { hour: "20", calls: 5200 },
-  { hour: "21", calls: 4500 },
-  { hour: "22", calls: 3800 },
-  { hour: "23", calls: 2900 },
-]
+const hourlyDistribution: { hour: string; calls: number }[] = []
 
-const regionUsage = [
-  { region: "Asia Pacific", calls: 89500, percentage: 57.1 },
-  { region: "North America", calls: 42300, percentage: 27.0 },
-  { region: "Europe", calls: 18900, percentage: 12.1 },
-  { region: "Others", calls: 6089, percentage: 3.9 },
-]
+const regionUsage: { region: string; calls: number; percentage: number }[] = []
 
 export default function UsagePage() {
   const [dateRange, setDateRange] = React.useState("7d")
-  const maxDailyCalls = Math.max(...dailyUsage.map((d) => d.calls))
-  const maxHourlyCalls = Math.max(...hourlyDistribution.map((h) => h.calls))
+  const maxDailyCalls = dailyUsage.length > 0 ? Math.max(...dailyUsage.map((d) => d.calls)) : 0
+  const maxHourlyCalls =
+    hourlyDistribution.length > 0 ? Math.max(...hourlyDistribution.map((h) => h.calls)) : 0
 
   return (
     <div className="space-y-6">
@@ -230,43 +191,54 @@ export default function UsagePage() {
                 <CardDescription>일별 API 호출 추이</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex h-[300px] items-end gap-2">
-                  {dailyUsage.map((day, i) => {
-                    const successHeight = (day.success / maxDailyCalls) * 100
-                    const failedHeight = (day.failed / maxDailyCalls) * 100
-                    return (
-                      <div key={i} className="flex flex-1 flex-col items-center gap-1">
-                        <div className="flex w-full flex-col" style={{ height: "260px" }}>
-                          <div className="flex-1" />
-                          <div
-                            className="w-full rounded-t bg-red-500"
-                            style={{
-                              height: `${failedHeight}%`,
-                              minHeight: day.failed > 0 ? "2px" : "0",
-                            }}
-                          />
-                          <div
-                            className="bg-primary w-full"
-                            style={{ height: `${successHeight}%` }}
-                          />
-                        </div>
-                        <span className="text-muted-foreground text-xs">
-                          {day.date.split(" ")[1]}
-                        </span>
+                {dailyUsage.length > 0 ? (
+                  <>
+                    <div className="flex h-[300px] items-end gap-2">
+                      {dailyUsage.map((day, i) => {
+                        const successHeight = (day.success / maxDailyCalls) * 100
+                        const failedHeight = (day.failed / maxDailyCalls) * 100
+                        return (
+                          <div key={i} className="flex flex-1 flex-col items-center gap-1">
+                            <div className="flex w-full flex-col" style={{ height: "260px" }}>
+                              <div className="flex-1" />
+                              <div
+                                className="w-full rounded-t bg-red-500"
+                                style={{
+                                  height: `${failedHeight}%`,
+                                  minHeight: day.failed > 0 ? "2px" : "0",
+                                }}
+                              />
+                              <div
+                                className="bg-primary w-full"
+                                style={{ height: `${successHeight}%` }}
+                              />
+                            </div>
+                            <span className="text-muted-foreground text-xs">
+                              {day.date.split(" ")[1]}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="mt-4 flex items-center justify-center gap-6">
+                      <div className="flex items-center gap-2">
+                        <div className="bg-primary h-3 w-3 rounded" />
+                        <span className="text-muted-foreground text-sm">Success</span>
                       </div>
-                    )
-                  })}
-                </div>
-                <div className="mt-4 flex items-center justify-center gap-6">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-primary h-3 w-3 rounded" />
-                    <span className="text-muted-foreground text-sm">Success</span>
+                      <div className="flex items-center gap-2">
+                        <div className="h-3 w-3 rounded bg-red-500" />
+                        <span className="text-muted-foreground text-sm">Failed</span>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex h-[300px] items-center justify-center">
+                    <div className="text-center">
+                      <BarChart3 className="text-muted-foreground/30 mx-auto mb-2 h-12 w-12" />
+                      <p className="text-muted-foreground">사용 데이터가 없습니다</p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded bg-red-500" />
-                    <span className="text-muted-foreground text-sm">Failed</span>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
 
@@ -304,7 +276,9 @@ export default function UsagePage() {
                     <div>
                       <p className="text-muted-foreground">Peak Day</p>
                       <p className="font-medium">
-                        {formatNumber(Math.max(...dailyUsage.map((d) => d.calls)))}
+                        {formatNumber(
+                          dailyUsage.length > 0 ? Math.max(...dailyUsage.map((d) => d.calls)) : 0
+                        )}
                       </p>
                     </div>
                   </div>
@@ -324,36 +298,43 @@ export default function UsagePage() {
               <CardDescription>일별 상세 사용량</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Total Calls</TableHead>
-                    <TableHead className="text-right">Success</TableHead>
-                    <TableHead className="text-right">Failed</TableHead>
-                    <TableHead className="text-right">Success Rate</TableHead>
-                    <TableHead className="text-right">Est. Cost</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {dailyUsage.map((day) => (
-                    <TableRow key={day.date}>
-                      <TableCell className="font-medium">{day.date}</TableCell>
-                      <TableCell className="text-right">{formatNumber(day.calls)}</TableCell>
-                      <TableCell className="text-right text-green-600">
-                        {formatNumber(day.success)}
-                      </TableCell>
-                      <TableCell className="text-right text-red-600">
-                        {formatNumber(day.failed)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {((day.success / day.calls) * 100).toFixed(2)}%
-                      </TableCell>
-                      <TableCell className="text-right">{formatCurrency(day.cost)}</TableCell>
+              {dailyUsage.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead className="text-right">Total Calls</TableHead>
+                      <TableHead className="text-right">Success</TableHead>
+                      <TableHead className="text-right">Failed</TableHead>
+                      <TableHead className="text-right">Success Rate</TableHead>
+                      <TableHead className="text-right">Est. Cost</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {dailyUsage.map((day) => (
+                      <TableRow key={day.date}>
+                        <TableCell className="font-medium">{day.date}</TableCell>
+                        <TableCell className="text-right">{formatNumber(day.calls)}</TableCell>
+                        <TableCell className="text-right text-green-600">
+                          {formatNumber(day.success)}
+                        </TableCell>
+                        <TableCell className="text-right text-red-600">
+                          {formatNumber(day.failed)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {((day.success / day.calls) * 100).toFixed(2)}%
+                        </TableCell>
+                        <TableCell className="text-right">{formatCurrency(day.cost)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="py-12 text-center">
+                  <Activity className="text-muted-foreground/30 mx-auto mb-2 h-12 w-12" />
+                  <p className="text-muted-foreground">일별 사용 데이터가 없습니다</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -366,45 +347,52 @@ export default function UsagePage() {
               <CardDescription>엔드포인트별 사용량 및 성능</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Endpoint</TableHead>
-                    <TableHead className="text-right">Calls</TableHead>
-                    <TableHead>Share</TableHead>
-                    <TableHead className="text-right">Avg Latency</TableHead>
-                    <TableHead className="text-right">Success Rate</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {endpointUsage.map((endpoint) => (
-                    <TableRow key={endpoint.endpoint}>
-                      <TableCell>
-                        <code className="bg-muted rounded px-2 py-1 font-mono text-sm">
-                          {endpoint.endpoint}
-                        </code>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatNumber(endpoint.calls)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Progress value={endpoint.percentage} className="h-2 w-20" />
-                          <span className="text-muted-foreground w-12 text-sm">
-                            {endpoint.percentage}%
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">{endpoint.avgLatency}ms</TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant={endpoint.successRate >= 99 ? "success" : "secondary"}>
-                          {endpoint.successRate}%
-                        </Badge>
-                      </TableCell>
+              {endpointUsage.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Endpoint</TableHead>
+                      <TableHead className="text-right">Calls</TableHead>
+                      <TableHead>Share</TableHead>
+                      <TableHead className="text-right">Avg Latency</TableHead>
+                      <TableHead className="text-right">Success Rate</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {endpointUsage.map((endpoint) => (
+                      <TableRow key={endpoint.endpoint}>
+                        <TableCell>
+                          <code className="bg-muted rounded px-2 py-1 font-mono text-sm">
+                            {endpoint.endpoint}
+                          </code>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatNumber(endpoint.calls)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Progress value={endpoint.percentage} className="h-2 w-20" />
+                            <span className="text-muted-foreground w-12 text-sm">
+                              {endpoint.percentage}%
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">{endpoint.avgLatency}ms</TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant={endpoint.successRate >= 99 ? "success" : "secondary"}>
+                            {endpoint.successRate}%
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="py-12 text-center">
+                  <Activity className="text-muted-foreground/30 mx-auto mb-2 h-12 w-12" />
+                  <p className="text-muted-foreground">엔드포인트 사용 데이터가 없습니다</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -416,19 +404,26 @@ export default function UsagePage() {
                 <CardDescription>API 호출 비율</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {endpointUsage.map((endpoint) => (
-                    <div key={endpoint.endpoint} className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <code className="font-mono">{endpoint.endpoint}</code>
-                        <span className="text-muted-foreground">
-                          {formatNumber(endpoint.calls)} ({endpoint.percentage}%)
-                        </span>
+                {endpointUsage.length > 0 ? (
+                  <div className="space-y-4">
+                    {endpointUsage.map((endpoint) => (
+                      <div key={endpoint.endpoint} className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <code className="font-mono">{endpoint.endpoint}</code>
+                          <span className="text-muted-foreground">
+                            {formatNumber(endpoint.calls)} ({endpoint.percentage}%)
+                          </span>
+                        </div>
+                        <Progress value={endpoint.percentage} className="h-2" />
                       </div>
-                      <Progress value={endpoint.percentage} className="h-2" />
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-8 text-center">
+                    <PieChart className="text-muted-foreground/30 mx-auto mb-2 h-8 w-8" />
+                    <p className="text-muted-foreground text-sm">데이터가 없습니다</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -438,33 +433,40 @@ export default function UsagePage() {
                 <CardDescription>엔드포인트별 평균 응답 시간</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {endpointUsage.map((endpoint) => {
-                    const maxLatency = Math.max(...endpointUsage.map((e) => e.avgLatency))
-                    const latencyPercent = (endpoint.avgLatency / maxLatency) * 100
-                    return (
-                      <div key={endpoint.endpoint} className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <code className="font-mono">{endpoint.endpoint}</code>
-                          <span className="font-medium">{endpoint.avgLatency}ms</span>
+                {endpointUsage.length > 0 ? (
+                  <div className="space-y-4">
+                    {endpointUsage.map((endpoint) => {
+                      const maxLatency = Math.max(...endpointUsage.map((e) => e.avgLatency))
+                      const latencyPercent = (endpoint.avgLatency / maxLatency) * 100
+                      return (
+                        <div key={endpoint.endpoint} className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <code className="font-mono">{endpoint.endpoint}</code>
+                            <span className="font-medium">{endpoint.avgLatency}ms</span>
+                          </div>
+                          <div className="bg-muted h-2 overflow-hidden rounded-full">
+                            <div
+                              className={cn(
+                                "h-full rounded-full",
+                                endpoint.avgLatency < 100
+                                  ? "bg-green-500"
+                                  : endpoint.avgLatency < 300
+                                    ? "bg-yellow-500"
+                                    : "bg-red-500"
+                              )}
+                              style={{ width: `${latencyPercent}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="bg-muted h-2 overflow-hidden rounded-full">
-                          <div
-                            className={cn(
-                              "h-full rounded-full",
-                              endpoint.avgLatency < 100
-                                ? "bg-green-500"
-                                : endpoint.avgLatency < 300
-                                  ? "bg-yellow-500"
-                                  : "bg-red-500"
-                            )}
-                            style={{ width: `${latencyPercent}%` }}
-                          />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="py-8 text-center">
+                    <Clock className="text-muted-foreground/30 mx-auto mb-2 h-8 w-8" />
+                    <p className="text-muted-foreground text-sm">데이터가 없습니다</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -483,8 +485,10 @@ export default function UsagePage() {
                   {formatNumber(usageOverview.failedCalls)}
                 </div>
                 <p className="text-muted-foreground mt-1 text-xs">
-                  {((usageOverview.failedCalls / usageOverview.totalCalls) * 100).toFixed(2)}% of
-                  total calls
+                  {usageOverview.totalCalls > 0
+                    ? ((usageOverview.failedCalls / usageOverview.totalCalls) * 100).toFixed(2)
+                    : 0}
+                  % of total calls
                 </p>
               </CardContent>
             </Card>
@@ -495,8 +499,14 @@ export default function UsagePage() {
                 <Zap className="text-muted-foreground h-4 w-4" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">400</div>
-                <p className="text-muted-foreground mt-1 text-xs">Bad Request (57.2%)</p>
+                <div className="text-2xl font-bold">
+                  {errorBreakdown.length > 0 ? errorBreakdown[0].code : "-"}
+                </div>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  {errorBreakdown.length > 0
+                    ? `${errorBreakdown[0].description} (${errorBreakdown[0].percentage}%)`
+                    : "에러 없음"}
+                </p>
               </CardContent>
             </Card>
 
@@ -506,7 +516,9 @@ export default function UsagePage() {
                 <TrendingUp className="text-muted-foreground h-4 w-4" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{formatNumber(312)}</div>
+                <div className="text-2xl font-bold">
+                  {formatNumber(errorBreakdown.find((e) => e.code === 429)?.count || 0)}
+                </div>
                 <p className="text-muted-foreground mt-1 text-xs">429 responses</p>
               </CardContent>
             </Card>
@@ -518,35 +530,42 @@ export default function UsagePage() {
               <CardDescription>HTTP 상태 코드별 에러 분석</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Status Code</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Count</TableHead>
-                    <TableHead>Share</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {errorBreakdown.map((error) => (
-                    <TableRow key={error.code}>
-                      <TableCell>
-                        <Badge variant="destructive">{error.code}</Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">{error.description}</TableCell>
-                      <TableCell className="text-right">{formatNumber(error.count)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Progress value={error.percentage} className="h-2 w-20" />
-                          <span className="text-muted-foreground w-12 text-sm">
-                            {error.percentage}%
-                          </span>
-                        </div>
-                      </TableCell>
+              {errorBreakdown.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Status Code</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Count</TableHead>
+                      <TableHead>Share</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {errorBreakdown.map((error) => (
+                      <TableRow key={error.code}>
+                        <TableCell>
+                          <Badge variant="destructive">{error.code}</Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">{error.description}</TableCell>
+                        <TableCell className="text-right">{formatNumber(error.count)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Progress value={error.percentage} className="h-2 w-20" />
+                            <span className="text-muted-foreground w-12 text-sm">
+                              {error.percentage}%
+                            </span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="py-12 text-center">
+                  <CheckCircle className="mx-auto mb-2 h-12 w-12 text-green-500/30" />
+                  <p className="text-muted-foreground">에러가 없습니다</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -561,26 +580,37 @@ export default function UsagePage() {
                 <CardDescription>시간대별 API 호출 분포 (UTC)</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex h-[200px] items-end gap-1">
-                  {hourlyDistribution.map((hour, i) => {
-                    const heightPercent = (hour.calls / maxHourlyCalls) * 100
-                    return (
-                      <div key={i} className="flex flex-1 flex-col items-center gap-1">
-                        <div
-                          className="bg-primary hover:bg-primary/80 w-full rounded-t transition-all"
-                          style={{ height: `${heightPercent}%`, minHeight: "2px" }}
-                        />
-                      </div>
-                    )
-                  })}
-                </div>
-                <div className="text-muted-foreground mt-2 flex justify-between text-xs">
-                  <span>00:00</span>
-                  <span>06:00</span>
-                  <span>12:00</span>
-                  <span>18:00</span>
-                  <span>23:00</span>
-                </div>
+                {hourlyDistribution.length > 0 ? (
+                  <>
+                    <div className="flex h-[200px] items-end gap-1">
+                      {hourlyDistribution.map((hour, i) => {
+                        const heightPercent = (hour.calls / maxHourlyCalls) * 100
+                        return (
+                          <div key={i} className="flex flex-1 flex-col items-center gap-1">
+                            <div
+                              className="bg-primary hover:bg-primary/80 w-full rounded-t transition-all"
+                              style={{ height: `${heightPercent}%`, minHeight: "2px" }}
+                            />
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="text-muted-foreground mt-2 flex justify-between text-xs">
+                      <span>00:00</span>
+                      <span>06:00</span>
+                      <span>12:00</span>
+                      <span>18:00</span>
+                      <span>23:00</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex h-[200px] items-center justify-center">
+                    <div className="text-center">
+                      <Clock className="text-muted-foreground/30 mx-auto mb-2 h-8 w-8" />
+                      <p className="text-muted-foreground text-sm">시간대별 데이터가 없습니다</p>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -591,22 +621,29 @@ export default function UsagePage() {
                 <CardDescription>지역별 API 호출 분포</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {regionUsage.map((region) => (
-                    <div key={region.region} className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2">
-                          <Globe className="text-muted-foreground h-4 w-4" />
-                          <span>{region.region}</span>
+                {regionUsage.length > 0 ? (
+                  <div className="space-y-4">
+                    {regionUsage.map((region) => (
+                      <div key={region.region} className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-2">
+                            <Globe className="text-muted-foreground h-4 w-4" />
+                            <span>{region.region}</span>
+                          </div>
+                          <span className="text-muted-foreground">
+                            {formatNumber(region.calls)} ({region.percentage}%)
+                          </span>
                         </div>
-                        <span className="text-muted-foreground">
-                          {formatNumber(region.calls)} ({region.percentage}%)
-                        </span>
+                        <Progress value={region.percentage} className="h-2" />
                       </div>
-                      <Progress value={region.percentage} className="h-2" />
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-8 text-center">
+                    <Globe className="text-muted-foreground/30 mx-auto mb-2 h-8 w-8" />
+                    <p className="text-muted-foreground text-sm">지역별 데이터가 없습니다</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -618,23 +655,56 @@ export default function UsagePage() {
               <CardDescription>피크 시간대 분석</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-lg border p-4">
-                  <p className="text-muted-foreground text-sm">Peak Hour</p>
-                  <p className="text-2xl font-bold">11:00 UTC</p>
-                  <p className="text-muted-foreground mt-1 text-sm">{formatNumber(12100)} calls</p>
+              {hourlyDistribution.length > 0 ? (
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="rounded-lg border p-4">
+                    <p className="text-muted-foreground text-sm">Peak Hour</p>
+                    <p className="text-2xl font-bold">
+                      {
+                        hourlyDistribution.reduce(
+                          (max, h) => (h.calls > max.calls ? h : max),
+                          hourlyDistribution[0]
+                        ).hour
+                      }
+                      :00 UTC
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-sm">
+                      {formatNumber(Math.max(...hourlyDistribution.map((h) => h.calls)))} calls
+                    </p>
+                  </div>
+                  <div className="rounded-lg border p-4">
+                    <p className="text-muted-foreground text-sm">Low Hour</p>
+                    <p className="text-2xl font-bold">
+                      {
+                        hourlyDistribution.reduce(
+                          (min, h) => (h.calls < min.calls ? h : min),
+                          hourlyDistribution[0]
+                        ).hour
+                      }
+                      :00 UTC
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-sm">
+                      {formatNumber(Math.min(...hourlyDistribution.map((h) => h.calls)))} calls
+                    </p>
+                  </div>
+                  <div className="rounded-lg border p-4">
+                    <p className="text-muted-foreground text-sm">Peak/Low Ratio</p>
+                    <p className="text-2xl font-bold">
+                      {Math.round(
+                        Math.max(...hourlyDistribution.map((h) => h.calls)) /
+                          Math.max(Math.min(...hourlyDistribution.map((h) => h.calls)), 1)
+                      )}
+                      x
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-sm">Consider load balancing</p>
+                  </div>
                 </div>
-                <div className="rounded-lg border p-4">
-                  <p className="text-muted-foreground text-sm">Low Hour</p>
-                  <p className="text-2xl font-bold">04:00 UTC</p>
-                  <p className="text-muted-foreground mt-1 text-sm">{formatNumber(1100)} calls</p>
+              ) : (
+                <div className="py-8 text-center">
+                  <BarChart3 className="text-muted-foreground/30 mx-auto mb-2 h-8 w-8" />
+                  <p className="text-muted-foreground text-sm">분석할 데이터가 없습니다</p>
                 </div>
-                <div className="rounded-lg border p-4">
-                  <p className="text-muted-foreground text-sm">Peak/Low Ratio</p>
-                  <p className="text-2xl font-bold">11x</p>
-                  <p className="text-muted-foreground mt-1 text-sm">Consider load balancing</p>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -62,18 +62,38 @@ import {
   Cell,
   Tooltip,
 } from "recharts"
-import {
-  MOCK_ARCHETYPES,
-  MOCK_ARCHETYPE_STATS,
-  type MockArchetype,
-} from "@/services/mock-data.service"
+// 아키타입 타입 정의
+interface Archetype {
+  id: string
+  name: string
+  description: string
+  vector: {
+    depth: number
+    lens: number
+    stance: number
+    scope: number
+    taste: number
+    purpose: number
+  }
+  color: string
+  userCount: number
+  percentage: number
+  trend: "up" | "down" | "stable"
+  trendValue: number
+  status: "active" | "inactive"
+  createdAt: string
+}
 
-// Re-export type for local use
-type Archetype = MockArchetype
+// Archetypes - empty by default, will be loaded from API
+const ARCHETYPES: Archetype[] = []
 
-// Use centralized mock data
-const ARCHETYPES = MOCK_ARCHETYPES
-const ARCHETYPE_STATS = MOCK_ARCHETYPE_STATS
+// Stats - default empty values
+const ARCHETYPE_STATS = {
+  totalUsers: 0,
+  avgMatchAccuracy: 0,
+  lastClusterUpdate: "-",
+  nextScheduledUpdate: "-",
+}
 
 export default function ArchetypesPage() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -328,95 +348,111 @@ export default function ArchetypesPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>아키타입</TableHead>
-                  <TableHead className="text-right">사용자 수</TableHead>
-                  <TableHead className="text-right">비율</TableHead>
-                  <TableHead className="text-right">추세</TableHead>
-                  <TableHead className="text-right">상태</TableHead>
-                  <TableHead className="w-10"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredArchetypes.map((archetype) => (
-                  <TableRow
-                    key={archetype.id}
-                    className="cursor-pointer"
-                    onClick={() => setSelectedArchetype(archetype)}
-                  >
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="h-3 w-3 rounded-full"
-                          style={{ backgroundColor: archetype.color }}
-                        />
-                        <div>
-                          <p className="font-medium">{archetype.name}</p>
-                          <p className="text-muted-foreground max-w-[200px] truncate text-xs">
-                            {archetype.description}
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {archetype.userCount.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right">{archetype.percentage.toFixed(1)}%</TableCell>
-                    <TableCell className="text-right">
-                      <div
-                        className={`flex items-center justify-end gap-1 ${
-                          archetype.trend === "up"
-                            ? "text-green-600"
-                            : archetype.trend === "down"
-                              ? "text-red-600"
-                              : "text-muted-foreground"
-                        }`}
-                      >
-                        {archetype.trend === "up" && <TrendingUp className="h-3 w-3" />}
-                        {archetype.trend === "down" && <TrendingDown className="h-3 w-3" />}
-                        {archetype.trendValue > 0 ? "+" : ""}
-                        {archetype.trendValue.toFixed(1)}%
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge variant={archetype.status === "active" ? "default" : "secondary"}>
-                        {archetype.status === "active" ? "활성" : "비활성"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="mr-2 h-4 w-4" />
-                            상세 보기
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Edit className="mr-2 h-4 w-4" />
-                            편집
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Copy className="mr-2 h-4 w-4" />
-                            복제
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            삭제
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+            {filteredArchetypes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Users className="text-muted-foreground mb-4 h-12 w-12" />
+                <h3 className="mb-2 text-lg font-medium">정의된 아키타입이 없습니다</h3>
+                <p className="text-muted-foreground mb-4 text-sm">
+                  새 아키타입을 추가하여 사용자 분류를 시작하세요.
+                </p>
+                <Button onClick={() => setShowCreateDialog(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  아키타입 추가
+                </Button>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>아키타입</TableHead>
+                    <TableHead className="text-right">사용자 수</TableHead>
+                    <TableHead className="text-right">비율</TableHead>
+                    <TableHead className="text-right">추세</TableHead>
+                    <TableHead className="text-right">상태</TableHead>
+                    <TableHead className="w-10"></TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredArchetypes.map((archetype) => (
+                    <TableRow
+                      key={archetype.id}
+                      className="cursor-pointer"
+                      onClick={() => setSelectedArchetype(archetype)}
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="h-3 w-3 rounded-full"
+                            style={{ backgroundColor: archetype.color }}
+                          />
+                          <div>
+                            <p className="font-medium">{archetype.name}</p>
+                            <p className="text-muted-foreground max-w-[200px] truncate text-xs">
+                              {archetype.description}
+                            </p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {archetype.userCount.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {archetype.percentage.toFixed(1)}%
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div
+                          className={`flex items-center justify-end gap-1 ${
+                            archetype.trend === "up"
+                              ? "text-green-600"
+                              : archetype.trend === "down"
+                                ? "text-red-600"
+                                : "text-muted-foreground"
+                          }`}
+                        >
+                          {archetype.trend === "up" && <TrendingUp className="h-3 w-3" />}
+                          {archetype.trend === "down" && <TrendingDown className="h-3 w-3" />}
+                          {archetype.trendValue > 0 ? "+" : ""}
+                          {archetype.trendValue.toFixed(1)}%
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant={archetype.status === "active" ? "default" : "secondary"}>
+                          {archetype.status === "active" ? "활성" : "비활성"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Eye className="mr-2 h-4 w-4" />
+                              상세 보기
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Edit className="mr-2 h-4 w-4" />
+                              편집
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Copy className="mr-2 h-4 w-4" />
+                              복제
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-destructive">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              삭제
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -60,7 +60,6 @@ import {
   BarChart,
   UserCog,
 } from "lucide-react"
-import { MOCK_TEAM_MEMBERS } from "@/services/mock-data.service"
 
 // 타입 정의
 interface Permission {
@@ -317,98 +316,8 @@ const permissionGroups: PermissionGroup[] = [
   },
 ]
 
-// TODO: Move role definitions to centralized mock-data.service when RBAC module is expanded
-// Role user counts are dynamically calculated from MOCK_TEAM_MEMBERS
-const getRoleUserCount = (roleCode: string): number => {
-  return MOCK_TEAM_MEMBERS.filter((m) => m.role === roleCode).length
-}
-
-// 역할 정의
-const mockRoles: Role[] = [
-  {
-    id: "role-001",
-    name: "관리자",
-    code: "ADMIN",
-    description: "시스템 전체 관리 권한을 가진 관리자 역할",
-    permissions: permissionGroups.flatMap((g) => g.permissions.map((p) => p.code)),
-    userCount: getRoleUserCount("ADMIN"),
-    isSystem: true,
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "role-002",
-    name: "AI 엔지니어",
-    code: "AI_ENGINEER",
-    description: "AI 모델 개발 및 페르소나 관리 권한",
-    permissions: [
-      "persona:read",
-      "persona:create",
-      "persona:update",
-      "persona:deploy",
-      "persona:incubator",
-      "insight:read",
-      "insight:analyze",
-      "insight:psychometric",
-      "insight:archetype",
-      "matching:simulate",
-      "matching:tune",
-      "matching:performance",
-      "config:model",
-    ],
-    userCount: getRoleUserCount("AI_ENGINEER"),
-    isSystem: true,
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "role-003",
-    name: "콘텐츠 매니저",
-    code: "CONTENT_MANAGER",
-    description: "페르소나 콘텐츠 관리 및 편집 권한",
-    permissions: ["persona:read", "persona:create", "persona:update", "insight:read"],
-    userCount: getRoleUserCount("CONTENT_MANAGER"),
-    isSystem: true,
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "role-004",
-    name: "분석가",
-    code: "ANALYST",
-    description: "데이터 조회 및 분석 권한 (읽기 전용)",
-    permissions: [
-      "persona:read",
-      "insight:read",
-      "insight:psychometric",
-      "matching:performance",
-      "ops:monitor",
-    ],
-    userCount: getRoleUserCount("ANALYST"),
-    isSystem: true,
-    createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z",
-  },
-  {
-    id: "role-005",
-    name: "운영 담당자",
-    code: "OPERATOR",
-    description: "시스템 운영 및 모니터링 권한",
-    permissions: [
-      "persona:read",
-      "system:deploy",
-      "system:version",
-      "system:events",
-      "ops:monitor",
-      "ops:incident",
-      "ops:backup",
-    ],
-    userCount: getRoleUserCount("OPERATOR"),
-    isSystem: false,
-    createdAt: "2024-01-10T00:00:00Z",
-    updatedAt: "2024-01-15T00:00:00Z",
-  },
-]
+// Roles - empty by default, will be loaded from API
+const mockRoles: Role[] = []
 
 export default function RolePermissionsPage() {
   const [roles, setRoles] = useState<Role[]>(mockRoles)
@@ -665,108 +574,121 @@ export default function RolePermissionsPage() {
           </div>
 
           {/* 역할 카드 */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredRoles.map((role) => (
-              <Card key={role.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`rounded-lg p-2 ${
-                          role.code === "ADMIN"
-                            ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
-                            : role.code === "AI_ENGINEER"
-                              ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
-                              : role.code === "CONTENT_MANAGER"
-                                ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                                : role.code === "ANALYST"
-                                  ? "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300"
-                                  : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                        }`}
-                      >
-                        <Shield className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg">{role.name}</CardTitle>
-                        <code className="text-muted-foreground text-xs">{role.code}</code>
-                      </div>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          disabled={role.isSystem && role.code === "ADMIN"}
+          {filteredRoles.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Shield className="text-muted-foreground mb-4 h-12 w-12" />
+              <h3 className="mb-2 text-lg font-medium">등록된 역할이 없습니다</h3>
+              <p className="text-muted-foreground mb-4 text-sm">
+                새 역할을 생성하여 팀원들에게 권한을 부여하세요.
+              </p>
+              <Button onClick={() => setIsCreateRoleDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />새 역할
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filteredRoles.map((role) => (
+                <Card key={role.id}>
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`rounded-lg p-2 ${
+                            role.code === "ADMIN"
+                              ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
+                              : role.code === "AI_ENGINEER"
+                                ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                                : role.code === "CONTENT_MANAGER"
+                                  ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                                  : role.code === "ANALYST"
+                                    ? "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300"
+                                    : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                          }`}
                         >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEditRole(role)}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          수정
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDuplicateRole(role)}>
-                          <Copy className="mr-2 h-4 w-4" />
-                          복제
-                        </DropdownMenuItem>
-                        {!role.isSystem && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => handleDeleteRole(role.id)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              삭제
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground mb-4 text-sm">{role.description}</p>
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-1">
-                        <Users className="text-muted-foreground h-4 w-4" />
-                        <span>{role.userCount}명</span>
+                          <Shield className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">{role.name}</CardTitle>
+                          <code className="text-muted-foreground text-xs">{role.code}</code>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Key className="text-muted-foreground h-4 w-4" />
-                        <span>{getPermissionCount(role)}</span>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled={role.isSystem && role.code === "ADMIN"}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditRole(role)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            수정
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDuplicateRole(role)}>
+                            <Copy className="mr-2 h-4 w-4" />
+                            복제
+                          </DropdownMenuItem>
+                          {!role.isSystem && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => handleDeleteRole(role.id)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                삭제
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                    {role.isSystem && (
-                      <Badge variant="secondary" className="text-xs">
-                        <Lock className="mr-1 h-3 w-3" />
-                        시스템
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* 주요 권한 표시 */}
-                  <div className="mt-4 border-t pt-4">
-                    <p className="text-muted-foreground mb-2 text-xs">주요 권한</p>
-                    <div className="flex flex-wrap gap-1">
-                      {role.permissions.slice(0, 5).map((perm) => (
-                        <Badge key={perm} variant="outline" className="text-xs">
-                          {perm.split(":")[0]}
-                        </Badge>
-                      ))}
-                      {role.permissions.length > 5 && (
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground mb-4 text-sm">{role.description}</p>
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-1">
+                          <Users className="text-muted-foreground h-4 w-4" />
+                          <span>{role.userCount}명</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Key className="text-muted-foreground h-4 w-4" />
+                          <span>{getPermissionCount(role)}</span>
+                        </div>
+                      </div>
+                      {role.isSystem && (
                         <Badge variant="secondary" className="text-xs">
-                          +{role.permissions.length - 5}
+                          <Lock className="mr-1 h-3 w-3" />
+                          시스템
                         </Badge>
                       )}
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+
+                    {/* 주요 권한 표시 */}
+                    <div className="mt-4 border-t pt-4">
+                      <p className="text-muted-foreground mb-2 text-xs">주요 권한</p>
+                      <div className="flex flex-wrap gap-1">
+                        {role.permissions.slice(0, 5).map((perm) => (
+                          <Badge key={perm} variant="outline" className="text-xs">
+                            {perm.split(":")[0]}
+                          </Badge>
+                        ))}
+                        {role.permissions.length > 5 && (
+                          <Badge variant="secondary" className="text-xs">
+                            +{role.permissions.length - 5}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         {/* 권한 매트릭스 탭 */}

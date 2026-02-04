@@ -48,9 +48,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { MOCK_TEAM_MEMBERS } from "@/services/mock-data.service"
-
-// TODO: Add MOCK_AUDIT_LOGS to @/services/mock-data.service for centralized audit log management
 // 감사 로그 타입
 interface AuditLog {
   id: string
@@ -67,103 +64,14 @@ interface AuditLog {
   status: "success" | "failure" | "warning"
 }
 
-const AUDIT_LOGS: AuditLog[] = [
-  {
-    id: "1",
-    timestamp: "2025-01-16 15:30:45",
-    user: { name: "김관리자", email: "admin@deepsight.ai" },
-    action: "LOGIN",
-    category: "auth",
-    resource: "Session",
-    details: "관리자 로그인 성공",
-    ip: "192.168.1.100",
-    status: "success",
-  },
-  {
-    id: "2",
-    timestamp: "2025-01-16 15:25:12",
-    user: { name: "이엔지니어", email: "engineer@deepsight.ai" },
-    action: "CREATE",
-    category: "persona",
-    resource: "Persona: 논리적 평론가",
-    details: "새 페르소나 생성",
-    ip: "192.168.1.101",
-    status: "success",
-  },
-  {
-    id: "3",
-    timestamp: "2025-01-16 15:20:33",
-    user: { name: "박콘텐츠", email: "content@deepsight.ai" },
-    action: "UPDATE",
-    category: "persona",
-    resource: "Persona: 감성 에세이스트",
-    details: "프롬프트 템플릿 수정",
-    ip: "192.168.1.102",
-    status: "success",
-  },
-  {
-    id: "4",
-    timestamp: "2025-01-16 15:15:20",
-    user: { name: "김관리자", email: "admin@deepsight.ai" },
-    action: "UPDATE",
-    category: "config",
-    resource: "Global Config",
-    details: "AI 모델 설정 변경",
-    ip: "192.168.1.100",
-    status: "success",
-  },
-  {
-    id: "5",
-    timestamp: "2025-01-16 15:10:05",
-    user: { name: "최분석", email: "analyst@deepsight.ai" },
-    action: "VIEW",
-    category: "system",
-    resource: "Performance Report",
-    details: "성능 리포트 조회",
-    ip: "192.168.1.103",
-    status: "success",
-  },
-  {
-    id: "6",
-    timestamp: "2025-01-16 15:05:48",
-    user: { name: "Unknown", email: "unknown@test.com" },
-    action: "LOGIN",
-    category: "auth",
-    resource: "Session",
-    details: "잘못된 비밀번호로 로그인 시도",
-    ip: "203.0.113.45",
-    status: "failure",
-  },
-  {
-    id: "7",
-    timestamp: "2025-01-16 15:00:22",
-    user: { name: "이엔지니어", email: "engineer@deepsight.ai" },
-    action: "DEPLOY",
-    category: "persona",
-    resource: "Persona: 트렌드 헌터",
-    details: "프로덕션 배포",
-    ip: "192.168.1.101",
-    status: "success",
-  },
-  {
-    id: "8",
-    timestamp: "2025-01-16 14:55:15",
-    user: { name: "김관리자", email: "admin@deepsight.ai" },
-    action: "CREATE",
-    category: "user",
-    resource: "User: 정신규",
-    details: "새 사용자 초대",
-    ip: "192.168.1.100",
-    status: "success",
-  },
-]
+// TODO: API 연동 시 실제 데이터로 교체
+const AUDIT_LOGS: AuditLog[] = []
 
-// TODO: Move AUDIT_STATS to @/services/mock-data.service
 const AUDIT_STATS = {
-  totalLogs: 1234,
-  todayLogs: 89,
-  failedAttempts: 3,
-  uniqueUsers: MOCK_TEAM_MEMBERS.filter((m) => m.status === "ACTIVE").length,
+  totalLogs: 0,
+  todayLogs: 0,
+  failedAttempts: 0,
+  uniqueUsers: 0,
 }
 
 export default function AuditLogsPage() {
@@ -391,35 +299,49 @@ export default function AuditLogsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredLogs.map((log) => (
-                <TableRow
-                  key={log.id}
-                  className="cursor-pointer"
-                  onClick={() => setSelectedLog(log)}
-                >
-                  <TableCell className="font-mono text-xs">{log.timestamp}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-6 w-6">
-                        <AvatarFallback className="text-xs">
-                          {log.user.name.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm">{log.user.name}</span>
+              {filteredLogs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-32 text-center">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <FileText className="text-muted-foreground h-8 w-8" />
+                      <p className="text-muted-foreground">감사 로그가 없습니다</p>
+                      <p className="text-muted-foreground text-sm">
+                        시스템 활동이 기록되면 여기에 표시됩니다
+                      </p>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {getActionIcon(log.action)}
-                      <span>{log.action}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>{getCategoryBadge(log.category)}</TableCell>
-                  <TableCell className="max-w-[200px] truncate">{log.resource}</TableCell>
-                  <TableCell className="font-mono text-xs">{log.ip}</TableCell>
-                  <TableCell className="text-right">{getStatusBadge(log.status)}</TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                filteredLogs.map((log) => (
+                  <TableRow
+                    key={log.id}
+                    className="cursor-pointer"
+                    onClick={() => setSelectedLog(log)}
+                  >
+                    <TableCell className="font-mono text-xs">{log.timestamp}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarFallback className="text-xs">
+                            {log.user.name.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm">{log.user.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {getActionIcon(log.action)}
+                        <span>{log.action}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>{getCategoryBadge(log.category)}</TableCell>
+                    <TableCell className="max-w-[200px] truncate">{log.resource}</TableCell>
+                    <TableCell className="font-mono text-xs">{log.ip}</TableCell>
+                    <TableCell className="text-right">{getStatusBadge(log.status)}</TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

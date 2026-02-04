@@ -50,7 +50,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { cn, formatNumber, formatCurrency } from "@/lib/utils"
 
-// Plan data based on documentation
+// Plan data based on documentation (static content)
 const plans = [
   {
     id: "free",
@@ -70,7 +70,7 @@ const plans = [
       { name: "우선 처리", included: false },
     ],
     recommended: false,
-    current: false,
+    current: true, // Default to Free plan
   },
   {
     id: "starter",
@@ -90,7 +90,7 @@ const plans = [
       { name: "우선 처리", included: false },
     ],
     recommended: true,
-    current: true,
+    current: false,
   },
   {
     id: "pro",
@@ -135,48 +135,34 @@ const plans = [
 ]
 
 const currentUsage = {
-  used: 32500,
-  limit: 50000,
-  percentUsed: 65,
-  estimatedCost: 31.85,
-  billingCycle: "2025-01-01 ~ 2025-01-31",
-  daysRemaining: 15,
+  used: 0,
+  limit: 3000,
+  percentUsed: 0,
+  estimatedCost: 0,
+  billingCycle: "",
+  daysRemaining: 0,
 }
 
-const invoices = [
-  {
-    id: "INV-2025-001",
-    date: "2025-01-01",
-    amount: 49.0,
-    status: "paid",
-    description: "Starter Plan - January 2025",
-  },
-  {
-    id: "INV-2024-012",
-    date: "2024-12-01",
-    amount: 49.0,
-    status: "paid",
-    description: "Starter Plan - December 2024",
-  },
-  {
-    id: "INV-2024-011",
-    date: "2024-11-01",
-    amount: 49.0,
-    status: "paid",
-    description: "Starter Plan - November 2024",
-  },
-  {
-    id: "INV-2024-010",
-    date: "2024-10-01",
-    amount: 49.0,
-    status: "paid",
-    description: "Starter Plan - October 2024",
-  },
-]
+type Invoice = {
+  id: string
+  date: string
+  amount: number
+  status: string
+  description: string
+}
 
-const paymentMethods = [
-  { id: "card_1", type: "card", brand: "Visa", last4: "4242", expiry: "12/26", isDefault: true },
-]
+const invoices: Invoice[] = []
+
+type PaymentMethod = {
+  id: string
+  type: string
+  brand: string
+  last4: string
+  expiry: string
+  isDefault: boolean
+}
+
+const paymentMethods: PaymentMethod[] = []
 
 export default function BillingPage() {
   const [upgradeDialogOpen, setUpgradeDialogOpen] = React.useState(false)
@@ -213,7 +199,7 @@ export default function BillingPage() {
                 <CardDescription>현재 구독 중인 플랜</CardDescription>
               </div>
               <Badge variant="default" className="px-3 py-1 text-lg">
-                Starter
+                Free
               </Badge>
             </div>
           </CardHeader>
@@ -221,15 +207,15 @@ export default function BillingPage() {
             <div className="grid gap-4 md:grid-cols-3">
               <div className="rounded-lg border p-4">
                 <p className="text-muted-foreground text-sm">월 요금</p>
-                <p className="text-2xl font-bold">{formatCurrency(49)}</p>
+                <p className="text-2xl font-bold">{formatCurrency(0)}</p>
               </div>
               <div className="rounded-lg border p-4">
                 <p className="text-muted-foreground text-sm">API 호출 한도</p>
-                <p className="text-2xl font-bold">{formatNumber(50000)}</p>
+                <p className="text-2xl font-bold">{formatNumber(3000)}</p>
               </div>
               <div className="rounded-lg border p-4">
                 <p className="text-muted-foreground text-sm">Rate Limit</p>
-                <p className="text-2xl font-bold">100/min</p>
+                <p className="text-2xl font-bold">10/min</p>
               </div>
             </div>
 
@@ -242,8 +228,7 @@ export default function BillingPage() {
               </div>
               <Progress value={currentUsage.percentUsed} className="h-3" />
               <p className="text-muted-foreground text-xs">
-                {formatNumber(currentUsage.limit - currentUsage.used)} calls 남음 ·{" "}
-                {currentUsage.daysRemaining}일 후 갱신
+                {formatNumber(currentUsage.limit - currentUsage.used)} calls 남음
               </p>
             </div>
 
@@ -260,11 +245,11 @@ export default function BillingPage() {
           </CardContent>
           <CardFooter className="flex justify-between border-t pt-6">
             <div>
-              <p className="text-muted-foreground text-sm">다음 결제일</p>
-              <p className="font-medium">2025년 2월 1일</p>
+              <p className="text-muted-foreground text-sm">현재 플랜</p>
+              <p className="font-medium">Free (무료)</p>
             </div>
-            <Button onClick={() => handleUpgrade(plans[2])}>
-              Upgrade to Pro
+            <Button onClick={() => handleUpgrade(plans[1])}>
+              Upgrade to Starter
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </CardFooter>
@@ -277,25 +262,32 @@ export default function BillingPage() {
             <CardDescription>결제 수단 관리</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {paymentMethods.map((method) => (
-              <div
-                key={method.id}
-                className="flex items-center justify-between rounded-lg border p-4"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="bg-muted rounded p-2">
-                    <CreditCard className="h-5 w-5" />
+            {paymentMethods.length > 0 ? (
+              paymentMethods.map((method) => (
+                <div
+                  key={method.id}
+                  className="flex items-center justify-between rounded-lg border p-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="bg-muted rounded p-2">
+                      <CreditCard className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-medium">
+                        {method.brand} •••• {method.last4}
+                      </p>
+                      <p className="text-muted-foreground text-sm">Expires {method.expiry}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium">
-                      {method.brand} •••• {method.last4}
-                    </p>
-                    <p className="text-muted-foreground text-sm">Expires {method.expiry}</p>
-                  </div>
+                  {method.isDefault && <Badge variant="secondary">Default</Badge>}
                 </div>
-                {method.isDefault && <Badge variant="secondary">Default</Badge>}
+              ))
+            ) : (
+              <div className="py-6 text-center">
+                <CreditCard className="text-muted-foreground/30 mx-auto mb-2 h-8 w-8" />
+                <p className="text-muted-foreground text-sm">등록된 결제 수단이 없습니다</p>
               </div>
-            ))}
+            )}
             <Button variant="outline" className="w-full" asChild>
               <Link href="/billing/payment-methods">Manage Payment Methods</Link>
             </Button>
@@ -412,40 +404,47 @@ export default function BillingPage() {
           </Button>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Invoice</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {invoices.map((invoice) => (
-                <TableRow key={invoice.id}>
-                  <TableCell className="font-mono text-sm">{invoice.id}</TableCell>
-                  <TableCell>{invoice.date}</TableCell>
-                  <TableCell>{invoice.description}</TableCell>
-                  <TableCell>
-                    <Badge variant={invoice.status === "paid" ? "success" : "secondary"}>
-                      {invoice.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {formatCurrency(invoice.amount)}
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="icon">
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
+          {invoices.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Invoice</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {invoices.map((invoice) => (
+                  <TableRow key={invoice.id}>
+                    <TableCell className="font-mono text-sm">{invoice.id}</TableCell>
+                    <TableCell>{invoice.date}</TableCell>
+                    <TableCell>{invoice.description}</TableCell>
+                    <TableCell>
+                      <Badge variant={invoice.status === "paid" ? "success" : "secondary"}>
+                        {invoice.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(invoice.amount)}
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="icon">
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="py-12 text-center">
+              <FileText className="text-muted-foreground/30 mx-auto mb-2 h-12 w-12" />
+              <p className="text-muted-foreground">결제 내역이 없습니다</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

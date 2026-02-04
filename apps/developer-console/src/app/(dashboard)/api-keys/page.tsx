@@ -57,108 +57,34 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn, formatNumber, formatRelativeTime, maskApiKey } from "@/lib/utils"
 
-// Mock data - replace with real API calls
-const apiKeys = [
-  {
-    id: "key_1",
-    name: "Production Server",
-    prefix: "pk_live_",
-    key: "pk_live_abc123def456ghi789jkl012mno345pqr678",
-    environment: "live" as const,
-    status: "active" as const,
-    permissions: ["match", "personas", "feedback"],
-    createdAt: "2025-01-01T00:00:00Z",
-    lastUsed: new Date(Date.now() - 120000).toISOString(),
-    totalCalls: 125000,
-    callsThisMonth: 45678,
-    rateLimit: 1000,
-  },
-  {
-    id: "key_2",
-    name: "Development",
-    prefix: "pk_test_",
-    key: "pk_test_xyz789abc123def456ghi012jkl345mno678",
-    environment: "test" as const,
-    status: "active" as const,
-    permissions: ["match", "personas", "feedback"],
-    createdAt: "2025-01-05T00:00:00Z",
-    lastUsed: new Date(Date.now() - 3600000).toISOString(),
-    totalCalls: 8900,
-    callsThisMonth: 890,
-    rateLimit: 100,
-  },
-  {
-    id: "key_3",
-    name: "Staging Server",
-    prefix: "pk_test_",
-    key: "pk_test_sta123gin456ser789ver012key345abc678",
-    environment: "test" as const,
-    status: "active" as const,
-    permissions: ["match", "personas"],
-    createdAt: "2025-01-10T00:00:00Z",
-    lastUsed: new Date(Date.now() - 86400000).toISOString(),
-    totalCalls: 2340,
-    callsThisMonth: 234,
-    rateLimit: 100,
-  },
-  {
-    id: "key_4",
-    name: "Legacy API (Deprecated)",
-    prefix: "pk_live_",
-    key: "pk_live_leg123acy456key789old012dep345rec678",
-    environment: "live" as const,
-    status: "revoked" as const,
-    permissions: ["match"],
-    createdAt: "2024-06-15T00:00:00Z",
-    lastUsed: "2024-12-01T00:00:00Z",
-    totalCalls: 567890,
-    callsThisMonth: 0,
-    rateLimit: 500,
-  },
-]
+// Empty data - will be fetched from API
+type ApiKeyData = {
+  id: string
+  name: string
+  prefix: string
+  key: string
+  environment: "live" | "test"
+  status: "active" | "revoked" | "expired"
+  permissions: string[]
+  createdAt: string
+  lastUsed: string
+  totalCalls: number
+  callsThisMonth: number
+  rateLimit: number
+}
 
-const recentActivity = [
-  {
-    id: "1",
-    keyName: "Production Server",
-    action: "API call",
-    endpoint: "/v1/match",
-    status: 200,
-    timestamp: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    keyName: "Production Server",
-    action: "API call",
-    endpoint: "/v1/match",
-    status: 200,
-    timestamp: new Date(Date.now() - 30000).toISOString(),
-  },
-  {
-    id: "3",
-    keyName: "Development",
-    action: "API call",
-    endpoint: "/v1/personas",
-    status: 200,
-    timestamp: new Date(Date.now() - 60000).toISOString(),
-  },
-  {
-    id: "4",
-    keyName: "Production Server",
-    action: "API call",
-    endpoint: "/v1/feedback",
-    status: 201,
-    timestamp: new Date(Date.now() - 90000).toISOString(),
-  },
-  {
-    id: "5",
-    keyName: "Production Server",
-    action: "API call",
-    endpoint: "/v1/match",
-    status: 400,
-    timestamp: new Date(Date.now() - 120000).toISOString(),
-  },
-]
+const apiKeys: ApiKeyData[] = []
+
+type ActivityData = {
+  id: string
+  keyName: string
+  action: string
+  endpoint: string
+  status: number
+  timestamp: string
+}
+
+const recentActivity: ActivityData[] = []
 
 export default function ApiKeysPage() {
   const [showKey, setShowKey] = React.useState<Record<string, boolean>>({})
@@ -277,7 +203,9 @@ export default function ApiKeysPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatNumber(Math.max(...activeKeys.map((k) => k.rateLimit)))}
+              {activeKeys.length > 0
+                ? formatNumber(Math.max(...activeKeys.map((k) => k.rateLimit)))
+                : 0}
             </div>
             <p className="text-muted-foreground text-xs">requests/min (max)</p>
           </CardContent>
@@ -289,8 +217,12 @@ export default function ApiKeysPage() {
             <Clock className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">2 min</div>
-            <p className="text-muted-foreground text-xs">ago</p>
+            <div className="text-2xl font-bold">
+              {recentActivity.length > 0 ? formatRelativeTime(recentActivity[0].timestamp) : "-"}
+            </div>
+            <p className="text-muted-foreground text-xs">
+              {recentActivity.length > 0 ? "" : "활동 없음"}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -517,6 +449,13 @@ export default function ApiKeysPage() {
                   ))}
                 </TableBody>
               </Table>
+
+              {recentActivity.length === 0 && (
+                <div className="py-12 text-center">
+                  <Activity className="text-muted-foreground/30 mx-auto mb-2 h-12 w-12" />
+                  <p className="text-muted-foreground">최근 활동이 없습니다</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

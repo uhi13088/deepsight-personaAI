@@ -56,28 +56,28 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { cn } from "@/lib/utils"
 
-// Mock user data
+// Empty/default user data - will be fetched from API
 const userData = {
-  id: "user_abc123",
-  name: "김개발",
-  email: "dev@acme.com",
-  avatar: null,
-  phone: "+82 10-1234-5678",
-  company: "Acme Corp",
+  id: "",
+  name: "",
+  email: "",
+  avatar: null as string | null,
+  phone: "",
+  company: "",
   timezone: "Asia/Seoul",
   language: "ko",
-  twoFactorEnabled: true,
-  lastPasswordChange: "2024-12-01T00:00:00Z",
+  twoFactorEnabled: false,
+  lastPasswordChange: "",
 }
 
 const notificationSettings = {
   email: {
     apiAlerts: true,
-    usageReports: true,
+    usageReports: false,
     billing: true,
     security: true,
     marketing: false,
-    productUpdates: true,
+    productUpdates: false,
   },
   push: {
     apiAlerts: true,
@@ -87,24 +87,16 @@ const notificationSettings = {
   },
 }
 
-const activeSessions = [
-  {
-    id: "session_1",
-    device: "Chrome on MacOS",
-    ip: "203.0.113.42",
-    location: "Seoul, South Korea",
-    lastActive: "Just now",
-    current: true,
-  },
-  {
-    id: "session_2",
-    device: "Safari on iPhone",
-    ip: "203.0.113.43",
-    location: "Seoul, South Korea",
-    lastActive: "2 hours ago",
-    current: false,
-  },
-]
+type SessionData = {
+  id: string
+  device: string
+  ip: string
+  location: string
+  lastActive: string
+  current: boolean
+}
+
+const activeSessions: SessionData[] = []
 
 export default function SettingsPage() {
   const [name, setName] = React.useState(userData.name)
@@ -437,41 +429,50 @@ export default function SettingsPage() {
               <CardDescription>현재 로그인된 기기 목록</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {activeSessions.map((session) => (
-                <div
-                  key={session.id}
-                  className="flex items-center justify-between rounded-lg border p-4"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="bg-muted rounded-lg p-2">
-                      <Smartphone className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{session.device}</p>
-                        {session.current && (
-                          <Badge variant="success" className="text-xs">
-                            Current
-                          </Badge>
-                        )}
+              {activeSessions.length > 0 ? (
+                <>
+                  {activeSessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className="flex items-center justify-between rounded-lg border p-4"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="bg-muted rounded-lg p-2">
+                          <Smartphone className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{session.device}</p>
+                            {session.current && (
+                              <Badge variant="success" className="text-xs">
+                                Current
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-muted-foreground text-sm">
+                            {session.location} · {session.ip}
+                          </p>
+                          <p className="text-muted-foreground text-xs">{session.lastActive}</p>
+                        </div>
                       </div>
-                      <p className="text-muted-foreground text-sm">
-                        {session.location} · {session.ip}
-                      </p>
-                      <p className="text-muted-foreground text-xs">{session.lastActive}</p>
+                      {!session.current && (
+                        <Button variant="ghost" size="sm" className="text-destructive">
+                          <LogOut className="mr-2 h-4 w-4" />
+                          Sign Out
+                        </Button>
+                      )}
                     </div>
-                  </div>
-                  {!session.current && (
-                    <Button variant="ghost" size="sm" className="text-destructive">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      Sign Out
-                    </Button>
-                  )}
+                  ))}
+                  <Button variant="outline" className="w-full">
+                    Sign Out All Other Sessions
+                  </Button>
+                </>
+              ) : (
+                <div className="py-8 text-center">
+                  <Smartphone className="text-muted-foreground/30 mx-auto mb-2 h-8 w-8" />
+                  <p className="text-muted-foreground text-sm">세션 정보가 없습니다</p>
                 </div>
-              ))}
-              <Button variant="outline" className="w-full">
-                Sign Out All Other Sessions
-              </Button>
+              )}
             </CardContent>
           </Card>
 

@@ -36,66 +36,24 @@ import {
   getHttpStatusColor,
 } from "@/lib/utils"
 
-// Mock data - replace with real API calls
+// Empty data - will be fetched from API
 const dashboardMetrics = {
-  apiCalls: { today: 1234, change: 12 },
-  successRate: { value: 99.8, change: 0.2 },
-  latency: { p95: 142, change: -5 },
-  cost: { thisMonth: 234.56, percentUsed: 65 },
+  apiCalls: { today: 0, change: 0 },
+  successRate: { value: 0, change: 0 },
+  latency: { p95: 0, change: 0 },
+  cost: { thisMonth: 0, percentUsed: 0 },
 }
 
-const usageData = [
-  { date: "Jan 10", calls: 1100 },
-  { date: "Jan 11", calls: 1250 },
-  { date: "Jan 12", calls: 980 },
-  { date: "Jan 13", calls: 1400 },
-  { date: "Jan 14", calls: 1380 },
-  { date: "Jan 15", calls: 1200 },
-  { date: "Jan 16", calls: 1350 },
-]
+const usageData: { date: string; calls: number }[] = []
 
-const recentLogs = [
-  {
-    id: "1",
-    timestamp: new Date().toISOString(),
-    endpoint: "POST /v1/match",
-    status: 200,
-    latency: 145,
-    requestId: "req_abc123",
-  },
-  {
-    id: "2",
-    timestamp: new Date(Date.now() - 30000).toISOString(),
-    endpoint: "POST /v1/match",
-    status: 200,
-    latency: 132,
-    requestId: "req_def456",
-  },
-  {
-    id: "3",
-    timestamp: new Date(Date.now() - 60000).toISOString(),
-    endpoint: "POST /v1/feedback",
-    status: 201,
-    latency: 45,
-    requestId: "req_ghi789",
-  },
-  {
-    id: "4",
-    timestamp: new Date(Date.now() - 90000).toISOString(),
-    endpoint: "POST /v1/match",
-    status: 400,
-    latency: 12,
-    requestId: "req_jkl012",
-  },
-  {
-    id: "5",
-    timestamp: new Date(Date.now() - 120000).toISOString(),
-    endpoint: "GET /v1/personas",
-    status: 200,
-    latency: 78,
-    requestId: "req_mno345",
-  },
-]
+const recentLogs: {
+  id: string
+  timestamp: string
+  endpoint: string
+  status: number
+  latency: number
+  requestId: string
+}[] = []
 
 const quickActions = [
   { title: "새 API Key 생성", href: "/api-keys/new", icon: Key },
@@ -217,21 +175,32 @@ export default function DashboardPage() {
             <CardDescription>Daily API call volume</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex h-[200px] items-end gap-2">
-              {usageData.map((day, i) => {
-                const maxCalls = Math.max(...usageData.map((d) => d.calls))
-                const heightPercent = (day.calls / maxCalls) * 100
-                return (
-                  <div key={i} className="flex flex-1 flex-col items-center gap-1">
-                    <div
-                      className="bg-primary hover:bg-primary/80 w-full rounded-t transition-all"
-                      style={{ height: `${heightPercent}%`, minHeight: "4px" }}
-                    />
-                    <span className="text-muted-foreground text-xs">{day.date.split(" ")[1]}</span>
-                  </div>
-                )
-              })}
-            </div>
+            {usageData.length > 0 ? (
+              <div className="flex h-[200px] items-end gap-2">
+                {usageData.map((day, i) => {
+                  const maxCalls = Math.max(...usageData.map((d) => d.calls))
+                  const heightPercent = (day.calls / maxCalls) * 100
+                  return (
+                    <div key={i} className="flex flex-1 flex-col items-center gap-1">
+                      <div
+                        className="bg-primary hover:bg-primary/80 w-full rounded-t transition-all"
+                        style={{ height: `${heightPercent}%`, minHeight: "4px" }}
+                      />
+                      <span className="text-muted-foreground text-xs">
+                        {day.date.split(" ")[1]}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="flex h-[200px] items-center justify-center">
+                <div className="text-center">
+                  <TrendingUp className="text-muted-foreground/30 mx-auto mb-2 h-8 w-8" />
+                  <p className="text-muted-foreground text-sm">사용 데이터가 없습니다</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -250,33 +219,40 @@ export default function DashboardPage() {
             </Button>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {recentLogs.slice(0, 5).map((log) => (
-                <div key={log.id} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant={
-                        log.status >= 200 && log.status < 300
-                          ? "success"
-                          : log.status >= 400
-                            ? "destructive"
-                            : "secondary"
-                      }
-                      className="font-mono text-xs"
-                    >
-                      {log.status}
-                    </Badge>
-                    <span className="text-muted-foreground max-w-[120px] truncate font-mono text-xs">
-                      {log.endpoint.split(" ")[1]}
-                    </span>
+            {recentLogs.length > 0 ? (
+              <div className="space-y-3">
+                {recentLogs.slice(0, 5).map((log) => (
+                  <div key={log.id} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={
+                          log.status >= 200 && log.status < 300
+                            ? "success"
+                            : log.status >= 400
+                              ? "destructive"
+                              : "secondary"
+                        }
+                        className="font-mono text-xs"
+                      >
+                        {log.status}
+                      </Badge>
+                      <span className="text-muted-foreground max-w-[120px] truncate font-mono text-xs">
+                        {log.endpoint.split(" ")[1]}
+                      </span>
+                    </div>
+                    <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                      <span>{log.latency}ms</span>
+                      <span>{formatRelativeTime(log.timestamp)}</span>
+                    </div>
                   </div>
-                  <div className="text-muted-foreground flex items-center gap-2 text-xs">
-                    <span>{log.latency}ms</span>
-                    <span>{formatRelativeTime(log.timestamp)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <Activity className="text-muted-foreground/30 mx-auto mb-2 h-8 w-8" />
+                <p className="text-muted-foreground text-sm">최근 활동이 없습니다</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -307,25 +283,12 @@ export default function DashboardPage() {
                   <TableHead className="text-right">Calls</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <td className="font-medium">Production Server</td>
-                  <td>
-                    <Badge variant="default">Live</Badge>
-                  </td>
-                  <td className="text-muted-foreground">2 min ago</td>
-                  <td className="text-right">{formatNumber(12500)}</td>
-                </TableRow>
-                <TableRow>
-                  <td className="font-medium">Development</td>
-                  <td>
-                    <Badge variant="secondary">Test</Badge>
-                  </td>
-                  <td className="text-muted-foreground">1 hour ago</td>
-                  <td className="text-right">{formatNumber(890)}</td>
-                </TableRow>
-              </TableBody>
+              <TableBody></TableBody>
             </Table>
+            <div className="py-8 text-center">
+              <Key className="text-muted-foreground/30 mx-auto mb-2 h-8 w-8" />
+              <p className="text-muted-foreground text-sm">등록된 API Key가 없습니다</p>
+            </div>
           </CardContent>
         </Card>
 
@@ -336,45 +299,34 @@ export default function DashboardPage() {
             <CardDescription>API calls distribution</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {[
-                { endpoint: "/v1/match", calls: 45000, percentage: 69 },
-                { endpoint: "/v1/personas", calls: 12000, percentage: 18 },
-                { endpoint: "/v1/feedback", calls: 8000, percentage: 12 },
-              ].map((item) => (
-                <div key={item.endpoint} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-mono">{item.endpoint}</span>
-                    <span className="text-muted-foreground">
-                      {formatNumber(item.calls)} ({item.percentage}%)
-                    </span>
-                  </div>
-                  <Progress value={item.percentage} className="h-2" />
-                </div>
-              ))}
+            <div className="py-8 text-center">
+              <TrendingUp className="text-muted-foreground/30 mx-auto mb-2 h-8 w-8" />
+              <p className="text-muted-foreground text-sm">사용 기록이 없습니다</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Alerts */}
-      <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950">
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-yellow-600" />
-            <CardTitle className="text-yellow-800 dark:text-yellow-200">Usage Alert</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-yellow-700 dark:text-yellow-300">
-            You&apos;ve used 65% of your monthly API call quota. Consider upgrading to Pro for more
-            calls.
-          </p>
-          <Button variant="outline" size="sm" className="mt-3" asChild>
-            <Link href="/billing">View Plans</Link>
-          </Button>
-        </CardContent>
-      </Card>
+      {/* Alerts - only shown when usage exceeds threshold */}
+      {dashboardMetrics.cost.percentUsed >= 80 && (
+        <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-600" />
+              <CardTitle className="text-yellow-800 dark:text-yellow-200">Usage Alert</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-yellow-700 dark:text-yellow-300">
+              You&apos;ve used {dashboardMetrics.cost.percentUsed}% of your monthly API call quota.
+              Consider upgrading to Pro for more calls.
+            </p>
+            <Button variant="outline" size="sm" className="mt-3" asChild>
+              <Link href="/billing">View Plans</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
