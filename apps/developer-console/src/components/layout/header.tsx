@@ -2,7 +2,19 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Bell, ChevronDown, LogOut, Menu, Moon, Search, Settings, Sun, User } from "lucide-react"
+import { toast } from "sonner"
+import {
+  Bell,
+  ChevronDown,
+  HelpCircle,
+  LogOut,
+  Menu,
+  Moon,
+  Search,
+  Settings,
+  Sun,
+  User,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -13,6 +25,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -25,6 +44,21 @@ export function Header() {
   const { user, organization, organizations, switchOrganization, logout } = useAuthStore()
   const { theme, setTheme, setSidebarMobileOpen } = useUIStore()
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotificationStore()
+  const [searchQuery, setSearchQuery] = React.useState("")
+  const [helpOpen, setHelpOpen] = React.useState(false)
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      toast.info(`"${searchQuery}" 검색 중...`, {
+        description: "검색 기능은 준비 중입니다.",
+      })
+    }
+  }
+
+  const handleHelp = () => {
+    setHelpOpen(true)
+  }
 
   const displayName = user?.name || user?.email || "User"
   const initials = displayName
@@ -48,10 +82,16 @@ export function Header() {
       </Button>
 
       {/* Search */}
-      <div className="relative max-w-md flex-1">
+      <form onSubmit={handleSearch} className="relative max-w-md flex-1">
         <Search className="text-muted-foreground absolute left-2.5 top-2.5 h-4 w-4" />
-        <Input type="search" placeholder="Search..." className="bg-muted/50 pl-8" />
-      </div>
+        <Input
+          type="search"
+          placeholder="Search..."
+          className="bg-muted/50 pl-8"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </form>
 
       <div className="flex items-center gap-2">
         {/* Organization Switcher */}
@@ -99,6 +139,41 @@ export function Header() {
           {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           <span className="sr-only">Toggle theme</span>
         </Button>
+
+        {/* Help */}
+        <Button variant="ghost" size="icon" onClick={handleHelp}>
+          <HelpCircle className="h-5 w-5" />
+          <span className="sr-only">Help</span>
+        </Button>
+
+        {/* Help Dialog */}
+        <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Help</DialogTitle>
+              <DialogDescription>Developer Console User Guide</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <h4 className="font-medium">Keyboard Shortcuts</h4>
+                <ul className="text-muted-foreground space-y-1 text-sm">
+                  <li>
+                    <kbd className="bg-muted rounded px-1">Ctrl + K</kbd> - Search
+                  </li>
+                  <li>
+                    <kbd className="bg-muted rounded px-1">Ctrl + /</kbd> - Help
+                  </li>
+                </ul>
+              </div>
+              <div className="space-y-2">
+                <h4 className="font-medium">Support</h4>
+                <p className="text-muted-foreground text-sm">
+                  Technical support: support@deepsight.ai
+                </p>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Notifications */}
         <DropdownMenu>
