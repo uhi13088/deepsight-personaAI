@@ -63,7 +63,7 @@ export function Header() {
   const [isSearching, setIsSearching] = React.useState(false)
   const [searchOpen, setSearchOpen] = React.useState(false)
   const [helpOpen, setHelpOpen] = React.useState(false)
-  const searchTimeoutRef = React.useRef<NodeJS.Timeout>()
+  const searchTimeoutRef = React.useRef<NodeJS.Timeout | undefined>(undefined)
 
   // Debounced search
   React.useEffect(() => {

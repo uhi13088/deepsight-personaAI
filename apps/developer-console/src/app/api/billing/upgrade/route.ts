@@ -1,20 +1,26 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import Stripe from "stripe"
+import crypto from "crypto"
 
 const upgradeSchema = z.object({
   planId: z.enum(["free", "starter", "pro", "enterprise"]),
 })
 
-// Stripe price IDs (configure in Stripe Dashboard)
-const PRICE_IDS: Record<string, string> = {
-  starter: process.env.STRIPE_PRICE_STARTER || "",
-  pro: process.env.STRIPE_PRICE_PRO || "",
-  enterprise: process.env.STRIPE_PRICE_ENTERPRISE || "",
+// Toss Payments 플랜별 가격 (원화)
+const PLAN_PRICES: Record<string, number> = {
+  starter: 29000, // ₩29,000/월
+  pro: 99000, // ₩99,000/월
+  enterprise: 299000, // ₩299,000/월
+}
+
+const PLAN_NAMES: Record<string, string> = {
+  starter: "Starter 플랜",
+  pro: "Pro 플랜",
+  enterprise: "Enterprise 플랜",
 }
 
 // ============================================================================
-// POST /api/billing/upgrade - 플랜 업그레이드 (Stripe Checkout)
+// POST /api/billing/upgrade - 플랜 업그레이드 (Toss Payments)
 // ============================================================================
 
 export async function POST(request: NextRequest) {
@@ -48,13 +54,13 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Check if Stripe is configured
-    if (!process.env.STRIPE_SECRET_KEY || !PRICE_IDS[planId]) {
+    // Check if Toss Payments is configured
+    if (!process.env.TOSS_CLIENT_KEY || !process.env.TOSS_SECRET_KEY) {
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: "STRIPE_NOT_CONFIGURED",
+            code: "PAYMENT_NOT_CONFIGURED",
             message: "결제 시스템이 설정되지 않았습니다. 관리자에게 문의하세요.",
           },
         },
@@ -62,32 +68,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: "2024-11-20.acacia",
-    })
-
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || ""
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
-      payment_method_types: ["card"],
-      line_items: [
-        {
-          price: PRICE_IDS[planId],
-          quantity: 1,
-        },
-      ],
-      success_url: `${baseUrl}/billing?success=true&plan=${planId}`,
-      cancel_url: `${baseUrl}/billing?canceled=true`,
-      metadata: {
-        planId,
-      },
-    })
+    // Generate unique order ID
+    const orderId = `ORDER_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`
 
+    // Return payment info for client-side Toss widget
     return NextResponse.json({
       success: true,
       data: {
-        checkoutUrl: session.url,
+        paymentInfo: {
+          clientKey: process.env.TOSS_CLIENT_KEY,
+          orderId,
+          orderName: PLAN_NAMES[planId],
+          amount: PLAN_PRICES[planId],
+          customerName: "DeepSight 사용자", // TODO: Get from session
+          successUrl: `${baseUrl}/api/billing/toss/success?planId=${planId}`,
+          failUrl: `${baseUrl}/billing?error=payment_failed`,
+        },
         planId,
       },
     })

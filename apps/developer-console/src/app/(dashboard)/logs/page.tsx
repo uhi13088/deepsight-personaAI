@@ -97,7 +97,7 @@ export default function LogsPage() {
   }, [searchQuery, statusFilter, endpointFilter, apiKeyFilter])
 
   // Debounce search and filters
-  const searchTimeoutRef = React.useRef<NodeJS.Timeout>()
+  const searchTimeoutRef = React.useRef<NodeJS.Timeout | undefined>(undefined)
 
   React.useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -113,22 +113,8 @@ export default function LogsPage() {
     }
   }, [fetchLogs])
 
-  // Filter logs client-side for additional filtering not sent to API
-  const filteredLogs = apiLogs.filter((log) => {
-    // API already handles search, status, endpoint, apiKey filters
-    // This is for any additional client-side filtering if needed
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilter === "2xx" && log.status >= 200 && log.status < 300) ||
-      (statusFilter === "4xx" && log.status >= 400 && log.status < 500) ||
-      (statusFilter === "5xx" && log.status >= 500)
-
-    const matchesEndpoint = endpointFilter === "all" || log.endpoint === endpointFilter
-
-    const matchesApiKey = apiKeyFilter === "all" || log.apiKeyName === apiKeyFilter
-
-    return matchesSearch && matchesStatus && matchesEndpoint && matchesApiKey
-  })
+  // API already handles all filtering - just use the fetched logs directly
+  const filteredLogs = apiLogs
 
   const handleRefresh = async () => {
     setIsRefreshing(true)

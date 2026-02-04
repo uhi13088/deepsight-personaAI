@@ -63,6 +63,16 @@ export interface CreatePaymentMethodInput {
   token: string
 }
 
+export interface TossPaymentInfo {
+  clientKey: string
+  orderId: string
+  orderName: string
+  amount: number
+  customerName: string
+  successUrl: string
+  failUrl: string
+}
+
 // ============================================================================
 // 서비스 클래스
 // ============================================================================
@@ -112,8 +122,11 @@ class BillingService {
     return response.data.plans
   }
 
-  async upgradePlan(planId: PlanId): Promise<void> {
-    const response = await apiClient.post("/billing/upgrade", { planId })
+  async upgradePlan(planId: PlanId): Promise<TossPaymentInfo | null> {
+    const response = await apiClient.post<{ paymentInfo?: TossPaymentInfo; planId: string }>(
+      "/billing/upgrade",
+      { planId }
+    )
 
     if (!response.success) {
       throw new ApiError({
@@ -123,6 +136,13 @@ class BillingService {
         timestamp: new Date().toISOString(),
       })
     }
+
+    // Free 플랜은 결제 정보 없이 바로 변경
+    if (!response.data?.paymentInfo) {
+      return null
+    }
+
+    return response.data.paymentInfo
   }
 
   async downgradePlan(planId: PlanId): Promise<void> {
