@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
         branch,
         commitHash: commitHash || `${Date.now().toString(16)}`,
         createdById: session.user.id,
-        status: "active",
+        status: "ACTIVE",
         addedCount: 0,
         modifiedCount: 0,
         deletedCount: 0,
