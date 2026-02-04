@@ -40,9 +40,9 @@ const PAGE_TITLES: Record<string, string> = {
   "/global-config/models": "모델 설정",
   "/global-config/safety-filters": "안전 필터",
   "/global-config/api-endpoints": "API 엔드포인트",
-  "/team/users": "사용자 관리",
-  "/team/roles": "역할 권한",
-  "/team/audit-logs": "감사 로그",
+  "/team-access": "사용자 관리",
+  "/team-access/permissions": "역할 권한",
+  "/team-access/audit-logs": "감사 로그",
 }
 
 // 알림 데이터 (API 연동 필요)
