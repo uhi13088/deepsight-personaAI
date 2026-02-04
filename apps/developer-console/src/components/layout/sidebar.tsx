@@ -68,20 +68,13 @@ const billingNavItems: NavItem[] = [
   {
     title: "Billing",
     icon: CreditCard,
-    children: [
-      { title: "현재 플랜", href: "/billing" },
-      { title: "결제 수단", href: "/billing/payment-methods" },
-      { title: "청구서", href: "/billing/invoices" },
-    ],
+    href: "/billing",
   },
   {
     title: "Webhooks",
     icon: Webhook,
     badge: "v2.0",
-    children: [
-      { title: "Webhook 목록", href: "/webhooks" },
-      { title: "이벤트 로그", href: "/webhooks/events" },
-    ],
+    href: "/webhooks",
   },
 ]
 
@@ -89,12 +82,7 @@ const docsNavItems: NavItem[] = [
   {
     title: "Documentation",
     icon: BookOpen,
-    children: [
-      { title: "시작하기", href: "/docs/getting-started" },
-      { title: "API Reference", href: "/docs/api-reference" },
-      { title: "SDK 가이드", href: "/docs/sdk" },
-      { title: "샘플 코드", href: "/docs/examples" },
-    ],
+    href: "/docs",
   },
   {
     title: "Playground",
@@ -107,28 +95,17 @@ const settingsNavItems: NavItem[] = [
   {
     title: "Team",
     icon: Users,
-    children: [
-      { title: "팀원 관리", href: "/team" },
-      { title: "권한 설정", href: "/team/roles" },
-    ],
+    href: "/team",
   },
   {
     title: "Settings",
     icon: Settings,
-    children: [
-      { title: "계정 설정", href: "/settings" },
-      { title: "알림 설정", href: "/settings/notifications" },
-      { title: "보안 설정", href: "/settings/security" },
-    ],
+    href: "/settings",
   },
   {
     title: "Support",
     icon: HelpCircle,
-    children: [
-      { title: "문의하기", href: "/support" },
-      { title: "FAQ", href: "/support/faq" },
-      { title: "커뮤니티", href: "/support/community" },
-    ],
+    href: "/support",
   },
 ]
 
