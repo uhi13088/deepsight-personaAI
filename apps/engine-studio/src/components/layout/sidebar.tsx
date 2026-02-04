@@ -30,6 +30,7 @@ import {
   UserCog,
   KeyRound,
   ScrollText,
+  Target,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -86,6 +87,7 @@ const navigation: NavItem[] = [
     children: [
       { title: "시뮬레이터", href: "/matching-lab/simulator", icon: FlaskConical },
       { title: "알고리즘 튜닝", href: "/matching-lab/algorithm-tuning", icon: Settings },
+      { title: "골든 샘플", href: "/matching-lab/golden-samples", icon: Target },
       { title: "성과 분석", href: "/matching-lab/performance", icon: LineChart },
     ],
   },

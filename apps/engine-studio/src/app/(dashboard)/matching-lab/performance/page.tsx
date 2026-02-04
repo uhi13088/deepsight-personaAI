@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { toast } from "sonner"
 import {
   BarChart3,
@@ -50,73 +50,63 @@ import {
   Cell,
 } from "recharts"
 
-// 성능 지표 데이터
-const PERFORMANCE_KPI = {
-  dailyMatches: 156789,
-  matchAccuracy: 94.2,
-  avgLatency: 23,
-  userSatisfaction: 4.5,
-  ctr: 28.6,
-  nps: 72,
+// 기본 데이터 타입
+interface KPI {
+  dailyMatches: number
+  matchAccuracy: number
+  avgLatency: number
+  userSatisfaction: number
+  ctr: number
+  nps: number
 }
 
-const TREND_DATA = [
-  { date: "01/10", matches: 142345, accuracy: 93.1, latency: 25, ctr: 26.2 },
-  { date: "01/11", matches: 148923, accuracy: 93.5, latency: 24, ctr: 27.1 },
-  { date: "01/12", matches: 151234, accuracy: 93.8, latency: 23, ctr: 27.8 },
-  { date: "01/13", matches: 149876, accuracy: 94.0, latency: 24, ctr: 28.2 },
-  { date: "01/14", matches: 154321, accuracy: 94.1, latency: 22, ctr: 28.4 },
-  { date: "01/15", matches: 153456, accuracy: 94.2, latency: 23, ctr: 28.5 },
-  { date: "01/16", matches: 156789, accuracy: 94.2, latency: 23, ctr: 28.6 },
-]
+interface TrendItem {
+  date: string
+  matches: number
+  accuracy: number
+  latency: number
+  ctr: number
+}
 
-const ALGORITHM_PERFORMANCE = [
-  {
-    algorithm: "Hybrid v2.1",
-    matches: 78234,
-    accuracy: 95.2,
-    avgLatency: 22,
-    ctr: 29.1,
-    status: "primary",
-  },
-  {
-    algorithm: "Context-Aware",
-    matches: 45678,
-    accuracy: 93.8,
-    avgLatency: 25,
-    ctr: 27.8,
-    status: "secondary",
-  },
-  {
-    algorithm: "Cosine Similarity",
-    matches: 23456,
-    accuracy: 92.1,
-    avgLatency: 18,
-    ctr: 26.2,
-    status: "legacy",
-  },
-  {
-    algorithm: "Weighted Euclidean",
-    matches: 9421,
-    accuracy: 91.5,
-    avgLatency: 20,
-    ctr: 25.8,
-    status: "legacy",
-  },
-]
+interface AlgorithmItem {
+  algorithm: string
+  matches: number
+  accuracy: number
+  avgLatency: number
+  ctr: number
+  status: string
+}
 
-const TOP_PERSONAS = [
-  { name: "논리적 평론가", matches: 23456, accuracy: 96.5, ctr: 31.2 },
-  { name: "감성 에세이스트", matches: 21345, accuracy: 95.2, ctr: 29.8 },
-  { name: "트렌드 헌터", matches: 19876, accuracy: 94.1, ctr: 28.5 },
-  { name: "균형 잡힌 가이드", matches: 18234, accuracy: 93.8, ctr: 27.9 },
-  { name: "시네필 평론가", matches: 15678, accuracy: 95.8, ctr: 30.1 },
-]
+interface PersonaItem {
+  name: string
+  matches: number
+  accuracy: number
+  ctr: number
+}
 
-const FEEDBACK_DATA = [
-  { type: "positive", count: 89234, percentage: 85 },
-  { type: "neutral", count: 10523, percentage: 10 },
-  { type: "negative", count: 5243, percentage: 5 },
+interface FeedbackItem {
+  type: string
+  count: number
+  percentage: number
+}
+
+// 기본값
+const DEFAULT_KPI: KPI = {
+  dailyMatches: 0,
+  matchAccuracy: 0,
+  avgLatency: 0,
+  userSatisfaction: 0,
+  ctr: 0,
+  nps: 0,
+}
+
+const DEFAULT_trendData: TrendItem[] = []
+const DEFAULT_ALGORITHM_DATA: AlgorithmItem[] = []
+const DEFAULT_PERSONAS: PersonaItem[] = []
+const DEFAULT_FEEDBACK: FeedbackItem[] = [
+  { type: "positive", count: 0, percentage: 0 },
+  { type: "neutral", count: 0, percentage: 0 },
+  { type: "negative", count: 0, percentage: 0 },
 ]
 
 const FEEDBACK_COLORS = {
@@ -128,7 +118,42 @@ const FEEDBACK_COLORS = {
 export default function PerformancePage() {
   const [dateRange, setDateRange] = useState("7d")
   const [refreshing, setRefreshing] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // 데이터 상태
+  const [kpi, setKpi] = useState<KPI>(DEFAULT_KPI)
+  const [trendData, setTrendData] = useState<TrendItem[]>(DEFAULT_trendData)
+  const [algorithmData, setAlgorithmData] = useState<AlgorithmItem[]>(DEFAULT_ALGORITHM_DATA)
+  const [topPersonas, setTopPersonas] = useState<PersonaItem[]>(DEFAULT_PERSONAS)
+  const [feedbackData, setFeedbackData] = useState<FeedbackItem[]>(DEFAULT_FEEDBACK)
+
+  // 데이터 가져오기
+  const fetchPerformanceData = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/matching/performance?range=${dateRange}`)
+      const data = await response.json()
+
+      if (data.success) {
+        setKpi(data.data.kpi)
+        setTrendData(data.data.trendData)
+        setAlgorithmData(data.data.algorithmPerformance)
+        setTopPersonas(data.data.topPersonas)
+        setFeedbackData(data.data.feedbackData)
+      }
+    } catch (error) {
+      console.error("Failed to fetch performance data:", error)
+      toast.error("성능 데이터를 불러올 수 없습니다")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [dateRange])
+
+  // 초기 로드 및 날짜 범위 변경 시 데이터 가져오기
+  useEffect(() => {
+    fetchPerformanceData()
+  }, [fetchPerformanceData])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -139,26 +164,29 @@ export default function PerformancePage() {
     }
   }, [])
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setRefreshing(true)
     // Clear any existing timeout before setting a new one
     if (refreshTimeoutRef.current) {
       clearTimeout(refreshTimeoutRef.current)
     }
+
+    await fetchPerformanceData()
+
     refreshTimeoutRef.current = setTimeout(() => {
       setRefreshing(false)
       toast.success("데이터가 새로고침되었습니다")
-    }, 1500)
+    }, 500)
   }
 
   const handleExportReport = () => {
     const reportData = {
       dateRange,
-      kpi: PERFORMANCE_KPI,
-      trendData: TREND_DATA,
-      algorithmPerformance: ALGORITHM_PERFORMANCE,
-      topPersonas: TOP_PERSONAS,
-      feedbackData: FEEDBACK_DATA,
+      kpi,
+      trendData,
+      algorithmPerformance: algorithmData,
+      topPersonas,
+      feedbackData,
       exportedAt: new Date().toISOString(),
     }
     const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: "application/json" })
@@ -216,9 +244,7 @@ export default function PerformancePage() {
             <Target className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {PERFORMANCE_KPI.dailyMatches.toLocaleString()}
-            </div>
+            <div className="text-2xl font-bold">{kpi.dailyMatches.toLocaleString()}</div>
             <div className="mt-1 flex items-center text-xs text-green-600">
               <ArrowUpRight className="mr-1 h-3 w-3" />
               +8.2%
@@ -232,7 +258,7 @@ export default function PerformancePage() {
             <CheckCircle className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{PERFORMANCE_KPI.matchAccuracy}%</div>
+            <div className="text-2xl font-bold">{kpi.matchAccuracy}%</div>
             <div className="mt-1 flex items-center text-xs text-green-600">
               <ArrowUpRight className="mr-1 h-3 w-3" />
               +0.4%
@@ -246,7 +272,7 @@ export default function PerformancePage() {
             <Zap className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{PERFORMANCE_KPI.avgLatency}ms</div>
+            <div className="text-2xl font-bold">{kpi.avgLatency}ms</div>
             <div className="mt-1 flex items-center text-xs text-green-600">
               <ArrowDownRight className="mr-1 h-3 w-3" />
               -2ms
@@ -260,7 +286,7 @@ export default function PerformancePage() {
             <ThumbsUp className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{PERFORMANCE_KPI.userSatisfaction}</div>
+            <div className="text-2xl font-bold">{kpi.userSatisfaction}</div>
             <div className="mt-1 flex items-center text-xs text-green-600">
               <ArrowUpRight className="mr-1 h-3 w-3" />
               +0.2
@@ -274,7 +300,7 @@ export default function PerformancePage() {
             <Eye className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{PERFORMANCE_KPI.ctr}%</div>
+            <div className="text-2xl font-bold">{kpi.ctr}%</div>
             <div className="mt-1 flex items-center text-xs text-green-600">
               <ArrowUpRight className="mr-1 h-3 w-3" />
               +1.2%
@@ -288,7 +314,7 @@ export default function PerformancePage() {
             <Users className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{PERFORMANCE_KPI.nps}</div>
+            <div className="text-2xl font-bold">{kpi.nps}</div>
             <div className="mt-1 flex items-center text-xs text-green-600">
               <ArrowUpRight className="mr-1 h-3 w-3" />
               +5
@@ -308,7 +334,7 @@ export default function PerformancePage() {
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={TREND_DATA}>
+                <AreaChart data={trendData}>
                   <defs>
                     <linearGradient id="colorMatches" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
@@ -365,7 +391,7 @@ export default function PerformancePage() {
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={TREND_DATA}>
+                <LineChart data={trendData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="date" className="text-xs" />
                   <YAxis yAxisId="left" domain={[15, 30]} className="text-xs" />
@@ -427,7 +453,7 @@ export default function PerformancePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {ALGORITHM_PERFORMANCE.map((algo) => (
+                {algorithmData.map((algo) => (
                   <TableRow key={algo.algorithm}>
                     <TableCell className="font-medium">{algo.algorithm}</TableCell>
                     <TableCell className="text-right">{algo.matches.toLocaleString()}</TableCell>
@@ -469,7 +495,7 @@ export default function PerformancePage() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={FEEDBACK_DATA}
+                    data={feedbackData}
                     cx="50%"
                     cy="50%"
                     innerRadius={50}
@@ -477,7 +503,7 @@ export default function PerformancePage() {
                     dataKey="count"
                     nameKey="type"
                   >
-                    {FEEDBACK_DATA.map((entry) => (
+                    {feedbackData.map((entry) => (
                       <Cell
                         key={entry.type}
                         fill={FEEDBACK_COLORS[entry.type as keyof typeof FEEDBACK_COLORS]}
@@ -498,7 +524,7 @@ export default function PerformancePage() {
               </ResponsiveContainer>
             </div>
             <div className="mt-4 space-y-2">
-              {FEEDBACK_DATA.map((item) => (
+              {feedbackData.map((item) => (
                 <div key={item.type} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div
@@ -531,7 +557,7 @@ export default function PerformancePage() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-5">
-            {TOP_PERSONAS.map((persona, index) => (
+            {topPersonas.map((persona, index) => (
               <div key={persona.name} className="rounded-lg border p-4">
                 <div className="mb-3 flex items-center gap-2">
                   <span className="bg-primary/10 flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold">
