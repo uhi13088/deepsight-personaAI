@@ -8,8 +8,7 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  // Note: directUrl removed for simpler deployment
-  // Only needed when running migrations locally with pgbouncer
+  directUrl = env("DIRECT_URL")
 }
 
 // ============================================
