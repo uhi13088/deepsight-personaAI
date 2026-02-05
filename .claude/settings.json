@@ -1,6 +1,14 @@
 {
   "permissions": {
-    "deny": ["Bash(rm -rf:*)", "Bash(curl:*)", "Bash(wget:*)", "Bash(sudo:*)"],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Bash(rm -rf:*)",
+      "Bash(curl:*)",
+      "Bash(wget:*)",
+      "Bash(sudo:*)"
+    ],
     "ask": [
       "Bash(git push:*)",
       "Bash(git push --force:*)",
