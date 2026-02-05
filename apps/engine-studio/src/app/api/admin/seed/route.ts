@@ -34,7 +34,7 @@ async function seedDatabase(secret: string | null) {
   const admin = await prisma.user.create({
     data: {
       email: "uhi1308@naver.com",
-      name: "관리자",
+      name: "김호성",
       password: hashedPassword,
       role: "ADMIN",
       isActive: true,
