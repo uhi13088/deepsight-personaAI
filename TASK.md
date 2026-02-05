@@ -7,7 +7,9 @@
 
 ## 📋 QUEUE (대기)
 
-(없음)
+- [ ] **T7: Developer Console 미완성 부분 마무리**
+  - AC1: 로그 페이지 실제 DB 연동 (mock 제거)
+  - AC2: 빌링 페이지 미완성 TODO 처리
 
 ---
 
@@ -18,6 +20,18 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T6: Engine Studio api-endpoints 중복 제거 및 DB 연동** ✅ 2026-02-05
+  - 변경: `apps/engine-studio/prisma/schema.prisma` (ApiEndpoint 모델, HttpMethod/EndpointStatus enum 추가)
+  - 변경: `apps/engine-studio/prisma/migrations/003_api_endpoints.sql` (신규 - DDL + v1 시드 5개)
+  - 변경: `apps/engine-studio/src/app/api/api-endpoints/route.ts` (신규 - GET/POST)
+  - 변경: `apps/engine-studio/src/app/api/api-endpoints/[id]/route.ts` (신규 - GET/PATCH/DELETE)
+  - 변경: `apps/engine-studio/src/app/(dashboard)/global-config/api-endpoints/page.tsx` (재작성)
+  - 제거: API 키 탭 (Developer Console에 실제 구현 있음, ~400줄 중복 코드)
+  - 제거: API 테스트 다이얼로그 (Developer Console playground와 중복, ~100줄)
+  - 연동: 엔드포인트 탭 → ApiEndpoint DB CRUD
+  - 연동: 설정 탭 → SystemConfig API (category: 'API')
+  - 테스트: TypeScript PASS, 70/70 PASS, Build PASS
 
 - [x] **T5: 설문 시스템 구현** ✅ 2026-02-05
   - 변경: `apps/engine-studio/prisma/schema.prisma` (Survey, SurveyQuestion, SurveyResponse, SurveyAnswer 모델 추가)

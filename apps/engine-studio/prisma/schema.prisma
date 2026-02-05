@@ -633,6 +633,44 @@ model PersonaTestResult {
 }
 
 // ============================================
+// API 엔드포인트 관리
+// ============================================
+
+model ApiEndpoint {
+  id              String         @id @default(cuid())
+  path            String
+  method          HttpMethod
+  name            String
+  description     String?
+  version         String         @default("v1")
+  status          EndpointStatus @default(ACTIVE)
+  category        String         @default("general")
+  requiresAuth    Boolean        @default(true)
+  rateLimit       Int            @default(100)  // req/min
+  timeout         Int            @default(30000) // ms
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@unique([path, method])
+  @@map("api_endpoints")
+}
+
+enum HttpMethod {
+  GET
+  POST
+  PUT
+  PATCH
+  DELETE
+}
+
+enum EndpointStatus {
+  ACTIVE
+  DEPRECATED
+  DISABLED
+}
+
+// ============================================
 // 시스템 설정
 // ============================================
 
