@@ -1,38 +1,39 @@
 -- DeepSight AI Engine Studio - Database Migration Script
 -- v3.0 - 6D Vector System
 -- Generated from schema.prisma
+-- 멱등성(Idempotent): 중복 실행해도 안전합니다
 
 -- ============================================
--- ENUMS
+-- ENUMS (이미 존재하면 스킵)
 -- ============================================
 
-CREATE TYPE "UserRole" AS ENUM ('ADMIN', 'AI_ENGINEER', 'CONTENT_MANAGER', 'ANALYST');
-CREATE TYPE "PersonaVisibility" AS ENUM ('GLOBAL', 'PRIVATE', 'SHARED');
-CREATE TYPE "PersonaRole" AS ENUM ('REVIEWER', 'CURATOR', 'EDUCATOR', 'COMPANION', 'ANALYST');
-CREATE TYPE "PersonaStatus" AS ENUM ('DRAFT', 'REVIEW', 'ACTIVE', 'STANDARD', 'LEGACY', 'DEPRECATED', 'PAUSED', 'ARCHIVED');
-CREATE TYPE "PersonaSource" AS ENUM ('MANUAL', 'INCUBATOR', 'MUTATION');
-CREATE TYPE "OnboardingLevel" AS ENUM ('LIGHT', 'MEDIUM', 'DEEP');
-CREATE TYPE "AlgorithmType" AS ENUM ('COSINE', 'WEIGHTED', 'CONTEXT', 'HYBRID');
-CREATE TYPE "AlgorithmStatus" AS ENUM ('DRAFT', 'TESTING', 'ACTIVE', 'DEPRECATED');
-CREATE TYPE "ChangeType" AS ENUM ('MAJOR', 'MINOR', 'PATCH', 'ROLLBACK');
-CREATE TYPE "FeedbackType" AS ENUM ('LIKE', 'DISLIKE', 'NONE');
-CREATE TYPE "ABTestType" AS ENUM ('ALGORITHM', 'PERSONA', 'PARAMETER', 'WEIGHT', 'DIMENSION');
-CREATE TYPE "ABTestStatus" AS ENUM ('DRAFT', 'RUNNING', 'PAUSED', 'COMPLETED', 'CANCELLED');
-CREATE TYPE "QuestionType" AS ENUM ('SLIDER', 'MULTIPLE_CHOICE', 'RANKING', 'TEXT', 'IMAGE');
-CREATE TYPE "DifficultyLevel" AS ENUM ('EASY', 'MEDIUM', 'HARD');
-CREATE TYPE "IncubatorStatus" AS ENUM ('PENDING', 'PASSED', 'FAILED', 'APPROVED', 'REJECTED');
-CREATE TYPE "FilterType" AS ENUM ('PROFANITY', 'HATE_SPEECH', 'POLITICAL', 'RELIGIOUS', 'CUSTOM');
-CREATE TYPE "DeploymentTarget" AS ENUM ('PERSONA', 'ALGORITHM', 'CONFIG');
-CREATE TYPE "DeploymentEnv" AS ENUM ('DEV', 'STG', 'PROD');
-CREATE TYPE "DeploymentStatus" AS ENUM ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED', 'ROLLED_BACK');
-CREATE TYPE "IncidentSeverity" AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
-CREATE TYPE "IncidentStatus" AS ENUM ('REPORTED', 'INVESTIGATING', 'IDENTIFIED', 'FIXING', 'RESOLVED', 'CLOSED');
-CREATE TYPE "VersionStatus" AS ENUM ('ACTIVE', 'DEPRECATED', 'ARCHIVED');
-CREATE TYPE "EventChannelStatus" AS ENUM ('ACTIVE', 'PAUSED', 'ERROR');
-CREATE TYPE "EventStatus" AS ENUM ('PENDING', 'PROCESSING', 'SUCCESS', 'FAILED');
-CREATE TYPE "EventPriority" AS ENUM ('LOW', 'NORMAL', 'HIGH', 'CRITICAL');
-CREATE TYPE "BackupType" AS ENUM ('FULL', 'INCREMENTAL', 'DIFFERENTIAL');
-CREATE TYPE "BackupStatus" AS ENUM ('IN_PROGRESS', 'COMPLETED', 'FAILED');
+DO $$ BEGIN CREATE TYPE "UserRole" AS ENUM ('ADMIN', 'AI_ENGINEER', 'CONTENT_MANAGER', 'ANALYST'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "PersonaVisibility" AS ENUM ('GLOBAL', 'PRIVATE', 'SHARED'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "PersonaRole" AS ENUM ('REVIEWER', 'CURATOR', 'EDUCATOR', 'COMPANION', 'ANALYST'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "PersonaStatus" AS ENUM ('DRAFT', 'REVIEW', 'ACTIVE', 'STANDARD', 'LEGACY', 'DEPRECATED', 'PAUSED', 'ARCHIVED'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "PersonaSource" AS ENUM ('MANUAL', 'INCUBATOR', 'MUTATION'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "OnboardingLevel" AS ENUM ('LIGHT', 'MEDIUM', 'DEEP'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "AlgorithmType" AS ENUM ('COSINE', 'WEIGHTED', 'CONTEXT', 'HYBRID'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "AlgorithmStatus" AS ENUM ('DRAFT', 'TESTING', 'ACTIVE', 'DEPRECATED'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "ChangeType" AS ENUM ('MAJOR', 'MINOR', 'PATCH', 'ROLLBACK'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "FeedbackType" AS ENUM ('LIKE', 'DISLIKE', 'NONE'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "ABTestType" AS ENUM ('ALGORITHM', 'PERSONA', 'PARAMETER', 'WEIGHT', 'DIMENSION'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "ABTestStatus" AS ENUM ('DRAFT', 'RUNNING', 'PAUSED', 'COMPLETED', 'CANCELLED'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "QuestionType" AS ENUM ('SLIDER', 'MULTIPLE_CHOICE', 'RANKING', 'TEXT', 'IMAGE'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "DifficultyLevel" AS ENUM ('EASY', 'MEDIUM', 'HARD'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "IncubatorStatus" AS ENUM ('PENDING', 'PASSED', 'FAILED', 'APPROVED', 'REJECTED'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "FilterType" AS ENUM ('PROFANITY', 'HATE_SPEECH', 'POLITICAL', 'RELIGIOUS', 'CUSTOM'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "DeploymentTarget" AS ENUM ('PERSONA', 'ALGORITHM', 'CONFIG'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "DeploymentEnv" AS ENUM ('DEV', 'STG', 'PROD'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "DeploymentStatus" AS ENUM ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED', 'ROLLED_BACK'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "IncidentSeverity" AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "IncidentStatus" AS ENUM ('REPORTED', 'INVESTIGATING', 'IDENTIFIED', 'FIXING', 'RESOLVED', 'CLOSED'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "VersionStatus" AS ENUM ('ACTIVE', 'DEPRECATED', 'ARCHIVED'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "EventChannelStatus" AS ENUM ('ACTIVE', 'PAUSED', 'ERROR'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "EventStatus" AS ENUM ('PENDING', 'PROCESSING', 'SUCCESS', 'FAILED'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "EventPriority" AS ENUM ('LOW', 'NORMAL', 'HIGH', 'CRITICAL'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "BackupType" AS ENUM ('FULL', 'INCREMENTAL', 'DIFFERENTIAL'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE TYPE "BackupStatus" AS ENUM ('IN_PROGRESS', 'COMPLETED', 'FAILED'); EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 -- ============================================
 -- HELPER FUNCTION FOR CUID
@@ -53,7 +54,7 @@ $$ LANGUAGE plpgsql;
 -- 인증 및 사용자 관리
 -- ============================================
 
-CREATE TABLE "users" (
+CREATE TABLE IF NOT EXISTS "users" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "email" TEXT NOT NULL,
   "name" TEXT,
@@ -67,9 +68,9 @@ CREATE TABLE "users" (
 
   CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
-CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+CREATE UNIQUE INDEX IF NOT EXISTS "users_email_key" ON "users"("email");
 
-CREATE TABLE "accounts" (
+CREATE TABLE IF NOT EXISTS "accounts" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "userId" TEXT NOT NULL,
   "type" TEXT NOT NULL,
@@ -86,9 +87,9 @@ CREATE TABLE "accounts" (
   CONSTRAINT "accounts_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "accounts_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
-CREATE UNIQUE INDEX "accounts_provider_providerAccountId_key" ON "accounts"("provider", "providerAccountId");
+CREATE UNIQUE INDEX IF NOT EXISTS "accounts_provider_providerAccountId_key" ON "accounts"("provider", "providerAccountId");
 
-CREATE TABLE "sessions" (
+CREATE TABLE IF NOT EXISTS "sessions" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "sessionToken" TEXT NOT NULL,
   "userId" TEXT NOT NULL,
@@ -97,21 +98,21 @@ CREATE TABLE "sessions" (
   CONSTRAINT "sessions_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "sessions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
-CREATE UNIQUE INDEX "sessions_sessionToken_key" ON "sessions"("sessionToken");
+CREATE UNIQUE INDEX IF NOT EXISTS "sessions_sessionToken_key" ON "sessions"("sessionToken");
 
-CREATE TABLE "verification_tokens" (
+CREATE TABLE IF NOT EXISTS "verification_tokens" (
   "identifier" TEXT NOT NULL,
   "token" TEXT NOT NULL,
   "expires" TIMESTAMP(3) NOT NULL
 );
-CREATE UNIQUE INDEX "verification_tokens_token_key" ON "verification_tokens"("token");
-CREATE UNIQUE INDEX "verification_tokens_identifier_token_key" ON "verification_tokens"("identifier", "token");
+CREATE UNIQUE INDEX IF NOT EXISTS "verification_tokens_token_key" ON "verification_tokens"("token");
+CREATE UNIQUE INDEX IF NOT EXISTS "verification_tokens_identifier_token_key" ON "verification_tokens"("identifier", "token");
 
 -- ============================================
 -- 페르소나 관리
 -- ============================================
 
-CREATE TABLE "personas" (
+CREATE TABLE IF NOT EXISTS "personas" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "organizationId" TEXT,
   "visibility" "PersonaVisibility" NOT NULL DEFAULT 'PRIVATE',
@@ -141,7 +142,7 @@ CREATE TABLE "personas" (
   CONSTRAINT "personas_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
-CREATE TABLE "persona_vectors" (
+CREATE TABLE IF NOT EXISTS "persona_vectors" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "personaId" TEXT NOT NULL,
   "version" INTEGER NOT NULL DEFAULT 1,
@@ -161,7 +162,7 @@ CREATE TABLE "persona_vectors" (
 -- 사용자 벡터 및 아키타입
 -- ============================================
 
-CREATE TABLE "user_vectors" (
+CREATE TABLE IF NOT EXISTS "user_vectors" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "userId" TEXT NOT NULL,
   "onboardingLevel" "OnboardingLevel" NOT NULL DEFAULT 'LIGHT',
@@ -177,9 +178,9 @@ CREATE TABLE "user_vectors" (
 
   CONSTRAINT "user_vectors_pkey" PRIMARY KEY ("id")
 );
-CREATE UNIQUE INDEX "user_vectors_userId_key" ON "user_vectors"("userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "user_vectors_userId_key" ON "user_vectors"("userId");
 
-CREATE TABLE "archetypes" (
+CREATE TABLE IF NOT EXISTS "archetypes" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "name" TEXT NOT NULL,
   "description" TEXT,
@@ -201,13 +202,13 @@ CREATE TABLE "archetypes" (
 
   CONSTRAINT "archetypes_pkey" PRIMARY KEY ("id")
 );
-CREATE UNIQUE INDEX "archetypes_name_key" ON "archetypes"("name");
+CREATE UNIQUE INDEX IF NOT EXISTS "archetypes_name_key" ON "archetypes"("name");
 
 -- ============================================
 -- 매칭 알고리즘
 -- ============================================
 
-CREATE TABLE "matching_algorithms" (
+CREATE TABLE IF NOT EXISTS "matching_algorithms" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "name" TEXT NOT NULL,
   "version" TEXT NOT NULL,
@@ -224,7 +225,7 @@ CREATE TABLE "matching_algorithms" (
   CONSTRAINT "matching_algorithms_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "algorithm_versions" (
+CREATE TABLE IF NOT EXISTS "algorithm_versions" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "algorithmId" TEXT NOT NULL,
   "version" TEXT NOT NULL,
@@ -246,7 +247,7 @@ CREATE TABLE "algorithm_versions" (
 -- 매칭 로그
 -- ============================================
 
-CREATE TABLE "matching_logs" (
+CREATE TABLE IF NOT EXISTS "matching_logs" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "requestId" TEXT NOT NULL DEFAULT generate_cuid(),
   "userId" TEXT NOT NULL,
@@ -264,9 +265,9 @@ CREATE TABLE "matching_logs" (
   CONSTRAINT "matching_logs_algorithmId_fkey" FOREIGN KEY ("algorithmId") REFERENCES "matching_algorithms"("id") ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT "matching_logs_selectedPersonaId_fkey" FOREIGN KEY ("selectedPersonaId") REFERENCES "personas"("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
-CREATE UNIQUE INDEX "matching_logs_requestId_key" ON "matching_logs"("requestId");
+CREATE UNIQUE INDEX IF NOT EXISTS "matching_logs_requestId_key" ON "matching_logs"("requestId");
 
-CREATE TABLE "feedbacks" (
+CREATE TABLE IF NOT EXISTS "feedbacks" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "userId" TEXT NOT NULL,
   "personaId" TEXT NOT NULL,
@@ -283,7 +284,7 @@ CREATE TABLE "feedbacks" (
 -- A/B 테스트
 -- ============================================
 
-CREATE TABLE "ab_tests" (
+CREATE TABLE IF NOT EXISTS "ab_tests" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "name" TEXT NOT NULL,
   "description" TEXT,
@@ -311,7 +312,7 @@ CREATE TABLE "ab_tests" (
 -- 심리 프로파일링 템플릿
 -- ============================================
 
-CREATE TABLE "psych_profile_templates" (
+CREATE TABLE IF NOT EXISTS "psych_profile_templates" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "name" TEXT NOT NULL,
   "onboardingLevel" "OnboardingLevel" NOT NULL,
@@ -332,7 +333,7 @@ CREATE TABLE "psych_profile_templates" (
 -- 골든 샘플 (테스트용)
 -- ============================================
 
-CREATE TABLE "golden_samples" (
+CREATE TABLE IF NOT EXISTS "golden_samples" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "contentTitle" TEXT NOT NULL,
   "contentType" TEXT,
@@ -354,7 +355,7 @@ CREATE TABLE "golden_samples" (
 -- 인큐베이터 로그
 -- ============================================
 
-CREATE TABLE "incubator_logs" (
+CREATE TABLE IF NOT EXISTS "incubator_logs" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "batchId" TEXT NOT NULL,
   "batchDate" DATE NOT NULL,
@@ -377,7 +378,7 @@ CREATE TABLE "incubator_logs" (
 -- 리뷰 스타일 (v3.0)
 -- ============================================
 
-CREATE TABLE "review_styles" (
+CREATE TABLE IF NOT EXISTS "review_styles" (
   "id" TEXT NOT NULL,
   "name" TEXT NOT NULL,
   "description" TEXT,
@@ -392,7 +393,7 @@ CREATE TABLE "review_styles" (
   CONSTRAINT "review_styles_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "style_content_reviews" (
+CREATE TABLE IF NOT EXISTS "style_content_reviews" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "styleId" TEXT NOT NULL,
   "contentId" TEXT NOT NULL,
@@ -407,9 +408,9 @@ CREATE TABLE "style_content_reviews" (
   CONSTRAINT "style_content_reviews_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "style_content_reviews_styleId_fkey" FOREIGN KEY ("styleId") REFERENCES "review_styles"("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
-CREATE UNIQUE INDEX "style_content_reviews_styleId_contentId_key" ON "style_content_reviews"("styleId", "contentId");
+CREATE UNIQUE INDEX IF NOT EXISTS "style_content_reviews_styleId_contentId_key" ON "style_content_reviews"("styleId", "contentId");
 
-CREATE TABLE "style_review_logs" (
+CREATE TABLE IF NOT EXISTS "style_review_logs" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "userId" TEXT NOT NULL,
   "personaId" TEXT NOT NULL,
@@ -428,7 +429,7 @@ CREATE TABLE "style_review_logs" (
 -- 페르소나 테스트 결과
 -- ============================================
 
-CREATE TABLE "persona_test_results" (
+CREATE TABLE IF NOT EXISTS "persona_test_results" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "personaId" TEXT NOT NULL,
   "testType" TEXT NOT NULL,
@@ -448,7 +449,7 @@ CREATE TABLE "persona_test_results" (
 -- 시스템 설정
 -- ============================================
 
-CREATE TABLE "system_configs" (
+CREATE TABLE IF NOT EXISTS "system_configs" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "category" TEXT NOT NULL,
   "key" TEXT NOT NULL,
@@ -458,9 +459,9 @@ CREATE TABLE "system_configs" (
 
   CONSTRAINT "system_configs_pkey" PRIMARY KEY ("id")
 );
-CREATE UNIQUE INDEX "system_configs_category_key_key" ON "system_configs"("category", "key");
+CREATE UNIQUE INDEX IF NOT EXISTS "system_configs_category_key_key" ON "system_configs"("category", "key");
 
-CREATE TABLE "safety_filters" (
+CREATE TABLE IF NOT EXISTS "safety_filters" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "name" TEXT NOT NULL,
   "filterType" "FilterType" NOT NULL,
@@ -476,7 +477,7 @@ CREATE TABLE "safety_filters" (
 -- 배포 관리
 -- ============================================
 
-CREATE TABLE "deployments" (
+CREATE TABLE IF NOT EXISTS "deployments" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "targetType" "DeploymentTarget" NOT NULL,
   "targetId" TEXT NOT NULL,
@@ -495,7 +496,7 @@ CREATE TABLE "deployments" (
 -- 장애 관리
 -- ============================================
 
-CREATE TABLE "incidents" (
+CREATE TABLE IF NOT EXISTS "incidents" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "title" TEXT NOT NULL,
   "description" TEXT NOT NULL,
@@ -511,7 +512,7 @@ CREATE TABLE "incidents" (
   CONSTRAINT "incidents_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "incident_timelines" (
+CREATE TABLE IF NOT EXISTS "incident_timelines" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "incidentId" TEXT NOT NULL,
   "action" TEXT NOT NULL,
@@ -527,7 +528,7 @@ CREATE TABLE "incident_timelines" (
 -- 감사 로그
 -- ============================================
 
-CREATE TABLE "audit_logs" (
+CREATE TABLE IF NOT EXISTS "audit_logs" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "userId" TEXT NOT NULL,
   "action" TEXT NOT NULL,
@@ -541,15 +542,15 @@ CREATE TABLE "audit_logs" (
   CONSTRAINT "audit_logs_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "audit_logs_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
-CREATE INDEX "audit_logs_userId_idx" ON "audit_logs"("userId");
-CREATE INDEX "audit_logs_targetType_targetId_idx" ON "audit_logs"("targetType", "targetId");
-CREATE INDEX "audit_logs_createdAt_idx" ON "audit_logs"("createdAt");
+CREATE INDEX IF NOT EXISTS "audit_logs_userId_idx" ON "audit_logs"("userId");
+CREATE INDEX IF NOT EXISTS "audit_logs_targetType_targetId_idx" ON "audit_logs"("targetType", "targetId");
+CREATE INDEX IF NOT EXISTS "audit_logs_createdAt_idx" ON "audit_logs"("createdAt");
 
 -- ============================================
 -- 시스템 모니터링
 -- ============================================
 
-CREATE TABLE "system_metrics" (
+CREATE TABLE IF NOT EXISTS "system_metrics" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "metricType" TEXT NOT NULL,
   "value" DECIMAL(10,4) NOT NULL,
@@ -559,13 +560,13 @@ CREATE TABLE "system_metrics" (
 
   CONSTRAINT "system_metrics_pkey" PRIMARY KEY ("id")
 );
-CREATE INDEX "system_metrics_metricType_recordedAt_idx" ON "system_metrics"("metricType", "recordedAt");
+CREATE INDEX IF NOT EXISTS "system_metrics_metricType_recordedAt_idx" ON "system_metrics"("metricType", "recordedAt");
 
 -- ============================================
 -- 백업 기록
 -- ============================================
 
-CREATE TABLE "backup_records" (
+CREATE TABLE IF NOT EXISTS "backup_records" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "backupType" "BackupType" NOT NULL,
   "status" "BackupStatus" NOT NULL DEFAULT 'IN_PROGRESS',
@@ -582,7 +583,7 @@ CREATE TABLE "backup_records" (
 -- 버전 관리
 -- ============================================
 
-CREATE TABLE "versions" (
+CREATE TABLE IF NOT EXISTS "versions" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "tag" TEXT NOT NULL,
   "name" TEXT NOT NULL,
@@ -601,9 +602,9 @@ CREATE TABLE "versions" (
   CONSTRAINT "versions_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "versions_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
-CREATE UNIQUE INDEX "versions_tag_key" ON "versions"("tag");
+CREATE UNIQUE INDEX IF NOT EXISTS "versions_tag_key" ON "versions"("tag");
 
-CREATE TABLE "commits" (
+CREATE TABLE IF NOT EXISTS "commits" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "hash" TEXT NOT NULL,
   "message" TEXT NOT NULL,
@@ -615,9 +616,9 @@ CREATE TABLE "commits" (
 
   CONSTRAINT "commits_pkey" PRIMARY KEY ("id")
 );
-CREATE UNIQUE INDEX "commits_hash_key" ON "commits"("hash");
+CREATE UNIQUE INDEX IF NOT EXISTS "commits_hash_key" ON "commits"("hash");
 
-CREATE TABLE "branches" (
+CREATE TABLE IF NOT EXISTS "branches" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "name" TEXT NOT NULL,
   "lastCommitMessage" TEXT NOT NULL DEFAULT '',
@@ -631,13 +632,13 @@ CREATE TABLE "branches" (
 
   CONSTRAINT "branches_pkey" PRIMARY KEY ("id")
 );
-CREATE UNIQUE INDEX "branches_name_key" ON "branches"("name");
+CREATE UNIQUE INDEX IF NOT EXISTS "branches_name_key" ON "branches"("name");
 
 -- ============================================
 -- 이벤트 버스
 -- ============================================
 
-CREATE TABLE "event_channels" (
+CREATE TABLE IF NOT EXISTS "event_channels" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "name" TEXT NOT NULL,
   "description" TEXT NOT NULL DEFAULT '',
@@ -654,7 +655,7 @@ CREATE TABLE "event_channels" (
   CONSTRAINT "event_channels_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "events" (
+CREATE TABLE IF NOT EXISTS "events" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "type" TEXT NOT NULL,
   "source" TEXT NOT NULL,
@@ -671,11 +672,11 @@ CREATE TABLE "events" (
   CONSTRAINT "events_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "events_channelId_fkey" FOREIGN KEY ("channelId") REFERENCES "event_channels"("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
-CREATE INDEX "events_status_idx" ON "events"("status");
-CREATE INDEX "events_type_idx" ON "events"("type");
-CREATE INDEX "events_createdAt_idx" ON "events"("createdAt");
+CREATE INDEX IF NOT EXISTS "events_status_idx" ON "events"("status");
+CREATE INDEX IF NOT EXISTS "events_type_idx" ON "events"("type");
+CREATE INDEX IF NOT EXISTS "events_createdAt_idx" ON "events"("createdAt");
 
-CREATE TABLE "dead_letter_events" (
+CREATE TABLE IF NOT EXISTS "dead_letter_events" (
   "id" TEXT NOT NULL DEFAULT generate_cuid(),
   "originalEventId" TEXT NOT NULL,
   "eventType" TEXT NOT NULL,
@@ -690,16 +691,16 @@ CREATE TABLE "dead_letter_events" (
 );
 
 -- ============================================
--- 초기 데이터 (선택사항)
+-- 초기 데이터 (중복 삽입 방지)
 -- ============================================
 
--- 기본 관리자 사용자 (비밀번호: admin123 - bcrypt 해시)
--- INSERT INTO "users" ("id", "email", "name", "password", "role") VALUES
--- (generate_cuid(), 'admin@deepsight.ai', 'Admin', '$2a$10$...', 'ADMIN');
-
 -- 기본 브랜치
-INSERT INTO "branches" ("name", "isDefault", "isProtected", "lastCommitMessage") VALUES
-('main', true, true, 'Initial commit');
+INSERT INTO "branches" ("name", "isDefault", "isProtected", "lastCommitMessage")
+VALUES ('main', true, true, 'Initial commit')
+ON CONFLICT ("name") DO NOTHING;
 
--- 완료 메시지
+-- ============================================
+-- 완료
+-- ============================================
+
 SELECT 'DeepSight AI Engine Studio 데이터베이스 마이그레이션 완료!' as status;
