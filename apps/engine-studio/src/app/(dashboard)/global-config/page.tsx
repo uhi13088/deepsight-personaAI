@@ -38,11 +38,6 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import Link from "next/link"
 
-// AI models - empty by default, will be loaded from API
-const AI_MODELS: { id: string; name: string; provider: string; status: string; usage: number }[] =
-  []
-
-// TODO: Move CONFIG_CATEGORIES to @/services/mock-data.service when configuration management is expanded
 // 설정 카테고리
 const CONFIG_CATEGORIES = [
   {
@@ -95,9 +90,18 @@ const CONFIG_CATEGORIES = [
   },
 ]
 
+interface AIModelSummary {
+  id: string
+  name: string
+  provider: string
+  status: string
+  usage: number
+}
+
 export default function GlobalConfigPage() {
   const [activeTab, setActiveTab] = useState("general")
   const [isSaving, setIsSaving] = useState(false)
+  const [aiModels, setAiModels] = useState<AIModelSummary[]>([])
   const [generalSettings, setGeneralSettings] = useState({
     systemName: "DeepSight Engine Studio",
     environment: "production",
@@ -181,9 +185,32 @@ export default function GlobalConfigPage() {
     }
   }, [])
 
+  const fetchAiModels = useCallback(async () => {
+    try {
+      const res = await fetch("/api/ai-models")
+      const json = await res.json()
+      if (json.success && json.data) {
+        setAiModels(
+          json.data.models.map(
+            (m: { id: string; name: string; provider: string; status: string; usage: number }) => ({
+              id: m.id,
+              name: m.name,
+              provider: m.provider,
+              status: m.status,
+              usage: m.usage,
+            })
+          )
+        )
+      }
+    } catch (error) {
+      console.error("Failed to fetch AI models:", error)
+    }
+  }, [])
+
   useEffect(() => {
     fetchSettings()
-  }, [fetchSettings])
+    fetchAiModels()
+  }, [fetchSettings, fetchAiModels])
 
   const handleSaveAllSettings = async () => {
     setIsSaving(true)
@@ -430,7 +457,7 @@ export default function GlobalConfigPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {AI_MODELS.length === 0 ? (
+              {aiModels.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <Brain className="text-muted-foreground mb-4 h-10 w-10" />
                   <h3 className="mb-2 font-medium">등록된 AI 모델이 없습니다</h3>
@@ -446,7 +473,7 @@ export default function GlobalConfigPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {AI_MODELS.map((model) => (
+                  {aiModels.map((model) => (
                     <div
                       key={model.id}
                       className="flex items-center justify-between rounded-lg border p-3"
