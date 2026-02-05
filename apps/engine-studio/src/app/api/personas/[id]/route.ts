@@ -29,6 +29,7 @@ const updatePersonaSchema = z.object({
 // 응답 데이터 변환 헬퍼
 function transformPersona(persona: Awaited<ReturnType<typeof getPersonaWithRelations>>) {
   if (!persona) return null
+  const latestVector = persona.vectors[0]
   return {
     id: persona.id,
     name: persona.name,
@@ -36,18 +37,31 @@ function transformPersona(persona: Awaited<ReturnType<typeof getPersonaWithRelat
     expertise: persona.expertise,
     description: persona.description,
     status: persona.status,
+    visibility: persona.visibility,
+    profileImageUrl: persona.profileImageUrl,
     qualityScore: persona.qualityScore ? Number(persona.qualityScore) : null,
-    vector: persona.vectors[0]
+    vector: latestVector
       ? {
-          depth: Number(persona.vectors[0].depth),
-          lens: Number(persona.vectors[0].lens),
-          stance: Number(persona.vectors[0].stance),
-          scope: Number(persona.vectors[0].scope),
-          taste: Number(persona.vectors[0].taste),
-          purpose: Number(persona.vectors[0].purpose),
+          depth: Number(latestVector.depth),
+          lens: Number(latestVector.lens),
+          stance: Number(latestVector.stance),
+          scope: Number(latestVector.scope),
+          taste: Number(latestVector.taste),
+          purpose: Number(latestVector.purpose),
         }
       : null,
     promptTemplate: persona.promptTemplate,
+    versions: persona.vectors.map((v) => ({
+      id: v.id,
+      version: v.version,
+      depth: Number(v.depth),
+      lens: Number(v.lens),
+      stance: Number(v.stance),
+      scope: Number(v.scope),
+      taste: Number(v.taste),
+      purpose: Number(v.purpose),
+      createdAt: v.createdAt.toISOString(),
+    })),
     createdBy: persona.createdBy,
     createdAt: persona.createdAt.toISOString(),
     updatedAt: persona.updatedAt.toISOString(),
@@ -58,7 +72,7 @@ async function getPersonaWithRelations(id: string) {
   return prisma.persona.findUnique({
     where: { id },
     include: {
-      vectors: { orderBy: { version: "desc" }, take: 1 },
+      vectors: { orderBy: { version: "desc" } },
       createdBy: { select: { id: true, name: true, email: true } },
     },
   })
@@ -85,9 +99,33 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       )
     }
 
+    // 성과 지표 계산
+    const [selectionCount, likes, dislikes] = await Promise.all([
+      prisma.matchingLog.count({ where: { selectedPersonaId: id } }).catch(() => 0),
+      prisma.feedback.count({ where: { personaId: id, feedbackType: "LIKE" } }).catch(() => 0),
+      prisma.feedback.count({ where: { personaId: id, feedbackType: "DISLIKE" } }).catch(() => 0),
+    ])
+
+    const totalFeedback = likes + dislikes
+    const hasMetrics = totalFeedback > 0 || selectionCount > 0
+    const metrics = hasMetrics
+      ? {
+          impressions: selectionCount,
+          clicks: selectionCount,
+          ctr: 0,
+          likes,
+          dislikes,
+          satisfactionRate: totalFeedback > 0 ? (likes / totalFeedback) * 100 : 0,
+          avgEngagementTime: 0,
+        }
+      : null
+
     return NextResponse.json({
       success: true,
-      data: transformPersona(persona),
+      data: {
+        ...transformPersona(persona),
+        metrics,
+      },
     })
   } catch (error) {
     console.error("[API] GET /api/personas/[id] error:", error)

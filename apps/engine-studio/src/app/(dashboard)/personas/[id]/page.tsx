@@ -54,70 +54,39 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { RadarChart } from "@/components/charts/radar-chart"
-import { personaService, type PersonaDetailResponse } from "@/services/persona-service"
+import { personaService } from "@/services/persona-service"
 import type { PersonaRole, PersonaStatus, Vector6D } from "@/types"
 
-// 샘플 페르소나 데이터
-const SAMPLE_PERSONA = {
-  id: "1",
-  name: "논리적 평론가",
-  role: "REVIEWER",
-  tagline: "데이터와 논리로 콘텐츠를 분석하는 평론가",
-  description: "영화의 서사 구조와 연출을 분석적으로 보는 것을 좋아합니다.",
-  expertise: ["영화", "드라마"],
-  status: "ACTIVE",
-  visibility: "PUBLIC",
-  avatar: "/avatars/analyst.png",
-  vector: {
-    depth: 0.85,
-    lens: 0.9,
-    stance: 0.8,
-    scope: 0.85,
-    taste: 0.3,
-    purpose: 0.7,
-  },
+// 페르소나 페이지 데이터 타입
+interface PersonaPageData {
+  id: string
+  name: string
+  role: string
+  description: string
+  expertise: string[]
+  status: string
+  visibility: string
+  vector: Vector6D
   prompt: {
-    systemPrompt: `# 역할 정의
-당신은 "논리적 평론가"입니다. 리뷰어(Reviewer) 역할을 수행합니다.
-전문 분야: 영화, 드라마
-
-# 성향 가이드
-- 분석 깊이: 85% 심층적 (배경과 맥락까지 파악)
-- 판단 렌즈: 90% 논리적 (구조와 근거 중시)
-- 평가 태도: 80% 비판적 (결점도 지적)
-- 관심 범위: 85% 디테일 (세부사항 꼼꼼히)
-- 취향 성향: 30% 클래식 (검증된 것 선호)
-- 소비 목적: 70% 의미 추구
-
-# 행동 지침
-1. 콘텐츠를 추천할 때는 항상 논리적 근거를 제시하세요.
-2. 연출, 각본, 연기력 등 세부 요소를 분석하세요.
-3. 아쉬운 점도 솔직하게 말하되, 건설적으로 표현하세요.
-
-# 금기사항
-- 비속어, 혐오 표현 절대 금지
-- 정치적/종교적 편향 금지
-- 스포일러 주의`,
-    exampleResponses: [
-      "이 영화는 3막 구조에서 2막 전환점의 타이밍이 절묘합니다.",
-      "연출력 8/10, 각본 7/10, 배우 연기 9/10로 평가합니다.",
-    ],
-    restrictions: ["스포일러 금지", "비속어 금지"],
-  },
+    systemPrompt: string
+    exampleResponses: string[]
+    restrictions: string[]
+  }
   metrics: {
-    impressionCount: 15420,
-    selectionCount: 8234,
-    avgRating: 4.5,
-    matchAccuracy: 87.3,
-  },
-  versions: [
-    { version: "v1.2.0", date: "2026-01-15", changes: "벡터 미세 조정", author: "김엔지니어" },
-    { version: "v1.1.0", date: "2026-01-10", changes: "프롬프트 개선", author: "박매니저" },
-    { version: "v1.0.0", date: "2026-01-05", changes: "최초 생성", author: "이관리자" },
-  ],
-  qualityScore: 92,
-  createdAt: "2026-01-05T10:00:00Z",
-  updatedAt: "2026-01-15T14:30:00Z",
+    impressionCount: number
+    selectionCount: number
+    avgRating: number
+    matchAccuracy: number
+  } | null
+  versions: Array<{
+    version: string
+    date: string
+    changes: string
+    author: string
+  }>
+  qualityScore: number
+  createdAt: string
+  updatedAt: string
 }
 
 const VECTOR_LABELS = {
@@ -134,7 +103,7 @@ export default function PersonaDetailPage() {
   const router = useRouter()
   const personaId = params?.id as string
 
-  const [persona, setPersona] = useState(SAMPLE_PERSONA)
+  const [persona, setPersona] = useState<PersonaPageData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
@@ -172,19 +141,51 @@ export default function PersonaDetailPage() {
     setError(null)
 
     try {
-      const apiData: PersonaDetailResponse = await personaService.getPersonaById(personaId)
+      const apiData = await personaService.getPersonaById(personaId)
 
-      // API 응답을 페이지 형식에 맞게 변환
+      const defaultVector: Vector6D = {
+        depth: 0.5,
+        lens: 0.5,
+        stance: 0.5,
+        scope: 0.5,
+        taste: 0.5,
+        purpose: 0.5,
+      }
+
       setPersona({
-        ...SAMPLE_PERSONA,
         id: apiData.id,
         name: apiData.name,
-        role: apiData.role || SAMPLE_PERSONA.role,
-        expertise: apiData.expertise || SAMPLE_PERSONA.expertise,
-        description: apiData.description || SAMPLE_PERSONA.description,
+        role: apiData.role || "REVIEWER",
+        description: apiData.description || "",
+        expertise: apiData.expertise || [],
         status: apiData.status,
-        vector: apiData.vector || SAMPLE_PERSONA.vector,
-        qualityScore: apiData.qualityScore ?? SAMPLE_PERSONA.qualityScore,
+        visibility:
+          ((apiData as unknown as Record<string, unknown>).visibility as string) || "PRIVATE",
+        vector: apiData.vector || defaultVector,
+        prompt: {
+          systemPrompt: apiData.promptTemplate || "",
+          exampleResponses: [],
+          restrictions: [],
+        },
+        metrics: apiData.metrics
+          ? {
+              impressionCount: apiData.metrics.impressions,
+              selectionCount: apiData.metrics.clicks,
+              avgRating:
+                apiData.metrics.satisfactionRate > 0 ? apiData.metrics.satisfactionRate / 20 : 0,
+              matchAccuracy: apiData.metrics.ctr,
+            }
+          : null,
+        versions: (apiData.versions || []).map((v, idx) => ({
+          version: `v${v.version}.0`,
+          date:
+            v.createdAt instanceof Date
+              ? v.createdAt.toISOString().split("T")[0]
+              : String(v.createdAt).split("T")[0],
+          changes: idx === 0 ? "최신 벡터" : `벡터 버전 ${v.version}`,
+          author: "",
+        })),
+        qualityScore: apiData.qualityScore ?? 0,
         createdAt:
           apiData.createdAt instanceof Date
             ? apiData.createdAt.toISOString()
@@ -193,24 +194,10 @@ export default function PersonaDetailPage() {
           apiData.updatedAt instanceof Date
             ? apiData.updatedAt.toISOString()
             : (apiData.updatedAt as unknown as string),
-        prompt: {
-          ...SAMPLE_PERSONA.prompt,
-          systemPrompt: apiData.promptTemplate || SAMPLE_PERSONA.prompt.systemPrompt,
-        },
-        metrics: apiData.metrics
-          ? {
-              impressionCount: apiData.metrics.impressions,
-              selectionCount: apiData.metrics.clicks,
-              avgRating: apiData.metrics.satisfactionRate / 20, // 100점 만점 → 5점 만점
-              matchAccuracy: apiData.metrics.ctr,
-            }
-          : SAMPLE_PERSONA.metrics,
       })
     } catch (err) {
       console.error("Failed to fetch persona:", err)
       setError(err instanceof Error ? err.message : "페르소나를 불러올 수 없습니다")
-      // 에러 시에도 샘플 데이터로 폴백 (데모 목적)
-      setPersona({ ...SAMPLE_PERSONA, id: personaId })
     } finally {
       setIsLoading(false)
     }
@@ -221,13 +208,14 @@ export default function PersonaDetailPage() {
   }, [fetchPersona])
 
   const handleVectorChange = (key: string, value: number[]) => {
-    setPersona((prev) => ({
-      ...prev,
-      vector: { ...prev.vector, [key]: value[0] },
-    }))
+    setPersona((prev) => {
+      if (!prev) return prev
+      return { ...prev, vector: { ...prev.vector, [key]: value[0] } }
+    })
   }
 
   const handleSave = async () => {
+    if (!persona) return
     setIsSaving(true)
     try {
       await personaService.updatePersona(personaId, {
@@ -267,6 +255,7 @@ export default function PersonaDetailPage() {
   }
 
   const handleDuplicate = async () => {
+    if (!persona) return
     try {
       const newPersona = await personaService.createPersona({
         name: `${persona.name} (복제본)`,
@@ -288,41 +277,47 @@ export default function PersonaDetailPage() {
   const handleAddExpertise = () => {
     const newExpertise = prompt("추가할 전문 분야를 입력하세요:")
     if (newExpertise?.trim()) {
-      setPersona((prev) => ({
-        ...prev,
-        expertise: [...prev.expertise, newExpertise.trim()],
-      }))
+      setPersona((prev) => {
+        if (!prev) return prev
+        return { ...prev, expertise: [...prev.expertise, newExpertise.trim()] }
+      })
     }
   }
 
   const handleAddExampleResponse = () => {
     const newExample = prompt("예시 응답을 입력하세요:")
     if (newExample?.trim()) {
-      setPersona((prev) => ({
-        ...prev,
-        prompt: {
-          ...prev.prompt,
-          exampleResponses: [...prev.prompt.exampleResponses, newExample.trim()],
-        },
-      }))
+      setPersona((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          prompt: {
+            ...prev.prompt,
+            exampleResponses: [...prev.prompt.exampleResponses, newExample.trim()],
+          },
+        }
+      })
     }
   }
 
   const handleAddRestriction = () => {
     const newRestriction = prompt("금기사항을 입력하세요:")
     if (newRestriction?.trim()) {
-      setPersona((prev) => ({
-        ...prev,
-        prompt: {
-          ...prev.prompt,
-          restrictions: [...prev.prompt.restrictions, newRestriction.trim()],
-        },
-      }))
+      setPersona((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          prompt: {
+            ...prev.prompt,
+            restrictions: [...prev.prompt.restrictions, newRestriction.trim()],
+          },
+        }
+      })
     }
   }
 
   const handleApplyPreset = (presetName: string) => {
-    const presets: Record<string, typeof SAMPLE_PERSONA.vector> = {
+    const presets: Record<string, Vector6D> = {
       "냉철한 분석가": {
         depth: 0.95,
         lens: 0.95,
@@ -351,12 +346,16 @@ export default function PersonaDetailPage() {
     }
     const preset = presets[presetName]
     if (preset) {
-      setPersona((prev) => ({ ...prev, vector: preset }))
+      setPersona((prev) => {
+        if (!prev) return prev
+        return { ...prev, vector: preset }
+      })
       toast.success(`'${presetName}' 프리셋이 적용되었습니다`)
     }
   }
 
   const handleAutoGeneratePrompt = () => {
+    if (!persona) return
     const { depth, lens, stance, scope, taste, purpose } = persona.vector
     const generatedPrompt = `# 역할 정의
 당신은 "${persona.name}"입니다. ${persona.role} 역할을 수행합니다.
@@ -380,10 +379,10 @@ export default function PersonaDetailPage() {
 - 정치적/종교적 편향 금지
 - 스포일러 주의`
 
-    setPersona((prev) => ({
-      ...prev,
-      prompt: { ...prev.prompt, systemPrompt: generatedPrompt },
-    }))
+    setPersona((prev) => {
+      if (!prev) return prev
+      return { ...prev, prompt: { ...prev.prompt, systemPrompt: generatedPrompt } }
+    })
     toast.success("벡터 기반으로 프롬프트가 생성되었습니다")
   }
 
@@ -447,6 +446,7 @@ export default function PersonaDetailPage() {
   }, [fetchLastValidation])
 
   const handleTestPrompt = async () => {
+    if (!persona) return
     setTestResult("생성 중...")
 
     try {
@@ -503,23 +503,26 @@ ${result.response}
     )
   }
 
-  // 에러 상태 (샘플 데이터로 표시하면서 알림)
-  if (error) {
-    console.warn("Using sample data due to error:", error)
+  // 에러 상태 또는 데이터 없음
+  if (error || !persona) {
+    return (
+      <div className="flex min-h-[400px] flex-col items-center justify-center p-6">
+        <AlertTriangle className="mb-4 h-12 w-12 text-red-500" />
+        <h2 className="mb-2 text-lg font-semibold">페르소나를 불러올 수 없습니다</h2>
+        <p className="text-muted-foreground mb-4 text-sm">{error || "데이터를 찾을 수 없습니다"}</p>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => router.push("/personas")}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            목록으로
+          </Button>
+          <Button onClick={() => fetchPersona()}>다시 시도</Button>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6 p-6">
-      {/* 에러 알림 배너 */}
-      {error && (
-        <div className="flex items-center gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20">
-          <AlertTriangle className="h-5 w-5 text-yellow-600" />
-          <p className="text-sm text-yellow-800 dark:text-yellow-200">
-            API 연동 전이므로 샘플 데이터를 표시합니다. (ID: {personaId})
-          </p>
-        </div>
-      )}
-
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -535,7 +538,7 @@ ${result.response}
                 품질 {persona.qualityScore}점
               </span>
             </div>
-            <p className="text-muted-foreground">{persona.tagline}</p>
+            <p className="text-muted-foreground">{persona.description || "설명 없음"}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -592,7 +595,9 @@ ${result.response}
                   <Input
                     value={persona.name}
                     disabled={!isEditing}
-                    onChange={(e) => setPersona((prev) => ({ ...prev, name: e.target.value }))}
+                    onChange={(e) =>
+                      setPersona((prev) => (prev ? { ...prev, name: e.target.value } : prev))
+                    }
                   />
                 </div>
                 <div className="space-y-2">
@@ -600,7 +605,9 @@ ${result.response}
                   <Select
                     disabled={!isEditing}
                     value={persona.role}
-                    onValueChange={(value) => setPersona((prev) => ({ ...prev, role: value }))}
+                    onValueChange={(value) =>
+                      setPersona((prev) => (prev ? { ...prev, role: value } : prev))
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -615,21 +622,13 @@ ${result.response}
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>태그라인</Label>
-                  <Input
-                    value={persona.tagline}
-                    disabled={!isEditing}
-                    onChange={(e) => setPersona((prev) => ({ ...prev, tagline: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
                   <Label>설명</Label>
                   <Textarea
                     value={persona.description}
                     disabled={!isEditing}
                     rows={3}
                     onChange={(e) =>
-                      setPersona((prev) => ({ ...prev, description: e.target.value }))
+                      setPersona((prev) => (prev ? { ...prev, description: e.target.value } : prev))
                     }
                   />
                 </div>
@@ -646,7 +645,9 @@ ${result.response}
                   <Select
                     disabled={!isEditing}
                     value={persona.status}
-                    onValueChange={(value) => setPersona((prev) => ({ ...prev, status: value }))}
+                    onValueChange={(value) =>
+                      setPersona((prev) => (prev ? { ...prev, status: value } : prev))
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -666,15 +667,16 @@ ${result.response}
                     disabled={!isEditing}
                     value={persona.visibility}
                     onValueChange={(value) =>
-                      setPersona((prev) => ({ ...prev, visibility: value }))
+                      setPersona((prev) => (prev ? { ...prev, visibility: value } : prev))
                     }
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="PUBLIC">공개 (Public)</SelectItem>
+                      <SelectItem value="GLOBAL">전체 공개 (Global)</SelectItem>
                       <SelectItem value="PRIVATE">비공개 (Private)</SelectItem>
+                      <SelectItem value="SHARED">공유 (Shared)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -804,10 +806,11 @@ ${result.response}
                 rows={20}
                 className="font-mono text-sm"
                 onChange={(e) =>
-                  setPersona((prev) => ({
-                    ...prev,
-                    prompt: { ...prev.prompt, systemPrompt: e.target.value },
-                  }))
+                  setPersona((prev) =>
+                    prev
+                      ? { ...prev, prompt: { ...prev.prompt, systemPrompt: e.target.value } }
+                      : prev
+                  )
                 }
               />
               <div className="flex items-center justify-between">
@@ -839,11 +842,15 @@ ${result.response}
                 <CardTitle>예시 응답</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {persona.prompt.exampleResponses.map((example, idx) => (
-                  <div key={idx} className="bg-muted rounded-lg p-3 text-sm">
-                    &quot;{example}&quot;
-                  </div>
-                ))}
+                {persona.prompt.exampleResponses.length > 0 ? (
+                  persona.prompt.exampleResponses.map((example, idx) => (
+                    <div key={idx} className="bg-muted rounded-lg p-3 text-sm">
+                      &quot;{example}&quot;
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-muted-foreground text-sm">등록된 예시 응답이 없습니다.</p>
+                )}
                 {isEditing && (
                   <Button
                     variant="outline"
@@ -862,15 +869,19 @@ ${result.response}
                 <CardTitle>금기사항</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {persona.prompt.restrictions.map((restriction, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm dark:bg-red-900/20"
-                  >
-                    <AlertTriangle className="h-4 w-4 text-red-500" />
-                    {restriction}
-                  </div>
-                ))}
+                {persona.prompt.restrictions.length > 0 ? (
+                  persona.prompt.restrictions.map((restriction, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm dark:bg-red-900/20"
+                    >
+                      <AlertTriangle className="h-4 w-4 text-red-500" />
+                      {restriction}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-muted-foreground text-sm">등록된 금기사항이 없습니다.</p>
+                )}
                 {isEditing && (
                   <Button
                     variant="outline"
@@ -1058,38 +1069,50 @@ ${result.response}
 
         {/* 성과 지표 탭 */}
         <TabsContent value="metrics" className="space-y-6">
-          <div className="grid grid-cols-4 gap-4">
+          {persona.metrics ? (
+            <div className="grid grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-2xl font-bold">
+                    {persona.metrics.impressionCount.toLocaleString()}
+                  </div>
+                  <p className="text-muted-foreground text-sm">총 노출 수</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-2xl font-bold">
+                    {persona.metrics.selectionCount.toLocaleString()}
+                  </div>
+                  <p className="text-muted-foreground text-sm">선택 수</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-2xl font-bold">★ {persona.metrics.avgRating.toFixed(1)}</div>
+                  <p className="text-muted-foreground text-sm">평균 평점</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-2xl font-bold text-green-600">
+                    {persona.metrics.matchAccuracy.toFixed(1)}%
+                  </div>
+                  <p className="text-muted-foreground text-sm">매칭 정확도</p>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
             <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold">
-                  {persona.metrics.impressionCount.toLocaleString()}
-                </div>
-                <p className="text-muted-foreground text-sm">총 노출 수</p>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <AlertCircle className="text-muted-foreground mb-4 h-12 w-12" />
+                <h3 className="mb-2 text-lg font-medium">성과 데이터가 없습니다</h3>
+                <p className="text-muted-foreground text-sm">
+                  매칭이 진행되면 성과 지표가 표시됩니다.
+                </p>
               </CardContent>
             </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold">
-                  {persona.metrics.selectionCount.toLocaleString()}
-                </div>
-                <p className="text-muted-foreground text-sm">선택 수</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold">★ {persona.metrics.avgRating}</div>
-                <p className="text-muted-foreground text-sm">평균 평점</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-2xl font-bold text-green-600">
-                  {persona.metrics.matchAccuracy}%
-                </div>
-                <p className="text-muted-foreground text-sm">매칭 정확도</p>
-              </CardContent>
-            </Card>
-          </div>
+          )}
         </TabsContent>
 
         {/* 버전 히스토리 탭 */}
@@ -1099,44 +1122,55 @@ ${result.response}
               <CardTitle>버전 히스토리</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {persona.versions.map((version, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between rounded-lg border p-4"
-                  >
-                    <div className="flex items-center gap-4">
-                      <History className="text-muted-foreground h-5 w-5" />
-                      <div>
-                        <div className="font-medium">{version.version}</div>
-                        <div className="text-muted-foreground text-sm">{version.changes}</div>
+              {persona.versions.length > 0 ? (
+                <div className="space-y-4">
+                  {persona.versions.map((version, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between rounded-lg border p-4"
+                    >
+                      <div className="flex items-center gap-4">
+                        <History className="text-muted-foreground h-5 w-5" />
+                        <div>
+                          <div className="font-medium">{version.version}</div>
+                          <div className="text-muted-foreground text-sm">{version.changes}</div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-muted-foreground text-sm">
-                        {version.author} • {version.date}
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewVersion(version.version)}
-                      >
-                        <Eye className="mr-2 h-4 w-4" />
-                        보기
-                      </Button>
-                      {idx > 0 && (
+                      <div className="flex items-center gap-4">
+                        <div className="text-muted-foreground text-sm">
+                          {version.author ? `${version.author} • ` : ""}
+                          {version.date}
+                        </div>
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleRollback(version.version)}
+                          onClick={() => handleViewVersion(version.version)}
                         >
-                          롤백
+                          <Eye className="mr-2 h-4 w-4" />
+                          보기
                         </Button>
-                      )}
+                        {idx > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRollback(version.version)}
+                          >
+                            롤백
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <History className="text-muted-foreground mb-4 h-12 w-12" />
+                  <h3 className="mb-2 text-lg font-medium">버전 히스토리가 없습니다</h3>
+                  <p className="text-muted-foreground text-sm">
+                    벡터가 수정되면 버전 히스토리가 기록됩니다.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

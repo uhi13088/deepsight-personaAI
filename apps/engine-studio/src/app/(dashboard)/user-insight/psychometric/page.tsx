@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
 import {
   Brain,
@@ -13,6 +13,7 @@ import {
   Target,
   Layers,
   Zap,
+  Loader2,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -49,7 +50,6 @@ const VECTOR_DIMENSIONS = [
     low: "표면적 감상",
     high: "심층적 분석",
     color: "#3b82f6",
-    weight: 1.0,
   },
   {
     key: "lens",
@@ -59,7 +59,6 @@ const VECTOR_DIMENSIONS = [
     low: "주관적 감정",
     high: "객관적 기준",
     color: "#10b981",
-    weight: 1.0,
   },
   {
     key: "stance",
@@ -69,7 +68,6 @@ const VECTOR_DIMENSIONS = [
     low: "관대한 평가",
     high: "엄격한 평가",
     color: "#f59e0b",
-    weight: 1.0,
   },
   {
     key: "scope",
@@ -79,7 +77,6 @@ const VECTOR_DIMENSIONS = [
     low: "특정 장르 집중",
     high: "다양한 탐색",
     color: "#ef4444",
-    weight: 1.0,
   },
   {
     key: "taste",
@@ -89,7 +86,6 @@ const VECTOR_DIMENSIONS = [
     low: "대중적 인기",
     high: "개성적 선택",
     color: "#8b5cf6",
-    weight: 1.0,
   },
   {
     key: "purpose",
@@ -99,46 +95,48 @@ const VECTOR_DIMENSIONS = [
     low: "순수 오락",
     high: "자기 성장",
     color: "#ec4899",
-    weight: 1.0,
   },
 ]
 
-// 모델 설정
-const MODEL_CONFIG = {
-  version: "3.0",
-  lastUpdated: "2025-01-15",
-  status: "active",
-  accuracy: 94.2,
-  totalProcessed: 156789,
-  avgInferenceTime: "23ms",
+interface ModelConfig {
+  version: string
+  lastUpdated: string
+  status: string
+  accuracy: number
+  totalProcessed: number
+  avgInferenceTime: string
 }
 
-// Mock 데이터
-const ACCURACY_TREND = [
-  { date: "01/10", accuracy: 93.1, samples: 12340 },
-  { date: "01/11", accuracy: 93.5, samples: 13210 },
-  { date: "01/12", accuracy: 93.8, samples: 14520 },
-  { date: "01/13", accuracy: 94.0, samples: 15680 },
-  { date: "01/14", accuracy: 94.1, samples: 16230 },
-  { date: "01/15", accuracy: 94.2, samples: 17450 },
-  { date: "01/16", accuracy: 94.2, samples: 18120 },
-]
+interface AccuracyTrendItem {
+  date: string
+  accuracy: number
+  samples: number
+}
 
-const SAMPLE_VECTOR = [
-  { dimension: "DEPTH", value: 0.72, fullMark: 1 },
-  { dimension: "LENS", value: 0.45, fullMark: 1 },
-  { dimension: "STANCE", value: 0.68, fullMark: 1 },
-  { dimension: "SCOPE", value: 0.35, fullMark: 1 },
-  { dimension: "TASTE", value: 0.82, fullMark: 1 },
-  { dimension: "PURPOSE", value: 0.55, fullMark: 1 },
-]
+interface SampleVectorItem {
+  dimension: string
+  value: number
+  fullMark: number
+}
+
+interface LearningSettings {
+  adaptiveLearning: boolean
+  realTimeUpdate: boolean
+  confidenceThreshold: number
+  decayRate: number
+  minInteractions: number
+}
 
 export default function PsychometricPage() {
   const [activeTab, setActiveTab] = useState("config")
+  const [isLoading, setIsLoading] = useState(true)
   const [weights, setWeights] = useState<Record<string, number>>(
-    VECTOR_DIMENSIONS.reduce((acc, dim) => ({ ...acc, [dim.key]: dim.weight }), {})
+    VECTOR_DIMENSIONS.reduce(
+      (acc, dim) => ({ ...acc, [dim.key]: 1.0 }),
+      {} as Record<string, number>
+    )
   )
-  const [settings, setSettings] = useState({
+  const [settings, setSettings] = useState<LearningSettings>({
     adaptiveLearning: true,
     realTimeUpdate: true,
     confidenceThreshold: 0.75,
@@ -148,6 +146,74 @@ export default function PsychometricPage() {
   const [isRetraining, setIsRetraining] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
+  // API에서 로드되는 데이터
+  const [modelConfig, setModelConfig] = useState<ModelConfig>({
+    version: "-",
+    lastUpdated: "-",
+    status: "unknown",
+    accuracy: 0,
+    totalProcessed: 0,
+    avgInferenceTime: "-",
+  })
+  const [accuracyTrend, setAccuracyTrend] = useState<AccuracyTrendItem[]>([])
+  const [sampleVector, setSampleVector] = useState<SampleVectorItem[]>([])
+  const [userVectorCount, setUserVectorCount] = useState(0)
+
+  // 데이터 로드
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/psychometric/stats")
+      const json = await res.json()
+      if (json.success && json.data) {
+        const {
+          modelConfig: mc,
+          accuracyTrend: at,
+          sampleVector: sv,
+          userVectorCount: uvc,
+        } = json.data
+        setModelConfig(mc)
+        setAccuracyTrend(at)
+        setSampleVector(sv)
+        setUserVectorCount(uvc)
+      }
+    } catch (error) {
+      console.error("Failed to fetch psychometric stats:", error)
+    }
+  }, [])
+
+  const fetchSettings = useCallback(async () => {
+    try {
+      const res = await fetch("/api/psychometric/settings")
+      const json = await res.json()
+      if (json.success && json.data) {
+        const { weights: w, learning } = json.data
+        if (w) {
+          setWeights(w)
+        }
+        if (learning) {
+          setSettings({
+            adaptiveLearning: learning.adaptiveRate ?? true,
+            realTimeUpdate: true,
+            confidenceThreshold: learning.convergenceThreshold ?? 0.75,
+            decayRate: 0.05,
+            minInteractions: learning.batchSize ?? 10,
+          })
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch psychometric settings:", error)
+    }
+  }, [])
+
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true)
+      await Promise.all([fetchStats(), fetchSettings()])
+      setIsLoading(false)
+    }
+    loadData()
+  }, [fetchStats, fetchSettings])
+
   const handleWeightChange = (key: string, value: number[]) => {
     setWeights({ ...weights, [key]: value[0] })
   }
@@ -155,7 +221,7 @@ export default function PsychometricPage() {
   const handleRetrain = async () => {
     setIsRetraining(true)
     toast.loading("모델 재학습을 시작합니다...", { id: "retrain" })
-    // Simulate retraining process
+    // 재학습은 별도 ML 파이프라인에서 처리 - 여기서는 상태 표시만
     await new Promise((resolve) => setTimeout(resolve, 2000))
     setIsRetraining(false)
     toast.success("모델 재학습이 완료되었습니다.", { id: "retrain" })
@@ -164,17 +230,101 @@ export default function PsychometricPage() {
   const handleSaveSettings = async () => {
     setIsSaving(true)
     toast.loading("설정을 저장하는 중...", { id: "save-settings" })
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsSaving(false)
-    toast.success("설정이 성공적으로 저장되었습니다.", { id: "save-settings" })
+    try {
+      const res = await fetch("/api/psychometric/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key: "learning_settings",
+          value: {
+            learningRate: 0.01,
+            batchSize: settings.minInteractions,
+            epochs: 100,
+            convergenceThreshold: settings.confidenceThreshold,
+            adaptiveRate: settings.adaptiveLearning,
+            feedbackWeight: 0.7,
+          },
+        }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        toast.success("설정이 성공적으로 저장되었습니다.", { id: "save-settings" })
+      } else {
+        toast.error(json.error?.message || "설정 저장에 실패했습니다.", { id: "save-settings" })
+      }
+    } catch {
+      toast.error("설정 저장 중 오류가 발생했습니다.", { id: "save-settings" })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleSaveWeights = async () => {
     toast.loading("가중치를 저장하는 중...", { id: "save-weights" })
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    toast.success("가중치가 성공적으로 저장되었습니다.", { id: "save-weights" })
+    try {
+      const res = await fetch("/api/psychometric/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key: "dimension_weights",
+          value: weights,
+        }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        toast.success("가중치가 성공적으로 저장되었습니다.", { id: "save-weights" })
+      } else {
+        toast.error(json.error?.message || "가중치 저장에 실패했습니다.", { id: "save-weights" })
+      }
+    } catch {
+      toast.error("가중치 저장 중 오류가 발생했습니다.", { id: "save-weights" })
+    }
+  }
+
+  // 벡터 해석 텍스트 생성
+  const getVectorInterpretation = () => {
+    if (sampleVector.length === 0) return null
+
+    const getVal = (dim: string) => sampleVector.find((v) => v.dimension === dim)?.value ?? 0.5
+
+    const depthLabel = getVal("DEPTH") > 0.6 ? "깊이 있는 분석" : "가벼운 감상"
+    const tasteLabel = getVal("TASTE") > 0.6 ? "개성적인 선택" : "대중적인 선택"
+    const stanceLabel = getVal("STANCE") > 0.6 ? "비교적 엄격한 기준" : "관대한 평가"
+    const scopeLabel = getVal("SCOPE") > 0.5 ? "다양한 탐색" : "특정 장르에 집중하는 경향"
+    const purposeLabel =
+      getVal("PURPOSE") > 0.6
+        ? "자기 성장 지향적"
+        : getVal("PURPOSE") < 0.4
+          ? "오락 중심"
+          : "오락과 성장의 균형"
+    const lensLabel =
+      getVal("LENS") > 0.6
+        ? "객관적 분석"
+        : getVal("LENS") < 0.4
+          ? "감정 중심의 판단"
+          : "감정과 논리 사이"
+
+    return (
+      <p className="text-sm leading-relaxed">
+        이 사용자는 <strong>{depthLabel}</strong>을 선호하며(DEPTH: {getVal("DEPTH").toFixed(2)}),{" "}
+        <strong>{tasteLabel}</strong>을 추구합니다(TASTE: {getVal("TASTE").toFixed(2)}). 평가에
+        있어서는 <strong>{stanceLabel}</strong>을 적용하고(STANCE: {getVal("STANCE").toFixed(2)}),{" "}
+        <strong>{scopeLabel}</strong>이 있습니다(SCOPE: {getVal("SCOPE").toFixed(2)}). 콘텐츠 소비는{" "}
+        <strong>{purposeLabel}</strong>을 추구하며(PURPOSE: {getVal("PURPOSE").toFixed(2)}), 판단은{" "}
+        <strong>{lensLabel}</strong>에서 이루어집니다(LENS: {getVal("LENS").toFixed(2)}).
+      </p>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+          <p className="text-muted-foreground">데이터를 불러오는 중...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -210,11 +360,11 @@ export default function PsychometricPage() {
             <Layers className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">v{MODEL_CONFIG.version}</div>
+            <div className="text-2xl font-bold">v{modelConfig.version}</div>
             <div className="mt-1 flex items-center gap-2">
               <Badge variant="secondary" className="text-xs">
                 <CheckCircle className="mr-1 h-3 w-3" />
-                {MODEL_CONFIG.status}
+                {modelConfig.status}
               </Badge>
             </div>
           </CardContent>
@@ -226,10 +376,12 @@ export default function PsychometricPage() {
             <Target className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{MODEL_CONFIG.accuracy}%</div>
+            <div className="text-2xl font-bold">{modelConfig.accuracy}%</div>
             <div className="mt-1 flex items-center text-xs text-green-600">
               <TrendingUp className="mr-1 h-3 w-3" />
-              +0.4% from last week
+              {accuracyTrend.length >= 2
+                ? `${(accuracyTrend[accuracyTrend.length - 1].accuracy - accuracyTrend[0].accuracy).toFixed(1)}% 변화`
+                : "데이터 수집 중"}
             </div>
           </CardContent>
         </Card>
@@ -240,8 +392,10 @@ export default function PsychometricPage() {
             <BarChart3 className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{MODEL_CONFIG.totalProcessed.toLocaleString()}</div>
-            <p className="text-muted-foreground mt-1 text-xs">누적 사용자 프로필</p>
+            <div className="text-2xl font-bold">{modelConfig.totalProcessed.toLocaleString()}</div>
+            <p className="text-muted-foreground mt-1 text-xs">
+              사용자 벡터: {userVectorCount.toLocaleString()}개
+            </p>
           </CardContent>
         </Card>
 
@@ -251,7 +405,7 @@ export default function PsychometricPage() {
             <Zap className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{MODEL_CONFIG.avgInferenceTime}</div>
+            <div className="text-2xl font-bold">{modelConfig.avgInferenceTime}</div>
             <p className="text-muted-foreground mt-1 text-xs">목표: 50ms 이내</p>
           </CardContent>
         </Card>
@@ -342,10 +496,12 @@ export default function PsychometricPage() {
                         />
                         {dim.name}
                       </Label>
-                      <span className="font-mono text-sm">{weights[dim.key].toFixed(2)}</span>
+                      <span className="font-mono text-sm">
+                        {(weights[dim.key] ?? 1.0).toFixed(2)}
+                      </span>
                     </div>
                     <Slider
-                      value={[weights[dim.key]]}
+                      value={[weights[dim.key] ?? 1.0]}
                       onValueChange={(value) => handleWeightChange(dim.key, value)}
                       min={0}
                       max={2}
@@ -362,7 +518,10 @@ export default function PsychometricPage() {
                     size="sm"
                     onClick={() => {
                       setWeights(
-                        VECTOR_DIMENSIONS.reduce((acc, dim) => ({ ...acc, [dim.key]: 1.0 }), {})
+                        VECTOR_DIMENSIONS.reduce(
+                          (acc, dim) => ({ ...acc, [dim.key]: 1.0 }),
+                          {} as Record<string, number>
+                        )
                       )
                       toast.success("가중치가 기본값으로 복원되었습니다.")
                     }}
@@ -387,7 +546,7 @@ export default function PsychometricPage() {
                     <RadarChart
                       data={VECTOR_DIMENSIONS.map((dim) => ({
                         dimension: dim.name,
-                        weight: weights[dim.key],
+                        weight: weights[dim.key] ?? 1.0,
                         fullMark: 2,
                       }))}
                     >
@@ -518,34 +677,46 @@ export default function PsychometricPage() {
             <Card>
               <CardHeader>
                 <CardTitle>모델 정확도 추이</CardTitle>
-                <CardDescription>최근 7일간의 모델 정확도 변화</CardDescription>
+                <CardDescription>최근 매칭 로그 기반 정확도 변화</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-[350px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={ACCURACY_TREND}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="date" className="text-xs" />
-                      <YAxis domain={[90, 100]} className="text-xs" />
-                      <RechartsTooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                        }}
-                      />
-                      <Legend />
-                      <Line
-                        type="monotone"
-                        dataKey="accuracy"
-                        name="정확도 (%)"
-                        stroke="hsl(var(--primary))"
-                        strokeWidth={2}
-                        dot={{ fill: "hsl(var(--primary))" }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+                {accuracyTrend.length > 0 ? (
+                  <div className="h-[350px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={accuracyTrend}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                        <XAxis dataKey="date" className="text-xs" />
+                        <YAxis domain={[0, 100]} className="text-xs" />
+                        <RechartsTooltip
+                          contentStyle={{
+                            backgroundColor: "hsl(var(--card))",
+                            border: "1px solid hsl(var(--border))",
+                            borderRadius: "8px",
+                          }}
+                        />
+                        <Legend />
+                        <Line
+                          type="monotone"
+                          dataKey="accuracy"
+                          name="정확도 (%)"
+                          stroke="hsl(var(--primary))"
+                          strokeWidth={2}
+                          dot={{ fill: "hsl(var(--primary))" }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="flex h-[350px] flex-col items-center justify-center text-center">
+                    <BarChart3 className="text-muted-foreground mb-4 h-10 w-10" />
+                    <p className="text-muted-foreground text-sm">
+                      아직 정확도 추이 데이터가 없습니다.
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      매칭 로그가 쌓이면 자동으로 표시됩니다.
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -556,79 +727,88 @@ export default function PsychometricPage() {
           <Card>
             <CardHeader>
               <CardTitle>샘플 사용자 벡터</CardTitle>
-              <CardDescription>실제 사용자의 6D 벡터 프로필 예시를 확인합니다.</CardDescription>
+              <CardDescription>
+                {sampleVector.length > 0
+                  ? "실제 사용자의 6D 벡터 프로필을 확인합니다."
+                  : "사용자 벡터 데이터가 쌓이면 여기에 표시됩니다."}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="h-[350px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart data={SAMPLE_VECTOR}>
-                      <PolarGrid />
-                      <PolarAngleAxis dataKey="dimension" className="text-xs" />
-                      <PolarRadiusAxis angle={30} domain={[0, 1]} />
-                      <Radar
-                        name="사용자 벡터"
-                        dataKey="value"
-                        stroke="#8b5cf6"
-                        fill="#8b5cf6"
-                        fillOpacity={0.3}
-                      />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </div>
+              {sampleVector.length > 0 ? (
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="h-[350px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart data={sampleVector}>
+                        <PolarGrid />
+                        <PolarAngleAxis dataKey="dimension" className="text-xs" />
+                        <PolarRadiusAxis angle={30} domain={[0, 1]} />
+                        <Radar
+                          name="사용자 벡터"
+                          dataKey="value"
+                          stroke="#8b5cf6"
+                          fill="#8b5cf6"
+                          fillOpacity={0.3}
+                        />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
 
-                <div className="space-y-4">
-                  <h4 className="font-semibold">차원별 상세 값</h4>
-                  {SAMPLE_VECTOR.map((item) => {
-                    const dim = VECTOR_DIMENSIONS.find((d) => d.name === item.dimension)
-                    return (
-                      <div key={item.dimension} className="space-y-1">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="flex items-center gap-2">
-                            <div
-                              className="h-2 w-2 rounded-full"
-                              style={{ backgroundColor: dim?.color }}
-                            />
-                            {item.dimension}
-                          </span>
-                          <span className="font-mono">{item.value.toFixed(2)}</span>
+                  <div className="space-y-4">
+                    <h4 className="font-semibold">차원별 상세 값</h4>
+                    {sampleVector.map((item) => {
+                      const dim = VECTOR_DIMENSIONS.find((d) => d.name === item.dimension)
+                      return (
+                        <div key={item.dimension} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="flex items-center gap-2">
+                              <div
+                                className="h-2 w-2 rounded-full"
+                                style={{ backgroundColor: dim?.color }}
+                              />
+                              {item.dimension}
+                            </span>
+                            <span className="font-mono">{item.value.toFixed(2)}</span>
+                          </div>
+                          <Progress value={item.value * 100} className="h-2" />
+                          <div className="text-muted-foreground flex justify-between text-xs">
+                            <span>{dim?.low}</span>
+                            <span>{dim?.high}</span>
+                          </div>
                         </div>
-                        <Progress value={item.value * 100} className="h-2" />
-                        <div className="text-muted-foreground flex justify-between text-xs">
-                          <span>{dim?.low}</span>
-                          <span>{dim?.high}</span>
-                        </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Brain className="text-muted-foreground mb-4 h-12 w-12" />
+                  <h3 className="mb-2 text-lg font-medium">사용자 벡터 데이터가 없습니다</h3>
+                  <p className="text-muted-foreground text-sm">
+                    사용자 인터랙션이 쌓이면 벡터 프로필이 생성됩니다.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>벡터 해석</CardTitle>
-              <CardDescription>현재 샘플 벡터에 대한 AI 기반 해석</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-muted/30 rounded-lg p-4">
-                <p className="text-sm leading-relaxed">
-                  이 사용자는 <strong>깊이 있는 분석</strong>을 선호하며(DEPTH: 0.72),
-                  <strong>개성적인 선택</strong>을 추구합니다(TASTE: 0.82). 평가에 있어서는{" "}
-                  <strong>비교적 엄격한 기준</strong>을 적용하고(STANCE: 0.68), 특정 장르에{" "}
-                  <strong>집중하는 경향</strong>이 있습니다(SCOPE: 0.35). 콘텐츠 소비는 오락과
-                  성장의 <strong>균형</strong>을 추구하며(PURPOSE: 0.55), 판단은{" "}
-                  <strong>감정과 논리 사이</strong>에서 이루어집니다(LENS: 0.45).
-                </p>
-                <Separator className="my-4" />
-                <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                  <Info className="h-4 w-4" />
-                  추천 페르소나: &quot;논리적 평론가&quot;, &quot;시네필 평론가&quot;
+          {sampleVector.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>벡터 해석</CardTitle>
+                <CardDescription>현재 샘플 벡터에 대한 AI 기반 해석</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-muted/30 rounded-lg p-4">
+                  {getVectorInterpretation()}
+                  <Separator className="my-4" />
+                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <Info className="h-4 w-4" />
+                    벡터 값을 기반으로 자동 생성된 해석입니다.
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>

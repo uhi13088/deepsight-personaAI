@@ -14,14 +14,16 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // 페르소나 통계
+    // 페르소나 통계 (테이블이 비어있어도 안전하게 처리)
     const [totalPersonas, activePersonas, personasByStatus] = await Promise.all([
-      prisma.persona.count(),
-      prisma.persona.count({ where: { status: { in: ["ACTIVE", "STANDARD"] } } }),
-      prisma.persona.groupBy({
-        by: ["status"],
-        _count: true,
-      }),
+      prisma.persona.count().catch(() => 0),
+      prisma.persona.count({ where: { status: { in: ["ACTIVE", "STANDARD"] } } }).catch(() => 0),
+      prisma.persona
+        .groupBy({
+          by: ["status"],
+          _count: true,
+        })
+        .catch(() => []),
     ])
 
     // 매칭 통계 (최근 7일)
@@ -29,15 +31,19 @@ export async function GET(request: NextRequest) {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
     const [totalMatches, recentMatches, matchingLogs] = await Promise.all([
-      prisma.matchingLog.count(),
-      prisma.matchingLog.count({
-        where: { createdAt: { gte: sevenDaysAgo } },
-      }),
-      prisma.matchingLog.findMany({
-        where: { createdAt: { gte: sevenDaysAgo } },
-        orderBy: { createdAt: "desc" },
-        take: 1000,
-      }),
+      prisma.matchingLog.count().catch(() => 0),
+      prisma.matchingLog
+        .count({
+          where: { createdAt: { gte: sevenDaysAgo } },
+        })
+        .catch(() => 0),
+      prisma.matchingLog
+        .findMany({
+          where: { createdAt: { gte: sevenDaysAgo } },
+          orderBy: { createdAt: "desc" },
+          take: 1000,
+        })
+        .catch(() => []),
     ])
 
     // 일별 매칭 트렌드 계산
@@ -70,22 +76,29 @@ export async function GET(request: NextRequest) {
     }))
 
     // 상위 페르소나 (매칭 횟수 기준)
-    const topPersonasData = await prisma.matchingLog.groupBy({
-      by: ["selectedPersonaId"],
-      where: { selectedPersonaId: { not: null } },
-      _count: true,
-      orderBy: { _count: { selectedPersonaId: "desc" } },
-      take: 5,
-    })
+    const topPersonasData = await prisma.matchingLog
+      .groupBy({
+        by: ["selectedPersonaId"],
+        where: { selectedPersonaId: { not: null } },
+        _count: true,
+        orderBy: { _count: { selectedPersonaId: "desc" } },
+        take: 5,
+      })
+      .catch(() => [])
 
     const topPersonaIds = topPersonasData
       .filter((p) => p.selectedPersonaId)
       .map((p) => p.selectedPersonaId as string)
 
-    const topPersonasDetails = await prisma.persona.findMany({
-      where: { id: { in: topPersonaIds } },
-      select: { id: true, name: true, qualityScore: true },
-    })
+    const topPersonasDetails =
+      topPersonaIds.length > 0
+        ? await prisma.persona
+            .findMany({
+              where: { id: { in: topPersonaIds } },
+              select: { id: true, name: true, qualityScore: true },
+            })
+            .catch(() => [])
+        : []
 
     const topPersonas = topPersonasData
       .filter((p) => p.selectedPersonaId)
@@ -100,13 +113,15 @@ export async function GET(request: NextRequest) {
       })
 
     // 최근 활동 (감사 로그에서)
-    const recentLogs = await prisma.auditLog.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      include: {
-        user: { select: { name: true } },
-      },
-    })
+    const recentLogs = await prisma.auditLog
+      .findMany({
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        include: {
+          user: { select: { name: true } },
+        },
+      })
+      .catch(() => [])
 
     const recentActivity = recentLogs.map((log) => ({
       id: log.id,
@@ -119,8 +134,8 @@ export async function GET(request: NextRequest) {
 
     // 사용자 통계
     const [totalUsers, activeUsers] = await Promise.all([
-      prisma.user.count(),
-      prisma.user.count({ where: { isActive: true } }),
+      prisma.user.count().catch(() => 0),
+      prisma.user.count({ where: { isActive: true } }).catch(() => 0),
     ])
 
     const stats = {

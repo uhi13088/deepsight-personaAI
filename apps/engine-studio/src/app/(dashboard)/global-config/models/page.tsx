@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
 import {
   Brain,
@@ -13,6 +13,7 @@ import {
   Edit,
   Trash2,
   TestTube,
+  Loader2,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -47,48 +48,81 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-// AI 모델 데이터
 interface AIModel {
   id: string
   name: string
   provider: string
-  version: string
-  status: "active" | "inactive" | "testing"
-  purpose: string[]
-  config: {
-    temperature: number
-    maxTokens: number
-    topP: number
-  }
-  usage: {
-    requests: number
-    tokens: number
-    cost: number
-  }
-  performance: {
-    latency: number
-    successRate: number
-  }
+  modelId: string
+  status: string
+  endpoint: string
+  apiKeySet: boolean
+  maxTokens: number
+  temperature: number
+  usage: number
+  costPer1kTokens: number
+  description: string
 }
 
-// AI models - empty by default, will be loaded from API
-const AI_MODELS: AIModel[] = []
+interface NewModelForm {
+  provider: string
+  name: string
+  modelId: string
+  endpoint: string
+  maxTokens: number
+  temperature: number
+  costPer1kTokens: number
+  description: string
+}
 
-// Usage stats - default empty values
-const USAGE_STATS = {
-  totalRequests: 0,
-  totalTokens: 0,
-  totalCost: 0,
-  avgLatency: 0,
+const defaultNewModel: NewModelForm = {
+  provider: "",
+  name: "",
+  modelId: "",
+  endpoint: "",
+  maxTokens: 4096,
+  temperature: 0.7,
+  costPer1kTokens: 0,
+  description: "",
 }
 
 export default function ModelsPage() {
-  const [selectedModel, setSelectedModel] = useState<AIModel | null>(
-    AI_MODELS.length > 0 ? AI_MODELS[0] : null
-  )
+  const [models, setModels] = useState<AIModel[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [selectedModel, setSelectedModel] = useState<AIModel | null>(null)
   const [showAddDialog, setShowAddDialog] = useState(false)
+  const [newModel, setNewModel] = useState<NewModelForm>(defaultNewModel)
+  const [isAdding, setIsAdding] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
-  const getStatusBadge = (status: AIModel["status"]) => {
+  const fetchModels = useCallback(async () => {
+    try {
+      const res = await fetch("/api/ai-models")
+      const json = await res.json()
+      if (json.success && json.data) {
+        setModels(json.data.models)
+        if (json.data.models.length > 0 && !selectedModel) {
+          setSelectedModel(json.data.models[0])
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch AI models:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [selectedModel])
+
+  useEffect(() => {
+    fetchModels()
+  }, [fetchModels])
+
+  const usageStats = {
+    totalRequests: models.reduce((sum, m) => sum + m.usage, 0),
+    totalTokens: 0,
+    totalCost: models.reduce((sum, m) => sum + m.costPer1kTokens * m.usage, 0),
+    avgLatency: 0,
+  }
+
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
         return <Badge className="bg-green-500">활성</Badge>
@@ -96,29 +130,72 @@ export default function ModelsPage() {
         return <Badge variant="secondary">비활성</Badge>
       case "testing":
         return <Badge className="bg-blue-500">테스트</Badge>
+      default:
+        return <Badge variant="outline">{status}</Badge>
     }
   }
 
-  const getPurposeBadge = (purpose: string) => {
-    const labels: Record<string, string> = {
-      persona_generation: "페르소나 생성",
-      prompt_generation: "프롬프트 생성",
-      analysis: "분석",
-      content_review: "콘텐츠 리뷰",
-      safety_check: "안전 검사",
-      vector_embedding: "벡터 임베딩",
-      image_analysis: "이미지 분석",
+  const handleAddModel = async () => {
+    if (!newModel.provider || !newModel.name || !newModel.modelId) {
+      toast.error("필수 항목을 입력해주세요.")
+      return
     }
+
+    setIsAdding(true)
+    try {
+      const res = await fetch("/api/ai-models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newModel),
+      })
+      const json = await res.json()
+      if (json.success) {
+        toast.success("새 모델이 추가되었습니다.")
+        setShowAddDialog(false)
+        setNewModel(defaultNewModel)
+        await fetchModels()
+      } else {
+        toast.error(json.error?.message || "모델 추가에 실패했습니다.")
+      }
+    } catch {
+      toast.error("모델 추가 중 오류가 발생했습니다.")
+    } finally {
+      setIsAdding(false)
+    }
+  }
+
+  const handleDeleteModel = async (id: string) => {
+    setIsDeleting(true)
+    try {
+      const res = await fetch(`/api/ai-models?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      })
+      const json = await res.json()
+      if (json.success) {
+        toast.success("모델이 삭제되었습니다.")
+        if (selectedModel?.id === id) {
+          setSelectedModel(null)
+        }
+        await fetchModels()
+      } else {
+        toast.error(json.error?.message || "모델 삭제에 실패했습니다.")
+      }
+    } catch {
+      toast.error("모델 삭제 중 오류가 발생했습니다.")
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  if (isLoading) {
     return (
-      <Badge variant="outline" className="text-xs">
-        {labels[purpose] || purpose}
-      </Badge>
+      <div className="flex h-[50vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+          <p className="text-muted-foreground">AI 모델 데이터를 불러오는 중...</p>
+        </div>
+      </div>
     )
-  }
-
-  const handleAddModel = () => {
-    toast.success("새 모델이 추가되었습니다.")
-    setShowAddDialog(false)
   }
 
   return (
@@ -148,7 +225,10 @@ export default function ModelsPage() {
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
                   <Label>프로바이더</Label>
-                  <Select>
+                  <Select
+                    value={newModel.provider}
+                    onValueChange={(value) => setNewModel({ ...newModel, provider: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="선택" />
                     </SelectTrigger>
@@ -162,22 +242,44 @@ export default function ModelsPage() {
                 </div>
                 <div className="grid gap-2">
                   <Label>모델 이름</Label>
-                  <Input placeholder="예: GPT-4 Turbo" />
+                  <Input
+                    placeholder="예: GPT-4 Turbo"
+                    value={newModel.name}
+                    onChange={(e) => setNewModel({ ...newModel, name: e.target.value })}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label>모델 ID</Label>
-                  <Input placeholder="예: gpt-4-turbo-preview" />
+                  <Input
+                    placeholder="예: gpt-4-turbo-preview"
+                    value={newModel.modelId}
+                    onChange={(e) => setNewModel({ ...newModel, modelId: e.target.value })}
+                  />
                 </div>
                 <div className="grid gap-2">
-                  <Label>API 키</Label>
-                  <Input type="password" placeholder="sk-..." />
+                  <Label>엔드포인트 (선택)</Label>
+                  <Input
+                    placeholder="https://api.example.com/v1"
+                    value={newModel.endpoint}
+                    onChange={(e) => setNewModel({ ...newModel, endpoint: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>설명 (선택)</Label>
+                  <Input
+                    placeholder="모델 용도나 특성을 설명하세요"
+                    value={newModel.description}
+                    onChange={(e) => setNewModel({ ...newModel, description: e.target.value })}
+                  />
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowAddDialog(false)}>
                   취소
                 </Button>
-                <Button onClick={handleAddModel}>추가</Button>
+                <Button onClick={handleAddModel} disabled={isAdding}>
+                  {isAdding ? "추가 중..." : "추가"}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -188,25 +290,25 @@ export default function ModelsPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">총 요청 수</CardTitle>
+            <CardTitle className="text-sm font-medium">등록된 모델</CardTitle>
             <Activity className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{USAGE_STATS.totalRequests.toLocaleString()}</div>
-            <p className="text-muted-foreground mt-1 text-xs">이번 달</p>
+            <div className="text-2xl font-bold">{models.length}</div>
+            <p className="text-muted-foreground mt-1 text-xs">
+              활성: {models.filter((m) => m.status === "active").length}개
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">총 토큰</CardTitle>
+            <CardTitle className="text-sm font-medium">총 사용량</CardTitle>
             <Zap className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {(USAGE_STATS.totalTokens / 1000000).toFixed(1)}M
-            </div>
-            <p className="text-muted-foreground mt-1 text-xs">이번 달</p>
+            <div className="text-2xl font-bold">{usageStats.totalRequests.toLocaleString()}</div>
+            <p className="text-muted-foreground mt-1 text-xs">전체 모델 합산</p>
           </CardContent>
         </Card>
 
@@ -216,19 +318,21 @@ export default function ModelsPage() {
             <DollarSign className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${USAGE_STATS.totalCost.toLocaleString()}</div>
-            <p className="text-muted-foreground mt-1 text-xs">이번 달</p>
+            <div className="text-2xl font-bold">
+              ${usageStats.totalCost.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+            </div>
+            <p className="text-muted-foreground mt-1 text-xs">추정 비용</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">평균 지연</CardTitle>
+            <CardTitle className="text-sm font-medium">프로바이더</CardTitle>
             <Activity className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{USAGE_STATS.avgLatency}ms</div>
-            <p className="text-muted-foreground mt-1 text-xs">전체 모델</p>
+            <div className="text-2xl font-bold">{new Set(models.map((m) => m.provider)).size}</div>
+            <p className="text-muted-foreground mt-1 text-xs">사용 중인 프로바이더</p>
           </CardContent>
         </Card>
       </div>
@@ -242,7 +346,7 @@ export default function ModelsPage() {
             <CardDescription>클릭하여 상세 설정</CardDescription>
           </CardHeader>
           <CardContent>
-            {AI_MODELS.length === 0 ? (
+            {models.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Brain className="text-muted-foreground mb-4 h-12 w-12" />
                 <h3 className="mb-2 text-lg font-medium">등록된 모델이 없습니다</h3>
@@ -254,7 +358,7 @@ export default function ModelsPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {AI_MODELS.map((model) => (
+                {models.map((model) => (
                   <div
                     key={model.id}
                     className={`hover:border-primary cursor-pointer rounded-lg border p-3 transition-all ${
@@ -270,14 +374,7 @@ export default function ModelsPage() {
                       {getStatusBadge(model.status)}
                     </div>
                     <p className="text-muted-foreground text-xs">{model.provider}</p>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {model.purpose.slice(0, 2).map((p) => getPurposeBadge(p))}
-                      {model.purpose.length > 2 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{model.purpose.length - 2}
-                        </Badge>
-                      )}
-                    </div>
+                    <p className="text-muted-foreground mt-1 text-xs">{model.modelId}</p>
                   </div>
                 ))}
               </div>
@@ -292,7 +389,9 @@ export default function ModelsPage() {
               <div>
                 <CardTitle>{selectedModel?.name || "모델 선택"}</CardTitle>
                 <CardDescription>
-                  {selectedModel?.provider} • {selectedModel?.version}
+                  {selectedModel
+                    ? `${selectedModel.provider} / ${selectedModel.modelId}`
+                    : "왼쪽에서 모델을 선택하세요"}
                 </CardDescription>
               </div>
               {selectedModel && (
@@ -313,7 +412,11 @@ export default function ModelsPage() {
                         편집
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive">
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        disabled={isDeleting}
+                        onClick={() => handleDeleteModel(selectedModel.id)}
+                      >
                         <Trash2 className="mr-2 h-4 w-4" />
                         삭제
                       </DropdownMenuItem>
@@ -329,7 +432,7 @@ export default function ModelsPage() {
                 <TabsList>
                   <TabsTrigger value="config">설정</TabsTrigger>
                   <TabsTrigger value="usage">사용량</TabsTrigger>
-                  <TabsTrigger value="performance">성능</TabsTrigger>
+                  <TabsTrigger value="info">정보</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="config" className="mt-4 space-y-6">
@@ -337,15 +440,14 @@ export default function ModelsPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <Label>Temperature</Label>
-                        <span className="font-mono text-sm">
-                          {selectedModel.config.temperature}
-                        </span>
+                        <span className="font-mono text-sm">{selectedModel.temperature}</span>
                       </div>
                       <Slider
-                        value={[selectedModel.config.temperature]}
+                        value={[selectedModel.temperature]}
                         min={0}
                         max={2}
                         step={0.1}
+                        disabled
                       />
                       <p className="text-muted-foreground text-xs">
                         낮을수록 일관된 응답, 높을수록 창의적 응답
@@ -355,74 +457,88 @@ export default function ModelsPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <Label>Max Tokens</Label>
-                        <span className="font-mono text-sm">{selectedModel.config.maxTokens}</span>
+                        <span className="font-mono text-sm">{selectedModel.maxTokens}</span>
                       </div>
                       <Slider
-                        value={[selectedModel.config.maxTokens]}
+                        value={[selectedModel.maxTokens]}
                         min={256}
-                        max={16384}
+                        max={200000}
                         step={256}
+                        disabled
                       />
                     </div>
 
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label>Top P</Label>
-                        <span className="font-mono text-sm">{selectedModel.config.topP}</span>
+                        <Label>1K 토큰당 비용</Label>
+                        <span className="font-mono text-sm">
+                          ${selectedModel.costPer1kTokens.toFixed(4)}
+                        </span>
                       </div>
-                      <Slider value={[selectedModel.config.topP]} min={0} max={1} step={0.05} />
                     </div>
                   </div>
 
                   <Separator />
 
                   <div>
-                    <Label className="mb-2 block">용도</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedModel.purpose.map((p) => getPurposeBadge(p))}
+                    <Label className="mb-2 block">상태</Label>
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(selectedModel.status)}
+                      {selectedModel.apiKeySet && (
+                        <Badge variant="outline" className="text-xs">
+                          API 키 설정됨
+                        </Badge>
+                      )}
                     </div>
                   </div>
 
-                  <Button className="w-full">
+                  <Button className="w-full" disabled>
                     <Save className="mr-2 h-4 w-4" />
-                    설정 저장
+                    설정 저장 (편집 모드에서 사용)
                   </Button>
                 </TabsContent>
 
                 <TabsContent value="usage" className="mt-4 space-y-4">
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="rounded-lg border p-4 text-center">
-                      <p className="text-2xl font-bold">
-                        {selectedModel.usage.requests.toLocaleString()}
-                      </p>
-                      <p className="text-muted-foreground text-sm">요청 수</p>
+                      <p className="text-2xl font-bold">{selectedModel.usage.toLocaleString()}</p>
+                      <p className="text-muted-foreground text-sm">사용 횟수</p>
                     </div>
                     <div className="rounded-lg border p-4 text-center">
                       <p className="text-2xl font-bold">
-                        {(selectedModel.usage.tokens / 1000000).toFixed(1)}M
+                        $
+                        {(selectedModel.costPer1kTokens * selectedModel.usage).toLocaleString(
+                          undefined,
+                          { maximumFractionDigits: 2 }
+                        )}
                       </p>
-                      <p className="text-muted-foreground text-sm">토큰</p>
-                    </div>
-                    <div className="rounded-lg border p-4 text-center">
-                      <p className="text-2xl font-bold">
-                        ${selectedModel.usage.cost.toLocaleString()}
-                      </p>
-                      <p className="text-muted-foreground text-sm">비용</p>
+                      <p className="text-muted-foreground text-sm">추정 비용</p>
                     </div>
                   </div>
                 </TabsContent>
 
-                <TabsContent value="performance" className="mt-4 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                <TabsContent value="info" className="mt-4 space-y-4">
+                  <div className="space-y-3">
                     <div className="rounded-lg border p-4">
-                      <p className="text-muted-foreground mb-2 text-sm">평균 지연</p>
-                      <p className="text-2xl font-bold">{selectedModel.performance.latency}ms</p>
+                      <p className="text-muted-foreground mb-1 text-sm">모델 ID</p>
+                      <p className="font-mono text-sm">{selectedModel.modelId}</p>
                     </div>
                     <div className="rounded-lg border p-4">
-                      <p className="text-muted-foreground mb-2 text-sm">성공률</p>
-                      <p className="text-2xl font-bold">{selectedModel.performance.successRate}%</p>
-                      <Progress value={selectedModel.performance.successRate} className="mt-2" />
+                      <p className="text-muted-foreground mb-1 text-sm">프로바이더</p>
+                      <p className="text-sm font-medium">{selectedModel.provider}</p>
                     </div>
+                    {selectedModel.endpoint && (
+                      <div className="rounded-lg border p-4">
+                        <p className="text-muted-foreground mb-1 text-sm">엔드포인트</p>
+                        <p className="font-mono text-sm">{selectedModel.endpoint}</p>
+                      </div>
+                    )}
+                    {selectedModel.description && (
+                      <div className="rounded-lg border p-4">
+                        <p className="text-muted-foreground mb-1 text-sm">설명</p>
+                        <p className="text-sm">{selectedModel.description}</p>
+                      </div>
+                    )}
                   </div>
                 </TabsContent>
               </Tabs>
