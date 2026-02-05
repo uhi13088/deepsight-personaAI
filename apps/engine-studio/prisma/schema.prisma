@@ -418,6 +418,9 @@ model PsychProfileTemplate {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  // Relations
+  surveyQuestions SurveyQuestion[]
+
   @@map("psych_profile_templates")
 }
 
@@ -427,6 +430,68 @@ enum QuestionType {
   RANKING
   TEXT
   IMAGE
+}
+
+// ============================================
+// 설문 시스템
+// ============================================
+
+model Survey {
+  id              String          @id @default(cuid())
+  title           String
+  description     String?
+  onboardingLevel OnboardingLevel
+  isActive        Boolean         @default(true)
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  questions       SurveyQuestion[]
+  responses       SurveyResponse[]
+
+  @@map("surveys")
+}
+
+model SurveyQuestion {
+  id              String               @id @default(cuid())
+  surveyId        String
+  survey          Survey               @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  templateId      String
+  template        PsychProfileTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  questionOrder   Int
+  isRequired      Boolean              @default(true)
+
+  @@unique([surveyId, templateId])
+  @@map("survey_questions")
+}
+
+model SurveyResponse {
+  id              String         @id @default(cuid())
+  surveyId        String
+  survey          Survey         @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  userId          String
+  answers         SurveyAnswer[]
+  computedVector  Json?
+  completedAt     DateTime?
+
+  createdAt       DateTime       @default(now())
+
+  @@unique([surveyId, userId])
+  @@map("survey_responses")
+}
+
+model SurveyAnswer {
+  id              String         @id @default(cuid())
+  responseId      String
+  response        SurveyResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  questionId      String
+  value           Json
+
+  createdAt       DateTime       @default(now())
+
+  @@unique([responseId, questionId])
+  @@map("survey_answers")
 }
 
 // ============================================

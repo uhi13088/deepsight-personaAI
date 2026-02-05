@@ -351,6 +351,67 @@ export interface UserVector {
 }
 
 // ============================================
+// 설문 시스템 관련
+// ============================================
+
+export interface Survey {
+  id: string
+  title: string
+  description: string | null
+  onboardingLevel: OnboardingLevel
+  isActive: boolean
+  questions?: SurveyQuestionWithTemplate[]
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface SurveyQuestionWithTemplate {
+  id: string
+  surveyId: string
+  templateId: string
+  questionOrder: number
+  isRequired: boolean
+  template: PsychProfileTemplate
+}
+
+export interface SurveyResponse {
+  id: string
+  surveyId: string
+  userId: string
+  answers: SurveyAnswer[]
+  computedVector: Vector6D | null
+  completedAt: Date | null
+  createdAt: Date
+}
+
+export interface SurveyAnswer {
+  id: string
+  responseId: string
+  questionId: string
+  value: unknown
+  createdAt: Date
+}
+
+export interface SurveyCreateInput {
+  title: string
+  description?: string
+  onboardingLevel: OnboardingLevel
+  questionIds: string[]
+}
+
+export interface SurveyUpdateInput {
+  title?: string
+  description?: string
+  onboardingLevel?: OnboardingLevel
+  isActive?: boolean
+  questionIds?: string[]
+}
+
+export interface SurveyResponseSubmitInput {
+  answers: { questionId: string; value: unknown }[]
+}
+
+// ============================================
 // 인큐베이터 관련
 // ============================================
 

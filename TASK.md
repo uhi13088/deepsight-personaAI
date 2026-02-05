@@ -7,11 +7,7 @@
 
 ## 📋 QUEUE (대기)
 
-- [ ] **T5: 설문 시스템 구현**
-  - AC: 설문 생성/수정/삭제 API
-  - AC: 설문 응답 제출 API
-  - AC: 응답 → 6D 벡터 변환 로직
-  - AC: 테스트 PASS
+(없음)
 
 ---
 
@@ -22,6 +18,16 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T5: 설문 시스템 구현** ✅ 2026-02-05
+  - 변경: `apps/engine-studio/prisma/schema.prisma` (Survey, SurveyQuestion, SurveyResponse, SurveyAnswer 모델 추가)
+  - 변경: `apps/engine-studio/prisma/migrations/002_survey_system.sql` (신규)
+  - 변경: `apps/engine-studio/src/lib/survey/vector-converter.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/surveys/route.ts` (신규 - GET/POST)
+  - 변경: `apps/engine-studio/src/app/api/surveys/[id]/route.ts` (신규 - GET/PUT/DELETE)
+  - 변경: `apps/engine-studio/src/app/api/surveys/[id]/responses/route.ts` (신규 - POST/GET)
+  - 변경: `apps/engine-studio/src/types/index.ts` (설문 타입 추가)
+  - 테스트: PASS (70/70, 신규 25개)
 
 - [x] **T4: 6D 벡터 매칭 로직 구현** ✅ 2026-02-03
   - 변경: `apps/engine-studio/src/lib/matching/algorithms.ts` (신규)
