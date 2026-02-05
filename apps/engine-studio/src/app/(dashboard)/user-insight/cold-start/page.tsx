@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { toast } from "sonner"
 import {
   Snowflake,
@@ -15,6 +15,9 @@ import {
   BarChart3,
   Info,
   LucideIcon,
+  Plus,
+  Trash2,
+  GripVertical,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -23,6 +26,9 @@ import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -50,10 +56,9 @@ import {
   Area,
 } from "recharts"
 
-// Cold Start mode configuration with icons (icons cannot be serialized in mock-data.service)
-// The base data comes from the centralized service, icons are added here
+// Cold Start mode configuration with icons
 interface ColdStartModeWithIcon {
-  id: string
+  id: "LIGHT" | "MEDIUM" | "DEEP"
   name: string
   nameKr: string
   description: string
@@ -68,39 +73,39 @@ interface ColdStartModeWithIcon {
 
 const COLD_START_MODES: ColdStartModeWithIcon[] = [
   {
-    id: "quick",
+    id: "LIGHT",
     name: "Quick Mode",
     nameKr: "빠른 시작",
-    description: "3개 질문으로 빠르게 기본 성향 파악",
-    questions: 3,
+    description: "12개 질문으로 빠르게 기본 성향 파악",
+    questions: 12,
     accuracy: 72,
-    duration: "30초",
+    duration: "2분",
     icon: Zap,
     color: "text-yellow-500",
     bgColor: "bg-yellow-500/10",
-    features: ["핵심 취향 3문항", "기본 6D 벡터 추정", "즉시 추천 가능"],
+    features: ["핵심 취향 12문항", "기본 6D 벡터 추정", "즉시 추천 가능"],
   },
   {
-    id: "standard",
+    id: "MEDIUM",
     name: "Standard Mode",
     nameKr: "표준 시작",
-    description: "7개 질문으로 균형잡힌 프로필 생성",
-    questions: 7,
+    description: "30개 질문으로 균형잡힌 프로필 생성",
+    questions: 30,
     accuracy: 85,
-    duration: "2분",
+    duration: "5분",
     icon: Target,
     color: "text-blue-500",
     bgColor: "bg-blue-500/10",
     features: ["확장된 취향 분석", "정밀 6D 벡터 계산", "컨텍스트 기반 추천"],
   },
   {
-    id: "deep",
+    id: "DEEP",
     name: "Deep Mode",
     nameKr: "심층 분석",
-    description: "15개 질문으로 정교한 사용자 프로필 구축",
-    questions: 15,
+    description: "60개 질문으로 정교한 사용자 프로필 구축",
+    questions: 60,
     accuracy: 94,
-    duration: "5분",
+    duration: "15분",
     icon: BarChart3,
     color: "text-purple-500",
     bgColor: "bg-purple-500/10",
@@ -108,70 +113,211 @@ const COLD_START_MODES: ColdStartModeWithIcon[] = [
   },
 ]
 
+// Question type from API
+interface ColdStartQuestion {
+  id: string
+  name: string
+  onboardingLevel: "LIGHT" | "MEDIUM" | "DEEP"
+  questionOrder: number
+  questionText: string
+  questionType: "SLIDER" | "MULTIPLE_CHOICE" | "RANKING" | "TEXT" | "IMAGE"
+  options: unknown
+  targetDimensions: string[]
+  weightFormula: unknown
+  isRequired: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 // Cold Start stats - default empty values
-const COLD_START_STATS = {
+const DEFAULT_STATS = {
   todayNewUsers: 0,
   avgCompletionRate: 0,
   avgTimeToComplete: "-",
-  modeDistribution: { quick: 0, standard: 0, deep: 0 },
+  modeDistribution: { LIGHT: 0, MEDIUM: 0, DEEP: 0 },
 }
 
 // Trend data - empty by default
 const TREND_DATA: { date: string; quick: number; standard: number; deep: number }[] = []
 
-// Question sets - empty by default
-const QUESTION_SETS: Record<string, { id: number; question: string; type: string }[]> = {
-  quick: [],
-  standard: [],
-  deep: [],
+const QUESTION_TYPE_LABELS: Record<string, string> = {
+  SLIDER: "슬라이더",
+  MULTIPLE_CHOICE: "객관식",
+  RANKING: "순위",
+  TEXT: "텍스트",
+  IMAGE: "이미지",
 }
 
+const DIMENSION_OPTIONS = ["depth", "lens", "stance", "scope", "taste", "purpose"]
+
 export default function ColdStartPage() {
-  const [activeMode, setActiveMode] = useState("standard")
+  const [activeMode, setActiveMode] = useState<"LIGHT" | "MEDIUM" | "DEEP">("MEDIUM")
   const [isEditing, setIsEditing] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const [showAddDialog, setShowAddDialog] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [, setSelectedQuestion] = useState<{ id: number; question: string; type: string } | null>(
-    null
-  )
+  const [isLoading, setIsLoading] = useState(true)
+  const [questions, setQuestions] = useState<ColdStartQuestion[]>([])
+  const [questionCounts, setQuestionCounts] = useState({
+    LIGHT: 0,
+    MEDIUM: 0,
+    DEEP: 0,
+    total: 0,
+  })
+  const [stats] = useState(DEFAULT_STATS)
+  const [selectedQuestion, setSelectedQuestion] = useState<ColdStartQuestion | null>(null)
   const [settings, setSettings] = useState({
     autoSelectMode: true,
     skipIfReturningUser: true,
-    fallbackMode: "quick",
+    fallbackMode: "LIGHT" as "LIGHT" | "MEDIUM" | "DEEP",
     minConfidenceThreshold: 70,
   })
+
+  // 새 질문 폼 상태
+  const [newQuestion, setNewQuestion] = useState({
+    name: "",
+    questionText: "",
+    questionType: "MULTIPLE_CHOICE" as "SLIDER" | "MULTIPLE_CHOICE" | "RANKING" | "TEXT" | "IMAGE",
+    targetDimensions: [] as string[],
+    options: null as unknown,
+    isRequired: true,
+  })
+
+  // 질문 목록 조회
+  const fetchQuestions = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch("/api/cold-start/questions")
+      const data = await response.json()
+      if (data.success) {
+        setQuestions(data.data.questions)
+        setQuestionCounts(data.data.counts)
+      }
+    } catch (error) {
+      console.error("Failed to fetch questions:", error)
+      toast.error("질문 목록을 불러올 수 없습니다")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  // 설정 조회
+  const fetchSettings = useCallback(async () => {
+    try {
+      const response = await fetch("/api/cold-start/settings")
+      const data = await response.json()
+      if (data.success) {
+        setSettings(data.data.settings)
+      }
+    } catch (error) {
+      console.error("Failed to fetch settings:", error)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchQuestions()
+    fetchSettings()
+  }, [fetchQuestions, fetchSettings])
+
+  // 현재 모드의 질문들
+  const currentModeQuestions = questions.filter((q) => q.onboardingLevel === activeMode)
 
   const handleSaveSettings = async () => {
     setIsSaving(true)
     toast.loading("설정을 저장하는 중...", { id: "save-cold-start" })
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsSaving(false)
-    toast.success("Cold Start 설정이 저장되었습니다.", { id: "save-cold-start" })
+    try {
+      const response = await fetch("/api/cold-start/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      })
+      const data = await response.json()
+      if (data.success) {
+        toast.success("Cold Start 설정이 저장되었습니다.", { id: "save-cold-start" })
+      } else {
+        toast.error(data.error?.message || "설정 저장에 실패했습니다", { id: "save-cold-start" })
+      }
+    } catch {
+      toast.error("서버 오류가 발생했습니다", { id: "save-cold-start" })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleTestFullFlow = () => {
     setShowPreview(false)
     toast.info("전체 흐름 테스트를 시작합니다...")
-    // Simulate test flow initiation
     setTimeout(() => {
       toast.success("테스트 흐름이 새 창에서 시작되었습니다.")
     }, 500)
   }
 
-  const handleAddQuestion = () => {
-    toast.success("새 질문이 추가되었습니다. 내용을 입력해주세요.")
+  const handleAddQuestion = async () => {
+    if (!newQuestion.name || !newQuestion.questionText) {
+      toast.error("질문 이름과 내용은 필수입니다")
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const response = await fetch("/api/cold-start/questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...newQuestion,
+          onboardingLevel: activeMode,
+        }),
+      })
+      const data = await response.json()
+      if (data.success) {
+        toast.success("질문이 추가되었습니다")
+        setShowAddDialog(false)
+        setNewQuestion({
+          name: "",
+          questionText: "",
+          questionType: "MULTIPLE_CHOICE",
+          targetDimensions: [],
+          options: null,
+          isRequired: true,
+        })
+        fetchQuestions()
+      } else {
+        toast.error(data.error?.message || "질문 추가에 실패했습니다")
+      }
+    } catch {
+      toast.error("서버 오류가 발생했습니다")
+    } finally {
+      setIsSaving(false)
+    }
   }
 
-  const handleEditQuestion = (question: { id: number; question: string; type: string }) => {
+  const handleDeleteQuestion = async (questionId: string) => {
+    if (!confirm("이 질문을 삭제하시겠습니까?")) return
+
+    try {
+      const response = await fetch(`/api/cold-start/questions/${questionId}`, {
+        method: "DELETE",
+      })
+      const data = await response.json()
+      if (data.success) {
+        toast.success("질문이 삭제되었습니다")
+        fetchQuestions()
+      } else {
+        toast.error(data.error?.message || "질문 삭제에 실패했습니다")
+      }
+    } catch {
+      toast.error("서버 오류가 발생했습니다")
+    }
+  }
+
+  const handleEditQuestion = (question: ColdStartQuestion) => {
     setSelectedQuestion(question)
-    toast.info(`질문 ${question.id} 편집 모드`)
+    toast.info(`질문 "${question.name}" 편집 모드`)
   }
 
   const handleToggleEditing = () => {
     if (isEditing) {
-      // Saving
-      toast.success("질문 세트가 저장되었습니다.")
+      toast.success("편집 모드가 종료되었습니다.")
     }
     setIsEditing(!isEditing)
   }
@@ -252,7 +398,7 @@ export default function ColdStartPage() {
             <Users className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{COLD_START_STATS.todayNewUsers}</div>
+            <div className="text-2xl font-bold">{stats.todayNewUsers}</div>
             <div className="mt-1 flex items-center text-xs text-green-600">
               <TrendingUp className="mr-1 h-3 w-3" />
               +8.2% from yesterday
@@ -262,44 +408,57 @@ export default function ColdStartPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">완료율</CardTitle>
+            <CardTitle className="text-sm font-medium">전체 질문 수</CardTitle>
             <CheckCircle className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{COLD_START_STATS.avgCompletionRate}%</div>
-            <Progress value={COLD_START_STATS.avgCompletionRate} className="mt-2" />
+            <div className="text-2xl font-bold">{questionCounts.total}</div>
+            <Progress value={(questionCounts.total / 102) * 100} className="mt-2" />
+            <p className="text-muted-foreground mt-1 text-xs">목표: 102개 (12+30+60)</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">평균 완료 시간</CardTitle>
+            <CardTitle className="text-sm font-medium">모드별 질문</CardTitle>
             <Clock className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{COLD_START_STATS.avgTimeToComplete}</div>
-            <p className="text-muted-foreground mt-1 text-xs">목표: 2분 이내</p>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-yellow-600">Quick</span>
+                <span>{questionCounts.LIGHT}/12</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-blue-600">Standard</span>
+                <span>{questionCounts.MEDIUM}/30</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-purple-600">Deep</span>
+                <span>{questionCounts.DEEP}/60</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">모드 분포</CardTitle>
+            <CardTitle className="text-sm font-medium">완료율</CardTitle>
             <BarChart3 className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span>Quick</span>
-                <span>{COLD_START_STATS.modeDistribution.quick}%</span>
+                <span>{Math.round((questionCounts.LIGHT / 12) * 100)}%</span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span>Standard</span>
-                <span>{COLD_START_STATS.modeDistribution.standard}%</span>
+                <span>{Math.round((questionCounts.MEDIUM / 30) * 100)}%</span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span>Deep</span>
-                <span>{COLD_START_STATS.modeDistribution.deep}%</span>
+                <span>{Math.round((questionCounts.DEEP / 60) * 100)}%</span>
               </div>
             </div>
           </CardContent>
@@ -378,65 +537,178 @@ export default function ColdStartPage() {
                 <CardTitle>질문 세트 편집</CardTitle>
                 <CardDescription>
                   {COLD_START_MODES.find((m) => m.id === activeMode)?.name} 모드의 질문을
-                  편집합니다.
+                  편집합니다. ({currentModeQuestions.length}개)
                 </CardDescription>
               </div>
-              <Button
-                variant={isEditing ? "default" : "outline"}
-                size="sm"
-                onClick={handleToggleEditing}
-              >
-                {isEditing ? "저장" : "편집"}
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setShowAddDialog(true)}>
+                  <Plus className="mr-1 h-4 w-4" />
+                  질문 추가
+                </Button>
+                <Button
+                  variant={isEditing ? "default" : "outline"}
+                  size="sm"
+                  onClick={handleToggleEditing}
+                >
+                  {isEditing ? "완료" : "편집"}
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            {QUESTION_SETS[activeMode as keyof typeof QUESTION_SETS]?.length === 0 ? (
+            {isLoading ? (
+              <div className="flex justify-center py-12">
+                <div className="border-primary h-8 w-8 animate-spin rounded-full border-b-2" />
+              </div>
+            ) : currentModeQuestions.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Target className="text-muted-foreground mb-4 h-10 w-10" />
                 <h3 className="mb-2 font-medium">등록된 질문이 없습니다</h3>
                 <p className="text-muted-foreground mb-4 text-sm">
                   질문을 추가하여 사용자 프로필 수집을 시작하세요.
                 </p>
-                <Button variant="outline" onClick={handleAddQuestion}>
-                  + 질문 추가
+                <Button variant="outline" onClick={() => setShowAddDialog(true)}>
+                  <Plus className="mr-1 h-4 w-4" />
+                  질문 추가
                 </Button>
               </div>
             ) : (
               <div className="space-y-3">
-                {QUESTION_SETS[activeMode as keyof typeof QUESTION_SETS]?.map((q, idx) => (
+                {currentModeQuestions.map((q, idx) => (
                   <div key={q.id} className="flex items-center gap-3 rounded-lg border p-3">
+                    {isEditing && (
+                      <GripVertical className="text-muted-foreground h-4 w-4 cursor-grab" />
+                    )}
                     <span className="bg-primary/10 flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium">
                       {idx + 1}
                     </span>
                     <div className="flex-1">
-                      <p className="text-sm font-medium">{q.question}</p>
-                      <Badge variant="secondary" className="mt-1 text-xs">
-                        {q.type === "single"
-                          ? "단일 선택"
-                          : q.type === "multi"
-                            ? "복수 선택"
-                            : q.type === "ranking"
-                              ? "순위"
-                              : "척도"}
-                      </Badge>
+                      <p className="text-sm font-medium">{q.questionText}</p>
+                      <div className="mt-1 flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">
+                          {QUESTION_TYPE_LABELS[q.questionType] || q.questionType}
+                        </Badge>
+                        {q.targetDimensions.map((dim) => (
+                          <Badge key={dim} variant="outline" className="text-xs">
+                            {dim}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
                     {isEditing && (
-                      <Button variant="ghost" size="sm" onClick={() => handleEditQuestion(q)}>
-                        <Settings className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => handleEditQuestion(q)}>
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteQuestion(q.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
                     )}
                   </div>
                 ))}
               </div>
             )}
-            {isEditing && QUESTION_SETS[activeMode as keyof typeof QUESTION_SETS]?.length > 0 && (
-              <Button variant="outline" className="mt-4 w-full" onClick={handleAddQuestion}>
-                + 질문 추가
-              </Button>
-            )}
           </CardContent>
         </Card>
+
+        {/* 질문 추가 다이얼로그 */}
+        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>새 질문 추가</DialogTitle>
+              <DialogDescription>
+                {COLD_START_MODES.find((m) => m.id === activeMode)?.nameKr} 모드에 새 질문을
+                추가합니다.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>질문 이름</Label>
+                <Input
+                  value={newQuestion.name}
+                  onChange={(e) => setNewQuestion({ ...newQuestion, name: e.target.value })}
+                  placeholder="예: 영화 장르 선호도"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>질문 내용</Label>
+                <Textarea
+                  value={newQuestion.questionText}
+                  onChange={(e) => setNewQuestion({ ...newQuestion, questionText: e.target.value })}
+                  placeholder="예: 가장 좋아하는 영화 장르는 무엇인가요?"
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>질문 유형</Label>
+                <Select
+                  value={newQuestion.questionType}
+                  onValueChange={(v) =>
+                    setNewQuestion({
+                      ...newQuestion,
+                      questionType: v as typeof newQuestion.questionType,
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MULTIPLE_CHOICE">객관식</SelectItem>
+                    <SelectItem value="SLIDER">슬라이더</SelectItem>
+                    <SelectItem value="RANKING">순위</SelectItem>
+                    <SelectItem value="TEXT">텍스트</SelectItem>
+                    <SelectItem value="IMAGE">이미지</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>대상 차원</Label>
+                <div className="flex flex-wrap gap-2">
+                  {DIMENSION_OPTIONS.map((dim) => (
+                    <Badge
+                      key={dim}
+                      variant={newQuestion.targetDimensions.includes(dim) ? "default" : "outline"}
+                      className="cursor-pointer"
+                      onClick={() => {
+                        setNewQuestion((prev) => ({
+                          ...prev,
+                          targetDimensions: prev.targetDimensions.includes(dim)
+                            ? prev.targetDimensions.filter((d) => d !== dim)
+                            : [...prev.targetDimensions, dim],
+                        }))
+                      }}
+                    >
+                      {dim}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={newQuestion.isRequired}
+                  onCheckedChange={(checked) =>
+                    setNewQuestion({ ...newQuestion, isRequired: checked })
+                  }
+                />
+                <Label>필수 질문</Label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+                취소
+              </Button>
+              <Button onClick={handleAddQuestion} disabled={isSaving}>
+                {isSaving ? "추가 중..." : "추가"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Settings */}
         <Card>
@@ -492,15 +764,17 @@ export default function ColdStartPage() {
                 <span className="font-medium">폴백 모드</span>
                 <Select
                   value={settings.fallbackMode}
-                  onValueChange={(value) => setSettings({ ...settings, fallbackMode: value })}
+                  onValueChange={(value: "LIGHT" | "MEDIUM" | "DEEP") =>
+                    setSettings({ ...settings, fallbackMode: value })
+                  }
                 >
                   <SelectTrigger className="w-32">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="quick">Quick</SelectItem>
-                    <SelectItem value="standard">Standard</SelectItem>
-                    <SelectItem value="deep">Deep</SelectItem>
+                    <SelectItem value="LIGHT">Quick</SelectItem>
+                    <SelectItem value="MEDIUM">Standard</SelectItem>
+                    <SelectItem value="DEEP">Deep</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -13,6 +13,10 @@ import {
   Eye,
   RotateCcw,
   Trash2,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  ShieldCheck,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -31,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { Progress } from "@/components/ui/progress"
 import {
   Dialog,
   DialogContent,
@@ -139,6 +144,25 @@ export default function PersonaDetailPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [testResult, setTestResult] = useState("")
   const [testContent, setTestContent] = useState("")
+
+  // 검증 관련 상태
+  const [validationResult, setValidationResult] = useState<{
+    overallScore: number
+    passed: boolean
+    breakdown: {
+      promptQuality: { score: number; details: Record<string, number>; issues: string[] }
+      vectorConsistency: {
+        score: number
+        details: Record<string, { expected: string; actual: string; match: boolean }>
+        issues: string[]
+      }
+      expertiseRelevance: { score: number; issues: string[] }
+    }
+    allIssues: string[]
+    validatedAt: string
+  } | null>(null)
+  const [isValidating, setIsValidating] = useState(false)
+  const [lastValidationDate, setLastValidationDate] = useState<string | null>(null)
 
   // 페르소나 데이터 로드
   const fetchPersona = useCallback(async () => {
@@ -373,6 +397,55 @@ export default function PersonaDetailPage() {
     }
   }
 
+  // 페르소나 검증 실행
+  const handleValidation = async () => {
+    setIsValidating(true)
+    try {
+      const response = await fetch(`/api/personas/${personaId}/validate`, {
+        method: "POST",
+      })
+      const data = await response.json()
+
+      if (!data.success) {
+        throw new Error(data.error?.message || "검증 실패")
+      }
+
+      setValidationResult(data.data)
+      setLastValidationDate(data.data.validatedAt)
+
+      if (data.data.passed) {
+        toast.success(`검증 통과! 점수: ${data.data.overallScore}점`)
+      } else {
+        toast.warning(`검증 미통과. 점수: ${data.data.overallScore}점 (70점 이상 필요)`)
+      }
+    } catch (err) {
+      console.error("Validation error:", err)
+      toast.error(err instanceof Error ? err.message : "검증에 실패했습니다")
+    } finally {
+      setIsValidating(false)
+    }
+  }
+
+  // 마지막 검증 결과 조회
+  const fetchLastValidation = useCallback(async () => {
+    if (!personaId) return
+
+    try {
+      const response = await fetch(`/api/personas/${personaId}/validate`)
+      const data = await response.json()
+
+      if (data.success && data.data.hasBeenValidated) {
+        setLastValidationDate(data.data.lastValidationDate)
+      }
+    } catch (err) {
+      console.error("Failed to fetch validation:", err)
+    }
+  }, [personaId])
+
+  useEffect(() => {
+    fetchLastValidation()
+  }, [fetchLastValidation])
+
   const handleTestPrompt = async () => {
     setTestResult("생성 중...")
 
@@ -501,6 +574,7 @@ ${result.response}
           <TabsTrigger value="basic">기본 정보</TabsTrigger>
           <TabsTrigger value="vector">성향 벡터</TabsTrigger>
           <TabsTrigger value="prompt">프롬프트</TabsTrigger>
+          <TabsTrigger value="validation">검증</TabsTrigger>
           <TabsTrigger value="metrics">성과 지표</TabsTrigger>
           <TabsTrigger value="history">버전 히스토리</TabsTrigger>
         </TabsList>
@@ -810,6 +884,176 @@ ${result.response}
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* 검증 탭 */}
+        <TabsContent value="validation" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5" />
+                    페르소나 품질 검증
+                  </CardTitle>
+                  <CardDescription>
+                    프롬프트 품질, 벡터 일관성, 전문분야 관련성을 검증합니다.
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-4">
+                  {lastValidationDate && (
+                    <span className="text-muted-foreground text-sm">
+                      마지막 검증: {new Date(lastValidationDate).toLocaleDateString("ko-KR")}
+                    </span>
+                  )}
+                  <Button onClick={handleValidation} disabled={isValidating}>
+                    <ShieldCheck className="mr-2 h-4 w-4" />
+                    {isValidating ? "검증 중..." : "검증 실행"}
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {validationResult ? (
+                <div className="space-y-6">
+                  {/* 종합 점수 */}
+                  <div className="bg-muted rounded-lg p-6 text-center">
+                    <div
+                      className={`text-5xl font-bold ${validationResult.passed ? "text-green-600" : "text-red-600"}`}
+                    >
+                      {validationResult.overallScore}점
+                    </div>
+                    <div className="mt-2 flex items-center justify-center gap-2">
+                      {validationResult.passed ? (
+                        <>
+                          <CheckCircle2 className="h-5 w-5 text-green-600" />
+                          <span className="font-medium text-green-600">검증 통과</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="h-5 w-5 text-red-600" />
+                          <span className="font-medium text-red-600">
+                            검증 미통과 (70점 이상 필요)
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 상세 점수 */}
+                  <div className="grid grid-cols-3 gap-4">
+                    {/* 프롬프트 품질 */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">프롬프트 품질</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold">
+                          {validationResult.breakdown.promptQuality.score}점
+                        </div>
+                        <Progress
+                          value={validationResult.breakdown.promptQuality.score}
+                          className="mt-2"
+                        />
+                        <div className="mt-3 space-y-1 text-sm">
+                          {Object.entries(validationResult.breakdown.promptQuality.details).map(
+                            ([key, value]) => (
+                              <div key={key} className="flex justify-between">
+                                <span className="text-muted-foreground">{key}</span>
+                                <span>{Math.round(value)}%</span>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* 벡터 일관성 */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">벡터 일관성</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold">
+                          {validationResult.breakdown.vectorConsistency.score}점
+                        </div>
+                        <Progress
+                          value={validationResult.breakdown.vectorConsistency.score}
+                          className="mt-2"
+                        />
+                        <div className="mt-3 space-y-1 text-sm">
+                          {Object.entries(validationResult.breakdown.vectorConsistency.details).map(
+                            ([key, detail]) => (
+                              <div key={key} className="flex items-center justify-between">
+                                <span className="text-muted-foreground">{key}</span>
+                                {detail.match ? (
+                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                ) : (
+                                  <XCircle className="h-4 w-4 text-red-500" />
+                                )}
+                              </div>
+                            )
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* 전문분야 관련성 */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">전문분야 관련성</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold">
+                          {validationResult.breakdown.expertiseRelevance.score}점
+                        </div>
+                        <Progress
+                          value={validationResult.breakdown.expertiseRelevance.score}
+                          className="mt-2"
+                        />
+                        <div className="text-muted-foreground mt-3 text-sm">
+                          프롬프트에 전문분야 관련 내용이 포함되어 있는지 검사합니다.
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* 발견된 이슈 */}
+                  {validationResult.allIssues.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                          <AlertCircle className="h-5 w-5 text-yellow-600" />
+                          발견된 이슈 ({validationResult.allIssues.length}개)
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {validationResult.allIssues.map((issue, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-start gap-2 rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-800 dark:bg-yellow-900/20"
+                            >
+                              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-yellow-600" />
+                              <span className="text-sm">{issue}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              ) : (
+                <div className="py-12 text-center">
+                  <ShieldCheck className="text-muted-foreground mx-auto h-12 w-12" />
+                  <h3 className="mt-4 text-lg font-medium">아직 검증되지 않았습니다</h3>
+                  <p className="text-muted-foreground mt-2">
+                    &apos;검증 실행&apos; 버튼을 클릭하여 페르소나 품질을 검증해보세요.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* 성과 지표 탭 */}

@@ -2,11 +2,13 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 import {
   Bell,
   ChevronDown,
+  FileText,
   HelpCircle,
+  Key,
   LogOut,
   Menu,
   Moon,
@@ -14,6 +16,8 @@ import {
   Settings,
   Sun,
   User,
+  Webhook,
+  History,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,6 +29,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
   Dialog,
   DialogContent,
@@ -40,19 +45,76 @@ import { useUIStore } from "@/store/ui-store"
 import { useNotificationStore } from "@/store/notification-store"
 import { cn, formatRelativeTime } from "@/lib/utils"
 
+interface SearchResult {
+  type: "api_key" | "log" | "webhook" | "doc"
+  id: string
+  title: string
+  description: string
+  url: string
+}
+
 export function Header() {
+  const router = useRouter()
   const { user, organization, organizations, switchOrganization, logout } = useAuthStore()
   const { theme, setTheme, setSidebarMobileOpen } = useUIStore()
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotificationStore()
   const [searchQuery, setSearchQuery] = React.useState("")
+  const [searchResults, setSearchResults] = React.useState<SearchResult[]>([])
+  const [isSearching, setIsSearching] = React.useState(false)
+  const [searchOpen, setSearchOpen] = React.useState(false)
   const [helpOpen, setHelpOpen] = React.useState(false)
+  const searchTimeoutRef = React.useRef<NodeJS.Timeout | undefined>(undefined)
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (searchQuery.trim()) {
-      toast.info(`"${searchQuery}" 검색 중...`, {
-        description: "검색 기능은 준비 중입니다.",
-      })
+  // Debounced search
+  React.useEffect(() => {
+    if (searchQuery.length < 2) {
+      setSearchResults([])
+      return
+    }
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      setIsSearching(true)
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`)
+        const data = await res.json()
+        if (data.success) {
+          setSearchResults(data.data.results)
+          setSearchOpen(true)
+        }
+      } catch (error) {
+        console.error("Search error:", error)
+      } finally {
+        setIsSearching(false)
+      }
+    }, 300)
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [searchQuery])
+
+  const handleResultClick = (result: SearchResult) => {
+    setSearchOpen(false)
+    setSearchQuery("")
+    router.push(result.url)
+  }
+
+  const getResultIcon = (type: SearchResult["type"]) => {
+    switch (type) {
+      case "api_key":
+        return <Key className="h-4 w-4" />
+      case "webhook":
+        return <Webhook className="h-4 w-4" />
+      case "log":
+        return <History className="h-4 w-4" />
+      case "doc":
+        return <FileText className="h-4 w-4" />
     }
   }
 
@@ -82,16 +144,46 @@ export function Header() {
       </Button>
 
       {/* Search */}
-      <form onSubmit={handleSearch} className="relative max-w-md flex-1">
-        <Search className="text-muted-foreground absolute left-2.5 top-2.5 h-4 w-4" />
-        <Input
-          type="search"
-          placeholder="Search..."
-          className="bg-muted/50 pl-8"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-      </form>
+      <Popover open={searchOpen && searchResults.length > 0} onOpenChange={setSearchOpen}>
+        <PopoverTrigger asChild>
+          <div className="relative max-w-md flex-1">
+            <Search className="text-muted-foreground absolute left-2.5 top-2.5 h-4 w-4" />
+            <Input
+              type="search"
+              placeholder="Search API keys, logs, docs..."
+              className="bg-muted/50 pl-8"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => searchResults.length > 0 && setSearchOpen(true)}
+            />
+            {isSearching && (
+              <div className="absolute right-2.5 top-2.5">
+                <div className="border-primary h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
+              </div>
+            )}
+          </div>
+        </PopoverTrigger>
+        <PopoverContent className="w-[400px] p-0" align="start">
+          <div className="max-h-[300px] overflow-auto">
+            {searchResults.map((result) => (
+              <button
+                key={`${result.type}-${result.id}`}
+                className="hover:bg-muted flex w-full items-center gap-3 px-4 py-3 text-left transition-colors"
+                onClick={() => handleResultClick(result)}
+              >
+                <div className="text-muted-foreground">{getResultIcon(result.type)}</div>
+                <div className="flex-1 overflow-hidden">
+                  <p className="truncate text-sm font-medium">{result.title}</p>
+                  <p className="text-muted-foreground truncate text-xs">{result.description}</p>
+                </div>
+                <Badge variant="outline" className="text-xs capitalize">
+                  {result.type.replace("_", " ")}
+                </Badge>
+              </button>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
 
       <div className="flex items-center gap-2">
         {/* Organization Switcher */}

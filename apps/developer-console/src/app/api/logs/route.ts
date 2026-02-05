@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
 
     // Parse query parameters
+    const search = searchParams.get("search")
     const status = searchParams.get("status") // "success", "error", "all"
     const endpoint = searchParams.get("endpoint")
     const apiKeyId = searchParams.get("apiKeyId")
@@ -23,12 +24,17 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "50"), 1), 100)
     const offset = Math.max(parseInt(searchParams.get("offset") || "0"), 0)
 
-    // TODO: Get organizationId from session - for now, get all logs
-    // In production, filter by organization
-    // const organizationId = await getOrganizationId(request)
-
     // Build where clause
     const where: Record<string, unknown> = {}
+
+    // Search filter - search in requestId, endpoint, or IP
+    if (search) {
+      where.OR = [
+        { requestId: { contains: search, mode: "insensitive" } },
+        { endpoint: { contains: search, mode: "insensitive" } },
+        { ipAddress: { contains: search, mode: "insensitive" } },
+      ]
+    }
 
     if (status === "success") {
       where.statusCode = { lt: 400 }
@@ -41,7 +47,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (endpoint) {
-      where.endpoint = { contains: endpoint }
+      where.endpoint = { contains: endpoint, mode: "insensitive" }
     }
 
     if (apiKeyId) {

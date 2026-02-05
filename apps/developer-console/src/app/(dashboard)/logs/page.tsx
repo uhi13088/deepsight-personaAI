@@ -72,40 +72,49 @@ export default function LogsPage() {
   const [expandedRows, setExpandedRows] = React.useState<Set<string>>(new Set())
   const [showFilters, setShowFilters] = React.useState(false)
 
+  const fetchLogs = React.useCallback(async () => {
+    try {
+      const filters: Parameters<typeof logsService.getLogs>[0] = {}
+
+      if (searchQuery) filters.search = searchQuery
+      if (statusFilter !== "all") {
+        if (statusFilter === "2xx") filters.status = "success"
+        else if (statusFilter === "4xx") filters.status = "client_error"
+        else if (statusFilter === "5xx") filters.status = "server_error"
+      }
+      if (endpointFilter !== "all") filters.endpoint = endpointFilter
+      if (apiKeyFilter !== "all") filters.apiKeyId = apiKeyFilter
+
+      const data = await logsService.getLogs(filters)
+      setApiLogs(data.logs)
+      setStats(data.stats)
+    } catch (error) {
+      console.error("Failed to fetch logs:", error)
+      toast.error("로그를 불러오는데 실패했습니다.")
+    } finally {
+      setIsLoading(false)
+    }
+  }, [searchQuery, statusFilter, endpointFilter, apiKeyFilter])
+
+  // Debounce search and filters
+  const searchTimeoutRef = React.useRef<NodeJS.Timeout | undefined>(undefined)
+
   React.useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const data = await logsService.getLogs()
-        setApiLogs(data.logs)
-        setStats(data.stats)
-      } catch (error) {
-        console.error("Failed to fetch logs:", error)
-        toast.error("로그를 불러오는데 실패했습니다.")
-      } finally {
-        setIsLoading(false)
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      fetchLogs()
+    }, 300)
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
       }
     }
-    fetchData()
-  }, [])
+  }, [fetchLogs])
 
-  const filteredLogs = apiLogs.filter((log) => {
-    const matchesSearch =
-      log.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.endpoint.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.ip.includes(searchQuery)
-
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilter === "2xx" && log.status >= 200 && log.status < 300) ||
-      (statusFilter === "4xx" && log.status >= 400 && log.status < 500) ||
-      (statusFilter === "5xx" && log.status >= 500)
-
-    const matchesEndpoint = endpointFilter === "all" || log.endpoint === endpointFilter
-
-    const matchesApiKey = apiKeyFilter === "all" || log.apiKeyName === apiKeyFilter
-
-    return matchesSearch && matchesStatus && matchesEndpoint && matchesApiKey
-  })
+  // API already handles all filtering - just use the fetched logs directly
+  const filteredLogs = apiLogs
 
   const handleRefresh = async () => {
     setIsRefreshing(true)

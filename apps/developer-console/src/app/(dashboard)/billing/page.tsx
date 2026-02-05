@@ -57,7 +57,28 @@ import {
   type Plan,
   type Invoice as ServiceInvoice,
   type PaymentMethod as ServicePaymentMethod,
+  type TossPaymentInfo,
 } from "@/services/billing-service"
+import Script from "next/script"
+
+// Toss Payments SDK types
+declare global {
+  interface Window {
+    TossPayments?: (clientKey: string) => {
+      requestPayment: (
+        method: string,
+        options: {
+          amount: number
+          orderId: string
+          orderName: string
+          customerName: string
+          successUrl: string
+          failUrl: string
+        }
+      ) => Promise<void>
+    }
+  }
+}
 
 // Plan data based on documentation (static content)
 const plans = [
@@ -147,7 +168,26 @@ export default function BillingPage() {
   const [upgradeDialogOpen, setUpgradeDialogOpen] = React.useState(false)
   const [selectedPlan, setSelectedPlan] = React.useState<(typeof plans)[0] | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
+  const [isProcessingPayment, setIsProcessingPayment] = React.useState(false)
   const [billingData, setBillingData] = React.useState<BillingData | null>(null)
+  const [tossReady, setTossReady] = React.useState(false)
+
+  // URL 쿼리 파라미터로 결제 결과 처리
+  React.useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const success = urlParams.get("success")
+    const plan = urlParams.get("plan")
+    const error = urlParams.get("error")
+
+    if (success === "true" && plan) {
+      toast.success(`${plan} 플랜으로 업그레이드되었습니다!`)
+      // URL에서 쿼리 파라미터 제거
+      window.history.replaceState({}, "", "/billing")
+    } else if (error) {
+      toast.error("결제 처리 중 오류가 발생했습니다.")
+      window.history.replaceState({}, "", "/billing")
+    }
+  }, [])
 
   React.useEffect(() => {
     const fetchData = async () => {
@@ -188,16 +228,48 @@ export default function BillingPage() {
 
   const confirmUpgrade = async () => {
     if (!selectedPlan) return
+
+    setIsProcessingPayment(true)
     try {
-      await billingService.upgradePlan(selectedPlan.id as "free" | "starter" | "pro" | "enterprise")
-      toast.success("플랜이 업그레이드되었습니다.")
-      // Refresh data
-      const data = await billingService.getBillingInfo()
-      setBillingData(data)
-      setUpgradeDialogOpen(false)
+      const paymentInfo = await billingService.upgradePlan(
+        selectedPlan.id as "free" | "starter" | "pro" | "enterprise"
+      )
+
+      // Free 플랜은 결제 없이 바로 적용
+      if (!paymentInfo) {
+        toast.success("플랜이 변경되었습니다.")
+        const data = await billingService.getBillingInfo()
+        setBillingData(data)
+        setUpgradeDialogOpen(false)
+        return
+      }
+
+      // Toss Payments SDK 로드 확인
+      if (!window.TossPayments) {
+        toast.error("결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해주세요.")
+        return
+      }
+
+      // Toss Payments 결제 요청
+      const tossPayments = window.TossPayments(paymentInfo.clientKey)
+      await tossPayments.requestPayment("카드", {
+        amount: paymentInfo.amount,
+        orderId: paymentInfo.orderId,
+        orderName: paymentInfo.orderName,
+        customerName: paymentInfo.customerName,
+        successUrl: paymentInfo.successUrl,
+        failUrl: paymentInfo.failUrl,
+      })
     } catch (error) {
       console.error("Failed to upgrade plan:", error)
-      toast.error("플랜 업그레이드에 실패했습니다.")
+      // Toss 결제창 취소 시에도 에러가 발생하므로 구분 처리
+      if (error instanceof Error && error.message.includes("PAY_PROCESS_CANCELED")) {
+        toast.info("결제가 취소되었습니다.")
+      } else {
+        toast.error("플랜 업그레이드에 실패했습니다.")
+      }
+    } finally {
+      setIsProcessingPayment(false)
     }
   }
 
@@ -524,13 +596,31 @@ export default function BillingPage() {
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setUpgradeDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setUpgradeDialogOpen(false)}
+              disabled={isProcessingPayment}
+            >
               Cancel
             </Button>
-            <Button onClick={confirmUpgrade}>Confirm Upgrade</Button>
+            <Button onClick={confirmUpgrade} disabled={isProcessingPayment}>
+              {isProcessingPayment ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : selectedPlan?.price === 0 ? (
+                "Confirm Downgrade"
+              ) : (
+                "결제하기"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Toss Payments SDK */}
+      <Script src="https://js.tosspayments.com/v1/payment" onLoad={() => setTossReady(true)} />
     </div>
   )
 }

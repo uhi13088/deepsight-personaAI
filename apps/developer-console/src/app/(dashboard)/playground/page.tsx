@@ -98,10 +98,13 @@ const endpoints = [
   },
 ]
 
-const apiKeys = [
-  { id: "pk_test_***abc", name: "Development", environment: "test" },
-  { id: "pk_live_***xyz", name: "Production Server", environment: "live" },
-]
+type ApiKeyItem = {
+  id: string
+  name: string
+  prefix: string
+  lastFour: string
+  environment: string
+}
 
 // Sample response data
 const sampleResponses: Record<string, object> = {
@@ -156,7 +159,8 @@ const sampleResponses: Record<string, object> = {
 
 export default function PlaygroundPage() {
   const [selectedEndpoint, setSelectedEndpoint] = React.useState(endpoints[0])
-  const [selectedApiKey, setSelectedApiKey] = React.useState(apiKeys[0].id)
+  const [apiKeys, setApiKeys] = React.useState<ApiKeyItem[]>([])
+  const [selectedApiKey, setSelectedApiKey] = React.useState("")
   const [requestBody, setRequestBody] = React.useState(
     JSON.stringify(endpoints[0].defaultBody, null, 2)
   )
@@ -166,8 +170,28 @@ export default function PlaygroundPage() {
   const [responseStatus, setResponseStatus] = React.useState<number | null>(null)
   const [responseTime, setResponseTime] = React.useState<number | null>(null)
   const [isLoading, setIsLoading] = React.useState(false)
+  const [isLoadingKeys, setIsLoadingKeys] = React.useState(true)
   const [copied, setCopied] = React.useState(false)
   const [showAdvanced, setShowAdvanced] = React.useState(false)
+
+  // Fetch API keys on mount
+  React.useEffect(() => {
+    async function fetchApiKeys() {
+      try {
+        const res = await fetch("/api/api-keys")
+        const data = await res.json()
+        if (data.apiKeys && data.apiKeys.length > 0) {
+          setApiKeys(data.apiKeys)
+          setSelectedApiKey(`${data.apiKeys[0].prefix}***${data.apiKeys[0].lastFour}`)
+        }
+      } catch (error) {
+        console.error("Failed to fetch API keys:", error)
+      } finally {
+        setIsLoadingKeys(false)
+      }
+    }
+    fetchApiKeys()
+  }, [])
 
   const handleEndpointChange = (endpointId: string) => {
     const endpoint = endpoints.find((e) => e.id === endpointId)
@@ -287,26 +311,37 @@ export default function PlaygroundPage() {
           <p className="text-muted-foreground">API를 테스트하고 응답을 확인하세요</p>
         </div>
         <div className="flex gap-2">
-          <Select value={selectedApiKey} onValueChange={setSelectedApiKey}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {apiKeys.map((key) => (
-                <SelectItem key={key.id} value={key.id}>
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant={key.environment === "live" ? "default" : "secondary"}
-                      className="text-xs"
-                    >
-                      {key.environment}
-                    </Badge>
-                    {key.name}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {isLoadingKeys ? (
+            <div className="text-muted-foreground text-sm">Loading keys...</div>
+          ) : apiKeys.length === 0 ? (
+            <Button variant="outline" asChild>
+              <a href="/api-keys/new">Create API Key</a>
+            </Button>
+          ) : (
+            <Select value={selectedApiKey} onValueChange={setSelectedApiKey}>
+              <SelectTrigger className="w-[250px]">
+                <SelectValue placeholder="Select API Key" />
+              </SelectTrigger>
+              <SelectContent>
+                {apiKeys.map((key) => {
+                  const keyDisplay = `${key.prefix}***${key.lastFour}`
+                  return (
+                    <SelectItem key={key.id} value={keyDisplay}>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={key.environment === "live" ? "default" : "secondary"}
+                          className="text-xs"
+                        >
+                          {key.environment}
+                        </Badge>
+                        {key.name}
+                      </div>
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </div>
 
