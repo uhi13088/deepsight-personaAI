@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/layout/sidebar"
 import { Header } from "@/components/layout/header"
 import { Toaster } from "@/components/layout/toaster"
 import { Toaster as SonnerToaster } from "sonner"
+import { ErrorBoundary } from "@/components/error-boundary"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -17,7 +18,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Header />
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto p-6">{children}</main>
+        <main className="flex-1 overflow-auto p-6">
+          <ErrorBoundary>{children}</ErrorBoundary>
+        </main>
       </div>
 
       {/* Toast Notifications */}
