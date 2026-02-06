@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth"
 
 // Cold Start 설정 저장소 (실제로는 DB에 저장해야 함)
 // 여기서는 메모리에 임시 저장
-let coldStartSettings = {
+const coldStartSettings = {
   autoSelectMode: true,
   skipIfReturningUser: true,
   fallbackMode: "LIGHT" as "LIGHT" | "MEDIUM" | "DEEP",

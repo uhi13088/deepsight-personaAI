@@ -3,8 +3,9 @@
  * 초기 데이터 및 관리자 계정 생성
  */
 
-import { PrismaClient } from "@prisma/client"
+import { Prisma, PrismaClient } from "@prisma/client"
 import bcrypt from "bcryptjs"
+import { COLD_START_QUESTIONS } from "./seed-data/cold-start-questions"
 
 const prisma = new PrismaClient()
 
@@ -156,6 +157,32 @@ async function main() {
     },
   })
   console.log(`✅ Algorithm created: ${algorithm.name}`)
+
+  // Cold Start 질문 시딩 (PsychProfileTemplate)
+  let questionCount = 0
+  for (const q of COLD_START_QUESTIONS) {
+    const id = `seed-q-${q.name}`
+    await prisma.psychProfileTemplate.upsert({
+      where: { id },
+      update: {},
+      create: {
+        id,
+        name: q.name,
+        onboardingLevel: q.onboardingLevel,
+        questionOrder: q.questionOrder,
+        questionText: q.questionText,
+        questionType: q.questionType,
+        options: q.options as unknown as Prisma.InputJsonValue,
+        targetDimensions: q.targetDimensions,
+        weightFormula: q.weightFormula as unknown as Prisma.InputJsonValue,
+        isRequired: q.isRequired,
+      },
+    })
+    questionCount++
+  }
+  console.log(
+    `✅ Cold Start questions created: ${questionCount}개 (LIGHT: 12, MEDIUM: 18, DEEP: 30)`
+  )
 
   console.log("🎉 Database seed completed!")
 }
