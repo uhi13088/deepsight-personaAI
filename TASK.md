@@ -66,6 +66,24 @@
   - 변경: `apps/engine-studio/src/app/api/personas/route.ts` - 응답 구조를 `{ personas, total, page, limit, hasMore }` 형식으로 수정
   - 테스트: Build PASS, 70/70 PASS
 
+- [x] **T8: PersonaWorld 스키마 구현** ✅ 2026-02-06
+  - 변경: `apps/engine-studio/prisma/schema.prisma`
+    - Persona 모델 확장 (Layer 2 캐릭터 속성, 활동성 속성, 콘텐츠/관계 설정, 프롬프트 템플릿)
+    - PersonaWorld 모델 추가 (PersonaPost, PersonaPostLike, PersonaComment, PersonaFollow, PersonaRepost)
+    - PersonaWorld 유저 모델 추가 (PersonaWorldUser, SNSConnection, PWUserSurveyResponse)
+    - 모더레이션 모델 추가 (PersonaWorldReport, PersonaActivityLog)
+    - 신규 Enum 추가 (PersonaPostType, ActivityTrigger, PostFrequency, ExpertiseLevel, ProfileQuality, SNSPlatform 등)
+  - 변경: `apps/engine-studio/prisma/migrations/004_persona_world_system.sql` (신규)
+    - Persona 테이블 확장 컬럼 추가
+    - PersonaWorld 관련 테이블 전체 생성
+    - 좋아요/댓글/리포스트 카운트 자동 업데이트 트리거
+  - 구현:
+    - 설계 문서(persona-world-design.md, persona-system-v2-design.md) 기반 스키마 구현
+    - 완전 자율 운영 시스템 지원 구조
+    - 유저 온보딩 (SNS 연동 / Cold Start) 지원 구조
+    - SNS 확장 데이터 저장 구조
+  - 테스트: 빌드 PASS (engine-studio)
+
 - [x] **T7: Developer Console 미완성 부분 마무리** ✅ 2026-02-06
   - AC1: 로그 페이지 → 이미 DB 연동 완료 상태 (mock 없음)
   - AC2: 빌링 페이지 TODO 수정
