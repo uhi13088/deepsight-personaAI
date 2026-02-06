@@ -113,7 +113,9 @@ export default function TeamPage() {
   const [selectedMember, setSelectedMember] = React.useState<ServiceMember | null>(null)
   const [inviteEmail, setInviteEmail] = React.useState("")
   const [inviteRole, setInviteRole] = React.useState("developer")
+  const [editRole, setEditRole] = React.useState<MemberRole>("developer")
   const [isLoading, setIsLoading] = React.useState(true)
+  const [isSaving, setIsSaving] = React.useState(false)
   const [teamData, setTeamData] = React.useState<TeamData | null>(null)
 
   React.useEffect(() => {
@@ -187,6 +189,46 @@ export default function TeamPage() {
     } catch (error) {
       console.error("Failed to invite member:", error)
       toast.error("초대 발송에 실패했습니다.")
+    }
+  }
+
+  const handleUpdateRole = async () => {
+    if (!selectedMember) return
+
+    setIsSaving(true)
+    try {
+      await teamService.updateMember(selectedMember.id, { role: editRole })
+      toast.success("역할이 변경되었습니다.")
+      // Refresh team data
+      const data = await teamService.getTeam()
+      setTeamData(data)
+      setEditMemberDialogOpen(false)
+      setSelectedMember(null)
+    } catch (error) {
+      console.error("Failed to update member role:", error)
+      toast.error("역할 변경에 실패했습니다.")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleRemoveMember = async () => {
+    if (!selectedMember) return
+
+    setIsSaving(true)
+    try {
+      await teamService.removeMember(selectedMember.id)
+      toast.success("멤버가 제거되었습니다.")
+      // Refresh team data
+      const data = await teamService.getTeam()
+      setTeamData(data)
+      setRemoveMemberDialogOpen(false)
+      setSelectedMember(null)
+    } catch (error) {
+      console.error("Failed to remove member:", error)
+      toast.error("멤버 제거에 실패했습니다.")
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -328,6 +370,7 @@ export default function TeamPage() {
                               <DropdownMenuItem
                                 onClick={() => {
                                   setSelectedMember(member)
+                                  setEditRole(member.role)
                                   setEditMemberDialogOpen(true)
                                 }}
                               >
@@ -530,7 +573,7 @@ export default function TeamPage() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Role</Label>
-              <Select defaultValue={selectedMember?.role}>
+              <Select value={editRole} onValueChange={(value) => setEditRole(value as MemberRole)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -547,10 +590,17 @@ export default function TeamPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditMemberDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setEditMemberDialogOpen(false)}
+              disabled={isSaving}
+            >
               Cancel
             </Button>
-            <Button onClick={() => setEditMemberDialogOpen(false)}>Save Changes</Button>
+            <Button onClick={handleUpdateRole} disabled={isSaving}>
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save Changes
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -573,10 +623,15 @@ export default function TeamPage() {
             </AlertDescription>
           </Alert>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRemoveMemberDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setRemoveMemberDialogOpen(false)}
+              disabled={isSaving}
+            >
               Cancel
             </Button>
-            <Button variant="destructive" onClick={() => setRemoveMemberDialogOpen(false)}>
+            <Button variant="destructive" onClick={handleRemoveMember} disabled={isSaving}>
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Remove Member
             </Button>
           </DialogFooter>

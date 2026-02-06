@@ -216,6 +216,24 @@ export default function BillingPage() {
   const paymentMethods = billingData?.paymentMethods ?? []
   const currentPlan = billingData?.currentPlan
 
+  const handleDownloadInvoice = async (invoiceId: string) => {
+    try {
+      const blob = await billingService.downloadInvoice(invoiceId)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `invoice-${invoiceId}.txt`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast.success("청구서가 다운로드되었습니다.")
+    } catch (error) {
+      console.error("Failed to download invoice:", error)
+      toast.error("청구서 다운로드에 실패했습니다.")
+    }
+  }
+
   const displayPlans = plans.map((plan) => ({
     ...plan,
     current: currentPlan?.id === plan.id,
@@ -538,7 +556,11 @@ export default function BillingPage() {
                       {formatCurrency(invoice.amount)}
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDownloadInvoice(invoice.id)}
+                      >
                         <Download className="h-4 w-4" />
                       </Button>
                     </TableCell>

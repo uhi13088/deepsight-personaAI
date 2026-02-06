@@ -7,7 +7,11 @@
 
 ## 📋 QUEUE (대기)
 
-(없음)
+- [ ] **T19: Export 기능 구현** 🟡 High
+  - 현황: 여러 페이지에 Export 버튼 있으나 미구현
+  - AC1: 감사 로그 CSV/JSON 내보내기
+  - AC2: 사용량 데이터 CSV/JSON 내보내기
+  - AC3: 팀 멤버 목록 CSV 내보내기
 
 ---
 
@@ -18,6 +22,49 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T18: Invoice 다운로드 기능 구현** ✅ 2026-02-06
+  - 변경: `apps/developer-console/src/app/api/billing/invoices/[id]/download/route.ts` (신규)
+  - 변경: `apps/developer-console/src/app/(dashboard)/billing/page.tsx`
+  - 구현:
+    - GET /api/billing/invoices/:id/download API
+    - Invoice 텍스트 포맷 생성 (PDF URL 있으면 리다이렉트)
+    - 다운로드 버튼 클릭 시 handleDownloadInvoice() 호출
+    - Blob 다운로드 처리
+  - 테스트: Build PASS (developer-console)
+
+- [x] **T17: API Key 로테이션 실제 로직 구현** ✅ 2026-02-06
+  - 변경: `apps/developer-console/src/app/api/api-keys/[id]/rotate/route.ts` (신규)
+  - 변경: `apps/developer-console/src/services/api-keys-service.ts`
+  - 변경: `apps/developer-console/src/app/(dashboard)/api-keys/page.tsx`
+  - 구현:
+    - POST /api/api-keys/:id/rotate API (키 로테이션)
+    - 새 키 생성 (crypto.randomBytes + sha256 해시)
+    - rotateKey() 서비스 메서드 구현
+    - Rotate 다이얼로그 API 연동 + 로딩 상태
+    - 새 키 표시 다이얼로그 (한 번만 표시, 복사 기능)
+  - 테스트: Build PASS (developer-console)
+
+- [x] **T16: Webhook Test 기능 구현** ✅ 2026-02-06
+  - 변경: `apps/developer-console/src/app/(dashboard)/webhooks/page.tsx`
+  - 변경: `apps/developer-console/src/services/webhooks-service.ts`
+  - 구현:
+    - Test Webhook 메뉴 클릭 시 handleTestWebhook() 호출
+    - 테스트 결과 다이얼로그 (로딩/성공/실패 상태)
+    - 상태코드, 응답시간, 응답 본문 표시
+    - 테스트 후 Delivery Logs 자동 갱신
+  - 테스트: Build PASS (developer-console)
+
+- [x] **T15: 팀 역할 수정 API 연동** ✅ 2026-02-06
+  - 변경: `apps/developer-console/src/app/api/team/members/[id]/route.ts` (신규)
+  - 변경: `apps/developer-console/src/app/(dashboard)/team/page.tsx`
+  - 구현:
+    - PATCH /api/team/members/:id API (역할 수정)
+    - DELETE /api/team/members/:id API (멤버 제거)
+    - Edit Role 다이얼로그 API 연동 + 로딩 상태
+    - Remove Member 다이얼로그 API 연동 + 로딩 상태
+    - 성공/실패 토스트 메시지 표시
+  - 테스트: Build PASS (developer-console)
 
 - [x] **T14: PersonaWorld 디자인 시스템 구축** ✅ 2026-02-06
   - 변경: `apps/engine-studio/src/app/globals.css` (PersonaWorld CSS 추가)

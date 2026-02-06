@@ -79,6 +79,14 @@ export default function WebhooksPage() {
   const [deliveryLogs, setDeliveryLogs] = React.useState<ServiceDeliveryLog[]>([])
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
+  const [testResultDialogOpen, setTestResultDialogOpen] = React.useState(false)
+  const [testResult, setTestResult] = React.useState<{
+    success: boolean
+    statusCode: number
+    latency: number
+    response?: string
+  } | null>(null)
+  const [isTesting, setIsTesting] = React.useState(false)
   const [selectedWebhook, setSelectedWebhook] = React.useState<Webhook | null>(null)
   const [newWebhookUrl, setNewWebhookUrl] = React.useState("")
   const [newWebhookDescription, setNewWebhookDescription] = React.useState("")
@@ -175,6 +183,37 @@ export default function WebhooksPage() {
     } catch (error) {
       console.error("Failed to delete webhook:", error)
       toast.error("웹훅 삭제에 실패했습니다.")
+    }
+  }
+
+  const handleTestWebhook = async (webhook: Webhook) => {
+    setSelectedWebhook(webhook)
+    setIsTesting(true)
+    setTestResult(null)
+    setTestResultDialogOpen(true)
+
+    try {
+      const result = await webhooksService.testWebhook(webhook.id)
+      setTestResult(result)
+      // Refresh delivery logs
+      const data = await webhooksService.getWebhooks()
+      setDeliveryLogs(data.deliveryLogs)
+      if (result.success) {
+        toast.success("웹훅 테스트 성공!")
+      } else {
+        toast.error(`웹훅 테스트 실패 (${result.statusCode})`)
+      }
+    } catch (error) {
+      console.error("Failed to test webhook:", error)
+      setTestResult({
+        success: false,
+        statusCode: 0,
+        latency: 0,
+        response: "테스트 요청 실패",
+      })
+      toast.error("웹훅 테스트에 실패했습니다.")
+    } finally {
+      setIsTesting(false)
     }
   }
 
@@ -375,7 +414,7 @@ export default function WebhooksPage() {
                               <Copy className="mr-2 h-4 w-4" />
                               Copy Secret
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleTestWebhook(webhook)}>
                               <RefreshCw className="mr-2 h-4 w-4" />
                               Test Webhook
                             </DropdownMenuItem>
@@ -627,6 +666,61 @@ function verifyWebhookSignature(payload, signature, secret) {
             <Button variant="destructive" onClick={handleDeleteWebhook}>
               Delete Webhook
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Test Result Dialog */}
+      <Dialog open={testResultDialogOpen} onOpenChange={setTestResultDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Webhook Test Result</DialogTitle>
+            <DialogDescription>
+              {selectedWebhook?.url} 으로 테스트 요청을 보냈습니다
+            </DialogDescription>
+          </DialogHeader>
+          {isTesting ? (
+            <div className="flex flex-col items-center gap-4 py-8">
+              <Loader2 className="text-primary h-8 w-8 animate-spin" />
+              <p className="text-muted-foreground">테스트 요청 전송 중...</p>
+            </div>
+          ) : testResult ? (
+            <div className="space-y-4">
+              <Alert variant={testResult.success ? "default" : "destructive"}>
+                {testResult.success ? (
+                  <CheckCircle className="h-4 w-4" />
+                ) : (
+                  <XCircle className="h-4 w-4" />
+                )}
+                <AlertTitle>{testResult.success ? "성공" : "실패"}</AlertTitle>
+                <AlertDescription>
+                  {testResult.success
+                    ? "웹훅 엔드포인트가 정상적으로 응답했습니다."
+                    : "웹훅 엔드포인트 응답에 실패했습니다."}
+                </AlertDescription>
+              </Alert>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg border p-4">
+                  <p className="text-muted-foreground text-sm">Status Code</p>
+                  <p className="text-2xl font-bold">{testResult.statusCode || "-"}</p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-muted-foreground text-sm">Latency</p>
+                  <p className="text-2xl font-bold">{testResult.latency}ms</p>
+                </div>
+              </div>
+              {testResult.response && (
+                <div className="space-y-2">
+                  <p className="text-muted-foreground text-sm">Response</p>
+                  <div className="bg-muted max-h-32 overflow-auto rounded-lg p-4">
+                    <code className="font-mono text-sm">{testResult.response}</code>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button onClick={() => setTestResultDialogOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

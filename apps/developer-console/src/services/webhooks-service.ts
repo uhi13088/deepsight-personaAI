@@ -143,14 +143,15 @@ class WebhooksService {
 
   async testWebhook(
     id: string
-  ): Promise<{ success: boolean; statusCode: number; latency: number }> {
-    const response = await apiClient.post<{
+  ): Promise<{ success: boolean; statusCode: number; latency: number; response?: string }> {
+    const apiResponse = await apiClient.post<{
       success: boolean
       statusCode: number
       latency: number
+      response?: string
     }>(`/webhooks/${id}/test`)
 
-    if (!response.success || !response.data) {
+    if (!apiResponse.success || !apiResponse.data) {
       throw new ApiError({
         code: "WEBHOOK_TEST_FAILED",
         message: "웹훅 테스트에 실패했습니다.",
@@ -159,7 +160,7 @@ class WebhooksService {
       })
     }
 
-    return response.data
+    return apiResponse.data
   }
 
   async getDeliveryLogs(webhookId?: string): Promise<DeliveryLog[]> {

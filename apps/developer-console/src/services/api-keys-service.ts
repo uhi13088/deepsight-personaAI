@@ -48,6 +48,21 @@ export interface CreateApiKeyResponse {
   message: string
 }
 
+export interface RotateApiKeyResponse {
+  apiKey: {
+    id: string
+    name: string
+    key: string // Full key - only shown once
+    prefix: string
+    lastFour: string
+    environment: string
+    permissions: string[]
+    rateLimit: number
+    rotatedAt: string
+  }
+  message: string
+}
+
 // ============================================================================
 // 서비스 클래스
 // ============================================================================
@@ -124,6 +139,21 @@ class ApiKeysService {
         timestamp: new Date().toISOString(),
       })
     }
+  }
+
+  async rotateKey(id: string): Promise<RotateApiKeyResponse> {
+    const response = await apiClient.post<RotateApiKeyResponse>(`/api-keys/${id}/rotate`)
+
+    if (!response.success || !response.data) {
+      throw new ApiError({
+        code: "API_KEY_ROTATE_FAILED",
+        message: "API 키 로테이션에 실패했습니다.",
+        status: 500,
+        timestamp: new Date().toISOString(),
+      })
+    }
+
+    return response.data
   }
 }
 

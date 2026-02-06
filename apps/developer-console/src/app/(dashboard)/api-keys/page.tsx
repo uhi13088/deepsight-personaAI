@@ -13,6 +13,7 @@ import {
   Trash2,
   Activity,
   AlertTriangle,
+  Check,
   CheckCircle,
   Clock,
   Shield,
@@ -55,6 +56,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { cn, formatNumber, formatRelativeTime, maskApiKey } from "@/lib/utils"
 import { toast } from "sonner"
 import { apiKeysService, type ApiKey } from "@/services/api-keys-service"
@@ -68,9 +71,12 @@ export default function ApiKeysPage() {
   const [statusFilter, setStatusFilter] = React.useState<string>("all")
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
   const [rotateDialogOpen, setRotateDialogOpen] = React.useState(false)
+  const [rotateResultDialogOpen, setRotateResultDialogOpen] = React.useState(false)
   const [selectedKey, setSelectedKey] = React.useState<ApiKey | null>(null)
   const [copiedKey, setCopiedKey] = React.useState<string | null>(null)
   const [isDeleting, setIsDeleting] = React.useState(false)
+  const [isRotating, setIsRotating] = React.useState(false)
+  const [newRotatedKey, setNewRotatedKey] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     const fetchApiKeys = async () => {
@@ -112,6 +118,27 @@ export default function ApiKeysPage() {
       toast.error("API 키 폐기에 실패했습니다.")
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  const handleRotateKey = async () => {
+    if (!selectedKey) return
+    setIsRotating(true)
+    try {
+      const result = await apiKeysService.rotateKey(selectedKey.id)
+      setNewRotatedKey(result.apiKey.key)
+      // Update the key in the list
+      setApiKeys((prev) =>
+        prev.map((k) => (k.id === selectedKey.id ? { ...k, lastFour: result.apiKey.lastFour } : k))
+      )
+      toast.success("API 키가 로테이션되었습니다.")
+      setRotateDialogOpen(false)
+      setRotateResultDialogOpen(true)
+    } catch (error) {
+      console.error("Failed to rotate API key:", error)
+      toast.error("API 키 로테이션에 실패했습니다.")
+    } finally {
+      setIsRotating(false)
     }
   }
 
@@ -508,17 +535,71 @@ export default function ApiKeysPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRotateDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setRotateDialogOpen(false)}
+              disabled={isRotating}
+            >
               취소
             </Button>
+            <Button onClick={handleRotateKey} disabled={isRotating}>
+              {isRotating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  로테이션 중...
+                </>
+              ) : (
+                "새 키 생성"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rotate Result Dialog - Shows the new key */}
+      <Dialog open={rotateResultDialogOpen} onOpenChange={setRotateResultDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>새 API 키가 생성되었습니다</DialogTitle>
+            <DialogDescription>
+              아래 키를 안전한 곳에 저장하세요. 이 키는 다시 볼 수 없습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <Alert>
+            <Key className="h-4 w-4" />
+            <AlertTitle>중요</AlertTitle>
+            <AlertDescription>
+              이 키는 한 번만 표시됩니다. 지금 복사하여 안전하게 저장하세요.
+            </AlertDescription>
+          </Alert>
+          {newRotatedKey && (
+            <div className="space-y-2">
+              <Label>새 API 키</Label>
+              <div className="bg-muted flex items-center gap-2 rounded-lg p-4">
+                <code className="flex-1 break-all font-mono text-sm">{newRotatedKey}</code>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => copyToClipboard(newRotatedKey, "new-rotated-key")}
+                >
+                  {copiedKey === "new-rotated-key" ? (
+                    <Check className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
             <Button
               onClick={() => {
-                toast.info("Key 로테이션 기능은 준비 중입니다.")
-                setRotateDialogOpen(false)
+                setRotateResultDialogOpen(false)
+                setNewRotatedKey(null)
                 setSelectedKey(null)
               }}
             >
-              새 키 생성
+              확인
             </Button>
           </DialogFooter>
         </DialogContent>
