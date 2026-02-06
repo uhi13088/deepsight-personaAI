@@ -172,21 +172,33 @@ class OperationsService {
 
     const response = await apiClient.get<{
       data: Incident[]
-      stats: IncidentStats
+      stats: Record<string, number>
+      pagination: { total: number }
     }>(`/operations/incidents?${params.toString()}`)
 
     if (!response.success || !response.data) {
-      throw new ApiError({
-        code: "INCIDENTS_FETCH_FAILED",
-        message: "인시던트 목록을 불러오는데 실패했습니다.",
-        status: 500,
-        timestamp: new Date().toISOString(),
-      })
+      return {
+        incidents: [],
+        stats: { total: 0, open: 0, investigating: 0, resolved: 0, critical: 0 },
+      }
     }
 
+    const statusStats = response.data.stats || {}
+    const total = response.data.pagination?.total || response.data.data?.length || 0
+
     return {
-      incidents: response.data.data,
-      stats: response.data.stats,
+      incidents: response.data.data || [],
+      stats: {
+        total,
+        open:
+          (statusStats.reported || 0) +
+          (statusStats.investigating || 0) +
+          (statusStats.identified || 0) +
+          (statusStats.fixing || 0),
+        investigating: statusStats.investigating || 0,
+        resolved: (statusStats.resolved || 0) + (statusStats.closed || 0),
+        critical: 0, // 별도 쿼리 필요
+      },
     }
   }
 
