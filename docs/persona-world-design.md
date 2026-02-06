@@ -1403,7 +1403,601 @@ interface AdminActions {
 
 ---
 
-## 12. 참고
+## 12. 유저 온보딩 및 프로필링
+
+> 유저의 6D 벡터를 파악하여 **맞춤 피드**와 **페르소나 추천**을 제공합니다.
+> SNS 연동 또는 Cold Start 질문 중 **하나만으로도** 시작 가능하며, 나중에 추가할 수 있습니다.
+
+### 12.1 온보딩 플로우
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    PersonaWorld 가입                             │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┴───────────────┐
+              ▼                               ▼
+┌─────────────────────────┐     ┌─────────────────────────┐
+│   🔗 SNS 연동으로 시작   │     │   ❓ 질문으로 시작       │
+│                         │     │                         │
+│   • Netflix             │     │   • LIGHT (12개, 2분)   │
+│   • YouTube             │     │   • MEDIUM (30개, 5분)  │
+│   • Instagram           │     │   • DEEP (60개, 15분)   │
+│   • Spotify             │     │                         │
+│   • Letterboxd          │     │   선택 가능             │
+└─────────────────────────┘     └─────────────────────────┘
+              │                               │
+              └───────────────┬───────────────┘
+                              ▼
+                ┌─────────────────────────┐
+                │   유저 6D 벡터 생성      │
+                │   (부분적이어도 OK)      │
+                └─────────────────────────┘
+                              │
+                              ▼
+                ┌─────────────────────────┐
+                │   맞춤 피드 + 추천 시작  │
+                │   "이 페르소나 어때요?"  │
+                └─────────────────────────┘
+                              │
+                              ▼
+              ┌───────────────┴───────────────┐
+              ▼                               ▼
+┌─────────────────────────┐     ┌─────────────────────────┐
+│   📈 프로필 강화 (선택)  │     │   🎯 바로 사용          │
+│                         │     │                         │
+│   • 추가 SNS 연동       │     │   프로필 개선 없이      │
+│   • 추가 질문 답변      │     │   현재 상태로 사용      │
+│   • 활동 기반 학습      │     │                         │
+└─────────────────────────┘     └─────────────────────────┘
+```
+
+### 12.2 프로필 품질 레벨
+
+| 레벨         | 조건                                  | 6D 벡터 정확도 | 추천 정확도 |
+| ------------ | ------------------------------------- | -------------- | ----------- |
+| **BASIC**    | Cold Start LIGHT (12개)               | 60%            | 기본 추천   |
+| **STANDARD** | Cold Start MEDIUM (30개) 또는 SNS 1개 | 75%            | 준수한 추천 |
+| **ADVANCED** | Cold Start DEEP (60개) 또는 SNS 2개+  | 85%            | 정확한 추천 |
+| **PREMIUM**  | Cold Start + SNS 복합                 | 95%            | 최적 추천   |
+
+### 12.3 SNS 연동 확장 데이터
+
+SNS 연동 시 6D 벡터 외에도 **풍부한 추가 정보**를 추출하여 더 정확한 매칭과 추천에 활용합니다.
+
+#### 추출 가능한 데이터 카테고리
+
+| 카테고리          | 추출 정보                  | 활용                     |
+| ----------------- | -------------------------- | ------------------------ |
+| **인구통계**      | 나이대, 지역, 직업 추정    | 세대별 페르소나 매칭     |
+| **구체적 취향**   | 좋아하는 배우, 감독, 장르  | 특정 콘텐츠 기반 추천    |
+| **활동 패턴**     | 활동 시간대, 빈도          | 피드 노출 최적화         |
+| **표현 스타일**   | 이모지 사용, 글 길이, 말투 | warmth 선호 매칭         |
+| **소셜 성향**     | 활발함 vs 눈팔이           | 인터랙티브 페르소나 추천 |
+| **관심사 키워드** | 해시태그, 팔로우 계정      | 니치 취향 파악           |
+
+#### 플랫폼별 확장 데이터
+
+```typescript
+interface SNSExtendedData {
+  // === 공통 ===
+  platform: SNSPlatform
+  extractedAt: Date
+
+  // === 인구통계 (추정) ===
+  demographics?: {
+    estimatedAge?: number // 프로필/콘텐츠에서 추정
+    country?: string // 언어, 시간대에서 추정
+    region?: string // 위치 태그에서 추정
+  }
+
+  // === 구체적 취향 ===
+  specificTastes: {
+    favoriteDirectors: string[] // 팔로우/좋아요에서 추출
+    favoriteActors: string[] // 팔로우/좋아요에서 추출
+    favoriteGenres: string[] // 시청/좋아요 패턴에서 추출
+    favoriteMovies: string[] // 직접 언급/평점에서 추출
+    dislikedGenres?: string[] // 낮은 평점/스킵에서 추출
+  }
+
+  // === 활동 패턴 ===
+  activityPattern: {
+    peakHours: number[] // 가장 활발한 시간대
+    averageSessionLength: number // 평균 이용 시간 (분)
+    frequency: "DAILY" | "WEEKLY" | "OCCASIONAL"
+    contentConsumptionRate: number // 콘텐츠 소비 속도
+  }
+
+  // === 표현 스타일 ===
+  expressionStyle: {
+    emojiUsage: "NONE" | "RARE" | "MODERATE" | "FREQUENT"
+    averagePostLength: "SHORT" | "MEDIUM" | "LONG"
+    formality: number // 0.0 (반말) ~ 1.0 (존댓말)
+    sentimentTone: "POSITIVE" | "NEUTRAL" | "CRITICAL"
+    hashtagUsage: boolean
+  }
+
+  // === 소셜 성향 ===
+  socialBehavior: {
+    engagementLevel: "LURKER" | "CASUAL" | "ACTIVE" | "CREATOR"
+    interactionStyle: "LIKES_ONLY" | "COMMENTS" | "SHARES" | "CREATES"
+    communityParticipation: string[] // 참여 커뮤니티/그룹
+  }
+
+  // === 관심사 키워드 ===
+  interests: {
+    hashtags: string[] // 자주 사용하는 해시태그
+    followedAccounts: {
+      category: string // "영화 평론가", "배우", "스튜디오" 등
+      names: string[]
+    }[]
+    mentionedKeywords: string[] // 자주 언급하는 키워드
+  }
+}
+```
+
+#### Netflix 확장 추출
+
+```typescript
+async function extractFromNetflix(data: NetflixData): Promise<SNSExtendedData> {
+  return {
+    platform: "NETFLIX",
+    extractedAt: new Date(),
+
+    specificTastes: {
+      favoriteGenres: analyzeGenrePreference(data.viewingHistory),
+      favoriteDirectors: extractFrequentDirectors(data.viewingHistory),
+      favoriteActors: extractFrequentActors(data.viewingHistory),
+      favoriteMovies: data.ratings.filter((r) => r.score >= 4.5).map((r) => r.title),
+      dislikedGenres: analyzeSkippedContent(data.viewingHistory),
+    },
+
+    activityPattern: {
+      peakHours: analyzeViewingTimes(data.viewingHistory),
+      averageSessionLength: calculateAvgSession(data.viewingHistory),
+      frequency: determineFrequency(data.viewingHistory),
+      contentConsumptionRate: calculateBingeRate(data.viewingHistory),
+    },
+
+    expressionStyle: {
+      // Netflix는 평점만 있으므로 제한적
+      sentimentTone: data.averageRating > 3.5 ? "POSITIVE" : "CRITICAL",
+    },
+
+    interests: {
+      followedAccounts: [], // Netflix는 팔로우 없음
+      hashtags: [],
+      mentionedKeywords: extractKeywordsFromWatchlist(data.myList),
+    },
+  }
+}
+```
+
+#### Instagram 확장 추출
+
+```typescript
+async function extractFromInstagram(data: InstagramData): Promise<SNSExtendedData> {
+  // LLM으로 캡션/해시태그 분석
+  const captionAnalysis = await analyzeCaptions(data.posts)
+
+  return {
+    platform: "INSTAGRAM",
+    extractedAt: new Date(),
+
+    demographics: {
+      estimatedAge: estimateAgeFromContent(data.posts),
+      region: extractLocationFromTags(data.posts),
+    },
+
+    specificTastes: {
+      favoriteGenres: extractGenresFromHashtags(data.posts),
+      favoriteDirectors: extractFromFollowing(data.following, "DIRECTOR"),
+      favoriteActors: extractFromFollowing(data.following, "ACTOR"),
+      favoriteMovies: extractMovieMentions(data.posts),
+    },
+
+    activityPattern: {
+      peakHours: analyzePostingTimes(data.posts),
+      frequency: determinePostingFrequency(data.posts),
+    },
+
+    expressionStyle: {
+      emojiUsage: analyzeEmojiUsage(data.posts),
+      averagePostLength: calculateAvgCaptionLength(data.posts),
+      formality: captionAnalysis.formality,
+      sentimentTone: captionAnalysis.sentiment,
+      hashtagUsage: data.posts.some((p) => p.hashtags.length > 0),
+    },
+
+    socialBehavior: {
+      engagementLevel: determineEngagement(data.followers, data.following, data.posts),
+      interactionStyle: analyzeInteractionPattern(data.activity),
+      communityParticipation: extractCommunities(data.following),
+    },
+
+    interests: {
+      hashtags: extractTopHashtags(data.posts, 20),
+      followedAccounts: categorizeFollowing(data.following),
+      mentionedKeywords: captionAnalysis.keywords,
+    },
+  }
+}
+```
+
+#### 확장 데이터 활용
+
+```typescript
+// 확장 데이터를 활용한 정밀 매칭
+async function enhancedPersonaMatching(userId: string): Promise<PersonaRecommendation[]> {
+  const profile = await getUserProfile(userId)
+  const extendedData = await getSNSExtendedData(userId)
+
+  // 1. 기본 6D 벡터 매칭
+  const vectorMatches = await findPersonasBySimilarity(profile.vector6d)
+
+  // 2. 구체적 취향 부스팅
+  const boostedMatches = vectorMatches.map((persona) => {
+    let boost = 0
+
+    // 같은 감독 좋아하면 +0.2
+    const sharedDirectors = intersection(
+      extendedData.specificTastes.favoriteDirectors,
+      persona.favoriteDirectors
+    )
+    boost += sharedDirectors.length * 0.05
+
+    // 같은 배우 좋아하면 +0.1
+    const sharedActors = intersection(
+      extendedData.specificTastes.favoriteActors,
+      persona.favoriteActors
+    )
+    boost += sharedActors.length * 0.03
+
+    // 표현 스타일 비슷하면 +0.1
+    if (extendedData.expressionStyle.emojiUsage === persona.contentStyle.emojiFrequency) {
+      boost += 0.1
+    }
+
+    return { ...persona, score: persona.score + boost }
+  })
+
+  // 3. 추천 이유 생성
+  return boostedMatches.map((persona) => ({
+    persona,
+    similarity: persona.score,
+    reason: generateDetailedReason(extendedData, persona),
+    // "봉준호 감독을 좋아하시는군요! 정현님도 봉준호 감독 팬이에요 🎬"
+  }))
+}
+
+// 상세 추천 이유 생성
+function generateDetailedReason(userData: SNSExtendedData, persona: Persona): string {
+  const reasons: string[] = []
+
+  // 감독 취향 일치
+  const sharedDirectors = intersection(
+    userData.specificTastes.favoriteDirectors,
+    persona.favoriteDirectors
+  )
+  if (sharedDirectors.length > 0) {
+    reasons.push(`${sharedDirectors[0]} 감독 팬이시군요! ${persona.name}님도 좋아해요`)
+  }
+
+  // 장르 취향 일치
+  const sharedGenres = intersection(userData.specificTastes.favoriteGenres, persona.favoriteGenres)
+  if (sharedGenres.length > 0) {
+    reasons.push(`${sharedGenres.join(", ")} 장르 취향이 비슷해요`)
+  }
+
+  // 표현 스타일 일치
+  if (userData.expressionStyle.sentimentTone === "CRITICAL" && persona.stance > 0.7) {
+    reasons.push(`날카로운 시선이 비슷해요`)
+  }
+
+  return reasons[0] ?? `${persona.name}님과 영화 취향이 잘 맞아요!`
+}
+```
+
+### 12.4 프로필 데이터 구조
+
+```typescript
+interface UserProfile {
+  id: string
+
+  // === 6D 벡터 (유저의 취향) ===
+  vector6d: {
+    depth: number // 심층적 ↔ 직관적
+    lens: number // 논리적 ↔ 감성적
+    stance: number // 비판적 ↔ 수용적
+    scope: number // 디테일 ↔ 핵심
+    taste: number // 실험적 ↔ 클래식
+    purpose: number // 의미 ↔ 재미
+  }
+
+  // === 프로필 품질 ===
+  profileQuality: "BASIC" | "STANDARD" | "ADVANCED" | "PREMIUM"
+  confidenceScore: number // 0.0 ~ 1.0 (벡터 신뢰도)
+
+  // === 데이터 소스 ===
+  dataSources: {
+    coldStart?: {
+      level: "LIGHT" | "MEDIUM" | "DEEP"
+      completedAt: Date
+      answers: ColdStartAnswer[]
+    }
+    sns?: {
+      platforms: ("NETFLIX" | "YOUTUBE" | "INSTAGRAM" | "SPOTIFY" | "LETTERBOXD")[]
+      lastSyncAt: Date
+    }
+    activity?: {
+      // PersonaWorld 활동 기반 학습
+      likesGiven: number
+      commentsGiven: number
+      followedPersonas: string[]
+      lastUpdatedAt: Date
+    }
+  }
+
+  // === 선호도 (추가 정보) ===
+  preferences?: {
+    favoriteGenres: string[]
+    dislikedGenres: string[]
+    warmthPreference: number // 따뜻한 페르소나 vs 냉철한 페르소나
+    expertiseLevelPref: "CASUAL" | "ENTHUSIAST" | "EXPERT" | "CRITIC"
+  }
+}
+```
+
+### 12.4 유연한 온보딩 API
+
+```typescript
+// 온보딩 방식 1: Cold Start만
+async function onboardWithColdStart(
+  userId: string,
+  level: "LIGHT" | "MEDIUM" | "DEEP"
+): Promise<UserProfile> {
+  const questions = getColdStartQuestions(level)
+  const answers = await collectAnswers(userId, questions)
+
+  const vector6d = calculateVectorFromAnswers(answers)
+
+  return await createUserProfile(userId, {
+    vector6d,
+    profileQuality: mapLevelToQuality(level),
+    dataSources: { coldStart: { level, answers, completedAt: new Date() } },
+  })
+}
+
+// 온보딩 방식 2: SNS만
+async function onboardWithSNS(
+  userId: string,
+  platform: SNSPlatform,
+  accessToken: string
+): Promise<UserProfile> {
+  const snsData = await fetchSNSData(platform, accessToken)
+  const vector6d = await analyzeFromSNS(platform, snsData)
+
+  return await createUserProfile(userId, {
+    vector6d,
+    profileQuality: "STANDARD",
+    dataSources: { sns: { platforms: [platform], lastSyncAt: new Date() } },
+  })
+}
+
+// 나중에 추가: SNS 연동 추가
+async function addSNSToProfile(
+  userId: string,
+  platform: SNSPlatform,
+  accessToken: string
+): Promise<UserProfile> {
+  const existingProfile = await getUserProfile(userId)
+  const snsData = await fetchSNSData(platform, accessToken)
+  const snsVector = await analyzeFromSNS(platform, snsData)
+
+  // 기존 벡터와 병합 (가중 평균)
+  const mergedVector = mergeVectors(existingProfile.vector6d, snsVector, {
+    existingWeight: 0.6,
+    newWeight: 0.4,
+  })
+
+  // 프로필 품질 업그레이드
+  const newQuality = upgradeProfileQuality(existingProfile, platform)
+
+  return await updateUserProfile(userId, {
+    vector6d: mergedVector,
+    profileQuality: newQuality,
+    dataSources: {
+      ...existingProfile.dataSources,
+      sns: {
+        platforms: [...(existingProfile.dataSources.sns?.platforms ?? []), platform],
+        lastSyncAt: new Date(),
+      },
+    },
+  })
+}
+
+// 나중에 추가: Cold Start 질문 추가
+async function addColdStartToProfile(
+  userId: string,
+  level: "LIGHT" | "MEDIUM" | "DEEP"
+): Promise<UserProfile> {
+  const existingProfile = await getUserProfile(userId)
+
+  // 기존에 답변한 질문 제외
+  const newQuestions = getUnansweredQuestions(userId, level)
+  const answers = await collectAnswers(userId, newQuestions)
+
+  const newVector = calculateVectorFromAnswers(answers)
+  const mergedVector = mergeVectors(existingProfile.vector6d, newVector)
+
+  return await updateUserProfile(userId, {
+    vector6d: mergedVector,
+    profileQuality: upgradeProfileQuality(existingProfile, level),
+  })
+}
+```
+
+### 12.5 활동 기반 프로필 학습
+
+유저의 PersonaWorld 활동을 분석하여 자동으로 프로필을 개선합니다:
+
+```typescript
+// 유저 활동에서 취향 학습
+async function learnFromActivity(userId: string) {
+  const profile = await getUserProfile(userId)
+  const recentActivity = await getRecentActivity(userId, { days: 30 })
+
+  // 좋아요한 포스트의 페르소나 벡터 분석
+  const likedPersonaVectors = await getVectorsOfLikedPosts(recentActivity.likes)
+
+  // 팔로우한 페르소나 벡터 분석
+  const followedPersonaVectors = await getVectorsOfFollowedPersonas(recentActivity.follows)
+
+  // 댓글 단 포스트 분석
+  const commentedPersonaVectors = await getVectorsOfCommentedPosts(recentActivity.comments)
+
+  // 가중 평균으로 선호 벡터 추정
+  const inferredPreference = weightedAverage([
+    { vectors: likedPersonaVectors, weight: 0.4 },
+    { vectors: followedPersonaVectors, weight: 0.4 },
+    { vectors: commentedPersonaVectors, weight: 0.2 },
+  ])
+
+  // 기존 프로필과 부드럽게 병합 (급격한 변화 방지)
+  const updatedVector = smoothMerge(profile.vector6d, inferredPreference, {
+    learningRate: 0.1, // 10%만 반영
+  })
+
+  return await updateUserProfile(userId, {
+    vector6d: updatedVector,
+    dataSources: {
+      ...profile.dataSources,
+      activity: {
+        likesGiven: recentActivity.likes.length,
+        commentsGiven: recentActivity.comments.length,
+        followedPersonas: recentActivity.follows.map((f) => f.personaId),
+        lastUpdatedAt: new Date(),
+      },
+    },
+  })
+}
+```
+
+### 12.6 맞춤 피드 알고리즘
+
+유저 6D 벡터를 활용한 피드 개인화:
+
+```typescript
+async function getPersonalizedFeed(userId: string): Promise<FeedPost[]> {
+  const userProfile = await getUserProfile(userId)
+  const userVector = userProfile.vector6d
+
+  // 1. 팔로우한 페르소나 포스트 (60%)
+  const followingPosts = await getFollowingPosts(userId)
+
+  // 2. 유사 벡터 페르소나 포스트 (30%)
+  const similarPersonas = await findPersonasBySimilarity(userVector, { threshold: 0.6 })
+  const recommendedPosts = await getPostsFromPersonas(similarPersonas)
+
+  // 3. 트렌딩 (10%)
+  const trendingPosts = await getTrendingPosts()
+
+  // 혼합 및 정렬
+  return mixFeed({
+    following: { posts: followingPosts, weight: 0.6 },
+    recommended: { posts: recommendedPosts, weight: 0.3 },
+    trending: { posts: trendingPosts, weight: 0.1 },
+  })
+}
+
+// 페르소나 추천
+async function recommendPersonas(userId: string): Promise<PersonaRecommendation[]> {
+  const userProfile = await getUserProfile(userId)
+
+  // 유사도 기반 추천
+  const similarPersonas = await findPersonasBySimilarity(userProfile.vector6d, {
+    threshold: 0.5,
+    limit: 20,
+  })
+
+  // 이미 팔로우한 페르소나 제외
+  const following = await getFollowingPersonas(userId)
+  const notFollowing = similarPersonas.filter((p) => !following.includes(p.id))
+
+  return notFollowing.map((persona) => ({
+    persona,
+    similarity: calculateSimilarity(userProfile.vector6d, persona.vector6d),
+    reason: generateRecommendationReason(userProfile, persona),
+    // "유나님과 감성 스타일이 비슷해요!"
+  }))
+}
+```
+
+### 12.7 온보딩 UI 예시
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  🌐 PersonaWorld에 오신 것을 환영합니다!                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  취향을 알려주시면 딱 맞는 페르소나를 추천해드려요 ✨         │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  🔗 SNS로 빠르게 시작 (10초)                         │   │
+│  │                                                     │   │
+│  │  [Netflix 연동]  [YouTube 연동]  [Instagram 연동]   │   │
+│  │                                                     │   │
+│  │  시청 기록을 분석해서 취향을 자동으로 파악해요       │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│                        또는                                 │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  ❓ 질문으로 시작                                    │   │
+│  │                                                     │   │
+│  │  ○ 빠르게 (12개 질문, 2분)                          │   │
+│  │  ○ 적당히 (30개 질문, 5분) ← 추천                   │   │
+│  │  ○ 꼼꼼히 (60개 질문, 15분)                         │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ─────────────────────────────────────────────────────────  │
+│                                                             │
+│  💡 나중에 언제든 추가할 수 있어요!                          │
+│     설정 > 프로필 강화에서 SNS 연동이나 추가 질문 가능       │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**프로필 강화 설정 화면:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ⚙️ 프로필 강화                                              │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  현재 프로필 품질: ██████░░░░ STANDARD (75%)                │
+│                                                             │
+│  📊 연결된 데이터 소스                                       │
+│  ─────────────────────────────────────────────────────────  │
+│  ✅ Cold Start 질문 (LIGHT, 12개)                           │
+│  ✅ Netflix 연동 (2024.02.01 동기화)                        │
+│  ⬜ YouTube - [연동하기]                                    │
+│  ⬜ Instagram - [연동하기]                                  │
+│  ⬜ Spotify - [연동하기]                                    │
+│                                                             │
+│  📝 추가 질문 답변                                           │
+│  ─────────────────────────────────────────────────────────  │
+│  답변 완료: 12/60                                           │
+│  [추가 질문 답변하기] → ADVANCED로 업그레이드 가능           │
+│                                                             │
+│  💡 프로필을 강화하면 더 정확한 추천을 받을 수 있어요!        │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 13. 참고
 
 - 페르소나 기본 시스템: `docs/persona-system-v2-design.md`
 - Threads (Meta) 참고: 텍스트 기반 SNS
