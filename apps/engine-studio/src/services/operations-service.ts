@@ -170,11 +170,14 @@ class OperationsService {
     if (filters?.status) params.set("status", filters.status)
     if (filters?.severity) params.set("severity", filters.severity)
 
-    const response = await apiClient.get<{
-      data: Incident[]
-      stats: Record<string, number>
-      pagination: { total: number }
-    }>(`/operations/incidents?${params.toString()}`)
+    const response = await apiClient.get<
+      | Incident[]
+      | {
+          data: Incident[]
+          stats: Record<string, number>
+          pagination: { total: number }
+        }
+    >(`/operations/incidents?${params.toString()}`)
 
     if (!response.success || !response.data) {
       return {
@@ -183,11 +186,15 @@ class OperationsService {
       }
     }
 
-    const statusStats = response.data.stats || {}
-    const total = response.data.pagination?.total || response.data.data?.length || 0
+    // Handle both array and object response formats
+    const incidents = Array.isArray(response.data) ? response.data : (response.data.data ?? [])
+    const statusStats = Array.isArray(response.data) ? {} : response.data.stats || {}
+    const total = Array.isArray(response.data)
+      ? response.data.length
+      : response.data.pagination?.total || response.data.data?.length || 0
 
     return {
-      incidents: response.data.data || [],
+      incidents,
       stats: {
         total,
         open:
@@ -203,7 +210,9 @@ class OperationsService {
   }
 
   async getIncident(id: string): Promise<Incident> {
-    const response = await apiClient.get<{ data: Incident }>(`/operations/incidents/${id}`)
+    const response = await apiClient.get<Incident | { data: Incident }>(
+      `/operations/incidents/${id}`
+    )
 
     if (!response.success || !response.data) {
       throw new ApiError({
@@ -214,11 +223,19 @@ class OperationsService {
       })
     }
 
-    return response.data.data
+    // Handle both direct and wrapped response formats
+    const incident =
+      "data" in response.data && response.data.data
+        ? response.data.data
+        : (response.data as Incident)
+    return incident
   }
 
   async createIncident(input: CreateIncidentInput): Promise<Incident> {
-    const response = await apiClient.post<{ data: Incident }>("/operations/incidents", input)
+    const response = await apiClient.post<Incident | { data: Incident }>(
+      "/operations/incidents",
+      input
+    )
 
     if (!response.success || !response.data) {
       throw new ApiError({
@@ -229,14 +246,22 @@ class OperationsService {
       })
     }
 
-    return response.data.data
+    // Handle both direct and wrapped response formats
+    const incident =
+      "data" in response.data && response.data.data
+        ? response.data.data
+        : (response.data as Incident)
+    return incident
   }
 
   async updateIncident(
     id: string,
     input: Partial<Omit<Incident, "id" | "createdAt" | "updatedAt">>
   ): Promise<Incident> {
-    const response = await apiClient.patch<{ data: Incident }>(`/operations/incidents/${id}`, input)
+    const response = await apiClient.patch<Incident | { data: Incident }>(
+      `/operations/incidents/${id}`,
+      input
+    )
 
     if (!response.success || !response.data) {
       throw new ApiError({
@@ -247,7 +272,12 @@ class OperationsService {
       })
     }
 
-    return response.data.data
+    // Handle both direct and wrapped response formats
+    const incident =
+      "data" in response.data && response.data.data
+        ? response.data.data
+        : (response.data as Incident)
+    return incident
   }
 
   async addIncidentTimeline(
@@ -271,10 +301,13 @@ class OperationsService {
   // ========== 백업 ==========
 
   async getBackups(): Promise<{ backups: Backup[]; stats: BackupStats }> {
-    const response = await apiClient.get<{
-      data: Backup[]
-      stats: BackupStats
-    }>("/operations/backup")
+    const response = await apiClient.get<
+      | Backup[]
+      | {
+          data: Backup[]
+          stats: BackupStats
+        }
+    >("/operations/backup")
 
     if (!response.success || !response.data) {
       throw new ApiError({
@@ -285,14 +318,22 @@ class OperationsService {
       })
     }
 
-    return {
-      backups: response.data.data,
-      stats: response.data.stats,
-    }
+    // Handle both array and object response formats
+    const backups = Array.isArray(response.data) ? response.data : (response.data.data ?? [])
+    const stats = Array.isArray(response.data)
+      ? { totalBackups: response.data.length, totalSize: 0, lastBackup: null, nextScheduled: null }
+      : (response.data.stats ?? {
+          totalBackups: 0,
+          totalSize: 0,
+          lastBackup: null,
+          nextScheduled: null,
+        })
+
+    return { backups, stats }
   }
 
   async startBackup(type: Backup["type"]): Promise<Backup> {
-    const response = await apiClient.post<{ data: Backup }>("/operations/backup", { type })
+    const response = await apiClient.post<Backup | { data: Backup }>("/operations/backup", { type })
 
     if (!response.success || !response.data) {
       throw new ApiError({
@@ -303,7 +344,10 @@ class OperationsService {
       })
     }
 
-    return response.data.data
+    // Handle both direct and wrapped response formats
+    const backup =
+      "data" in response.data && response.data.data ? response.data.data : (response.data as Backup)
+    return backup
   }
 }
 

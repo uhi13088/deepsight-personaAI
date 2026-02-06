@@ -45,6 +45,7 @@ import {
   AreaChart,
   Area,
 } from "recharts"
+import { downloadJSON, generateFilename } from "@/lib/export"
 
 export default function MonitoringPage() {
   const [monitoringData, setMonitoringData] = useState<MonitoringData | null>(null)
@@ -191,9 +192,12 @@ export default function MonitoringPage() {
           <Button
             variant="outline"
             onClick={() => {
-              toast.success("로그 다운로드를 시작합니다", {
-                description: "로그 파일이 곧 다운로드됩니다.",
-              })
+              if (monitoringData) {
+                downloadJSON(monitoringData, generateFilename("monitoring_logs"))
+                toast.success("로그 다운로드가 완료되었습니다")
+              } else {
+                toast.error("다운로드할 데이터가 없습니다")
+              }
             }}
           >
             <Download className="mr-2 h-4 w-4" />

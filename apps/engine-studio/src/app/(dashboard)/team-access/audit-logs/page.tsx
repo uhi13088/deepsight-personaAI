@@ -54,6 +54,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { downloadCSV, generateFilename } from "@/lib/export"
 
 export default function AuditLogsPage() {
   const [logs, setLogs] = useState<ApiAuditLog[]>([])
@@ -100,9 +101,26 @@ export default function AuditLogsPage() {
   }
 
   const handleExport = () => {
-    toast.success("감사 로그 내보내기가 시작되었습니다", {
-      description: "CSV 파일이 곧 다운로드됩니다",
-    })
+    const exportData = filteredLogs.map((log) => ({
+      timestamp: log.createdAt,
+      user: log.user.name || log.user.email,
+      action: log.action,
+      targetType: log.targetType,
+      targetId: log.targetId || "",
+      details: JSON.stringify(log.details || {}),
+      ipAddress: log.ipAddress || "",
+    }))
+    const columns = [
+      { key: "timestamp", label: "Timestamp" },
+      { key: "user", label: "User" },
+      { key: "action", label: "Action" },
+      { key: "targetType", label: "Target Type" },
+      { key: "targetId", label: "Target ID" },
+      { key: "details", label: "Details" },
+      { key: "ipAddress", label: "IP Address" },
+    ]
+    downloadCSV(exportData, generateFilename("audit_logs"), columns)
+    toast.success("감사 로그 내보내기가 완료되었습니다")
   }
 
   const getActionIcon = (action: string) => {

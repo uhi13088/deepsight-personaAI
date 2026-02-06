@@ -66,10 +66,9 @@ export interface CreateArchetypeInput {
 
 class ArchetypesService {
   async getArchetypes(): Promise<{ archetypes: Archetype[]; stats: ArchetypeStats }> {
-    const response = await apiClient.get<{
-      data: Archetype[]
-      total: number
-    }>("/archetypes")
+    const response = await apiClient.get<Archetype[] | { data: Archetype[]; total: number }>(
+      "/archetypes"
+    )
 
     if (!response.success || !response.data) {
       throw new ApiError({
@@ -80,12 +79,16 @@ class ArchetypesService {
       })
     }
 
+    // Handle both array and object response formats
+    const archetypes = Array.isArray(response.data) ? response.data : (response.data.data ?? [])
+    const total = Array.isArray(response.data) ? response.data.length : (response.data.total ?? 0)
+
     return {
-      archetypes: response.data.data,
+      archetypes,
       stats: {
-        total: response.data.total,
+        total,
         avgUserCount: 0,
-        topArchetype: response.data.data[0]?.name || null,
+        topArchetype: archetypes[0]?.name || null,
       },
     }
   }

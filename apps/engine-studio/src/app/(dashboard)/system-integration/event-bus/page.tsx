@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { eventBusService } from "@/services"
 import type { Event, EventChannel, DeadLetterEvent, EventStatus, EventPriority } from "@/services"
@@ -58,6 +59,7 @@ import {
 // 타입은 서비스에서 import
 
 export default function EventBusMonitorPage() {
+  const router = useRouter()
   const [events, setEvents] = useState<Event[]>([])
   const [channels, setChannels] = useState<EventChannel[]>([])
   const [deadLetters, setDeadLetters] = useState<DeadLetterEvent[]>([])
@@ -99,9 +101,7 @@ export default function EventBusMonitorPage() {
   }
 
   const handleOpenSettings = () => {
-    toast.info("이벤트 버스 설정", {
-      description: "이벤트 버스 설정 페이지로 이동합니다.",
-    })
+    router.push("/global-config/system-settings")
   }
 
   const handlePauseChannel = async (channel: EventChannel) => {
