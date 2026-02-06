@@ -19,6 +19,11 @@
 
 ## ✅ DONE (완료)
 
+- [x] **Hotfix: 팀 서비스/페이지 null safety 추가** ✅ 2026-02-06
+  - 원인: `membersResponse.members`가 undefined일 때 `teamMembers.filter()` 에러
+  - 변경: `team-service.ts` - API 실패시 빈 배열/기본값 반환, `team-access/page.tsx` - `|| []` 방어 코드
+  - 테스트: Build PASS
+
 - [x] **Hotfix: 팀 멤버 API 응답 구조 수정** ✅ 2026-02-06
   - 원인: API가 `data: [...]` 직접 반환, apiClient가 `data.data ?? data` 추출 → 서비스에서 `.map()` 에러
   - 변경: `/api/users/route.ts` - 응답을 `{ data: { data: [...], total } }` 구조로 래핑
