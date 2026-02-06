@@ -19,6 +19,11 @@
 
 ## ✅ DONE (완료)
 
+- [x] **Hotfix: 인시던트 서비스 응답 포맷 수정** ✅ 2026-02-06
+  - 원인: API가 `stats: { reported, investigating, ... }` 반환, 서비스는 `IncidentStats` 형식 기대 → `.length`, `.filter` 에러
+  - 변경: `operations-service.ts` - stats 형식 변환 (reported+investigating+identified+fixing→open), null safety 추가
+  - 테스트: Build PASS
+
 - [x] **Hotfix: 모니터링 서비스 응답 타입 수정** ✅ 2026-02-06
   - 원인: API가 `metrics`를 객체로 반환, 서비스는 배열 기대 → `.forEach` 에러
   - 변경: `operations-service.ts` - 객체 형태의 metrics/currentStatus 처리로 변경
