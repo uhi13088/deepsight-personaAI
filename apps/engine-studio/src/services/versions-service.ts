@@ -71,7 +71,7 @@ export interface CreateVersionInput {
 
 class VersionsService {
   async getVersions(): Promise<VersionsData> {
-    const response = await apiClient.get<VersionsData>("/api/versions")
+    const response = await apiClient.get<VersionsData>("/versions")
 
     if (!response.success || !response.data) {
       return {
@@ -85,7 +85,7 @@ class VersionsService {
   }
 
   async createVersion(input: CreateVersionInput): Promise<Version> {
-    const response = await apiClient.post<{ version: Version }>("/api/versions", input)
+    const response = await apiClient.post<{ version: Version }>("/versions", input)
 
     if (!response.success || !response.data) {
       throw new ApiError({
@@ -152,7 +152,7 @@ class VersionsService {
       modified: string[]
       deleted: string[]
       commits: Commit[]
-    }>("/api/versions/compare", { base: baseTag, target: targetTag })
+    }>("/versions/compare", { base: baseTag, target: targetTag })
 
     if (!response.success || !response.data) {
       throw new ApiError({
@@ -168,7 +168,7 @@ class VersionsService {
 
   // 브랜치 관련 메서드
   async createBranch(name: string, baseBranch: string): Promise<Branch> {
-    const response = await apiClient.post<{ branch: Branch }>("/api/versions/branches", {
+    const response = await apiClient.post<{ branch: Branch }>("/versions/branches", {
       name,
       baseBranch,
     })

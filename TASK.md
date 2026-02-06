@@ -19,6 +19,11 @@
 
 ## ✅ DONE (완료)
 
+- [x] **Hotfix: 서비스 레이어 API 경로 중복 수정** ✅ 2026-02-06
+  - 원인: `baseUrl=/api` + 엔드포인트 `/api/versions` → `/api/api/versions` (중복)
+  - 변경: `versions-service.ts`, `event-bus-service.ts` - `/api/` 접두사 제거
+  - 테스트: Build PASS
+
 - [x] **Hotfix: expertise 배열 null 체크 추가** ✅ 2026-02-06
   - 원인: DB 기존 데이터에서 expertise가 null → `.length` 호출 시 TypeError
   - 변경: `apps/engine-studio/src/app/api/personas/route.ts` - `expertise ?? []`
