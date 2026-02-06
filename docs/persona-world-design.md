@@ -1461,7 +1461,244 @@ interface AdminActions {
 | **ADVANCED** | Cold Start DEEP (60개) 또는 SNS 2개+  | 85%            | 정확한 추천 |
 | **PREMIUM**  | Cold Start + SNS 복합                 | 95%            | 최적 추천   |
 
-### 12.3 프로필 데이터 구조
+### 12.3 SNS 연동 확장 데이터
+
+SNS 연동 시 6D 벡터 외에도 **풍부한 추가 정보**를 추출하여 더 정확한 매칭과 추천에 활용합니다.
+
+#### 추출 가능한 데이터 카테고리
+
+| 카테고리          | 추출 정보                  | 활용                     |
+| ----------------- | -------------------------- | ------------------------ |
+| **인구통계**      | 나이대, 지역, 직업 추정    | 세대별 페르소나 매칭     |
+| **구체적 취향**   | 좋아하는 배우, 감독, 장르  | 특정 콘텐츠 기반 추천    |
+| **활동 패턴**     | 활동 시간대, 빈도          | 피드 노출 최적화         |
+| **표현 스타일**   | 이모지 사용, 글 길이, 말투 | warmth 선호 매칭         |
+| **소셜 성향**     | 활발함 vs 눈팔이           | 인터랙티브 페르소나 추천 |
+| **관심사 키워드** | 해시태그, 팔로우 계정      | 니치 취향 파악           |
+
+#### 플랫폼별 확장 데이터
+
+```typescript
+interface SNSExtendedData {
+  // === 공통 ===
+  platform: SNSPlatform
+  extractedAt: Date
+
+  // === 인구통계 (추정) ===
+  demographics?: {
+    estimatedAge?: number // 프로필/콘텐츠에서 추정
+    country?: string // 언어, 시간대에서 추정
+    region?: string // 위치 태그에서 추정
+  }
+
+  // === 구체적 취향 ===
+  specificTastes: {
+    favoriteDirectors: string[] // 팔로우/좋아요에서 추출
+    favoriteActors: string[] // 팔로우/좋아요에서 추출
+    favoriteGenres: string[] // 시청/좋아요 패턴에서 추출
+    favoriteMovies: string[] // 직접 언급/평점에서 추출
+    dislikedGenres?: string[] // 낮은 평점/스킵에서 추출
+  }
+
+  // === 활동 패턴 ===
+  activityPattern: {
+    peakHours: number[] // 가장 활발한 시간대
+    averageSessionLength: number // 평균 이용 시간 (분)
+    frequency: "DAILY" | "WEEKLY" | "OCCASIONAL"
+    contentConsumptionRate: number // 콘텐츠 소비 속도
+  }
+
+  // === 표현 스타일 ===
+  expressionStyle: {
+    emojiUsage: "NONE" | "RARE" | "MODERATE" | "FREQUENT"
+    averagePostLength: "SHORT" | "MEDIUM" | "LONG"
+    formality: number // 0.0 (반말) ~ 1.0 (존댓말)
+    sentimentTone: "POSITIVE" | "NEUTRAL" | "CRITICAL"
+    hashtagUsage: boolean
+  }
+
+  // === 소셜 성향 ===
+  socialBehavior: {
+    engagementLevel: "LURKER" | "CASUAL" | "ACTIVE" | "CREATOR"
+    interactionStyle: "LIKES_ONLY" | "COMMENTS" | "SHARES" | "CREATES"
+    communityParticipation: string[] // 참여 커뮤니티/그룹
+  }
+
+  // === 관심사 키워드 ===
+  interests: {
+    hashtags: string[] // 자주 사용하는 해시태그
+    followedAccounts: {
+      category: string // "영화 평론가", "배우", "스튜디오" 등
+      names: string[]
+    }[]
+    mentionedKeywords: string[] // 자주 언급하는 키워드
+  }
+}
+```
+
+#### Netflix 확장 추출
+
+```typescript
+async function extractFromNetflix(data: NetflixData): Promise<SNSExtendedData> {
+  return {
+    platform: "NETFLIX",
+    extractedAt: new Date(),
+
+    specificTastes: {
+      favoriteGenres: analyzeGenrePreference(data.viewingHistory),
+      favoriteDirectors: extractFrequentDirectors(data.viewingHistory),
+      favoriteActors: extractFrequentActors(data.viewingHistory),
+      favoriteMovies: data.ratings.filter((r) => r.score >= 4.5).map((r) => r.title),
+      dislikedGenres: analyzeSkippedContent(data.viewingHistory),
+    },
+
+    activityPattern: {
+      peakHours: analyzeViewingTimes(data.viewingHistory),
+      averageSessionLength: calculateAvgSession(data.viewingHistory),
+      frequency: determineFrequency(data.viewingHistory),
+      contentConsumptionRate: calculateBingeRate(data.viewingHistory),
+    },
+
+    expressionStyle: {
+      // Netflix는 평점만 있으므로 제한적
+      sentimentTone: data.averageRating > 3.5 ? "POSITIVE" : "CRITICAL",
+    },
+
+    interests: {
+      followedAccounts: [], // Netflix는 팔로우 없음
+      hashtags: [],
+      mentionedKeywords: extractKeywordsFromWatchlist(data.myList),
+    },
+  }
+}
+```
+
+#### Instagram 확장 추출
+
+```typescript
+async function extractFromInstagram(data: InstagramData): Promise<SNSExtendedData> {
+  // LLM으로 캡션/해시태그 분석
+  const captionAnalysis = await analyzeCaptions(data.posts)
+
+  return {
+    platform: "INSTAGRAM",
+    extractedAt: new Date(),
+
+    demographics: {
+      estimatedAge: estimateAgeFromContent(data.posts),
+      region: extractLocationFromTags(data.posts),
+    },
+
+    specificTastes: {
+      favoriteGenres: extractGenresFromHashtags(data.posts),
+      favoriteDirectors: extractFromFollowing(data.following, "DIRECTOR"),
+      favoriteActors: extractFromFollowing(data.following, "ACTOR"),
+      favoriteMovies: extractMovieMentions(data.posts),
+    },
+
+    activityPattern: {
+      peakHours: analyzePostingTimes(data.posts),
+      frequency: determinePostingFrequency(data.posts),
+    },
+
+    expressionStyle: {
+      emojiUsage: analyzeEmojiUsage(data.posts),
+      averagePostLength: calculateAvgCaptionLength(data.posts),
+      formality: captionAnalysis.formality,
+      sentimentTone: captionAnalysis.sentiment,
+      hashtagUsage: data.posts.some((p) => p.hashtags.length > 0),
+    },
+
+    socialBehavior: {
+      engagementLevel: determineEngagement(data.followers, data.following, data.posts),
+      interactionStyle: analyzeInteractionPattern(data.activity),
+      communityParticipation: extractCommunities(data.following),
+    },
+
+    interests: {
+      hashtags: extractTopHashtags(data.posts, 20),
+      followedAccounts: categorizeFollowing(data.following),
+      mentionedKeywords: captionAnalysis.keywords,
+    },
+  }
+}
+```
+
+#### 확장 데이터 활용
+
+```typescript
+// 확장 데이터를 활용한 정밀 매칭
+async function enhancedPersonaMatching(userId: string): Promise<PersonaRecommendation[]> {
+  const profile = await getUserProfile(userId)
+  const extendedData = await getSNSExtendedData(userId)
+
+  // 1. 기본 6D 벡터 매칭
+  const vectorMatches = await findPersonasBySimilarity(profile.vector6d)
+
+  // 2. 구체적 취향 부스팅
+  const boostedMatches = vectorMatches.map((persona) => {
+    let boost = 0
+
+    // 같은 감독 좋아하면 +0.2
+    const sharedDirectors = intersection(
+      extendedData.specificTastes.favoriteDirectors,
+      persona.favoriteDirectors
+    )
+    boost += sharedDirectors.length * 0.05
+
+    // 같은 배우 좋아하면 +0.1
+    const sharedActors = intersection(
+      extendedData.specificTastes.favoriteActors,
+      persona.favoriteActors
+    )
+    boost += sharedActors.length * 0.03
+
+    // 표현 스타일 비슷하면 +0.1
+    if (extendedData.expressionStyle.emojiUsage === persona.contentStyle.emojiFrequency) {
+      boost += 0.1
+    }
+
+    return { ...persona, score: persona.score + boost }
+  })
+
+  // 3. 추천 이유 생성
+  return boostedMatches.map((persona) => ({
+    persona,
+    similarity: persona.score,
+    reason: generateDetailedReason(extendedData, persona),
+    // "봉준호 감독을 좋아하시는군요! 정현님도 봉준호 감독 팬이에요 🎬"
+  }))
+}
+
+// 상세 추천 이유 생성
+function generateDetailedReason(userData: SNSExtendedData, persona: Persona): string {
+  const reasons: string[] = []
+
+  // 감독 취향 일치
+  const sharedDirectors = intersection(
+    userData.specificTastes.favoriteDirectors,
+    persona.favoriteDirectors
+  )
+  if (sharedDirectors.length > 0) {
+    reasons.push(`${sharedDirectors[0]} 감독 팬이시군요! ${persona.name}님도 좋아해요`)
+  }
+
+  // 장르 취향 일치
+  const sharedGenres = intersection(userData.specificTastes.favoriteGenres, persona.favoriteGenres)
+  if (sharedGenres.length > 0) {
+    reasons.push(`${sharedGenres.join(", ")} 장르 취향이 비슷해요`)
+  }
+
+  // 표현 스타일 일치
+  if (userData.expressionStyle.sentimentTone === "CRITICAL" && persona.stance > 0.7) {
+    reasons.push(`날카로운 시선이 비슷해요`)
+  }
+
+  return reasons[0] ?? `${persona.name}님과 영화 취향이 잘 맞아요!`
+}
+```
+
+### 12.4 프로필 데이터 구조
 
 ```typescript
 interface UserProfile {
