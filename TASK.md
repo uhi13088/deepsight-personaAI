@@ -19,6 +19,11 @@
 
 ## ✅ DONE (완료)
 
+- [x] **Hotfix: 모니터링 서비스 응답 타입 수정** ✅ 2026-02-06
+  - 원인: API가 `metrics`를 객체로 반환, 서비스는 배열 기대 → `.forEach` 에러
+  - 변경: `operations-service.ts` - 객체 형태의 metrics/currentStatus 처리로 변경
+  - 테스트: Build PASS
+
 - [x] **Hotfix: 서비스 레이어 API 경로 중복 수정** ✅ 2026-02-06
   - 원인: `baseUrl=/api` + 엔드포인트 `/api/versions` → `/api/api/versions` (중복)
   - 변경: `versions-service.ts`, `event-bus-service.ts` - `/api/` 접두사 제거
