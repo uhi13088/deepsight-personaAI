@@ -78,9 +78,25 @@ class TeamService {
       return { members: [], total: 0 }
     }
 
-    // API 응답을 TeamMember 형식으로 변환
-    const rawData = response.data.data || []
-    const members: TeamMember[] = rawData.map((user) => ({
+    // API 응답 형식 자동 감지 (배열 직접 또는 { data, total } 구조)
+    const responseData = response.data as unknown
+    const rawData = Array.isArray(responseData)
+      ? responseData
+      : (responseData as { data?: unknown[] })?.data || []
+
+    const members: TeamMember[] = (
+      rawData as Array<{
+        id: string
+        name: string | null
+        email: string
+        role: UserRole
+        status: string
+        department: string | null
+        image: string | null
+        lastLogin: string | null
+        createdAt: string
+      }>
+    ).map((user) => ({
       id: user.id,
       name: user.name || user.email.split("@")[0],
       email: user.email,
@@ -92,9 +108,14 @@ class TeamService {
       joinedAt: user.createdAt,
     }))
 
+    // total 추출 (배열이면 length, 객체면 total 속성)
+    const total = Array.isArray(responseData)
+      ? responseData.length
+      : (responseData as { total?: number })?.total || members.length
+
     return {
       members,
-      total: response.data.total || members.length,
+      total,
     }
   }
 
