@@ -1,0 +1,268 @@
+@import "tailwindcss";
+
+/* PersonaWorld 버블 폰트 (Fredoka) */
+@import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+:root {
+  /* 기본 컬러 */
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 221.2 83.2% 53.3%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222.2 84% 4.9%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 222.2 84% 4.9%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 221.2 83.2% 53.3%;
+  --radius: 0.75rem;
+
+  /* PersonaWorld 그라데이션 컬러 */
+  --pw-gradient-start: #667eea;
+  --pw-gradient-middle: #f093fb;
+  --pw-gradient-end: #f5576c;
+
+  /* 폰트 */
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-brand: "Fredoka", "Nunito", sans-serif;
+}
+
+/* =========================================
+   PersonaWorld Design System
+   White Background + Accent Gradients
+   ========================================= */
+
+body {
+  font-family: var(--font-sans);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* 그라데이션 텍스트 - 헤드라인용 */
+.pw-text-gradient {
+  background: linear-gradient(
+    135deg,
+    var(--pw-gradient-start) 0%,
+    var(--pw-gradient-middle) 50%,
+    var(--pw-gradient-end) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* 애니메이션 텍스트 그라데이션 */
+.pw-text-gradient-animated {
+  background: linear-gradient(
+    270deg,
+    var(--pw-gradient-start),
+    var(--pw-gradient-middle),
+    var(--pw-gradient-end),
+    var(--pw-gradient-middle),
+    var(--pw-gradient-start)
+  );
+  background-size: 400% 400%;
+  animation: pw-gradient-shift 8s ease infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@keyframes pw-gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* 기본 그라데이션 배경 (로고/버튼용) */
+.pw-gradient {
+  background: linear-gradient(
+    135deg,
+    var(--pw-gradient-start) 0%,
+    var(--pw-gradient-middle) 50%,
+    var(--pw-gradient-end) 100%
+  );
+}
+
+/* 그라데이션 아이콘 */
+.pw-icon-gradient {
+  background: linear-gradient(
+    135deg,
+    var(--pw-gradient-start) 0%,
+    var(--pw-gradient-middle) 50%,
+    var(--pw-gradient-end) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.pw-icon-gradient svg {
+  stroke: url(#pw-gradient);
+}
+
+/* 그라데이션 보더 (얇은 라인용) */
+.pw-border-gradient {
+  position: relative;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(white, white) padding-box,
+    linear-gradient(
+        135deg,
+        var(--pw-gradient-start),
+        var(--pw-gradient-middle),
+        var(--pw-gradient-end)
+      )
+      border-box;
+}
+
+/* 얇은 그라데이션 라인 */
+.pw-line-gradient {
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--pw-gradient-start) 0%,
+    var(--pw-gradient-middle) 50%,
+    var(--pw-gradient-end) 100%
+  );
+}
+
+/* 버튼 그라데이션 */
+.pw-button {
+  background: linear-gradient(
+    135deg,
+    var(--pw-gradient-start) 0%,
+    var(--pw-gradient-middle) 50%,
+    var(--pw-gradient-end) 100%
+  );
+  background-size: 200% 200%;
+  transition:
+    background-position 0.3s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.pw-button:hover {
+  background-position: 100% 100%;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+}
+
+.pw-button:active {
+  transform: translateY(0);
+}
+
+/* 프로필 링 */
+.pw-profile-ring {
+  padding: 3px;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    var(--pw-gradient-start),
+    var(--pw-gradient-middle),
+    var(--pw-gradient-end)
+  );
+}
+
+/* 카드 호버 효과 */
+.pw-card-hover {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.pw-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+}
+
+/* 스피너 */
+.pw-spinner {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    var(--pw-gradient-start),
+    var(--pw-gradient-middle),
+    var(--pw-gradient-end),
+    var(--pw-gradient-start)
+  );
+  animation: pw-spin 1s linear infinite;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+}
+
+@keyframes pw-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 좋아요 하트 애니메이션 */
+.pw-heart-pop {
+  animation: pw-heart-pop 0.3s ease;
+}
+
+@keyframes pw-heart-pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 글로우 효과 (미니멀) */
+.pw-glow {
+  box-shadow: 0 0 20px rgba(102, 126, 234, 0.15);
+}
+
+/* 반짝임 효과 */
+.pw-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.pw-shimmer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: pw-shimmer 2s infinite;
+}
+
+@keyframes pw-shimmer {
+  100% {
+    left: 100%;
+  }
+}
+
+/* SVG 그라데이션 정의용 */
+.pw-gradient-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
