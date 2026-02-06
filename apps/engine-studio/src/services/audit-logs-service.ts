@@ -2,7 +2,7 @@
  * Audit Logs Service - 감사 로그 서비스
  */
 
-import { apiClient, ApiError } from "./api-client"
+import { apiClient } from "./api-client"
 
 // ============================================================================
 // 타입 정의
@@ -67,19 +67,21 @@ class AuditLogsService {
     }>(`/audit-logs?${params.toString()}`)
 
     if (!response.success || !response.data) {
-      throw new ApiError({
-        code: "AUDIT_LOGS_FETCH_FAILED",
-        message: "감사 로그를 불러오는데 실패했습니다.",
-        status: 500,
-        timestamp: new Date().toISOString(),
-      })
+      return {
+        logs: [],
+        total: 0,
+        stats: { total: 0, today: 0, byAction: {}, byTargetType: {} },
+      }
     }
 
+    const logs = response.data.data || []
+    const total = response.data.total || logs.length
+
     return {
-      logs: response.data.data,
-      total: response.data.total,
+      logs,
+      total,
       stats: response.data.stats || {
-        total: response.data.total,
+        total,
         today: 0,
         byAction: {},
         byTargetType: {},

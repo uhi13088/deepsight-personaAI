@@ -94,14 +94,35 @@ export async function GET(request: NextRequest) {
         : null,
     }))
 
+    // 통계 계산
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const todayCount = logs.filter((log) => new Date(log.createdAt) >= today).length
+
+    const byAction: Record<string, number> = {}
+    const byTargetType: Record<string, number> = {}
+    for (const log of logs) {
+      byAction[log.action] = (byAction[log.action] || 0) + 1
+      byTargetType[log.targetType] = (byTargetType[log.targetType] || 0) + 1
+    }
+
     return NextResponse.json({
       success: true,
-      data,
-      pagination: {
-        page,
-        limit,
+      data: {
+        data,
         total,
-        totalPages: Math.ceil(total / limit),
+        stats: {
+          total,
+          today: todayCount,
+          byAction,
+          byTargetType,
+        },
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
       },
     })
   } catch (error) {
