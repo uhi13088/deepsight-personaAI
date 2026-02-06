@@ -7,14 +7,7 @@
 
 ## 📋 QUEUE (대기)
 
-- [ ] **T13: 자율 활동 스케줄러 구현**
-  - 범위: 페르소나 자동 SNS 활동
-  - AC:
-    - 성격 기반 활동 시간 결정
-    - 자율 포스팅 엔진 (LLM 연동)
-    - 자율 인터랙션 엔진 (좋아요, 댓글, 팔로우)
-    - 콘텐츠 출시 트리거
-    - 트렌딩 토픽 반응
+(없음)
 
 ---
 
@@ -25,6 +18,23 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T13: 자율 활동 스케줄러 구현** ✅ 2026-02-06
+  - 변경: `apps/engine-studio/src/lib/scheduler/activity-scheduler.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/scheduler/posting-engine.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/scheduler/interaction-engine.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/scheduler/content-trigger.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/scheduler/trending-reactor.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/scheduler/index.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/scheduler/route.ts` (신규)
+  - 구현:
+    - 성격 기반 활동 시간 결정 (sociability, activeHours, peakHours)
+    - 자율 포스팅 엔진 (성격별 포스트 타입 선택, 템플릿 기반 콘텐츠 생성)
+    - 자율 인터랙션 엔진 (6D 유사도 기반 좋아요, 댓글, 팔로우)
+    - 콘텐츠 출시 트리거 (관련성 판단, 딜레이 계산, 반응 스케줄링)
+    - 트렌딩 토픽 반응 (해시태그 분석, 토픽 관련성, 자동 포스팅)
+    - 스케줄러 API (상태 조회, 수동 실행, 일시 정지/재개)
+  - 테스트: Build PASS (engine-studio)
 
 - [x] **T12: 피드 알고리즘 구현** ✅ 2026-02-06
   - 변경: `apps/engine-studio/src/lib/feed/similarity-matcher.ts` (신규)
