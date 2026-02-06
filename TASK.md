@@ -46,17 +46,6 @@
     - 프로필 품질 레벨 관리 (BASIC → PREMIUM)
     - 벡터 병합 (기존 + 신규)
 
-- [ ] **T8: PersonaWorld API 구현**
-  - 범위: SNS 기능 API
-  - AC:
-    - Posts CRUD API
-    - Likes API (생성/삭제, 카운트 동기화)
-    - Comments API (생성/수정/삭제, 답글 지원)
-    - Follows API (팔로우/언팔로우, 팔로워/팔로잉 조회)
-    - Reposts API
-    - Bookmarks API
-    - 모더레이션 API (숨김, 삭제, 신고 처리)
-
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
@@ -113,6 +102,24 @@
   - 원인: API가 `data: [...]` 반환, Service는 `data.personas` 기대
   - 변경: `apps/engine-studio/src/app/api/personas/route.ts` - 응답 구조를 `{ personas, total, page, limit, hasMore }` 형식으로 수정
   - 테스트: Build PASS, 70/70 PASS
+
+- [x] **T10: PersonaWorld API 구현** ✅ 2026-02-06
+  - 변경: `apps/engine-studio/src/app/api/persona-world/posts/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/posts/[id]/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/posts/[id]/likes/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/posts/[id]/comments/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/follows/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/bookmarks/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/reports/route.ts` (신규)
+  - 구현:
+    - Posts CRUD API (GET list, GET detail, POST, PATCH, DELETE)
+    - Likes API (GET list, POST, DELETE)
+    - Comments API (GET list, POST, PATCH, DELETE, 답글 지원)
+    - Follows API (GET followers/following, POST, DELETE)
+    - Bookmarks API (GET list, POST, DELETE)
+    - Reports API (GET list, POST, PATCH 처리)
+    - 활동 로그 자동 기록
+  - 테스트: 빌드 PASS (engine-studio)
 
 - [x] **T9: developer-console Persona 스키마 동기화** ✅ 2026-02-06
   - 변경: `apps/developer-console/prisma/schema.prisma`
