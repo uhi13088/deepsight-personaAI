@@ -19,6 +19,48 @@
 
 ## ✅ DONE (완료)
 
+- [x] **Hotfix: 감사 로그 API 응답 구조 및 null safety 추가** ✅ 2026-02-06
+  - 원인: API가 `data: [...]` 직접 반환 → 서비스에서 `response.data.data` undefined → `.length` 에러
+  - 변경: `/api/audit-logs` - 응답을 `{ data: { data, total, stats } }` 구조로 래핑, stats 계산 추가
+  - 변경: `audit-logs-service.ts` - null safety 추가
+  - 테스트: Build PASS
+
+- [x] **Hotfix: 팀 서비스/페이지 null safety 추가** ✅ 2026-02-06
+  - 원인: `membersResponse.members`가 undefined일 때 `teamMembers.filter()` 에러
+  - 변경: `team-service.ts` - API 실패시 빈 배열/기본값 반환, `team-access/page.tsx` - `|| []` 방어 코드
+  - 테스트: Build PASS
+
+- [x] **Hotfix: 팀 멤버 API 응답 구조 수정** ✅ 2026-02-06
+  - 원인: API가 `data: [...]` 직접 반환, apiClient가 `data.data ?? data` 추출 → 서비스에서 `.map()` 에러
+  - 변경: `/api/users/route.ts` - 응답을 `{ data: { data: [...], total } }` 구조로 래핑
+  - 테스트: Build PASS
+
+- [x] **Hotfix: 인시던트 서비스 응답 포맷 수정** ✅ 2026-02-06
+  - 원인: API가 `stats: { reported, investigating, ... }` 반환, 서비스는 `IncidentStats` 형식 기대 → `.length`, `.filter` 에러
+  - 변경: `operations-service.ts` - stats 형식 변환 (reported+investigating+identified+fixing→open), null safety 추가
+  - 테스트: Build PASS
+
+- [x] **Hotfix: 모니터링 서비스 응답 타입 수정** ✅ 2026-02-06
+  - 원인: API가 `metrics`를 객체로 반환, 서비스는 배열 기대 → `.forEach` 에러
+  - 변경: `operations-service.ts` - 객체 형태의 metrics/currentStatus 처리로 변경
+  - 테스트: Build PASS
+
+- [x] **Hotfix: 서비스 레이어 API 경로 중복 수정** ✅ 2026-02-06
+  - 원인: `baseUrl=/api` + 엔드포인트 `/api/versions` → `/api/api/versions` (중복)
+  - 변경: `versions-service.ts`, `event-bus-service.ts` - `/api/` 접두사 제거
+  - 테스트: Build PASS
+
+- [x] **Hotfix: expertise 배열 null 체크 추가** ✅ 2026-02-06
+  - 원인: DB 기존 데이터에서 expertise가 null → `.length` 호출 시 TypeError
+  - 변경: `apps/engine-studio/src/app/api/personas/route.ts` - `expertise ?? []`
+  - 변경: `apps/engine-studio/src/app/api/personas/[id]/route.ts` - `expertise ?? []`
+  - 테스트: Build PASS, 70/70 PASS
+
+- [x] **Hotfix: 페르소나 목록 API 응답 구조 수정** ✅ 2026-02-06
+  - 원인: API가 `data: [...]` 반환, Service는 `data.personas` 기대
+  - 변경: `apps/engine-studio/src/app/api/personas/route.ts` - 응답 구조를 `{ personas, total, page, limit, hasMore }` 형식으로 수정
+  - 테스트: Build PASS, 70/70 PASS
+
 - [x] **T7: Developer Console 미완성 부분 마무리** ✅ 2026-02-06
   - AC1: 로그 페이지 → 이미 DB 연동 완료 상태 (mock 없음)
   - AC2: 빌링 페이지 TODO 수정

@@ -77,8 +77,8 @@ export default function AuditLogsPage() {
     try {
       setIsLoading(true)
       const data = await auditLogsService.getLogs()
-      setLogs(data.logs)
-      setStats(data.stats)
+      setLogs(data.logs || [])
+      setStats(data.stats || { total: 0, today: 0, byAction: {}, byTargetType: {} })
     } catch (error) {
       console.error("Failed to load audit logs:", error)
       toast.error("감사 로그를 불러오는데 실패했습니다.")

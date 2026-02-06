@@ -68,7 +68,7 @@ export interface EventBusData {
 
 class EventBusService {
   async getEventBusData(): Promise<EventBusData> {
-    const response = await apiClient.get<EventBusData>("/api/event-bus")
+    const response = await apiClient.get<EventBusData>("/event-bus")
 
     if (!response.success || !response.data) {
       return {
@@ -93,7 +93,7 @@ class EventBusService {
     type?: string
     limit?: number
   }): Promise<Event[]> {
-    const response = await apiClient.get<{ events: Event[] }>("/api/event-bus/events", filters)
+    const response = await apiClient.get<{ events: Event[] }>("/event-bus/events", filters)
 
     if (!response.success || !response.data) {
       return []
@@ -103,7 +103,7 @@ class EventBusService {
   }
 
   async getChannels(): Promise<EventChannel[]> {
-    const response = await apiClient.get<{ channels: EventChannel[] }>("/api/event-bus/channels")
+    const response = await apiClient.get<{ channels: EventChannel[] }>("/event-bus/channels")
 
     if (!response.success || !response.data) {
       return []
@@ -140,7 +140,7 @@ class EventBusService {
 
   async getDeadLetters(): Promise<DeadLetterEvent[]> {
     const response = await apiClient.get<{ deadLetters: DeadLetterEvent[] }>(
-      "/api/event-bus/dead-letters"
+      "/event-bus/dead-letters"
     )
 
     if (!response.success || !response.data) {
@@ -165,7 +165,7 @@ class EventBusService {
 
   async retryAllDeadLetters(): Promise<{ retried: number; failed: number }> {
     const response = await apiClient.post<{ retried: number; failed: number }>(
-      "/api/event-bus/dead-letters/retry-all"
+      "/event-bus/dead-letters/retry-all"
     )
 
     if (!response.success || !response.data) {
@@ -194,7 +194,7 @@ class EventBusService {
   }
 
   async deleteAllDeadLetters(): Promise<void> {
-    const response = await apiClient.delete("/api/event-bus/dead-letters")
+    const response = await apiClient.delete("/event-bus/dead-letters")
 
     if (!response.success) {
       throw new ApiError({

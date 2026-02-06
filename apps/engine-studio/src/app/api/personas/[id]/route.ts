@@ -34,7 +34,7 @@ function transformPersona(persona: Awaited<ReturnType<typeof getPersonaWithRelat
     id: persona.id,
     name: persona.name,
     role: persona.role,
-    expertise: persona.expertise,
+    expertise: persona.expertise ?? [],
     description: persona.description,
     status: persona.status,
     visibility: persona.visibility,

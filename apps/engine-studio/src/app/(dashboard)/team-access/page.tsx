@@ -131,7 +131,7 @@ export default function TeamAccessPage() {
         teamService.getMembers(),
         teamService.getStats(),
       ])
-      setTeamMembers(membersResponse.members)
+      setTeamMembers(membersResponse.members || [])
       setTeamStats(stats)
     } catch (err) {
       console.error("Failed to fetch team data:", err)

@@ -117,11 +117,8 @@ class OperationsService {
 
   async getMonitoringData(period: string = "1h"): Promise<MonitoringData> {
     const response = await apiClient.get<{
-      metrics: Array<{
-        metricType: string
-        value: number
-        timestamp: string
-      }>
+      currentStatus: Record<string, { value: number; unit: string; status: string }>
+      metrics: Record<string, Array<{ value: number; recordedAt: string }>>
     }>(`/operations/monitoring?period=${period}`)
 
     if (!response.success || !response.data) {
@@ -133,26 +130,33 @@ class OperationsService {
       })
     }
 
-    // API 응답을 UI 형식으로 변환
-    const metricsMap = new Map<string, number>()
-    response.data.metrics.forEach((m) => {
-      metricsMap.set(m.metricType, m.value)
-    })
+    // currentStatus에서 최신 값 추출
+    const status = response.data.currentStatus || {}
+
+    // 시계열 데이터 변환
+    const cpuData = response.data.metrics?.CPU || []
+    const memoryData = response.data.metrics?.MEMORY || []
+    const timeSeriesData = cpuData.slice(-30).map((item, index) => ({
+      time: item.recordedAt,
+      cpu: item.value,
+      memory: memoryData[index]?.value || 0,
+      requests: 0,
+    }))
 
     return {
       metrics: {
-        cpu: metricsMap.get("CPU_USAGE") || 0,
-        memory: metricsMap.get("MEMORY_USAGE") || 0,
-        disk: metricsMap.get("DISK_USAGE") || 0,
-        network: metricsMap.get("NETWORK_IO") || 0,
-        requestsPerSec: metricsMap.get("REQUEST_COUNT") || 0,
-        avgLatency: metricsMap.get("RESPONSE_TIME") || 0,
-        errorRate: metricsMap.get("ERROR_RATE") || 0,
+        cpu: status.CPU?.value || 0,
+        memory: status.MEMORY?.value || 0,
+        disk: status.DISK?.value || 0,
+        network: status.NETWORK_IO?.value || 0,
+        requestsPerSec: status.REQUEST_COUNT?.value || 0,
+        avgLatency: status.API_LATENCY?.value || 0,
+        errorRate: status.ERROR_RATE?.value || 0,
         uptime: 99.9, // 기본값
       },
       services: [],
       alerts: [],
-      timeSeriesData: [],
+      timeSeriesData,
     }
   }
 
@@ -168,21 +172,33 @@ class OperationsService {
 
     const response = await apiClient.get<{
       data: Incident[]
-      stats: IncidentStats
+      stats: Record<string, number>
+      pagination: { total: number }
     }>(`/operations/incidents?${params.toString()}`)
 
     if (!response.success || !response.data) {
-      throw new ApiError({
-        code: "INCIDENTS_FETCH_FAILED",
-        message: "인시던트 목록을 불러오는데 실패했습니다.",
-        status: 500,
-        timestamp: new Date().toISOString(),
-      })
+      return {
+        incidents: [],
+        stats: { total: 0, open: 0, investigating: 0, resolved: 0, critical: 0 },
+      }
     }
 
+    const statusStats = response.data.stats || {}
+    const total = response.data.pagination?.total || response.data.data?.length || 0
+
     return {
-      incidents: response.data.data,
-      stats: response.data.stats,
+      incidents: response.data.data || [],
+      stats: {
+        total,
+        open:
+          (statusStats.reported || 0) +
+          (statusStats.investigating || 0) +
+          (statusStats.identified || 0) +
+          (statusStats.fixing || 0),
+        investigating: statusStats.investigating || 0,
+        resolved: (statusStats.resolved || 0) + (statusStats.closed || 0),
+        critical: 0, // 별도 쿼리 필요
+      },
     }
   }
 
