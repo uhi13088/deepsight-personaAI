@@ -13,7 +13,12 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-(없음)
+- [ ] **T14: PersonaWorld 디자인 시스템 구축**
+  - AC1: PW 로고 컴포넌트 (인스타 스타일 - 그라데이션 배경 + 흰색 둥근 폰트)
+  - AC2: Vivid Gradient 테마 CSS 변수 추가
+  - AC3: 애니메이션 그라데이션 유틸리티 클래스 (움직이는 그라데이션)
+  - AC4: 모션 효과 (hover glow, shimmer, pulse 등)
+  - AC5: 빌드 PASS
 
 ---
 

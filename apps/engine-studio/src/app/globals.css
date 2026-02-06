@@ -240,3 +240,416 @@ body {
 .animate-slide-in-bottom {
   animation: slideInFromBottom 0.3s ease-in-out;
 }
+
+/* =========================================
+   PersonaWorld Design System
+   Vivid Gradient Theme + Motion Effects
+   ========================================= */
+
+:root {
+  /* PersonaWorld 그라데이션 컬러 */
+  --pw-gradient-start: #667eea; /* Purple */
+  --pw-gradient-middle: #f093fb; /* Pink */
+  --pw-gradient-end: #f5576c; /* Coral/Orange */
+
+  /* 대안 그라데이션 (인스타 스타일) */
+  --pw-insta-purple: #833ab4;
+  --pw-insta-pink: #fd1d1d;
+  --pw-insta-orange: #fcb045;
+}
+
+/* 기본 그라데이션 */
+.pw-gradient {
+  background: linear-gradient(
+    135deg,
+    var(--pw-gradient-start) 0%,
+    var(--pw-gradient-middle) 50%,
+    var(--pw-gradient-end) 100%
+  );
+}
+
+/* 애니메이션 그라데이션 (움직이는 효과) */
+.pw-gradient-animated {
+  background: linear-gradient(
+    270deg,
+    var(--pw-gradient-start),
+    var(--pw-gradient-middle),
+    var(--pw-gradient-end),
+    var(--pw-gradient-middle),
+    var(--pw-gradient-start)
+  );
+  background-size: 400% 400%;
+  animation: pw-gradient-shift 8s ease infinite;
+}
+
+@keyframes pw-gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* 텍스트 그라데이션 */
+.pw-text-gradient {
+  background: linear-gradient(
+    135deg,
+    var(--pw-gradient-start) 0%,
+    var(--pw-gradient-middle) 50%,
+    var(--pw-gradient-end) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* 애니메이션 텍스트 그라데이션 */
+.pw-text-gradient-animated {
+  background: linear-gradient(
+    270deg,
+    var(--pw-gradient-start),
+    var(--pw-gradient-middle),
+    var(--pw-gradient-end),
+    var(--pw-gradient-middle),
+    var(--pw-gradient-start)
+  );
+  background-size: 400% 400%;
+  animation: pw-gradient-shift 8s ease infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* 그라데이션 보더 */
+.pw-border-gradient {
+  position: relative;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(hsl(var(--background)), hsl(var(--background))) padding-box,
+    linear-gradient(
+        135deg,
+        var(--pw-gradient-start),
+        var(--pw-gradient-middle),
+        var(--pw-gradient-end)
+      )
+      border-box;
+}
+
+/* 애니메이션 그라데이션 보더 */
+.pw-border-gradient-animated {
+  position: relative;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(hsl(var(--background)), hsl(var(--background))) padding-box,
+    linear-gradient(
+        270deg,
+        var(--pw-gradient-start),
+        var(--pw-gradient-middle),
+        var(--pw-gradient-end),
+        var(--pw-gradient-middle),
+        var(--pw-gradient-start)
+      )
+      border-box;
+  background-size:
+    100% 100%,
+    400% 400%;
+  animation: pw-border-shift 8s ease infinite;
+}
+
+@keyframes pw-border-shift {
+  0% {
+    background-position:
+      0 0,
+      0% 50%;
+  }
+  50% {
+    background-position:
+      0 0,
+      100% 50%;
+  }
+  100% {
+    background-position:
+      0 0,
+      0% 50%;
+  }
+}
+
+/* Glow 효과 */
+.pw-glow {
+  box-shadow:
+    0 0 20px rgba(102, 126, 234, 0.3),
+    0 0 40px rgba(240, 147, 251, 0.2),
+    0 0 60px rgba(245, 87, 108, 0.1);
+}
+
+.pw-glow-hover {
+  transition: box-shadow 0.3s ease;
+}
+
+.pw-glow-hover:hover {
+  box-shadow:
+    0 0 25px rgba(102, 126, 234, 0.4),
+    0 0 50px rgba(240, 147, 251, 0.3),
+    0 0 75px rgba(245, 87, 108, 0.2);
+}
+
+/* Shimmer 효과 (반짝이는 효과) */
+.pw-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.pw-shimmer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: pw-shimmer 2s infinite;
+}
+
+@keyframes pw-shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+/* Pulse 효과 (맥박처럼 뛰는 효과) */
+.pw-pulse {
+  animation: pw-pulse 2s ease-in-out infinite;
+}
+
+@keyframes pw-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+/* Float 효과 (둥둥 떠다니는 효과) */
+.pw-float {
+  animation: pw-float 3s ease-in-out infinite;
+}
+
+@keyframes pw-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Bounce 효과 */
+.pw-bounce {
+  animation: pw-bounce 1s ease infinite;
+}
+
+@keyframes pw-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+/* 프로필 링 (인스타 스토리 스타일) */
+.pw-profile-ring {
+  padding: 3px;
+  border-radius: 50%;
+  background: linear-gradient(
+    45deg,
+    var(--pw-insta-purple),
+    var(--pw-insta-pink),
+    var(--pw-insta-orange)
+  );
+}
+
+.pw-profile-ring-animated {
+  padding: 3px;
+  border-radius: 50%;
+  background: linear-gradient(
+    45deg,
+    var(--pw-insta-purple),
+    var(--pw-insta-pink),
+    var(--pw-insta-orange),
+    var(--pw-insta-purple)
+  );
+  background-size: 300% 300%;
+  animation: pw-ring-rotate 3s linear infinite;
+}
+
+@keyframes pw-ring-rotate {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* 카드 Hover 효과 */
+.pw-card-hover {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.pw-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 10px 40px rgba(102, 126, 234, 0.15),
+    0 5px 20px rgba(240, 147, 251, 0.1);
+}
+
+/* 버튼 효과 */
+.pw-button {
+  background: linear-gradient(
+    135deg,
+    var(--pw-gradient-start) 0%,
+    var(--pw-gradient-middle) 50%,
+    var(--pw-gradient-end) 100%
+  );
+  background-size: 200% 200%;
+  transition:
+    background-position 0.3s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.pw-button:hover {
+  background-position: 100% 100%;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+}
+
+.pw-button:active {
+  transform: translateY(0);
+}
+
+/* 좋아요 버튼 하트 애니메이션 */
+.pw-heart-pop {
+  animation: pw-heart-pop 0.3s ease;
+}
+
+@keyframes pw-heart-pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 스피너 (로딩) */
+.pw-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    var(--pw-gradient-start),
+    var(--pw-gradient-middle),
+    var(--pw-gradient-end),
+    var(--pw-gradient-start)
+  );
+  animation: pw-spin 1s linear infinite;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+}
+
+@keyframes pw-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 스켈레톤 로딩 */
+.pw-skeleton {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 0%,
+    hsl(var(--muted-foreground) / 0.1) 50%,
+    hsl(var(--muted)) 100%
+  );
+  background-size: 200% 100%;
+  animation: pw-skeleton 1.5s ease-in-out infinite;
+}
+
+@keyframes pw-skeleton {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* 알림 뱃지 펄스 */
+.pw-badge-pulse {
+  animation: pw-badge-pulse 2s ease-in-out infinite;
+}
+
+@keyframes pw-badge-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 87, 108, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(245, 87, 108, 0);
+  }
+}
+
+/* 타이핑 인디케이터 */
+.pw-typing-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pw-gradient-middle);
+  animation: pw-typing 1.4s infinite ease-in-out both;
+}
+
+.pw-typing-dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.pw-typing-dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes pw-typing {
+  0%,
+  80%,
+  100% {
+    transform: scale(0.6);
+    opacity: 0.6;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
