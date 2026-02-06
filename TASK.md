@@ -19,6 +19,11 @@
 
 ## ✅ DONE (완료)
 
+- [x] **Hotfix: 팀 멤버 API 응답 구조 수정** ✅ 2026-02-06
+  - 원인: API가 `data: [...]` 직접 반환, apiClient가 `data.data ?? data` 추출 → 서비스에서 `.map()` 에러
+  - 변경: `/api/users/route.ts` - 응답을 `{ data: { data: [...], total } }` 구조로 래핑
+  - 테스트: Build PASS
+
 - [x] **Hotfix: 인시던트 서비스 응답 포맷 수정** ✅ 2026-02-06
   - 원인: API가 `stats: { reported, investigating, ... }` 반환, 서비스는 `IncidentStats` 형식 기대 → `.length`, `.filter` 에러
   - 변경: `operations-service.ts` - stats 형식 변환 (reported+investigating+identified+fixing→open), null safety 추가
