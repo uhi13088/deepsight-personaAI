@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { auth } from "@/lib/auth"
 
 /**
  * GET /api/billing/toss/success - Toss 결제 성공 콜백
@@ -54,8 +55,19 @@ export async function GET(request: NextRequest) {
     // 결제 성공 - DB에 결제 기록 저장
     console.log("[Toss] Payment confirmed:", paymentResult)
 
-    // TODO: Get organization from session
-    const organization = await prisma.organization.findFirst()
+    // Get organization from session or fallback to first one (for development)
+    const session = await auth()
+    let organization
+    if (session?.user?.id) {
+      const membership = await prisma.organizationMember.findFirst({
+        where: { userId: session.user.id },
+        include: { organization: true },
+      })
+      organization = membership?.organization
+    }
+    if (!organization) {
+      organization = await prisma.organization.findFirst()
+    }
 
     if (organization && planId) {
       // 플랜 업데이트
