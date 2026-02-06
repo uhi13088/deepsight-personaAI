@@ -19,6 +19,7 @@ import {
   Key,
   Edit,
   Loader2,
+  Download,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -69,6 +70,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { cn, formatRelativeTime } from "@/lib/utils"
+import { downloadCSV, generateFilename } from "@/lib/export"
 
 const roles = [
   {
@@ -113,7 +115,9 @@ export default function TeamPage() {
   const [selectedMember, setSelectedMember] = React.useState<ServiceMember | null>(null)
   const [inviteEmail, setInviteEmail] = React.useState("")
   const [inviteRole, setInviteRole] = React.useState("developer")
+  const [editRole, setEditRole] = React.useState<MemberRole>("developer")
   const [isLoading, setIsLoading] = React.useState(true)
+  const [isSaving, setIsSaving] = React.useState(false)
   const [teamData, setTeamData] = React.useState<TeamData | null>(null)
 
   React.useEffect(() => {
@@ -188,6 +192,59 @@ export default function TeamPage() {
       console.error("Failed to invite member:", error)
       toast.error("초대 발송에 실패했습니다.")
     }
+  }
+
+  const handleUpdateRole = async () => {
+    if (!selectedMember) return
+
+    setIsSaving(true)
+    try {
+      await teamService.updateMember(selectedMember.id, { role: editRole })
+      toast.success("역할이 변경되었습니다.")
+      // Refresh team data
+      const data = await teamService.getTeam()
+      setTeamData(data)
+      setEditMemberDialogOpen(false)
+      setSelectedMember(null)
+    } catch (error) {
+      console.error("Failed to update member role:", error)
+      toast.error("역할 변경에 실패했습니다.")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleRemoveMember = async () => {
+    if (!selectedMember) return
+
+    setIsSaving(true)
+    try {
+      await teamService.removeMember(selectedMember.id)
+      toast.success("멤버가 제거되었습니다.")
+      // Refresh team data
+      const data = await teamService.getTeam()
+      setTeamData(data)
+      setRemoveMemberDialogOpen(false)
+      setSelectedMember(null)
+    } catch (error) {
+      console.error("Failed to remove member:", error)
+      toast.error("멤버 제거에 실패했습니다.")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleExportMembers = () => {
+    const columns = [
+      { key: "name", label: "Name" },
+      { key: "email", label: "Email" },
+      { key: "role", label: "Role" },
+      { key: "status", label: "Status" },
+      { key: "joinedAt", label: "Joined At" },
+      { key: "lastActive", label: "Last Active" },
+    ]
+    downloadCSV(members, generateFilename("team_members"), columns)
+    toast.success("CSV 파일이 다운로드되었습니다.")
   }
 
   if (isLoading) {
@@ -268,14 +325,20 @@ export default function TeamPage() {
                   <CardTitle>Team Members</CardTitle>
                   <CardDescription>현재 조직의 모든 멤버</CardDescription>
                 </div>
-                <div className="relative w-full md:w-[300px]">
-                  <Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-                  <Input
-                    placeholder="Search members..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
+                <div className="flex gap-2">
+                  <div className="relative w-full md:w-[300px]">
+                    <Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+                    <Input
+                      placeholder="Search members..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <Button variant="outline" onClick={handleExportMembers}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Export
+                  </Button>
                 </div>
               </div>
             </CardHeader>
@@ -328,6 +391,7 @@ export default function TeamPage() {
                               <DropdownMenuItem
                                 onClick={() => {
                                   setSelectedMember(member)
+                                  setEditRole(member.role)
                                   setEditMemberDialogOpen(true)
                                 }}
                               >
@@ -530,7 +594,7 @@ export default function TeamPage() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Role</Label>
-              <Select defaultValue={selectedMember?.role}>
+              <Select value={editRole} onValueChange={(value) => setEditRole(value as MemberRole)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -547,10 +611,17 @@ export default function TeamPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditMemberDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setEditMemberDialogOpen(false)}
+              disabled={isSaving}
+            >
               Cancel
             </Button>
-            <Button onClick={() => setEditMemberDialogOpen(false)}>Save Changes</Button>
+            <Button onClick={handleUpdateRole} disabled={isSaving}>
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save Changes
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -573,10 +644,15 @@ export default function TeamPage() {
             </AlertDescription>
           </Alert>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRemoveMemberDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setRemoveMemberDialogOpen(false)}
+              disabled={isSaving}
+            >
               Cancel
             </Button>
-            <Button variant="destructive" onClick={() => setRemoveMemberDialogOpen(false)}>
+            <Button variant="destructive" onClick={handleRemoveMember} disabled={isSaving}>
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Remove Member
             </Button>
           </DialogFooter>

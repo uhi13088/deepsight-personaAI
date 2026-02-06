@@ -44,11 +44,13 @@ class SafetyFiltersService {
     stats: SafetyFilterStats
   }> {
     const params = filterType ? `?filterType=${filterType}` : ""
-    const response = await apiClient.get<{
-      data: SafetyFilter[]
-      total: number
-      byType: Record<FilterType, number>
-    }>(`/safety-filters${params}`)
+    const response = await apiClient.get<
+      | SafetyFilter[]
+      | {
+          data?: SafetyFilter[]
+          stats?: { total: number; active: number; byType: Record<string, number> }
+        }
+    >(`/safety-filters${params}`)
 
     if (!response.success || !response.data) {
       throw new ApiError({
@@ -59,16 +61,17 @@ class SafetyFiltersService {
       })
     }
 
-    const filters = response.data.data
+    // Handle both array and object response formats
+    const filters = Array.isArray(response.data) ? response.data : (response.data.data ?? [])
     const activeCount = filters.filter((f) => f.isActive).length
 
     return {
       filters,
       stats: {
-        total: response.data.total,
+        total: filters.length,
         active: activeCount,
-        inactive: response.data.total - activeCount,
-        byType: response.data.byType || ({} as Record<FilterType, number>),
+        inactive: filters.length - activeCount,
+        byType: {} as Record<FilterType, number>,
       },
     }
   }

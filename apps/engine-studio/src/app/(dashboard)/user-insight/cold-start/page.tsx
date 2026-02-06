@@ -247,9 +247,14 @@ export default function ColdStartPage() {
   const handleTestFullFlow = () => {
     setShowPreview(false)
     toast.info("전체 흐름 테스트를 시작합니다...")
-    setTimeout(() => {
+    // Open cold start preview in a new window
+    const previewUrl = `/cold-start-preview?mode=${activeMode}`
+    const newWindow = window.open(previewUrl, "_blank", "width=500,height=700,scrollbars=yes")
+    if (newWindow) {
       toast.success("테스트 흐름이 새 창에서 시작되었습니다.")
-    }, 500)
+    } else {
+      toast.error("팝업이 차단되었습니다. 팝업 차단을 해제해주세요.")
+    }
   }
 
   const handleAddQuestion = async () => {
