@@ -58,6 +58,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { cn, formatRelativeTime, getHttpStatusColor } from "@/lib/utils"
+import { downloadCSV, downloadJSON, generateFilename } from "@/lib/export"
 
 export default function LogsPage() {
   const [isLoading, setIsLoading] = React.useState(true)
@@ -131,6 +132,27 @@ export default function LogsPage() {
     }
   }
 
+  const handleExportCSV = () => {
+    const columns = [
+      { key: "id", label: "ID" },
+      { key: "timestamp", label: "Timestamp" },
+      { key: "method", label: "Method" },
+      { key: "endpoint", label: "Endpoint" },
+      { key: "statusCode", label: "Status Code" },
+      { key: "latency", label: "Latency (ms)" },
+      { key: "apiKeyName", label: "API Key" },
+      { key: "requestBody", label: "Request Body" },
+      { key: "responseBody", label: "Response Body" },
+    ]
+    downloadCSV(filteredLogs, generateFilename("api_logs"), columns)
+    toast.success("CSV 파일이 다운로드되었습니다.")
+  }
+
+  const handleExportJSON = () => {
+    downloadJSON(filteredLogs, generateFilename("api_logs"))
+    toast.success("JSON 파일이 다운로드되었습니다.")
+  }
+
   const toggleRowExpansion = (logId: string) => {
     setExpandedRows((prev) => {
       const newSet = new Set(prev)
@@ -191,10 +213,19 @@ export default function LogsPage() {
             <RefreshCw className={cn("mr-2 h-4 w-4", isRefreshing && "animate-spin")} />
             Refresh
           </Button>
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Download className="mr-2 h-4 w-4" />
+                Export
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportCSV}>Export as CSV</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportJSON}>Export as JSON</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

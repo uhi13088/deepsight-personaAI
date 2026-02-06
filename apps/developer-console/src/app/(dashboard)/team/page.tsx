@@ -19,6 +19,7 @@ import {
   Key,
   Edit,
   Loader2,
+  Download,
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -69,6 +70,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { cn, formatRelativeTime } from "@/lib/utils"
+import { downloadCSV, generateFilename } from "@/lib/export"
 
 const roles = [
   {
@@ -232,6 +234,19 @@ export default function TeamPage() {
     }
   }
 
+  const handleExportMembers = () => {
+    const columns = [
+      { key: "name", label: "Name" },
+      { key: "email", label: "Email" },
+      { key: "role", label: "Role" },
+      { key: "status", label: "Status" },
+      { key: "joinedAt", label: "Joined At" },
+      { key: "lastActive", label: "Last Active" },
+    ]
+    downloadCSV(members, generateFilename("team_members"), columns)
+    toast.success("CSV 파일이 다운로드되었습니다.")
+  }
+
   if (isLoading) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -310,14 +325,20 @@ export default function TeamPage() {
                   <CardTitle>Team Members</CardTitle>
                   <CardDescription>현재 조직의 모든 멤버</CardDescription>
                 </div>
-                <div className="relative w-full md:w-[300px]">
-                  <Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-                  <Input
-                    placeholder="Search members..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
+                <div className="flex gap-2">
+                  <div className="relative w-full md:w-[300px]">
+                    <Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+                    <Input
+                      placeholder="Search members..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <Button variant="outline" onClick={handleExportMembers}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Export
+                  </Button>
                 </div>
               </div>
             </CardHeader>

@@ -7,11 +7,7 @@
 
 ## 📋 QUEUE (대기)
 
-- [ ] **T19: Export 기능 구현** 🟡 High
-  - 현황: 여러 페이지에 Export 버튼 있으나 미구현
-  - AC1: 감사 로그 CSV/JSON 내보내기
-  - AC2: 사용량 데이터 CSV/JSON 내보내기
-  - AC3: 팀 멤버 목록 CSV 내보내기
+(없음)
 
 ---
 
@@ -22,6 +18,18 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T19: Export 기능 구현** ✅ 2026-02-06
+  - 변경: `apps/developer-console/src/lib/export.ts` (신규)
+  - 변경: `apps/developer-console/src/app/(dashboard)/logs/page.tsx`
+  - 변경: `apps/developer-console/src/app/(dashboard)/usage/page.tsx`
+  - 변경: `apps/developer-console/src/app/(dashboard)/team/page.tsx`
+  - 구현:
+    - 공통 Export 유틸리티 (CSV/JSON 변환, BOM 지원, Blob 다운로드)
+    - AC1: 감사 로그 CSV/JSON 내보내기 (드롭다운 메뉴)
+    - AC2: 사용량 데이터 CSV/JSON 내보내기 (드롭다운 메뉴)
+    - AC3: 팀 멤버 목록 CSV 내보내기
+  - 테스트: Build PASS (developer-console)
 
 - [x] **T18: Invoice 다운로드 기능 구현** ✅ 2026-02-06
   - 변경: `apps/developer-console/src/app/api/billing/invoices/[id]/download/route.ts` (신규)

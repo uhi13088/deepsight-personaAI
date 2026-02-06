@@ -19,6 +19,7 @@ import {
   XCircle,
   Globe,
   Loader2,
+  ChevronDown,
 } from "lucide-react"
 import { toast } from "sonner"
 import { usageService, type UsageData } from "@/services/usage-service"
@@ -35,6 +36,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   Table,
   TableBody,
   TableCell,
@@ -43,6 +50,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { cn, formatNumber, formatCurrency } from "@/lib/utils"
+import { downloadCSV, downloadJSON, generateFilename } from "@/lib/export"
 
 // Helper function to get HTTP status code descriptions
 function getStatusCodeDescription(code: number): string {
@@ -102,6 +110,32 @@ export default function UsagePage() {
   const maxHourlyCalls =
     hourlyDistribution.length > 0 ? Math.max(...hourlyDistribution.map((h) => h.calls)) : 0
 
+  const handleExportCSV = () => {
+    const columns = [
+      { key: "date", label: "Date" },
+      { key: "calls", label: "Total Calls" },
+      { key: "success", label: "Success" },
+      { key: "failed", label: "Failed" },
+      { key: "cost", label: "Cost" },
+    ]
+    downloadCSV(dailyUsage, generateFilename("usage_data"), columns)
+    toast.success("CSV 파일이 다운로드되었습니다.")
+  }
+
+  const handleExportJSON = () => {
+    const exportData = {
+      overview: usageOverview,
+      dailyUsage,
+      byEndpoint: endpointUsage,
+      byStatusCode: errorBreakdown,
+      hourlyDistribution,
+      byRegion: regionUsage,
+      exportedAt: new Date().toISOString(),
+    }
+    downloadJSON(exportData, generateFilename("usage_data"))
+    toast.success("JSON 파일이 다운로드되었습니다.")
+  }
+
   if (isLoading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -131,10 +165,19 @@ export default function UsagePage() {
               <SelectItem value="90d">Last 90 Days</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Download className="mr-2 h-4 w-4" />
+                Export
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportCSV}>Export as CSV</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportJSON}>Export as JSON</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
