@@ -75,16 +75,12 @@ class TeamService {
     }>(this.baseEndpoint, filters)
 
     if (!response.success || !response.data) {
-      throw new ApiError({
-        code: "TEAM_FETCH_FAILED",
-        message: "팀 멤버 목록을 불러오는데 실패했습니다.",
-        status: 500,
-        timestamp: new Date().toISOString(),
-      })
+      return { members: [], total: 0 }
     }
 
     // API 응답을 TeamMember 형식으로 변환
-    const members: TeamMember[] = response.data.data.map((user) => ({
+    const rawData = response.data.data || []
+    const members: TeamMember[] = rawData.map((user) => ({
       id: user.id,
       name: user.name || user.email.split("@")[0],
       email: user.email,
@@ -98,7 +94,7 @@ class TeamService {
 
     return {
       members,
-      total: response.data.total,
+      total: response.data.total || members.length,
     }
   }
 
@@ -276,17 +272,12 @@ class TeamService {
     }>(`${this.baseEndpoint}?stats=true`)
 
     if (!response.success || !response.data) {
-      throw new ApiError({
-        code: "STATS_FETCH_FAILED",
-        message: "팀 통계를 불러오는데 실패했습니다.",
-        status: 500,
-        timestamp: new Date().toISOString(),
-      })
+      return { totalMembers: 0, activeMembers: 0, pendingInvites: 0, totalRoles: 4 }
     }
 
     const stats = response.data
     return {
-      totalMembers: stats.total,
+      totalMembers: stats.total || 0,
       activeMembers: stats.byStatus?.active || 0,
       pendingInvites: stats.byStatus?.pending || 0,
       totalRoles: Object.keys(stats.byRole || {}).length || 4,
