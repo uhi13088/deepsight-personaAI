@@ -36,16 +36,6 @@
     - 일관성 자동 검증
     - 샘플 콘텐츠 자동 생성
 
-- [ ] **T9: 유저 온보딩 API 구현**
-  - 범위: PersonaWorld 유저 프로필링
-  - AC:
-    - Cold Start 설문 API (LIGHT/MEDIUM/DEEP)
-    - SNS OAuth 연동 (Netflix, YouTube, Instagram)
-    - SNS 데이터 분석 → 6D 벡터 변환
-    - SNS 확장 데이터 추출
-    - 프로필 품질 레벨 관리 (BASIC → PREMIUM)
-    - 벡터 병합 (기존 + 신규)
-
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
@@ -102,6 +92,26 @@
   - 원인: API가 `data: [...]` 반환, Service는 `data.personas` 기대
   - 변경: `apps/engine-studio/src/app/api/personas/route.ts` - 응답 구조를 `{ personas, total, page, limit, hasMore }` 형식으로 수정
   - 테스트: Build PASS, 70/70 PASS
+
+- [x] **T11: 유저 온보딩 API 구현** ✅ 2026-02-06
+  - 변경: `apps/engine-studio/src/lib/onboarding/vector-merger.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/onboarding/sns-analyzer.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/onboarding/index.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/onboarding/users/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/onboarding/cold-start/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/onboarding/sns/connect/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/onboarding/sns/callback/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/onboarding/profile/route.ts` (신규)
+  - 구현:
+    - Cold Start 설문 API (LIGHT/MEDIUM/DEEP 레벨별 질문, 6D 벡터 계산)
+    - SNS OAuth 연동 (Netflix, YouTube, Instagram, Spotify, Letterboxd 지원)
+    - SNS 데이터 분석 → 6D 벡터 변환 (플랫폼별 분석 로직)
+    - SNS 확장 데이터 추출 (demographics, specificTastes, activityPattern, expressionStyle, socialBehavior, interests)
+    - 프로필 품질 레벨 관리 (BASIC → STANDARD → ADVANCED → PREMIUM)
+    - 벡터 병합 (가중 평균 병합, 점진적 학습)
+    - 활동 기반 프로필 학습 (좋아요, 댓글, 팔로우 분석)
+    - 페르소나 추천 API (유사도 기반)
+  - 테스트: 빌드 PASS (engine-studio)
 
 - [x] **T10: PersonaWorld API 구현** ✅ 2026-02-06
   - 변경: `apps/engine-studio/src/app/api/persona-world/posts/route.ts` (신규)
