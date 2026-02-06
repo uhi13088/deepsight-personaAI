@@ -88,8 +88,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data,
-      total: data.length,
+      data: {
+        data,
+        total: data.length,
+      },
     })
   } catch (error) {
     console.error("[API] GET /api/users error:", error)
