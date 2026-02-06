@@ -19,6 +19,12 @@
 
 ## ✅ DONE (완료)
 
+- [x] **Hotfix: expertise 배열 null 체크 추가** ✅ 2026-02-06
+  - 원인: DB 기존 데이터에서 expertise가 null → `.length` 호출 시 TypeError
+  - 변경: `apps/engine-studio/src/app/api/personas/route.ts` - `expertise ?? []`
+  - 변경: `apps/engine-studio/src/app/api/personas/[id]/route.ts` - `expertise ?? []`
+  - 테스트: Build PASS, 70/70 PASS
+
 - [x] **Hotfix: 페르소나 목록 API 응답 구조 수정** ✅ 2026-02-06
   - 원인: API가 `data: [...]` 반환, Service는 `data.personas` 기대
   - 변경: `apps/engine-studio/src/app/api/personas/route.ts` - 응답 구조를 `{ personas, total, page, limit, hasMore }` 형식으로 수정
