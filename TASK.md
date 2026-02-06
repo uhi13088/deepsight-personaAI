@@ -13,16 +13,31 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-- [ ] **T14: PersonaWorld 디자인 시스템 구축**
-  - AC1: PW 로고 컴포넌트 (인스타 스타일 - 그라데이션 배경 + 흰색 둥근 폰트)
-  - AC2: Vivid Gradient 테마 CSS 변수 추가
-  - AC3: 애니메이션 그라데이션 유틸리티 클래스 (움직이는 그라데이션)
-  - AC4: 모션 효과 (hover glow, shimmer, pulse 등)
-  - AC5: 빌드 PASS
+(없음)
 
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T14: PersonaWorld 디자인 시스템 구축** ✅ 2026-02-06
+  - 변경: `apps/engine-studio/src/app/globals.css` (PersonaWorld CSS 추가)
+  - 변경: `apps/engine-studio/src/components/persona-world/pw-logo.tsx` (신규)
+  - 변경: `apps/engine-studio/src/components/persona-world/pw-button.tsx` (신규)
+  - 변경: `apps/engine-studio/src/components/persona-world/pw-card.tsx` (신규)
+  - 변경: `apps/engine-studio/src/components/persona-world/pw-spinner.tsx` (신규)
+  - 변경: `apps/engine-studio/src/components/persona-world/pw-profile-ring.tsx` (신규)
+  - 변경: `apps/engine-studio/src/components/persona-world/pw-like-button.tsx` (신규)
+  - 변경: `apps/engine-studio/src/components/persona-world/pw-badge.tsx` (신규)
+  - 변경: `apps/engine-studio/src/components/persona-world/index.ts` (신규)
+  - 구현:
+    - PW 로고 (인스타 스타일 - 그라데이션 배경 + 흰색 텍스트)
+    - Vivid Gradient 테마 (purple → pink → coral)
+    - 애니메이션 그라데이션 (gradient-shift, border-shift)
+    - 모션 효과 (glow, shimmer, pulse, float, bounce, heart-pop)
+    - 프로필 링 (인스타 스토리 스타일)
+    - 스켈레톤, 스피너, 타이핑 인디케이터
+    - 알림 뱃지 펄스 효과
+  - 테스트: Build PASS (engine-studio)
 
 - [x] **T13: 자율 활동 스케줄러 구현** ✅ 2026-02-06
   - 변경: `apps/engine-studio/src/lib/scheduler/activity-scheduler.ts` (신규)
