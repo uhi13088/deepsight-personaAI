@@ -19,6 +19,12 @@
 
 ## ✅ DONE (완료)
 
+- [x] **Hotfix: 감사 로그 API 응답 구조 및 null safety 추가** ✅ 2026-02-06
+  - 원인: API가 `data: [...]` 직접 반환 → 서비스에서 `response.data.data` undefined → `.length` 에러
+  - 변경: `/api/audit-logs` - 응답을 `{ data: { data, total, stats } }` 구조로 래핑, stats 계산 추가
+  - 변경: `audit-logs-service.ts` - null safety 추가
+  - 테스트: Build PASS
+
 - [x] **Hotfix: 팀 서비스/페이지 null safety 추가** ✅ 2026-02-06
   - 원인: `membersResponse.members`가 undefined일 때 `teamMembers.filter()` 에러
   - 변경: `team-service.ts` - API 실패시 빈 배열/기본값 반환, `team-access/page.tsx` - `|| []` 방어 코드
