@@ -339,17 +339,64 @@ model Persona {
   name                String
   description         String?
   category            String?
+  role                PersonaRole   @default(REVIEWER)
+  profileImageUrl     String?
 
-  // 6D Vector dimensions (stored as Float for vector operations)
-  depth               Float         @default(0)
-  lens                Float         @default(0)
-  stance              Float         @default(0)
-  scope               Float         @default(0)
-  taste               Float         @default(0)
-  purpose             Float         @default(0)
+  // === 6D Vector dimensions ===
+  depth               Float         @default(0) // 분석 깊이: 직관적(0.0) ↔ 심층적(1.0)
+  lens                Float         @default(0) // 판단 렌즈: 감성적(0.0) ↔ 논리적(1.0)
+  stance              Float         @default(0) // 평가 태도: 수용적(0.0) ↔ 비판적(1.0)
+  scope               Float         @default(0) // 관심 범위: 핵심만(0.0) ↔ 디테일(1.0)
+  taste               Float         @default(0) // 취향 성향: 클래식(0.0) ↔ 실험적(1.0)
+  purpose             Float         @default(0) // 소비 목적: 오락(0.0) ↔ 의미추구(1.0)
+
+  // === Layer 2: 캐릭터 속성 ===
+  handle              String?       // SNS 핸들 (@yuna_feels)
+  tagline             String?       // 한줄 자기소개
+  birthDate           DateTime?     // 생년월일
+  country             String?       @default("KR") // 국가 코드
+  region              String?       // 지역
+  warmth              Float?        // 표현 온도 0.0~1.0
+  expertiseLevel      ExpertiseLevel @default(ENTHUSIAST)
+  speechPatterns      String[]      @default([]) // 말버릇
+  quirks              String[]      @default([]) // 특이 습관
+  background          String?       @db.Text // 배경 스토리
+  favoriteGenres      String[]      @default([]) // 선호 장르
+  dislikedGenres      String[]      @default([]) // 비선호 장르
+  viewingHabits       String?       // 시청 습관
+
+  // === 활동성 속성 (PersonaWorld용) ===
+  sociability         Float?        // 사교성 0.0~1.0
+  initiative          Float?        // 주도성 0.0~1.0
+  expressiveness      Float?        // 표현력 0.0~1.0
+  interactivity       Float?        // 친화력 0.0~1.0
+  postFrequency       PostFrequency @default(MODERATE)
+  timezone            String        @default("Asia/Seoul")
+  activeHours         Int[]         @default([]) // 활동 시간대
+  peakHours           Int[]         @default([]) // 피크 시간대
+
+  // === 콘텐츠/관계 설정 (JSON) ===
+  contentSettings     Json?         // preferredPostTypes, contentStyle, reviewStyle
+  relationshipSettings Json?        // relationshipStyle, conflictStyle
+
+  // === 프롬프트 템플릿 ===
+  promptTemplate      String?       @db.Text // 기본 프롬프트
+  basePrompt          String?       @db.Text // 기본 페르소나 정의
+  reviewPrompt        String?       @db.Text // 리뷰 생성용
+  postPrompt          String?       @db.Text // 일반 포스트용
+  commentPrompt       String?       @db.Text // 댓글 생성용
+  interactionPrompt   String?       @db.Text // 인터랙션용
+  specialPrompts      Json?         // vsBattle, qna, debate, collab 등
+
+  // === 품질 및 상태 ===
+  status              PersonaStatus @default(ACTIVE)
+  qualityScore        Float?
+  consistencyScore    Float?
+  source              PersonaSource @default(MANUAL)
+  generationConfig    Json?         // 자동 생성 시 설정
+  sampleContents      Json?         // 자동 생성된 샘플
 
   metadata            Json?
-
   active              Boolean       @default(true)
 
   createdAt           DateTime      @default(now())
@@ -358,6 +405,44 @@ model Persona {
   matchResults        MatchResult[]
 
   @@map("personas")
+}
+
+enum PersonaRole {
+  REVIEWER
+  CURATOR
+  EDUCATOR
+  COMPANION
+  ANALYST
+}
+
+enum PersonaStatus {
+  DRAFT
+  REVIEW
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum PersonaSource {
+  MANUAL
+  INCUBATOR
+  MUTATION
+  AUTO_GENERATED
+}
+
+enum ExpertiseLevel {
+  CASUAL
+  ENTHUSIAST
+  EXPERT
+  CRITIC
+}
+
+enum PostFrequency {
+  RARE
+  OCCASIONAL
+  MODERATE
+  ACTIVE
+  HYPERACTIVE
 }
 
 model MatchResult {

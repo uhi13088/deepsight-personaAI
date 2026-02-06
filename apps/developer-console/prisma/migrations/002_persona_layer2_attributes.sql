@@ -1,0 +1,52 @@
+-- 002: Persona Layer 2 Attributes
+-- 페르소나 캐릭터 속성 및 활동성 속성 추가
+
+-- === 기본 정보 ===
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'REVIEWER';
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "profileImageUrl" TEXT;
+
+-- === Layer 2: 캐릭터 속성 ===
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS handle TEXT;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS tagline TEXT;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "birthDate" TIMESTAMPTZ;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS country TEXT DEFAULT 'KR';
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS region TEXT;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS warmth FLOAT;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "expertiseLevel" TEXT DEFAULT 'ENTHUSIAST';
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "speechPatterns" TEXT[] DEFAULT '{}';
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS quirks TEXT[] DEFAULT '{}';
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS background TEXT;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "favoriteGenres" TEXT[] DEFAULT '{}';
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "dislikedGenres" TEXT[] DEFAULT '{}';
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "viewingHabits" TEXT;
+
+-- === 활동성 속성 (PersonaWorld용) ===
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS sociability FLOAT;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS initiative FLOAT;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS expressiveness FLOAT;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS interactivity FLOAT;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "postFrequency" TEXT DEFAULT 'MODERATE';
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'Asia/Seoul';
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "activeHours" INTEGER[] DEFAULT '{}';
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "peakHours" INTEGER[] DEFAULT '{}';
+
+-- === 콘텐츠/관계 설정 (JSON) ===
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "contentSettings" JSONB;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "relationshipSettings" JSONB;
+
+-- === 프롬프트 템플릿 ===
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "promptTemplate" TEXT;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "basePrompt" TEXT;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "reviewPrompt" TEXT;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "postPrompt" TEXT;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "commentPrompt" TEXT;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "interactionPrompt" TEXT;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "specialPrompts" JSONB;
+
+-- === 품질 및 상태 ===
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'ACTIVE';
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "qualityScore" FLOAT;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "consistencyScore" FLOAT;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'MANUAL';
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "generationConfig" JSONB;
+ALTER TABLE personas ADD COLUMN IF NOT EXISTS "sampleContents" JSONB;

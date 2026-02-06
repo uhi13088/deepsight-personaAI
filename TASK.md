@@ -7,7 +7,55 @@
 
 ## 📋 QUEUE (대기)
 
-(없음)
+- [ ] **T12: 피드 알고리즘 구현**
+  - 범위: PersonaWorld 피드 시스템
+  - AC:
+    - 팔로우 기반 피드 (60%)
+    - 6D 유사도 기반 추천 피드 (30%)
+    - 트렌딩 피드 (10%)
+    - 혼합 피드 알고리즘
+    - Explore 탭 (카테고리별 인기, 핫토픽, 활발한 토론)
+
+- [ ] **T11: 자율 활동 스케줄러 구현**
+  - 범위: 페르소나 자동 SNS 활동
+  - AC:
+    - 성격 기반 활동 시간 결정
+    - 자율 포스팅 엔진 (LLM 연동)
+    - 자율 인터랙션 엔진 (좋아요, 댓글, 팔로우)
+    - 콘텐츠 출시 트리거
+    - 트렌딩 토픽 반응
+
+- [ ] **T10: 페르소나 자동 생성 파이프라인 구현**
+  - 범위: 설계문서(persona-system-v2-design.md) 기반
+  - AC:
+    - 6D 벡터 자동 배정 (다양성 기반)
+    - 캐릭터 속성 자동 생성 (LLM)
+    - 활동성 속성 자동 추론 (규칙 기반)
+    - 콘텐츠/관계 설정 자동 추론
+    - 프롬프트 템플릿 자동 생성
+    - 일관성 자동 검증
+    - 샘플 콘텐츠 자동 생성
+
+- [ ] **T9: 유저 온보딩 API 구현**
+  - 범위: PersonaWorld 유저 프로필링
+  - AC:
+    - Cold Start 설문 API (LIGHT/MEDIUM/DEEP)
+    - SNS OAuth 연동 (Netflix, YouTube, Instagram)
+    - SNS 데이터 분석 → 6D 벡터 변환
+    - SNS 확장 데이터 추출
+    - 프로필 품질 레벨 관리 (BASIC → PREMIUM)
+    - 벡터 병합 (기존 + 신규)
+
+- [ ] **T8: PersonaWorld API 구현**
+  - 범위: SNS 기능 API
+  - AC:
+    - Posts CRUD API
+    - Likes API (생성/삭제, 카운트 동기화)
+    - Comments API (생성/수정/삭제, 답글 지원)
+    - Follows API (팔로우/언팔로우, 팔로워/팔로잉 조회)
+    - Reposts API
+    - Bookmarks API
+    - 모더레이션 API (숨김, 삭제, 신고 처리)
 
 ---
 
@@ -65,6 +113,17 @@
   - 원인: API가 `data: [...]` 반환, Service는 `data.personas` 기대
   - 변경: `apps/engine-studio/src/app/api/personas/route.ts` - 응답 구조를 `{ personas, total, page, limit, hasMore }` 형식으로 수정
   - 테스트: Build PASS, 70/70 PASS
+
+- [x] **T9: developer-console Persona 스키마 동기화** ✅ 2026-02-06
+  - 변경: `apps/developer-console/prisma/schema.prisma`
+    - Layer 2 캐릭터 속성 추가 (handle, tagline, birthDate, country, region, warmth, expertiseLevel 등)
+    - 활동성 속성 추가 (sociability, initiative, expressiveness, interactivity, postFrequency 등)
+    - 콘텐츠/관계 설정 추가 (contentSettings, relationshipSettings JSON)
+    - 프롬프트 템플릿 추가 (basePrompt, reviewPrompt, postPrompt, commentPrompt, interactionPrompt)
+    - 품질/상태 필드 추가 (status, qualityScore, consistencyScore, source)
+    - 신규 Enum 추가 (PersonaRole, PersonaStatus, PersonaSource, ExpertiseLevel, PostFrequency)
+  - 변경: `apps/developer-console/prisma/migrations/002_persona_layer2_attributes.sql` (신규)
+  - 테스트: 빌드 PASS (developer-console, engine-studio)
 
 - [x] **T8: PersonaWorld 스키마 구현** ✅ 2026-02-06
   - 변경: `apps/engine-studio/prisma/schema.prisma`
