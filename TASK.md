@@ -7,9 +7,7 @@
 
 ## 📋 QUEUE (대기)
 
-- [ ] **T7: Developer Console 미완성 부분 마무리**
-  - AC1: 로그 페이지 실제 DB 연동 (mock 제거)
-  - AC2: 빌링 페이지 미완성 TODO 처리
+(없음)
 
 ---
 
@@ -20,6 +18,13 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T7: Developer Console 미완성 부분 마무리** ✅ 2026-02-06
+  - AC1: 로그 페이지 → 이미 DB 연동 완료 상태 (mock 없음)
+  - AC2: 빌링 페이지 TODO 수정
+    - 변경: `apps/developer-console/src/app/api/billing/upgrade/route.ts` - customerName 세션 연동
+    - 변경: `apps/developer-console/src/app/api/billing/toss/success/route.ts` - organization 세션 연동
+  - 테스트: Build PASS
 
 - [x] **T6: Engine Studio api-endpoints 중복 제거 및 DB 연동** ✅ 2026-02-05
   - 변경: `apps/engine-studio/prisma/schema.prisma` (ApiEndpoint 모델, HttpMethod/EndpointStatus enum 추가)

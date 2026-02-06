@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import crypto from "crypto"
+import { auth } from "@/lib/auth"
 
 const upgradeSchema = z.object({
   planId: z.enum(["free", "starter", "pro", "enterprise"]),
@@ -25,6 +26,9 @@ const PLAN_NAMES: Record<string, string> = {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth()
+    const customerName = session?.user?.name || "DeepSight 사용자"
+
     const body = await request.json()
     const parsed = upgradeSchema.safeParse(body)
 
@@ -82,7 +86,7 @@ export async function POST(request: NextRequest) {
           orderId,
           orderName: PLAN_NAMES[planId],
           amount: PLAN_PRICES[planId],
-          customerName: "DeepSight 사용자", // TODO: Get from session
+          customerName,
           successUrl: `${baseUrl}/api/billing/toss/success?planId=${planId}`,
           failUrl: `${baseUrl}/billing?error=payment_failed`,
         },
