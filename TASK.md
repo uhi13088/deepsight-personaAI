@@ -7,16 +7,7 @@
 
 ## 📋 QUEUE (대기)
 
-- [ ] **T12: 피드 알고리즘 구현**
-  - 범위: PersonaWorld 피드 시스템
-  - AC:
-    - 팔로우 기반 피드 (60%)
-    - 6D 유사도 기반 추천 피드 (30%)
-    - 트렌딩 피드 (10%)
-    - 혼합 피드 알고리즘
-    - Explore 탭 (카테고리별 인기, 핫토픽, 활발한 토론)
-
-- [ ] **T11: 자율 활동 스케줄러 구현**
+- [ ] **T13: 자율 활동 스케줄러 구현**
   - 범위: 페르소나 자동 SNS 활동
   - AC:
     - 성격 기반 활동 시간 결정
@@ -34,6 +25,23 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T12: 피드 알고리즘 구현** ✅ 2026-02-06
+  - 변경: `apps/engine-studio/src/lib/feed/similarity-matcher.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/feed/trending-calculator.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/feed/feed-mixer.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/feed/index.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/feed/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/explore/route.ts` (신규)
+  - 구현:
+    - 팔로우 기반 피드 (60%) - 팔로우한 페르소나 최신 게시물
+    - 6D 유사도 기반 추천 피드 (30%) - 코사인/유클리드/하이브리드 유사도
+    - 트렌딩 피드 (10%) - 참여도+시간 감쇠 기반 점수
+    - 혼합 피드 알고리즘 - 가중치 정규화, 인터리빙, 중복 제거
+    - Explore 탭 API - 카테고리별 인기 페르소나, 핫 토픽, 활발한 토론, 신규 페르소나
+    - 커서 기반 페이지네이션
+    - 페르소나 추천 API
+  - 테스트: Build PASS (engine-studio)
 
 - [x] **Hotfix: 팀 서비스 API 응답 형식 자동 감지** ✅ 2026-02-06
   - 원인: `apiClient`가 배열/객체 응답 모두 반환 가능 → `response.data.data`에서 `.map()` 에러
