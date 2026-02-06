@@ -25,17 +25,6 @@
     - 콘텐츠 출시 트리거
     - 트렌딩 토픽 반응
 
-- [ ] **T10: 페르소나 자동 생성 파이프라인 구현**
-  - 범위: 설계문서(persona-system-v2-design.md) 기반
-  - AC:
-    - 6D 벡터 자동 배정 (다양성 기반)
-    - 캐릭터 속성 자동 생성 (LLM)
-    - 활동성 속성 자동 추론 (규칙 기반)
-    - 콘텐츠/관계 설정 자동 추론
-    - 프롬프트 템플릿 자동 생성
-    - 일관성 자동 검증
-    - 샘플 콘텐츠 자동 생성
-
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
@@ -92,6 +81,28 @@
   - 원인: API가 `data: [...]` 반환, Service는 `data.personas` 기대
   - 변경: `apps/engine-studio/src/app/api/personas/route.ts` - 응답 구조를 `{ personas, total, page, limit, hasMore }` 형식으로 수정
   - 테스트: Build PASS, 70/70 PASS
+
+- [x] **T12: 페르소나 자동 생성 파이프라인 구현** ✅ 2026-02-06
+  - 변경: `apps/engine-studio/src/lib/persona-generation/vector-diversity.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/persona-generation/character-generator.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/persona-generation/activity-inference.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/persona-generation/content-settings-inference.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/persona-generation/prompt-builder.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/persona-generation/consistency-validator.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/persona-generation/sample-content-generator.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/persona-generation/index.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/personas/generate/route.ts` (신규)
+  - 구현:
+    - 6D 벡터 자동 배정 (다양성 분석, 빈 셀/부족 셀 우선, 최대 거리 벡터 생성)
+    - 캐릭터 속성 자동 생성 (이름, 핸들, 태그라인, 생년월일, 국가/지역, warmth, expertiseLevel, 말버릇, 습관, 배경, 장르 선호)
+    - 활동성 속성 자동 추론 (sociability, initiative, expressiveness, interactivity, postFrequency, 활동 시간대)
+    - 콘텐츠/관계 설정 자동 추론 (포스트 타입 선호, 콘텐츠 스타일, 리뷰 스타일, 인터랙션 스타일, 관계/갈등/협업 스타일)
+    - 프롬프트 템플릿 자동 생성 (basePrompt, reviewPrompt, postPrompt, commentPrompt, interactionPrompt, specialPrompts)
+    - 일관성 자동 검증 (벡터↔캐릭터, 캐릭터↔활동성, 활동성↔콘텐츠, 관계 설정 검증, 70점 이상 통과, 자동 수정)
+    - 샘플 콘텐츠 자동 생성 (리뷰 2개, 포스트 1개, 댓글 2개)
+    - 배치 생성 기능 (다양성 고려)
+    - API 엔드포인트 (POST 단일/배치 생성, GET 다양성 분석)
+  - 테스트: 빌드 PASS (engine-studio)
 
 - [x] **T11: 유저 온보딩 API 구현** ✅ 2026-02-06
   - 변경: `apps/engine-studio/src/lib/onboarding/vector-merger.ts` (신규)
