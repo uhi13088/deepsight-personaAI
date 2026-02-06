@@ -7,7 +7,23 @@
 
 ## 📋 QUEUE (대기)
 
-(없음)
+- [ ] **T12: 피드 알고리즘 구현**
+  - 범위: PersonaWorld 피드 시스템
+  - AC:
+    - 팔로우 기반 피드 (60%)
+    - 6D 유사도 기반 추천 피드 (30%)
+    - 트렌딩 피드 (10%)
+    - 혼합 피드 알고리즘
+    - Explore 탭 (카테고리별 인기, 핫토픽, 활발한 토론)
+
+- [ ] **T11: 자율 활동 스케줄러 구현**
+  - 범위: 페르소나 자동 SNS 활동
+  - AC:
+    - 성격 기반 활동 시간 결정
+    - 자율 포스팅 엔진 (LLM 연동)
+    - 자율 인터랙션 엔진 (좋아요, 댓글, 팔로우)
+    - 콘텐츠 출시 트리거
+    - 트렌딩 토픽 반응
 
 ---
 
@@ -65,6 +81,95 @@
   - 원인: API가 `data: [...]` 반환, Service는 `data.personas` 기대
   - 변경: `apps/engine-studio/src/app/api/personas/route.ts` - 응답 구조를 `{ personas, total, page, limit, hasMore }` 형식으로 수정
   - 테스트: Build PASS, 70/70 PASS
+
+- [x] **T12: 페르소나 자동 생성 파이프라인 구현** ✅ 2026-02-06
+  - 변경: `apps/engine-studio/src/lib/persona-generation/vector-diversity.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/persona-generation/character-generator.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/persona-generation/activity-inference.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/persona-generation/content-settings-inference.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/persona-generation/prompt-builder.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/persona-generation/consistency-validator.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/persona-generation/sample-content-generator.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/persona-generation/index.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/personas/generate/route.ts` (신규)
+  - 구현:
+    - 6D 벡터 자동 배정 (다양성 분석, 빈 셀/부족 셀 우선, 최대 거리 벡터 생성)
+    - 캐릭터 속성 자동 생성 (이름, 핸들, 태그라인, 생년월일, 국가/지역, warmth, expertiseLevel, 말버릇, 습관, 배경, 장르 선호)
+    - 활동성 속성 자동 추론 (sociability, initiative, expressiveness, interactivity, postFrequency, 활동 시간대)
+    - 콘텐츠/관계 설정 자동 추론 (포스트 타입 선호, 콘텐츠 스타일, 리뷰 스타일, 인터랙션 스타일, 관계/갈등/협업 스타일)
+    - 프롬프트 템플릿 자동 생성 (basePrompt, reviewPrompt, postPrompt, commentPrompt, interactionPrompt, specialPrompts)
+    - 일관성 자동 검증 (벡터↔캐릭터, 캐릭터↔활동성, 활동성↔콘텐츠, 관계 설정 검증, 70점 이상 통과, 자동 수정)
+    - 샘플 콘텐츠 자동 생성 (리뷰 2개, 포스트 1개, 댓글 2개)
+    - 배치 생성 기능 (다양성 고려)
+    - API 엔드포인트 (POST 단일/배치 생성, GET 다양성 분석)
+  - 테스트: 빌드 PASS (engine-studio)
+
+- [x] **T11: 유저 온보딩 API 구현** ✅ 2026-02-06
+  - 변경: `apps/engine-studio/src/lib/onboarding/vector-merger.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/onboarding/sns-analyzer.ts` (신규)
+  - 변경: `apps/engine-studio/src/lib/onboarding/index.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/onboarding/users/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/onboarding/cold-start/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/onboarding/sns/connect/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/onboarding/sns/callback/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/onboarding/profile/route.ts` (신규)
+  - 구현:
+    - Cold Start 설문 API (LIGHT/MEDIUM/DEEP 레벨별 질문, 6D 벡터 계산)
+    - SNS OAuth 연동 (Netflix, YouTube, Instagram, Spotify, Letterboxd 지원)
+    - SNS 데이터 분석 → 6D 벡터 변환 (플랫폼별 분석 로직)
+    - SNS 확장 데이터 추출 (demographics, specificTastes, activityPattern, expressionStyle, socialBehavior, interests)
+    - 프로필 품질 레벨 관리 (BASIC → STANDARD → ADVANCED → PREMIUM)
+    - 벡터 병합 (가중 평균 병합, 점진적 학습)
+    - 활동 기반 프로필 학습 (좋아요, 댓글, 팔로우 분석)
+    - 페르소나 추천 API (유사도 기반)
+  - 테스트: 빌드 PASS (engine-studio)
+
+- [x] **T10: PersonaWorld API 구현** ✅ 2026-02-06
+  - 변경: `apps/engine-studio/src/app/api/persona-world/posts/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/posts/[id]/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/posts/[id]/likes/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/posts/[id]/comments/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/follows/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/bookmarks/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/persona-world/reports/route.ts` (신규)
+  - 구현:
+    - Posts CRUD API (GET list, GET detail, POST, PATCH, DELETE)
+    - Likes API (GET list, POST, DELETE)
+    - Comments API (GET list, POST, PATCH, DELETE, 답글 지원)
+    - Follows API (GET followers/following, POST, DELETE)
+    - Bookmarks API (GET list, POST, DELETE)
+    - Reports API (GET list, POST, PATCH 처리)
+    - 활동 로그 자동 기록
+  - 테스트: 빌드 PASS (engine-studio)
+
+- [x] **T9: developer-console Persona 스키마 동기화** ✅ 2026-02-06
+  - 변경: `apps/developer-console/prisma/schema.prisma`
+    - Layer 2 캐릭터 속성 추가 (handle, tagline, birthDate, country, region, warmth, expertiseLevel 등)
+    - 활동성 속성 추가 (sociability, initiative, expressiveness, interactivity, postFrequency 등)
+    - 콘텐츠/관계 설정 추가 (contentSettings, relationshipSettings JSON)
+    - 프롬프트 템플릿 추가 (basePrompt, reviewPrompt, postPrompt, commentPrompt, interactionPrompt)
+    - 품질/상태 필드 추가 (status, qualityScore, consistencyScore, source)
+    - 신규 Enum 추가 (PersonaRole, PersonaStatus, PersonaSource, ExpertiseLevel, PostFrequency)
+  - 변경: `apps/developer-console/prisma/migrations/002_persona_layer2_attributes.sql` (신규)
+  - 테스트: 빌드 PASS (developer-console, engine-studio)
+
+- [x] **T8: PersonaWorld 스키마 구현** ✅ 2026-02-06
+  - 변경: `apps/engine-studio/prisma/schema.prisma`
+    - Persona 모델 확장 (Layer 2 캐릭터 속성, 활동성 속성, 콘텐츠/관계 설정, 프롬프트 템플릿)
+    - PersonaWorld 모델 추가 (PersonaPost, PersonaPostLike, PersonaComment, PersonaFollow, PersonaRepost)
+    - PersonaWorld 유저 모델 추가 (PersonaWorldUser, SNSConnection, PWUserSurveyResponse)
+    - 모더레이션 모델 추가 (PersonaWorldReport, PersonaActivityLog)
+    - 신규 Enum 추가 (PersonaPostType, ActivityTrigger, PostFrequency, ExpertiseLevel, ProfileQuality, SNSPlatform 등)
+  - 변경: `apps/engine-studio/prisma/migrations/004_persona_world_system.sql` (신규)
+    - Persona 테이블 확장 컬럼 추가
+    - PersonaWorld 관련 테이블 전체 생성
+    - 좋아요/댓글/리포스트 카운트 자동 업데이트 트리거
+  - 구현:
+    - 설계 문서(persona-world-design.md, persona-system-v2-design.md) 기반 스키마 구현
+    - 완전 자율 운영 시스템 지원 구조
+    - 유저 온보딩 (SNS 연동 / Cold Start) 지원 구조
+    - SNS 확장 데이터 저장 구조
+  - 테스트: 빌드 PASS (engine-studio)
 
 - [x] **T7: Developer Console 미완성 부분 마무리** ✅ 2026-02-06
   - AC1: 로그 페이지 → 이미 DB 연동 완료 상태 (mock 없음)
