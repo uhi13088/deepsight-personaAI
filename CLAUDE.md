@@ -76,8 +76,10 @@ pnpm --filter engine-studio build  # 앱별 빌드
 ## 참조 문서
 
 - 상세 개발 가이드: `docs/DEVELOPMENT_GUIDE.md`
-- 기능정의서 (엔진스튜디오): `docs/deepsight_engine_studio.md`
-- 기능정의서 (개발자콘솔): `docs/deepsight_developer_console.md`
-- 기술 설계: `docs/deepsight_technical_design.md`
+- 기능정의서 (엔진스튜디오): `docs/[기능정의서] DeepSight_엔진스튜디오.md`
+- 기능정의서 (개발자콘솔): `docs/[기능정의서] DeepSight_개발자콘솔.md`
+- 기능정의서 (페르소나월드): `docs/[기능정의서] DeepSight_페르소나월드.md`
+- 설계서 (페르소나시스템): `docs/[설계서] DeepSight_페르소나시스템_v2.md`
+- UI 가이드 (디자인시스템): `docs/[UI가이드] DeepSight_페르소나월드_디자인시스템.md`
 - DB 스키마: `apps/engine-studio/prisma/schema.prisma`
 - 교훈 기록: `tasks/lessons.md`

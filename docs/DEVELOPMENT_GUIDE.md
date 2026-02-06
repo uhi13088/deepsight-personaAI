@@ -18,23 +18,26 @@
 
 ## 필수 참조 문서
 
-| 문서                          | 경로                                  | 핵심 용도                |
-| ----------------------------- | ------------------------------------- | ------------------------ |
-| **기능정의서 - 개발자콘솔**   | `docs/deepsight_developer_console.md` | API 관리, 대시보드 기능  |
-| **기능정의서 - 엔진스튜디오** | `docs/deepsight_engine_studio.md`     | 페르소나 설정, 벡터 매칭 |
-| **사업계획서**                | `docs/deepsight_business_plan.md`     | 비즈니스 모델, 시장 분석 |
-| **마케팅 가이드**             | `docs/deepsight_marketing_guide.md`   | 가격 전략, GTM           |
-| **기술 설계**                 | `docs/deepsight_technical_design.md`  | 아키텍처, DB, API 설계   |
+| 문서                           | 경로                                                     | 핵심 용도                |
+| ------------------------------ | -------------------------------------------------------- | ------------------------ |
+| **기능정의서 - 개발자콘솔**    | `docs/[기능정의서] DeepSight_개발자콘솔.md`              | API 관리, 대시보드 기능  |
+| **기능정의서 - 엔진스튜디오**  | `docs/[기능정의서] DeepSight_엔진스튜디오.md`            | 페르소나 설정, 벡터 매칭 |
+| **기능정의서 - 페르소나월드**  | `docs/[기능정의서] DeepSight_페르소나월드.md`            | AI SNS, 자율 활동 시스템 |
+| **설계서 - 페르소나시스템 v2** | `docs/[설계서] DeepSight_페르소나시스템_v2.md`           | 페르소나 레이어, 6D 벡터 |
+| **UI가이드 - 디자인시스템**    | `docs/[UI가이드] DeepSight_페르소나월드_디자인시스템.md` | 컴포넌트, 컬러, 모션     |
+| **마케팅 가이드**              | `docs/[가이드] DeepSight_마케팅 및 가격 전략 가이드.md`  | 가격 전략, GTM           |
+| **개발 가이드**                | `docs/[개발가이드] DeepSight_클로드코드.md`              | Claude Code 사용법       |
 
 ### 문서 참조 규칙
 
 ```
-페르소나 기능 개발 → 엔진스튜디오 기능정의서
+페르소나 기능 개발 → 엔진스튜디오 기능정의서 + 페르소나시스템 설계서
+PersonaWorld 기능 개발 → 페르소나월드 기능정의서
+PersonaWorld UI 개발 → 페르소나월드 디자인시스템 가이드
 API/대시보드 개발 → 개발자콘솔 기능정의서
-벡터 매칭 로직 → 기술 설계
-인증/멀티테넌트 → 기술 설계
-UI/UX 개발 → 기능정의서 + 기술 설계
-수익/과금 기능 → 사업계획서 + 마케팅 가이드
+벡터 매칭 로직 → 페르소나시스템 설계서
+UI/UX 개발 → 기능정의서 + 디자인시스템 가이드
+수익/과금 기능 → 마케팅 가이드
 ```
 
 ### 문서 충돌 시 우선순위
@@ -111,11 +114,22 @@ src/
 │   ├── (auth)/               # 인증 라우트 그룹
 │   ├── (dashboard)/          # 대시보드 라우트 그룹
 │   └── api/                  # API Routes
+│       └── persona-world/    # PersonaWorld API
 ├── components/               # 컴포넌트
 │   ├── ui/                   # shadcn/ui 기본
+│   ├── persona-world/        # PersonaWorld 디자인시스템 컴포넌트
+│   │   ├── pw-logo.tsx       # PW 로고
+│   │   ├── pw-button.tsx     # 그라데이션 버튼
+│   │   ├── pw-card.tsx       # 호버 카드
+│   │   ├── pw-profile-ring.tsx # 프로필 링
+│   │   └── ...
 │   ├── common/               # 공통 컴포넌트
 │   └── features/             # 기능별 컴포넌트
 ├── lib/                      # 라이브러리
+│   ├── feed/                 # 피드 알고리즘
+│   ├── scheduler/            # 자율 활동 스케줄러
+│   ├── onboarding/           # 유저 온보딩
+│   └── persona-generation/   # 페르소나 자동 생성
 ├── hooks/                    # 커스텀 훅
 ├── stores/                   # Zustand 스토어
 ├── types/                    # 타입 정의
