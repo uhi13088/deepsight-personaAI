@@ -9,11 +9,11 @@ interface PWLogoProps {
 }
 
 const sizeClasses = {
-  xs: "w-6 h-6 text-xs",
-  sm: "w-8 h-8 text-sm",
-  md: "w-10 h-10 text-base",
-  lg: "w-14 h-14 text-xl",
-  xl: "w-20 h-20 text-3xl",
+  xs: "h-6 w-6 text-[10px]",
+  sm: "h-8 w-8 text-sm",
+  md: "h-10 w-10 text-lg",
+  lg: "h-14 w-14 text-2xl",
+  xl: "h-20 w-20 text-4xl",
 }
 
 /**
@@ -38,8 +38,8 @@ export function PWLogo({ size = "md", animated = false, className }: PWLogoProps
         className
       )}
       style={{
-        fontFamily: "'Nunito', 'Quicksand', 'Poppins', sans-serif",
-        fontWeight: 800,
+        fontFamily: "'Fredoka', 'Nunito', sans-serif",
+        fontWeight: 700,
       }}
     >
       PW
@@ -75,8 +75,8 @@ export function PWLogoWithText({ size = "md", animated = false, className }: PWL
           textSizeClasses[size]
         )}
         style={{
-          fontFamily: "'Nunito', 'Quicksand', 'Poppins', sans-serif",
-          fontWeight: 700,
+          fontFamily: "'Fredoka', 'Nunito', sans-serif",
+          fontWeight: 600,
         }}
       >
         PersonaWorld
