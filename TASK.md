@@ -19,6 +19,11 @@
 
 ## ✅ DONE (완료)
 
+- [x] **Hotfix: 페르소나 목록 API 응답 구조 수정** ✅ 2026-02-06
+  - 원인: API가 `data: [...]` 반환, Service는 `data.personas` 기대
+  - 변경: `apps/engine-studio/src/app/api/personas/route.ts` - 응답 구조를 `{ personas, total, page, limit, hasMore }` 형식으로 수정
+  - 테스트: Build PASS, 70/70 PASS
+
 - [x] **T7: Developer Console 미완성 부분 마무리** ✅ 2026-02-06
   - AC1: 로그 페이지 → 이미 DB 연동 완료 상태 (mock 없음)
   - AC2: 빌링 페이지 TODO 수정

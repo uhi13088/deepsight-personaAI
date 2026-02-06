@@ -105,12 +105,12 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data,
-      pagination: {
+      data: {
+        personas: data,
+        total,
         page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+        hasMore: page * limit < total,
       },
     })
   } catch (error) {
