@@ -13,6 +13,7 @@ import {
   FileText,
   Loader2,
   UserPlus,
+  UserMinus,
   Search,
   Eye,
   Compass,
@@ -20,7 +21,9 @@ import {
   Palette,
   Brain,
 } from "lucide-react"
+import { toast } from "sonner"
 import { clientApi } from "@/lib/api"
+import { useUserStore } from "@/lib/user-store"
 import type { PersonaFullDetail, PostType, Vector6D } from "@/lib/types"
 
 // 6D 벡터 차원 정보
@@ -155,10 +158,13 @@ export default function PersonaDetailPage() {
   const params = useParams()
   const personaId = params.id as string
 
+  const { followedPersonas, followPersona, unfollowPersona, addNotification } = useUserStore()
   const [persona, setPersona] = useState<PersonaFullDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isFollowing, setIsFollowing] = useState(false)
+
+  // 현재 페르소나 팔로우 여부 확인
+  const isFollowing = followedPersonas.some((f) => f.personaId === personaId)
 
   useEffect(() => {
     async function fetchPersona() {
@@ -179,6 +185,25 @@ export default function PersonaDetailPage() {
       fetchPersona()
     }
   }, [personaId])
+
+  const handleFollowToggle = () => {
+    if (!persona) return
+
+    if (isFollowing) {
+      unfollowPersona(personaId)
+      toast.success(`${persona.name}님을 언팔로우했습니다`)
+    } else {
+      followPersona(personaId, persona.name)
+      toast.success(`${persona.name}님을 팔로우했습니다`)
+      // 팔로우 시 알림 추가 (데모용)
+      addNotification({
+        type: "recommendation",
+        message: `${persona.name}님의 새로운 콘텐츠를 받아보세요!`,
+        personaId: persona.id,
+        personaName: persona.name,
+      })
+    }
+  }
 
   // 로딩 상태
   if (isLoading) {
@@ -260,15 +285,24 @@ export default function PersonaDetailPage() {
             </div>
             {/* 팔로우 버튼 */}
             <button
-              onClick={() => setIsFollowing(!isFollowing)}
+              onClick={handleFollowToggle}
               className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${
                 isFollowing
-                  ? "border border-gray-200 bg-white text-gray-700 hover:border-gray-300"
+                  ? "border border-gray-200 bg-white text-gray-700 hover:border-red-300 hover:text-red-500"
                   : "bg-violet-500 text-white hover:bg-violet-600"
               }`}
             >
-              <UserPlus className="h-4 w-4" />
-              {isFollowing ? "팔로잉" : "팔로우"}
+              {isFollowing ? (
+                <>
+                  <UserMinus className="h-4 w-4" />
+                  팔로잉
+                </>
+              ) : (
+                <>
+                  <UserPlus className="h-4 w-4" />
+                  팔로우
+                </>
+              )}
             </button>
           </div>
 

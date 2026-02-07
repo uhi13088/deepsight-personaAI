@@ -1,12 +1,25 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import { PWLogoWithText, PWCard } from "@/components/persona-world"
-import { Home, Search, Bell, User, Users, TrendingUp, Sparkles } from "lucide-react"
+import {
+  Home,
+  Search,
+  Bell,
+  User,
+  Users,
+  TrendingUp,
+  Sparkles,
+  X,
+  Hash,
+  Loader2,
+} from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 import type { PersonaDetail } from "@/lib/types"
 import { clientApi } from "@/lib/api"
+import { useUserStore } from "@/lib/user-store"
 
 // 역할별 색상
 const ROLE_COLORS: Record<string, string> = {
@@ -35,10 +48,37 @@ const ROLE_EMOJI: Record<string, string> = {
   ANALYST: "📊",
 }
 
-export default function ExplorePage() {
+// 트렌딩 토픽 (데모용 - 실제로는 API에서 가져올 예정)
+const TRENDING_TOPICS = [
+  { tag: "영화리뷰", count: 234 },
+  { tag: "넷플릭스", count: 189 },
+  { tag: "K드라마", count: 156 },
+  { tag: "도서추천", count: 143 },
+  { tag: "맛집", count: 128 },
+  { tag: "테크", count: 112 },
+  { tag: "음악", count: 98 },
+  { tag: "게임", count: 87 },
+]
+
+function ExploreContent() {
+  const searchParams = useSearchParams()
+  const initialQuery = searchParams.get("q") || ""
+
   const [personas, setPersonas] = useState<PersonaDetail[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState("")
+  const [searchQuery, setSearchQuery] = useState(initialQuery)
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(initialQuery || null)
+  const { notifications } = useUserStore()
+  const unreadNotifications = notifications.filter((n) => !n.read).length
+
+  // URL 쿼리 파라미터 변경 감지
+  useEffect(() => {
+    const query = searchParams.get("q")
+    if (query) {
+      setSelectedTopic(query)
+      setSearchQuery("")
+    }
+  }, [searchParams])
 
   useEffect(() => {
     const fetchPersonas = async () => {
@@ -56,12 +96,28 @@ export default function ExplorePage() {
     fetchPersonas()
   }, [])
 
-  const filteredPersonas = personas.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.handle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.tagline && p.tagline.toLowerCase().includes(searchQuery.toLowerCase()))
-  )
+  // 검색어 또는 선택된 토픽으로 필터링
+  const activeQuery = selectedTopic || searchQuery
+  const filteredPersonas = personas.filter((p) => {
+    if (!activeQuery) return true
+    const query = activeQuery.toLowerCase()
+    return (
+      p.name.toLowerCase().includes(query) ||
+      p.handle.toLowerCase().includes(query) ||
+      (p.tagline && p.tagline.toLowerCase().includes(query)) ||
+      p.expertise.some((exp) => exp.toLowerCase().includes(query))
+    )
+  })
+
+  const handleTopicClick = (topic: string) => {
+    setSelectedTopic(topic)
+    setSearchQuery("")
+  }
+
+  const clearSearch = () => {
+    setSearchQuery("")
+    setSelectedTopic(null)
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -85,13 +141,61 @@ export default function ExplorePage() {
             <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="페르소나 검색..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-full border border-gray-200 bg-white py-3 pl-10 pr-4 text-sm focus:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-100"
+              placeholder="페르소나, 전문분야 검색..."
+              value={selectedTopic || searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                setSelectedTopic(null)
+              }}
+              className="w-full rounded-full border border-gray-200 bg-white py-3 pl-10 pr-10 text-sm focus:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-100"
             />
+            {(searchQuery || selectedTopic) && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Trending Topics */}
+        {!searchQuery && !selectedTopic && (
+          <div className="mb-6">
+            <div className="mb-3 flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-pink-500" />
+              <h3 className="text-sm font-medium text-gray-700">트렌딩 토픽</h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {TRENDING_TOPICS.map((topic) => (
+                <button
+                  key={topic.tag}
+                  onClick={() => handleTopicClick(topic.tag)}
+                  className="flex items-center gap-1 rounded-full bg-gradient-to-r from-purple-50 to-pink-50 px-3 py-1.5 text-sm transition-all hover:from-purple-100 hover:to-pink-100"
+                >
+                  <Hash className="h-3 w-3 text-purple-400" />
+                  <span className="text-gray-700">{topic.tag}</span>
+                  <span className="text-xs text-gray-400">{topic.count}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Selected Topic Badge */}
+        {selectedTopic && (
+          <div className="mb-4 flex items-center gap-2">
+            <span className="text-sm text-gray-500">토픽:</span>
+            <span className="flex items-center gap-1 rounded-full bg-purple-100 px-3 py-1 text-sm font-medium text-purple-700">
+              <Hash className="h-3 w-3" />
+              {selectedTopic}
+              <button onClick={clearSearch} className="ml-1 rounded-full p-0.5 hover:bg-purple-200">
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          </div>
+        )}
 
         {/* Section Header */}
         <div className="mb-4 flex items-center gap-2">
@@ -170,9 +274,14 @@ export default function ExplorePage() {
           </Link>
           <Link
             href="/notifications"
-            className="flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400"
+            className="relative flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400"
           >
             <Bell className="h-5 w-5" />
+            {unreadNotifications > 0 && (
+              <span className="absolute right-2 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                {unreadNotifications > 9 ? "9+" : unreadNotifications}
+              </span>
+            )}
             <span className="text-xs">알림</span>
           </Link>
           <Link
@@ -185,5 +294,23 @@ export default function ExplorePage() {
         </div>
       </nav>
     </div>
+  )
+}
+
+// 로딩 폴백 컴포넌트
+function ExploreLoading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+    </div>
+  )
+}
+
+// 메인 페이지 컴포넌트 (Suspense 래퍼)
+export default function ExplorePage() {
+  return (
+    <Suspense fallback={<ExploreLoading />}>
+      <ExploreContent />
+    </Suspense>
   )
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { PWLogoWithText, PWButton, PWCard, PWDivider, PWIcon } from "@/components/persona-world"
 import {
   Home,
@@ -15,11 +16,13 @@ import {
   TrendingUp,
   Sparkles,
   Loader2,
+  Hash,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 import type { FeedPost } from "@/lib/types"
 import { clientApi } from "@/lib/api"
+import { useUserStore } from "@/lib/user-store"
 
 // 역할별 색상
 const ROLE_COLORS: Record<string, string> = {
@@ -57,25 +60,29 @@ function formatTime(dateString: string): string {
 
 // 트렌딩 토픽 (정적)
 const TRENDING = [
-  { tag: "#신작드라마", count: "2.3K" },
-  { tag: "#영화추천", count: "1.8K" },
-  { tag: "#VS배틀", count: "1.2K" },
-  { tag: "#숨은명작", count: "890" },
+  { tag: "신작드라마", count: "2.3K" },
+  { tag: "영화추천", count: "1.8K" },
+  { tag: "VS배틀", count: "1.2K" },
+  { tag: "숨은명작", count: "890" },
 ]
 
 export default function FeedPage() {
-  const [posts, setPosts] = useState<(FeedPost & { liked: boolean })[]>([])
+  const router = useRouter()
+  const { likedPosts, bookmarkedPosts, toggleLike, toggleBookmark, notifications } = useUserStore()
+  const [posts, setPosts] = useState<FeedPost[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
+
+  const unreadNotifications = notifications.filter((n) => !n.read).length
 
   // 초기 피드 로드
   useEffect(() => {
     const fetchFeed = async () => {
       try {
         const data = await clientApi.getFeed({ limit: 20 })
-        setPosts(data.posts.map((p) => ({ ...p, liked: false })))
+        setPosts(data.posts)
         setNextCursor(data.nextCursor)
         setHasMore(data.hasMore)
       } catch (error) {
@@ -96,7 +103,7 @@ export default function FeedPage() {
     setLoadingMore(true)
     try {
       const data = await clientApi.getFeed({ limit: 20, cursor: nextCursor })
-      setPosts((prev) => [...prev, ...data.posts.map((p) => ({ ...p, liked: false }))])
+      setPosts((prev) => [...prev, ...data.posts])
       setNextCursor(data.nextCursor)
       setHasMore(data.hasMore)
     } catch (error) {
@@ -107,19 +114,21 @@ export default function FeedPage() {
     }
   }
 
-  // 좋아요 토글 (로컬 상태만)
+  // 좋아요 토글
   const handleLike = (postId: string) => {
-    setPosts((prev) =>
-      prev.map((post) =>
-        post.id === postId
-          ? {
-              ...post,
-              liked: !post.liked,
-              likeCount: post.liked ? post.likeCount - 1 : post.likeCount + 1,
-            }
-          : post
-      )
-    )
+    toggleLike(postId)
+  }
+
+  // 북마크 토글
+  const handleBookmark = (postId: string) => {
+    const isBookmarked = bookmarkedPosts.includes(postId)
+    toggleBookmark(postId)
+    toast.success(isBookmarked ? "북마크가 해제되었습니다" : "북마크에 추가되었습니다")
+  }
+
+  // 트렌딩 토픽 검색
+  const handleTrendingClick = (topic: string) => {
+    router.push(`/explore?q=${encodeURIComponent(topic)}`)
   }
 
   return (
@@ -164,11 +173,12 @@ export default function FeedPage() {
             {TRENDING.map((topic) => (
               <button
                 key={topic.tag}
-                onClick={() => toast.info(`"${topic.tag}" 검색 기능이 곧 추가됩니다`)}
-                className="rounded-full bg-gray-100 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-200"
+                onClick={() => handleTrendingClick(topic.tag)}
+                className="flex items-center gap-1 rounded-full bg-gradient-to-r from-purple-50 to-pink-50 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:from-purple-100 hover:to-pink-100"
               >
+                <Hash className="h-3 w-3 text-purple-400" />
                 {topic.tag}
-                <span className="ml-1 text-xs text-gray-400">{topic.count}</span>
+                <span className="text-xs text-gray-400">{topic.count}</span>
               </button>
             ))}
           </div>
@@ -227,23 +237,40 @@ export default function FeedPage() {
                   <button
                     onClick={() => handleLike(post.id)}
                     className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors ${
-                      post.liked
+                      likedPosts.includes(post.id)
                         ? "text-pink-500"
                         : "text-gray-500 hover:bg-pink-50 hover:text-pink-500"
                     }`}
                   >
-                    <Heart className={`h-4 w-4 ${post.liked ? "fill-current" : ""}`} />
-                    {post.likeCount}
+                    <Heart
+                      className={`h-4 w-4 ${likedPosts.includes(post.id) ? "fill-current" : ""}`}
+                    />
+                    {post.likeCount + (likedPosts.includes(post.id) ? 1 : 0)}
                   </button>
-                  <button className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-500">
+                  <button
+                    onClick={() => toast.info("댓글 기능이 곧 추가됩니다")}
+                    className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-500"
+                  >
                     <MessageCircle className="h-4 w-4" />
                     {post.commentCount}
                   </button>
-                  <button className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-green-50 hover:text-green-500">
+                  <button
+                    onClick={() => toast.info("공유 기능이 곧 추가됩니다")}
+                    className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-green-50 hover:text-green-500"
+                  >
                     <Share2 className="h-4 w-4" />
                   </button>
-                  <button className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-amber-50 hover:text-amber-500">
-                    <Bookmark className="h-4 w-4" />
+                  <button
+                    onClick={() => handleBookmark(post.id)}
+                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors ${
+                      bookmarkedPosts.includes(post.id)
+                        ? "text-amber-500"
+                        : "text-gray-500 hover:bg-amber-50 hover:text-amber-500"
+                    }`}
+                  >
+                    <Bookmark
+                      className={`h-4 w-4 ${bookmarkedPosts.includes(post.id) ? "fill-current" : ""}`}
+                    />
                   </button>
                 </div>
               </PWCard>
@@ -282,9 +309,14 @@ export default function FeedPage() {
           </Link>
           <Link
             href="/notifications"
-            className="flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400"
+            className="relative flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400"
           >
             <Bell className="h-5 w-5" />
+            {unreadNotifications > 0 && (
+              <span className="absolute right-2 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                {unreadNotifications > 9 ? "9+" : unreadNotifications}
+              </span>
+            )}
             <span className="text-xs">알림</span>
           </Link>
           <Link
