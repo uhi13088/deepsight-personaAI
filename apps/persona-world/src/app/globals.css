@@ -1,10 +1,15 @@
 @import "tailwindcss";
 
-/* PersonaWorld 버블 폰트 (Fredoka) */
-@import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+/*
+ * PersonaWorld 폰트 (Google Fonts via <link> in layout.tsx)
+ * - Inter: 본문용 (--font-sans)
+ * - Fredoka: 브랜드/로고용 (--font-brand) - 둥글고 풍선같은 느낌
+ */
 
 :root {
+  /* 폰트 */
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-brand: "Fredoka", "Nunito", sans-serif;
   /* 기본 컬러 */
   --background: 0 0% 100%;
   --foreground: 222.2 84% 4.9%;
@@ -31,10 +36,6 @@
   --pw-gradient-start: #667eea;
   --pw-gradient-middle: #f093fb;
   --pw-gradient-end: #f5576c;
-
-  /* 폰트 */
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
-  --font-brand: "Fredoka", "Nunito", sans-serif;
 }
 
 /* =========================================
@@ -43,9 +44,18 @@
    ========================================= */
 
 body {
-  font-family: var(--font-sans);
+  font-family:
+    var(--font-sans),
+    system-ui,
+    -apple-system,
+    sans-serif;
   background: hsl(var(--background));
   color: hsl(var(--foreground));
+}
+
+/* 브랜드 폰트 클래스 */
+.font-brand {
+  font-family: var(--font-brand), "Nunito", sans-serif;
 }
 
 /* 그라데이션 텍스트 - 헤드라인용 */
