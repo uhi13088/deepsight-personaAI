@@ -560,24 +560,97 @@ export const PLAN_PRICES = {
 
 ## 환경변수
 
-```env
-# .env.local
+### 앱별 포트 설정
 
+| 앱                | 포트 | URL                   |
+| ----------------- | ---- | --------------------- |
+| Landing           | 3000 | http://localhost:3000 |
+| Engine Studio     | 3001 | http://localhost:3001 |
+| Developer Console | 3002 | http://localhost:3002 |
+| PersonaWorld      | 3003 | http://localhost:3003 |
+
+### 앱 간 연동 구조
+
+```
+┌─────────────────┐     API 호출      ┌─────────────────┐
+│  PersonaWorld   │ ───────────────▶  │  Engine Studio  │
+│   (port 3003)   │                   │   (port 3001)   │
+└─────────────────┘                   └─────────────────┘
+        │                                     │
+        │                                     │
+        ▼                                     ▼
+┌─────────────────┐                   ┌─────────────────┐
+│    Landing      │                   │ Developer       │
+│   (port 3000)   │                   │ Console (3002)  │
+└─────────────────┘                   └─────────────────┘
+```
+
+### Engine Studio (.env.local)
+
+```env
 # Database
 DATABASE_URL="postgresql://..."
 DIRECT_URL="postgresql://..."
 
 # Auth
 NEXTAUTH_SECRET="your-secret-key"
-NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_URL="http://localhost:3001"
 
-# AI (선택)
+# AI
 OPENAI_API_KEY="sk-..."
 ANTHROPIC_API_KEY="sk-ant-..."
 
-# App
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
+# App URLs
+NEXT_PUBLIC_APP_URL="http://localhost:3001"
+NEXT_PUBLIC_DEVELOPER_CONSOLE_URL="http://localhost:3002"
+
+# Feature Flags
 NEXT_PUBLIC_USE_MOCK_DATA="true"
+FEATURE_DEMO_MODE="true"
+```
+
+### PersonaWorld (.env.local)
+
+```env
+# Engine Studio API 연동 (필수)
+NEXT_PUBLIC_ENGINE_API_URL="http://localhost:3001"
+```
+
+### Developer Console (.env.local)
+
+```env
+# Engine Studio API 연동
+NEXT_PUBLIC_APP_URL="http://localhost:3001"
+
+# Billing (선택)
+TOSS_CLIENT_KEY="..."
+TOSS_SECRET_KEY="..."
+```
+
+### Landing (.env.local)
+
+```env
+# 각 앱 URL (CTA 버튼용)
+NEXT_PUBLIC_ENGINE_STUDIO_URL="http://localhost:3001"
+NEXT_PUBLIC_PERSONA_WORLD_URL="http://localhost:3003"
+NEXT_PUBLIC_DEVELOPER_CONSOLE_URL="http://localhost:3002"
+NEXT_PUBLIC_CONTACT_EMAIL="contact@deepsight.ai"
+```
+
+### 프로덕션 환경변수 예시
+
+```env
+# Engine Studio
+NEXT_PUBLIC_APP_URL="https://engine.deepsight.ai"
+NEXT_PUBLIC_DEVELOPER_CONSOLE_URL="https://console.deepsight.ai"
+
+# PersonaWorld
+NEXT_PUBLIC_ENGINE_API_URL="https://engine.deepsight.ai"
+
+# Landing
+NEXT_PUBLIC_ENGINE_STUDIO_URL="https://engine.deepsight.ai"
+NEXT_PUBLIC_PERSONA_WORLD_URL="https://persona.deepsight.ai"
+NEXT_PUBLIC_DEVELOPER_CONSOLE_URL="https://console.deepsight.ai"
 ```
 
 ---
