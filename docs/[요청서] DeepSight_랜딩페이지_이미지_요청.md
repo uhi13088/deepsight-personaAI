@@ -639,7 +639,119 @@ import Image from "next/image"
 
 ---
 
-## 14. 임시 대체 방안
+## 14. 제품 스크린샷 촬영 가이드
+
+### 14.1 앱 실행 URL
+
+| 제품              | 로컬 URL              | 포트 |
+| ----------------- | --------------------- | ---- |
+| Engine Studio     | http://localhost:3001 | 3001 |
+| Developer Console | http://localhost:3002 | 3002 |
+| PersonaWorld      | http://localhost:3003 | 3003 |
+| Landing           | http://localhost:3000 | 3000 |
+
+### 14.2 앱 실행 방법
+
+```bash
+# 전체 앱 동시 실행
+pnpm dev
+
+# 또는 개별 앱 실행
+pnpm --filter engine-studio dev
+pnpm --filter developer-console dev
+pnpm --filter persona-world dev
+```
+
+### 14.3 스크린샷 촬영 페이지
+
+#### Engine Studio (http://localhost:3001)
+
+| 스크린샷      | 페이지 URL         | 촬영 포인트              |
+| ------------- | ------------------ | ------------------------ |
+| 대시보드      | `/dashboard`       | 전체 대시보드 통계 화면  |
+| 페르소나 목록 | `/personas`        | 페르소나 카드 그리드     |
+| 페르소나 생성 | `/personas/create` | AI 자동 생성 선택 화면   |
+| 페르소나 상세 | `/personas/[id]`   | 6D 벡터 레이더 차트 포함 |
+
+#### Developer Console (http://localhost:3002)
+
+| 스크린샷    | 페이지 URL    | 촬영 포인트              |
+| ----------- | ------------- | ------------------------ |
+| API 키 관리 | `/api-keys`   | API 키 목록 및 생성 버튼 |
+| Playground  | `/playground` | 코드 에디터 + 응답 패널  |
+| 문서        | `/docs`       | API 문서 네비게이션      |
+
+#### PersonaWorld (http://localhost:3003)
+
+| 스크린샷 | 페이지 URL    | 촬영 포인트          |
+| -------- | ------------- | -------------------- |
+| 피드     | `/feed`       | 포스트 카드 + 트렌딩 |
+| 탐색     | `/explore`    | 페르소나 카드 그리드 |
+| 프로필   | `/profile`    | 사용자 6D 벡터 표시  |
+| 온보딩   | `/onboarding` | 콜드스타트 질문 화면 |
+
+### 14.4 브라우저 스크린샷 촬영 방법
+
+#### Chrome DevTools 사용 (권장)
+
+```
+1. F12 → DevTools 열기
+2. Ctrl+Shift+P (Mac: Cmd+Shift+P) → Command Palette
+3. "screenshot" 검색
+4. 옵션 선택:
+   - "Capture full size screenshot" - 전체 페이지
+   - "Capture screenshot" - 현재 뷰포트
+   - "Capture node screenshot" - 선택한 요소만
+```
+
+#### 권장 뷰포트 크기
+
+| 용도          | 너비   | 높이  | 설정 방법              |
+| ------------- | ------ | ----- | ---------------------- |
+| 데스크톱 목업 | 1440px | 900px | DevTools → 반응형 모드 |
+| 모바일 목업   | 390px  | 844px | iPhone 14 Pro 프리셋   |
+
+#### DevTools 반응형 모드 설정
+
+```
+1. F12 → DevTools
+2. Ctrl+Shift+M (Mac: Cmd+Shift+M) → 반응형 모드 토글
+3. 상단에서 해상도 직접 입력: 1440 x 900
+4. DPR(Device Pixel Ratio) 2x 설정 → Retina용 고해상도
+```
+
+### 14.5 스크린샷 후처리
+
+1. **크롭**: 브라우저 주소창/탭 제거 (필요시)
+2. **리사이즈**: 지정 크기로 조정 (600x400px)
+3. **그림자 추가**: 선택 사항, 부드러운 드롭 섀도우
+4. **파일 저장**: PNG 형식, 지정된 파일명으로
+
+### 14.6 목업 프레임 씌우기 (선택)
+
+스크린샷에 브라우저/디바이스 프레임을 씌우려면:
+
+| 도구          | URL                   | 용도            |
+| ------------- | --------------------- | --------------- |
+| Screely       | https://screely.com   | 브라우저 목업   |
+| Mockup Photos | https://mockup.photos | 다양한 디바이스 |
+| Shots         | https://shots.so      | 심플한 목업     |
+
+### 14.7 Claude에게 스크린샷 적용 요청
+
+```
+Engine Studio 대시보드 스크린샷을 찍었어.
+
+- 파일: product-engine-studio.png (1200x800px)
+- 저장 위치: apps/landing/public/images/products/
+- 적용 위치: 랜딩 페이지 "3가지 제품" 섹션의 Engine Studio 카드
+
+스크린샷을 랜딩 페이지에 적용해줘.
+```
+
+---
+
+## 15. 임시 대체 방안
 
 이미지가 준비되기 전까지는 다음으로 대체:
 
