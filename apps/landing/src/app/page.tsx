@@ -28,6 +28,15 @@ import {
 import { Button } from "@/components/ui/button"
 
 // ============================================
+// Environment Variables
+// ============================================
+const PERSONA_WORLD_URL =
+  process.env.NEXT_PUBLIC_PERSONA_WORLD_URL || "https://persona-world.vercel.app"
+const DEVELOPER_CONSOLE_URL =
+  process.env.NEXT_PUBLIC_DEVELOPER_CONSOLE_URL || "https://developer-console.vercel.app"
+const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "contact@deepsight.ai"
+
+// ============================================
 // 6D 벡터 차원 정의
 // ============================================
 const VECTOR_DIMENSIONS = [
@@ -149,7 +158,7 @@ export default function LandingPage() {
               Pricing
             </a>
           </div>
-          <Link href="https://persona-world.vercel.app">
+          <Link href={PERSONA_WORLD_URL}>
             <Button className="ds-button text-white">시작하기</Button>
           </Link>
         </div>
@@ -175,13 +184,13 @@ export default function LandingPage() {
                 명확히 알 수 있는 설명 가능한 AI 추천 엔진
               </p>
               <div className="flex flex-col gap-4 sm:flex-row">
-                <Link href="https://persona-world.vercel.app">
+                <Link href={PERSONA_WORLD_URL}>
                   <Button size="lg" className="ds-button gap-2 text-white">
                     PersonaWorld 체험하기
                     <ArrowRight className="h-4 w-4" />
                   </Button>
                 </Link>
-                <Link href="https://developer-console.vercel.app">
+                <Link href={DEVELOPER_CONSOLE_URL}>
                   <Button size="lg" variant="outline" className="gap-2">
                     <Code className="h-4 w-4" />
                     API 연동하기
@@ -671,13 +680,13 @@ export default function LandingPage() {
             DeepSight로 사용자에게 &ldquo;왜&rdquo;를 설명할 수 있는 추천 시스템을 구축하세요.
           </p>
           <div className="flex flex-col justify-center gap-4 sm:flex-row">
-            <Link href="https://persona-world.vercel.app">
+            <Link href={PERSONA_WORLD_URL}>
               <Button size="lg" className="ds-button gap-2 text-white">
                 PersonaWorld 체험하기
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
-            <Link href="https://developer-console.vercel.app">
+            <Link href={DEVELOPER_CONSOLE_URL}>
               <Button
                 size="lg"
                 variant="outline"
@@ -719,7 +728,7 @@ export default function LandingPage() {
                   )
                 )}
               </ul>
-              <Link href="https://developer-console.vercel.app" className="w-full">
+              <Link href={DEVELOPER_CONSOLE_URL} className="w-full">
                 <Button variant="outline" className="w-full">
                   시작하기
                 </Button>
@@ -751,7 +760,7 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link href="https://developer-console.vercel.app" className="w-full">
+              <Link href={DEVELOPER_CONSOLE_URL} className="w-full">
                 <Button className="ds-button w-full text-white">시작하기</Button>
               </Link>
             </div>
@@ -777,7 +786,7 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link href="mailto:contact@deepsight.ai" className="w-full">
+              <Link href={`mailto:${CONTACT_EMAIL}`} className="w-full">
                 <Button variant="outline" className="w-full">
                   상담 요청
                 </Button>
