@@ -155,3 +155,143 @@ html {
 .animate-bounce-slow {
   animation: bounce 2s ease-in-out infinite;
 }
+
+/* =========================================
+   Floating Icons Animation
+   ========================================= */
+@keyframes float-1 {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(10px, -15px) rotate(5deg);
+  }
+  50% {
+    transform: translate(-5px, -25px) rotate(-3deg);
+  }
+  75% {
+    transform: translate(-15px, -10px) rotate(3deg);
+  }
+}
+
+@keyframes float-2 {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(-15px, -10px) rotate(-5deg);
+  }
+  50% {
+    transform: translate(10px, -20px) rotate(3deg);
+  }
+  75% {
+    transform: translate(5px, -5px) rotate(-3deg);
+  }
+}
+
+@keyframes float-3 {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(5px, -20px) rotate(3deg);
+  }
+  50% {
+    transform: translate(-10px, -10px) rotate(-5deg);
+  }
+  75% {
+    transform: translate(15px, -15px) rotate(5deg);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(37, 99, 235, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(79, 70, 229, 0.5);
+  }
+}
+
+.animate-float-1 {
+  animation: float-1 6s ease-in-out infinite;
+}
+.animate-float-2 {
+  animation: float-2 7s ease-in-out infinite;
+}
+.animate-float-3 {
+  animation: float-3 8s ease-in-out infinite;
+}
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* 3D Icon Container */
+.ds-icon-3d {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.6));
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+/* Dark Section */
+.ds-dark-section {
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+}
+
+/* Glassmorphism Card */
+.ds-glass-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Neon glow line */
+.ds-neon-line {
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--ds-blue) 20%,
+    var(--ds-indigo) 50%,
+    #a855f7 80%,
+    transparent 100%
+  );
+  filter: blur(0.5px);
+  box-shadow:
+    0 0 10px var(--ds-blue),
+    0 0 20px var(--ds-indigo);
+}
+
+/* Animated gradient border */
+@keyframes gradient-rotate {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.ds-gradient-border {
+  position: relative;
+  background: linear-gradient(135deg, var(--ds-blue), var(--ds-indigo), #a855f7, var(--ds-blue));
+  background-size: 300% 300%;
+  animation: gradient-rotate 4s ease infinite;
+  padding: 2px;
+  border-radius: 1rem;
+}
+
+.ds-gradient-border > div {
+  background: white;
+  border-radius: calc(1rem - 2px);
+}
