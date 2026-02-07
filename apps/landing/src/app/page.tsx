@@ -192,7 +192,7 @@ export default function LandingPage() {
                 <div className="absolute -bottom-4 h-64 w-64 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 opacity-50" />
                 {/* Middle layer */}
                 <div
-                  className="absolute -bottom-2 left-2 h-64 w-64 animate-pulse rounded-2xl border border-blue-200 bg-white shadow-lg"
+                  className="ds-pulse absolute -bottom-2 left-2 h-64 w-64 rounded-2xl border border-blue-200 bg-white shadow-lg"
                   style={{ animationDuration: "3s" }}
                 />
                 {/* Top card - 6D Vector Visual */}
@@ -253,7 +253,7 @@ export default function LandingPage() {
                       fill="none"
                       stroke={`url(#gradient-${i})`}
                       strokeWidth="3"
-                      className="animate-pulse"
+                      className="ds-pulse"
                       style={{ animationDelay: `${i * 0.2}s`, animationDuration: "2s" }}
                     />
                   ))}

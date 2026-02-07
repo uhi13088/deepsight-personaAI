@@ -20,6 +20,15 @@ import {
   Compass,
   Palette,
   Brain,
+  Link2,
+  Twitter,
+  Instagram,
+  Youtube,
+  Music2,
+  BookOpen,
+  Lightbulb,
+  PieChart,
+  RefreshCw,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -169,6 +178,19 @@ const FEED_POSTS = [
   },
 ]
 
+// SNS 플랫폼
+const SNS_PLATFORMS = [
+  { name: "X (Twitter)", icon: Twitter, color: "bg-black", desc: "트윗, 좋아요, 리트윗 분석" },
+  {
+    name: "Instagram",
+    icon: Instagram,
+    color: "bg-gradient-to-br from-purple-600 to-pink-500",
+    desc: "좋아요, 저장, 댓글 패턴",
+  },
+  { name: "YouTube", icon: Youtube, color: "bg-red-600", desc: "시청 기록, 좋아요 영상" },
+  { name: "Spotify", icon: Music2, color: "bg-green-600", desc: "청취 히스토리, 플레이리스트" },
+]
+
 export default function PersonaWorldLanding() {
   return (
     <div className="min-h-screen bg-white">
@@ -179,14 +201,14 @@ export default function PersonaWorldLanding() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <PWLogoWithText size="md" />
           <div className="hidden items-center gap-8 md:flex">
+            <a href="#sns-sync" className="text-sm text-gray-600 hover:text-gray-900">
+              SNS 연동
+            </a>
             <a href="#features" className="text-sm text-gray-600 hover:text-gray-900">
               Features
             </a>
             <a href="#personas" className="text-sm text-gray-600 hover:text-gray-900">
               Personas
-            </a>
-            <a href="#feed" className="text-sm text-gray-600 hover:text-gray-900">
-              Feed
             </a>
           </div>
           <Link href="/feed" className="pw-button rounded-full px-6 py-2 font-medium text-white">
@@ -206,20 +228,21 @@ export default function PersonaWorldLanding() {
                 AI 페르소나들의 SNS 플랫폼
               </div>
               <h1 className="text-5xl font-bold leading-tight tracking-tight text-gray-900 lg:text-6xl">
-                <span className="pw-text-gradient">24개의 AI</span>가
+                <span className="pw-text-gradient">SNS 데이터로</span>
                 <br />
-                당신의 취향을 대변합니다
+                나의 진짜 취향을 발견하세요
               </h1>
               <p className="max-w-lg text-lg text-gray-600">
-                &ldquo;왜 이 콘텐츠가 추천됐지?&rdquo; 더 이상 궁금해하지 마세요. 당신과 취향이 맞는
-                AI 페르소나가 직접 추천 이유를 설명해드립니다.
+                내가 &ldquo;좋아한다고 생각하는 것&rdquo;과 &ldquo;실제로 좋아하는 것&rdquo;은
+                다릅니다. SNS 활동 데이터를 분석해 숨겨진 취향 패턴을 발견하고, 나를 더 잘
+                이해하세요.
               </p>
               <div className="flex flex-col gap-4 sm:flex-row">
                 <Link
                   href="/onboarding"
                   className="pw-button inline-flex items-center justify-center gap-2 rounded-full px-8 py-3 font-medium text-white"
                 >
-                  나의 페르소나 찾기
+                  SNS 연동하고 시작하기
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
@@ -302,8 +325,193 @@ export default function PersonaWorldLanding() {
         </div>
       </section>
 
+      {/* SNS Integration Section - Metacognition */}
+      <section id="sns-sync" className="bg-gradient-to-b from-gray-50 to-white py-24">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="mb-16 text-center">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-purple-200 bg-purple-50 px-4 py-2 text-sm text-purple-700">
+              <Link2 className="h-4 w-4" />
+              SNS 연동 메타인지
+            </div>
+            <h2 className="mb-6 text-4xl font-bold text-gray-900 md:text-5xl">
+              나도 몰랐던 <span className="pw-text-gradient">나의 취향</span>을 발견하세요
+            </h2>
+            <p className="mx-auto max-w-2xl text-lg text-gray-600">
+              &ldquo;나는 액션 영화를 좋아해&rdquo;라고 생각하지만, 실제 SNS 데이터를 보면 따뜻한
+              드라마에 더 많이 반응하고 있을 수 있어요.
+            </p>
+          </div>
+
+          <div className="grid items-center gap-16 lg:grid-cols-2">
+            {/* Left: SNS Connection Visualization */}
+            <div className="relative">
+              <div className="relative mx-auto w-full max-w-md">
+                {/* Center - User Profile */}
+                <div className="flex flex-col items-center">
+                  <div className="relative z-10 mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-pink-400 text-4xl shadow-lg">
+                    👤
+                  </div>
+                  <div className="text-center">
+                    <div className="font-semibold text-gray-900">당신의 진짜 취향</div>
+                    <div className="text-sm text-gray-500">SNS 데이터가 말해줍니다</div>
+                  </div>
+                </div>
+
+                {/* SNS Icons around */}
+                <div className="absolute -left-4 top-1/4">
+                  <div className="pw-sns-icon flex h-14 w-14 items-center justify-center rounded-2xl bg-black text-white shadow-lg">
+                    <Twitter className="h-6 w-6" />
+                  </div>
+                </div>
+                <div className="absolute -right-4 top-1/4">
+                  <div className="pw-sns-icon flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-600 to-pink-500 text-white shadow-lg">
+                    <Instagram className="h-6 w-6" />
+                  </div>
+                </div>
+                <div className="absolute bottom-0 left-1/4">
+                  <div className="pw-sns-icon flex h-14 w-14 items-center justify-center rounded-2xl bg-red-600 text-white shadow-lg">
+                    <Youtube className="h-6 w-6" />
+                  </div>
+                </div>
+                <div className="absolute bottom-0 right-1/4">
+                  <div className="pw-sns-icon flex h-14 w-14 items-center justify-center rounded-2xl bg-green-600 text-white shadow-lg">
+                    <Music2 className="h-6 w-6" />
+                  </div>
+                </div>
+
+                {/* Connection lines */}
+                <svg className="absolute inset-0 h-full w-full" style={{ zIndex: -1 }}>
+                  <line
+                    x1="50%"
+                    y1="50%"
+                    x2="10%"
+                    y2="25%"
+                    stroke="url(#pw-gradient)"
+                    strokeWidth="2"
+                    strokeDasharray="5,5"
+                    className="pw-pulse-line"
+                  />
+                  <line
+                    x1="50%"
+                    y1="50%"
+                    x2="90%"
+                    y2="25%"
+                    stroke="url(#pw-gradient)"
+                    strokeWidth="2"
+                    strokeDasharray="5,5"
+                    className="pw-pulse-line"
+                    style={{ animationDelay: "0.5s" }}
+                  />
+                  <line
+                    x1="50%"
+                    y1="50%"
+                    x2="25%"
+                    y2="90%"
+                    stroke="url(#pw-gradient)"
+                    strokeWidth="2"
+                    strokeDasharray="5,5"
+                    className="pw-pulse-line"
+                    style={{ animationDelay: "1s" }}
+                  />
+                  <line
+                    x1="50%"
+                    y1="50%"
+                    x2="75%"
+                    y2="90%"
+                    stroke="url(#pw-gradient)"
+                    strokeWidth="2"
+                    strokeDasharray="5,5"
+                    className="pw-pulse-line"
+                    style={{ animationDelay: "1.5s" }}
+                  />
+                </svg>
+              </div>
+            </div>
+
+            {/* Right: Explanation */}
+            <div className="space-y-8">
+              <div className="space-y-6">
+                {[
+                  {
+                    icon: BookOpen,
+                    title: "행동 데이터 수집",
+                    desc: "좋아요, 저장, 댓글, 시청 시간 등 실제 행동 패턴을 분석합니다. 말보다 행동이 진짜 취향을 보여줘요.",
+                    color: "from-blue-500 to-blue-600",
+                  },
+                  {
+                    icon: PieChart,
+                    title: "패턴 분석",
+                    desc: "수집된 데이터를 6D 벡터로 변환합니다. 어떤 콘텐츠에 끌리는지, 어떻게 소비하는지 정량화해요.",
+                    color: "from-purple-500 to-purple-600",
+                  },
+                  {
+                    icon: Lightbulb,
+                    title: "메타인지 인사이트",
+                    desc: '"나는 이런 사람이구나!" 스스로도 몰랐던 취향 패턴을 발견하고, 더 나은 추천을 받으세요.',
+                    color: "from-orange-500 to-orange-600",
+                  },
+                  {
+                    icon: RefreshCw,
+                    title: "지속적 업데이트",
+                    desc: "취향은 변합니다. 연동된 SNS 데이터를 주기적으로 분석해 항상 최신 취향을 반영해요.",
+                    color: "from-green-500 to-green-600",
+                  },
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-start gap-4">
+                    <div
+                      className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${item.color}`}
+                    >
+                      <item.icon className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="mb-1 font-semibold text-gray-900">{item.title}</h3>
+                      <p className="text-gray-600">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* SNS Platform Cards */}
+          <div className="mt-16 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {SNS_PLATFORMS.map((platform, idx) => (
+              <div
+                key={idx}
+                className="group rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:border-purple-300 hover:shadow-lg"
+              >
+                <div
+                  className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl ${platform.color} text-white`}
+                >
+                  <platform.icon className="h-6 w-6" />
+                </div>
+                <h3 className="mb-1 font-semibold text-gray-900">{platform.name}</h3>
+                <p className="text-sm text-gray-600">{platform.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Insight Box */}
+          <div className="mt-12 rounded-2xl bg-gradient-to-r from-purple-50 to-pink-50 p-8">
+            <div className="flex flex-col items-center gap-6 md:flex-row">
+              <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-white shadow-lg">
+                <Brain className="h-8 w-8 text-purple-600" />
+              </div>
+              <div>
+                <h3 className="mb-2 text-xl font-bold text-gray-900">메타인지란?</h3>
+                <p className="text-gray-600">
+                  &ldquo;나 자신을 아는 것&rdquo;입니다. SNS 데이터 분석을 통해 무의식적으로 선택한
+                  콘텐츠 패턴을 발견하면, &ldquo;왜 이 콘텐츠에 끌렸는지&rdquo;를 이해하게 됩니다.
+                  이런 자기 이해는 더 나은 선택과 만족도 높은 콘텐츠 소비로 이어집니다.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* How it Works - Split Layout */}
-      <section className="bg-gray-50 py-24">
+      <section className="py-24">
         <div className="mx-auto max-w-7xl px-6">
           <div className="grid items-center gap-16 lg:grid-cols-2">
             {/* Left: Illustration - Matching Visualization */}
@@ -316,7 +524,7 @@ export default function PersonaWorldLanding() {
                   </div>
                   <div>
                     <div className="font-semibold text-gray-900">당신</div>
-                    <div className="text-sm text-gray-500">4개 질문 응답 완료</div>
+                    <div className="text-sm text-gray-500">SNS 연동 완료</div>
                   </div>
                 </div>
 
@@ -363,23 +571,23 @@ export default function PersonaWorldLanding() {
                 HOW IT WORKS
               </div>
               <h2 className="text-4xl font-bold text-gray-900">
-                4개의 질문으로
+                SNS 연동으로
                 <br />
                 <span className="pw-text-gradient">나를 이해하는 페르소나</span>
               </h2>
               <div className="space-y-4">
                 {[
                   {
-                    icon: MessageCircle,
+                    icon: Link2,
                     step: "1",
-                    title: "취향 질문",
-                    desc: "A vs B 형식의 간단한 4개 질문에 답해주세요",
+                    title: "SNS 연동",
+                    desc: "Twitter, Instagram, YouTube 등 사용하는 SNS를 연결하세요",
                   },
                   {
                     icon: BarChart3,
                     step: "2",
                     title: "6D 벡터 분석",
-                    desc: "당신의 콘텐츠 소비 성향을 6차원으로 분석해요",
+                    desc: "행동 데이터를 바탕으로 6차원 취향 벡터를 생성해요",
                   },
                   {
                     icon: Users,
@@ -391,7 +599,7 @@ export default function PersonaWorldLanding() {
                     icon: Heart,
                     step: "4",
                     title: "맞춤 추천",
-                    desc: "페르소나가 직접 추천 이유를 설명해드려요",
+                    desc: "페르소나가 왜 이 콘텐츠가 맞는지 설명해드려요",
                   },
                 ].map((item, idx) => (
                   <div key={idx} className="flex items-start gap-4">
@@ -534,7 +742,7 @@ export default function PersonaWorldLanding() {
                     title: "실시간 리뷰",
                     desc: "최신 콘텐츠에 대한 다양한 관점의 리뷰",
                   },
-                  { icon: Zap, title: "빠른 매칭", desc: "4초 만에 나와 맞는 페르소나 찾기" },
+                  { icon: Zap, title: "빠른 매칭", desc: "SNS 연동 즉시 맞는 페르소나 찾기" },
                   { icon: Heart, title: "취향 저격", desc: "나의 성향에 맞는 추천만 모아보기" },
                 ].map((item, idx) => (
                   <div key={idx} className="flex items-center gap-3">
@@ -601,19 +809,20 @@ export default function PersonaWorldLanding() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent" />
         <div className="relative z-10 mx-auto max-w-3xl px-6 text-center">
           <h2 className="mb-6 text-4xl font-bold text-white">
-            당신의 취향을 이해하는
+            SNS 데이터로 발견하는
             <br />
-            <span className="pw-text-gradient">AI 페르소나를 만나보세요</span>
+            <span className="pw-text-gradient">나의 진짜 취향</span>
           </h2>
           <p className="mb-8 text-lg text-gray-400">
-            4개의 간단한 질문으로 시작하세요. 당신과 가장 잘 맞는 AI 페르소나가 기다리고 있습니다.
+            SNS를 연동하고 나도 몰랐던 나의 취향 패턴을 발견하세요. 당신과 가장 잘 맞는 AI
+            페르소나가 기다리고 있습니다.
           </p>
           <div className="flex flex-col justify-center gap-4 sm:flex-row">
             <Link
               href="/onboarding"
               className="pw-button inline-flex items-center justify-center gap-2 rounded-full px-8 py-3 font-medium text-white"
             >
-              무료로 시작하기
+              SNS 연동하고 시작하기
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link

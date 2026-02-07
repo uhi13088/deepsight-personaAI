@@ -110,47 +110,18 @@ body {
   );
 }
 
-/* 그라데이션 아이콘 */
-.pw-icon-gradient {
+/* 애니메이션 그라데이션 */
+.pw-gradient-animated {
   background: linear-gradient(
-    135deg,
-    var(--pw-gradient-start) 0%,
-    var(--pw-gradient-middle) 50%,
-    var(--pw-gradient-end) 100%
+    270deg,
+    var(--pw-gradient-start),
+    var(--pw-gradient-middle),
+    var(--pw-gradient-end),
+    var(--pw-gradient-middle),
+    var(--pw-gradient-start)
   );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-.pw-icon-gradient svg {
-  stroke: url(#pw-gradient);
-}
-
-/* 그라데이션 보더 (얇은 라인용) */
-.pw-border-gradient {
-  position: relative;
-  border: 2px solid transparent;
-  background:
-    linear-gradient(white, white) padding-box,
-    linear-gradient(
-        135deg,
-        var(--pw-gradient-start),
-        var(--pw-gradient-middle),
-        var(--pw-gradient-end)
-      )
-      border-box;
-}
-
-/* 얇은 그라데이션 라인 */
-.pw-line-gradient {
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    var(--pw-gradient-start) 0%,
-    var(--pw-gradient-middle) 50%,
-    var(--pw-gradient-end) 100%
-  );
+  background-size: 400% 400%;
+  animation: pw-gradient-shift 8s ease infinite;
 }
 
 /* 버튼 그라데이션 */
@@ -176,98 +147,6 @@ body {
 
 .pw-button:active {
   transform: translateY(0);
-}
-
-/* 프로필 링 */
-.pw-profile-ring {
-  padding: 3px;
-  border-radius: 50%;
-  background: linear-gradient(
-    135deg,
-    var(--pw-gradient-start),
-    var(--pw-gradient-middle),
-    var(--pw-gradient-end)
-  );
-}
-
-/* 카드 호버 효과 */
-.pw-card-hover {
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.pw-card-hover:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
-}
-
-/* 스피너 */
-.pw-spinner {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: conic-gradient(
-    from 0deg,
-    var(--pw-gradient-start),
-    var(--pw-gradient-middle),
-    var(--pw-gradient-end),
-    var(--pw-gradient-start)
-  );
-  animation: pw-spin 1s linear infinite;
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
-}
-
-@keyframes pw-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* 좋아요 하트 애니메이션 */
-.pw-heart-pop {
-  animation: pw-heart-pop 0.3s ease;
-}
-
-@keyframes pw-heart-pop {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.3);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-/* 글로우 효과 (미니멀) */
-.pw-glow {
-  box-shadow: 0 0 20px rgba(102, 126, 234, 0.15);
-}
-
-/* 반짝임 효과 */
-.pw-shimmer {
-  position: relative;
-  overflow: hidden;
-}
-
-.pw-shimmer::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-  animation: pw-shimmer 2s infinite;
-}
-
-@keyframes pw-shimmer {
-  100% {
-    left: 100%;
-  }
 }
 
 /* SVG 그라데이션 정의용 */
@@ -383,6 +262,32 @@ body {
   border-radius: calc(1rem - 2px);
 }
 
+/* SNS Icon Styles */
+.pw-sns-icon {
+  transition: all 0.3s ease;
+}
+
+.pw-sns-icon:hover {
+  transform: scale(1.1);
+}
+
+/* Pulse animation for connection lines */
+@keyframes pw-pulse-line {
+  0%,
+  100% {
+    opacity: 0.3;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    opacity: 1;
+    stroke-dashoffset: 20;
+  }
+}
+
+.pw-pulse-line {
+  animation: pw-pulse-line 2s ease-in-out infinite;
+}
+
 /* Pulse animation (replacement for Tailwind animate-pulse) */
 @keyframes pw-pulse {
   0%,
@@ -396,4 +301,35 @@ body {
 
 .pw-pulse {
   animation: pw-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Stagger animation delays for visual interest */
+.pw-delay-100 {
+  animation-delay: 0.1s;
+}
+.pw-delay-200 {
+  animation-delay: 0.2s;
+}
+.pw-delay-300 {
+  animation-delay: 0.3s;
+}
+.pw-delay-400 {
+  animation-delay: 0.4s;
+}
+
+/* Bounce animation */
+@keyframes pw-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: translateY(-10px);
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+
+.pw-bounce {
+  animation: pw-bounce 1s infinite;
 }
