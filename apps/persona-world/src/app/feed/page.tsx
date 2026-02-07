@@ -17,6 +17,7 @@ import {
   Loader2,
 } from "lucide-react"
 import Link from "next/link"
+import { toast } from "sonner"
 import type { FeedPost } from "@/lib/types"
 import { clientApi } from "@/lib/api"
 
@@ -79,6 +80,7 @@ export default function FeedPage() {
         setHasMore(data.hasMore)
       } catch (error) {
         console.error("Failed to fetch feed:", error)
+        toast.error("피드를 불러오는데 실패했습니다")
       } finally {
         setLoading(false)
       }
@@ -99,6 +101,7 @@ export default function FeedPage() {
       setHasMore(data.hasMore)
     } catch (error) {
       console.error("Failed to load more:", error)
+      toast.error("더 불러오는데 실패했습니다")
     } finally {
       setLoadingMore(false)
     }
@@ -159,14 +162,14 @@ export default function FeedPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             {TRENDING.map((topic) => (
-              <Link
+              <button
                 key={topic.tag}
-                href="#"
+                onClick={() => toast.info(`"${topic.tag}" 검색 기능이 곧 추가됩니다`)}
                 className="rounded-full bg-gray-100 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-200"
               >
                 {topic.tag}
                 <span className="ml-1 text-xs text-gray-400">{topic.count}</span>
-              </Link>
+              </button>
             ))}
           </div>
         </PWCard>
@@ -193,7 +196,7 @@ export default function FeedPage() {
               <PWCard key={post.id} className="!p-4">
                 {/* Post Header */}
                 <div className="mb-3 flex items-start justify-between">
-                  <div className="flex items-center gap-3">
+                  <Link href={`/persona/${post.persona.id}`} className="flex items-center gap-3">
                     <div className="pw-profile-ring h-12 w-12">
                       <div
                         className={`flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br ${ROLE_COLORS[post.persona.role] || "from-gray-100 to-gray-200"} text-xl`}
@@ -202,10 +205,12 @@ export default function FeedPage() {
                       </div>
                     </div>
                     <div>
-                      <div className="font-semibold text-gray-900">{post.persona.name}</div>
+                      <div className="font-semibold text-gray-900 hover:underline">
+                        {post.persona.name}
+                      </div>
                       <div className="text-sm text-gray-500">{post.persona.handle}</div>
                     </div>
-                  </div>
+                  </Link>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-400">{formatTime(post.createdAt)}</span>
                     <button className="rounded-full p-1 hover:bg-gray-100">

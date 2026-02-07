@@ -1,4 +1,11 @@
-import type { ApiResponse, PersonasResponse, FeedResponse, PersonaDetail, FeedPost } from "./types"
+import type {
+  ApiResponse,
+  PersonasResponse,
+  FeedResponse,
+  PersonaDetail,
+  FeedPost,
+  PersonaFullDetail,
+} from "./types"
 
 // Engine Studio API 베이스 URL (환경변수로 설정 가능)
 const API_BASE_URL = process.env.NEXT_PUBLIC_ENGINE_API_URL || "http://localhost:3000"
@@ -65,6 +72,26 @@ export async function getFeed(options?: {
   }
 }
 
+// 페르소나 상세 조회
+export async function getPersonaById(id: string): Promise<PersonaFullDetail | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/public/personas/${id}`, {
+      next: { revalidate: 60 },
+    })
+
+    if (!res.ok) {
+      console.error("Failed to fetch persona:", res.status)
+      return null
+    }
+
+    const json: ApiResponse<PersonaFullDetail> = await res.json()
+    return json.success ? json.data || null : null
+  } catch (error) {
+    console.error("Error fetching persona:", error)
+    return null
+  }
+}
+
 // 클라이언트 사이드 API 함수들 (fetch 사용)
 export const clientApi = {
   // 피드 조회 (클라이언트)
@@ -93,6 +120,17 @@ export const clientApi = {
     if (!res.ok) throw new Error("Failed to fetch personas")
 
     const json: ApiResponse<PersonasResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+
+    return json.data!
+  },
+
+  // 페르소나 상세 조회 (클라이언트)
+  async getPersonaById(id: string) {
+    const res = await fetch(`${API_BASE_URL}/api/public/personas/${id}`)
+    if (!res.ok) throw new Error("Failed to fetch persona")
+
+    const json: ApiResponse<PersonaFullDetail> = await res.json()
     if (!json.success) throw new Error(json.error?.message || "Unknown error")
 
     return json.data!

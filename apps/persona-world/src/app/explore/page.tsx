@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { PWLogoWithText, PWCard } from "@/components/persona-world"
 import { Home, Search, Bell, User, Users, TrendingUp, Sparkles } from "lucide-react"
 import Link from "next/link"
+import { toast } from "sonner"
 import type { PersonaDetail } from "@/lib/types"
 import { clientApi } from "@/lib/api"
 
@@ -46,6 +47,7 @@ export default function ExplorePage() {
         setPersonas(data.personas)
       } catch (error) {
         console.error("Failed to fetch personas:", error)
+        toast.error("페르소나를 불러오는데 실패했습니다")
       } finally {
         setLoading(false)
       }
@@ -119,35 +121,37 @@ export default function ExplorePage() {
           /* Persona Grid */
           <div className="grid gap-4 sm:grid-cols-2">
             {filteredPersonas.map((persona) => (
-              <PWCard key={persona.id} className="transition-all hover:shadow-lg">
-                <div className="flex items-start gap-3">
-                  {/* Avatar */}
-                  <div className="pw-profile-ring h-14 w-14 flex-shrink-0">
-                    <div
-                      className={`flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br ${ROLE_COLORS[persona.role] || "from-gray-400 to-gray-500"} text-2xl`}
-                    >
-                      {ROLE_EMOJI[persona.role] || "🤖"}
-                    </div>
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 overflow-hidden">
-                    <div className="font-semibold text-gray-900">{persona.name}</div>
-                    <div className="text-sm text-gray-500">{persona.handle}</div>
-                    {persona.tagline && (
-                      <p className="mt-1 truncate text-xs text-gray-600">{persona.tagline}</p>
-                    )}
-                    <div className="mt-2 flex items-center gap-2">
-                      <span
-                        className={`rounded-full bg-gradient-to-r ${ROLE_COLORS[persona.role] || "from-gray-400 to-gray-500"} px-2 py-0.5 text-xs font-medium text-white`}
+              <Link key={persona.id} href={`/persona/${persona.id}`}>
+                <PWCard className="transition-all hover:shadow-lg">
+                  <div className="flex items-start gap-3">
+                    {/* Avatar */}
+                    <div className="pw-profile-ring h-14 w-14 flex-shrink-0">
+                      <div
+                        className={`flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br ${ROLE_COLORS[persona.role] || "from-gray-400 to-gray-500"} text-2xl`}
                       >
-                        {ROLE_NAMES[persona.role] || persona.role}
-                      </span>
-                      <span className="text-xs text-gray-400">{persona.postCount}개 포스트</span>
+                        {ROLE_EMOJI[persona.role] || "🤖"}
+                      </div>
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 overflow-hidden">
+                      <div className="font-semibold text-gray-900">{persona.name}</div>
+                      <div className="text-sm text-gray-500">{persona.handle}</div>
+                      {persona.tagline && (
+                        <p className="mt-1 truncate text-xs text-gray-600">{persona.tagline}</p>
+                      )}
+                      <div className="mt-2 flex items-center gap-2">
+                        <span
+                          className={`rounded-full bg-gradient-to-r ${ROLE_COLORS[persona.role] || "from-gray-400 to-gray-500"} px-2 py-0.5 text-xs font-medium text-white`}
+                        >
+                          {ROLE_NAMES[persona.role] || persona.role}
+                        </span>
+                        <span className="text-xs text-gray-400">{persona.postCount}개 포스트</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </PWCard>
+                </PWCard>
+              </Link>
             ))}
           </div>
         )}

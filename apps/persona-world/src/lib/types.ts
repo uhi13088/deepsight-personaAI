@@ -84,3 +84,9 @@ export interface TrendingTopic {
   tag: string
   count: number
 }
+
+// 페르소나 상세 페이지용 (포스트 포함)
+export interface PersonaFullDetail extends PersonaDetail {
+  description: string | null
+  recentPosts: Omit<FeedPost, "persona">[]
+}
