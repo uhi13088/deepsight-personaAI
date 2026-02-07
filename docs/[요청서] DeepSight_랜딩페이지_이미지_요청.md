@@ -508,7 +508,138 @@ Clean and recognizable at small sizes.
 
 ---
 
-## 12. 임시 대체 방안
+## 12. 파일 명명 규칙 및 저장 위치
+
+### 12.1 저장 위치
+
+모든 이미지는 다음 경로에 저장합니다:
+
+```
+apps/landing/public/images/
+├── hero/           # Hero 섹션 이미지
+├── personas/       # 페르소나 아바타
+├── products/       # 제품 목업 스크린샷
+├── infographics/   # 인포그래픽 (차트, 다이어그램)
+├── icons/          # 산업별 아이콘
+└── logos/          # 파트너사 로고
+```
+
+### 12.2 파일 명명 규칙
+
+| 카테고리    | 파일명 패턴                     | 예시                         |
+| ----------- | ------------------------------- | ---------------------------- |
+| 레이더 차트 | `vector-radar-chart.{png\|svg}` | `vector-radar-chart.png`     |
+| 플로우 차트 | `flow-{이름}.{png\|svg}`        | `flow-matching-process.png`  |
+| 비교 그래픽 | `compare-{주제}.{png\|svg}`     | `compare-recommendation.png` |
+| 페르소나    | `persona-{영문이름}.{png\|svg}` | `persona-yuna.png`           |
+| 제품 목업   | `product-{제품명}.{png\|svg}`   | `product-engine-studio.png`  |
+| 산업 아이콘 | `icon-{산업명}.{png\|svg}`      | `icon-ott-media.svg`         |
+| 파트너 로고 | `logo-{회사명}.{png\|svg}`      | `logo-partner-01.svg`        |
+
+### 12.3 Retina 대응
+
+고해상도(Retina) 이미지가 필요한 경우:
+
+| 용도        | 파일명 패턴     | 예시                  |
+| ----------- | --------------- | --------------------- |
+| 1x (일반)   | `{이름}.png`    | `persona-yuna.png`    |
+| 2x (Retina) | `{이름}@2x.png` | `persona-yuna@2x.png` |
+
+### 12.4 전체 파일 목록
+
+```
+apps/landing/public/images/
+├── infographics/
+│   ├── vector-radar-chart.png         # 6D 벡터 레이더 차트
+│   ├── vector-radar-chart@2x.png
+│   ├── flow-matching-process.png      # 매칭 플로우 다이어그램
+│   ├── flow-matching-process@2x.png
+│   ├── compare-recommendation.png     # 기존 vs DeepSight 비교
+│   └── compare-recommendation@2x.png
+│
+├── personas/
+│   ├── persona-yuna.png               # 유나 아바타
+│   ├── persona-yuna@2x.png
+│   ├── persona-junghyun.png           # 정현 아바타
+│   ├── persona-junghyun@2x.png
+│   ├── persona-taemin.png             # 태민 아바타
+│   ├── persona-taemin@2x.png
+│   ├── persona-sophia.png             # 소피아 아바타
+│   └── persona-sophia@2x.png
+│
+├── products/
+│   ├── product-engine-studio.png      # Engine Studio 목업
+│   ├── product-engine-studio@2x.png
+│   ├── product-dev-console.png        # Developer Console 목업
+│   ├── product-dev-console@2x.png
+│   ├── product-persona-world.png      # PersonaWorld 목업
+│   └── product-persona-world@2x.png
+│
+├── icons/
+│   ├── icon-ott-media.svg             # OTT/미디어 아이콘
+│   ├── icon-ecommerce.svg             # 이커머스 아이콘
+│   ├── icon-finance.svg               # 금융/투자 아이콘
+│   └── icon-education.svg             # 교육/EdTech 아이콘
+│
+└── logos/
+    ├── logo-partner-01.svg            # 파트너사 로고 (추후 교체)
+    ├── logo-partner-02.svg
+    ├── logo-partner-03.svg
+    └── logo-partner-04.svg
+```
+
+---
+
+## 13. Claude에게 작업 요청하는 방법
+
+### 13.1 이미지 등록 요청
+
+이미지를 생성하여 해당 경로에 저장한 후, Claude에게 다음과 같이 요청:
+
+```
+이미지 파일을 준비했어. 다음 경로에 저장해서 랜딩 페이지에 적용해줘:
+
+- 파일: persona-yuna.png, persona-yuna@2x.png
+- 저장 위치: apps/landing/public/images/personas/
+- 적용 위치: 랜딩 페이지 "6D 벡터란 무엇인가요?" 섹션
+```
+
+### 13.2 컴포넌트 업데이트 요청
+
+```
+apps/landing/public/images/infographics/vector-radar-chart.png 이미지를
+랜딩 페이지의 VectorExplanation 섹션에 적용해줘.
+현재 플레이스홀더를 실제 이미지로 교체해야 해.
+```
+
+### 13.3 Next.js Image 컴포넌트 사용
+
+Claude가 이미지를 적용할 때 사용할 코드 예시:
+
+```tsx
+import Image from "next/image"
+
+// 일반 이미지
+<Image
+  src="/images/personas/persona-yuna.png"
+  alt="유나 - 감성 리뷰어"
+  width={200}
+  height={200}
+/>
+
+// Retina 대응 (srcSet 자동 생성)
+<Image
+  src="/images/infographics/vector-radar-chart.png"
+  alt="6D 벡터 레이더 차트"
+  width={480}
+  height={480}
+  quality={90}
+/>
+```
+
+---
+
+## 14. 임시 대체 방안
 
 이미지가 준비되기 전까지는 다음으로 대체:
 
