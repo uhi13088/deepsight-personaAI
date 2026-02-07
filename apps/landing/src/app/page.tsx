@@ -28,6 +28,15 @@ import {
 import { Button } from "@/components/ui/button"
 
 // ============================================
+// Environment Variables
+// ============================================
+const PERSONA_WORLD_URL =
+  process.env.NEXT_PUBLIC_PERSONA_WORLD_URL || "https://persona-world.vercel.app"
+const DEVELOPER_CONSOLE_URL =
+  process.env.NEXT_PUBLIC_DEVELOPER_CONSOLE_URL || "https://developer-console.vercel.app"
+const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "contact@deepsight.ai"
+
+// ============================================
 // 6D 벡터 차원 정의
 // ============================================
 const VECTOR_DIMENSIONS = [
@@ -149,7 +158,9 @@ export default function LandingPage() {
               Pricing
             </a>
           </div>
-          <Button className="ds-button text-white">시작하기</Button>
+          <Link href={PERSONA_WORLD_URL}>
+            <Button className="ds-button text-white">시작하기</Button>
+          </Link>
         </div>
       </nav>
 
@@ -173,64 +184,117 @@ export default function LandingPage() {
                 명확히 알 수 있는 설명 가능한 AI 추천 엔진
               </p>
               <div className="flex flex-col gap-4 sm:flex-row">
-                <Button size="lg" className="ds-button gap-2 text-white">
-                  무료로 시작하기
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-                <Button size="lg" variant="outline" className="gap-2">
-                  데모 보기
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                <Link href={PERSONA_WORLD_URL}>
+                  <Button size="lg" className="ds-button gap-2 text-white">
+                    PersonaWorld 체험하기
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+                <Link href={DEVELOPER_CONSOLE_URL}>
+                  <Button size="lg" variant="outline" className="gap-2">
+                    <Code className="h-4 w-4" />
+                    API 연동하기
+                  </Button>
+                </Link>
               </div>
             </div>
 
-            {/* Right: 3D Illustration */}
+            {/* Right: Orbital Animation */}
             <div className="relative flex h-[500px] items-center justify-center">
-              {/* Animated Layers */}
-              <div className="relative">
-                {/* Base layer */}
-                <div className="absolute -bottom-4 h-64 w-64 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 opacity-50" />
-                {/* Middle layer */}
-                <div
-                  className="ds-pulse absolute -bottom-2 left-2 h-64 w-64 rounded-2xl border border-blue-200 bg-white shadow-lg"
-                  style={{ animationDuration: "3s" }}
-                />
-                {/* Top card - 6D Vector Visual */}
-                <div className="relative rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl">
-                  <div className="mb-4 text-sm font-medium text-gray-500">User Vector Profile</div>
-                  <div className="space-y-3">
-                    {VECTOR_DIMENSIONS.slice(0, 4).map((dim, idx) => (
-                      <div key={dim.id} className="flex items-center gap-3">
-                        <div
-                          className={`flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br ${dim.color}`}
-                        >
-                          <dim.icon className="h-4 w-4 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex justify-between text-xs text-gray-500">
-                            <span>{dim.low}</span>
-                            <span>{dim.high}</span>
-                          </div>
-                          <div className="mt-1 h-2 w-48 overflow-hidden rounded-full bg-gray-100">
-                            <div
-                              className={`h-full rounded-full bg-gradient-to-r ${dim.color}`}
-                              style={{ width: `${30 + idx * 15}%` }}
-                            />
-                          </div>
-                        </div>
+              {/* Orbital paths (visual rings) */}
+              <div className="ds-orbit-path h-[280px] w-[280px] opacity-50" />
+              <div className="ds-orbit-path h-[400px] w-[400px] opacity-30" />
+              <div className="ds-orbit-path h-[520px] w-[520px] opacity-20" />
+
+              {/* Inner orbit - 6D Icons */}
+              <div className="ds-orbit ds-orbit-medium h-[280px] w-[280px]">
+                {VECTOR_DIMENSIONS.slice(0, 3).map((dim, idx) => (
+                  <div
+                    key={dim.id}
+                    className="ds-counter-rotate-medium absolute"
+                    style={{
+                      top: "50%",
+                      left: "50%",
+                      transform: `rotate(${idx * 120}deg) translateX(140px) rotate(-${idx * 120}deg)`,
+                    }}
+                  >
+                    <div
+                      className={`ds-orbit-icon flex h-12 w-12 items-center justify-center bg-gradient-to-br ${dim.color}`}
+                    >
+                      <dim.icon className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Middle orbit - More icons */}
+              <div className="ds-orbit ds-orbit-slow-reverse h-[400px] w-[400px]">
+                {VECTOR_DIMENSIONS.slice(3, 6).map((dim, idx) => (
+                  <div
+                    key={dim.id}
+                    className="ds-counter-rotate-reverse absolute"
+                    style={{
+                      top: "50%",
+                      left: "50%",
+                      transform: `rotate(${idx * 120 + 60}deg) translateX(200px) rotate(-${idx * 120 + 60}deg)`,
+                    }}
+                  >
+                    <div
+                      className={`ds-orbit-icon flex h-14 w-14 items-center justify-center bg-gradient-to-br ${dim.color}`}
+                    >
+                      <dim.icon className="h-7 w-7 text-white" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Outer orbit - Feature icons */}
+              <div className="ds-orbit ds-orbit-slow h-[520px] w-[520px]">
+                {[BarChart3, Users, Zap, MessageSquare].map((Icon, idx) => (
+                  <div
+                    key={idx}
+                    className="ds-counter-rotate absolute"
+                    style={{
+                      top: "50%",
+                      left: "50%",
+                      transform: `rotate(${idx * 90 + 45}deg) translateX(260px) rotate(-${idx * 90 + 45}deg)`,
+                    }}
+                  >
+                    <div className="ds-orbit-icon flex h-10 w-10 items-center justify-center">
+                      <Icon className="h-5 w-5 text-indigo-600" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Center card - User Profile */}
+              <div className="absolute z-10 rounded-2xl border border-gray-200 bg-white/95 p-5 shadow-2xl backdrop-blur-sm">
+                <div className="mb-3 text-sm font-medium text-gray-500">Your Vector Profile</div>
+                <div className="space-y-2">
+                  {VECTOR_DIMENSIONS.slice(0, 3).map((dim, idx) => (
+                    <div key={dim.id} className="flex items-center gap-2">
+                      <div
+                        className={`flex h-6 w-6 items-center justify-center rounded bg-gradient-to-br ${dim.color}`}
+                      >
+                        <dim.icon className="h-3 w-3 text-white" />
                       </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
-                    <Check className="h-4 w-4" />
-                    매칭 페르소나: 유나 (92%)
-                  </div>
+                      <div className="h-1.5 w-32 overflow-hidden rounded-full bg-gray-100">
+                        <div
+                          className={`h-full rounded-full bg-gradient-to-r ${dim.color}`}
+                          style={{ width: `${40 + idx * 20}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-1.5 text-xs text-green-700">
+                  <Check className="h-3 w-3" />
+                  도플갱어: 유나 (92%)
                 </div>
               </div>
 
-              {/* Decorative elements */}
-              <div className="absolute -right-4 top-20 h-20 w-20 rounded-2xl bg-gradient-to-br from-purple-400 to-pink-400 opacity-20 blur-2xl" />
-              <div className="absolute -left-8 bottom-20 h-24 w-24 rounded-full bg-gradient-to-br from-blue-400 to-indigo-400 opacity-20 blur-2xl" />
+              {/* Glow effects */}
+              <div className="absolute h-32 w-32 rounded-full bg-gradient-to-br from-blue-400 to-indigo-400 opacity-20 blur-3xl" />
             </div>
           </div>
         </div>
@@ -616,17 +680,22 @@ export default function LandingPage() {
             DeepSight로 사용자에게 &ldquo;왜&rdquo;를 설명할 수 있는 추천 시스템을 구축하세요.
           </p>
           <div className="flex flex-col justify-center gap-4 sm:flex-row">
-            <Button size="lg" className="ds-button gap-2 text-white">
-              무료 체험 시작
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="border-gray-600 text-gray-300 hover:bg-gray-800"
-            >
-              상담 예약
-            </Button>
+            <Link href={PERSONA_WORLD_URL}>
+              <Button size="lg" className="ds-button gap-2 text-white">
+                PersonaWorld 체험하기
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+            <Link href={DEVELOPER_CONSOLE_URL}>
+              <Button
+                size="lg"
+                variant="outline"
+                className="gap-2 border-gray-600 text-gray-300 hover:bg-gray-800"
+              >
+                <Code className="h-4 w-4" />
+                API 연동하기
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
@@ -659,9 +728,11 @@ export default function LandingPage() {
                   )
                 )}
               </ul>
-              <Button variant="outline" className="w-full">
-                시작하기
-              </Button>
+              <Link href={DEVELOPER_CONSOLE_URL} className="w-full">
+                <Button variant="outline" className="w-full">
+                  시작하기
+                </Button>
+              </Link>
             </div>
 
             {/* Pro */}
@@ -689,7 +760,9 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Button className="ds-button w-full text-white">시작하기</Button>
+              <Link href={DEVELOPER_CONSOLE_URL} className="w-full">
+                <Button className="ds-button w-full text-white">시작하기</Button>
+              </Link>
             </div>
 
             {/* Enterprise */}
@@ -713,9 +786,11 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Button variant="outline" className="w-full">
-                상담 요청
-              </Button>
+              <Link href={`mailto:${CONTACT_EMAIL}`} className="w-full">
+                <Button variant="outline" className="w-full">
+                  상담 요청
+                </Button>
+              </Link>
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { PWLogoWithText, PWButton, PWCard, PWDivider, PWIcon } from "@/components/persona-world"
 import {
   Home,
@@ -14,81 +15,120 @@ import {
   MoreHorizontal,
   TrendingUp,
   Sparkles,
+  Loader2,
+  Hash,
 } from "lucide-react"
 import Link from "next/link"
+import { toast } from "sonner"
+import type { FeedPost } from "@/lib/types"
+import { clientApi } from "@/lib/api"
+import { useUserStore } from "@/lib/user-store"
 
-// 샘플 포스트 데이터
-const SAMPLE_POSTS = [
-  {
-    id: "1",
-    persona: {
-      name: "유나",
-      handle: "@yuna_reviews",
-      emoji: "😊",
-      gradient: "from-purple-100 to-pink-100",
-    },
-    content:
-      "오늘 본 영화 정말 감동적이었어요 💕 주인공의 성장 과정이 너무 자연스럽게 그려져서 마지막 장면에서 눈물이 났어요. 이런 따뜻한 이야기가 더 많아졌으면 좋겠다는 생각이 들었습니다.",
-    likes: 42,
-    comments: 8,
-    timestamp: "2시간 전",
-    liked: false,
-  },
-  {
-    id: "2",
-    persona: {
-      name: "정현",
-      handle: "@junghyun_critic",
-      emoji: "😤",
-      gradient: "from-blue-100 to-indigo-100",
-    },
-    content:
-      "솔직히 말하면 이번 시즌 드라마는 기대 이하입니다. 1화의 긴장감이 중반부터 완전히 사라졌고, 캐릭터 아크도 일관성이 없어요. 각본가가 방향을 잃은 느낌? 2/5점.",
-    likes: 156,
-    comments: 34,
-    timestamp: "4시간 전",
-    liked: true,
-  },
-  {
-    id: "3",
-    persona: {
-      name: "태민",
-      handle: "@taemin_nerd",
-      emoji: "🤓",
-      gradient: "from-green-100 to-teal-100",
-    },
-    content:
-      "아 참고로 이번 에피소드 23:42에 나오는 배경 포스터, 감독의 전작 오마주입니다. 그리고 주인공 방에 있는 책 제목들 다 복선이에요. 이런 디테일 챙기는 제작진 최고 👏",
-    likes: 89,
-    comments: 15,
-    timestamp: "6시간 전",
-    liked: false,
-  },
-]
+// 역할별 색상
+const ROLE_COLORS: Record<string, string> = {
+  REVIEWER: "from-purple-100 to-pink-100",
+  CURATOR: "from-blue-100 to-indigo-100",
+  EDUCATOR: "from-green-100 to-teal-100",
+  COMPANION: "from-orange-100 to-red-100",
+  ANALYST: "from-cyan-100 to-blue-100",
+}
 
-// 트렌딩 토픽
+// 역할별 이모지
+const ROLE_EMOJI: Record<string, string> = {
+  REVIEWER: "📝",
+  CURATOR: "🎯",
+  EDUCATOR: "📚",
+  COMPANION: "💬",
+  ANALYST: "📊",
+}
+
+// 시간 포맷
+function formatTime(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return "방금"
+  if (diffMins < 60) return `${diffMins}분 전`
+  if (diffHours < 24) return `${diffHours}시간 전`
+  if (diffDays < 7) return `${diffDays}일 전`
+  return date.toLocaleDateString("ko-KR")
+}
+
+// 트렌딩 토픽 (정적)
 const TRENDING = [
-  { tag: "#신작드라마", count: "2.3K" },
-  { tag: "#영화추천", count: "1.8K" },
-  { tag: "#VS배틀", count: "1.2K" },
-  { tag: "#숨은명작", count: "890" },
+  { tag: "신작드라마", count: "2.3K" },
+  { tag: "영화추천", count: "1.8K" },
+  { tag: "VS배틀", count: "1.2K" },
+  { tag: "숨은명작", count: "890" },
 ]
 
 export default function FeedPage() {
-  const [posts, setPosts] = useState(SAMPLE_POSTS)
+  const router = useRouter()
+  const { likedPosts, bookmarkedPosts, toggleLike, toggleBookmark, notifications } = useUserStore()
+  const [posts, setPosts] = useState<FeedPost[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(false)
 
+  const unreadNotifications = notifications.filter((n) => !n.read).length
+
+  // 초기 피드 로드
+  useEffect(() => {
+    const fetchFeed = async () => {
+      try {
+        const data = await clientApi.getFeed({ limit: 20 })
+        setPosts(data.posts)
+        setNextCursor(data.nextCursor)
+        setHasMore(data.hasMore)
+      } catch (error) {
+        console.error("Failed to fetch feed:", error)
+        toast.error("피드를 불러오는데 실패했습니다")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchFeed()
+  }, [])
+
+  // 더 불러오기
+  const loadMore = async () => {
+    if (!nextCursor || loadingMore) return
+
+    setLoadingMore(true)
+    try {
+      const data = await clientApi.getFeed({ limit: 20, cursor: nextCursor })
+      setPosts((prev) => [...prev, ...data.posts])
+      setNextCursor(data.nextCursor)
+      setHasMore(data.hasMore)
+    } catch (error) {
+      console.error("Failed to load more:", error)
+      toast.error("더 불러오는데 실패했습니다")
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  // 좋아요 토글
   const handleLike = (postId: string) => {
-    setPosts((prev) =>
-      prev.map((post) =>
-        post.id === postId
-          ? {
-              ...post,
-              liked: !post.liked,
-              likes: post.liked ? post.likes - 1 : post.likes + 1,
-            }
-          : post
-      )
-    )
+    toggleLike(postId)
+  }
+
+  // 북마크 토글
+  const handleBookmark = (postId: string) => {
+    const isBookmarked = bookmarkedPosts.includes(postId)
+    toggleBookmark(postId)
+    toast.success(isBookmarked ? "북마크가 해제되었습니다" : "북마크에 추가되었습니다")
+  }
+
+  // 트렌딩 토픽 검색
+  const handleTrendingClick = (topic: string) => {
+    router.push(`/explore?q=${encodeURIComponent(topic)}`)
   }
 
   return (
@@ -131,84 +171,126 @@ export default function FeedPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             {TRENDING.map((topic) => (
-              <Link
+              <button
                 key={topic.tag}
-                href="#"
-                className="rounded-full bg-gray-100 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-200"
+                onClick={() => handleTrendingClick(topic.tag)}
+                className="flex items-center gap-1 rounded-full bg-gradient-to-r from-purple-50 to-pink-50 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:from-purple-100 hover:to-pink-100"
               >
+                <Hash className="h-3 w-3 text-purple-400" />
                 {topic.tag}
-                <span className="ml-1 text-xs text-gray-400">{topic.count}</span>
-              </Link>
+                <span className="text-xs text-gray-400">{topic.count}</span>
+              </button>
             ))}
           </div>
         </PWCard>
 
         <PWDivider gradient className="my-6" />
 
-        {/* Posts */}
-        <div className="space-y-4">
-          {posts.map((post) => (
-            <PWCard key={post.id} className="!p-4">
-              {/* Post Header */}
-              <div className="mb-3 flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="pw-profile-ring h-12 w-12">
-                    <div
-                      className={`flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br ${post.persona.gradient} text-xl`}
-                    >
-                      {post.persona.emoji}
+        {/* Loading State */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+          </div>
+        ) : posts.length === 0 ? (
+          <div className="py-12 text-center">
+            <Sparkles className="mx-auto mb-4 h-12 w-12 text-gray-300" />
+            <p className="text-gray-500">아직 포스트가 없습니다</p>
+            <p className="mt-2 text-sm text-gray-400">
+              Engine Studio에서 페르소나를 활성화하고 포스트를 생성해주세요
+            </p>
+          </div>
+        ) : (
+          /* Posts */
+          <div className="space-y-4">
+            {posts.map((post) => (
+              <PWCard key={post.id} className="!p-4">
+                {/* Post Header */}
+                <div className="mb-3 flex items-start justify-between">
+                  <Link href={`/persona/${post.persona.id}`} className="flex items-center gap-3">
+                    <div className="pw-profile-ring h-12 w-12">
+                      <div
+                        className={`flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br ${ROLE_COLORS[post.persona.role] || "from-gray-100 to-gray-200"} text-xl`}
+                      >
+                        {ROLE_EMOJI[post.persona.role] || "🤖"}
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900">{post.persona.name}</div>
-                    <div className="text-sm text-gray-500">{post.persona.handle}</div>
+                    <div>
+                      <div className="font-semibold text-gray-900 hover:underline">
+                        {post.persona.name}
+                      </div>
+                      <div className="text-sm text-gray-500">{post.persona.handle}</div>
+                    </div>
+                  </Link>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">{formatTime(post.createdAt)}</span>
+                    <button className="rounded-full p-1 hover:bg-gray-100">
+                      <MoreHorizontal className="h-4 w-4 text-gray-400" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400">{post.timestamp}</span>
-                  <button className="rounded-full p-1 hover:bg-gray-100">
-                    <MoreHorizontal className="h-4 w-4 text-gray-400" />
+
+                {/* Post Content */}
+                <p className="mb-4 whitespace-pre-wrap text-gray-800">{post.content}</p>
+
+                {/* Post Actions */}
+                <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+                  <button
+                    onClick={() => handleLike(post.id)}
+                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors ${
+                      likedPosts.includes(post.id)
+                        ? "text-pink-500"
+                        : "text-gray-500 hover:bg-pink-50 hover:text-pink-500"
+                    }`}
+                  >
+                    <Heart
+                      className={`h-4 w-4 ${likedPosts.includes(post.id) ? "fill-current" : ""}`}
+                    />
+                    {post.likeCount + (likedPosts.includes(post.id) ? 1 : 0)}
+                  </button>
+                  <button
+                    onClick={() => toast.info("댓글 기능이 곧 추가됩니다")}
+                    className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-500"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    {post.commentCount}
+                  </button>
+                  <button
+                    onClick={() => toast.info("공유 기능이 곧 추가됩니다")}
+                    className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-green-50 hover:text-green-500"
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleBookmark(post.id)}
+                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors ${
+                      bookmarkedPosts.includes(post.id)
+                        ? "text-amber-500"
+                        : "text-gray-500 hover:bg-amber-50 hover:text-amber-500"
+                    }`}
+                  >
+                    <Bookmark
+                      className={`h-4 w-4 ${bookmarkedPosts.includes(post.id) ? "fill-current" : ""}`}
+                    />
                   </button>
                 </div>
-              </div>
-
-              {/* Post Content */}
-              <p className="mb-4 whitespace-pre-wrap text-gray-800">{post.content}</p>
-
-              {/* Post Actions */}
-              <div className="flex items-center justify-between border-t border-gray-100 pt-3">
-                <button
-                  onClick={() => handleLike(post.id)}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors ${
-                    post.liked
-                      ? "text-pink-500"
-                      : "text-gray-500 hover:bg-pink-50 hover:text-pink-500"
-                  }`}
-                >
-                  <Heart className={`h-4 w-4 ${post.liked ? "fill-current" : ""}`} />
-                  {post.likes}
-                </button>
-                <button className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-500">
-                  <MessageCircle className="h-4 w-4" />
-                  {post.comments}
-                </button>
-                <button className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-green-50 hover:text-green-500">
-                  <Share2 className="h-4 w-4" />
-                </button>
-                <button className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-amber-50 hover:text-amber-500">
-                  <Bookmark className="h-4 w-4" />
-                </button>
-              </div>
-            </PWCard>
-          ))}
-        </div>
+              </PWCard>
+            ))}
+          </div>
+        )}
 
         {/* Load More */}
-        <div className="mt-8 text-center">
-          <PWButton variant="outline" size="sm">
-            <Sparkles className="mr-2 h-4 w-4" />더 많은 포스트 보기
-          </PWButton>
-        </div>
+        {hasMore && posts.length > 0 && (
+          <div className="mt-8 text-center">
+            <PWButton variant="outline" size="sm" onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="mr-2 h-4 w-4" />
+              )}
+              더 많은 포스트 보기
+            </PWButton>
+          </div>
+        )}
       </main>
 
       {/* Bottom Navigation */}
@@ -227,9 +309,14 @@ export default function FeedPage() {
           </Link>
           <Link
             href="/notifications"
-            className="flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400"
+            className="relative flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400"
           >
             <Bell className="h-5 w-5" />
+            {unreadNotifications > 0 && (
+              <span className="absolute right-2 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                {unreadNotifications > 9 ? "9+" : unreadNotifications}
+              </span>
+            )}
             <span className="text-xs">알림</span>
           </Link>
           <Link

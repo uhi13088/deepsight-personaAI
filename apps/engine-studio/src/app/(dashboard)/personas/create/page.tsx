@@ -11,6 +11,8 @@ import {
   Rocket,
   AlertCircle,
   Loader2,
+  Wand2,
+  PenTool,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -60,9 +62,11 @@ const EXPERTISE_OPTIONS = [
 
 export default function CreatePersonaPage() {
   const router = useRouter()
+  const [creationMode, setCreationMode] = useState<"select" | "manual" | "auto">("select")
   const [currentStep, setCurrentStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
   const [isValidating, setIsValidating] = useState(false)
+  const [isAutoGenerating, setIsAutoGenerating] = useState(false)
 
   // Step 1: 기본 정보
   const [name, setName] = useState("")
@@ -231,294 +235,447 @@ ${description ? `[추가 설명]\n${description}` : ""}`
     setExpertise((prev) => (prev.includes(exp) ? prev.filter((e) => e !== exp) : [...prev, exp]))
   }
 
+  // AI 자동 생성 핸들러
+  const handleAutoGenerate = async () => {
+    setIsAutoGenerating(true)
+
+    try {
+      const response = await fetch("/api/personas/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}), // 빈 객체 - 다양성 기반 벡터 자동 배정
+      })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error?.message || "페르소나 생성에 실패했습니다")
+      }
+
+      toast.success("페르소나 자동 생성 완료", {
+        description: `'${result.data.persona.name}' 페르소나가 생성되었습니다. 수정 페이지로 이동합니다.`,
+      })
+
+      // 생성된 페르소나 수정 페이지로 이동
+      router.push(`/personas/${result.data.persona.id}`)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다"
+      toast.error("자동 생성 실패", { description: errorMessage })
+    } finally {
+      setIsAutoGenerating(false)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-4xl">
       {/* Header */}
       <div className="mb-6 flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => {
+            if (creationMode !== "select") {
+              setCreationMode("select")
+            } else {
+              router.back()
+            }
+          }}
+        >
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
           <h1 className="text-2xl font-bold">새 페르소나 생성</h1>
-          <p className="text-muted-foreground">4단계 마법사를 통해 페르소나를 생성합니다.</p>
+          <p className="text-muted-foreground">
+            {creationMode === "select"
+              ? "생성 방식을 선택하세요."
+              : "4단계 마법사를 통해 페르소나를 생성합니다."}
+          </p>
         </div>
       </div>
 
-      {/* Progress Steps */}
-      <div className="mb-8 flex items-center justify-between">
-        {STEPS.map((step, index) => (
-          <div
-            key={step.id}
-            className={`flex items-center ${index < STEPS.length - 1 ? "flex-1" : ""}`}
+      {/* Mode Selection */}
+      {creationMode === "select" && (
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* AI 자동 생성 카드 */}
+          <Card
+            className="hover:border-primary cursor-pointer border-2 transition-all hover:shadow-lg"
+            onClick={() => !isAutoGenerating && handleAutoGenerate()}
           >
-            <div className="flex items-center gap-2">
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
-                  currentStep > step.id
-                    ? "bg-green-500 text-white"
-                    : currentStep === step.id
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {currentStep > step.id ? <Check className="h-4 w-4" /> : step.id}
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500">
+                {isAutoGenerating ? (
+                  <Loader2 className="h-8 w-8 animate-spin text-white" />
+                ) : (
+                  <Wand2 className="h-8 w-8 text-white" />
+                )}
               </div>
-              <span
-                className={`text-sm font-medium ${
-                  currentStep === step.id ? "text-foreground" : "text-muted-foreground"
-                }`}
-              >
-                {step.title}
-              </span>
-            </div>
-            {index < STEPS.length - 1 && (
-              <div
-                className={`mx-4 h-0.5 flex-1 ${
-                  currentStep > step.id ? "bg-green-500" : "bg-muted"
-                }`}
-              />
-            )}
-          </div>
-        ))}
-      </div>
+              <CardTitle className="text-xl">AI 자동 생성</CardTitle>
+              <CardDescription>
+                AI가 다양성 분석을 기반으로 새로운 페르소나를 자동 생성합니다.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="text-muted-foreground space-y-2 text-sm">
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-500" />
+                  6D 벡터 자동 배정 (다양성 우선)
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-500" />
+                  캐릭터 속성 자동 생성
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-500" />
+                  프롬프트 템플릿 자동 구성
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-500" />
+                  일관성 검증 (70점 이상)
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-500" />
+                  생성 후 수정 가능 (DRAFT 상태)
+                </li>
+              </ul>
+              <Button className="mt-4 w-full" disabled={isAutoGenerating}>
+                {isAutoGenerating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    생성 중...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    AI로 생성하기
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
 
-      {/* Step Content */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>{STEPS[currentStep - 1].title}</CardTitle>
-          <CardDescription>{STEPS[currentStep - 1].description}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {/* Step 1: 기본 정보 */}
-          {currentStep === 1 && (
-            <div className="space-y-6">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="name">페르소나 이름 *</Label>
-                  <Input
-                    id="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="예: 논리적 평론가"
-                    maxLength={30}
+          {/* 수동 생성 카드 */}
+          <Card
+            className="hover:border-primary cursor-pointer border-2 transition-all hover:shadow-lg"
+            onClick={() => setCreationMode("manual")}
+          >
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-cyan-500">
+                <PenTool className="h-8 w-8 text-white" />
+              </div>
+              <CardTitle className="text-xl">직접 생성</CardTitle>
+              <CardDescription>단계별 마법사를 통해 페르소나를 직접 구성합니다.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="text-muted-foreground space-y-2 text-sm">
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-blue-500" />
+                  기본 정보 직접 입력
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-blue-500" />
+                  6D 벡터 슬라이더로 조정
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-blue-500" />
+                  프롬프트 직접 작성
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-blue-500" />
+                  검증 후 바로 배포 가능
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-blue-500" />
+                  세부 설정 완전 제어
+                </li>
+              </ul>
+              <Button variant="outline" className="mt-4 w-full">
+                <PenTool className="mr-2 h-4 w-4" />
+                직접 만들기
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Progress Steps - Only show in manual mode */}
+      {creationMode === "manual" && (
+        <>
+          <div className="mb-8 flex items-center justify-between">
+            {STEPS.map((step, index) => (
+              <div
+                key={step.id}
+                className={`flex items-center ${index < STEPS.length - 1 ? "flex-1" : ""}`}
+              >
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium ${
+                      currentStep > step.id
+                        ? "bg-green-500 text-white"
+                        : currentStep === step.id
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {currentStep > step.id ? <Check className="h-4 w-4" /> : step.id}
+                  </div>
+                  <span
+                    className={`text-sm font-medium ${
+                      currentStep === step.id ? "text-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    {step.title}
+                  </span>
+                </div>
+                {index < STEPS.length - 1 && (
+                  <div
+                    className={`mx-4 h-0.5 flex-1 ${
+                      currentStep > step.id ? "bg-green-500" : "bg-muted"
+                    }`}
                   />
-                  <p className="text-muted-foreground text-xs">
-                    {name.length}/30자 (한글/영문 2~30자)
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="role">역할 *</Label>
-                  <Select value={role} onValueChange={(v) => setRole(v as PersonaRole)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="역할 선택" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(PERSONA_ROLE_LABELS).map(([value, label]) => (
-                        <SelectItem key={value} value={value}>
-                          {label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>전문 분야 * (복수 선택 가능)</Label>
-                <div className="flex flex-wrap gap-2">
-                  {EXPERTISE_OPTIONS.map((exp) => (
-                    <Badge
-                      key={exp}
-                      variant={expertise.includes(exp) ? "default" : "outline"}
-                      className="cursor-pointer"
-                      onClick={() => toggleExpertise(exp)}
-                    >
-                      {exp}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">설명 (선택)</Label>
-                <Textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="페르소나의 특징이나 성격을 간단히 설명해주세요."
-                  maxLength={100}
-                  rows={3}
-                />
-                <p className="text-muted-foreground text-xs">{description.length}/100자</p>
-              </div>
-            </div>
-          )}
-
-          {/* Step 2: 성향 벡터 */}
-          {currentStep === 2 && (
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div>
-                <VectorSlider value={vector} onChange={setVector} showPresets showReset />
-              </div>
-              <div className="flex flex-col items-center justify-center">
-                <h4 className="mb-4 text-sm font-medium">벡터 시각화</h4>
-                <RadarChart data={vector} height={300} showLegend={false} />
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: 프롬프트 */}
-          {currentStep === 3 && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label>프롬프트 템플릿</Label>
-                <Button variant="outline" size="sm" onClick={generatePrompt}>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  자동 생성
-                </Button>
-              </div>
-              <Textarea
-                value={promptTemplate}
-                onChange={(e) => {
-                  setPromptTemplate(e.target.value)
-                  setIsAutoGenerated(false)
-                }}
-                placeholder="페르소나의 프롬프트를 입력하세요..."
-                rows={15}
-                className="font-mono text-sm"
-              />
-              <div className="text-muted-foreground flex items-center justify-between text-xs">
-                <span>{promptTemplate.length}자</span>
-                {isAutoGenerated && <Badge variant="secondary">자동 생성됨</Badge>}
-              </div>
-            </div>
-          )}
-
-          {/* Step 4: 검증 및 배포 */}
-          {currentStep === 4 && (
-            <div className="space-y-6">
-              <div className="text-center">
-                {!validationResult && !isValidating && (
-                  <div className="py-8">
-                    <p className="text-muted-foreground mb-4">
-                      검증을 실행하여 페르소나를 확인하세요.
-                    </p>
-                    <Button onClick={runValidation}>
-                      <Check className="mr-2 h-4 w-4" />
-                      검증 실행
-                    </Button>
-                  </div>
                 )}
+              </div>
+            ))}
+          </div>
 
-                {isValidating && (
-                  <div className="py-8">
-                    <Loader2 className="text-primary mx-auto mb-4 h-8 w-8 animate-spin" />
-                    <p className="text-muted-foreground">검증 중...</p>
-                  </div>
-                )}
-
-                {validationResult && (
-                  <div className="space-y-4 text-left">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">품질 점수</span>
-                      <div className="flex items-center gap-2">
-                        <Progress value={validationResult.score} className="w-32" />
-                        <span className="font-bold">{validationResult.score}점</span>
-                      </div>
+          {/* Step Content */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>{STEPS[currentStep - 1].title}</CardTitle>
+              <CardDescription>{STEPS[currentStep - 1].description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* Step 1: 기본 정보 */}
+              {currentStep === 1 && (
+                <div className="space-y-6">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">페르소나 이름 *</Label>
+                      <Input
+                        id="name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="예: 논리적 평론가"
+                        maxLength={30}
+                      />
+                      <p className="text-muted-foreground text-xs">
+                        {name.length}/30자 (한글/영문 2~30자)
+                      </p>
                     </div>
 
-                    {validationResult.passed ? (
-                      <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
-                        <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
-                          <Check className="h-5 w-5" />
-                          <span className="font-medium">검증 통과</span>
-                        </div>
-                        <p className="mt-1 text-sm text-green-600 dark:text-green-400">
-                          페르소나가 모든 기준을 충족했습니다. 저장하거나 배포할 수 있습니다.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20">
-                        <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-300">
-                          <AlertCircle className="h-5 w-5" />
-                          <span className="font-medium">개선 필요</span>
-                        </div>
-                        <p className="mt-1 text-sm text-yellow-600 dark:text-yellow-400">
-                          아래 항목을 개선한 후 다시 검증해주세요.
-                        </p>
-                      </div>
-                    )}
-
-                    {validationResult.issues.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">개선 사항:</p>
-                        <ul className="space-y-1">
-                          {validationResult.issues.map((issue, index) => (
-                            <li
-                              key={index}
-                              className="text-muted-foreground flex items-start gap-2 text-sm"
-                            >
-                              <span className="text-yellow-500">•</span>
-                              {issue}
-                            </li>
+                    <div className="space-y-2">
+                      <Label htmlFor="role">역할 *</Label>
+                      <Select value={role} onValueChange={(v) => setRole(v as PersonaRole)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="역할 선택" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(PERSONA_ROLE_LABELS).map(([value, label]) => (
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
                           ))}
-                        </ul>
-                      </div>
-                    )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
 
-                    <Button variant="outline" onClick={runValidation} className="w-full">
-                      다시 검증
+                  <div className="space-y-2">
+                    <Label>전문 분야 * (복수 선택 가능)</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {EXPERTISE_OPTIONS.map((exp) => (
+                        <Badge
+                          key={exp}
+                          variant={expertise.includes(exp) ? "default" : "outline"}
+                          className="cursor-pointer"
+                          onClick={() => toggleExpertise(exp)}
+                        >
+                          {exp}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="description">설명 (선택)</Label>
+                    <Textarea
+                      id="description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="페르소나의 특징이나 성격을 간단히 설명해주세요."
+                      maxLength={100}
+                      rows={3}
+                    />
+                    <p className="text-muted-foreground text-xs">{description.length}/100자</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: 성향 벡터 */}
+              {currentStep === 2 && (
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div>
+                    <VectorSlider value={vector} onChange={setVector} showPresets showReset />
+                  </div>
+                  <div className="flex flex-col items-center justify-center">
+                    <h4 className="mb-4 text-sm font-medium">벡터 시각화</h4>
+                    <RadarChart data={vector} height={300} showLegend={false} />
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: 프롬프트 */}
+              {currentStep === 3 && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label>프롬프트 템플릿</Label>
+                    <Button variant="outline" size="sm" onClick={generatePrompt}>
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      자동 생성
                     </Button>
                   </div>
-                )}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  <Textarea
+                    value={promptTemplate}
+                    onChange={(e) => {
+                      setPromptTemplate(e.target.value)
+                      setIsAutoGenerated(false)
+                    }}
+                    placeholder="페르소나의 프롬프트를 입력하세요..."
+                    rows={15}
+                    className="font-mono text-sm"
+                  />
+                  <div className="text-muted-foreground flex items-center justify-between text-xs">
+                    <span>{promptTemplate.length}자</span>
+                    {isAutoGenerated && <Badge variant="secondary">자동 생성됨</Badge>}
+                  </div>
+                </div>
+              )}
 
-      {/* Navigation Buttons */}
-      <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          onClick={() => setCurrentStep((s) => s - 1)}
-          disabled={currentStep === 1}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          이전
-        </Button>
+              {/* Step 4: 검증 및 배포 */}
+              {currentStep === 4 && (
+                <div className="space-y-6">
+                  <div className="text-center">
+                    {!validationResult && !isValidating && (
+                      <div className="py-8">
+                        <p className="text-muted-foreground mb-4">
+                          검증을 실행하여 페르소나를 확인하세요.
+                        </p>
+                        <Button onClick={runValidation}>
+                          <Check className="mr-2 h-4 w-4" />
+                          검증 실행
+                        </Button>
+                      </div>
+                    )}
 
-        <div className="flex gap-2">
-          {currentStep === 4 && validationResult?.passed && (
-            <>
-              <Button variant="outline" onClick={() => handleSave(false)} disabled={isLoading}>
-                {isLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="mr-2 h-4 w-4" />
-                )}
-                저장
-              </Button>
-              <Button onClick={() => handleSave(true)} disabled={isLoading}>
-                {isLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Rocket className="mr-2 h-4 w-4" />
-                )}
-                배포
-              </Button>
-            </>
-          )}
+                    {isValidating && (
+                      <div className="py-8">
+                        <Loader2 className="text-primary mx-auto mb-4 h-8 w-8 animate-spin" />
+                        <p className="text-muted-foreground">검증 중...</p>
+                      </div>
+                    )}
 
-          {currentStep < 4 && (
-            <Button onClick={() => setCurrentStep((s) => s + 1)} disabled={!canProceed()}>
-              다음
-              <ArrowRight className="ml-2 h-4 w-4" />
+                    {validationResult && (
+                      <div className="space-y-4 text-left">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">품질 점수</span>
+                          <div className="flex items-center gap-2">
+                            <Progress value={validationResult.score} className="w-32" />
+                            <span className="font-bold">{validationResult.score}점</span>
+                          </div>
+                        </div>
+
+                        {validationResult.passed ? (
+                          <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
+                            <div className="flex items-center gap-2 text-green-700 dark:text-green-300">
+                              <Check className="h-5 w-5" />
+                              <span className="font-medium">검증 통과</span>
+                            </div>
+                            <p className="mt-1 text-sm text-green-600 dark:text-green-400">
+                              페르소나가 모든 기준을 충족했습니다. 저장하거나 배포할 수 있습니다.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20">
+                            <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-300">
+                              <AlertCircle className="h-5 w-5" />
+                              <span className="font-medium">개선 필요</span>
+                            </div>
+                            <p className="mt-1 text-sm text-yellow-600 dark:text-yellow-400">
+                              아래 항목을 개선한 후 다시 검증해주세요.
+                            </p>
+                          </div>
+                        )}
+
+                        {validationResult.issues.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium">개선 사항:</p>
+                            <ul className="space-y-1">
+                              {validationResult.issues.map((issue, index) => (
+                                <li
+                                  key={index}
+                                  className="text-muted-foreground flex items-start gap-2 text-sm"
+                                >
+                                  <span className="text-yellow-500">•</span>
+                                  {issue}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        <Button variant="outline" onClick={runValidation} className="w-full">
+                          다시 검증
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Navigation Buttons */}
+          <div className="flex items-center justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setCurrentStep((s) => s - 1)}
+              disabled={currentStep === 1}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              이전
             </Button>
-          )}
-        </div>
-      </div>
+
+            <div className="flex gap-2">
+              {currentStep === 4 && validationResult?.passed && (
+                <>
+                  <Button variant="outline" onClick={() => handleSave(false)} disabled={isLoading}>
+                    {isLoading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="mr-2 h-4 w-4" />
+                    )}
+                    저장
+                  </Button>
+                  <Button onClick={() => handleSave(true)} disabled={isLoading}>
+                    {isLoading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Rocket className="mr-2 h-4 w-4" />
+                    )}
+                    배포
+                  </Button>
+                </>
+              )}
+
+              {currentStep < 4 && (
+                <Button onClick={() => setCurrentStep((s) => s + 1)} disabled={!canProceed()}>
+                  다음
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

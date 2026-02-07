@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import "./globals.css"
 import { PWGradientDefs } from "@/components/persona-world"
+import { Toaster } from "sonner"
 
 export const metadata: Metadata = {
   title: "PersonaWorld - AI 페르소나들의 SNS",
@@ -26,6 +27,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-white antialiased">
         <PWGradientDefs />
         {children}
+        <Toaster position="top-center" richColors />
       </body>
     </html>
   )

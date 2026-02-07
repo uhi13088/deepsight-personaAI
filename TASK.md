@@ -19,6 +19,64 @@
 
 ## ✅ DONE (완료)
 
+- [x] **T25: 앱 간 연동 환경변수 정리** ✅ 2026-02-07
+  - 변경: `apps/persona-world/src/lib/api.ts` - 기본 URL 포트 수정 (3000 → 3001)
+  - 변경: `docs/DEVELOPMENT_GUIDE.md` - 환경변수 섹션 전면 개편
+  - 구현:
+    - PersonaWorld → Engine Studio API 연동 기본값 수정
+    - 앱별 포트 설정 테이블 (Landing:3000, Engine:3001, Console:3002, PersonaWorld:3003)
+    - 앱 간 연동 구조 다이어그램
+    - 각 앱별 필요한 환경변수 문서화
+    - 프로덕션 환경변수 예시 추가
+  - 테스트: Build PASS
+
+- [x] **T24: 랜딩 페이지 이미지 요청서 보완** ✅ 2026-02-07
+  - 변경: `docs/[요청서] DeepSight_랜딩페이지_이미지_요청.md`
+  - 구현:
+    - 섹션 12: 파일 명명 규칙 및 저장 위치 추가
+      - 저장 위치: `apps/landing/public/images/{category}/`
+      - 파일명 패턴: `{type}-{name}.png`, Retina: `{name}@2x.png`
+      - 전체 파일 목록 트리 구조
+    - 섹션 13: Claude에게 작업 요청하는 방법
+      - 이미지 등록 요청 예시
+      - Next.js Image 컴포넌트 사용 예시
+    - 섹션 14: 제품 스크린샷 촬영 가이드
+      - 앱 실행 URL 및 포트
+      - 촬영할 페이지 목록 (Engine Studio, Developer Console, PersonaWorld)
+      - Chrome DevTools 스크린샷 방법
+      - 권장 뷰포트 크기 (1440x900 데스크톱, 390x844 모바일)
+      - 목업 프레임 도구 (Screely, Shots)
+  - 테스트: 문서 작성 완료
+
+- [x] **T23: 페르소나 AI 자동 생성 UI** ✅ 2026-02-07
+  - 변경: `apps/engine-studio/src/app/(dashboard)/personas/create/page.tsx`
+  - 구현:
+    - 모드 선택 화면 추가 (AI 자동 생성 vs 직접 생성)
+    - AI 자동 생성 카드 (보라-핑크 그라데이션, Wand2 아이콘)
+    - 직접 생성 카드 (파란-시안 그라데이션, PenTool 아이콘)
+    - handleAutoGenerate() - `/api/personas/generate` 연동
+    - 생성 후 수정 페이지로 자동 이동 (DRAFT 상태)
+    - 로딩 상태 UI (스피너, 버튼 비활성화)
+    - 뒤로가기 버튼: 모드 선택 ↔ 마법사 전환
+  - 테스트: Build PASS (engine-studio)
+
+- [x] **T22: PersonaWorld 사용자 상태 관리** ✅ 2026-02-07
+  - 변경: `apps/persona-world/src/lib/user-store.ts` (신규)
+  - 변경: `apps/persona-world/src/app/notifications/page.tsx`
+  - 변경: `apps/persona-world/src/app/persona/[id]/page.tsx`
+  - 변경: `apps/persona-world/src/app/feed/page.tsx`
+  - 변경: `apps/persona-world/src/app/explore/page.tsx`
+  - 구현:
+    - Zustand 스토어 (localStorage 영속화)
+    - 사용자 프로필 관리 (UserProfile, 6D 벡터)
+    - 팔로우/언팔로우 기능 (FollowedPersona)
+    - 좋아요/북마크 토글
+    - 알림 관리 (읽음 처리, 전체 읽음, 삭제)
+    - 알림 타입별 아이콘/스타일 (7가지 타입)
+    - 트렌딩 토픽 클릭 → 탐색 페이지 검색
+    - Suspense 래퍼 (useSearchParams 대응)
+  - 테스트: Build PASS (persona-world)
+
 - [x] **T19: Export 기능 구현** ✅ 2026-02-06
   - 변경: `apps/developer-console/src/lib/export.ts` (신규)
   - 변경: `apps/developer-console/src/app/(dashboard)/logs/page.tsx`
