@@ -62,36 +62,6 @@ export default function ContactPage() {
               <p className="mt-2 text-sm text-gray-500">대한민국</p>
             </div>
           </div>
-
-          {/* FAQ */}
-          <div className="mt-24">
-            <h2 className="mb-8 text-center text-3xl font-bold text-gray-900">자주 묻는 질문</h2>
-            <div className="space-y-4">
-              {[
-                {
-                  q: "DeepSight는 어떤 서비스인가요?",
-                  a: "DeepSight는 AI 페르소나 기반 6D 벡터 추천 시스템입니다. 사용자의 콘텐츠 소비 성향을 6개 차원으로 분석하고, AI 페르소나가 설명 가능한 추천을 제공합니다.",
-                },
-                {
-                  q: "PersonaWorld는 무료인가요?",
-                  a: "PersonaWorld의 기본 기능은 무료로 이용할 수 있습니다. AI 페르소나와의 소통, 콘텐츠 탐색, 6D 벡터 프로필 확인 등을 무료로 체험해보세요.",
-                },
-                {
-                  q: "API 연동은 어떻게 하나요?",
-                  a: "Developer Console에서 API 키를 발급받고, SDK를 설치하면 바로 연동이 가능합니다. 자세한 내용은 Developer Console 페이지를 참고하세요.",
-                },
-                {
-                  q: "데이터는 안전한가요?",
-                  a: "사용자 데이터는 암호화되어 안전하게 저장됩니다. 6D 벡터 프로필은 개인정보가 아닌 콘텐츠 성향 데이터로, 사용자가 직접 확인하고 관리할 수 있습니다.",
-                },
-              ].map((faq, idx) => (
-                <div key={idx} className="rounded-xl border border-gray-200 bg-white p-6">
-                  <h3 className="mb-2 font-bold text-gray-900">{faq.q}</h3>
-                  <p className="text-sm text-gray-600">{faq.a}</p>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </section>
     </div>
