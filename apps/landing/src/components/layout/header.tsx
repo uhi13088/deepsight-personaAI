@@ -51,7 +51,7 @@ export function Header() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#667eea] via-[#f093fb] to-[#f5576c]">
             <Layers className="h-5 w-5 text-white" />
           </div>
           <span className="text-xl font-bold">DeepSight</span>
@@ -65,7 +65,7 @@ export function Header() {
               href={item.href}
               className={`rounded-lg px-4 py-2 text-sm transition-colors ${
                 isActive(item.href)
-                  ? "font-medium text-blue-600"
+                  ? "font-medium text-[#667eea]"
                   : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
               }`}
             >
@@ -82,7 +82,7 @@ export function Header() {
             <button
               className={`flex items-center gap-1 rounded-lg px-4 py-2 text-sm transition-colors ${
                 isActive("/products")
-                  ? "font-medium text-blue-600"
+                  ? "font-medium text-[#667eea]"
                   : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
               }`}
             >
@@ -101,8 +101,8 @@ export function Header() {
                     className="flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-gray-50"
                     onClick={() => setProductsOpen(false)}
                   >
-                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50">
-                      <item.icon className="h-5 w-5 text-blue-600" />
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-purple-50 to-pink-50">
+                      <item.icon className="h-5 w-5 text-[#667eea]" />
                     </div>
                     <div>
                       <div className="text-sm font-medium text-gray-900">{item.label}</div>
@@ -118,7 +118,7 @@ export function Header() {
             href="/contact"
             className={`rounded-lg px-4 py-2 text-sm transition-colors ${
               isActive("/contact")
-                ? "font-medium text-blue-600"
+                ? "font-medium text-[#667eea]"
                 : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
             }`}
           >
@@ -152,7 +152,7 @@ export function Header() {
                 key={item.href}
                 href={item.href}
                 className={`rounded-lg px-4 py-2 text-sm ${
-                  isActive(item.href) ? "font-medium text-blue-600" : "text-gray-600"
+                  isActive(item.href) ? "font-medium text-[#667eea]" : "text-gray-600"
                 }`}
                 onClick={() => setMobileOpen(false)}
               >
@@ -167,7 +167,7 @@ export function Header() {
                 key={item.href}
                 href={item.href}
                 className={`rounded-lg px-4 py-2 text-sm ${
-                  isActive(item.href) ? "font-medium text-blue-600" : "text-gray-600"
+                  isActive(item.href) ? "font-medium text-[#667eea]" : "text-gray-600"
                 }`}
                 onClick={() => setMobileOpen(false)}
               >
@@ -177,7 +177,7 @@ export function Header() {
             <Link
               href="/contact"
               className={`rounded-lg px-4 py-2 text-sm ${
-                isActive("/contact") ? "font-medium text-blue-600" : "text-gray-600"
+                isActive("/contact") ? "font-medium text-[#667eea]" : "text-gray-600"
               }`}
               onClick={() => setMobileOpen(false)}
             >

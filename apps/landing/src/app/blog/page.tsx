@@ -16,7 +16,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  TECH: "bg-blue-100 text-blue-700",
+  TECH: "bg-purple-100 text-purple-700",
   PRODUCT: "bg-green-100 text-green-700",
   INSIGHT: "bg-purple-100 text-purple-700",
   ANNOUNCEMENT: "bg-orange-100 text-orange-700",
@@ -41,7 +41,7 @@ export default async function BlogPage() {
       {/* Hero */}
       <section className="bg-gray-50 py-24">
         <div className="mx-auto max-w-4xl px-6 text-center">
-          <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-blue-600">
+          <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
             BLOG
           </div>
           <h1 className="mb-6 text-5xl font-bold text-gray-900">DeepSight Blog</h1>
@@ -76,7 +76,7 @@ export default async function BlogPage() {
                     )}
                   </div>
 
-                  <h2 className="mb-2 text-xl font-bold text-gray-900 group-hover:text-blue-600">
+                  <h2 className="mb-2 text-xl font-bold text-gray-900 group-hover:text-[#667eea]">
                     {post.title}
                   </h2>
 
@@ -101,7 +101,7 @@ export default async function BlogPage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 flex items-center gap-1 text-sm font-medium text-blue-600 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="mt-4 flex items-center gap-1 text-sm font-medium text-[#667eea] opacity-0 transition-opacity group-hover:opacity-100">
                     읽기
                     <ArrowRight className="h-4 w-4" />
                   </div>

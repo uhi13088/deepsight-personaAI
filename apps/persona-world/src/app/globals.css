@@ -32,10 +32,12 @@
   --ring: 221.2 83.2% 53.3%;
   --radius: 0.75rem;
 
-  /* PersonaWorld 그라데이션 컬러 */
+  /* PersonaWorld 그라데이션 컬러 (확장 팔레트) */
   --pw-gradient-start: #667eea;
   --pw-gradient-middle: #f093fb;
   --pw-gradient-end: #f5576c;
+  --pw-green: #22c55e;
+  --pw-yellow: #eab308;
 }
 
 /* =========================================
@@ -58,31 +60,35 @@ body {
   font-family: var(--font-brand), "Nunito", sans-serif;
 }
 
-/* 그라데이션 텍스트 - 헤드라인용 */
+/* 그라데이션 텍스트 - 헤드라인용 (5색 다방향) */
 .pw-text-gradient {
   background: linear-gradient(
-    135deg,
+    120deg,
     var(--pw-gradient-start) 0%,
-    var(--pw-gradient-middle) 50%,
-    var(--pw-gradient-end) 100%
+    var(--pw-gradient-middle) 25%,
+    var(--pw-gradient-end) 45%,
+    var(--pw-green) 70%,
+    var(--pw-yellow) 100%
   );
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-/* 애니메이션 텍스트 그라데이션 */
+/* 애니메이션 텍스트 그라데이션 (5색 확장) */
 .pw-text-gradient-animated {
   background: linear-gradient(
     270deg,
     var(--pw-gradient-start),
     var(--pw-gradient-middle),
     var(--pw-gradient-end),
+    var(--pw-green),
+    var(--pw-yellow),
     var(--pw-gradient-middle),
     var(--pw-gradient-start)
   );
-  background-size: 400% 400%;
-  animation: pw-gradient-shift 8s ease infinite;
+  background-size: 500% 500%;
+  animation: pw-gradient-shift 10s ease infinite;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -127,7 +133,7 @@ body {
   stroke: url(#pw-gradient);
 }
 
-/* 그라데이션 보더 (얇은 라인용) */
+/* 그라데이션 보더 (얇은 라인용 — 5색 확장) */
 .pw-border-gradient {
   position: relative;
   border: 2px solid transparent;
@@ -137,7 +143,9 @@ body {
         135deg,
         var(--pw-gradient-start),
         var(--pw-gradient-middle),
-        var(--pw-gradient-end)
+        var(--pw-gradient-end),
+        var(--pw-green),
+        var(--pw-yellow)
       )
       border-box;
 }
@@ -202,7 +210,7 @@ body {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
 }
 
-/* 스피너 */
+/* 스피너 (5색 코닉 그라데이션) */
 .pw-spinner {
   width: 32px;
   height: 32px;
@@ -212,6 +220,8 @@ body {
     var(--pw-gradient-start),
     var(--pw-gradient-middle),
     var(--pw-gradient-end),
+    var(--pw-green),
+    var(--pw-yellow),
     var(--pw-gradient-start)
   );
   animation: pw-spin 1s linear infinite;
@@ -370,9 +380,11 @@ body {
     var(--pw-gradient-start),
     var(--pw-gradient-middle),
     var(--pw-gradient-end),
+    var(--pw-green),
+    var(--pw-yellow),
     var(--pw-gradient-start)
   );
-  background-size: 300% 300%;
+  background-size: 400% 400%;
   animation: pw-gradient-rotate 4s ease infinite;
   padding: 2px;
   border-radius: 1rem;
@@ -396,4 +408,84 @@ body {
 
 .pw-pulse {
   animation: pw-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* =========================================
+   Multi-Directional Gradient Variants
+   확장 팔레트 (보라→핑크→코랄→그린→옐로우)
+   ========================================= */
+
+/* 코닉(방사형 회전) 그라데이션 */
+.pw-gradient-conic {
+  background: conic-gradient(
+    from 0deg,
+    var(--pw-gradient-start),
+    var(--pw-gradient-middle),
+    var(--pw-gradient-end),
+    var(--pw-green),
+    var(--pw-yellow),
+    var(--pw-gradient-start)
+  );
+}
+
+/* 방사형 그라데이션 — 배경 글로우용 */
+.pw-gradient-radial {
+  background: radial-gradient(
+    ellipse at center,
+    var(--pw-gradient-start) 0%,
+    var(--pw-gradient-middle) 25%,
+    var(--pw-green) 50%,
+    var(--pw-yellow) 75%,
+    transparent 100%
+  );
+}
+
+/* 대각선 45deg 그라데이션 */
+.pw-gradient-diagonal {
+  background: linear-gradient(
+    45deg,
+    var(--pw-gradient-start) 0%,
+    var(--pw-gradient-middle) 30%,
+    var(--pw-green) 60%,
+    var(--pw-yellow) 100%
+  );
+}
+
+/* 메쉬 그라데이션 — 배경 데코용 */
+.pw-mesh-gradient {
+  background:
+    radial-gradient(at 20% 30%, rgba(102, 126, 234, 0.3) 0%, transparent 50%),
+    radial-gradient(at 80% 20%, rgba(240, 147, 251, 0.25) 0%, transparent 50%),
+    radial-gradient(at 50% 80%, rgba(34, 197, 94, 0.2) 0%, transparent 50%),
+    radial-gradient(at 90% 70%, rgba(234, 179, 8, 0.2) 0%, transparent 50%);
+}
+
+/* 5색 확장 텍스트 그라데이션 — 대각선 */
+.pw-text-gradient-extended {
+  background: linear-gradient(
+    45deg,
+    var(--pw-gradient-start) 0%,
+    var(--pw-gradient-middle) 20%,
+    var(--pw-gradient-end) 40%,
+    var(--pw-green) 65%,
+    var(--pw-yellow) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* 프로필 링 — 5색 확장 */
+.pw-profile-ring-extended {
+  padding: 3px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    var(--pw-gradient-start),
+    var(--pw-gradient-middle),
+    var(--pw-gradient-end),
+    var(--pw-green),
+    var(--pw-yellow),
+    var(--pw-gradient-start)
+  );
 }

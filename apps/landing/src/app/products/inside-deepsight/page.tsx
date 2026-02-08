@@ -26,7 +26,7 @@ const PIPELINE_STEPS = [
     title: "페르소나 설계",
     description:
       "전문 큐레이터가 페르소나의 성격, 전문 분야, 표현 스타일을 정의합니다. 6D 벡터 프로필을 설정하여 페르소나의 콘텐츠 취향을 정량화합니다.",
-    color: "from-blue-500 to-blue-600",
+    color: "from-[#667eea] to-[#f093fb]",
   },
   {
     step: 2,
@@ -34,7 +34,7 @@ const PIPELINE_STEPS = [
     title: "AI 프롬프트 엔지니어링",
     description:
       "각 페르소나의 성격과 관점을 AI가 일관되게 표현할 수 있도록 프롬프트 템플릿을 정교하게 설계합니다.",
-    color: "from-purple-500 to-purple-600",
+    color: "from-[#f093fb] to-[#f5576c]",
   },
   {
     step: 3,
@@ -80,16 +80,16 @@ export default function InsideDeepSightPage() {
     <div className="min-h-screen bg-white">
       {/* Hero */}
       <section className="ds-dark-section relative overflow-hidden py-24">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/30 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-900/30 via-transparent to-transparent" />
         <div className="relative z-10 mx-auto max-w-4xl px-6 text-center">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-500/10 px-4 py-2 text-sm text-blue-300">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-purple-400/30 bg-purple-500/10 px-4 py-2 text-sm text-purple-300">
             <Layers className="h-4 w-4" />
             Behind the Scenes
           </div>
           <h1 className="mb-6 text-5xl font-bold text-white">
             페르소나가
             <br />
-            <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#667eea] via-[#f093fb] to-[#22c55e] bg-clip-text text-transparent">
               만들어지는 곳
             </span>
           </h1>
@@ -104,7 +104,7 @@ export default function InsideDeepSightPage() {
       <section className="py-24">
         <div className="mx-auto max-w-5xl px-6">
           <div className="mb-16 text-center">
-            <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-blue-600">
+            <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
               CREATION PIPELINE
             </div>
             <h2 className="text-3xl font-bold text-gray-900">페르소나 제작 파이프라인</h2>
@@ -139,7 +139,7 @@ export default function InsideDeepSightPage() {
       <section className="bg-gray-50 py-24">
         <div className="mx-auto max-w-7xl px-6">
           <div className="mb-16 text-center">
-            <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-blue-600">
+            <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
               ENGINE STUDIO
             </div>
             <h2 className="text-3xl font-bold text-gray-900">내부 관리 시스템</h2>
@@ -151,7 +151,7 @@ export default function InsideDeepSightPage() {
           <div className="grid gap-8 md:grid-cols-3">
             {ENGINE_FEATURES.map((feature, idx) => (
               <div key={idx} className="rounded-2xl border border-gray-200 bg-white p-8">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-[#667eea] via-[#22c55e] to-[#eab308]">
                   <feature.icon className="h-7 w-7 text-white" />
                 </div>
                 <h3 className="mb-3 text-xl font-bold text-gray-900">{feature.title}</h3>

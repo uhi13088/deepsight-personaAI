@@ -80,7 +80,7 @@ export function HeroOrbital({ dimensions }: HeroOrbitalProps) {
             }}
           >
             <div className="ds-orbit-icon flex h-10 w-10 items-center justify-center">
-              <Icon className="h-5 w-5 text-indigo-600" />
+              <Icon className="h-5 w-5 text-[#667eea]" />
             </div>
           </div>
         ))}
@@ -113,7 +113,7 @@ export function HeroOrbital({ dimensions }: HeroOrbitalProps) {
       </div>
 
       {/* Glow effects */}
-      <div className="absolute h-32 w-32 rounded-full bg-gradient-to-br from-blue-400 to-indigo-400 opacity-20 blur-3xl" />
+      <div className="absolute h-32 w-32 rounded-full bg-gradient-to-br from-[#667eea] via-[#f093fb] to-[#22c55e] opacity-20 blur-3xl" />
     </div>
   )
 }

@@ -14,7 +14,7 @@ export default function ContactPage() {
       {/* Hero */}
       <section className="bg-gray-50 py-24">
         <div className="mx-auto max-w-4xl px-6 text-center">
-          <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-blue-600">
+          <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
             CONTACT
           </div>
           <h1 className="mb-6 text-5xl font-bold text-gray-900">문의하기</h1>
@@ -29,11 +29,11 @@ export default function ContactPage() {
         <div className="mx-auto max-w-4xl px-6">
           <div className="grid gap-8 md:grid-cols-3">
             <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-blue-50">
-                <Mail className="h-7 w-7 text-blue-600" />
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-purple-50">
+                <Mail className="h-7 w-7 text-[#667eea]" />
               </div>
               <h3 className="mb-2 text-lg font-bold text-gray-900">이메일</h3>
-              <a href={`mailto:${CONTACT_EMAIL}`} className="text-blue-600 hover:text-blue-700">
+              <a href={`mailto:${CONTACT_EMAIL}`} className="text-[#667eea] hover:text-purple-700">
                 {CONTACT_EMAIL}
               </a>
               <p className="mt-2 text-sm text-gray-500">일반 문의, 기술 상담</p>
