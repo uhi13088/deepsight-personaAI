@@ -8,7 +8,6 @@ import {
   Users,
   Zap,
   Check,
-  ChevronRight,
   Brain,
   Target,
   Eye,
@@ -18,27 +17,17 @@ import {
   MousePointer,
   Clock,
   Star,
-  Layers,
   MessageSquare,
   TrendingUp,
-  Shield,
   Code,
-  Building2,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { HeroOrbital } from "@/components/home/hero-orbital"
 
-// ============================================
-// Environment Variables
-// ============================================
 const PERSONA_WORLD_URL =
   process.env.NEXT_PUBLIC_PERSONA_WORLD_URL || "https://persona-world.vercel.app"
 const DEVELOPER_CONSOLE_URL =
   process.env.NEXT_PUBLIC_DEVELOPER_CONSOLE_URL || "https://developer-console.vercel.app"
-const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "contact@deepsight.ai"
 
-// ============================================
-// 6D 벡터 차원 정의
-// ============================================
 const VECTOR_DIMENSIONS = [
   {
     id: "depth",
@@ -96,19 +85,6 @@ const VECTOR_DIMENSIONS = [
   },
 ]
 
-// 플로팅 아이콘 위치
-const FLOATING_ICONS = [
-  { Icon: Brain, pos: "top-[10%] left-[8%]", delay: "0s", size: "w-14 h-14" },
-  { Icon: Target, pos: "top-[15%] right-[12%]", delay: "0.5s", size: "w-12 h-12" },
-  { Icon: Eye, pos: "top-[35%] left-[5%]", delay: "1s", size: "w-10 h-10" },
-  { Icon: Palette, pos: "top-[30%] right-[8%]", delay: "1.5s", size: "w-16 h-16" },
-  { Icon: Search, pos: "bottom-[35%] left-[10%]", delay: "2s", size: "w-12 h-12" },
-  { Icon: Compass, pos: "bottom-[25%] right-[15%]", delay: "2.5s", size: "w-14 h-14" },
-  { Icon: Sparkles, pos: "bottom-[15%] left-[15%]", delay: "0.3s", size: "w-10 h-10" },
-  { Icon: Users, pos: "bottom-[20%] right-[5%]", delay: "0.8s", size: "w-11 h-11" },
-]
-
-// 예상 시나리오 메트릭
 const METRICS = [
   { label: "추천 클릭률 향상", value: "+47%", icon: MousePointer },
   { label: "세션 체류시간", value: "+32%", icon: Clock },
@@ -116,7 +92,6 @@ const METRICS = [
   { label: "추천 만족도", value: "4.7/5", icon: Star },
 ]
 
-// 산업별 활용 사례
 const USE_CASES = [
   {
     industry: "OTT 플랫폼",
@@ -135,37 +110,11 @@ const USE_CASES = [
   },
 ]
 
-export default function LandingPage() {
+export default function HomePage() {
   return (
     <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="fixed top-0 z-50 w-full border-b border-gray-100 bg-white/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600">
-              <Layers className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-bold">DeepSight</span>
-          </div>
-          <div className="hidden items-center gap-8 md:flex">
-            <a href="#features" className="text-sm text-gray-600 hover:text-gray-900">
-              Features
-            </a>
-            <a href="#how-it-works" className="text-sm text-gray-600 hover:text-gray-900">
-              How it Works
-            </a>
-            <a href="#pricing" className="text-sm text-gray-600 hover:text-gray-900">
-              Pricing
-            </a>
-          </div>
-          <Link href={PERSONA_WORLD_URL}>
-            <Button className="ds-button text-white">시작하기</Button>
-          </Link>
-        </div>
-      </nav>
-
       {/* Hero Section */}
-      <section className="relative overflow-hidden pb-20 pt-32">
+      <section className="relative overflow-hidden pb-20 pt-16">
         <div className="mx-auto max-w-7xl px-6">
           <div className="grid items-center gap-12 lg:grid-cols-2">
             {/* Left: Text */}
@@ -184,174 +133,74 @@ export default function LandingPage() {
                 명확히 알 수 있는 설명 가능한 AI 추천 엔진
               </p>
               <div className="flex flex-col gap-4 sm:flex-row">
-                <Link href={PERSONA_WORLD_URL}>
-                  <Button size="lg" className="ds-button gap-2 text-white">
-                    PersonaWorld 체험하기
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
+                <Link
+                  href={PERSONA_WORLD_URL}
+                  className="ds-button inline-flex items-center justify-center gap-2 rounded-lg px-6 py-3 text-sm font-medium text-white"
+                >
+                  PersonaWorld 체험하기
+                  <ArrowRight className="h-4 w-4" />
                 </Link>
-                <Link href={DEVELOPER_CONSOLE_URL}>
-                  <Button size="lg" variant="outline" className="gap-2">
-                    <Code className="h-4 w-4" />
-                    API 연동하기
-                  </Button>
+                <Link
+                  href={DEVELOPER_CONSOLE_URL}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-6 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <Code className="h-4 w-4" />
+                  API 연동하기
                 </Link>
               </div>
             </div>
 
             {/* Right: Orbital Animation */}
-            <div className="relative flex h-[500px] items-center justify-center">
-              {/* Orbital paths (visual rings) */}
-              <div className="ds-orbit-path h-[280px] w-[280px] opacity-50" />
-              <div className="ds-orbit-path h-[400px] w-[400px] opacity-30" />
-              <div className="ds-orbit-path h-[520px] w-[520px] opacity-20" />
-
-              {/* Inner orbit - 6D Icons */}
-              <div className="ds-orbit ds-orbit-medium h-[280px] w-[280px]">
-                {VECTOR_DIMENSIONS.slice(0, 3).map((dim, idx) => (
-                  <div
-                    key={dim.id}
-                    className="ds-counter-rotate-medium absolute"
-                    style={{
-                      top: "50%",
-                      left: "50%",
-                      transform: `rotate(${idx * 120}deg) translateX(140px) rotate(-${idx * 120}deg)`,
-                    }}
-                  >
-                    <div
-                      className={`ds-orbit-icon flex h-12 w-12 items-center justify-center bg-gradient-to-br ${dim.color}`}
-                    >
-                      <dim.icon className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Middle orbit - More icons */}
-              <div className="ds-orbit ds-orbit-slow-reverse h-[400px] w-[400px]">
-                {VECTOR_DIMENSIONS.slice(3, 6).map((dim, idx) => (
-                  <div
-                    key={dim.id}
-                    className="ds-counter-rotate-reverse absolute"
-                    style={{
-                      top: "50%",
-                      left: "50%",
-                      transform: `rotate(${idx * 120 + 60}deg) translateX(200px) rotate(-${idx * 120 + 60}deg)`,
-                    }}
-                  >
-                    <div
-                      className={`ds-orbit-icon flex h-14 w-14 items-center justify-center bg-gradient-to-br ${dim.color}`}
-                    >
-                      <dim.icon className="h-7 w-7 text-white" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Outer orbit - Feature icons */}
-              <div className="ds-orbit ds-orbit-slow h-[520px] w-[520px]">
-                {[BarChart3, Users, Zap, MessageSquare].map((Icon, idx) => (
-                  <div
-                    key={idx}
-                    className="ds-counter-rotate absolute"
-                    style={{
-                      top: "50%",
-                      left: "50%",
-                      transform: `rotate(${idx * 90 + 45}deg) translateX(260px) rotate(-${idx * 90 + 45}deg)`,
-                    }}
-                  >
-                    <div className="ds-orbit-icon flex h-10 w-10 items-center justify-center">
-                      <Icon className="h-5 w-5 text-indigo-600" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Center card - User Profile */}
-              <div className="absolute z-10 rounded-2xl border border-gray-200 bg-white/95 p-5 shadow-2xl backdrop-blur-sm">
-                <div className="mb-3 text-sm font-medium text-gray-500">Your Vector Profile</div>
-                <div className="space-y-2">
-                  {VECTOR_DIMENSIONS.slice(0, 3).map((dim, idx) => (
-                    <div key={dim.id} className="flex items-center gap-2">
-                      <div
-                        className={`flex h-6 w-6 items-center justify-center rounded bg-gradient-to-br ${dim.color}`}
-                      >
-                        <dim.icon className="h-3 w-3 text-white" />
-                      </div>
-                      <div className="h-1.5 w-32 overflow-hidden rounded-full bg-gray-100">
-                        <div
-                          className={`h-full rounded-full bg-gradient-to-r ${dim.color}`}
-                          style={{ width: `${40 + idx * 20}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-3 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-1.5 text-xs text-green-700">
-                  <Check className="h-3 w-3" />
-                  도플갱어: 유나 (92%)
-                </div>
-              </div>
-
-              {/* Glow effects */}
-              <div className="absolute h-32 w-32 rounded-full bg-gradient-to-br from-blue-400 to-indigo-400 opacity-20 blur-3xl" />
-            </div>
+            <HeroOrbital dimensions={VECTOR_DIMENSIONS} />
           </div>
         </div>
       </section>
 
-      {/* Problem Section - Split Layout */}
+      {/* Problem Section */}
       <section className="bg-gray-50 py-24">
         <div className="mx-auto max-w-7xl px-6">
           <div className="grid items-center gap-16 lg:grid-cols-2">
-            {/* Left: Illustration */}
             <div className="relative flex items-center justify-center">
-              <div className="relative">
-                {/* Neon lines visualization */}
-                <svg viewBox="0 0 300 300" className="h-80 w-80">
-                  {/* Curved neon lines */}
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <path
-                      key={i}
-                      d={`M 50 ${150 + i * 20} Q 150 ${100 + i * 10} 250 ${150 + i * 20}`}
-                      fill="none"
-                      stroke={`url(#gradient-${i})`}
-                      strokeWidth="3"
-                      className="ds-pulse"
-                      style={{ animationDelay: `${i * 0.2}s`, animationDuration: "2s" }}
-                    />
-                  ))}
-                  <defs>
-                    {[0, 1, 2, 3, 4].map((i) => (
-                      <linearGradient
-                        key={i}
-                        id={`gradient-${i}`}
-                        x1="0%"
-                        y1="0%"
-                        x2="100%"
-                        y2="0%"
-                      >
-                        <stop offset="0%" stopColor="#2563eb" stopOpacity={0.3 + i * 0.15} />
-                        <stop offset="50%" stopColor="#7c3aed" stopOpacity={0.5 + i * 0.1} />
-                        <stop offset="100%" stopColor="#db2777" stopOpacity={0.3 + i * 0.15} />
-                      </linearGradient>
-                    ))}
-                  </defs>
-                </svg>
-                {/* 3D Platform */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div
-                    className="h-32 w-48 rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 shadow-2xl"
-                    style={{
-                      transform: "perspective(500px) rotateX(60deg)",
-                      boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-                    }}
+              <svg viewBox="0 0 300 300" className="h-80 w-80">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <path
+                    key={i}
+                    d={`M 50 ${150 + i * 20} Q 150 ${100 + i * 10} 250 ${150 + i * 20}`}
+                    fill="none"
+                    stroke={`url(#home-gradient-${i})`}
+                    strokeWidth="3"
+                    className="ds-pulse"
+                    style={{ animationDelay: `${i * 0.2}s`, animationDuration: "2s" }}
                   />
-                </div>
+                ))}
+                <defs>
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <linearGradient
+                      key={i}
+                      id={`home-gradient-${i}`}
+                      x1="0%"
+                      y1="0%"
+                      x2="100%"
+                      y2="0%"
+                    >
+                      <stop offset="0%" stopColor="#2563eb" stopOpacity={0.3 + i * 0.15} />
+                      <stop offset="50%" stopColor="#7c3aed" stopOpacity={0.5 + i * 0.1} />
+                      <stop offset="100%" stopColor="#db2777" stopOpacity={0.3 + i * 0.15} />
+                    </linearGradient>
+                  ))}
+                </defs>
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div
+                  className="h-32 w-48 rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 shadow-2xl"
+                  style={{
+                    transform: "perspective(500px) rotateX(60deg)",
+                    boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+                  }}
+                />
               </div>
             </div>
 
-            {/* Right: Content */}
             <div className="space-y-6">
               <div className="text-sm font-semibold uppercase tracking-wider text-blue-600">
                 THE PROBLEM
@@ -395,22 +244,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 6D Vector Section - Dark with Floating Icons */}
-      <section id="features" className="ds-dark-section relative overflow-hidden py-24">
-        {/* Floating Icons */}
-        {FLOATING_ICONS.map(({ Icon, pos, delay, size }, idx) => (
-          <div
-            key={idx}
-            className={`absolute ${pos} ${size} flex items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm`}
-            style={{
-              animation: `float-${(idx % 3) + 1} ${6 + idx}s ease-in-out infinite`,
-              animationDelay: delay,
-            }}
-          >
-            <Icon className="h-1/2 w-1/2 text-white/60" />
-          </div>
-        ))}
-
+      {/* 6D Vector Section */}
+      <section className="ds-dark-section relative overflow-hidden py-24">
         <div className="relative z-10 mx-auto max-w-4xl px-6 text-center">
           <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-blue-400">
             6D VECTOR SYSTEM
@@ -424,10 +259,9 @@ export default function LandingPage() {
           </h2>
           <p className="mx-auto mb-16 max-w-2xl text-lg text-gray-400">
             단순한 좋아요/싫어요를 넘어, 사용자의 콘텐츠 소비 성향을 6개의 독립적인 차원으로
-            분석합니다. 각 차원은 0.0 ~ 1.0 사이의 벡터값으로 표현됩니다.
+            분석합니다.
           </p>
 
-          {/* 6D Cards */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {VECTOR_DIMENSIONS.map((dim) => (
               <div
@@ -451,176 +285,20 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
-        </div>
-      </section>
 
-      {/* How it Works - Split Layout */}
-      <section id="how-it-works" className="py-24">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="mb-16 text-center">
-            <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-blue-600">
-              HOW IT WORKS
-            </div>
-            <h2 className="text-4xl font-bold text-gray-900">4단계 매칭 프로세스</h2>
-          </div>
-
-          {/* Step 1 - Left Image */}
-          <div className="mb-24 grid items-center gap-12 lg:grid-cols-2">
-            <div className="relative flex justify-center">
-              <div className="ds-gradient-border">
-                <div className="rounded-xl bg-white p-6">
-                  <div className="mb-4 text-sm font-medium text-gray-500">Cold-Start Question</div>
-                  <div className="space-y-3">
-                    <p className="font-medium text-gray-900">리뷰를 읽을 때 선호하는 스타일은?</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button className="rounded-lg border-2 border-blue-500 bg-blue-50 p-3 text-sm text-blue-700">
-                        핵심만 간결하게
-                      </button>
-                      <button className="rounded-lg border border-gray-200 p-3 text-sm text-gray-600 hover:border-gray-300">
-                        디테일하고 자세하게
-                      </button>
-                    </div>
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4].map((i) => (
-                        <div
-                          key={i}
-                          className={`h-1 flex-1 rounded-full ${i === 1 ? "bg-blue-500" : "bg-gray-200"}`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-600">
-                  1
-                </div>
-                <span className="text-sm font-medium text-blue-600">COLD-START</span>
-              </div>
-              <h3 className="text-3xl font-bold text-gray-900">4개의 간단한 질문</h3>
-              <p className="text-gray-600">
-                신규 사용자에게 4개의 A vs B 질문을 던집니다. 각 질문은 2개 차원을 동시에 측정하도록
-                설계되어 <strong>4초 만에</strong> 6D 프로필을 생성합니다.
-              </p>
-              <ul className="space-y-2 text-gray-600">
-                <li className="flex items-center gap-2">
-                  <Check className="h-5 w-5 text-green-500" />
-                  질문당 2개 차원 동시 측정
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-5 w-5 text-green-500" />
-                  확신도(Confidence) 함께 계산
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Step 2 - Right Image */}
-          <div className="mb-24 grid items-center gap-12 lg:grid-cols-2">
-            <div className="order-2 space-y-4 lg:order-1">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100 font-bold text-purple-600">
-                  2
-                </div>
-                <span className="text-sm font-medium text-purple-600">VECTOR CALCULATION</span>
-              </div>
-              <h3 className="text-3xl font-bold text-gray-900">6D 벡터 정량화</h3>
-              <p className="text-gray-600">
-                답변을 분석하여 6개 차원에 대해 <strong>0.0 ~ 1.0</strong> 범위의 벡터값과 확신도를
-                계산합니다. 확신도가 높은 차원은 매칭에서 더 큰 가중치를 받습니다.
-              </p>
-            </div>
-            <div className="order-1 flex justify-center lg:order-2">
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xl">
-                <div className="mb-4 text-sm font-medium text-gray-500">Vector Result</div>
-                {[
-                  { name: "Lens", value: 0.35, conf: 0.9, label: "감성적 성향" },
-                  { name: "Scope", value: 0.82, conf: 0.7, label: "디테일 선호" },
-                  { name: "Depth", value: 0.65, conf: 0.85, label: "분석적" },
-                ].map((item) => (
-                  <div
-                    key={item.name}
-                    className="mb-3 flex items-center justify-between rounded-lg bg-gray-50 p-3"
-                  >
-                    <div>
-                      <span className="font-mono text-sm font-medium">{item.name}</span>
-                      <span className="ml-2 text-xs text-gray-500">{item.label}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-mono text-sm font-bold text-gray-900">
-                        {item.value.toFixed(2)}
-                      </span>
-                      <span className="ml-2 text-xs text-gray-400">conf: {item.conf}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Step 3 & 4 as cards */}
-          <div className="grid gap-8 md:grid-cols-2">
-            {/* Step 3 */}
-            <div className="ds-gradient-border">
-              <div className="h-full rounded-xl bg-white p-8">
-                <div className="mb-4 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 font-bold text-green-600">
-                    3
-                  </div>
-                  <span className="text-sm font-medium text-green-600">PERSONA MATCHING</span>
-                </div>
-                <h3 className="mb-4 text-2xl font-bold text-gray-900">페르소나 매칭</h3>
-                <p className="mb-4 text-gray-600">
-                  24개 AI 페르소나와 코사인 유사도를 계산하고 보너스를 적용합니다.
-                </p>
-                <div className="space-y-2 rounded-lg bg-gray-50 p-4 font-mono text-sm">
-                  <div className="text-gray-600">FinalScore =</div>
-                  <div className="pl-4 text-gray-800">벡터 유사도 × 60%</div>
-                  <div className="pl-4 text-gray-800">+ 세대 보너스 × 15%</div>
-                  <div className="pl-4 text-gray-800">+ 지역 보너스 × 10%</div>
-                  <div className="pl-4 text-gray-800">+ 표현 온도 × 10%</div>
-                  <div className="pl-4 text-gray-800">+ 전문성 매칭 × 5%</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Step 4 */}
-            <div className="ds-gradient-border">
-              <div className="h-full rounded-xl bg-white p-8">
-                <div className="mb-4 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-pink-100 font-bold text-pink-600">
-                    4
-                  </div>
-                  <span className="text-sm font-medium text-pink-600">PERSONALIZED CURATION</span>
-                </div>
-                <h3 className="mb-4 text-2xl font-bold text-gray-900">설명 가능한 추천</h3>
-                <p className="mb-4 text-gray-600">
-                  매칭된 페르소나가 자신의 관점에서 콘텐츠를 추천합니다.
-                </p>
-                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                  <div className="mb-3 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-pink-400 text-lg">
-                      😊
-                    </div>
-                    <div>
-                      <div className="font-medium text-gray-900">유나</div>
-                      <div className="text-xs text-gray-500">감성파 리뷰어 · 92% 매칭</div>
-                    </div>
-                  </div>
-                  <p className="text-sm italic text-gray-700">
-                    &ldquo;이 영화의 마지막 장면에서 눈물이 났어요. 감정적인 공감을 좋아하시는
-                    당신이라면 분명 좋아하실 거예요.&rdquo;
-                  </p>
-                </div>
-              </div>
-            </div>
+          <div className="mt-12">
+            <Link
+              href="/features"
+              className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300"
+            >
+              자세히 알아보기
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* Metrics Section */}
+      {/* Metrics */}
       <section className="bg-gray-50 py-24">
         <div className="mx-auto max-w-7xl px-6">
           <div className="mb-4 text-center text-sm font-semibold uppercase tracking-wider text-blue-600">
@@ -628,7 +306,7 @@ export default function LandingPage() {
           </div>
           <h2 className="mb-4 text-center text-4xl font-bold text-gray-900">예상 시나리오</h2>
           <p className="mx-auto mb-12 max-w-2xl text-center text-gray-600">
-            DeepSight 도입 시 예상되는 효과입니다. 실제 결과는 서비스 특성에 따라 다를 수 있습니다.
+            DeepSight 도입 시 예상되는 효과입니다.
           </p>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {METRICS.map((metric, idx) => (
@@ -671,7 +349,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* CTA */}
       <section className="ds-dark-section relative overflow-hidden py-24">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent" />
         <div className="relative z-10 mx-auto max-w-3xl px-6 text-center">
@@ -680,136 +358,23 @@ export default function LandingPage() {
             DeepSight로 사용자에게 &ldquo;왜&rdquo;를 설명할 수 있는 추천 시스템을 구축하세요.
           </p>
           <div className="flex flex-col justify-center gap-4 sm:flex-row">
-            <Link href={PERSONA_WORLD_URL}>
-              <Button size="lg" className="ds-button gap-2 text-white">
-                PersonaWorld 체험하기
-                <ArrowRight className="h-4 w-4" />
-              </Button>
+            <Link
+              href={PERSONA_WORLD_URL}
+              className="ds-button inline-flex items-center justify-center gap-2 rounded-lg px-6 py-3 text-sm font-medium text-white"
+            >
+              PersonaWorld 체험하기
+              <ArrowRight className="h-4 w-4" />
             </Link>
-            <Link href={DEVELOPER_CONSOLE_URL}>
-              <Button
-                size="lg"
-                variant="outline"
-                className="gap-2 border-gray-600 text-gray-300 hover:bg-gray-800"
-              >
-                <Code className="h-4 w-4" />
-                API 연동하기
-              </Button>
+            <Link
+              href="/products/developer-console"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-600 px-6 py-3 text-sm font-medium text-gray-300 hover:bg-gray-800"
+            >
+              <Code className="h-4 w-4" />
+              API 연동하기
             </Link>
           </div>
         </div>
       </section>
-
-      {/* Pricing Section */}
-      <section id="pricing" className="py-24">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="mb-16 text-center">
-            <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-blue-600">
-              PRICING
-            </div>
-            <h2 className="text-4xl font-bold text-gray-900">심플한 요금제</h2>
-          </div>
-          <div className="grid gap-8 md:grid-cols-3">
-            {/* Starter */}
-            <div className="rounded-2xl border border-gray-200 bg-white p-8">
-              <h3 className="mb-2 text-xl font-bold text-gray-900">Starter</h3>
-              <p className="mb-4 text-gray-600">소규모 서비스 시작</p>
-              <div className="mb-6">
-                <span className="text-4xl font-bold">₩99,000</span>
-                <span className="text-gray-500">/월</span>
-              </div>
-              <ul className="mb-8 space-y-3">
-                {["MAU 10,000까지", "6D 벡터 프로파일링", "24개 페르소나", "이메일 지원"].map(
-                  (item) => (
-                    <li key={item} className="flex items-center gap-2 text-gray-600">
-                      <Check className="h-5 w-5 text-green-500" />
-                      {item}
-                    </li>
-                  )
-                )}
-              </ul>
-              <Link href={DEVELOPER_CONSOLE_URL} className="w-full">
-                <Button variant="outline" className="w-full">
-                  시작하기
-                </Button>
-              </Link>
-            </div>
-
-            {/* Pro */}
-            <div className="relative rounded-2xl border-2 border-blue-500 bg-white p-8 shadow-xl">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 px-4 py-1 text-sm font-medium text-white">
-                인기
-              </div>
-              <h3 className="mb-2 text-xl font-bold text-gray-900">Pro</h3>
-              <p className="mb-4 text-gray-600">성장하는 서비스</p>
-              <div className="mb-6">
-                <span className="text-4xl font-bold">₩299,000</span>
-                <span className="text-gray-500">/월</span>
-              </div>
-              <ul className="mb-8 space-y-3">
-                {[
-                  "MAU 100,000까지",
-                  "커스텀 페르소나",
-                  "A/B 테스트",
-                  "우선 지원",
-                  "분석 대시보드",
-                ].map((item) => (
-                  <li key={item} className="flex items-center gap-2 text-gray-600">
-                    <Check className="h-5 w-5 text-green-500" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <Link href={DEVELOPER_CONSOLE_URL} className="w-full">
-                <Button className="ds-button w-full text-white">시작하기</Button>
-              </Link>
-            </div>
-
-            {/* Enterprise */}
-            <div className="rounded-2xl border border-gray-200 bg-white p-8">
-              <h3 className="mb-2 text-xl font-bold text-gray-900">Enterprise</h3>
-              <p className="mb-4 text-gray-600">대규모 서비스</p>
-              <div className="mb-6">
-                <span className="text-4xl font-bold">문의</span>
-              </div>
-              <ul className="mb-8 space-y-3">
-                {[
-                  "무제한 MAU",
-                  "온프레미스 옵션",
-                  "전담 매니저",
-                  "SLA 보장",
-                  "커스텀 인테그레이션",
-                ].map((item) => (
-                  <li key={item} className="flex items-center gap-2 text-gray-600">
-                    <Check className="h-5 w-5 text-green-500" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-              <Link href={`mailto:${CONTACT_EMAIL}`} className="w-full">
-                <Button variant="outline" className="w-full">
-                  상담 요청
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-gray-200 bg-gray-50 py-12">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600">
-                <Layers className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-lg font-bold">DeepSight</span>
-            </div>
-            <p className="text-sm text-gray-500">© 2024 DeepSight. AI 페르소나 기반 추천 시스템</p>
-          </div>
-        </div>
-      </footer>
     </div>
   )
 }

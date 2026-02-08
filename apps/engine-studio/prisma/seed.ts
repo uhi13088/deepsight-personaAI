@@ -6,6 +6,7 @@
 import { Prisma, PrismaClient } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { COLD_START_QUESTIONS } from "./seed-data/cold-start-questions"
+import { BLOG_POSTS } from "./seed-data/blog-posts"
 
 const prisma = new PrismaClient()
 
@@ -183,6 +184,30 @@ async function main() {
   console.log(
     `✅ Cold Start questions created: ${questionCount}개 (LIGHT: 12, MEDIUM: 18, DEEP: 30)`
   )
+
+  // 블로그 포스트 시딩
+  let blogCount = 0
+  for (const post of BLOG_POSTS) {
+    const id = `seed-blog-${post.slug}`
+    await prisma.blogPost.upsert({
+      where: { id },
+      update: {},
+      create: {
+        id,
+        slug: post.slug,
+        title: post.title,
+        excerpt: post.excerpt,
+        content: post.content,
+        category: post.category,
+        tags: post.tags,
+        authorId: admin.id,
+        published: true,
+        publishedAt: new Date(Date.now() - blogCount * 7 * 24 * 60 * 60 * 1000), // 1주 간격
+      },
+    })
+    blogCount++
+  }
+  console.log(`✅ Blog posts created: ${blogCount}개`)
 
   console.log("🎉 Database seed completed!")
 }
