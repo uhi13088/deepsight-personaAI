@@ -46,78 +46,133 @@ const quickStartSteps = [
   },
   {
     step: 3,
-    title: "첫 API 호출",
-    description: "Match API로 첫 매칭을 시도하세요",
+    title: "페르소나 검색 → 매칭 → 추천",
+    description: "Catalog → Profiling → Matching → Recommendation 파이프라인을 호출하세요",
     code: {
-      javascript: `import DeepSight from '@deepsight/sdk';
+      javascript: `import { DeepSight } from '@deepsight/sdk';
 
-const client = new DeepSight('your-api-key');
+const ds = new DeepSight({ apiKey: 'your-api-key' });
 
-const result = await client.match({
-  content: "Your content here",
-  options: { limit: 5, threshold: 0.7 }
+// 1. 영화 전문 페르소나 검색 (Catalog API)
+const personas = await ds.personas.list({
+  expertise: '영화', role: 'REVIEWER'
 });
 
-console.log(result.matches);`,
+// 2. 유저 6D 프로필 생성 (Profiling API)
+const profile = await ds.profiles.create({
+  answers: coldStartAnswers
+});
+
+// 3. 유저에게 맞는 페르소나 매칭 (Matching API)
+const matches = await ds.match({
+  profileId: profile.id
+});
+
+// 4. 페르소나가 콘텐츠 추천 + 이유 (Recommendation API)
+const recs = await ds.recommend({
+  personaId: matches[0].id,
+  profileId: profile.id
+});
+// → { items: [{ title: "기생충", reason: "서사 구조가..." }] }`,
       python: `from deepsight import DeepSight
 
-client = DeepSight('your-api-key')
+ds = DeepSight('your-api-key')
 
-result = client.match(
-    content="Your content here",
-    options={"limit": 5, "threshold": 0.7}
-)
+# 1. 페르소나 검색 (Catalog API)
+personas = ds.personas.list(expertise='영화', role='REVIEWER')
 
-print(result.matches)`,
-      curl: `curl -X POST https://api.deepsight.ai/v1/match \\
+# 2. 유저 프로필 생성 (Profiling API)
+profile = ds.profiles.create(answers=cold_start_answers)
+
+# 3. 매칭 (Matching API)
+matches = ds.match(profile_id=profile.id)
+
+# 4. 추천 + 이유 (Recommendation API)
+recs = ds.recommend(
+    persona_id=matches[0].id,
+    profile_id=profile.id
+)`,
+      curl: `# 1. 페르소나 검색
+curl https://api.deepsight.ai/v1/personas?expertise=영화&role=REVIEWER \\
+  -H "Authorization: Bearer your-api-key"
+
+# 2. 유저 프로필 생성
+curl -X POST https://api.deepsight.ai/v1/profiles \\
   -H "Authorization: Bearer your-api-key" \\
   -H "Content-Type: application/json" \\
-  -d '{"content": "Your content here", "options": {"limit": 5}}'`,
+  -d '{"answers": [...]}'
+
+# 3. 매칭
+curl -X POST https://api.deepsight.ai/v1/match \\
+  -H "Authorization: Bearer your-api-key" \\
+  -H "Content-Type: application/json" \\
+  -d '{"profile_id": "prof_abc123"}'`,
     },
   },
 ]
 
 const apiEndpoints = [
   {
-    method: "POST",
-    path: "/v1/match",
-    name: "Match",
-    description: "콘텐츠와 페르소나 매칭 분석",
-    badge: "Core",
-  },
-  {
-    method: "POST",
-    path: "/v1/batch-match",
-    name: "Batch Match",
-    description: "여러 콘텐츠 일괄 매칭",
-    badge: "Core",
-  },
-  {
     method: "GET",
     path: "/v1/personas",
     name: "List Personas",
-    description: "페르소나 목록 조회",
-    badge: null,
+    description: "등록된 페르소나 목록 검색 및 조회",
+    badge: "Catalog",
   },
   {
     method: "GET",
     path: "/v1/personas/:id",
     name: "Get Persona",
-    description: "페르소나 상세 조회",
-    badge: null,
+    description: "페르소나 상세 정보 조회 (6D 벡터, 전문분야 등)",
+    badge: "Catalog",
+  },
+  {
+    method: "POST",
+    path: "/v1/profiles",
+    name: "Create Profile",
+    description: "유저의 6D 벡터 프로필 생성 (콜드스타트/SNS 연동)",
+    badge: "Profiling",
+  },
+  {
+    method: "GET",
+    path: "/v1/profiles/:id",
+    name: "Get Profile",
+    description: "유저 프로필 상세 조회",
+    badge: "Profiling",
+  },
+  {
+    method: "POST",
+    path: "/v1/match",
+    name: "Match",
+    description: "유저 프로필과 페르소나 간 최적 매칭",
+    badge: "Matching",
+  },
+  {
+    method: "POST",
+    path: "/v1/recommend",
+    name: "Recommend",
+    description: "매칭된 페르소나가 유저에게 콘텐츠 추천 + 이유 설명",
+    badge: "Recommendation",
+  },
+  {
+    method: "POST",
+    path: "/v1/evaluate",
+    name: "Evaluate",
+    description: "페르소나 관점에서 특정 콘텐츠 리뷰 및 분석",
+    badge: "Evaluation",
   },
   {
     method: "POST",
     path: "/v1/feedback",
     name: "Feedback",
-    description: "매칭 결과 피드백 제출",
+    description: "추천/평가 결과에 대한 피드백 제출",
     badge: null,
   },
   {
     method: "GET",
     path: "/v1/analytics/usage",
     name: "Usage Analytics",
-    description: "사용량 통계 조회",
+    description: "API 사용량 및 매칭 정확도 통계 조회",
     badge: "Pro",
   },
 ]
@@ -133,13 +188,14 @@ const docSections = [
     ],
   },
   {
-    title: "API Reference",
+    title: "Core APIs",
     icon: Book,
     items: [
-      { name: "Match API", description: "콘텐츠 매칭 API" },
-      { name: "Personas API", description: "페르소나 조회 API" },
-      { name: "Feedback API", description: "피드백 제출 API" },
-      { name: "Analytics API", description: "분석 데이터 API", badge: "Pro" },
+      { name: "Catalog API", description: "페르소나 검색 및 조회" },
+      { name: "Profiling API", description: "유저 6D 프로필 생성" },
+      { name: "Matching API", description: "유저-페르소나 매칭" },
+      { name: "Recommendation API", description: "콘텐츠 추천 + 이유" },
+      { name: "Evaluation API", description: "콘텐츠 리뷰 및 분석" },
     ],
   },
   {
@@ -147,6 +203,7 @@ const docSections = [
     icon: FileText,
     items: [
       { name: "6D Vector System", description: "6차원 벡터 이해하기" },
+      { name: "Profiling Methods", description: "콜드스타트 & SNS 연동" },
       { name: "Best Practices", description: "API 활용 모범 사례" },
       { name: "Rate Limiting", description: "Rate Limit 이해하기" },
       { name: "Error Handling", description: "에러 처리 가이드" },

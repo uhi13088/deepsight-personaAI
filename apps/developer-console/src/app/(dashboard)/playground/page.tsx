@@ -39,61 +39,89 @@ import { cn } from "@/lib/utils"
 // API Endpoints configuration
 const endpoints = [
   {
-    id: "match",
-    method: "POST",
-    path: "/v1/match",
-    name: "Match API",
-    description: "콘텐츠와 페르소나 매칭 분석",
-    defaultBody: {
-      content:
-        "이 제품은 최신 기술을 활용한 혁신적인 솔루션입니다. 빠른 성능과 직관적인 UI를 제공합니다.",
-      options: {
-        limit: 5,
-        threshold: 0.7,
-        include_scores: true,
-      },
-    },
-  },
-  {
-    id: "batch-match",
-    method: "POST",
-    path: "/v1/batch-match",
-    name: "Batch Match API",
-    description: "여러 콘텐츠 일괄 매칭",
-    defaultBody: {
-      contents: ["첫 번째 콘텐츠입니다.", "두 번째 콘텐츠입니다.", "세 번째 콘텐츠입니다."],
-      options: {
-        limit: 3,
-        threshold: 0.6,
-      },
-    },
-  },
-  {
-    id: "personas",
+    id: "catalog-list",
     method: "GET",
     path: "/v1/personas",
-    name: "List Personas",
-    description: "페르소나 목록 조회",
+    name: "Catalog — 페르소나 목록",
+    description: "등록된 페르소나를 검색하고 목록을 조회합니다",
     defaultBody: null,
   },
   {
-    id: "personas-detail",
+    id: "catalog-detail",
     method: "GET",
     path: "/v1/personas/:id",
-    name: "Get Persona",
-    description: "페르소나 상세 조회",
+    name: "Catalog — 페르소나 상세",
+    description: "페르소나 상세 정보 (6D 벡터, 전문분야 등) 조회",
     defaultBody: null,
+  },
+  {
+    id: "profiling",
+    method: "POST",
+    path: "/v1/profiles",
+    name: "Profiling — 프로필 생성",
+    description: "유저의 6D 벡터 프로필을 생성합니다",
+    defaultBody: {
+      method: "cold_start",
+      answers: [
+        { question_id: "q1", answer: "깊이 있는 분석을 선호합니다" },
+        { question_id: "q2", answer: "새로운 관점을 탐색하는 편입니다" },
+        { question_id: "q3", answer: "객관적인 시각을 중시합니다" },
+      ],
+    },
+  },
+  {
+    id: "matching",
+    method: "POST",
+    path: "/v1/match",
+    name: "Matching — 유저-페르소나 매칭",
+    description: "유저 프로필에 최적화된 페르소나를 매칭합니다",
+    defaultBody: {
+      profile_id: "prof_abc123",
+      options: {
+        limit: 5,
+        diversity_factor: 0.3,
+      },
+    },
+  },
+  {
+    id: "recommendation",
+    method: "POST",
+    path: "/v1/recommend",
+    name: "Recommendation — 콘텐츠 추천",
+    description: "매칭된 페르소나가 유저에게 콘텐츠를 추천하고 이유를 설명합니다",
+    defaultBody: {
+      persona_id: "persona_movie_reviewer",
+      profile_id: "prof_abc123",
+      content_type: "movie",
+      limit: 5,
+    },
+  },
+  {
+    id: "evaluation",
+    method: "POST",
+    path: "/v1/evaluate",
+    name: "Evaluation — 콘텐츠 평가",
+    description: "페르소나 관점에서 특정 콘텐츠를 리뷰하고 분석합니다",
+    defaultBody: {
+      persona_id: "persona_movie_reviewer",
+      content: {
+        title: "기생충",
+        type: "movie",
+        description: "봉준호 감독의 블랙코미디 스릴러",
+      },
+    },
   },
   {
     id: "feedback",
     method: "POST",
     path: "/v1/feedback",
-    name: "Submit Feedback",
-    description: "매칭 결과 피드백 제출",
+    name: "Feedback — 결과 피드백",
+    description: "추천/평가 결과에 대한 피드백을 제출합니다",
     defaultBody: {
-      match_id: "match_abc123",
+      reference_id: "rec_xyz789",
+      type: "recommendation",
       feedback: "positive",
-      comment: "매칭 결과가 정확합니다.",
+      comment: "추천 결과가 정확합니다.",
     },
   },
 ]
@@ -108,52 +136,85 @@ type ApiKeyItem = {
 
 // Sample response data
 const sampleResponses: Record<string, object> = {
-  match: {
-    request_id: "req_abc123def456",
-    matches: [
-      {
-        persona_id: "persona_tech_innovator",
-        name: "Tech Innovator",
-        score: 0.92,
-        dimensions: {
-          depth: 0.85,
-          lens: 0.88,
-          stance: 0.9,
-          scope: 0.95,
-          taste: 0.89,
-          purpose: 0.91,
-        },
-      },
-      {
-        persona_id: "persona_early_adopter",
-        name: "Early Adopter",
-        score: 0.87,
-        dimensions: {
-          depth: 0.82,
-          lens: 0.85,
-          stance: 0.88,
-          scope: 0.9,
-          taste: 0.86,
-          purpose: 0.88,
-        },
-      },
-    ],
-    processing_time_ms: 145,
+  "catalog-list": {
+    success: true,
+    data: {
+      personas: [
+        { id: "persona_movie_reviewer", name: "감성 시네필", expertise: "영화", role: "REVIEWER" },
+        { id: "persona_book_critic", name: "날카로운 독서가", expertise: "도서", role: "CRITIC" },
+        { id: "persona_music_curator", name: "멜로디 탐험가", expertise: "음악", role: "CURATOR" },
+      ],
+      total: 24,
+      page: 1,
+      per_page: 10,
+    },
   },
-  personas: {
-    personas: [
-      { id: "persona_tech_innovator", name: "Tech Innovator", category: "Technology" },
-      { id: "persona_early_adopter", name: "Early Adopter", category: "Consumer" },
-      { id: "persona_budget_conscious", name: "Budget Conscious", category: "Finance" },
-    ],
-    total: 12,
-    page: 1,
-    per_page: 10,
+  "catalog-detail": {
+    success: true,
+    data: {
+      id: "persona_movie_reviewer",
+      name: "감성 시네필",
+      expertise: "영화",
+      role: "REVIEWER",
+      traits: { depth: 0.85, lens: 0.72, stance: 0.68, scope: 0.55, taste: 0.91, purpose: 0.78 },
+      description: "서사와 감정의 깊이를 중시하는 영화 리뷰어",
+    },
+  },
+  profiling: {
+    success: true,
+    data: {
+      id: "prof_abc123",
+      traits: { depth: 0.82, lens: 0.75, stance: 0.6, scope: 0.7, taste: 0.88, purpose: 0.65 },
+      schema_version: "1.0",
+      method: "cold_start",
+      created_at: "2025-01-15T09:30:00Z",
+    },
+  },
+  matching: {
+    success: true,
+    data: {
+      matches: [
+        { persona_id: "persona_movie_reviewer", name: "감성 시네필", score: 0.94 },
+        { persona_id: "persona_book_critic", name: "날카로운 독서가", score: 0.87 },
+      ],
+      profile_id: "prof_abc123",
+      processing_time_ms: 120,
+    },
+  },
+  recommendation: {
+    success: true,
+    data: {
+      items: [
+        {
+          title: "기생충",
+          type: "movie",
+          reason: "서사 구조가 탄탄하고 계층 간 긴장감이 뛰어납니다",
+        },
+        { title: "인터스텔라", type: "movie", reason: "감정선과 SF 요소가 균형 잡혀 있습니다" },
+      ],
+      persona_id: "persona_movie_reviewer",
+      profile_id: "prof_abc123",
+    },
+  },
+  evaluation: {
+    success: true,
+    data: {
+      content: { title: "기생충", type: "movie" },
+      review: {
+        score: 9.2,
+        summary: "계층 구조를 블랙코미디로 풀어낸 수작",
+        strengths: ["촘촘한 서사 구조", "상징적 미장센", "배우들의 호연"],
+        considerations: ["장르 혼합에 대한 호불호"],
+      },
+      persona_id: "persona_movie_reviewer",
+    },
   },
   feedback: {
     success: true,
-    feedback_id: "fb_xyz789",
-    message: "Feedback submitted successfully",
+    data: {
+      feedback_id: "fb_xyz789",
+      message: "Feedback submitted successfully",
+    },
   },
 }
 
