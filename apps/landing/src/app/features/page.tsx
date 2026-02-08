@@ -112,14 +112,14 @@ const COLD_START_METHODS = [
     badge: "Quick Profile",
     badgeColor: "bg-purple-100 text-purple-600",
     description:
-      "A vs B 선택형 질문으로 6D 벡터를 빠르게 생성합니다. 각 질문이 2개 차원을 동시에 측정하도록 설계되어, 적은 질문으로 전체 프로필을 구성합니다.",
+      "A vs B 선택형 질문으로 6D 벡터를 생성합니다. 각 질문이 2개 차원을 동시에 측정하도록 설계되어 전체 프로필을 구성합니다. 다만 충분한 질문 수가 필요하여 시간이 걸립니다.",
     features: [
       "질문당 2개 차원 동시 측정",
       "확신도(Confidence) 함께 계산",
-      "사용자 직접 참여로 높은 정확도",
+      "사용자 직접 참여 기반",
     ],
-    accuracy: 3,
-    speed: "빠름",
+    accuracy: 2,
+    speed: "느림",
   },
   {
     icon: Share2,
@@ -127,8 +127,12 @@ const COLD_START_METHODS = [
     badge: "Social Analysis",
     badgeColor: "bg-green-100 text-green-600",
     description:
-      "소셜 미디어 데이터(팔로우, 관심사, 소비 패턴)를 분석하여 6D 벡터를 추론합니다. 질문에 답하지 않아도 프로필을 생성할 수 있어 온보딩 마찰을 최소화합니다.",
-    features: ["질문 없이 프로필 생성", "원시 데이터 저장 없이 벡터만 산출", "사용자 동의 기반"],
+      "소셜 미디어 데이터(팔로우, 관심사, 소비 패턴)를 분석하여 6D 벡터를 추론합니다. 실제 행동 데이터 기반이라 정확도가 높고, 질문 없이 즉시 프로필을 생성합니다.",
+    features: [
+      "실제 행동 데이터 기반 높은 정확도",
+      "원시 데이터 저장 없이 벡터만 산출",
+      "사용자 동의 기반",
+    ],
     accuracy: 3,
     speed: "즉시",
   },
@@ -141,7 +145,7 @@ const COLD_START_METHODS = [
       "문답에서 얻은 명시적 선호와 SNS에서 추론한 암묵적 패턴을 결합합니다. 두 데이터 소스를 교차 검증하여 가장 높은 정확도의 프로필을 생성합니다.",
     features: ["명시적 + 암묵적 데이터 결합", "교차 검증으로 확신도 향상", "최고 매칭 정확도"],
     accuracy: 4,
-    speed: "빠름",
+    speed: "보통",
   },
 ]
 
@@ -326,13 +330,19 @@ export default function FeaturesPage() {
             </p>
           </div>
 
-          <div className="mb-16 grid gap-8 md:grid-cols-3">
+          <div className="mb-16 grid gap-8 md:grid-cols-2 lg:grid-cols-4">
             {[
               {
                 icon: Users,
                 title: "다양한 페르소나",
                 description:
                   "감성적 영화 리뷰어, 논리적 기술 분석가, 트렌드 탐험가 등 다양한 성향의 페르소나가 각자의 시각으로 콘텐츠를 평가합니다.",
+              },
+              {
+                icon: Palette,
+                title: "컬러 지문",
+                description:
+                  "6D 벡터값을 색상으로 변환한 고유한 시각적 정체성입니다. 각 차원의 값이 색상 아우라로 표현되어, 페르소나의 성향을 한눈에 직관적으로 파악할 수 있습니다.",
               },
               {
                 icon: Shield,
