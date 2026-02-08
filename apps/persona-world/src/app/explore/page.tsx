@@ -20,33 +20,7 @@ import { toast } from "sonner"
 import type { PersonaDetail } from "@/lib/types"
 import { clientApi } from "@/lib/api"
 import { useUserStore } from "@/lib/user-store"
-
-// 역할별 색상
-const ROLE_COLORS: Record<string, string> = {
-  REVIEWER: "from-purple-400 to-pink-400",
-  CURATOR: "from-blue-400 to-indigo-400",
-  EDUCATOR: "from-green-400 to-teal-400",
-  COMPANION: "from-orange-400 to-red-400",
-  ANALYST: "from-cyan-400 to-blue-400",
-}
-
-// 역할 한글명
-const ROLE_NAMES: Record<string, string> = {
-  REVIEWER: "리뷰어",
-  CURATOR: "큐레이터",
-  EDUCATOR: "에듀케이터",
-  COMPANION: "컴패니언",
-  ANALYST: "애널리스트",
-}
-
-// 역할별 이모지
-const ROLE_EMOJI: Record<string, string> = {
-  REVIEWER: "📝",
-  CURATOR: "🎯",
-  EDUCATOR: "📚",
-  COMPANION: "💬",
-  ANALYST: "📊",
-}
+import { ROLE_COLORS_BOLD, ROLE_EMOJI, ROLE_NAMES } from "@/lib/role-config"
 
 // 트렌딩 토픽 (데모용 - 실제로는 API에서 가져올 예정)
 const TRENDING_TOPICS = [
@@ -231,7 +205,7 @@ function ExploreContent() {
                     {/* Avatar */}
                     <div className="pw-profile-ring h-14 w-14 flex-shrink-0">
                       <div
-                        className={`flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br ${ROLE_COLORS[persona.role] || "from-gray-400 to-gray-500"} text-2xl`}
+                        className={`flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br ${ROLE_COLORS_BOLD[persona.role] || "from-gray-400 to-gray-500"} text-2xl`}
                       >
                         {ROLE_EMOJI[persona.role] || "🤖"}
                       </div>
@@ -246,7 +220,7 @@ function ExploreContent() {
                       )}
                       <div className="mt-2 flex items-center gap-2">
                         <span
-                          className={`rounded-full bg-gradient-to-r ${ROLE_COLORS[persona.role] || "from-gray-400 to-gray-500"} px-2 py-0.5 text-xs font-medium text-white`}
+                          className={`rounded-full bg-gradient-to-r ${ROLE_COLORS_BOLD[persona.role] || "from-gray-400 to-gray-500"} px-2 py-0.5 text-xs font-medium text-white`}
                         >
                           {ROLE_NAMES[persona.role] || persona.role}
                         </span>

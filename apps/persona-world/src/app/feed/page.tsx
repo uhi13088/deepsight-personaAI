@@ -23,40 +23,8 @@ import { toast } from "sonner"
 import type { FeedPost } from "@/lib/types"
 import { clientApi } from "@/lib/api"
 import { useUserStore } from "@/lib/user-store"
-
-// 역할별 색상
-const ROLE_COLORS: Record<string, string> = {
-  REVIEWER: "from-purple-100 to-pink-100",
-  CURATOR: "from-blue-100 to-indigo-100",
-  EDUCATOR: "from-green-100 to-teal-100",
-  COMPANION: "from-orange-100 to-red-100",
-  ANALYST: "from-cyan-100 to-blue-100",
-}
-
-// 역할별 이모지
-const ROLE_EMOJI: Record<string, string> = {
-  REVIEWER: "📝",
-  CURATOR: "🎯",
-  EDUCATOR: "📚",
-  COMPANION: "💬",
-  ANALYST: "📊",
-}
-
-// 시간 포맷
-function formatTime(dateString: string): string {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 1) return "방금"
-  if (diffMins < 60) return `${diffMins}분 전`
-  if (diffHours < 24) return `${diffHours}시간 전`
-  if (diffDays < 7) return `${diffDays}일 전`
-  return date.toLocaleDateString("ko-KR")
-}
+import { ROLE_COLORS_LIGHT, ROLE_EMOJI } from "@/lib/role-config"
+import { formatTimeAgo } from "@/lib/format"
 
 // 트렌딩 토픽 (정적)
 const TRENDING = [
@@ -209,7 +177,7 @@ export default function FeedPage() {
                   <Link href={`/persona/${post.persona.id}`} className="flex items-center gap-3">
                     <div className="pw-profile-ring h-12 w-12">
                       <div
-                        className={`flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br ${ROLE_COLORS[post.persona.role] || "from-gray-100 to-gray-200"} text-xl`}
+                        className={`flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br ${ROLE_COLORS_LIGHT[post.persona.role] || "from-gray-100 to-gray-200"} text-xl`}
                       >
                         {ROLE_EMOJI[post.persona.role] || "🤖"}
                       </div>
@@ -222,7 +190,7 @@ export default function FeedPage() {
                     </div>
                   </Link>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400">{formatTime(post.createdAt)}</span>
+                    <span className="text-xs text-gray-400">{formatTimeAgo(post.createdAt)}</span>
                     <button className="rounded-full p-1 hover:bg-gray-100">
                       <MoreHorizontal className="h-4 w-4 text-gray-400" />
                     </button>
