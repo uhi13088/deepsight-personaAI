@@ -14,41 +14,14 @@ import {
   Loader2,
   UserPlus,
   UserMinus,
-  Search,
-  Eye,
-  Compass,
-  Target,
-  Palette,
-  Brain,
 } from "lucide-react"
 import { toast } from "sonner"
 import { clientApi } from "@/lib/api"
 import { useUserStore } from "@/lib/user-store"
+import { TRAIT_DIMENSIONS } from "@/lib/trait-colors"
+import { TraitColorBar } from "@/components/trait-color-bar"
+import { TraitColorFingerprint } from "@/components/trait-color-fingerprint"
 import type { PersonaFullDetail, PostType, Vector6D } from "@/lib/types"
-
-// 6D 벡터 차원 정보
-const VECTOR_DIMENSIONS = [
-  { id: "depth", name: "Depth", label: "분석 깊이", low: "직관적", high: "심층적", icon: Search },
-  { id: "lens", name: "Lens", label: "판단 렌즈", low: "감성적", high: "논리적", icon: Eye },
-  {
-    id: "stance",
-    name: "Stance",
-    label: "평가 태도",
-    low: "수용적",
-    high: "비판적",
-    icon: Compass,
-  },
-  { id: "scope", name: "Scope", label: "관심 범위", low: "핵심만", high: "디테일", icon: Target },
-  { id: "taste", name: "Taste", label: "취향 성향", low: "클래식", high: "실험적", icon: Palette },
-  {
-    id: "purpose",
-    name: "Purpose",
-    label: "소비 목적",
-    low: "오락",
-    high: "의미추구",
-    icon: Brain,
-  },
-] as const
 
 // 포스트 타입 라벨
 const POST_TYPE_LABELS: Record<PostType, string> = {
@@ -68,40 +41,6 @@ const ROLE_LABELS: Record<string, string> = {
   EDUCATOR: "교육자",
   COMPANION: "동반자",
   ANALYST: "분석가",
-}
-
-// 벡터 바 컴포넌트
-function VectorBar({
-  dimension,
-  value,
-}: {
-  dimension: (typeof VECTOR_DIMENSIONS)[number]
-  value: number
-}) {
-  const Icon = dimension.icon
-  const percentage = Math.round(value * 100)
-
-  return (
-    <div className="flex items-center gap-3">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-600">
-        <Icon className="h-4 w-4 text-white" />
-      </div>
-      <div className="flex-1">
-        <div className="mb-1 flex justify-between text-xs text-gray-500">
-          <span>{dimension.low}</span>
-          <span className="font-medium text-gray-700">{dimension.name}</span>
-          <span>{dimension.high}</span>
-        </div>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-violet-500 to-purple-600 transition-all duration-500"
-            style={{ width: `${percentage}%` }}
-          />
-        </div>
-      </div>
-      <span className="w-10 text-right text-sm font-medium text-gray-600">{percentage}%</span>
-    </div>
-  )
 }
 
 // 포스트 카드 컴포넌트
@@ -343,21 +282,43 @@ export default function PersonaDetailPage() {
           </div>
         </div>
 
-        {/* 6D 벡터 */}
+        {/* 성향 프로필 - 컬러 지문 + 게이지 바 */}
         {persona.vector && (
           <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h3 className="mb-4 flex items-center gap-2 font-semibold text-gray-900">
+            <h3 className="mb-5 flex items-center gap-2 font-semibold text-gray-900">
               <div className="flex h-6 w-6 items-center justify-center rounded bg-gradient-to-br from-violet-500 to-purple-600">
                 <FileText className="h-3 w-3 text-white" />
               </div>
-              성향 벡터 (6D)
+              성향 프로필
             </h3>
-            <div className="space-y-4">
-              {VECTOR_DIMENSIONS.map((dim) => (
-                <VectorBar
-                  key={dim.id}
+
+            {/* 컬러 지문 (종합 인상) */}
+            <div className="mb-6 flex justify-center">
+              <div className="w-64">
+                <TraitColorFingerprint
+                  data={persona.vector as unknown as Record<string, number>}
+                  size={260}
+                  showLabels
+                  showGrid
+                />
+              </div>
+            </div>
+
+            {/* 구분선 */}
+            <div className="mb-5 flex items-center gap-3">
+              <div className="h-px flex-1 bg-gray-100" />
+              <span className="text-xs text-gray-400">차원별 상세</span>
+              <div className="h-px flex-1 bg-gray-100" />
+            </div>
+
+            {/* 게이지 바 (차원별 상세) */}
+            <div className="space-y-5">
+              {TRAIT_DIMENSIONS.filter((dim) => dim.key in persona.vector!).map((dim) => (
+                <TraitColorBar
+                  key={dim.key}
                   dimension={dim}
-                  value={persona.vector![dim.id as keyof Vector6D]}
+                  value={persona.vector![dim.key as keyof Vector6D]}
+                  size="md"
                 />
               ))}
             </div>

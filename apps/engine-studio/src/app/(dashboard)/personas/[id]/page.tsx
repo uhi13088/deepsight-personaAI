@@ -54,6 +54,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { RadarChart } from "@/components/charts/radar-chart"
+import { TraitColorFingerprint } from "@/components/charts/trait-color-fingerprint"
+import { TRAIT_DIMENSIONS, getTraitDimension } from "@/lib/trait-colors"
 import { personaService } from "@/services/persona-service"
 import type { PersonaRole, PersonaStatus, Vector6D } from "@/types"
 
@@ -714,41 +716,88 @@ ${result.response}
                 <CardDescription>페르소나의 성격을 정의하는 6개 차원의 벡터입니다.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {Object.entries(VECTOR_LABELS).map(([key, label]) => (
-                  <div key={key} className="space-y-2">
-                    <div className="flex justify-between">
-                      <Label>{label.name}</Label>
-                      <span className="text-sm font-medium">
-                        {(persona.vector[key as keyof typeof persona.vector] * 100).toFixed(0)}%
-                      </span>
+                {Object.entries(VECTOR_LABELS).map(([key, label]) => {
+                  const traitColor = getTraitDimension(key)
+                  const value = persona.vector[key as keyof typeof persona.vector]
+                  return (
+                    <div key={key} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="flex items-center gap-2">
+                          {traitColor && (
+                            <span
+                              className="inline-block h-2.5 w-2.5 rounded-full"
+                              style={{ backgroundColor: traitColor.color.primary }}
+                            />
+                          )}
+                          {label.name}
+                        </Label>
+                        <span className="text-sm font-medium">{(value * 100).toFixed(0)}%</span>
+                      </div>
+                      {/* 컬러 그라디언트 게이지 (읽기 모드) */}
+                      {!isEditing && traitColor && (
+                        <div className="relative">
+                          <div
+                            className="h-2 w-full overflow-hidden rounded-full"
+                            style={{
+                              background: `linear-gradient(to right, ${traitColor.color.from}, ${traitColor.color.to})`,
+                            }}
+                          />
+                          <div
+                            className="absolute top-0 h-2 w-0.5 rounded-full bg-white"
+                            style={{
+                              left: `${value * 100}%`,
+                              transform: "translateX(-50%)",
+                              boxShadow: "0 0 3px rgba(0,0,0,0.4)",
+                            }}
+                          />
+                          <div className="text-muted-foreground mt-1 flex justify-between text-xs">
+                            <span>{label.low}</span>
+                            <span>{label.high}</span>
+                          </div>
+                        </div>
+                      )}
+                      {/* 슬라이더 (편집 모드) */}
+                      {isEditing && (
+                        <div className="flex items-center gap-4">
+                          <span className="text-muted-foreground w-16 text-xs">{label.low}</span>
+                          <Slider
+                            value={[value]}
+                            min={0}
+                            max={1}
+                            step={0.05}
+                            disabled={!isEditing}
+                            onValueChange={(v) => handleVectorChange(key, v)}
+                            className="flex-1"
+                          />
+                          <span className="text-muted-foreground w-16 text-right text-xs">
+                            {label.high}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-muted-foreground w-16 text-xs">{label.low}</span>
-                      <Slider
-                        value={[persona.vector[key as keyof typeof persona.vector]]}
-                        min={0}
-                        max={1}
-                        step={0.05}
-                        disabled={!isEditing}
-                        onValueChange={(value) => handleVectorChange(key, value)}
-                        className="flex-1"
-                      />
-                      <span className="text-muted-foreground w-16 text-right text-xs">
-                        {label.high}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>벡터 시각화</CardTitle>
+                <CardTitle>성향 컬러 지문</CardTitle>
+                <CardDescription>
+                  컬러 조합으로 페르소나의 전체 성향을 직관적으로 파악합니다.
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-80">
-                  <RadarChart data={persona.vector} />
+                <div className="flex justify-center">
+                  <div className="h-72 w-72">
+                    <TraitColorFingerprint
+                      data={persona.vector as unknown as Record<string, number>}
+                      size={300}
+                      showLabels
+                      showGrid
+                      showValues
+                    />
+                  </div>
                 </div>
                 <div className="bg-muted mt-4 rounded-lg p-4">
                   <h4 className="mb-2 font-medium">프리셋</h4>
