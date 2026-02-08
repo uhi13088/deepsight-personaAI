@@ -239,13 +239,14 @@ export default function VersionControlPage() {
   }
 
   const getStatusBadge = (status: Version["status"]) => {
-    const config = {
-      active: { variant: "outline" as const, className: "border-green-500 text-green-700" },
-      deprecated: { variant: "secondary" as const, className: "text-yellow-700" },
-      archived: { variant: "secondary" as const, className: "text-gray-500" },
+    const config: Record<string, { variant: "outline" | "secondary"; className: string }> = {
+      active: { variant: "outline", className: "border-green-500 text-green-700" },
+      deprecated: { variant: "secondary", className: "text-yellow-700" },
+      archived: { variant: "secondary", className: "text-gray-500" },
     }
+    const c = config[status] ?? { variant: "secondary" as const, className: "" }
     return (
-      <Badge variant={config[status].variant} className={config[status].className}>
+      <Badge variant={c.variant} className={c.className}>
         {status === "active" ? "활성" : status === "deprecated" ? "지원 종료 예정" : "보관됨"}
       </Badge>
     )

@@ -8,8 +8,16 @@ import type {
 } from "./types"
 
 // Engine Studio API 베이스 URL (환경변수로 설정 가능)
-// Engine Studio는 port 3001에서 실행됨
-const API_BASE_URL = process.env.NEXT_PUBLIC_ENGINE_API_URL || "http://localhost:3001"
+// Engine Studio는 port 3000에서 실행됨
+function resolveApiBaseUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_ENGINE_API_URL || "http://localhost:3000"
+  // 프로토콜 누락 방어 (상대 경로 방지)
+  if (raw && !raw.startsWith("http://") && !raw.startsWith("https://")) {
+    return `https://${raw}`
+  }
+  return raw
+}
+const API_BASE_URL = resolveApiBaseUrl()
 
 // 공개 페르소나 목록 조회
 export async function getPersonas(options?: {
