@@ -1,7 +1,6 @@
-@import "tailwindcss";
-
-/* PersonaWorld 버블 폰트 (Fredoka) */
+/* PersonaWorld 버블 폰트 (Fredoka) - @import는 반드시 최상단 */
 @import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
 
 :root {
   --background: 0 0% 100%;
