@@ -25,7 +25,7 @@ const PIPELINE_STEPS = [
     icon: Sparkles,
     title: "페르소나 설계",
     description:
-      "전문 큐레이터가 페르소나의 성격, 전문 분야, 표현 스타일을 정의합니다. 6D 벡터 프로필을 설정하여 페르소나의 콘텐츠 취향을 정량화합니다.",
+      "노드 에디터에서 페르소나의 기본 정보, 6D 벡터 프로필, 캐릭터 성격을 시각적으로 설계합니다. 각 설정이 노드로 표현되어 데이터 흐름을 한눈에 확인할 수 있습니다.",
     color: "from-[#667eea] to-[#f093fb]",
   },
   {
@@ -33,24 +33,24 @@ const PIPELINE_STEPS = [
     icon: Cpu,
     title: "AI 프롬프트 엔지니어링",
     description:
-      "각 페르소나의 성격과 관점을 AI가 일관되게 표현할 수 있도록 프롬프트 템플릿을 정교하게 설계합니다.",
+      "각 페르소나의 성격과 관점을 AI가 일관되게 표현할 수 있도록 프롬프트 템플릿을 설계합니다. 벡터 기반 자동 생성 후 수동 조정이 가능합니다.",
     color: "from-[#f093fb] to-[#f5576c]",
   },
   {
     step: 3,
     icon: Settings,
-    title: "벡터 튜닝 & 테스트",
+    title: "테스트 & 검증",
     description:
-      "인큐베이션 단계에서 페르소나의 6D 벡터를 조정하고, 다양한 콘텐츠에 대한 반응을 테스트합니다.",
-    color: "from-green-500 to-green-600",
+      "노드 에디터에서 값을 바꿔가며 실시간으로 AI 응답을 테스트합니다. 품질 검증(70점 이상)을 통과해야 배포 가능합니다.",
+    color: "from-[#667eea] to-[#f5576c]",
   },
   {
     step: 4,
     icon: GitBranch,
     title: "버전 관리 & 배포",
     description:
-      "페르소나의 모든 변경 이력을 버전 관리하고, 테스트를 통과한 버전만 PersonaWorld에 배포합니다.",
-    color: "from-orange-500 to-orange-600",
+      "페르소나의 모든 변경 이력을 버전 관리하고, 검증을 통과한 버전만 PersonaWorld에 배포합니다.",
+    color: "from-[#f093fb] to-[#667eea]",
   },
 ]
 
@@ -89,7 +89,7 @@ export default function InsideDeepSightPage() {
           <h1 className="mb-6 text-5xl font-bold text-white">
             페르소나가
             <br />
-            <span className="bg-gradient-to-r from-[#667eea] via-[#f093fb] to-[#22c55e] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#667eea] via-[#f093fb] to-[#f5576c] bg-clip-text text-transparent">
               만들어지는 곳
             </span>
           </h1>
@@ -151,7 +151,7 @@ export default function InsideDeepSightPage() {
           <div className="grid gap-8 md:grid-cols-3">
             {ENGINE_FEATURES.map((feature, idx) => (
               <div key={idx} className="rounded-2xl border border-gray-200 bg-white p-8">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-[#667eea] via-[#22c55e] to-[#eab308]">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-[#667eea] via-[#f093fb] to-[#f5576c]">
                   <feature.icon className="h-7 w-7 text-white" />
                 </div>
                 <h3 className="mb-3 text-xl font-bold text-gray-900">{feature.title}</h3>

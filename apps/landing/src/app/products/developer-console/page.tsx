@@ -146,11 +146,11 @@ const recommendations =
                 icon: Zap,
                 title: "빠른 응답",
                 description:
-                  "매칭 API 평균 응답 시간 100ms 이하. CDN 최적화로 글로벌 사용자에게 빠른 응답을 제공합니다.",
+                  "매칭 API의 빠른 응답 속도를 목표로 설계하고 있습니다. CDN 최적화로 글로벌 사용자에게 안정적인 서비스를 제공할 예정입니다.",
               },
             ].map((feature, idx) => (
               <div key={idx} className="rounded-2xl border border-gray-200 bg-white p-8">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-[#667eea] via-[#22c55e] to-[#eab308]">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-[#667eea] via-[#f093fb] to-[#f5576c]">
                   <feature.icon className="h-7 w-7 text-white" />
                 </div>
                 <h3 className="mb-3 text-xl font-bold text-gray-900">{feature.title}</h3>
@@ -164,10 +164,10 @@ const recommendations =
       {/* Pricing hint */}
       <section className="py-24">
         <div className="mx-auto max-w-3xl px-6 text-center">
-          <h2 className="mb-6 text-3xl font-bold text-gray-900">시작은 무료</h2>
+          <h2 className="mb-6 text-3xl font-bold text-gray-900">곧 출시됩니다</h2>
           <p className="mb-8 text-gray-600">
-            Developer Console에서 무료로 API 키를 발급받고 시작하세요. 월 10,000 API 호출까지 무료로
-            이용할 수 있습니다.
+            Developer Console과 SDK는 현재 개발 중입니다. 출시 시 가격 정책과 함께 상세한 API 문서를
+            공개할 예정입니다.
           </p>
           <Link
             href={DEVELOPER_CONSOLE_URL}

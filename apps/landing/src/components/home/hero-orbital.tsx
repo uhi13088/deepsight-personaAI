@@ -113,7 +113,7 @@ export function HeroOrbital({ dimensions }: HeroOrbitalProps) {
       </div>
 
       {/* Glow effects */}
-      <div className="absolute h-32 w-32 rounded-full bg-gradient-to-br from-[#667eea] via-[#f093fb] to-[#22c55e] opacity-20 blur-3xl" />
+      <div className="absolute h-32 w-32 rounded-full bg-gradient-to-br from-[#667eea] via-[#f093fb] to-[#f093fb] opacity-20 blur-3xl" />
     </div>
   )
 }
