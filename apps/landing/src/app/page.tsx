@@ -119,7 +119,7 @@ export default function HomePage() {
           <div className="grid items-center gap-12 lg:grid-cols-2">
             {/* Left: Text */}
             <div className="space-y-8">
-              <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-700">
+              <div className="inline-flex items-center gap-2 rounded-full border border-purple-200 bg-purple-50 px-4 py-2 text-sm text-purple-700">
                 <Sparkles className="h-4 w-4" />
                 AI 페르소나 기반 추천 시스템
               </div>
@@ -183,9 +183,9 @@ export default function HomePage() {
                       x2="100%"
                       y2="0%"
                     >
-                      <stop offset="0%" stopColor="#2563eb" stopOpacity={0.3 + i * 0.15} />
-                      <stop offset="50%" stopColor="#7c3aed" stopOpacity={0.5 + i * 0.1} />
-                      <stop offset="100%" stopColor="#db2777" stopOpacity={0.3 + i * 0.15} />
+                      <stop offset="0%" stopColor="#667eea" stopOpacity={0.3 + i * 0.15} />
+                      <stop offset="50%" stopColor="#f093fb" stopOpacity={0.5 + i * 0.1} />
+                      <stop offset="100%" stopColor="#f5576c" stopOpacity={0.3 + i * 0.15} />
                     </linearGradient>
                   ))}
                 </defs>
@@ -202,7 +202,7 @@ export default function HomePage() {
             </div>
 
             <div className="space-y-6">
-              <div className="text-sm font-semibold uppercase tracking-wider text-blue-600">
+              <div className="text-sm font-semibold uppercase tracking-wider text-purple-600">
                 THE PROBLEM
               </div>
               <h2 className="text-4xl font-bold text-gray-900">
@@ -247,13 +247,13 @@ export default function HomePage() {
       {/* 6D Vector Section */}
       <section className="ds-dark-section relative overflow-hidden py-24">
         <div className="relative z-10 mx-auto max-w-4xl px-6 text-center">
-          <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-blue-400">
+          <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-400">
             6D VECTOR SYSTEM
           </div>
           <h2 className="mb-6 text-4xl font-bold text-white md:text-5xl">
             6개 차원으로
             <br />
-            <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#667eea] via-[#22c55e] to-[#eab308] bg-clip-text text-transparent">
               취향을 정량화
             </span>
           </h2>
@@ -289,7 +289,7 @@ export default function HomePage() {
           <div className="mt-12">
             <Link
               href="/features"
-              className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300"
+              className="inline-flex items-center gap-2 text-purple-400 hover:text-purple-300"
             >
               자세히 알아보기
               <ArrowRight className="h-4 w-4" />
@@ -301,7 +301,7 @@ export default function HomePage() {
       {/* Metrics */}
       <section className="bg-gray-50 py-24">
         <div className="mx-auto max-w-7xl px-6">
-          <div className="mb-4 text-center text-sm font-semibold uppercase tracking-wider text-blue-600">
+          <div className="mb-4 text-center text-sm font-semibold uppercase tracking-wider text-purple-600">
             EXPECTED IMPACT
           </div>
           <h2 className="mb-4 text-center text-4xl font-bold text-gray-900">예상 시나리오</h2>
@@ -314,7 +314,7 @@ export default function HomePage() {
                 key={idx}
                 className="rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm"
               >
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-[#667eea] via-[#22c55e] to-[#eab308]">
                   <metric.icon className="h-7 w-7 text-white" />
                 </div>
                 <div className="ds-text-gradient mb-2 text-3xl font-bold">{metric.value}</div>
@@ -329,7 +329,7 @@ export default function HomePage() {
       <section className="py-24">
         <div className="mx-auto max-w-7xl px-6">
           <div className="mb-16 text-center">
-            <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-blue-600">
+            <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
               USE CASES
             </div>
             <h2 className="text-4xl font-bold text-gray-900">다양한 산업에 적용</h2>
@@ -351,7 +351,7 @@ export default function HomePage() {
 
       {/* CTA */}
       <section className="ds-dark-section relative overflow-hidden py-24">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent" />
         <div className="relative z-10 mx-auto max-w-3xl px-6 text-center">
           <h2 className="mb-6 text-4xl font-bold text-white">지금 바로 시작하세요</h2>
           <p className="mb-8 text-lg text-gray-400">

@@ -29,8 +29,8 @@ const VECTOR_DIMENSIONS = [
     description: "콘텐츠를 얼마나 깊이 분석하고 이해하려 하는지를 측정합니다.",
     icon: Search,
     color: "from-blue-500 to-blue-600",
-    bgColor: "bg-blue-50",
-    textColor: "text-blue-600",
+    bgColor: "bg-purple-50",
+    textColor: "text-purple-600",
   },
   {
     id: "lens",
@@ -99,7 +99,7 @@ const MATCHING_STEPS = [
     step: 1,
     title: "Cold-Start 질문",
     label: "COLD-START",
-    color: "bg-blue-100 text-blue-600",
+    color: "bg-purple-100 text-purple-600",
     description:
       "4개의 A vs B 질문으로 사용자의 6D 프로필을 4초 만에 생성합니다. 각 질문은 2개 차원을 동시에 측정하도록 설계되었습니다.",
     features: ["질문당 2개 차원 동시 측정", "확신도(Confidence) 함께 계산", "4초 내 프로필 완성"],
@@ -146,7 +146,7 @@ export default function FeaturesPage() {
       {/* Hero */}
       <section className="bg-gray-50 py-24">
         <div className="mx-auto max-w-4xl px-6 text-center">
-          <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-blue-600">
+          <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
             FEATURES
           </div>
           <h1 className="mb-6 text-5xl font-bold text-gray-900">
@@ -200,7 +200,7 @@ export default function FeaturesPage() {
       <section className="bg-gray-50 py-24">
         <div className="mx-auto max-w-5xl px-6">
           <div className="mb-16 text-center">
-            <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-blue-600">
+            <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
               HOW IT WORKS
             </div>
             <h2 className="text-3xl font-bold text-gray-900">4단계 매칭 프로세스</h2>
@@ -266,7 +266,7 @@ export default function FeaturesPage() {
               },
             ].map((item, idx) => (
               <div key={idx} className="rounded-2xl border border-gray-200 bg-white p-8">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-[#667eea] via-[#22c55e] to-[#eab308]">
                   <item.icon className="h-7 w-7 text-white" />
                 </div>
                 <h3 className="mb-3 text-xl font-bold text-gray-900">{item.title}</h3>

@@ -62,7 +62,7 @@ export default function AboutPage() {
       <section className="bg-gray-50 py-24">
         <div className="mx-auto max-w-4xl px-6 text-center">
           <div className="mb-6 flex justify-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#667eea] via-[#f093fb] to-[#f5576c]">
               <Layers className="h-9 w-9 text-white" />
             </div>
           </div>
@@ -82,7 +82,7 @@ export default function AboutPage() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="grid items-center gap-16 lg:grid-cols-2">
             <div>
-              <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-blue-600">
+              <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
                 OUR MISSION
               </div>
               <h2 className="mb-6 text-3xl font-bold text-gray-900">
@@ -119,7 +119,7 @@ export default function AboutPage() {
       <section className="bg-gray-50 py-24">
         <div className="mx-auto max-w-4xl px-6">
           <div className="mb-16 text-center">
-            <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-blue-600">
+            <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
               ROADMAP
             </div>
             <h2 className="text-3xl font-bold text-gray-900">개발 로드맵</h2>
@@ -134,7 +134,7 @@ export default function AboutPage() {
                       milestone.status === "완료"
                         ? "bg-green-100 text-green-600"
                         : milestone.status === "진행중"
-                          ? "bg-blue-100 text-blue-600"
+                          ? "bg-purple-100 text-purple-600"
                           : "bg-gray-100 text-gray-500"
                     }`}
                   >
@@ -150,7 +150,7 @@ export default function AboutPage() {
                         milestone.status === "완료"
                           ? "bg-green-100 text-green-700"
                           : milestone.status === "진행중"
-                            ? "bg-blue-100 text-blue-700"
+                            ? "bg-purple-100 text-purple-700"
                             : "bg-gray-100 text-gray-600"
                       }`}
                     >

@@ -12,7 +12,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  TECH: "bg-blue-100 text-blue-700",
+  TECH: "bg-purple-100 text-purple-700",
   PRODUCT: "bg-green-100 text-green-700",
   INSIGHT: "bg-purple-100 text-purple-700",
   ANNOUNCEMENT: "bg-orange-100 text-orange-700",
@@ -102,7 +102,7 @@ export default async function BlogDetailPage({ params }: { params: Promise<{ slu
           </header>
 
           {/* Content */}
-          <div className="prose prose-gray prose-headings:text-gray-900 prose-p:text-gray-600 prose-a:text-blue-600 prose-strong:text-gray-900 max-w-none">
+          <div className="prose prose-gray prose-headings:text-gray-900 prose-p:text-gray-600 prose-a:text-[#667eea] prose-strong:text-gray-900 max-w-none">
             {post.content.split("\n").map((line, idx) => {
               if (line.startsWith("### ")) {
                 return (
@@ -154,7 +154,7 @@ export default async function BlogDetailPage({ params }: { params: Promise<{ slu
           <div className="mt-8">
             <Link
               href="/blog"
-              className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700"
+              className="inline-flex items-center gap-1 text-sm font-medium text-[#667eea] hover:text-purple-700"
             >
               <ArrowLeft className="h-4 w-4" />
               블로그 목록으로 돌아가기

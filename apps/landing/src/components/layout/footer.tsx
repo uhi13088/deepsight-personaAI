@@ -15,7 +15,7 @@ export function Footer() {
           {/* Brand */}
           <div className="md:col-span-1">
             <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#667eea] via-[#f093fb] to-[#f5576c]">
                 <Layers className="h-5 w-5 text-white" />
               </div>
               <span className="text-lg font-bold">DeepSight</span>
