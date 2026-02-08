@@ -139,7 +139,7 @@ class IncubatorService {
       })
     }
 
-    const personas: IncubatorPersona[] = response.data.data.map((item) => ({
+    const personas: IncubatorPersona[] = (response.data.data ?? []).map((item) => ({
       id: item.id,
       name: item.personaName,
       status: item.status as IncubatorPersona["status"],
