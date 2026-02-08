@@ -15,11 +15,6 @@ import {
   Bookmark,
   Link2,
   Users,
-  Eye,
-  Compass,
-  Target,
-  Palette,
-  Brain,
   Loader2,
   Trash2,
 } from "lucide-react"
@@ -27,31 +22,9 @@ import Link from "next/link"
 import { toast } from "sonner"
 import { useUserStore } from "@/lib/user-store"
 import { clientApi } from "@/lib/api"
+import { TRAIT_DIMENSIONS } from "@/lib/trait-colors"
+import { TraitColorBar } from "@/components/trait-color-bar"
 import type { PersonaDetail, Vector6D } from "@/lib/types"
-
-// 6D 벡터 차원 정보
-const VECTOR_DIMENSIONS = [
-  { id: "depth", name: "Depth", label: "분석 깊이", low: "직관적", high: "심층적", icon: Search },
-  { id: "lens", name: "Lens", label: "판단 렌즈", low: "감성적", high: "논리적", icon: Eye },
-  {
-    id: "stance",
-    name: "Stance",
-    label: "평가 태도",
-    low: "수용적",
-    high: "비판적",
-    icon: Compass,
-  },
-  { id: "scope", name: "Scope", label: "관심 범위", low: "핵심만", high: "디테일", icon: Target },
-  { id: "taste", name: "Taste", label: "취향 성향", low: "클래식", high: "실험적", icon: Palette },
-  {
-    id: "purpose",
-    name: "Purpose",
-    label: "소비 목적",
-    low: "오락",
-    high: "의미추구",
-    icon: Brain,
-  },
-] as const
 
 export default function ProfilePage() {
   const { profile, followedPersonas, likedPosts, bookmarkedPosts, reset, notifications } =
@@ -152,34 +125,15 @@ export default function ProfilePage() {
               <PWIcon icon={BarChart3} size="sm" gradient />
               나의 취향 벡터
             </h3>
-            <div className="space-y-3">
-              {VECTOR_DIMENSIONS.map((dim) => {
-                const value = profile.vector![dim.id as keyof Vector6D]
-                const percentage = Math.round(value * 100)
-                const Icon = dim.icon
-                return (
-                  <div key={dim.id} className="flex items-center gap-3">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-pink-500">
-                      <Icon className="h-3.5 w-3.5 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="mb-1 flex justify-between text-xs text-gray-500">
-                        <span>{dim.low}</span>
-                        <span>{dim.high}</span>
-                      </div>
-                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500"
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                    <span className="w-8 text-right text-xs font-medium text-gray-600">
-                      {percentage}%
-                    </span>
-                  </div>
-                )
-              })}
+            <div className="space-y-4">
+              {TRAIT_DIMENSIONS.filter((dim) => dim.key in profile.vector!).map((dim) => (
+                <TraitColorBar
+                  key={dim.key}
+                  dimension={dim}
+                  value={profile.vector![dim.key as keyof Vector6D]}
+                  size="sm"
+                />
+              ))}
             </div>
           </PWCard>
         )}

@@ -21,31 +21,13 @@ import { useUserStore } from "@/lib/user-store"
 import { TRAIT_DIMENSIONS } from "@/lib/trait-colors"
 import { TraitColorBar } from "@/components/trait-color-bar"
 import { TraitColorFingerprint } from "@/components/trait-color-fingerprint"
-import type { PersonaFullDetail, PostType, Vector6D } from "@/lib/types"
-
-// 포스트 타입 라벨
-const POST_TYPE_LABELS: Record<PostType, string> = {
-  REVIEW: "리뷰",
-  OPINION: "의견",
-  RECOMMENDATION: "추천",
-  VS_BATTLE: "VS 배틀",
-  QNA: "Q&A",
-  NEWS_REACTION: "뉴스 반응",
-  DEBATE: "토론",
-}
-
-// 역할 라벨
-const ROLE_LABELS: Record<string, string> = {
-  REVIEWER: "리뷰어",
-  CURATOR: "큐레이터",
-  EDUCATOR: "교육자",
-  COMPANION: "동반자",
-  ANALYST: "분석가",
-}
+import { ROLE_NAMES, POST_TYPE_LABELS } from "@/lib/role-config"
+import { formatTimeAgo } from "@/lib/format"
+import type { PersonaFullDetail, Vector6D } from "@/lib/types"
 
 // 포스트 카드 컴포넌트
 function PostCard({ post }: { post: PersonaFullDetail["recentPosts"][number] }) {
-  const timeAgo = getTimeAgo(post.createdAt)
+  const timeAgo = formatTimeAgo(post.createdAt)
 
   return (
     <div className="rounded-xl border border-gray-100 bg-white p-4 transition-all hover:border-violet-200 hover:shadow-sm">
@@ -75,22 +57,6 @@ function PostCard({ post }: { post: PersonaFullDetail["recentPosts"][number] }) 
       </div>
     </div>
   )
-}
-
-// 시간 포맷
-function getTimeAgo(dateString: string): string {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 1) return "방금"
-  if (diffMins < 60) return `${diffMins}분 전`
-  if (diffHours < 24) return `${diffHours}시간 전`
-  if (diffDays < 7) return `${diffDays}일 전`
-  return date.toLocaleDateString("ko-KR")
 }
 
 export default function PersonaDetailPage() {
@@ -218,7 +184,7 @@ export default function PersonaDetailPage() {
                 <h2 className="text-xl font-bold text-gray-900">{persona.name}</h2>
                 <p className="text-sm text-gray-500">{persona.handle}</p>
                 <span className="mt-1 inline-block rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-600">
-                  {ROLE_LABELS[persona.role] || persona.role}
+                  {ROLE_NAMES[persona.role] || persona.role}
                 </span>
               </div>
             </div>
