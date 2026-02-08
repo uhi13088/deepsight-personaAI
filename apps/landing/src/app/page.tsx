@@ -86,10 +86,10 @@ const VECTOR_DIMENSIONS = [
 ]
 
 const METRICS = [
-  { label: "추천 클릭률 향상", value: "+47%", icon: MousePointer },
-  { label: "세션 체류시간", value: "+32%", icon: Clock },
-  { label: "콜드스타트 해결", value: "4초", icon: Zap },
-  { label: "추천 만족도", value: "4.7/5", icon: Star },
+  { label: "추천 정확도 향상", value: "6D", icon: MousePointer },
+  { label: "콜드스타트 해결", value: "즉시", icon: Zap },
+  { label: "추천 이유 설명", value: "투명", icon: Clock },
+  { label: "필터버블 탈출", value: "다관점", icon: Star },
 ]
 
 const USE_CASES = [
@@ -304,9 +304,9 @@ export default function HomePage() {
           <div className="mb-4 text-center text-sm font-semibold uppercase tracking-wider text-purple-600">
             EXPECTED IMPACT
           </div>
-          <h2 className="mb-4 text-center text-4xl font-bold text-gray-900">예상 시나리오</h2>
+          <h2 className="mb-4 text-center text-4xl font-bold text-gray-900">핵심 가치</h2>
           <p className="mx-auto mb-12 max-w-2xl text-center text-gray-600">
-            DeepSight 도입 시 예상되는 효과입니다.
+            DeepSight가 기존 추천 시스템과 다른 점입니다.
           </p>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {METRICS.map((metric, idx) => (

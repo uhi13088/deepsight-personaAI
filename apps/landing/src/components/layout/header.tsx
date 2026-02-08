@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { label: "Features", href: "/features" },
   { label: "About", href: "/about" },
   { label: "Blog", href: "/blog" },
+  { label: "FAQ", href: "/faq" },
 ] as const
 
 const PRODUCT_ITEMS = [
