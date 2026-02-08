@@ -53,9 +53,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { RadarChart } from "@/components/charts/radar-chart"
 import { TraitColorFingerprint } from "@/components/charts/trait-color-fingerprint"
-import { TRAIT_DIMENSIONS, getTraitDimension } from "@/lib/trait-colors"
+import { TraitColorBar } from "@/components/charts/trait-color-bar"
+import { getTraitDimension } from "@/lib/trait-colors"
 import { personaService } from "@/services/persona-service"
 import type { PersonaRole, PersonaStatus, Vector6D } from "@/types"
 
@@ -721,58 +721,41 @@ ${result.response}
                   const value = persona.vector[key as keyof typeof persona.vector]
                   return (
                     <div key={key} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label className="flex items-center gap-2">
-                          {traitColor && (
-                            <span
-                              className="inline-block h-2.5 w-2.5 rounded-full"
-                              style={{ backgroundColor: traitColor.color.primary }}
-                            />
-                          )}
-                          {label.name}
-                        </Label>
-                        <span className="text-sm font-medium">{(value * 100).toFixed(0)}%</span>
-                      </div>
-                      {/* 컬러 그라디언트 게이지 (읽기 모드) */}
+                      {/* TraitColorBar 게이지 (읽기 모드) */}
                       {!isEditing && traitColor && (
-                        <div className="relative">
-                          <div
-                            className="h-2 w-full overflow-hidden rounded-full"
-                            style={{
-                              background: `linear-gradient(to right, ${traitColor.color.from}, ${traitColor.color.to})`,
-                            }}
-                          />
-                          <div
-                            className="absolute top-0 h-2 w-0.5 rounded-full bg-white"
-                            style={{
-                              left: `${value * 100}%`,
-                              transform: "translateX(-50%)",
-                              boxShadow: "0 0 3px rgba(0,0,0,0.4)",
-                            }}
-                          />
-                          <div className="text-muted-foreground mt-1 flex justify-between text-xs">
-                            <span>{label.low}</span>
-                            <span>{label.high}</span>
-                          </div>
-                        </div>
+                        <TraitColorBar dimension={traitColor} value={value} size="md" />
                       )}
                       {/* 슬라이더 (편집 모드) */}
                       {isEditing && (
-                        <div className="flex items-center gap-4">
-                          <span className="text-muted-foreground w-16 text-xs">{label.low}</span>
-                          <Slider
-                            value={[value]}
-                            min={0}
-                            max={1}
-                            step={0.05}
-                            disabled={!isEditing}
-                            onValueChange={(v) => handleVectorChange(key, v)}
-                            className="flex-1"
-                          />
-                          <span className="text-muted-foreground w-16 text-right text-xs">
-                            {label.high}
-                          </span>
-                        </div>
+                        <>
+                          <div className="flex items-center justify-between">
+                            <Label className="flex items-center gap-2">
+                              {traitColor && (
+                                <span
+                                  className="inline-block h-2.5 w-2.5 rounded-full"
+                                  style={{ backgroundColor: traitColor.color.primary }}
+                                />
+                              )}
+                              {label.name}
+                            </Label>
+                            <span className="text-sm font-medium">{(value * 100).toFixed(0)}%</span>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className="text-muted-foreground w-16 text-xs">{label.low}</span>
+                            <Slider
+                              value={[value]}
+                              min={0}
+                              max={1}
+                              step={0.05}
+                              disabled={!isEditing}
+                              onValueChange={(v) => handleVectorChange(key, v)}
+                              className="flex-1"
+                            />
+                            <span className="text-muted-foreground w-16 text-right text-xs">
+                              {label.high}
+                            </span>
+                          </div>
+                        </>
                       )}
                     </div>
                   )
