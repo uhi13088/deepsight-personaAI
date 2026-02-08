@@ -53,7 +53,7 @@ const faqCategories = [
       {
         question: "API Key는 어떻게 생성하나요?",
         answer:
-          "Dashboard에서 'API Keys' 메뉴로 이동한 후 '새 API Key 생성' 버튼을 클릭하세요. 키 이름, 환경(Test/Live), 권한을 설정한 후 생성할 수 있습니다.",
+          "Dashboard에서 'API Keys' 메뉴로 이동한 후 '새 API Key 생성' 버튼을 클릭하세요. 키 이름, 환경(Test/Live), 권한(Catalog/Profiling/Matching/Recommendation/Evaluation 등)을 설정한 후 생성할 수 있습니다.",
       },
       {
         question: "Test 환경과 Live 환경의 차이는 무엇인가요?",
@@ -63,7 +63,12 @@ const faqCategories = [
       {
         question: "첫 API 호출은 어떻게 하나요?",
         answer:
-          "API Key를 생성한 후, Playground에서 바로 테스트하거나 문서의 Quick Start 가이드를 따라 진행하세요. cURL, JavaScript, Python 등 다양한 언어의 예제 코드를 제공합니다.",
+          "API Key를 생성한 후, Playground에서 바로 테스트하거나 문서의 Quick Start 가이드를 따라 진행하세요. 기본 흐름은 Catalog API로 페르소나 검색 → Profiling API로 유저 프로필 생성 → Matching API로 매칭 → Recommendation API로 추천 받기입니다.",
+      },
+      {
+        question: "DeepSight API로 무엇을 할 수 있나요?",
+        answer:
+          "DeepSight에 등록된 AI 페르소나를 활용하여 5가지 핵심 기능을 사용할 수 있습니다: 페르소나 카탈로그 검색(Catalog), 유저 프로파일링(Profiling), 유저-페르소나 매칭(Matching), 콘텐츠 추천(Recommendation), 콘텐츠 평가(Evaluation).",
       },
     ],
   },
@@ -78,19 +83,24 @@ const faqCategories = [
           "Rate Limit 초과 시 HTTP 429 에러가 반환됩니다. 잠시 후 다시 시도하거나, 플랜을 업그레이드하여 Rate Limit을 높일 수 있습니다. Retry-After 헤더를 확인하여 대기 시간을 파악하세요.",
       },
       {
-        question: "API 응답 시간이 느린 경우 어떻게 해야 하나요?",
+        question: "Profiling API에서 지원하는 프로필 생성 방식은?",
         answer:
-          "응답 시간 지연의 일반적인 원인: 1) 콘텐츠 길이가 너무 긴 경우 2) 동시 요청이 많은 경우 3) 네트워크 지연. 콘텐츠를 적절히 분할하거나 Batch API를 활용해 보세요.",
+          "콜드스타트 질문셋 기반과 SNS 연동 분석 두 가지 방식을 지원합니다. SNS 연동이 실제 행동 데이터 기반이라 정확도가 높으며, 콜드스타트는 별도 연동 없이 질문 응답만으로 프로필을 생성합니다.",
       },
       {
-        question: "Webhook은 어떻게 설정하나요?",
+        question: "Recommendation API 응답에 추천 이유가 포함되나요?",
         answer:
-          "Webhook은 Pro 플랜 이상에서 사용 가능합니다. Settings > Webhooks에서 엔드포인트 URL을 등록하고 수신할 이벤트를 선택하세요. HMAC 서명으로 요청을 검증할 수 있습니다.",
+          "네. Recommendation API 응답에는 각 추천 항목마다 reason 필드가 포함됩니다. 매칭된 페르소나가 유저의 성향을 고려하여 왜 이 콘텐츠를 추천하는지 설명합니다.",
       },
       {
         question: "6D Vector는 무엇인가요?",
         answer:
-          "6D Vector는 DeepSight의 핵심 매칭 기술입니다. Depth(깊이), Lens(관점), Stance(태도), Scope(범위), Taste(취향), Purpose(목적) 6가지 차원으로 콘텐츠와 페르소나를 분석합니다.",
+          "6D Vector는 DeepSight의 핵심 분석 기술입니다. Depth(깊이), Lens(관점), Stance(태도), Scope(범위), Taste(취향), Purpose(목적) 6가지 차원으로 유저와 페르소나의 성향을 분석합니다. Profiling API를 통해 유저의 6D 프로필을 생성하고, Matching API에서 페르소나와의 유사도를 계산합니다.",
+      },
+      {
+        question: "Webhook은 어떻게 설정하나요?",
+        answer:
+          "Webhook은 Pro 플랜 이상에서 사용 가능합니다. Webhooks 메뉴에서 엔드포인트 URL을 등록하고 수신할 이벤트(profile.created, match.completed, recommendation.generated 등)를 선택하세요.",
       },
     ],
   },

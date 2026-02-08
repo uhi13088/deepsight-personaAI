@@ -36,27 +36,45 @@ interface Permission {
 
 const permissions: Permission[] = [
   {
-    id: "match",
-    name: "Match API",
-    description: "콘텐츠와 페르소나 매칭 분석",
-    endpoints: ["POST /v1/match", "POST /v1/batch-match"],
+    id: "catalog",
+    name: "Catalog API",
+    description: "등록된 페르소나 검색 및 상세 조회",
+    endpoints: ["GET /v1/personas", "GET /v1/personas/:id"],
   },
   {
-    id: "personas",
-    name: "Personas API",
-    description: "페르소나 목록 조회 및 상세 정보",
-    endpoints: ["GET /v1/personas", "GET /v1/personas/:id"],
+    id: "profiling",
+    name: "Profiling API",
+    description: "유저 6D 벡터 프로필 생성 및 조회",
+    endpoints: ["POST /v1/profiles", "GET /v1/profiles/:id"],
+  },
+  {
+    id: "matching",
+    name: "Matching API",
+    description: "유저 프로필과 페르소나 간 최적 매칭",
+    endpoints: ["POST /v1/match"],
+  },
+  {
+    id: "recommendation",
+    name: "Recommendation API",
+    description: "매칭된 페르소나가 콘텐츠 추천 및 이유 설명",
+    endpoints: ["POST /v1/recommend"],
+  },
+  {
+    id: "evaluation",
+    name: "Evaluation API",
+    description: "페르소나 관점에서 콘텐츠 리뷰 및 분석",
+    endpoints: ["POST /v1/evaluate"],
   },
   {
     id: "feedback",
     name: "Feedback API",
-    description: "매칭 결과 피드백 제출",
+    description: "추천/평가 결과에 대한 피드백 제출",
     endpoints: ["POST /v1/feedback"],
   },
   {
     id: "analytics",
     name: "Analytics API",
-    description: "사용량 통계 및 분석 데이터 조회",
+    description: "API 사용량 및 매칭 정확도 통계 조회",
     endpoints: ["GET /v1/analytics/*"],
   },
 ]
