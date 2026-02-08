@@ -54,15 +54,7 @@ const nextConfig: NextConfig = {
   ],
 
   // 리다이렉트 설정
-  redirects: async () => [
-    // HTTP를 HTTPS로 리다이렉트 (프로덕션)
-    // 보안을 위해 루트 경로 접근 시 대시보드로 이동
-    {
-      source: "/",
-      destination: "/dashboard",
-      permanent: false,
-    },
-  ],
+  redirects: async () => [],
 
   // 이미지 최적화 설정
   images: {
@@ -86,9 +78,7 @@ const nextConfig: NextConfig = {
     // 서버 액션 보안 설정
     serverActions: {
       bodySizeLimit: "2mb",
-      allowedOrigins: [process.env.NEXTAUTH_URL || "http://localhost:3000"].filter(
-        Boolean
-      ) as string[],
+      allowedOrigins: ["http://localhost:3003"].filter(Boolean) as string[],
     },
   },
 

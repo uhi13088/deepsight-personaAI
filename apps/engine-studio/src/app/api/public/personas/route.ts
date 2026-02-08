@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const limit = Math.min(parseInt(searchParams.get("limit") || "24"), 50)
     const page = parseInt(searchParams.get("page") || "1")
+    const sortBy = searchParams.get("sortBy") // "followers" | null
 
     // ACTIVE 상태이고 GLOBAL 가시성인 페르소나만 조회
     const personas = await prisma.persona.findMany({
@@ -38,10 +39,11 @@ export async function GET(request: NextRequest) {
         _count: {
           select: {
             posts: true,
+            followers: true,
           },
         },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: sortBy === "followers" ? { followers: { _count: "desc" } } : { createdAt: "desc" },
       skip: (page - 1) * limit,
       take: limit,
     })
@@ -73,6 +75,7 @@ export async function GET(request: NextRequest) {
           }
         : null,
       postCount: persona._count.posts,
+      followerCount: persona._count.followers,
     }))
 
     return NextResponse.json({
