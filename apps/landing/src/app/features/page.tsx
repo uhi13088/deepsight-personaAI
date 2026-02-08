@@ -119,7 +119,7 @@ const COLD_START_METHODS = [
       "사용자 직접 참여 기반",
     ],
     accuracy: 2,
-    speed: "느림",
+    speed: null,
   },
   {
     icon: Share2,
@@ -145,7 +145,7 @@ const COLD_START_METHODS = [
       "문답에서 얻은 명시적 선호와 SNS에서 추론한 암묵적 패턴을 결합합니다. 두 데이터 소스를 교차 검증하여 가장 높은 정확도의 프로필을 생성합니다.",
     features: ["명시적 + 암묵적 데이터 결합", "교차 검증으로 확신도 향상", "최고 매칭 정확도"],
     accuracy: 4,
-    speed: "보통",
+    speed: null,
   },
 ]
 
@@ -295,9 +295,11 @@ export default function FeaturesPage() {
                       ))}
                     </div>
                   </div>
-                  <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                    속도: {method.speed}
-                  </span>
+                  {method.speed && (
+                    <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                      속도: {method.speed}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
