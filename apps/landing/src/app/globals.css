@@ -22,12 +22,10 @@
   --ring: 222.2 84% 4.9%;
   --radius: 0.5rem;
 
-  /* DeepSight Brand Colors — PW 그라데이션 기반 + Green/Yellow 확장 */
+  /* DeepSight Brand Colors — PW 그라데이션 기반 */
   --ds-purple: #667eea;
   --ds-pink: #f093fb;
   --ds-coral: #f5576c;
-  --ds-green: #22c55e;
-  --ds-yellow: #eab308;
 }
 
 @theme inline {
@@ -93,15 +91,13 @@ html {
   scroll-behavior: smooth;
 }
 
-/* DeepSight Gradient Text — 다방향 멀티컬러 */
+/* DeepSight Gradient Text */
 .ds-text-gradient {
   background: linear-gradient(
-    120deg,
+    135deg,
     var(--ds-purple) 0%,
-    var(--ds-pink) 25%,
-    var(--ds-coral) 45%,
-    var(--ds-green) 70%,
-    var(--ds-yellow) 100%
+    var(--ds-pink) 50%,
+    var(--ds-coral) 100%
   );
   -webkit-background-clip: text;
   background-clip: text;
@@ -146,7 +142,7 @@ html {
     transparent,
     var(--ds-purple),
     var(--ds-pink),
-    var(--ds-green),
+    var(--ds-coral),
     transparent
   );
 }
@@ -283,10 +279,9 @@ html {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    var(--ds-purple) 10%,
-    var(--ds-pink) 30%,
-    var(--ds-green) 55%,
-    var(--ds-yellow) 80%,
+    var(--ds-purple) 15%,
+    var(--ds-pink) 50%,
+    var(--ds-coral) 85%,
     transparent 100%
   );
   filter: blur(0.5px);
@@ -314,8 +309,7 @@ html {
     135deg,
     var(--ds-purple),
     var(--ds-pink),
-    var(--ds-green),
-    var(--ds-yellow),
+    var(--ds-coral),
     var(--ds-purple)
   );
   background-size: 300% 300%;
@@ -513,7 +507,7 @@ html {
 
 /* =========================================
    Multi-Directional Gradient Variants
-   PW 기반 + Green/Yellow 확장 팔레트
+   PW 기반 3색 팔레트 (보라→핑크→코랄)
    ========================================= */
 
 /* 코닉(방사형 회전) 그라데이션 — 로고/아이콘 배경용 */
@@ -523,8 +517,6 @@ html {
     var(--ds-purple),
     var(--ds-pink),
     var(--ds-coral),
-    var(--ds-green),
-    var(--ds-yellow),
     var(--ds-purple)
   );
 }
@@ -534,22 +526,15 @@ html {
   background: radial-gradient(
     ellipse at center,
     var(--ds-purple) 0%,
-    var(--ds-pink) 25%,
-    var(--ds-green) 50%,
-    var(--ds-yellow) 75%,
+    var(--ds-pink) 40%,
+    var(--ds-coral) 70%,
     transparent 100%
   );
 }
 
 /* 대각선 45deg 그라데이션 */
 .ds-gradient-diagonal {
-  background: linear-gradient(
-    45deg,
-    var(--ds-purple) 0%,
-    var(--ds-pink) 30%,
-    var(--ds-green) 60%,
-    var(--ds-yellow) 100%
-  );
+  background: linear-gradient(45deg, var(--ds-purple) 0%, var(--ds-pink) 50%, var(--ds-coral) 100%);
 }
 
 /* 역대각선 225deg 그라데이션 */
@@ -557,9 +542,8 @@ html {
   background: linear-gradient(
     225deg,
     var(--ds-coral) 0%,
-    var(--ds-pink) 30%,
-    var(--ds-purple) 60%,
-    var(--ds-green) 100%
+    var(--ds-pink) 50%,
+    var(--ds-purple) 100%
   );
 }
 
@@ -568,9 +552,8 @@ html {
   background: linear-gradient(
     180deg,
     var(--ds-purple) 0%,
-    var(--ds-pink) 35%,
-    var(--ds-coral) 65%,
-    var(--ds-green) 100%
+    var(--ds-pink) 50%,
+    var(--ds-coral) 100%
   );
 }
 
@@ -579,8 +562,7 @@ html {
   background:
     radial-gradient(at 20% 30%, rgba(102, 126, 234, 0.3) 0%, transparent 50%),
     radial-gradient(at 80% 20%, rgba(240, 147, 251, 0.25) 0%, transparent 50%),
-    radial-gradient(at 50% 80%, rgba(34, 197, 94, 0.2) 0%, transparent 50%),
-    radial-gradient(at 90% 70%, rgba(234, 179, 8, 0.2) 0%, transparent 50%);
+    radial-gradient(at 50% 80%, rgba(245, 87, 108, 0.2) 0%, transparent 50%);
 }
 
 /* 애니메이션 코닉 그라데이션 — 로딩/강조용 */
@@ -599,8 +581,6 @@ html {
     var(--ds-purple),
     var(--ds-pink),
     var(--ds-coral),
-    var(--ds-green),
-    var(--ds-yellow),
     var(--ds-purple)
   );
   animation: conic-spin 4s linear infinite;
