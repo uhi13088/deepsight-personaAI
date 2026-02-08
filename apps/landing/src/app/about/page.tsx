@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowRight, Layers } from "lucide-react"
+import { ArrowRight, Layers, Quote } from "lucide-react"
 
 export const metadata: Metadata = {
   title: "About",
@@ -9,6 +9,41 @@ export const metadata: Metadata = {
 
 const PERSONA_WORLD_URL =
   process.env.NEXT_PUBLIC_PERSONA_WORLD_URL || "https://persona-world.vercel.app"
+
+const TEAM_STORIES = [
+  {
+    name: "민준",
+    role: "Founder",
+    avatar: "from-[#667eea] to-[#f093fb]",
+    quote:
+      "넷플릭스를 켜면 항상 뭘 봐야 할지 모르겠어요. 드라마를 좋아하는데, 추천받아서 봤다가 취향 안 맞으면 시간이 너무 아까워요. 소설이나 웹툰도 마찬가지고요. 내 시간은 한정되어 있으니까... 나와 완전히 똑같은 도플갱어 AI가 먼저 보고 알려주면 좋겠다고 생각했어요. 실패하지 않을, 검증된 콘텐츠만 소비하고 싶었거든요. 그게 AI 페르소나의 시작이었습니다.",
+    highlight: "실패 없는 콘텐츠 소비",
+  },
+  {
+    name: "서연",
+    role: "Product Designer",
+    avatar: "from-[#f093fb] to-[#f5576c]",
+    quote:
+      "웹소설을 매일 읽는데, 신작이 하루에도 수십 편씩 쏟아져요. 10화까지 읽었는데 취향 아닌 걸 알았을 때... 그 허탈함이란. 누군가 미리 읽고 '이건 너한테 맞아'라고 알려주는 친구가 있으면 좋겠다는 생각을 늘 했어요. 그 친구가 AI라면, 수백 편을 동시에 읽어줄 수 있잖아요.",
+    highlight: "콘텐츠 홍수 속 길잡이",
+  },
+  {
+    name: "현우",
+    role: "AI Engineer",
+    avatar: "from-[#667eea] to-[#f5576c]",
+    quote:
+      "음악 앱 플레이리스트가 점점 비슷해지는 게 느껴졌어요. 제가 좋아하는 장르만 계속 틀어주니까, 한 달이 지나면 이미 다 아는 노래뿐이더라고요. 새로운 음악을 발견하는 즐거움이 사라진 거예요. 필터버블을 깨면서도 내 취향을 존중하는 추천, 그게 가능해야 한다고 생각했습니다.",
+    highlight: "필터버블 없는 발견의 즐거움",
+  },
+  {
+    name: "지은",
+    role: "Data Analyst",
+    avatar: "from-[#f5576c] to-[#667eea]",
+    quote:
+      "퇴근하면 시간이 2~3시간밖에 없어요. 영화 한 편을 볼까, 드라마 한 편을 볼까 고민하다가 결국 유튜브 숏츠만 보고 자는 날이 많았어요. 선택이 두려운 거예요, 실패하면 오늘 밤이 통째로 날아가니까. 내 취향을 정확히 아는 AI가 '오늘은 이거 봐'라고 딱 한 마디 해주면... 그게 얼마나 편할까요.",
+    highlight: "한정된 시간, 확실한 선택",
+  },
+]
 
 const MILESTONES = [
   {
@@ -77,8 +112,66 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Mission */}
+      {/* Our Story */}
       <section className="py-24">
+        <div className="mx-auto max-w-5xl px-6">
+          <div className="mb-16 text-center">
+            <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
+              OUR STORY
+            </div>
+            <h2 className="mb-4 text-3xl font-bold text-gray-900">우리가 시작한 이유</h2>
+            <p className="mx-auto max-w-2xl text-gray-600">
+              DeepSight 팀은 모두 같은 불편함을 겪고 있었습니다. 콘텐츠는 넘쳐나는데, 정작 나에게
+              맞는 콘텐츠를 찾는 건 너무 어렵다는 것. 실패할 때마다 아까운 건 시간이었습니다.
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            {TEAM_STORIES.map((story, idx) => (
+              <div
+                key={idx}
+                className="relative rounded-2xl border border-gray-200 bg-white p-8 transition-all hover:shadow-md"
+              >
+                <Quote className="absolute right-8 top-8 h-8 w-8 text-gray-100" />
+                <div className="mb-4 flex items-center gap-4">
+                  <div
+                    className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${story.avatar} text-sm font-bold text-white`}
+                  >
+                    {story.name[0]}
+                  </div>
+                  <div>
+                    <div className="font-semibold text-gray-900">{story.name}</div>
+                    <div className="text-sm text-gray-500">{story.role}</div>
+                  </div>
+                  <div className="ml-auto rounded-full bg-purple-50 px-3 py-1 text-xs font-medium text-purple-600">
+                    {story.highlight}
+                  </div>
+                </div>
+                <p className="leading-relaxed text-gray-600">&ldquo;{story.quote}&rdquo;</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-12 rounded-2xl bg-gradient-to-r from-[#667eea]/5 via-[#f093fb]/5 to-[#f5576c]/5 p-8 text-center">
+            <p className="text-lg font-medium text-gray-900">
+              이 경험들이 모여 하나의 질문이 되었습니다.
+            </p>
+            <p className="mt-2 text-2xl font-bold">
+              <span className="ds-text-gradient">
+                &ldquo;나와 똑같은 취향의 AI가 먼저 보고 알려주면?&rdquo;
+              </span>
+            </p>
+            <p className="mt-4 text-gray-600">
+              그래서 우리는 AI 페르소나를 만들기 시작했습니다. 사용자의 취향을 6개 차원으로
+              정량화하고, 그 취향을 가진 도플갱어 AI가 수백 개의 콘텐츠를 미리 소비한 뒤, 검증된
+              추천만 전달하는 시스템. 그것이 DeepSight입니다.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Mission */}
+      <section className="bg-gray-50 py-24">
         <div className="mx-auto max-w-7xl px-6">
           <div className="grid items-center gap-16 lg:grid-cols-2">
             <div>
@@ -116,7 +209,7 @@ export default function AboutPage() {
       </section>
 
       {/* Roadmap */}
-      <section className="bg-gray-50 py-24">
+      <section className="py-24">
         <div className="mx-auto max-w-4xl px-6">
           <div className="mb-16 text-center">
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
