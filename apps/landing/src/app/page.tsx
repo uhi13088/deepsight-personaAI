@@ -253,7 +253,7 @@ export default function HomePage() {
           <h2 className="mb-6 text-4xl font-bold text-white md:text-5xl">
             6개 차원으로
             <br />
-            <span className="bg-gradient-to-r from-[#667eea] via-[#22c55e] to-[#eab308] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#667eea] via-[#f093fb] to-[#f5576c] bg-clip-text text-transparent">
               취향을 정량화
             </span>
           </h2>
@@ -314,7 +314,7 @@ export default function HomePage() {
                 key={idx}
                 className="rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm"
               >
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-[#667eea] via-[#22c55e] to-[#eab308]">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-[#667eea] via-[#f093fb] to-[#f5576c]">
                   <metric.icon className="h-7 w-7 text-white" />
                 </div>
                 <div className="ds-text-gradient mb-2 text-3xl font-bold">{metric.value}</div>
