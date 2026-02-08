@@ -6,6 +6,37 @@
 -- 중복 slug가 있으면 건너뜁니다 (ON CONFLICT DO NOTHING)
 -- ============================================
 
+-- 1) BlogCategory enum 생성 (이미 있으면 무시)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'BlogCategory') THEN
+    CREATE TYPE "BlogCategory" AS ENUM ('TECH', 'PRODUCT', 'INSIGHT', 'ANNOUNCEMENT');
+  END IF;
+END
+$$;
+
+-- 2) blog_posts 테이블 생성 (이미 있으면 무시)
+CREATE TABLE IF NOT EXISTS blog_posts (
+  id            TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  slug          TEXT NOT NULL UNIQUE,
+  title         TEXT NOT NULL,
+  excerpt       TEXT,
+  content       TEXT NOT NULL,
+  cover_image_url TEXT,
+  category      "BlogCategory" NOT NULL,
+  tags          TEXT[] DEFAULT '{}',
+  author_id     TEXT NOT NULL REFERENCES users(id),
+  published     BOOLEAN DEFAULT false,
+  published_at  TIMESTAMPTZ,
+  view_count    INTEGER DEFAULT 0,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS blog_posts_published_idx ON blog_posts (published, published_at);
+CREATE INDEX IF NOT EXISTS blog_posts_category_idx ON blog_posts (category);
+
+-- 3) 블로그 데이터 삽입
 INSERT INTO blog_posts (id, slug, title, excerpt, content, category, tags, author_id, published, published_at, view_count, created_at, updated_at)
 VALUES
 
