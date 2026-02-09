@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
             code: validation.error?.code || "UNAUTHORIZED",
             message: validation.error?.message || "Invalid API key",
           },
-          request_id: requestId,
+          requestId,
         },
         { status: 401 }
       )
@@ -48,18 +48,18 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json()
-    const { match_id, feedback, comment } = body
+    const { matchId, feedback, comment } = body
 
-    // Validate match_id
-    if (!match_id || typeof match_id !== "string") {
+    // Validate matchId
+    if (!matchId || typeof matchId !== "string") {
       return NextResponse.json(
         {
           success: false,
           error: {
             code: "INVALID_MATCH_ID",
-            message: "match_id is required and must be a string",
+            message: "matchId is required and must be a string",
           },
-          request_id: requestId,
+          requestId,
         },
         { status: 400 }
       )
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
             code: "INVALID_FEEDBACK",
             message: `feedback must be one of: ${VALID_FEEDBACK_TYPES.join(", ")}`,
           },
-          request_id: requestId,
+          requestId,
         },
         { status: 400 }
       )
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
               code: "INVALID_COMMENT",
               message: "comment must be a string",
             },
-            request_id: requestId,
+            requestId,
           },
           { status: 400 }
         )
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
               code: "COMMENT_TOO_LONG",
               message: "comment must not exceed 1000 characters",
             },
-            request_id: requestId,
+            requestId,
           },
           { status: 400 }
         )
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     // Find the match result by requestId
     const matchResult = await prisma.matchResult.findFirst({
-      where: { requestId: match_id },
+      where: { requestId: matchId },
       include: {
         feedback: true,
         persona: {
@@ -130,9 +130,9 @@ export async function POST(request: NextRequest) {
           success: false,
           error: {
             code: "MATCH_NOT_FOUND",
-            message: "Match result not found with the given match_id",
+            message: "Match result not found with the given matchId",
           },
-          request_id: requestId,
+          requestId,
         },
         { status: 404 }
       )
@@ -159,25 +159,25 @@ export async function POST(request: NextRequest) {
         "/api/v1/feedback",
         200,
         processingTime,
-        { match_id, feedback, comment: comment ? "[provided]" : null },
-        { feedback_id: updatedFeedback.id, action: "updated" }
+        { matchId, feedback, comment: comment ? "[provided]" : null },
+        { feedbackId: updatedFeedback.id, action: "updated" }
       )
 
       return NextResponse.json({
         success: true,
-        request_id: requestId,
+        requestId,
         data: {
-          feedback_id: updatedFeedback.id,
-          match_id,
-          persona_id: matchResult.persona.id,
-          persona_name: matchResult.persona.name,
+          feedbackId: updatedFeedback.id,
+          matchId,
+          personaId: matchResult.persona.id,
+          personaName: matchResult.persona.name,
           feedback,
           comment: comment || null,
-          updated_at: updatedFeedback.createdAt.toISOString(),
+          updatedAt: updatedFeedback.createdAt.toISOString(),
         },
         meta: {
           action: "updated",
-          processing_time_ms: processingTime,
+          processingTimeMs: processingTime,
         },
       })
     }
@@ -201,26 +201,26 @@ export async function POST(request: NextRequest) {
       "/api/v1/feedback",
       201,
       processingTime,
-      { match_id, feedback, comment: comment ? "[provided]" : null },
-      { feedback_id: newFeedback.id, action: "created" }
+      { matchId, feedback, comment: comment ? "[provided]" : null },
+      { feedbackId: newFeedback.id, action: "created" }
     )
 
     return NextResponse.json(
       {
         success: true,
-        request_id: requestId,
+        requestId,
         data: {
-          feedback_id: newFeedback.id,
-          match_id,
-          persona_id: matchResult.persona.id,
-          persona_name: matchResult.persona.name,
+          feedbackId: newFeedback.id,
+          matchId,
+          personaId: matchResult.persona.id,
+          personaName: matchResult.persona.name,
           feedback,
           comment: comment || null,
-          created_at: newFeedback.createdAt.toISOString(),
+          createdAt: newFeedback.createdAt.toISOString(),
         },
         meta: {
           action: "created",
-          processing_time_ms: processingTime,
+          processingTimeMs: processingTime,
         },
       },
       { status: 201 }
@@ -237,8 +237,8 @@ export async function POST(request: NextRequest) {
           code: "INTERNAL_ERROR",
           message: "An error occurred while submitting feedback",
         },
-        request_id: requestId,
-        processing_time_ms: processingTime,
+        requestId,
+        processingTimeMs: processingTime,
       },
       { status: 500 }
     )
@@ -264,25 +264,25 @@ export async function GET(request: NextRequest) {
             code: validation.error?.code || "UNAUTHORIZED",
             message: validation.error?.message || "Invalid API key",
           },
-          request_id: requestId,
+          requestId,
         },
         { status: 401 }
       )
     }
 
     const { searchParams } = new URL(request.url)
-    const matchId = searchParams.get("match_id")
+    const matchId = searchParams.get("matchId")
 
-    // Validate match_id
+    // Validate matchId
     if (!matchId) {
       return NextResponse.json(
         {
           success: false,
           error: {
             code: "MISSING_MATCH_ID",
-            message: "match_id query parameter is required",
+            message: "matchId query parameter is required",
           },
-          request_id: requestId,
+          requestId,
         },
         { status: 400 }
       )
@@ -308,9 +308,9 @@ export async function GET(request: NextRequest) {
           success: false,
           error: {
             code: "MATCH_NOT_FOUND",
-            message: "Match result not found with the given match_id",
+            message: "Match result not found with the given matchId",
           },
-          request_id: requestId,
+          requestId,
         },
         { status: 404 }
       )
@@ -326,38 +326,38 @@ export async function GET(request: NextRequest) {
       "/api/v1/feedback",
       200,
       processingTime,
-      { match_id: matchId },
-      { has_feedback: !!matchResult.feedback }
+      { matchId },
+      { hasFeedback: !!matchResult.feedback }
     )
 
     if (!matchResult.feedback) {
       return NextResponse.json({
         success: true,
-        request_id: requestId,
+        requestId,
         data: null,
         meta: {
-          match_id: matchId,
-          has_feedback: false,
-          processing_time_ms: processingTime,
+          matchId,
+          hasFeedback: false,
+          processingTimeMs: processingTime,
         },
       })
     }
 
     return NextResponse.json({
       success: true,
-      request_id: requestId,
+      requestId,
       data: {
-        feedback_id: matchResult.feedback.id,
-        match_id: matchId,
-        persona_id: matchResult.persona.id,
-        persona_name: matchResult.persona.name,
+        feedbackId: matchResult.feedback.id,
+        matchId,
+        personaId: matchResult.persona.id,
+        personaName: matchResult.persona.name,
         feedback: matchResult.feedback.feedback.toLowerCase(),
         comment: matchResult.feedback.comment,
-        created_at: matchResult.feedback.createdAt.toISOString(),
+        createdAt: matchResult.feedback.createdAt.toISOString(),
       },
       meta: {
-        has_feedback: true,
-        processing_time_ms: processingTime,
+        hasFeedback: true,
+        processingTimeMs: processingTime,
       },
     })
   } catch (error) {
@@ -372,8 +372,8 @@ export async function GET(request: NextRequest) {
           code: "INTERNAL_ERROR",
           message: "An error occurred while fetching feedback",
         },
-        request_id: requestId,
-        processing_time_ms: processingTime,
+        requestId,
+        processingTimeMs: processingTime,
       },
       { status: 500 }
     )

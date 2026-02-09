@@ -7,7 +7,7 @@ import type { PersonaVector } from "@deepsight/shared-types"
 import type { Persona } from "@prisma/client"
 
 type MatchResult = {
-  persona_id: string
+  personaId: string
   name: string
   category: string
   score: number
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
             code: validation.error?.code || "UNAUTHORIZED",
             message: validation.error?.message || "Invalid API key",
           },
-          request_id: requestId,
+          requestId,
         },
         { status: 401 }
       )
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
             code: "INVALID_CONTENTS",
             message: "contents is required and must be an array",
           },
-          request_id: requestId,
+          requestId,
         },
         { status: 400 }
       )
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
             code: "EMPTY_CONTENTS",
             message: "contents array must not be empty",
           },
-          request_id: requestId,
+          requestId,
         },
         { status: 400 }
       )
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
             code: "TOO_MANY_CONTENTS",
             message: "contents array must not exceed 100 items",
           },
-          request_id: requestId,
+          requestId,
         },
         { status: 400 }
       )
@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
               code: "INVALID_CONTENT",
               message: `content at index ${i} must be a string`,
             },
-            request_id: requestId,
+            requestId,
           },
           { status: 400 }
         )
@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
               code: "CONTENT_TOO_SHORT",
               message: `content at index ${i} must be at least 10 characters`,
             },
-            request_id: requestId,
+            requestId,
           },
           { status: 400 }
         )
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
               code: "CONTENT_TOO_LONG",
               message: `content at index ${i} must not exceed 10,000 characters`,
             },
-            request_id: requestId,
+            requestId,
           },
           { status: 400 }
         )
@@ -212,18 +212,18 @@ export async function POST(request: NextRequest) {
       const matches = personas
         .map((persona: Persona) => {
           const personaVector: PersonaVector = {
-            depth: persona.depth,
-            lens: persona.lens,
-            stance: persona.stance,
-            scope: persona.scope,
-            taste: persona.taste,
-            purpose: persona.purpose,
+            depth: Number(persona.depth),
+            lens: Number(persona.lens),
+            stance: Number(persona.stance),
+            scope: Number(persona.scope),
+            taste: Number(persona.taste),
+            purpose: Number(persona.purpose),
           }
 
           const score = cosineSimilarity(contentVector, personaVector)
 
           return {
-            persona_id: persona.id,
+            personaId: persona.id,
             name: persona.name,
             category: persona.category || "General",
             score: Math.round(score * 1000) / 1000,
@@ -255,15 +255,15 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      request_id: requestId,
+      requestId,
       data: {
         results,
       },
       meta: {
-        total_contents: contents.length,
+        totalContents: contents.length,
         limit,
-        threshold_applied: threshold,
-        processing_time_ms: processingTime,
+        thresholdApplied: threshold,
+        processingTimeMs: processingTime,
       },
     })
   } catch (error) {
@@ -278,8 +278,8 @@ export async function POST(request: NextRequest) {
           code: "INTERNAL_ERROR",
           message: "An error occurred while processing the batch match request",
         },
-        request_id: requestId,
-        processing_time_ms: processingTime,
+        requestId,
+        processingTimeMs: processingTime,
       },
       { status: 500 }
     )

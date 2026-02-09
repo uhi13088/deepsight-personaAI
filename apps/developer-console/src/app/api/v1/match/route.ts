@@ -7,7 +7,7 @@ import type { PersonaVector } from "@deepsight/shared-types"
 import type { Persona } from "@prisma/client"
 
 type MatchResult = {
-  persona_id: string
+  personaId: string
   name: string
   category: string
   score: number
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
             code: validation.error?.code || "UNAUTHORIZED",
             message: validation.error?.message || "Invalid API key",
           },
-          request_id: requestId,
+          requestId,
         },
         { status: 401 }
       )
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
             code: "INVALID_CONTENT",
             message: "Content is required and must be a string",
           },
-          request_id: requestId,
+          requestId,
         },
         { status: 400 }
       )
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
             code: "CONTENT_TOO_SHORT",
             message: "Content must be at least 10 characters",
           },
-          request_id: requestId,
+          requestId,
         },
         { status: 400 }
       )
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
             code: "CONTENT_TOO_LONG",
             message: "Content must not exceed 10,000 characters",
           },
-          request_id: requestId,
+          requestId,
         },
         { status: 400 }
       )
@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
 
     const limit = Math.min(Math.max(options.limit || 5, 1), 20)
     const threshold = Math.max(Math.min(options.threshold || 0.0, 1.0), 0.0)
-    const includeScores = options.include_scores !== false
+    const includeScores = options.includeScores !== false
 
     // Analyze content to get a content vector
     const contentVector = analyzeContent(content)
@@ -187,30 +187,34 @@ export async function POST(request: NextRequest) {
     const matches = personas
       .map((persona: Persona) => {
         const personaVector: PersonaVector = {
-          depth: persona.depth,
-          lens: persona.lens,
-          stance: persona.stance,
-          scope: persona.scope,
-          taste: persona.taste,
-          purpose: persona.purpose,
+          depth: Number(persona.depth),
+          lens: Number(persona.lens),
+          stance: Number(persona.stance),
+          scope: Number(persona.scope),
+          taste: Number(persona.taste),
+          purpose: Number(persona.purpose),
         }
 
         const score = cosineSimilarity(contentVector, personaVector)
 
         return {
-          persona_id: persona.id,
+          personaId: persona.id,
           name: persona.name,
           category: persona.category || "General",
           score: Math.round(score * 1000) / 1000,
           dimensions: includeScores
             ? {
-                depth: Math.round(Math.abs(contentVector.depth - persona.depth) * 1000) / 1000,
-                lens: Math.round(Math.abs(contentVector.lens - persona.lens) * 1000) / 1000,
-                stance: Math.round(Math.abs(contentVector.stance - persona.stance) * 1000) / 1000,
-                scope: Math.round(Math.abs(contentVector.scope - persona.scope) * 1000) / 1000,
-                taste: Math.round(Math.abs(contentVector.taste - persona.taste) * 1000) / 1000,
+                depth:
+                  Math.round(Math.abs(contentVector.depth - personaVector.depth) * 1000) / 1000,
+                lens: Math.round(Math.abs(contentVector.lens - personaVector.lens) * 1000) / 1000,
+                stance:
+                  Math.round(Math.abs(contentVector.stance - personaVector.stance) * 1000) / 1000,
+                scope:
+                  Math.round(Math.abs(contentVector.scope - personaVector.scope) * 1000) / 1000,
+                taste:
+                  Math.round(Math.abs(contentVector.taste - personaVector.taste) * 1000) / 1000,
                 purpose:
-                  Math.round(Math.abs(contentVector.purpose - persona.purpose) * 1000) / 1000,
+                  Math.round(Math.abs(contentVector.purpose - personaVector.purpose) * 1000) / 1000,
               }
             : undefined,
         }
@@ -232,7 +236,7 @@ export async function POST(request: NextRequest) {
             requestId,
             content: content.slice(0, 5000), // Truncate for storage
             contentHash,
-            personaId: matches[0].persona_id,
+            personaId: matches[0].personaId,
             score: matches[0].score,
             depthScore: matches[0].dimensions?.depth,
             lensScore: matches[0].dimensions?.lens,
@@ -260,16 +264,16 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      request_id: requestId,
+      requestId,
       data: {
         matches,
-        content_vector: includeScores ? contentVector : undefined,
+        contentVector: includeScores ? contentVector : undefined,
       },
       meta: {
-        content_length: content.length,
-        matches_found: matches.length,
-        threshold_applied: threshold,
-        processing_time_ms: processingTime,
+        contentLength: content.length,
+        matchesFound: matches.length,
+        thresholdApplied: threshold,
+        processingTimeMs: processingTime,
       },
     })
   } catch (error) {
@@ -284,8 +288,8 @@ export async function POST(request: NextRequest) {
           code: "INTERNAL_ERROR",
           message: "An error occurred while processing the match request",
         },
-        request_id: requestId,
-        processing_time_ms: processingTime,
+        requestId,
+        processingTimeMs: processingTime,
       },
       { status: 500 }
     )

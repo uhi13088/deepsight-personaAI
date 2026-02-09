@@ -48,13 +48,13 @@ model Account {
   type                String
   provider            String
   providerAccountId   String
-  refresh_token       String? @db.Text
-  access_token        String? @db.Text
-  expires_at          Int?
-  token_type          String?
+  refreshToken        String? @map("refresh_token") @db.Text
+  accessToken         String? @map("access_token") @db.Text
+  expiresAt           Int?    @map("expires_at")
+  tokenType           String? @map("token_type")
   scope               String?
-  id_token            String? @db.Text
-  session_state       String?
+  idToken             String? @map("id_token") @db.Text
+  sessionState        String? @map("session_state")
 
   user                User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -343,12 +343,12 @@ model Persona {
   profileImageUrl     String?
 
   // === 6D Vector dimensions ===
-  depth               Float         @default(0) // 분석 깊이: 직관적(0.0) ↔ 심층적(1.0)
-  lens                Float         @default(0) // 판단 렌즈: 감성적(0.0) ↔ 논리적(1.0)
-  stance              Float         @default(0) // 평가 태도: 수용적(0.0) ↔ 비판적(1.0)
-  scope               Float         @default(0) // 관심 범위: 핵심만(0.0) ↔ 디테일(1.0)
-  taste               Float         @default(0) // 취향 성향: 클래식(0.0) ↔ 실험적(1.0)
-  purpose             Float         @default(0) // 소비 목적: 오락(0.0) ↔ 의미추구(1.0)
+  depth               Decimal       @default(0) @db.Decimal(3, 2) // 분석 깊이: 직관적(0.0) ↔ 심층적(1.0)
+  lens                Decimal       @default(0) @db.Decimal(3, 2) // 판단 렌즈: 감성적(0.0) ↔ 논리적(1.0)
+  stance              Decimal       @default(0) @db.Decimal(3, 2) // 평가 태도: 수용적(0.0) ↔ 비판적(1.0)
+  scope               Decimal       @default(0) @db.Decimal(3, 2) // 관심 범위: 핵심만(0.0) ↔ 디테일(1.0)
+  taste               Decimal       @default(0) @db.Decimal(3, 2) // 취향 성향: 클래식(0.0) ↔ 실험적(1.0)
+  purpose             Decimal       @default(0) @db.Decimal(3, 2) // 소비 목적: 오락(0.0) ↔ 의미추구(1.0)
 
   // === Layer 2: 캐릭터 속성 ===
   handle              String?       // SNS 핸들 (@yuna_feels)
@@ -356,7 +356,7 @@ model Persona {
   birthDate           DateTime?     // 생년월일
   country             String?       @default("KR") // 국가 코드
   region              String?       // 지역
-  warmth              Float?        // 표현 온도 0.0~1.0
+  warmth              Decimal?      @db.Decimal(3, 2) // 표현 온도 0.0~1.0
   expertiseLevel      ExpertiseLevel @default(ENTHUSIAST)
   speechPatterns      String[]      @default([]) // 말버릇
   quirks              String[]      @default([]) // 특이 습관
@@ -366,10 +366,10 @@ model Persona {
   viewingHabits       String?       // 시청 습관
 
   // === 활동성 속성 (PersonaWorld용) ===
-  sociability         Float?        // 사교성 0.0~1.0
-  initiative          Float?        // 주도성 0.0~1.0
-  expressiveness      Float?        // 표현력 0.0~1.0
-  interactivity       Float?        // 친화력 0.0~1.0
+  sociability         Decimal?      @db.Decimal(3, 2) // 사교성 0.0~1.0
+  initiative          Decimal?      @db.Decimal(3, 2) // 주도성 0.0~1.0
+  expressiveness      Decimal?      @db.Decimal(3, 2) // 표현력 0.0~1.0
+  interactivity       Decimal?      @db.Decimal(3, 2) // 친화력 0.0~1.0
   postFrequency       PostFrequency @default(MODERATE)
   timezone            String        @default("Asia/Seoul")
   activeHours         Int[]         @default([]) // 활동 시간대
@@ -390,8 +390,8 @@ model Persona {
 
   // === 품질 및 상태 ===
   status              PersonaStatus @default(ACTIVE)
-  qualityScore        Float?
-  consistencyScore    Float?
+  qualityScore        Decimal?      @db.Decimal(5, 2)
+  consistencyScore    Decimal?      @db.Decimal(3, 2)
   source              PersonaSource @default(MANUAL)
   generationConfig    Json?         // 자동 생성 시 설정
   sampleContents      Json?         // 자동 생성된 샘플

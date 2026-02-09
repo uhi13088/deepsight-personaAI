@@ -77,10 +77,10 @@ const endpoints = [
     name: "Matching — 유저-페르소나 매칭",
     description: "유저 프로필에 최적화된 페르소나를 매칭합니다",
     defaultBody: {
-      profile_id: "prof_abc123",
+      profileId: "prof_abc123",
       options: {
         limit: 5,
-        diversity_factor: 0.3,
+        diversityFactor: 0.3,
       },
     },
   },
@@ -91,9 +91,9 @@ const endpoints = [
     name: "Recommendation — 콘텐츠 추천",
     description: "매칭된 페르소나가 유저에게 콘텐츠를 추천하고 이유를 설명합니다",
     defaultBody: {
-      persona_id: "persona_movie_reviewer",
-      profile_id: "prof_abc123",
-      content_type: "movie",
+      personaId: "persona_movie_reviewer",
+      profileId: "prof_abc123",
+      contentType: "movie",
       limit: 5,
     },
   },
@@ -104,7 +104,7 @@ const endpoints = [
     name: "Evaluation — 콘텐츠 평가",
     description: "페르소나 관점에서 특정 콘텐츠를 리뷰하고 분석합니다",
     defaultBody: {
-      persona_id: "persona_movie_reviewer",
+      personaId: "persona_movie_reviewer",
       content: {
         title: "기생충",
         type: "movie",
@@ -119,7 +119,7 @@ const endpoints = [
     name: "Feedback — 결과 피드백",
     description: "추천/평가 결과에 대한 피드백을 제출합니다",
     defaultBody: {
-      reference_id: "rec_xyz789",
+      referenceId: "rec_xyz789",
       type: "recommendation",
       feedback: "positive",
       comment: "추천 결과가 정확합니다.",
@@ -147,7 +147,7 @@ const sampleResponses: Record<string, object> = {
       ],
       total: 24,
       page: 1,
-      per_page: 10,
+      perPage: 10,
     },
   },
   "catalog-detail": {
@@ -166,20 +166,20 @@ const sampleResponses: Record<string, object> = {
     data: {
       id: "prof_abc123",
       traits: { depth: 0.82, lens: 0.75, stance: 0.6, scope: 0.7, taste: 0.88, purpose: 0.65 },
-      schema_version: "1.0",
-      method: "cold_start",
-      created_at: "2025-01-15T09:30:00Z",
+      schemaVersion: "1.0",
+      method: "coldStart",
+      createdAt: "2025-01-15T09:30:00Z",
     },
   },
   matching: {
     success: true,
     data: {
       matches: [
-        { persona_id: "persona_movie_reviewer", name: "감성 시네필", score: 0.94 },
-        { persona_id: "persona_book_critic", name: "날카로운 독서가", score: 0.87 },
+        { personaId: "persona_movie_reviewer", name: "감성 시네필", score: 0.94 },
+        { personaId: "persona_book_critic", name: "날카로운 독서가", score: 0.87 },
       ],
-      profile_id: "prof_abc123",
-      processing_time_ms: 120,
+      profileId: "prof_abc123",
+      processingTimeMs: 120,
     },
   },
   recommendation: {
@@ -193,8 +193,8 @@ const sampleResponses: Record<string, object> = {
         },
         { title: "인터스텔라", type: "movie", reason: "감정선과 SF 요소가 균형 잡혀 있습니다" },
       ],
-      persona_id: "persona_movie_reviewer",
-      profile_id: "prof_abc123",
+      personaId: "persona_movie_reviewer",
+      profileId: "prof_abc123",
     },
   },
   evaluation: {
@@ -207,13 +207,13 @@ const sampleResponses: Record<string, object> = {
         strengths: ["촘촘한 서사 구조", "상징적 미장센", "배우들의 호연"],
         considerations: ["장르 혼합에 대한 호불호"],
       },
-      persona_id: "persona_movie_reviewer",
+      personaId: "persona_movie_reviewer",
     },
   },
   feedback: {
     success: true,
     data: {
-      feedback_id: "fb_xyz789",
+      feedbackId: "fb_xyz789",
       message: "Feedback submitted successfully",
     },
   },

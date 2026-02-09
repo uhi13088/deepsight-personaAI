@@ -18,7 +18,7 @@ export interface DeepSightConfig {
 export interface MatchOptions {
   limit?: number
   threshold?: number
-  include_scores?: boolean
+  includeScores?: boolean
 }
 
 export interface MatchDimensions {
@@ -31,7 +31,7 @@ export interface MatchDimensions {
 }
 
 export interface MatchItem {
-  persona_id: string
+  personaId: string
   name: string
   category: string
   score: number
@@ -40,16 +40,16 @@ export interface MatchItem {
 
 export interface MatchResponse {
   success: boolean
-  request_id: string
+  requestId: string
   data: {
     matches: MatchItem[]
-    content_vector?: PersonaVector
+    contentVector?: PersonaVector
   }
   meta: {
-    content_length: number
-    matches_found: number
-    threshold_applied: number
-    processing_time_ms: number
+    contentLength: number
+    matchesFound: number
+    thresholdApplied: number
+    processingTimeMs: number
   }
 }
 
@@ -65,13 +65,13 @@ export interface BatchMatchItem {
 
 export interface BatchMatchResponse {
   success: boolean
-  request_id: string
+  requestId: string
   data: {
     results: BatchMatchItem[]
   }
   meta: {
-    total_contents: number
-    processing_time_ms: number
+    totalContents: number
+    processingTimeMs: number
   }
 }
 
@@ -105,7 +105,7 @@ export interface PersonaListResponse {
     total: number
     page: number
     limit: number
-    has_more: boolean
+    hasMore: boolean
   }
 }
 
@@ -117,16 +117,16 @@ export interface PersonaGetResponse {
 }
 
 export interface FeedbackData {
-  match_id?: string
-  request_id?: string
-  persona_id: string
+  matchId?: string
+  requestId?: string
+  personaId: string
   feedback: "positive" | "negative" | "neutral"
   comment?: string
 }
 
 export interface FeedbackResponse {
   success: boolean
-  feedback_id: string
+  feedbackId: string
   message: string
 }
 
@@ -136,7 +136,7 @@ export interface ApiError {
     code: string
     message: string
   }
-  request_id?: string
+  requestId?: string
 }
 
 // ============================================
@@ -211,7 +211,7 @@ export class DeepSight {
         throw new DeepSightError(
           data.error?.code || "REQUEST_FAILED",
           data.error?.message || `Request failed with status ${response.status}`,
-          data.request_id
+          data.requestId
         )
       }
 
@@ -324,8 +324,8 @@ class FeedbackClient {
    * @example
    * ```typescript
    * const result = await client.feedback.submit({
-   *   request_id: "req_abc123",
-   *   persona_id: "persona_xyz",
+   *   requestId: "req_abc123",
+   *   personaId: "persona_xyz",
    *   feedback: "positive",
    *   comment: "Great match!"
    * });

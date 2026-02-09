@@ -21,4 +21,8 @@
 - [2026-02-03] 테스트: mocking 시 vi.mock보다 dependency injection 우선
 -->
 
-(아직 없음 - 사용자 수정 지시 시 자동 기록)
+- [2026-02-09] 네이밍: Prisma 필드는 camelCase + `@map("snake_case")` 패턴 사용. snake_case 필드명 직접 사용 금지
+- [2026-02-09] 네이밍: 6D 벡터 타입은 전 앱에서 `Decimal @db.Decimal(3, 2)` 통일. Float 사용 금지
+- [2026-02-09] 네이밍: TypeScript 코드 전체 camelCase 통일 (API 응답 JSON 키 포함)
+- [2026-02-09] 네이밍: Prisma Decimal → number 변환 시 반드시 `Number()` 래핑 (산술 연산 전)
+- [2026-02-09] 프로세스: 작업 시작 전 사용자에게 계획 공유하고 승인 받을 것
