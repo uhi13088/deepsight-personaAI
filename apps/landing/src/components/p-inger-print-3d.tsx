@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useMemo } from "react"
+import { useRef, useMemo, useEffect } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { OrbitControls, Environment } from "@react-three/drei"
 import * as THREE from "three"
@@ -18,8 +18,8 @@ interface PingerPrint3DProps {
 }
 
 /**
- * 6D 벡터값에 따라 구체 표면을 변형하는 셰이더 머티리얼
- * 각 차원이 특정 방향의 돌기/함몰을 생성 (세포/아메바 형태)
+ * 부드러운 유기적 형태 + 알루미늄 아노다이징 질감
+ * 6D 벡터값에 따라 구체가 자연스러운 pebble/제품 형태로 변형
  */
 const vertexShader = `
   uniform float uDepth;
@@ -32,9 +32,10 @@ const vertexShader = `
 
   varying vec3 vNormal;
   varying vec3 vPosition;
+  varying vec3 vWorldNormal;
   varying float vDisplacement;
 
-  // 3D 심플렉스 노이즈 근사
+  // 3D simplex noise
   vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec4 permute(vec4 x) { return mod289(((x * 34.0) + 1.0) * x); }
@@ -86,38 +87,36 @@ const vertexShader = `
   void main() {
     vec3 pos = position;
     vec3 dir = normalize(pos);
-    float t = uTime * 0.3;
+    float t = uTime * 0.12;
 
-    // 각 6D 차원이 특정 축 방향으로 변형
-    // depth: Y축(상하) 돌기 — 높을수록 뾰족
-    float dDepth = uDepth * 0.35 * pow(max(dot(dir, vec3(0.0, 1.0, 0.0)), 0.0), 2.0 + (1.0 - uDepth) * 3.0);
+    // 부드러운 구형 조화(spherical harmonics) 기반 변형
+    // depth: Y축 살짝 늘림/찌그러트림
+    float d = uDepth * 0.1 * (dir.y * dir.y - 0.33);
 
-    // lens: X축(좌우) 변형
-    float dLens = uLens * 0.3 * pow(max(dot(dir, vec3(1.0, 0.0, 0.0)), 0.0), 2.0 + (1.0 - uLens) * 3.0);
+    // lens: X축 늘림
+    d += uLens * 0.09 * (dir.x * dir.x - 0.33);
 
-    // stance: Z축(전후) 변형
-    float dStance = uStance * 0.3 * pow(max(dot(dir, vec3(0.0, 0.0, 1.0)), 0.0), 2.0 + (1.0 - uStance) * 3.0);
+    // stance: Z축 늘림
+    d += uStance * 0.08 * (dir.z * dir.z - 0.33);
 
-    // scope: 대각선 돌기들
-    float dScope = uScope * 0.25 * pow(max(dot(dir, normalize(vec3(1.0, 1.0, 0.0))), 0.0), 3.0);
-    dScope += uScope * 0.25 * pow(max(dot(dir, normalize(vec3(-1.0, -1.0, 0.0))), 0.0), 3.0);
+    // scope: 안장(saddle) 변형 — 유기적 비대칭
+    d += uScope * 0.07 * dir.x * dir.y;
+    d += uScope * 0.05 * dir.y * dir.z;
 
-    // taste: 유기적 노이즈 변형 (불규칙 울퉁불퉁)
-    float dTaste = uTaste * 0.2 * snoise(pos * 2.5 + t);
+    // taste: 부드러운 저주파 노이즈 (유기적 울렁임)
+    d += uTaste * 0.07 * snoise(pos * 1.2 + t);
 
-    // purpose: 저주파 맥동 (부드럽게 숨쉬는 느낌)
-    float dPurpose = uPurpose * 0.1 * sin(t * 0.8) * snoise(pos * 1.2);
+    // purpose: 매우 느린 맥동
+    d += uPurpose * 0.03 * sin(t * 0.4) * (0.5 + 0.5 * snoise(pos * 0.8));
 
-    float totalDisplacement = dDepth + dLens + dStance + dScope + dTaste + dPurpose;
+    // 기본 미세 텍스처 (제품 표면의 아주 미세한 울퉁)
+    d += snoise(pos * 1.8 + t * 0.15) * 0.012;
 
-    // 기본 유기적 노이즈 (세포막 텍스처)
-    float baseNoise = snoise(pos * 3.0 + t * 0.5) * 0.05;
-    totalDisplacement += baseNoise;
+    pos += dir * d;
 
-    pos += dir * totalDisplacement;
-
-    vDisplacement = totalDisplacement;
+    vDisplacement = d;
     vNormal = normalMatrix * normal;
+    vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
     vPosition = (modelViewMatrix * vec4(pos, 1.0)).xyz;
 
     gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
@@ -135,42 +134,62 @@ const fragmentShader = `
 
   varying vec3 vNormal;
   varying vec3 vPosition;
+  varying vec3 vWorldNormal;
   varying float vDisplacement;
 
   void main() {
-    vec3 normal = normalize(vNormal);
-    vec3 viewDir = normalize(-vPosition);
+    vec3 N = normalize(vNormal);
+    vec3 V = normalize(-vPosition);
 
-    // 프레넬 효과 (가장자리 글로우)
-    float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 2.5);
+    // === 아노다이징 컬러 계산 (6D 기반) ===
+    float ct = clamp(vDisplacement * 5.0 + 0.5, 0.0, 1.0);
+    vec3 anodizeColor;
+    if (ct < 0.2) anodizeColor = mix(uColor1, uColor2, ct * 5.0);
+    else if (ct < 0.4) anodizeColor = mix(uColor2, uColor3, (ct - 0.2) * 5.0);
+    else if (ct < 0.6) anodizeColor = mix(uColor3, uColor4, (ct - 0.4) * 5.0);
+    else if (ct < 0.8) anodizeColor = mix(uColor4, uColor5, (ct - 0.6) * 5.0);
+    else anodizeColor = mix(uColor5, uColor6, (ct - 0.8) * 5.0);
 
-    // displacement 기반 색상 혼합 (6D 각 차원 컬러)
-    float t = vDisplacement * 3.0 + 0.5;
-    vec3 color;
-    if (t < 0.2) color = mix(uColor1, uColor2, t * 5.0);
-    else if (t < 0.4) color = mix(uColor2, uColor3, (t - 0.2) * 5.0);
-    else if (t < 0.6) color = mix(uColor3, uColor4, (t - 0.4) * 5.0);
-    else if (t < 0.8) color = mix(uColor4, uColor5, (t - 0.6) * 5.0);
-    else color = mix(uColor5, uColor6, (t - 0.8) * 5.0);
+    // === 알루미늄 베이스 ===
+    vec3 metalBase = vec3(0.82, 0.84, 0.88);
+    // 아노다이징: 금속 위에 컬러 틴트 (60% 투과)
+    vec3 baseColor = mix(metalBase, anodizeColor, 0.55);
 
-    // 기본 라이팅
-    vec3 lightDir = normalize(vec3(1.0, 1.5, 2.0));
-    float diffuse = max(dot(normal, lightDir), 0.0) * 0.6 + 0.4;
+    // === 3-라이트 프로덕트 라이팅 ===
+    vec3 L1 = normalize(vec3(1.5, 2.0, 3.0));   // 메인 키라이트
+    vec3 L2 = normalize(vec3(-2.0, 0.5, 1.0));   // 필 라이트
+    vec3 L3 = normalize(vec3(0.0, -1.0, 2.0));   // 림 라이트
 
-    // 스펙큘러
-    vec3 halfDir = normalize(lightDir + viewDir);
-    float specular = pow(max(dot(normal, halfDir), 0.0), 32.0) * 0.3;
+    // Diffuse (부드러운 램버트)
+    float d1 = max(dot(N, L1), 0.0);
+    float d2 = max(dot(N, L2), 0.0) * 0.35;
+    float d3 = max(dot(N, L3), 0.0) * 0.15;
+    float diffuse = d1 * 0.5 + d2 + d3 + 0.3; // 높은 ambient
 
-    // 프레넬 글로우 (가장자리에 밝은 색상)
-    vec3 fresnelColor = mix(uColor1, uColor6, 0.5);
+    // Specular (알루미늄: 날카로운 하이라이트)
+    vec3 H1 = normalize(L1 + V);
+    vec3 H2 = normalize(L2 + V);
+    float s1 = pow(max(dot(N, H1), 0.0), 120.0) * 0.7;
+    float s2 = pow(max(dot(N, H2), 0.0), 80.0) * 0.25;
 
-    vec3 finalColor = color * diffuse + specular + fresnel * fresnelColor * 0.4;
+    // Fresnel (금속 가장자리 반사)
+    float fresnel = pow(1.0 - max(dot(N, V), 0.0), 4.0);
 
-    // 서브서피스 스캐터링 근사 (세포 느낌)
-    float sss = pow(max(dot(-normal, lightDir), 0.0), 2.0) * 0.15;
-    finalColor += color * sss;
+    // === 최종 합성 ===
+    vec3 finalColor = baseColor * diffuse;
 
-    gl_FragColor = vec4(finalColor, 0.92 + fresnel * 0.08);
+    // 금속 스펙큘러: 반사광도 베이스 컬러에 의해 틴트됨
+    finalColor += baseColor * s1 + vec3(0.95) * s2 * 0.4;
+
+    // 엣지 리플렉션 (환경 반사 시뮬레이션)
+    vec3 envReflect = mix(baseColor, vec3(1.0), 0.4);
+    finalColor += envReflect * fresnel * 0.3;
+
+    // 미세한 브러시드 텍스처 (양극산화 알루미늄의 미세 결)
+    float micro = 1.0 + sin(vWorldNormal.y * 80.0 + vWorldNormal.x * 40.0) * 0.008;
+    finalColor *= micro;
+
+    gl_FragColor = vec4(finalColor, 1.0);
   }
 `
 
@@ -181,9 +200,8 @@ function hexToVec3(hex: string): THREE.Vector3 {
   return new THREE.Vector3(r, g, b)
 }
 
-function CellSphere({ data }: { data: Record<string, number> }) {
+function ProductSphere({ data }: { data: Record<string, number> }) {
   const meshRef = useRef<THREE.Mesh>(null)
-
   const dimensions = useMemo(() => TRAIT_DIMENSIONS.filter((d) => d.key in data), [data])
 
   const uniforms = useMemo(
@@ -202,14 +220,35 @@ function CellSphere({ data }: { data: Record<string, number> }) {
       uColor5: { value: hexToVec3(dimensions[4]?.color.primary ?? "#8B5CF6") },
       uColor6: { value: hexToVec3(dimensions[5]?.color.primary ?? "#EC4899") },
     }),
-    [data, dimensions]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   )
+
+  // 페르소나 전환 시 uniform 값 업데이트
+  useEffect(() => {
+    if (!meshRef.current) return
+    const mat = meshRef.current.material as THREE.ShaderMaterial
+    mat.uniforms.uDepth.value = data.depth ?? 0.5
+    mat.uniforms.uLens.value = data.lens ?? 0.5
+    mat.uniforms.uStance.value = data.stance ?? 0.5
+    mat.uniforms.uScope.value = data.scope ?? 0.5
+    mat.uniforms.uTaste.value = data.taste ?? 0.5
+    mat.uniforms.uPurpose.value = data.purpose ?? 0.5
+
+    const colors = dimensions.map((d) => hexToVec3(d.color.primary))
+    if (colors[0]) mat.uniforms.uColor1.value = colors[0]
+    if (colors[1]) mat.uniforms.uColor2.value = colors[1]
+    if (colors[2]) mat.uniforms.uColor3.value = colors[2]
+    if (colors[3]) mat.uniforms.uColor4.value = colors[3]
+    if (colors[4]) mat.uniforms.uColor5.value = colors[4]
+    if (colors[5]) mat.uniforms.uColor6.value = colors[5]
+  }, [data, dimensions])
 
   useFrame((state) => {
     if (meshRef.current) {
-      const material = meshRef.current.material as THREE.ShaderMaterial
-      material.uniforms.uTime.value = state.clock.elapsedTime
-      meshRef.current.rotation.y += 0.003
+      const mat = meshRef.current.material as THREE.ShaderMaterial
+      mat.uniforms.uTime.value = state.clock.elapsedTime
+      meshRef.current.rotation.y += 0.002
     }
   })
 
@@ -220,7 +259,6 @@ function CellSphere({ data }: { data: Record<string, number> }) {
         vertexShader={vertexShader}
         fragmentShader={fragmentShader}
         uniforms={uniforms}
-        transparent
       />
     </mesh>
   )
@@ -228,7 +266,7 @@ function CellSphere({ data }: { data: Record<string, number> }) {
 
 export function PingerPrint3D({
   data,
-  size = 280,
+  size = 200,
   autoRotate = true,
   showLabel = true,
 }: PingerPrint3DProps) {
@@ -236,20 +274,22 @@ export function PingerPrint3D({
     <div className="inline-flex flex-col items-center gap-2">
       <div style={{ width: size, height: size }}>
         <Canvas
-          camera={{ position: [0, 0, 2.8], fov: 45 }}
+          camera={{ position: [0, 0.2, 2.6], fov: 40 }}
           gl={{ antialias: true, alpha: true }}
           style={{ background: "transparent" }}
         >
-          <ambientLight intensity={0.4} />
-          <directionalLight position={[2, 3, 4]} intensity={0.8} />
-          <directionalLight position={[-2, -1, -3]} intensity={0.3} color="#667eea" />
-          <CellSphere data={data} />
+          <ambientLight intensity={0.5} />
+          <directionalLight position={[3, 4, 5]} intensity={1.0} />
+          <directionalLight position={[-3, 1, 2]} intensity={0.4} color="#e8ecf4" />
+          <directionalLight position={[0, -2, 3]} intensity={0.2} color="#f0f0f5" />
+          <ProductSphere data={data} />
           <OrbitControls
             enableZoom={false}
             enablePan={false}
             autoRotate={autoRotate}
-            autoRotateSpeed={1.5}
+            autoRotateSpeed={0.8}
           />
+          <Environment preset="studio" />
         </Canvas>
       </div>
       {showLabel && <span className="text-xs font-medium text-gray-400">3D P-inger Print</span>}
