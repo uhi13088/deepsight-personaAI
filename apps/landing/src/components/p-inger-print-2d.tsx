@@ -143,7 +143,7 @@ export function PingerPrint2D({ data, size = 240, showLabel = true }: PingerPrin
           {/* 방사형 페이드 */}
           <radialGradient id={`pp2d-fade-${uid}`} cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor="white" stopOpacity="1" />
-            <stop offset="70%" stopColor="white" stopOpacity="1" />
+            <stop offset="85%" stopColor="white" stopOpacity="1" />
             <stop offset="100%" stopColor="white" stopOpacity="0" />
           </radialGradient>
 
@@ -175,7 +175,7 @@ export function PingerPrint2D({ data, size = 240, showLabel = true }: PingerPrin
           {ridgeLines.map((d, i) => {
             const t = i / ridgeLines.length
             // 내측은 진하고 외측은 연하게
-            const opacity = 0.3 + (1 - t) * 0.5
+            const opacity = 0.45 + (1 - t) * 0.45
             // 릿지 색상: 그라디언트 색상 순환
             const dimIdx = i % dimensions.length
             const color = dimensions[dimIdx]?.color.primary ?? "#9CA3AF"
@@ -194,17 +194,7 @@ export function PingerPrint2D({ data, size = 240, showLabel = true }: PingerPrin
           })}
         </g>
 
-        {/* 외곽 테두리 (미세한 글로우) */}
-        <ellipse
-          cx={size / 2}
-          cy={size / 2}
-          rx={maskRx}
-          ry={maskRy}
-          fill="none"
-          stroke={`url(#pp2d-grad-${uid})`}
-          strokeWidth={1.5}
-          opacity={0.3}
-        />
+        {/* 외곽 없음 — 릿지 패턴 자체가 형태를 정의 */}
       </svg>
 
       {showLabel && <span className="text-xs font-medium text-gray-400">2D P-inger Print</span>}

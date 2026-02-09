@@ -20,7 +20,6 @@ const PERSONA_WORLD_URL =
   process.env.NEXT_PUBLIC_PERSONA_WORLD_URL || "https://persona-world.vercel.app"
 
 const NAV_ITEMS = [
-  { label: "Home", href: "/" },
   { label: "About", href: "/about" },
   { label: "Blog", href: "/blog" },
   { label: "FAQ", href: "/faq" },
