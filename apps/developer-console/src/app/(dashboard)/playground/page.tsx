@@ -35,6 +35,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
+import { PingerPrint2D } from "@/components/p-inger-print-2d"
 
 // API Endpoints configuration
 const endpoints = [
@@ -233,6 +234,21 @@ export default function PlaygroundPage() {
   const [isLoading, setIsLoading] = React.useState(false)
   const [isLoadingKeys, setIsLoadingKeys] = React.useState(true)
   const [copied, setCopied] = React.useState(false)
+
+  // 응답에서 6D 벡터 추출 → P-inger Print 시각화
+  const responseTraits = React.useMemo(() => {
+    if (!response) return null
+    try {
+      const parsed = JSON.parse(response)
+      const traits = parsed?.data?.traits
+      if (traits && typeof traits === "object" && "depth" in traits) {
+        return traits as Record<string, number>
+      }
+      return null
+    } catch {
+      return null
+    }
+  }, [response])
   const [showAdvanced, setShowAdvanced] = React.useState(false)
 
   // Fetch API keys on mount
@@ -682,6 +698,14 @@ resp, _ := client.Do(req)`}
                       {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
+                  {responseTraits && (
+                    <div className="bg-muted/50 flex flex-col items-center gap-2 rounded-lg border p-4">
+                      <span className="text-muted-foreground text-xs font-medium">
+                        P-inger Print Preview
+                      </span>
+                      <PingerPrint2D data={responseTraits} size={180} showLabel={false} />
+                    </div>
+                  )}
                 </div>
               ) : isLoading ? (
                 <div className="flex h-[300px] items-center justify-center">

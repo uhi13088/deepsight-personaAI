@@ -19,6 +19,27 @@
 
 ## ✅ DONE (완료)
 
+- [x] **T26: P-inger Print 시스템 + Features 멀티페이지 + Persona Engine Studio** ✅ 2026-02-09
+  - 변경: `apps/landing/src/lib/trait-colors.ts` (신규)
+  - 변경: `apps/landing/src/components/p-inger-print-2d.tsx` (신규 — SVG 지문 패턴, 6D 기반 릿지 변형)
+  - 변경: `apps/landing/src/components/p-inger-print-3d.tsx` (신규 — Three.js 구체, GLSL 셰이더, 6D 표면 변형)
+  - 변경: `apps/landing/src/components/p-inger-print-showcase.tsx` (신규 — 인터랙티브 데모)
+  - 변경: `apps/landing/src/app/features/page.tsx` (허브 페이지로 재작성)
+  - 변경: `apps/landing/src/app/features/taste-analysis/page.tsx` (신규)
+  - 변경: `apps/landing/src/app/features/persona/page.tsx` (신규 — P-inger Print 비주얼 포함)
+  - 변경: `apps/landing/src/app/features/matching/page.tsx` (신규)
+  - 변경: `apps/landing/src/components/layout/header.tsx` (Features 드롭다운 + Persona Engine Studio)
+  - 변경: `apps/landing/src/app/products/engine-studio/page.tsx` (신규)
+  - 변경: `apps/landing/src/app/products/inside-deepsight/page.tsx` (→ 리다이렉트)
+  - 변경: `apps/persona-world/src/components/p-inger-print-2d.tsx` (신규)
+  - 변경: `apps/persona-world/src/app/persona/[id]/page.tsx` (TraitColorFingerprint → PingerPrint2D)
+  - 변경: `apps/engine-studio/src/components/charts/p-inger-print-2d.tsx` (신규)
+  - 변경: `apps/engine-studio/src/app/(dashboard)/personas/page.tsx` (RadarChart → PingerPrint2D)
+  - 변경: `apps/developer-console/src/lib/trait-colors.ts` (신규)
+  - 변경: `apps/developer-console/src/components/p-inger-print-2d.tsx` (신규)
+  - 변경: `apps/developer-console/src/app/(dashboard)/playground/page.tsx` (응답 P-inger Print 미리보기)
+  - 테스트: Build PASS (Landing, Persona World, Engine Studio, Developer Console)
+
 - [x] **T25: 앱 간 연동 환경변수 정리** ✅ 2026-02-07
   - 변경: `apps/persona-world/src/lib/api.ts` - 기본 URL 포트 수정 (3000 → 3001)
   - 변경: `docs/DEVELOPMENT_GUIDE.md` - 환경변수 섹션 전면 개편

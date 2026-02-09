@@ -3,17 +3,48 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Layers, ChevronDown, Menu, X, Users, Code, Eye } from "lucide-react"
+import {
+  Layers,
+  ChevronDown,
+  Menu,
+  X,
+  Users,
+  Code,
+  Eye,
+  Search,
+  Sparkles,
+  Fingerprint,
+} from "lucide-react"
 
 const PERSONA_WORLD_URL =
   process.env.NEXT_PUBLIC_PERSONA_WORLD_URL || "https://persona-world.vercel.app"
 
 const NAV_ITEMS = [
   { label: "Home", href: "/" },
-  { label: "Features", href: "/features" },
   { label: "About", href: "/about" },
   { label: "Blog", href: "/blog" },
   { label: "FAQ", href: "/faq" },
+] as const
+
+const FEATURE_ITEMS = [
+  {
+    label: "소비자 취향 분석",
+    href: "/features/taste-analysis",
+    desc: "6D 벡터 기반 정밀 프로파일링",
+    icon: Search,
+  },
+  {
+    label: "AI 페르소나",
+    href: "/features/persona",
+    desc: "P-inger Print와 고유한 관점",
+    icon: Fingerprint,
+  },
+  {
+    label: "매칭 시스템",
+    href: "/features/matching",
+    desc: "설명 가능한 투명한 추천",
+    icon: Sparkles,
+  },
 ] as const
 
 const PRODUCT_ITEMS = [
@@ -30,9 +61,9 @@ const PRODUCT_ITEMS = [
     icon: Code,
   },
   {
-    label: "Inside DeepSight",
-    href: "/products/inside-deepsight",
-    desc: "페르소나가 만들어지는 과정",
+    label: "Persona Engine Studio",
+    href: "/products/engine-studio",
+    desc: "페르소나가 만들어지는 곳",
     icon: Eye,
   },
 ] as const
@@ -40,6 +71,7 @@ const PRODUCT_ITEMS = [
 export function Header() {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [featuresOpen, setFeaturesOpen] = useState(false)
   const [productsOpen, setProductsOpen] = useState(false)
 
   const isActive = (href: string) => {
@@ -60,6 +92,65 @@ export function Header() {
 
         {/* Desktop Nav */}
         <nav className="hidden items-center gap-1 md:flex">
+          <Link
+            href="/"
+            className={`rounded-lg px-4 py-2 text-sm transition-colors ${
+              isActive("/") && pathname === "/"
+                ? "font-medium text-[#667eea]"
+                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            }`}
+          >
+            Home
+          </Link>
+
+          {/* Features Dropdown */}
+          <div
+            className="relative"
+            onMouseEnter={() => setFeaturesOpen(true)}
+            onMouseLeave={() => setFeaturesOpen(false)}
+          >
+            <button
+              className={`flex items-center gap-1 rounded-lg px-4 py-2 text-sm transition-colors ${
+                isActive("/features")
+                  ? "font-medium text-[#667eea]"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              }`}
+            >
+              Features
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${featuresOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {featuresOpen && (
+              <div className="absolute left-0 top-full w-72 rounded-xl border border-gray-100 bg-white p-2 shadow-xl">
+                <Link
+                  href="/features"
+                  className="mb-1 block rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-purple-500 hover:bg-gray-50"
+                  onClick={() => setFeaturesOpen(false)}
+                >
+                  모든 기능 보기
+                </Link>
+                {FEATURE_ITEMS.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-gray-50"
+                    onClick={() => setFeaturesOpen(false)}
+                  >
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-purple-50 to-pink-50">
+                      <item.icon className="h-5 w-5 text-[#667eea]" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">{item.label}</div>
+                      <div className="text-xs text-gray-500">{item.desc}</div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
           {NAV_ITEMS.map((item) => (
             <Link
               key={item.href}
@@ -148,6 +239,30 @@ export function Header() {
       {mobileOpen && (
         <div className="border-t border-gray-100 bg-white px-6 pb-4 md:hidden">
           <nav className="flex flex-col gap-1 pt-4">
+            <Link
+              href="/"
+              className={`rounded-lg px-4 py-2 text-sm ${
+                pathname === "/" ? "font-medium text-[#667eea]" : "text-gray-600"
+              }`}
+              onClick={() => setMobileOpen(false)}
+            >
+              Home
+            </Link>
+            <div className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Features
+            </div>
+            {FEATURE_ITEMS.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`rounded-lg px-4 py-2 text-sm ${
+                  isActive(item.href) ? "font-medium text-[#667eea]" : "text-gray-600"
+                }`}
+                onClick={() => setMobileOpen(false)}
+              >
+                {item.label}
+              </Link>
+            ))}
             {NAV_ITEMS.map((item) => (
               <Link
                 key={item.href}

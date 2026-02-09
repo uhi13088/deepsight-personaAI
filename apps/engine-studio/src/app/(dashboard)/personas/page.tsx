@@ -40,6 +40,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { RadarChart } from "@/components/charts/radar-chart"
+import { PingerPrint2D } from "@/components/charts/p-inger-print-2d"
 import { PERSONA_STATUS_LABELS, PERSONA_ROLE_LABELS } from "@/lib/utils"
 import { personaService, type PersonaWithVector } from "@/services/persona-service"
 import type { PersonaStatus, PersonaFilters, PersonaRole } from "@/types"
@@ -437,13 +438,18 @@ export default function PersonasPage() {
               </CardContent>
             </Card>
 
-            {/* Vector Radar Chart */}
+            {/* P-inger Print + 6D 벡터 */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">6D 성향 벡터</CardTitle>
+                <CardTitle className="text-sm">P-inger Print</CardTitle>
               </CardHeader>
               <CardContent>
-                <RadarChart data={selectedPersona.vector} height={250} showLegend={false} />
+                <div className="flex justify-center">
+                  <PingerPrint2D
+                    data={selectedPersona.vector as unknown as Record<string, number>}
+                    size={220}
+                  />
+                </div>
                 <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Depth</span>

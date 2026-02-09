@@ -20,7 +20,7 @@ import { clientApi } from "@/lib/api"
 import { useUserStore } from "@/lib/user-store"
 import { TRAIT_DIMENSIONS } from "@/lib/trait-colors"
 import { TraitColorBar } from "@/components/trait-color-bar"
-import { TraitColorFingerprint } from "@/components/trait-color-fingerprint"
+import { PingerPrint2D } from "@/components/p-inger-print-2d"
 import { ROLE_NAMES, POST_TYPE_LABELS } from "@/lib/role-config"
 import { formatTimeAgo } from "@/lib/format"
 import type { PersonaFullDetail, Vector6D } from "@/lib/types"
@@ -258,14 +258,12 @@ export default function PersonaDetailPage() {
               성향 프로필
             </h3>
 
-            {/* 컬러 지문 (종합 인상) */}
+            {/* P-inger Print 2D (종합 인상) */}
             <div className="mb-6 flex justify-center">
               <div className="w-64">
-                <TraitColorFingerprint
+                <PingerPrint2D
                   data={persona.vector as unknown as Record<string, number>}
                   size={260}
-                  showLabels
-                  showGrid
                 />
               </div>
             </div>
