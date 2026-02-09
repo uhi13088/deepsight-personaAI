@@ -11,7 +11,7 @@ const PingerPrint3D = dynamic(
     ssr: false,
     loading: () => (
       <div className="inline-flex flex-col items-center gap-2">
-        <div className="flex h-[200px] w-[200px] items-center justify-center">
+        <div className="flex h-[280px] w-[280px] items-center justify-center">
           <div className="h-24 w-24 animate-pulse rounded-full bg-gradient-to-br from-[#667eea]/20 via-[#f093fb]/20 to-[#f5576c]/20" />
         </div>
         <span className="text-xs font-medium text-gray-400">3D P-inger Print</span>
@@ -93,11 +93,11 @@ export function PingerPrintShowcase() {
 
         {/* 3D Print */}
         <div className="flex flex-col items-center">
-          <PingerPrint3D data={persona.data} size={200} autoRotate />
+          <PingerPrint3D data={persona.data} size={280} autoRotate />
           <p className="mt-3 text-center text-sm text-gray-500">
-            아노다이징 오브젝트 — 6D 벡터값이
+            컬러 크롬 오브젝트 — 6D 벡터값이
             <br />
-            형태와 컬러를 고유하게 결정
+            팔의 길이와 컬러를 고유하게 결정
           </p>
         </div>
       </div>
