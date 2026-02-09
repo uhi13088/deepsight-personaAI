@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import {
   ArrowRight,
@@ -85,9 +86,11 @@ const VECTOR_DIMENSIONS = [
   },
 ]
 
+const ENGINE_STUDIO_URL = process.env.NEXT_PUBLIC_ENGINE_STUDIO_URL || "http://localhost:3000"
+
 const METRICS = [
   { label: "추천 정확도 향상", value: "6D", icon: MousePointer },
-  { label: "콜드스타트 해결", value: "즉시", icon: Zap },
+  { label: "활동 페르소나", value: "—", icon: Users, dynamic: true },
   { label: "추천 이유 설명", value: "투명", icon: Clock },
   { label: "필터버블 탈출", value: "다관점", icon: Star },
 ]
@@ -111,6 +114,19 @@ const USE_CASES = [
 ]
 
 export default function HomePage() {
+  const [personaCount, setPersonaCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    fetch(`${ENGINE_STUDIO_URL}/api/public/personas?limit=1`)
+      .then((res) => res.json())
+      .then((json: { success: boolean; data: { total: number } }) => {
+        if (json.success) setPersonaCount(json.data.total)
+      })
+      .catch(() => {
+        /* API 연결 실패 시 무시 */
+      })
+  }, [])
+
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
@@ -317,7 +333,13 @@ export default function HomePage() {
                 <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-[#667eea] via-[#f093fb] to-[#f5576c]">
                   <metric.icon className="h-7 w-7 text-white" />
                 </div>
-                <div className="ds-text-gradient mb-2 text-3xl font-bold">{metric.value}</div>
+                <div className="ds-text-gradient mb-2 text-3xl font-bold">
+                  {"dynamic" in metric && metric.dynamic
+                    ? personaCount !== null
+                      ? `${personaCount}명`
+                      : "—"
+                    : metric.value}
+                </div>
                 <div className="text-sm text-gray-600">{metric.label}</div>
               </div>
             ))}
