@@ -21,7 +21,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             code: validation.error?.code || "UNAUTHORIZED",
             message: validation.error?.message || "Invalid API key",
           },
-          request_id: requestId,
+          requestId,
         },
         { status: 401 }
       )
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             code: "NOT_FOUND",
             message: `Persona with id '${id}' not found`,
           },
-          request_id: requestId,
+          requestId,
         },
         { status: 404 }
       )
@@ -56,15 +56,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       description: persona.description || "",
       active: persona.active,
       dimensions: {
-        depth: persona.depth,
-        lens: persona.lens,
-        stance: persona.stance,
-        scope: persona.scope,
-        taste: persona.taste,
-        purpose: persona.purpose,
+        depth: Number(persona.depth),
+        lens: Number(persona.lens),
+        stance: Number(persona.stance),
+        scope: Number(persona.scope),
+        taste: Number(persona.taste),
+        purpose: Number(persona.purpose),
       } satisfies PersonaVector,
-      created_at: persona.createdAt.toISOString(),
-      updated_at: persona.updatedAt.toISOString(),
+      createdAt: persona.createdAt.toISOString(),
+      updatedAt: persona.updatedAt.toISOString(),
     }
 
     const latencyMs = Date.now() - startTime
@@ -83,12 +83,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     return NextResponse.json({
       success: true,
-      request_id: requestId,
+      requestId,
       data: {
         persona: transformedPersona,
       },
       meta: {
-        processing_time_ms: latencyMs,
+        processingTimeMs: latencyMs,
       },
     })
   } catch (error) {
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           code: "INTERNAL_ERROR",
           message: "An error occurred while fetching the persona",
         },
-        request_id: requestId,
+        requestId,
       },
       { status: 500 }
     )

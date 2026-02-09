@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
             code: validation.error?.code || "UNAUTHORIZED",
             message: validation.error?.message || "Invalid API key",
           },
-          request_id: requestId,
+          requestId,
         },
         { status: 401 }
       )
@@ -61,29 +61,29 @@ export async function GET(request: NextRequest) {
       category: p.category || "General",
       description: p.description || "",
       dimensions: {
-        depth: p.depth,
-        lens: p.lens,
-        stance: p.stance,
-        scope: p.scope,
-        taste: p.taste,
-        purpose: p.purpose,
+        depth: Number(p.depth),
+        lens: Number(p.lens),
+        stance: Number(p.stance),
+        scope: Number(p.scope),
+        taste: Number(p.taste),
+        purpose: Number(p.purpose),
       } satisfies PersonaVector,
-      created_at: p.createdAt.toISOString(),
-      updated_at: p.updatedAt.toISOString(),
+      createdAt: p.createdAt.toISOString(),
+      updatedAt: p.updatedAt.toISOString(),
     }))
 
     const response = {
       success: true,
-      request_id: requestId,
+      requestId,
       data: {
         personas: transformedPersonas,
       },
       meta: {
         page,
-        per_page: perPage,
+        perPage,
         total,
-        total_pages: Math.ceil(total / perPage),
-        has_more: page * perPage < total,
+        totalPages: Math.ceil(total / perPage),
+        hasMore: page * perPage < total,
       },
     }
 
@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
           code: "INTERNAL_ERROR",
           message: "An error occurred while fetching personas",
         },
-        request_id: requestId,
+        requestId,
       },
       { status: 500 }
     )
