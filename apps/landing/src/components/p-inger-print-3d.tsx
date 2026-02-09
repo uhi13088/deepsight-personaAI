@@ -2,7 +2,7 @@
 
 import { useRef, useMemo, useEffect } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
-import { OrbitControls, Environment } from "@react-three/drei"
+import { OrbitControls } from "@react-three/drei"
 import * as THREE from "three"
 import { TRAIT_DIMENSIONS } from "@/lib/trait-colors"
 
@@ -254,7 +254,7 @@ function ProductSphere({ data }: { data: Record<string, number> }) {
 
   return (
     <mesh ref={meshRef}>
-      <sphereGeometry args={[1, 128, 128]} />
+      <sphereGeometry args={[1, 64, 64]} />
       <shaderMaterial
         vertexShader={vertexShader}
         fragmentShader={fragmentShader}
@@ -289,7 +289,6 @@ export function PingerPrint3D({
             autoRotate={autoRotate}
             autoRotateSpeed={0.8}
           />
-          <Environment preset="studio" />
         </Canvas>
       </div>
       {showLabel && <span className="text-xs font-medium text-gray-400">3D P-inger Print</span>}
