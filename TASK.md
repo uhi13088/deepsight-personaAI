@@ -35,17 +35,23 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-- [ ] **T27: 교차축 계산 엔진 + Paradox Score 확장 + V_Final 확장**
-  - 범위: 설계서 §3.6/3.8, 구현계획서 §5/6 + 신규 섹션
-  - AC1: 교차축 계산 엔진 — 83축 각각의 스코어를 실제 계산하는 알고리즘 (신규 섹션)
-  - AC2: Paradox Score 확장 — L1↔L2(기존) + L1↔L3(28축) + L2↔L3(20축) 통합
-  - AC3: V_Final 출력 확장 — 7D 벡터 + CrossAxisProfile(83값) 함께 반환
-  - AC4: 설계서 + 구현계획서 양쪽 동기화
-  - AC5: 구현계획서 Phase 태스크 + 파일 변경 맵 반영
+(없음)
 
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T27: 교차축 계산 엔진 + Paradox Score 확장 + V_Final 확장** ✅ 2026-02-10
+  - 변경: `docs/persona-engine-v3-design.md` (v3.0-draft.5)
+    - §3.6.3 확장: Paradox Score → 3-Layer 확장형 (L1↔L2 + L1↔L3 + L2↔L3 가중 합산)
+    - §3.8.4 신설: 교차축 스코어 계산 (83축, 관계 유형별 공식 4종, CrossAxisProfile)
+  - 변경: `docs/persona-engine-v3-implementation-plan.md` (v1.6)
+    - §5 확장: VFinalResult에 crossAxisProfile + paradoxProfile 추가
+    - §6 전면 개편: 교차축 계산 엔진 + Extended Paradox Score (6.1~6.7)
+    - Phase 1 태스크 확장 (1-4~1-9: cross-axis.ts, inversions 테이블)
+    - 파일 변경 맵 추가 (cross-axis.ts, cross-axis-inversions.ts)
+  - 변경: `TASK.md` (T27-T30 티켓 등록)
+  - 테스트: 설계 문서 — 코드 구현 아님
 
 - [x] **T26: P-inger Print 시스템 + Features 멀티페이지 + Persona Engine Studio** ✅ 2026-02-09
   - 변경: `apps/landing/src/lib/trait-colors.ts` (신규)
