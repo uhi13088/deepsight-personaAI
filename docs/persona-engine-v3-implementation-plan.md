@@ -5,7 +5,7 @@
 > **문서 정보**
 >
 > - 작성일: 2026-02-10
-> - 버전: v1.7
+> - 버전: v1.8
 > - 상태: 확정 — 구현 대기
 > - 관련 문서: `docs/persona-engine-v3-design.md` (설계서)
 > - 목적: 설계서의 "무엇을"에 대응하는 "어떻게" — 이 문서만 보고 구현 가능
@@ -24,6 +24,7 @@
 | v1.5 | 2026-02-10 | 품질 아키텍처 3대 핵심 추가 — Section 15(PersonaWorld RAG 구현: 컨텍스트 빌더, Voice 앵커, 관계 기억, 캐싱), Section 16(품질 피드백 루프 구현: 4대 측정 엔진, Few-shot 자동 수집, 대시보드), Section 17(LLM 모델 전략 구현: 3-Tier 라우터, Prompt Caching, Provider Adapter). Phase 9(RAG+피드백+모델 전략, 18태스크) 신설. 파일 변경 맵 확장. 섹션 재번호(Phase→18, 파일맵→19) |
 | v1.6 | 2026-02-10 | 교차축 계산 엔진 + Paradox Score 확장 (T27) — Section 6 전면 개편: 83축 교차축 스코어 계산 엔진(CrossAxisProfile, 관계유형별 공식 4종), L1↔L3/L2↔L3 역설 지표, Extended Paradox Score(3-Layer 가중 합산). Section 5 확장: VFinalResult에 crossAxisProfile+paradoxProfile 추가. Phase 1 태스크 1-4~1-9로 확장(교차축 엔진, 역방향 매핑 테이블). 파일 변경 맵: cross-axis.ts, cross-axis-inversions.ts 추가 |
 | v1.7 | 2026-02-10 | 매칭 알고리즘 다층 확장 (T28) — Section 10 전면 개편: 7D 코사인 유사도→3-Tier 매칭(Basic/Advanced/Exploration). Tier별 차원 조합(V_Final 7D + 교차축 83축 + Paradox 호환 + 비정량적 보정). 피드 믹싱 전략(60/30/10), 통합 매칭 엔진, MatchingResult 타입. Phase 5 태스크 5-1~5-7로 확장. 파일 변경 맵: 매칭 모듈 6개 파일 추가 |
+| v1.8 | 2026-02-10 | 비정량↔정량 연결 알고리즘 구체화 (T29) — Section 9 확장(9.3~9.6): ① Init(LLM 구조화 키워드 추출, 의미 카테고리→벡터 매핑 테이블, delta 적용 규칙), ② Override(2단계 트리거 감지, override/additive delta, 지수 감쇠 복귀 곡선 λ=0.7-0.6×volatility), ③ Adapt(UIV 3축 분석, 차원별 α, 모멘텀, ±0.3 드리프트 클램프), ④ Express(파생 상태값 5종, sigmoid 확률 공식, 쿨다운). Phase 4 태스크 4-1~4-9로 확장. 파일 변경 맵: 상호작용 모듈 9개 항목 추가 |
 
 ---
 
@@ -1310,6 +1311,371 @@ export interface PersonaV3GenerationResult {
     archetypeUsed: string
     generationTime: number
     regenerationCount: number
+  }
+}
+```
+
+### 9.3 상호작용 모듈 — ① Initialization (초기값 보정)
+
+배경 서사 텍스트에서 키워드를 추출하고, 의미 카테고리→벡터 매핑으로 초기값을 보정한다. 생성 파이프라인 Step 1 이후 일회성으로 실행된다.
+
+```typescript
+// ── 타입 ──
+
+interface ExtractedKeyword {
+  text: string
+  categories: SemanticCategory[]
+  confidence: number  // 0.0~1.0
+}
+
+type SemanticCategory =
+  | '성취_동기' | '목표_지향' | '반주류' | '독립적'
+  | '사회적_욕구' | '인정_결핍' | '내향적' | '은둔'
+  | '감성적' | '직관적' | '논리적' | '분석적'
+  | '비판적' | '도전적'
+  | '불안' | '트라우마' | '낙관적' | '안정적'
+  | '친화적' | '이타적' | '냉소적'
+  | '호기심' | '탐구적' | '체계적' | '계획적' | '즉흥적' | '자유로운'
+  | '외향적' | '에너지_넘치는'
+  | '경제적_결핍' | '풍요' | '충족'
+  | '도덕적' | '정의' | '비도덕적' | '수단과_방법'
+  | '감정_기복' | '폭발적' | '차분한' | '냉정한'
+  | '사회_변혁' | '혁명적' | '개인적' | '내면적'
+
+interface CategoryMapping {
+  category: SemanticCategory
+  dimension: string        // 예: 'L1.purpose', 'L2.neuroticism'
+  deltaDirection: 1 | -1   // 증가 or 감소
+  deltaRange: [number, number]  // [min, max]
+}
+
+// ── 핵심 로직 ──
+
+// 1. LLM 구조화 추출
+async function extractKeywords(backstory: string): Promise<ExtractedKeyword[]> {
+  const result = await llmTierRouter.execute({
+    tier: 'medium',  // 키워드 추출은 Medium 모델 사용
+    prompt: KEYWORD_EXTRACTION_PROMPT,
+    input: backstory,
+    outputSchema: extractedKeywordArraySchema,
+  })
+  return result.keywords
+}
+
+// 2. 카테고리 → 벡터 매핑 적용
+function applyInitialization(
+  archetypeDefaults: ThreeLayerVector,
+  keywords: ExtractedKeyword[],
+): ThreeLayerVector {
+  const deltas: Record<string, number> = {}
+
+  for (const keyword of keywords) {
+    for (const category of keyword.categories) {
+      const mappings = CATEGORY_MAPPING_TABLE.filter(m => m.category === category)
+      for (const mapping of mappings) {
+        const delta = mapping.deltaDirection
+          * lerp(mapping.deltaRange[0], mapping.deltaRange[1], keyword.confidence)
+        deltas[mapping.dimension] = (deltas[mapping.dimension] ?? 0) + delta * keyword.confidence
+      }
+    }
+  }
+
+  // delta 클램프 ±0.4, 최종값 클램프 [0, 1]
+  return applyDeltas(archetypeDefaults, deltas, { maxDelta: 0.4 })
+}
+```
+
+`CATEGORY_MAPPING_TABLE`은 `src/constants/v3/keyword-mappings.ts`에 정의. 설계서 §5.3의 매핑 테이블 전체를 포함.
+
+### 9.4 상호작용 모듈 — ② Override (벡터 오버라이드)
+
+트리거 감지 → delta 적용 → 복귀 곡선의 3-Stage 시스템.
+
+```typescript
+// ── 타입 ──
+
+interface TriggerRule {
+  triggerId: string
+  keywords: string[]
+  context: string          // LLM에 전달할 맥락 설명
+  effects: TriggerEffect[]
+}
+
+interface TriggerEffect {
+  dimension: string        // 'L1.lens', 'L3.volatility', 'Pressure' 등
+  delta: number            // 변동량 (-1.0 ~ +1.0)
+  type: 'override' | 'additive'
+}
+
+interface OverrideState {
+  triggerId: string
+  activatedAt: number      // 턴 번호
+  triggerStrength: number   // 0.5~1.0
+  effects: TriggerEffect[]
+  isRecovering: boolean
+}
+
+// ── Stage 1: 트리거 감지 ──
+
+function detectTrigger(
+  userText: string,
+  triggers: TriggerRule[],
+): { trigger: TriggerRule; strength: number } | null {
+  // Step 1: 키워드 빠른 필터
+  const hits = triggers.filter(t =>
+    t.keywords.some(kw => userText.includes(kw))
+  )
+  if (hits.length === 0) return null
+
+  // Step 2: 맥락 확인 (LLM Light = 규칙 기반)
+  for (const trigger of hits) {
+    const contextScore = evaluateTriggerContext(userText, trigger)
+    if (contextScore >= 0.5) {
+      return { trigger, strength: contextScore }
+    }
+  }
+  return null
+}
+
+// ── Stage 2: Delta 적용 ──
+
+function applyOverride(
+  currentVectors: ThreeLayerVector,
+  baseVectors: ThreeLayerVector,
+  trigger: TriggerRule,
+  strength: number,
+): ThreeLayerVector {
+  const result = deepClone(currentVectors)
+
+  for (const effect of trigger.effects) {
+    const base = getVectorValue(baseVectors, effect.dimension)
+    const current = getVectorValue(result, effect.dimension)
+
+    if (effect.type === 'override') {
+      const overridden = base + effect.delta * strength
+      setVectorValue(result, effect.dimension, clamp(overridden, 0, 1))
+    } else {
+      setVectorValue(result, effect.dimension, clamp(current + effect.delta * strength, 0, 1))
+    }
+  }
+  return result
+}
+
+// ── Stage 3: 복귀 곡선 (Exponential Decay) ──
+
+function applyRecovery(
+  overriddenVectors: ThreeLayerVector,
+  baseVectors: ThreeLayerVector,
+  turnsElapsed: number,
+  volatility: number,  // L3.volatility
+): ThreeLayerVector {
+  // λ = 0.7 - 0.6 × volatility
+  const lambda = 0.7 - 0.6 * volatility
+  const decayFactor = Math.exp(-lambda * turnsElapsed)
+
+  const result = deepClone(baseVectors)
+  for (const dim of ALL_DIMENSIONS) {
+    const vBase = getVectorValue(baseVectors, dim)
+    const vOverridden = getVectorValue(overriddenVectors, dim)
+    const vRecovered = vBase + (vOverridden - vBase) * decayFactor
+    setVectorValue(result, dim, clamp(vRecovered, 0, 1))
+  }
+  return result
+}
+```
+
+### 9.5 상호작용 모듈 — ③ Adaptation (동적 가중치)
+
+매 인터랙션마다 유저의 태도를 분석하여 벡터를 미세 보정한다.
+
+```typescript
+// ── 타입 ──
+
+interface UserAttitude {
+  politeness: number    // 0.0~1.0
+  aggression: number    // 0.0~1.0
+  intimacy: number      // 0.0~1.0
+}
+
+interface AdaptationState {
+  recentDeltas: Array<Record<string, number>>  // 최근 3턴의 delta 기록
+  cumulativeAdaptation: Record<string, number>  // 누적 적응량
+}
+
+// ── 태도 → delta 매핑 ──
+
+const ATTITUDE_MAPPINGS: Array<{
+  attitude: keyof UserAttitude
+  dimension: string
+  formula: (score: number) => number
+}> = [
+  { attitude: 'politeness', dimension: 'L2.agreeableness',
+    formula: (s) => (s - 0.5) * 0.4 },
+  { attitude: 'politeness', dimension: 'L2.warmth',
+    formula: (s) => (s - 0.5) * 0.3 },
+  { attitude: 'aggression', dimension: 'L1.stance',
+    formula: (s) => (s - 0.3) * 0.5 },
+  { attitude: 'aggression', dimension: 'L2.neuroticism',
+    formula: (s) => (s - 0.5) * 0.2 },
+  { attitude: 'intimacy',   dimension: 'L1.sociability',
+    formula: (s) => (s - 0.5) * 0.3 },
+  { attitude: 'intimacy',   dimension: 'L2.extraversion',
+    formula: (s) => (s - 0.5) * 0.2 },
+]
+
+// ── 핵심 로직 ──
+
+function computeAdaptation(
+  currentVectors: ThreeLayerVector,
+  baseVectors: ThreeLayerVector,
+  attitude: UserAttitude,
+  state: AdaptationState,
+): { vectors: ThreeLayerVector; newState: AdaptationState } {
+  const deltas: Record<string, number> = {}
+
+  for (const mapping of ATTITUDE_MAPPINGS) {
+    const rawDelta = mapping.formula(attitude[mapping.attitude])
+    const alpha = computeAlpha(mapping.dimension, currentVectors)
+    const momentum = computeMomentum(mapping.dimension, state.recentDeltas)
+
+    deltas[mapping.dimension] = rawDelta * alpha * momentum
+  }
+
+  // 적용 + 드리프트 방지 클램프 (base ± 0.3)
+  const result = deepClone(currentVectors)
+  for (const [dim, delta] of Object.entries(deltas)) {
+    const current = getVectorValue(result, dim)
+    const base = getVectorValue(baseVectors, dim)
+    const adapted = clamp(current + delta, base - 0.3, base + 0.3)
+    setVectorValue(result, dim, clamp(adapted, 0, 1))
+  }
+
+  return {
+    vectors: result,
+    newState: {
+      recentDeltas: [...state.recentDeltas.slice(-2), deltas],
+      cumulativeAdaptation: mergeDeltaMaps(state.cumulativeAdaptation, deltas),
+    },
+  }
+}
+
+// 차원별 적응률
+function computeAlpha(dimension: string, vectors: ThreeLayerVector): number {
+  const BASE = 0.15
+  const volatility = vectors.l3.volatility
+  const openness = vectors.l2.openness
+  const extraversion = vectors.l2.extraversion
+
+  const alphaMap: Record<string, number> = {
+    'L1.stance':        BASE * (1 + volatility * 0.5),
+    'L2.agreeableness': BASE * (1 + openness * 0.3),
+    'L1.sociability':   BASE * (1 + extraversion * 0.4),
+    'L2.neuroticism':   BASE * (1 + volatility * 0.6),
+  }
+  return clamp(alphaMap[dimension] ?? BASE, 0.05, 0.35)
+}
+
+// 모멘텀 (방향 일관성 보너스)
+function computeMomentum(
+  dimension: string,
+  recentDeltas: Array<Record<string, number>>,
+): number {
+  if (recentDeltas.length < 2) return 1.0
+  const signs = recentDeltas.map(d => Math.sign(d[dimension] ?? 0))
+  const currentSign = signs[signs.length - 1] || 0
+  const sameCount = signs.filter(s => s === currentSign).length
+  const consistency = (sameCount / signs.length) - 0.5
+  return clamp(1.0 + 0.3 * consistency, 0.85, 1.15)
+}
+```
+
+### 9.6 상호작용 모듈 — ④ Expression (확률적 발현)
+
+현재 벡터 상태에서 quirk 발현 확률을 계산하고, 시스템 프롬프트에 동적 지침을 추가한다.
+
+```typescript
+// ── 타입 ──
+
+interface QuirkDefinition {
+  id: string
+  name: string
+  stateKey: DerivedStateKey
+  threshold: number       // 발동 기준점
+  sensitivity: number     // sigmoid 감도 (높을수록 급격한 전환)
+  promptInstruction: string
+  cooldown: number        // 최소 대기 턴 수
+}
+
+type DerivedStateKey =
+  | 'conflictScore'
+  | 'anxietyLevel'
+  | 'defenseLevel'
+  | 'emotionalDepth'
+  | 'pressureGap'
+
+interface ExpressionState {
+  lastActivatedTurn: Record<string, number>  // quirkId → 마지막 발동 턴
+}
+
+// ── 파생 상태값 계산 ──
+
+function computeDerivedStates(
+  vectors: ThreeLayerVector,
+  pressure: number,
+  conversationTurnCount: number,
+  pressureBaseline: number,
+): Record<DerivedStateKey, number> {
+  return {
+    conflictScore:
+      Math.abs(vectors.l1.stance - vectors.l2.agreeableness)
+      * (1 + vectors.l3.volatility) / 2,
+    anxietyLevel:
+      vectors.l2.neuroticism * (1 + pressure) / 2,
+    defenseLevel:
+      (vectors.l3.lack + vectors.l2.neuroticism) / 2
+      * (1 - vectors.l2.agreeableness),
+    emotionalDepth:
+      Math.min(conversationTurnCount / 20, 1.0)
+      * (1 + vectors.l2.openness) / 2,
+    pressureGap:
+      Math.abs(pressure - pressureBaseline),
+  }
+}
+
+// ── 확률 계산 + 프롬프트 주입 ──
+
+function sigmoid(x: number): number {
+  return 1 / (1 + Math.exp(-x))
+}
+
+function evaluateQuirks(
+  quirks: QuirkDefinition[],
+  derivedStates: Record<DerivedStateKey, number>,
+  currentTurn: number,
+  state: ExpressionState,
+): { instructions: string[]; newState: ExpressionState } {
+  const instructions: string[] = []
+  const newLastActivated = { ...state.lastActivatedTurn }
+
+  for (const quirk of quirks) {
+    // 쿨다운 체크
+    const lastTurn = state.lastActivatedTurn[quirk.id] ?? -Infinity
+    if (currentTurn - lastTurn < quirk.cooldown) continue
+
+    // 확률 계산
+    const stateValue = derivedStates[quirk.stateKey]
+    const prob = sigmoid(quirk.sensitivity * (stateValue - quirk.threshold))
+
+    // 발현 판정
+    if (Math.random() < prob) {
+      instructions.push(quirk.promptInstruction)
+      newLastActivated[quirk.id] = currentTurn
+    }
+  }
+
+  return {
+    instructions,
+    newState: { lastActivatedTurn: newLastActivated },
   }
 }
 ```
@@ -3551,15 +3917,19 @@ function generateLightResponse(
 | 3-3 | Pressure Context 생성기 | `src/lib/persona-generation/pressure-generator.ts` | **신규** |
 | 3-4 | Zeitgeist 프로필 생성기 | `src/lib/persona-generation/zeitgeist-generator.ts` | **신규** |
 
-### Phase 4: 하이브리드 연결 메커니즘
+### Phase 4: 하이브리드 연결 메커니즘 (비정량↔정량 4대 알고리즘)
 
 | # | 태스크 | 파일 | 변경 수준 |
 |---|--------|------|-----------|
-| 4-1 | 초기화 로직 | `src/lib/interaction/initialization.ts` | **신규** |
-| 4-2 | 오버라이드 로직 | `src/lib/interaction/override.ts` | **신규** |
-| 4-3 | 적응 로직 | `src/lib/interaction/adaptation.ts` | **신규** |
-| 4-4 | 표현 로직 | `src/lib/interaction/expression.ts` | **신규** |
-| 4-5 | 모듈 index | `src/lib/interaction/index.ts` | **신규** |
+| 4-1 | 타입 정의 (ExtractedKeyword, TriggerRule, QuirkDefinition 등) | `src/lib/interaction/types.ts` | **신규** |
+| 4-2 | 의미 카테고리 → 벡터 매핑 상수 테이블 | `src/constants/v3/keyword-mappings.ts` | **신규** |
+| 4-3 | Init: LLM 키워드 추출 + 카테고리 매핑 + delta 적용 | `src/lib/interaction/initialization.ts` | **신규** |
+| 4-4 | Override: 트리거 감지(2단계) + delta 적용 + 복귀 곡선(exp decay) | `src/lib/interaction/override.ts` | **신규** |
+| 4-5 | Adapt: UIV 분석 + 차원별 α + 모멘텀 + 드리프트 클램프 | `src/lib/interaction/adaptation.ts` | **신규** |
+| 4-6 | Express: 파생 상태값 계산 + sigmoid 확률 + 쿨다운 + 프롬프트 주입 | `src/lib/interaction/expression.ts` | **신규** |
+| 4-7 | 태도 → delta 매핑 상수 (ATTITUDE_MAPPINGS) | `src/constants/v3/attitude-mappings.ts` | **신규** |
+| 4-8 | 모듈 index + 통합 InteractionEngine | `src/lib/interaction/index.ts` | **신규** |
+| 4-9 | 상호작용 모듈 단위 테스트 | `src/lib/interaction/__tests__/` | **신규** |
 
 ### Phase 5: 매칭 알고리즘 재구성 (3-Tier 다층 매칭)
 
@@ -3711,12 +4081,16 @@ apps/engine-studio/src/lib/persona-generation/voice-generator.ts
 apps/engine-studio/src/lib/persona-generation/pressure-generator.ts
 apps/engine-studio/src/lib/persona-generation/zeitgeist-generator.ts
 
-# ── 상호작용 ──
-apps/engine-studio/src/lib/interaction/initialization.ts
-apps/engine-studio/src/lib/interaction/override.ts
-apps/engine-studio/src/lib/interaction/adaptation.ts
-apps/engine-studio/src/lib/interaction/expression.ts
-apps/engine-studio/src/lib/interaction/index.ts
+# ── 상호작용 (비정량↔정량 4대 알고리즘) ──
+apps/engine-studio/src/lib/interaction/types.ts               ← 상호작용 타입 (ExtractedKeyword, TriggerRule, QuirkDefinition 등)
+apps/engine-studio/src/lib/interaction/initialization.ts      ← Init: LLM 키워드 추출 + 카테고리 매핑 + delta 적용
+apps/engine-studio/src/lib/interaction/override.ts            ← Override: 트리거 감지 + delta + 복귀 곡선 (exp decay)
+apps/engine-studio/src/lib/interaction/adaptation.ts          ← Adapt: UIV + 차원별 α + 모멘텀 + 드리프트 클램프
+apps/engine-studio/src/lib/interaction/expression.ts          ← Express: 파생 상태값 + sigmoid 확률 + 쿨다운
+apps/engine-studio/src/lib/interaction/index.ts               ← 통합 InteractionEngine
+apps/engine-studio/src/lib/interaction/__tests__/             ← 상호작용 단위 테스트
+apps/engine-studio/src/constants/v3/keyword-mappings.ts       ← 의미 카테고리→벡터 매핑 테이블
+apps/engine-studio/src/constants/v3/attitude-mappings.ts      ← 태도→delta 매핑 상수
 
 # ── 매칭 (3-Tier 다층 매칭) ──
 apps/engine-studio/src/lib/matching/types.ts                  ← 매칭 타입 (MatchingInput, MatchingResult, MatchingTier)

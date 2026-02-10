@@ -5,7 +5,7 @@
 > **문서 정보**
 >
 > - 작성일: 2026-02-10
-> - 버전: v3.0-draft.5
+> - 버전: v3.0-draft.6
 > - 상태: 설계 단계
 > - 이전 버전: `[설계서] DeepSight_페르소나시스템_v2.md`
 
@@ -20,6 +20,7 @@
 | v3.0-draft.3 | 2026-02-10 | 구현 계획서 동기화 — 10개 누락 기능 추가: L1↔L2 7쌍 매핑(기존 5쌍→7쌍+Many-to-One), Paradox Score 공식, L3 역설 연결(4대 기능), 교차축 시스템(83+), 차원 간 투영, 아키타입 템플릿(12+), 생성 파이프라인, V_Final 매칭, 일관성 검증, 컬러지문 시스템(P-inger Print), 색상 체계(CIELAB+OKLCH), 노드 에디터(ComfyUI DAG) |
 | v3.0-draft.4 | 2026-02-10 | 품질 아키텍처 3대 핵심 추가 — PersonaWorld RAG(페르소나 장기 기억, Voice 앵커+관계 기억+관심사 연속성), 품질 피드백 루프(4대 자동 평가 지표, 3단계 자동화, Few-shot 라이브러리 자동 구축), LLM 3-Tier 모델 전략(Sonnet/mini/규칙 기반, 동적 분기 조건 8종) |
 | v3.0-draft.5 | 2026-02-10 | 106D+ 실질 연산 확장 (T27+T28) — §3.6.3 Paradox Score 3-Layer 확장(Extended Paradox Score 공식, L1↔L3/L2↔L3 역설 지표), §3.8.4 교차축 스코어 계산(관계유형 4종 공식, 83축 실연산). §10 전면 개편: V_Final 단일 매칭→3-Tier 다층 매칭(Basic/Advanced/Exploration), 비정량적 보정(Voice+서사 ±0.1), 피드 믹싱(60/30/10), 매칭 결과 구조(explainability) |
+| v3.0-draft.6 | 2026-02-10 | 비정량↔정량 연결 알고리즘 구체화 (T29) — §5.3 Init 확장: LLM 구조화 키워드 추출, 의미 카테고리→벡터 매핑 테이블(L1 7종/L2 8종/L3 8종), delta 적용 규칙(±0.4 클램프, confidence 가중). §5.4 Override 확장: 2단계 트리거 감지(키워드+맥락), override/additive delta 타입, 지수 감쇠 복귀 곡선(λ=0.7-0.6×volatility). §5.5 Adapt 확장: UIV 3축 분석, 태도→delta 매핑 6종, 차원별 적응률 α, 모멘텀 보너스, ±0.3 드리프트 클램프. §5.6 Express 확장: 파생 상태값 5종, sigmoid 범용 공식, quirk 정의 스키마(stateKey/threshold/sensitivity/cooldown) |
 
 ---
 
@@ -781,15 +782,104 @@ Phase 1(벡터)과 Phase 2(비정량적 요소)를 따로따로 정의하는 것
 
 ```
 Input:  배경 서사 텍스트 (Backstory)
-Process: NLP 키워드 추출 → 키워드-벡터 매핑 규칙 적용
-Output: 16D 벡터의 초기값 설정
+Process: LLM 기반 키워드 추출 → 의미 카테고리 분류 → 카테고리-벡터 매핑 규칙 적용
+Output: 기저 16D 벡터의 초기값 보정 (delta)
 ```
+
+#### 추출 방법: LLM 구조화 추출
+
+배경 서사에서 키워드를 추출할 때 규칙 기반 NLP 대신 **LLM 구조화 출력**을 사용한다. 이유: 서사 텍스트는 비정형적이고, 함축적 의미(예: "가난한 예술가" → 반주류 + 결핍)를 규칙으로 포착하기 어렵다.
+
+```
+LLM Input:
+  배경 서사 텍스트 + 추출 프롬프트
+
+LLM Output (JSON):
+  {
+    keywords: [
+      { text: "가난", categories: ["경제적_결핍", "사회적_소외"] },
+      { text: "야망", categories: ["성취_동기", "목표_지향"] },
+      { text: "인정 욕구", categories: ["인정_결핍", "사회적_욕구"] },
+      ...
+    ]
+  }
+```
+
+#### 의미 카테고리 → 벡터 매핑 테이블
+
+추출된 키워드의 의미 카테고리를 벡터 차원에 매핑한다. 하나의 카테고리가 여러 차원에 영향을 줄 수 있고, 여러 카테고리가 같은 차원에 영향을 줄 수도 있다.
+
+**L1 (Social Persona) 매핑**:
+
+| 의미 카테고리 | 영향 차원 | delta 방향 | delta 크기 | 근거 |
+|---|---|---|---|---|
+| `성취_동기` / `목표_지향` | purpose | ↑ +0.2 ~ +0.4 | 중 | 오락보다 의미 추구 |
+| `반주류` / `독립적` | taste | ↑ +0.2 ~ +0.3 | 중 | 실험적 취향 지향 |
+| `사회적_욕구` / `인정_결핍` | sociability | ↑ +0.1 ~ +0.3 | 중 | 인정 추구 → 사회적 활동성 |
+| `내향적` / `은둔` | sociability | ↓ -0.2 ~ -0.4 | 중 | 사회적 활동 회피 |
+| `감성적` / `직관적` | lens | ↓ -0.2 ~ -0.3 | 중 | 논리보다 감성 지향 |
+| `논리적` / `분석적` | lens | ↑ +0.2 ~ +0.3 | 중 | 감성보다 논리 지향 |
+| `비판적` / `도전적` | stance | ↑ +0.1 ~ +0.3 | 중 | 기존 질서에 대한 비판 |
+
+**L2 (Core Temperament) 매핑**:
+
+| 의미 카테고리 | 영향 차원 | delta 방향 | delta 크기 | 근거 |
+|---|---|---|---|---|
+| `불안` / `트라우마` | neuroticism | ↑ +0.2 ~ +0.4 | 중~대 | 정서적 불안정 |
+| `낙관적` / `안정적` | neuroticism | ↓ -0.2 ~ -0.3 | 중 | 정서적 안정 |
+| `친화적` / `이타적` | agreeableness | ↑ +0.2 ~ +0.3 | 중 | 타인 지향 |
+| `냉소적` / `독립적` | agreeableness | ↓ -0.1 ~ -0.3 | 중 | 자기 지향 |
+| `호기심` / `탐구적` | openness | ↑ +0.2 ~ +0.3 | 중 | 새로운 경험 지향 |
+| `체계적` / `계획적` | conscientiousness | ↑ +0.2 ~ +0.3 | 중 | 질서 지향 |
+| `즉흥적` / `자유로운` | conscientiousness | ↓ -0.2 ~ -0.3 | 중 | 자유 지향 |
+| `외향적` / `에너지 넘치는` | extraversion | ↑ +0.2 ~ +0.3 | 중 | 사회적 에너지 |
+
+**L3 (Narrative Drive) 매핑**:
+
+| 의미 카테고리 | 영향 차원 | delta 방향 | delta 크기 | 근거 |
+|---|---|---|---|---|
+| `경제적_결핍` / `인정_결핍` | lack | ↑ +0.2 ~ +0.4 | 중~대 | 결핍감이 행동 동기 |
+| `풍요` / `충족` | lack | ↓ -0.2 ~ -0.3 | 중 | 결핍감 부재 |
+| `도덕적` / `정의` | moralCompass | ↑ +0.2 ~ +0.3 | 중 | 도덕 지향 |
+| `비도덕적` / `수단과_방법` | moralCompass | ↓ -0.2 ~ -0.4 | 중~대 | 목적이 수단을 정당화 |
+| `감정_기복` / `폭발적` | volatility | ↑ +0.2 ~ +0.4 | 중~대 | 감정 변동성 |
+| `차분한` / `냉정한` | volatility | ↓ -0.2 ~ -0.3 | 중 | 감정 안정성 |
+| `사회_변혁` / `혁명적` | scope | ↑ +0.2 ~ +0.3 | 중 | 거시적 서사 지향 |
+| `개인적` / `내면적` | scope | ↓ -0.1 ~ -0.3 | 중 | 미시적 서사 지향 |
+
+#### Delta 적용 규칙
+
+```
+for each extracted keyword:
+  categories = keyword.categories
+  for each category:
+    mappings = lookupMappings(category)
+    for each mapping:
+      delta = calculateDelta(mapping.direction, mapping.range, keyword.confidence)
+      // confidence: LLM이 반환한 키워드 신뢰도 (0.0~1.0)
+      accumulatedDelta[mapping.dimension] += delta * keyword.confidence
+
+// 최종 적용
+for each dimension:
+  initialValue = archetypeDefault[dimension] + clamp(accumulatedDelta[dimension], -0.4, +0.4)
+  finalValue = clamp(initialValue, 0.0, 1.0)
+```
+
+- **클램프 범위 ±0.4**: 서사 키워드가 아키타입 기본값을 최대 ±0.4까지만 보정. 아키타입의 기본 성격을 완전히 뒤집지 않도록 제한
+- **신뢰도 가중**: LLM이 불확실한 키워드(confidence 낮음)는 delta 영향이 줄어듦
+- **충돌 처리**: 같은 차원에 상반된 delta가 적용될 경우, 합산 후 클램프로 자연스럽게 상쇄
 
 #### 구체적 예시
 
 **배경 서사**: "가난하게 자라(사회적) 인정 욕구가 강하며(심리적), 성공을 위해 수단과 방법을 가리지 않음(도덕적)."
 
-**추출 키워드**: `가난`, `야망`, `인정 욕구`, `수단과 방법`
+**LLM 추출 결과**:
+| 키워드 | 의미 카테고리 | confidence |
+|---|---|---|
+| `가난` | `경제적_결핍`, `사회적_소외` | 0.95 |
+| `야망` | `성취_동기`, `목표_지향` | 0.90 |
+| `인정 욕구` | `인정_결핍`, `사회적_욕구` | 0.92 |
+| `수단과 방법` | `비도덕적`, `수단과_방법` | 0.88 |
 
 **벡터 매핑 결과**:
 | 키워드 | 영향받는 벡터 차원 | 설정값 | 이유 |
@@ -806,15 +896,96 @@ Output: 16D 벡터의 초기값 설정
 
 로버트 맥키의 "진정한 성격은 압박 속에서 드러난다"는 이론을 적용한다. 평소의 벡터가 압박 상황에서 어떻게 **왜곡**되는지를 정의한다. 중요한 것은 이것이 영구적 변경이 아니라 **일시적 오버라이드**라는 점이다 — 상황이 해소되면 원래 벡터값으로 돌아온다.
 
-#### 변환 로직
+#### 변환 로직 — 3단계: 감지 → 오버라이드 → 복귀
+
+##### Stage 1: 트리거 감지 알고리즘
+
+유저의 입력 텍스트를 페르소나의 **트리거 목록**과 대조하여 오버라이드 발동 여부를 결정한다. 단순 키워드 매칭만으로는 맥락을 놓칠 수 있으므로, **2단계 감지**를 사용한다.
 
 ```
-If (Context.Trigger matches Defined_Trigger_Keywords) Then {
-    Apply_Modifier(target_dimension, delta_value)
-    // target_dimension: 영향받는 벡터 차원
-    // delta_value: 변동량 (양수: 증가, 음수: 감소)
-}
+Step 1 — 키워드 매칭 (빠른 필터):
+  triggerHits = userText의 토큰 ∩ persona.pressureTriggers.keywords
+  if (triggerHits.length == 0) → 트리거 미발동, 종료
+
+Step 2 — 맥락 확인 (LLM Light 모델):
+  contextScore = LLM_Light.evaluate(
+    userText,
+    triggerHits,
+    persona.pressureTriggers.context  // "가족 관련 부정적 상황에서만 발동"
+  )
+  // contextScore: 0.0 (무관) ~ 1.0 (정확히 맥락 일치)
+
+  if (contextScore < 0.5) → 트리거 미발동, 종료
+  triggerStrength = contextScore  // 0.5 ~ 1.0
 ```
+
+- **키워드 매칭**은 규칙 기반으로 빠르게 수행 (비용 0)
+- **맥락 확인**은 키워드가 매칭된 경우에만 LLM Light 모델(규칙 기반)로 수행 (비용 최소)
+- `triggerStrength`가 높을수록 맥락이 트리거와 정확히 부합
+
+##### Stage 2: Delta 결정 규칙
+
+트리거 발동 시, 해당 트리거에 정의된 **오버라이드 규칙**을 `triggerStrength`에 비례하여 적용한다.
+
+```
+오버라이드 규칙 구조:
+{
+  triggerId: "family_trauma",
+  keywords: ["가족", "부모", "어린 시절", "집"],
+  context: "가족 관련 부정적 상황, 트라우마 자극",
+  effects: [
+    { dimension: "L1.lens",       delta: -0.8, type: "override" },   // 논리→감성
+    { dimension: "L3.volatility", delta: +0.2, type: "additive" },   // 기복 증가
+    { dimension: "Pressure",      delta: +0.5, type: "additive" },   // 압박 증가
+  ]
+}
+
+Delta 적용:
+for each effect in trigger.effects:
+  if (effect.type == "override"):
+    // 현재값을 무시하고 base + delta 방향으로 강제 이동
+    overriddenValue = baseValue + effect.delta * triggerStrength
+    currentValue = clamp(overriddenValue, 0.0, 1.0)
+  if (effect.type == "additive"):
+    // 현재값에 delta를 더함
+    currentValue = clamp(currentValue + effect.delta * triggerStrength, 0.0, 1.0)
+```
+
+- **`override` 타입**: 기본값에서 delta만큼 강제 이동 (예: lens 0.9 → 0.9 + (-0.8 × 0.9) ≈ 0.18)
+- **`additive` 타입**: 현재값에 delta 추가 (예: volatility 0.7 → 0.7 + 0.2 × 0.9 ≈ 0.88)
+- `triggerStrength` (0.5~1.0)에 비례하므로, 맥락 일치도가 약하면 delta도 약해짐
+
+##### Stage 3: 복귀 곡선 (Exponential Decay)
+
+오버라이드 상태는 **영구적이지 않다**. 트리거 자극이 사라지면 지수 감쇠(exponential decay)로 원래 벡터값에 점진적으로 복귀한다.
+
+```
+복귀 공식:
+  V(t) = V_base + (V_overridden - V_base) × e^(-λt)
+
+  V(t):          시간 t에서의 벡터값
+  V_base:        페르소나 기본 벡터값 (Init에서 설정된 값)
+  V_overridden:  오버라이드 직후의 벡터값
+  λ (lambda):    감쇠 상수 (클수록 빠르게 복귀)
+  t:             오버라이드 이후 경과 턴 수 (인터랙션 단위)
+```
+
+**감쇠 상수 λ 결정**:
+
+| L3.volatility 범위 | λ 값 | 복귀 속도 | 의미 |
+|---|---|---|---|
+| 0.0 ~ 0.3 (안정) | 0.7 | 빠름 (~3턴) | 감정 기복이 적어 빠르게 원래로 돌아옴 |
+| 0.3 ~ 0.6 (보통) | 0.4 | 보통 (~5턴) | 일반적인 회복 속도 |
+| 0.6 ~ 0.8 (불안정) | 0.2 | 느림 (~8턴) | 감정 기복이 커서 오래 지속 |
+| 0.8 ~ 1.0 (매우 불안정) | 0.1 | 매우 느림(~12턴) | 한번 격앙되면 쉽게 돌아오지 않음 |
+
+```
+λ = 0.7 - 0.6 × L3.volatility
+// volatility 0.0 → λ=0.7 (빠른 복귀)
+// volatility 1.0 → λ=0.1 (느린 복귀)
+```
+
+**복귀 중 재트리거**: 복귀 도중 동일 트리거가 다시 발동되면, 현재의 V(t) 위에서 다시 오버라이드가 적용된다 (누적). 이는 "같은 트라우마를 반복적으로 자극하면 점점 더 강하게 반응"하는 자연스러운 캐릭터 행동을 구현한다.
 
 #### 구체적 예시
 
@@ -831,21 +1002,23 @@ Pressure = 0.1
          ⬇ (유저가 "가족" 키워드를 언급)
 
 [트리거 감지]
-조건 충족: "가족" ∈ traumaTriggers
-Pressure += 0.5 → Pressure = 0.6
+Step 1: "가족" ∈ triggerKeywords → hit
+Step 2: contextScore = 0.85 (가족에 대한 부정적 맥락)
+→ triggerStrength = 0.85
 
-         ⬇ (벡터 오버라이드 적용)
+[오버라이드 적용]
+L1.lens: 0.9 + (-0.8 × 0.85) = 0.22 (이성 급격히 하락)
+L3.volatility: 0.7 + (0.2 × 0.85) = 0.87 (감정 기복 급증)
+Pressure: 0.1 + (0.5 × 0.85) = 0.53
 
-[오버라이드 상태]
-L1.lens: 0.9 → 0.1 (이성 급격히 하락, 감성/충동적으로 전환)
-L3.volatility: 0.7 → 0.9 (감정 기복 급증)
-→ 평소의 "논리적 분석" 대신 "감정적 반박"이 출력됨
+         ⬇ (상황 해소 후 — 복귀 곡선 적용)
 
-         ⬇ (상황 해소 후)
-
-[복귀]
-L1.lens: 0.1 → 0.9 (원래 값으로 점진적 복귀)
-Pressure: 점진적 감소
+[복귀 — λ = 0.7 - 0.6 × 0.87 = 0.18]
+t=1: lens = 0.9 + (0.22 - 0.9) × e^(-0.18×1) = 0.33
+t=3: lens = 0.9 + (0.22 - 0.9) × e^(-0.18×3) = 0.49
+t=5: lens = 0.9 + (0.22 - 0.9) × e^(-0.18×5) = 0.62
+t=10: lens = 0.9 + (0.22 - 0.9) × e^(-0.18×10) = 0.79
+→ 약 12턴 후 lens ≈ 0.85 (거의 원래 수준)
 ```
 
 ### 5.5 연결 로직 ③ — 관계성 및 타자성 → 동적 가중치 (Dynamic Weighting)
@@ -857,32 +1030,108 @@ Pressure: 점진적 감소
 #### 변환 로직
 
 ```
-Target_Vector = Base_Vector + (User_Interaction_Vector * Adaptability_Rate)
+V_adapted(n) = V_current(n-1) + UIV(n) × α_dim × momentum(n)
 ```
 
-- `Base_Vector`: 페르소나의 기본 벡터값
-- `User_Interaction_Vector`: 유저의 입력 텍스트에서 분석한 태도 벡터 (공손도, 공격성, 친밀도 등)
-- `Adaptability_Rate`: 페르소나 고유의 적응 속도 (0.0 = 상대에 영향 안 받음 ~ 1.0 = 상대에 크게 영향 받음)
+- `V_current(n-1)`: 직전 인터랙션 시점의 벡터값 (Init + Override + 이전 Adapt 누적)
+- `UIV(n)`: n번째 인터랙션의 User Interaction Vector
+- `α_dim`: 차원별 적응률 (Adaptability Rate)
+- `momentum(n)`: 방향 일관성 보너스
+
+##### User Interaction Vector (UIV) 계산
+
+유저의 입력 텍스트에서 **태도 차원**을 분석하여 벡터 보정 방향을 결정한다. LLM Light 모델로 3가지 태도 점수를 추출한다.
+
+```
+LLM Light Input:  유저 입력 텍스트
+LLM Light Output (JSON):
+  {
+    politeness: 0.0~1.0,    // 공손도 (0=무례, 1=매우 공손)
+    aggression: 0.0~1.0,    // 공격성 (0=온화, 1=매우 공격적)
+    intimacy:   0.0~1.0     // 친밀도 (0=거리감, 1=매우 친밀)
+  }
+```
+
+**태도 → 벡터 delta 매핑**:
+
+| 태도 점수 | 영향 차원 | delta 공식 | 설명 |
+|---|---|---|---|
+| politeness | L2.agreeableness | `+(politeness - 0.5) × 0.4` | 공손 → 친화↑, 무례 → 친화↓ |
+| politeness | L2.warmth* | `+(politeness - 0.5) × 0.3` | 공손 → 따뜻함↑ |
+| aggression | L1.stance | `+(aggression - 0.3) × 0.5` | 공격적 유저 → 비판적 태도 강화 |
+| aggression | L2.neuroticism | `+(aggression - 0.5) × 0.2` | 공격 → 정서 불안정 미세 증가 |
+| intimacy | L1.sociability | `+(intimacy - 0.5) × 0.3` | 친밀 → 사회성↑, 거리감 → 사회성↓ |
+| intimacy | L2.extraversion | `+(intimacy - 0.5) × 0.2` | 친밀 → 외향성 미세 증가 |
+
+*warmth는 L2 확장 속성 (agreeableness의 하위 facet으로 내부 계산용)
+
+##### 차원별 적응률 (α_dim)
+
+모든 차원이 동일한 속도로 적응하지 않는다. 페르소나의 L2/L3 특성에 따라 **차원별 적응률**이 결정된다.
+
+```
+기본 적응률: α_base = 0.15  (전체 기본값)
+
+차원별 조정:
+  α(L1.stance)       = α_base × (1 + L3.volatility × 0.5)
+    // 변덕스러운 캐릭터일수록 태도가 쉽게 변함
+  α(L2.agreeableness) = α_base × (1 + L2.openness × 0.3)
+    // 개방적일수록 상대에 쉽게 영향 받음
+  α(L1.sociability)   = α_base × (1 + L2.extraversion × 0.4)
+    // 외향적일수록 사회성이 상대에 민감
+  α(L2.neuroticism)   = α_base × (1 + L3.volatility × 0.6)
+    // 변덕+불안 → 정서가 상대에 크게 좌우됨
+```
+
+**적응률 클램프**: `α_dim = clamp(α_dim, 0.05, 0.35)` — 최소 5%, 최대 35%
+
+##### 모멘텀 (방향 일관성 보너스)
+
+같은 방향의 자극이 반복되면 적응이 가속된다. 반대로, 자극 방향이 자주 바뀌면 적응이 둔화된다.
+
+```
+momentum(n) = 1.0 + 0.3 × consistency(n)
+
+consistency(n) = (최근 3턴 중 같은 부호의 delta 비율) - 0.5
+  // 3턴 모두 같은 방향: consistency = 0.5 → momentum = 1.15
+  // 방향이 섞임: consistency = -0.17 → momentum = 0.95
+  // 3턴 모두 반대: consistency = -0.5 → momentum = 0.85
+```
+
+**드리프트 방지 클램프**:
+
+```
+for each dimension:
+  V_adapted = clamp(V_adapted, V_base - 0.3, V_base + 0.3)
+  // V_base는 Init에서 설정된 기본값
+  // Adapt는 기본값에서 최대 ±0.3만 이동 가능
+  // 이를 넘는 변화는 Override(이벤트 드리븐)에서만 가능
+```
 
 #### 구체적 예시
 
 **페르소나 설정**: "친절한 사람에게는 따뜻하지만, 무례한 사람에게는 냉소적임."
+- L2.openness = 0.7, L2.extraversion = 0.5, L3.volatility = 0.4
 
 **시나리오 A — 유저가 공손할 때**:
 ```
 유저 입력: "선생님, 이 영화에 대해 어떻게 생각하세요?"
-→ Politeness Score = 0.8 (높음)
-→ L2.agreeableness: 0.6 → 0.8 (+0.2)
-→ 출력: 따뜻하고 자세한 답변, 존칭 사용, 유저의 질문에 대한 깊은 공감 표현
+→ UIV: politeness=0.8, aggression=0.1, intimacy=0.6
+→ delta(L2.agreeableness) = (0.8-0.5)×0.4 = +0.12
+→ α(L2.agreeableness) = 0.15 × (1+0.7×0.3) = 0.18
+→ L2.agreeableness: 0.6 + 0.12 × 0.18 × 1.0 = 0.62 (미세 증가)
+→ 출력: 따뜻하고 자세한 답변
 ```
 
-**시나리오 B — 유저가 공격적일 때**:
+**시나리오 B — 유저가 3턴 연속 공격적일 때**:
 ```
-유저 입력: "그 리뷰 완전 헛소리 아닌가요?"
-→ Politeness Score = 0.2 (낮음), Aggression = 0.7 (높음)
-→ L1.stance: 0.7 → 1.0 (+0.3, 비판적 태도 강화)
-→ warmth: 0.5 → 0.1 (-0.4, 온도 급락)
-→ 출력: 냉소적이고 날카로운 반박, 거리감 있는 어투
+유저 입력(3턴차): "그 리뷰 완전 헛소리 아닌가요?"
+→ UIV: politeness=0.2, aggression=0.7, intimacy=0.2
+→ delta(L1.stance) = (0.7-0.3)×0.5 = +0.20
+→ α(L1.stance) = 0.15 × (1+0.4×0.5) = 0.18
+→ momentum = 1.0 + 0.3 × 0.5 = 1.15 (3턴 연속 같은 방향)
+→ L1.stance: 0.75 + 0.20 × 0.18 × 1.15 = 0.79 (점진적 강화)
+→ 출력: 냉소적이고 날카로운 반박
 ```
 
 ### 5.6 연결 로직 ④ — 고유한 개성 → 확률적 발현 (Probabilistic Output)
@@ -891,25 +1140,80 @@ Target_Vector = Base_Vector + (User_Interaction_Vector * Adaptability_Rate)
 
 벡터값 자체가 텍스트를 생성하는 것이 아니라, 벡터의 **현재 상태**가 비정량적 말버릇과 습관의 **발현 확률**을 결정한다. 이 확률에 따라 시스템 프롬프트에 지침이 동적으로 추가된다.
 
-#### 변환 로직
+#### 변환 로직 — 3단계: 상태값 계산 → 조건 평가 → 확률 결정
+
+##### Stage 1: 파생 상태값 계산
+
+벡터의 현재 상태에서 quirk 평가에 필요한 **파생 상태값**을 계산한다. 이 값들은 여러 벡터 차원의 조합으로 만들어진다.
+
+| 파생 상태값 | 계산 공식 | 의미 |
+|---|---|---|
+| `conflictScore` | `abs(L1.stance - L2.agreeableness) × (1 + L3.volatility) / 2` | 내적 갈등 — 표면 태도와 본성의 괴리 |
+| `anxietyLevel` | `L2.neuroticism × (1 + Pressure) / 2` | 불안 수준 — 신경증 × 현재 압박 |
+| `defenseLevel` | `(L3.lack + L2.neuroticism) / 2 × (1 - L2.agreeableness)` | 방어 수준 — 결핍+불안이 높고 친화가 낮을수록 |
+| `emotionalDepth` | `(conversationTurnCount / 20) × (1 + L2.openness) / 2` | 대화 깊이 — 턴 수 + 개방성 가중 |
+| `pressureGap` | `abs(Pressure - persona.pressureBaseline)` | 압박 괴리 — 현재 P가 기본과 얼마나 다른가 |
+
+##### Stage 2: 범용 확률 공식
+
+모든 quirk은 **동일한 확률 공식**으로 발현 확률이 계산된다. quirk마다 다른 것은 `stateValue`, `threshold`, `sensitivity` 파라미터뿐이다.
 
 ```
-1. 현재 벡터 상태에서 Conflict Score 등 상태값 계산
-2. 각 quirk의 발현 조건과 대조
-3. 조건 충족 시 확률 계산: Probability = max(0, (State_Value - Threshold) * Multiplier)
-4. 확률에 따라 시스템 프롬프트에 [X% 확률로 해당 습관 발현] 지침 추가
+Probability = sigmoid(sensitivity × (stateValue - threshold))
+
+sigmoid(x) = 1 / (1 + e^(-x))
+```
+
+- `stateValue`: 위의 파생 상태값 중 해당 quirk의 입력
+- `threshold`: 발동 기준점 (이 값 이하면 확률 ≈ 0)
+- `sensitivity`: 감도 (높을수록 threshold 부근에서 확률이 급변)
+
+**sigmoid를 사용하는 이유**: `max(0, (val - threshold) × multiplier)` 같은 선형 공식은 threshold 경계에서 불연속적이고, 1.0을 초과할 수 있다. sigmoid는 0~1 범위를 자연스럽게 보장하며, threshold 부근에서 점진적으로 전환된다.
+
+##### Stage 3: 시스템 프롬프트 통합
+
+계산된 확률을 기반으로 발현 여부를 결정하고, 시스템 프롬프트에 지침을 주입한다.
+
+```
+for each quirk in persona.quirks:
+  stateValue = computeStateValue(quirk.stateKey, currentVectors)
+  prob = sigmoid(quirk.sensitivity × (stateValue - quirk.threshold))
+
+  if (random() < prob):
+    systemPrompt.append(quirk.promptInstruction)
+    // 예: "이번 응답에서 말 끝에 헛기침("크흠,")을 넣어주세요."
+```
+
+#### Quirk 정의 스키마
+
+각 quirk은 다음 구조로 정의된다:
+
+```
+{
+  id: "nervous_cough",
+  name: "헛기침",
+  stateKey: "conflictScore",     // 어떤 파생 상태값을 사용하는지
+  threshold: 0.5,                 // 발동 기준점
+  sensitivity: 6.0,               // sigmoid 감도
+  promptInstruction: "이번 응답에서 문장 시작에 '크흠,' 또는 '음...'을 넣으세요.
+                      내면의 갈등이 표면에 드러나는 순간입니다.",
+  cooldown: 3                     // 최소 대기 턴 (같은 quirk 반복 방지)
+}
 ```
 
 #### 구체적 예시
 
 **페르소나의 quirks 정의**:
 
-| 습관 | 발동 조건 | 확률 | 출력 효과 |
-|---|---|---|---|
-| 헛기침 | Conflict_Score > 0.7 (내적 갈등이 높을 때) | `(Conflict - 0.5) * 2 = 0.6` → 60% | 문장 앞에 "크흠," 추가. 당황하거나 내면의 갈등이 표면에 드러나는 순간 |
-| 화제 전환 | received_compliment == true (칭찬을 받았을 때) | 80% (고정) | 칭찬에 대한 짧은 부정("아, 그건...") 후 빠르게 다른 주제로 전환. 인정 결핍(L3.lack)이 높은 캐릭터의 방어기제 |
-| 셀프 디프리케이팅 유머 | depth_of_conversation > 0.8 (대화가 깊어졌을 때) | 40% | 갑자기 자기비하 유머를 던져서 분위기를 환기. 깊은 대화에서 느끼는 불안(L2.neuroticism)을 유머로 방어 |
-| 방어적 비꼬기 | L2.neuroticism > 0.5 AND L3.lack > 0.7 (불안하고 결핍된 상태) | 50% | 직접적으로 감정을 드러내는 대신 비꼬는 말투로 방어. "아, 네, 물론이죠. 모든 사람이 다 전문가니까요." |
+| 습관 | stateKey | threshold | sensitivity | 확률 예시 | 출력 효과 |
+|---|---|---|---|---|---|
+| 헛기침 | `conflictScore` | 0.5 | 6.0 | conflict=0.7 → sigmoid(6×0.2) = 77% | 문장 앞에 "크흠," 추가. 내적 갈등의 표면화 |
+| 화제 전환 | `defenseLevel` | 0.4 | 8.0 | defense=0.6 → sigmoid(8×0.2) = 83% | 칭찬에 짧은 부정 후 빠르게 주제 전환. L3.lack 높은 캐릭터의 방어기제 |
+| 셀프 유머 | `emotionalDepth` | 0.6 | 5.0 | depth=0.8 → sigmoid(5×0.2) = 73% | 자기비하 유머로 분위기 환기. L2.neuroticism의 유머 방어 |
+| 방어적 비꼬기 | `anxietyLevel` | 0.5 | 7.0 | anxiety=0.65 → sigmoid(7×0.15) = 74% | 비꼬는 말투로 감정 방어. "아, 네, 물론이죠." |
+| 주제 고착 | `pressureGap` | 0.3 | 4.0 | gap=0.5 → sigmoid(4×0.2) = 69% | 압박이 높아지면 한 주제에 집착하며 반복. 강박적 특성 |
+
+**쿨다운 메커니즘**: 같은 quirk이 매 턴마다 발현되면 부자연스러우므로, `cooldown` 턴 동안은 해당 quirk의 확률을 0으로 고정한다.
 
 ### 5.7 연결 메커니즘 종합
 
