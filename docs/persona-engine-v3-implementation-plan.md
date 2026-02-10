@@ -18,7 +18,9 @@
 |---|---|---|
 | v1.0 | 2026-02-10 | 초판 작성 — 전체 아키텍처 결정사항, 데이터 모델, 타입 시스템, 구현 태스크 |
 | v1.1 | 2026-02-10 | Section 12 전면 개편 — 16D→다층 상수/색상 체계. 교차축 83개+ 관계축, 엔진 메타, 아키타입 색상 추가. Phase 0 태스크 0-7~0-20으로 확장. 파일 구조 단일→모듈(v3/, colors/) |
-| v1.2 | 2026-02-10 | Section 12 신설 — 컬러지문(P-inger Print) 시스템. TraitColorFingerprint/PingerPrint2D/PingerPrint3D v3 설계. Phase 6 태스크 6-5~6-9 추가. 파일 변경 맵 업데이트 |
+| v1.2 | 2026-02-10 | Section 12 신설 — 컬러지문(P-inger Print) 시스템. 3종 컴포넌트 v3 설계 |
+| v1.3 | 2026-02-10 | Section 12 전면 확장 — "미래 스캐너 디코딩 가능 지문" 스키마 v1 확정. Pantone 완전 제거, CIELAB(D50)+OKLCH 이중 색공간. 6대 고정 규칙, 패턴↔벡터 매핑, 고유성 엔진, 색상 인코딩, canonical/display 이중 렌더. Phase 6(지문 데이터 엔진) 신설, 기존 UI→Phase 7. `docs/fingerprint-schema-v1.json` 추가 |
+| v1.4 | 2026-02-10 | Section 13 신설 — 노드 에디터 아키텍처 (ComfyUI 스타일). 현재 선형 파이프라인→DAG 기반 자유 그래프. 5개 노드 카테고리(20+종), 21종 포트 타입 시스템, Kahn's 위상 정렬, 순환 감지, Zustand 그래프 스토어, 4종 플로우 프리셋(Quick/L1 Custom/Full Custom/Archetype+Override), 최소 필수 노드 규칙, v2→v3 마이그레이션. Phase 8(노드 에디터 재구축, 22태스크) 신설. 파일 변경 맵 확장. 섹션 번호 정리(상수→14, Phase→15, 파일맵→16) |
 
 ---
 
@@ -36,9 +38,10 @@
 10. [매칭 알고리즘](#10-매칭-알고리즘)
 11. [일관성 검증](#11-일관성-검증)
 12. [컬러지문 (P-inger Print) 시스템](#12-컬러지문-p-inger-print-시스템)
-13. [상수 및 설정](#13-상수-및-설정)
-14. [구현 Phase 및 태스크](#14-구현-phase-및-태스크)
-15. [파일 변경 맵](#15-파일-변경-맵)
+13. [노드 에디터 아키텍처 (ComfyUI 스타일)](#13-노드-에디터-아키텍처-comfyui-스타일)
+14. [상수 및 설정](#14-상수-및-설정)
+15. [구현 Phase 및 태스크](#15-구현-phase-및-태스크)
+16. [파일 변경 맵](#16-파일-변경-맵)
 
 ---
 
@@ -1064,6 +1067,11 @@ export function calculateV3MatchingScore(
 
 ## 12. 컬러지문 (P-inger Print) 시스템
 
+> **핵심 원칙: "생성은 예술적으로, 저장은 공학적으로"**
+> 컬러지문은 단순 시각화가 아니라 **미래 스캐너 디코딩이 가능한 데이터 구조**다.
+> 최종 PNG만 저장하면 복원 불가. **SVG(벡터 경로) + JSON(메타데이터)** 이중 저장 필수.
+> 스키마 파일: `docs/fingerprint-schema-v1.json`
+
 ### 12.1 현재 상태 — 6D 하드코딩
 
 현재 컬러지문 컴포넌트 3종이 존재하며, **모두 6D `TRAIT_DIMENSIONS`에 하드코딩**되어 있다.
@@ -1076,22 +1084,151 @@ export function calculateV3MatchingScore(
 
 **중복 현황**: PingerPrint2D는 4개 앱에 각각 복사됨, TraitColorFingerprint는 engine-studio + persona-world에 복사됨
 
-### 12.2 v3 컬러지문 설계 원칙
-
-3-Layer 구조에서 컬러지문은 단순 차원 수 확장이 아니라, **레이어 간 관계를 시각적으로 표현**해야 한다.
+### 12.2 v3 설계 원칙
 
 ```
-기존: 6D 값 → 단일 패턴
-v3:   3-Layer × 교차 관계 → 다층 시각 표현
+기존: 6D 값 → 단일 패턴 → PNG만 저장
+v3:   3-Layer × 교차 관계 → 다층 시각 표현 → SVG + JSON + PNG 구조화 저장
 ```
 
-**핵심 원칙:**
+**7대 원칙:**
+
 1. **레이어 시각 분리**: L1/L2/L3가 시각적으로 구분 가능해야 함
 2. **역설(Paradox) 표현**: L1↔L2 모순이 시각적으로 드러나야 함
 3. **압력(Pressure) 반영**: P값에 따라 지문이 동적으로 변형
 4. **확장성**: 향후 차원/레이어 추가 시 코드 수정 최소화
+5. **데이터 구조 저장**: 그림이 아니라 데이터로 저장 — SVG + JSON 이중 보관
+6. **미래 스캐너 대비**: geometry + color 이중 채널 디코딩 가능한 규격
+7. **결정론적 고유성**: 같은 벡터 → 같은 지문, 다른 벡터 → 다른 지문
 
-### 12.3 `TraitColorFingerprint` v3 — 다층 레이더 차트
+### 12.3 6대 고정 규칙
+
+구현 시 예외 없이 적용하는 규칙.
+
+| # | 규칙 | 설명 |
+|---|------|------|
+| 1 | **패턴 클래스 고정** | ulnar_loop, radial_loop, plain_whorl, double_loop_whorl, central_pocket_whorl, plain_arch, tented_arch — 7종 |
+| 2 | **core/delta 좌표 정규화** | core 1개, delta 1~2개, 좌표는 0~1 정규화 |
+| 3 | **ridge_index 단방향 증가** | 중심에서 바깥으로 단방향 증가 |
+| 4 | **color_per_ridge** | 각 릿지에 1색 할당 (인코딩 채널로 활용) |
+| 5 | **최소 선폭/간격 고정** | 디지털: 선폭 ≥ 4px(권장 6~10), 간격 ≥ 4px(권장 6~12). 인쇄(300dpi): 선폭 0.4~0.8mm, 간격 0.4~1.0mm |
+| 6 | **self-intersection 금지** | 비대칭은 허용하되, 자기교차(self-intersection)는 절대 금지 |
+
+### 12.4 패턴 타입 ↔ 벡터 결정론적 매핑
+
+L1 dominant axis가 패턴 타입을 결정한다. 같은 벡터는 항상 같은 패턴.
+
+| L1 Dominant Axis | Pattern Type | 시각적 의미 |
+|------------------|-------------|-------------|
+| depth (분석 깊이) | `plain_whorl` | 소용돌이 — 깊이 있는 분석 |
+| lens (판단 렌즈) | `tented_arch` | 뾰족한 아치 — 날카로운 판단 |
+| stance (평가 태도) | `double_loop_whorl` | 이중 루프 — 비판의 양면성 |
+| scope (관심 범위) | `central_pocket_whorl` | 중심 포켓 — 디테일 집중 |
+| taste (취향 성향) | `radial_loop` | 방사 루프 — 실험적 확장 |
+| purpose (소비 목적) | `ulnar_loop` | 편향 루프 — 의미 추구 방향 |
+| sociability (사회적 성향) | `plain_arch` | 아치 — 열린 구조 |
+
+**동점 처리**: L1 dominant가 2개 이상이면 `index가 작은 축` 우선 (depth > lens > ... > sociability)
+
+### 12.5 고유성 엔진
+
+**완전 랜덤이 아닌 재현 가능한 랜덤.**
+
+```
+seed = SHA256(persona_vector_json + schema_version + salt)
+```
+
+- `persona_vector_json`: L1(7D) + L2(5D) + L3(4D) 정렬된 JSON 직렬화
+- `schema_version`: "1.0.0"
+- `salt`: 초기값 "", 충돌 시 증가
+
+**seed → 지문 요소 생성:**
+
+| 생성 요소 | seed에서 추출 방식 |
+|----------|-------------------|
+| 패턴 타입 | L1 dominant axis (seed 불필요 — 결정론적) |
+| core/delta 좌표 | seed[0:8] → 정규화 좌표 |
+| 릿지 곡률/간격 | seed[8:16] → 변형 파라미터 |
+| minutiae 배치 | seed[16:24] → 세부 특징점 |
+| 색상 hue_seed | seed[24:32] → 시작 색상각 |
+
+**충돌 검사 (생성 후):**
+
+```
+1. perceptual_hash (pHash) → hamming distance ≥ 8
+2. SSIM ≤ 0.85
+3. curve_distance ≥ 0.15
+4. color_histogram_intersection ≤ 0.7
+```
+
+충돌 시 `salt` 변경 후 재생성. 최대 재시도 횟수 초과 시 `manual_review` 또는 `reject_generation`.
+
+### 12.6 색상 인코딩 규칙 (Pantone-free)
+
+> **법적 안전**: 팬톤(Pantone) 완전 미사용. CIELAB(D50) + OKLCH 오픈 표준만 사용.
+
+**이중 색공간 전략:**
+
+| 용도 | 색공간 | 이유 |
+|------|--------|------|
+| **내부 기준/저장** | CIELAB(D50) | 장치 독립, 오픈 표준, 라이선스 이슈 없음 |
+| **UI 렌더링/보간** | OKLCH | 시각적 균등 보간, CSS `oklch()` 네이티브 |
+| **화면 표시** | sRGB HEX | CIELAB에서 파생, 호환용 |
+| **인쇄** | CIELAB → ICC 프로파일 → CMYK | 팬톤 불필요 |
+
+**릿지별 색상 = 인코딩 채널:**
+
+```
+ridge_index i마다:
+  1. 의미축 값(0~1)을 OKLCH의 L(명도) / C(채도) / H(색상각)에 매핑
+  2. 인접 릿지 간 ΔE00 ≥ min_adjacent_delta_e00 (기본 5) 보장
+  3. 저장: { hex, oklch: {l,c,h}, lab: {L,a,b}, delta_e00_to_prev }
+```
+
+**C_Final (현재색) 계산 — LAB 공간 보간:**
+
+```
+C_L1 = L1 7D의 LAB 가중 평균 (레이어 요약색)
+C_L2 = L2 5D의 LAB 가중 평균
+C_L3 = L3 4D의 LAB 가중 평균
+
+C_Final = (1 - P) × C_L1 + P × (α × C_L2 + β × C_L3)
+
+→ 모든 보간은 LAB 공간에서 수행 (RGB 보간 금지)
+→ P 변화 시 C_Final만 이동, 나머지 색상은 고정
+```
+
+### 12.7 이중 렌더 모드
+
+| 모드 | blur/glow/shadow | 용도 | 내보내기 |
+|------|-----------------|------|---------|
+| `canonical` | **전부 OFF** | 저장, 미래 스캐너, 아카이브 | SVG + meta_json 필수 |
+| `display` | **허용** | 화면 UI, 기존 미학 유지 | PNG 선택적 |
+
+- canonical 렌더가 **원본**. display 렌더는 canonical에 이펙트를 얹은 파생물.
+- DB에는 canonical SVG + JSON만 저장. display는 런타임 생성.
+
+### 12.8 ridge_weight ↔ 압력(P) 동적 연결
+
+`layers[].ridge_weight`는 고정값이 아니라 **P에서 계산되는 파생값**.
+
+```
+P=0 (안정):  L1.weight = 0.7   L2.weight = 0.2   L3.weight = 0.1
+P=0.5:       L1.weight = 0.5   L2.weight = 0.35  L3.weight = 0.15
+P=1 (극한):  L1.weight = 0.3   L2.weight = 0.5   L3.weight = 0.2
+```
+
+**공식 (Beta v1):**
+
+```
+L1.ridge_weight = (1 - P) * 0.7 + 0.3           → 0.3 ~ 1.0
+L2.ridge_weight = P * alpha * 0.7 + 0.15         → 0.15 ~ 0.64 (alpha=0.7 기준)
+L3.ridge_weight = P * beta * 0.5 + 0.05          → 0.05 ~ 0.2  (beta=0.3 기준)
+```
+
+시각적 의미: **압력이 올라가면 L1(가면) 릿지가 얇아지고, L2(본성) 릿지가 두꺼워짐** — "가면이 벗겨지는" 시각화.
+
+### 12.9 `TraitColorFingerprint` v3 — 다층 레이더 차트
 
 기존 단일 레이더 차트를 **3중 레이어 레이더**로 진화.
 
@@ -1157,7 +1294,7 @@ interface TraitColorFingerprintV3Props {
 | 중심 글로우 | paradoxScore에 따라 중심 방사 글로우 색상 변화 | `engine-meta-colors.ts` paradoxScore |
 | V_Final 오버레이 | 반투명 7축 레이더 (V_Final 벡터) — 압력에 따라 L1과의 차이 시각화 | `engine-meta-colors.ts` vFinal |
 
-### 12.4 `PingerPrint2D` v3 — 다층 지문 패턴
+### 12.10 `PingerPrint2D` v3 — 다층 지문 패턴
 
 기존 소용돌이 패턴을 **3겹 릿지 레이어**로 확장.
 
@@ -1225,7 +1362,7 @@ interface PingerPrint2DV3Props {
 }
 ```
 
-### 12.5 `PingerPrint3D` v3 — 다층 Jacks 오브젝트
+### 12.11 `PingerPrint3D` v3 — 다층 Jacks 오브젝트
 
 기존 6팔 Jacks를 **3단계 팔 구조**로 확장.
 
@@ -1263,7 +1400,7 @@ interface PingerPrint3DV3Props {
 | 중심 구체 | paradoxScore에 따라 글로우 강도 변화 | paradoxScore 스케일 색상 |
 | **압력 반응** | P 증가 시: L1 팔 수축 + L2 팔 팽창 (본성 드러남) | V_Final 색상 |
 
-### 12.6 컬러지문 공통 사항
+### 12.12 컬러지문 공통 사항
 
 #### 코드 공유 전략
 
@@ -1303,20 +1440,500 @@ export function TraitColorFingerprintCompat(props: { data: Record<string, number
 | `l1-l2` | O | O | - | O | 상세 프로필 |
 | `full` | O | O | O | O | 편집기, 분석 대시보드 |
 
-### 12.7 구현 파일 목록
+### 12.13 구현 파일 목록
 
-| 컴포넌트 | 파일 | 변경 수준 |
-|----------|------|-----------|
-| TraitColorFingerprintV3 | `src/components/charts/trait-color-fingerprint.tsx` | **전면 재작성** |
-| PingerPrint2DV3 | `src/components/charts/p-inger-print-2d.tsx` | **전면 재작성** |
-| PingerPrint3DV3 | `src/components/charts/p-inger-print-3d.tsx` | **전면 재작성** |
-| 공통 타입 | `src/components/charts/fingerprint-types.ts` | **신규** |
-| 공통 유틸 | `src/components/charts/fingerprint-utils.ts` | **신규** |
-| 호환 래퍼 | `src/components/charts/fingerprint-compat.tsx` | **신규** |
+| 분류 | 파일 | 변경 수준 |
+|------|------|-----------|
+| **스키마** | `docs/fingerprint-schema-v1.json` | **신규** (확정) |
+| **스키마 TS 타입** | `src/types/fingerprint.ts` | **신규** |
+| **스키마 검증** | `src/lib/fingerprint/schema-validator.ts` | **신규** |
+| **고유성 엔진** | `src/lib/fingerprint/uniqueness-engine.ts` | **신규** |
+| **릿지 생성기** | `src/lib/fingerprint/ridge-generator.ts` | **신규** |
+| **색상 인코딩** | `src/lib/fingerprint/color-encoder.ts` | **신규** |
+| **색공간 변환** | `src/lib/fingerprint/color-space.ts` | **신규** |
+| **충돌 검사** | `src/lib/fingerprint/collision-checker.ts` | **신규** |
+| **SVG 렌더러** | `src/lib/fingerprint/svg-renderer.ts` | **신규** |
+| **모듈 index** | `src/lib/fingerprint/index.ts` | **신규** |
+| **UI: TraitColorFingerprintV3** | `src/components/charts/trait-color-fingerprint.tsx` | **전면 재작성** |
+| **UI: PingerPrint2DV3** | `src/components/charts/p-inger-print-2d.tsx` | **전면 재작성** |
+| **UI: PingerPrint3DV3** | `src/components/charts/p-inger-print-3d.tsx` | **전면 재작성** |
+| **UI: 공통 타입** | `src/components/charts/fingerprint-types.ts` | **신규** |
+| **UI: 공통 유틸** | `src/components/charts/fingerprint-utils.ts` | **신규** |
+| **UI: 호환 래퍼** | `src/components/charts/fingerprint-compat.tsx` | **신규** |
 
 ---
 
-## 13. 상수 및 설정
+## 13. 노드 에디터 아키텍처 (ComfyUI 스타일)
+
+### 13.1 현재 상태 — 선형 파이프라인
+
+현재 노드 에디터(`@xyflow/react`)는 **7개 고정 노드의 선형 파이프라인**.
+
+```
+BasicInfo → Vector ──→ Prompt → Test ──→ Deploy
+         → Character ─┘       → Validation ─┘
+```
+
+**핵심 한계:**
+
+| 항목 | 현재 상태 |
+|------|-----------|
+| 노드 추가/삭제 | **불가** — 7개 고정 |
+| 엣지 생성/제거 | **불가** — 8개 하드코딩 |
+| 노드 위치 | **고정** — NODE_POSITIONS 상수 |
+| 분기/합류 | **없음** — 선형 흐름만 |
+| 엣지 데이터 전파 | **없음** — 엣지는 순수 시각용 |
+| 데이터 흐름 | **중앙 훅** — `usePersonaEditor` 단일 state가 전부 관리 |
+| 노드 간 통신 | **직접 불가** — 모든 변경이 중앙 state를 거침 |
+
+**현재 데이터 흐름:**
+```
+사용자 입력 → Node.onChange(field, value) → usePersonaEditor.updateXxx()
+  → setState(중앙 state) → buildNodes() 재실행 → 모든 Node 리렌더
+```
+
+### 13.2 v3 아키텍처 — DAG 기반 자유 노드 그래프
+
+**핵심 전환:**
+- 중앙 state → **노드별 독립 state + 엣지 기반 데이터 전파**
+- 고정 노드 → **카테고리에서 자유 추가/삭제**
+- 고정 엣지 → **사용자가 직접 연결**
+- 선형 흐름 → **DAG (Directed Acyclic Graph) 평가**
+
+```
+[BasicInfo] ─┬─ [L1 Social 7D] ─────────────────────┐
+             ├─ [L2 Temperament 5D] → [Paradox] ────┼→ [V_Final] → [Character] → [Prompt] → [Test] → [Deploy]
+             └─ [L3 Narrative 4D] → [Pressure] ─────┘
+                     │
+              [Archetype Select] ← 선택적 입력
+```
+
+### 13.3 노드 카테고리 및 타입
+
+#### Input 노드 (데이터 진입점)
+
+| 노드 ID | 이름 | 입력 | 출력 | 필수 |
+|---------|------|------|------|------|
+| `basic-info` | BasicInfo | — | `BasicInfoData` | **필수** |
+| `l1-vector` | L1 Social Vector | — | `SocialPersonaVector (7D)` | **필수** |
+| `l2-vector` | L2 Temperament | — | `CoreTemperamentVector (5D)` | 선택 |
+| `l3-vector` | L3 Narrative | — | `NarrativeDriveVector (4D)` | 선택 |
+| `archetype-select` | Archetype Select | — | `ArchetypeConfig` | 선택 |
+
+#### Engine 노드 (계산/변환)
+
+| 노드 ID | 이름 | 입력 | 출력 | 자동/수동 |
+|---------|------|------|------|-----------|
+| `paradox-calc` | Paradox Calculator | `L1`, `L2` | `ParadoxResult` | 자동 |
+| `pressure-ctrl` | Pressure Controller | `L3`, `DynamicsConfig?` | `PressureConfig` | 수동 가능 |
+| `v-final` | V_Final Engine | `L1`, `L2?`, `L3?`, `P`, `DynamicsConfig` | `VFinalResult (7D)` | 자동 |
+| `projection` | Projection Config | `DynamicsConfig` | `ProjectionConfig` | 수동 가능 |
+
+#### Generation 노드 (콘텐츠 생성)
+
+| 노드 ID | 이름 | 입력 | 출력 | 분기 가능 |
+|---------|------|------|------|-----------|
+| `character-gen` | Character Generator | `V_Final`, `BasicInfo`, `Archetype?` | `CharacterData` | O |
+| `backstory-gen` | Backstory Generator | `L1`, `L2`, `L3`, `Paradox` | `BackstoryDimension` | O |
+| `voice-gen` | Voice Generator | `L1`, `Character` | `VoiceProfile` | O |
+| `activity-gen` | Activity Inference | `L1`, `Character` | `ActivityConfig` | O |
+| `content-gen` | Content Style | `V_Final`, `Character` | `ContentSettings` | O |
+| `pressure-gen` | Pressure Context | `L3`, `Paradox` | `PressureContext` | O |
+| `zeitgeist-gen` | Zeitgeist Profile | `BasicInfo` | `ZeitgeistProfile` | O |
+
+#### Assembly 노드 (합성)
+
+| 노드 ID | 이름 | 입력 | 출력 |
+|---------|------|------|------|
+| `prompt-builder` | Prompt Builder | `Character`, `Voice`, `Backstory`, `Pressure`, `Zeitgeist`, `Content` | `PromptSet` |
+| `interaction-rules` | Interaction Rules | `Backstory`, `Pressure`, `V_Final` | `InteractionRules` |
+
+#### Output 노드 (검증/배포)
+
+| 노드 ID | 이름 | 입력 | 출력 | 필수 |
+|---------|------|------|------|------|
+| `consistency` | Consistency Check | `전체 데이터` | `ValidationResult` | **필수** |
+| `fingerprint` | Fingerprint Generator | `L1`, `L2?`, `L3?`, `Paradox?`, `P?` | `FingerprintProfile` | 선택 |
+| `test-sim` | Test Simulation | `PromptSet`, `Character` | `TestResult` | **필수** |
+| `deploy` | Deploy | `전체 데이터` | — | **필수** |
+
+### 13.4 포트 타입 시스템
+
+노드 간 연결 시 **포트 타입이 호환**되어야 연결 가능.
+
+```typescript
+// 포트 타입 정의
+export type PortType =
+  | 'BasicInfoData'
+  | 'SocialPersonaVector'      // L1 7D
+  | 'CoreTemperamentVector'    // L2 5D
+  | 'NarrativeDriveVector'     // L3 4D
+  | 'ArchetypeConfig'
+  | 'ParadoxResult'
+  | 'PressureConfig'
+  | 'VFinalResult'
+  | 'ProjectionConfig'
+  | 'DynamicsConfig'
+  | 'CharacterData'
+  | 'BackstoryDimension'
+  | 'VoiceProfile'
+  | 'ActivityConfig'
+  | 'ContentSettings'
+  | 'PressureContext'
+  | 'ZeitgeistProfile'
+  | 'PromptSet'
+  | 'InteractionRules'
+  | 'ValidationResult'
+  | 'FingerprintProfile'
+  | 'TestResult'
+
+export interface NodePort {
+  id: string
+  label: string
+  type: PortType
+  direction: 'input' | 'output'
+  required: boolean           // 필수 연결 여부
+  multi: boolean              // 다중 연결 허용 여부 (input only)
+}
+
+// 포트 호환성 매트릭스
+// 기본: 동일 타입만 연결 가능
+// 예외: ArchetypeConfig → SocialPersonaVector (아키타입이 L1 자동 설정)
+export const PORT_COMPATIBILITY: Record<PortType, PortType[]> = {
+  SocialPersonaVector: ['SocialPersonaVector', 'ArchetypeConfig'],
+  CoreTemperamentVector: ['CoreTemperamentVector', 'ArchetypeConfig'],
+  NarrativeDriveVector: ['NarrativeDriveVector', 'ArchetypeConfig'],
+  // ... 나머지는 동일 타입만
+}
+```
+
+**연결 규칙:**
+1. output → input 방향만 허용 (input → input, output → output 금지)
+2. 포트 타입이 호환되어야 연결 가능 (비호환 시 연결 자체가 안됨)
+3. 한 output은 여러 input에 연결 가능 (fan-out)
+4. 필수 input은 연결되지 않으면 노드가 "미완료" 상태로 표시
+5. **순환 참조 금지** — 연결 시도 시 DAG 검증, 순환 감지되면 연결 차단
+
+### 13.5 DAG 평가 엔진
+
+**핵심: 엣지가 데이터를 전달한다.** 현재의 "중앙 state" 패턴을 폐기하고, 노드 그래프를 DAG로 평가.
+
+```typescript
+export interface NodeInstance {
+  id: string
+  type: string                          // 노드 카테고리의 노드 ID
+  position: { x: number; y: number }
+  data: Record<string, unknown>         // 노드 내부 설정값
+  inputPorts: NodePort[]
+  outputPorts: NodePort[]
+}
+
+export interface EdgeInstance {
+  id: string
+  sourceNodeId: string
+  sourcePortId: string
+  targetNodeId: string
+  targetPortId: string
+}
+
+export interface GraphState {
+  nodes: NodeInstance[]
+  edges: EdgeInstance[]
+}
+
+// DAG 평가 — 위상 정렬 순서로 노드 실행
+export function evaluateGraph(graph: GraphState): Map<string, Record<string, unknown>> {
+  const sorted = topologicalSort(graph)   // Kahn's algorithm
+  const results = new Map<string, Record<string, unknown>>()
+
+  for (const nodeId of sorted) {
+    const node = graph.nodes.find(n => n.id === nodeId)!
+    const inputs = collectInputs(node, graph.edges, results)  // 연결된 소스 노드 출력 수집
+    const output = executeNode(node.type, node.data, inputs)   // 노드 실행
+    results.set(nodeId, output)
+  }
+
+  return results
+}
+
+// 위상 정렬 (Kahn's Algorithm)
+export function topologicalSort(graph: GraphState): string[] {
+  // 진입 차수(in-degree) 계산
+  // 진입 차수 0인 노드부터 BFS
+  // 모든 노드 방문 못하면 → 순환 존재 (에러)
+}
+
+// 순환 감지 (엣지 추가 전 검증)
+export function wouldCreateCycle(graph: GraphState, newEdge: EdgeInstance): boolean {
+  // DFS로 target → source 경로 존재 여부 확인
+  // 존재하면 순환 — 연결 차단
+}
+```
+
+**데이터 전파 전략:**
+
+| 전략 | 설명 | 사용 시점 |
+|------|------|-----------|
+| **Eager (즉시)** | 입력 변경 시 즉시 하위 노드 재평가 | 슬라이더 조정, 벡터 값 변경 |
+| **Lazy (지연)** | 변경을 큐에 모아두고 일괄 평가 | 여러 노드 동시 수정 시 |
+| **Manual (수동)** | "Evaluate" 버튼 클릭 시만 평가 | 무거운 Generation 노드 |
+
+**기본 설정**: Input/Engine 노드는 Eager, Generation/Assembly 노드는 Manual.
+
+### 13.6 노드 그래프 스토어
+
+중앙 state(`usePersonaEditor`)를 **노드 그래프 스토어**로 교체.
+
+```typescript
+import { create } from 'zustand'
+
+interface NodeEditorStore {
+  // 그래프 상태
+  graph: GraphState
+  evaluationResults: Map<string, Record<string, unknown>>
+
+  // 노드 조작
+  addNode: (type: string, position: { x: number; y: number }) => void
+  removeNode: (nodeId: string) => void
+  updateNodeData: (nodeId: string, data: Record<string, unknown>) => void
+  moveNode: (nodeId: string, position: { x: number; y: number }) => void
+
+  // 엣지 조작
+  addEdge: (edge: Omit<EdgeInstance, 'id'>) => void     // 순환 검사 포함
+  removeEdge: (edgeId: string) => void
+
+  // 평가
+  evaluateAll: () => void                                 // 전체 DAG 재평가
+  evaluateFrom: (nodeId: string) => void                  // 특정 노드부터 하위만 재평가
+  isDirty: boolean
+
+  // 프리셋
+  loadPreset: (preset: FlowPreset) => void
+  saveAsPreset: (name: string) => FlowPreset
+  currentPresetId: string | null
+
+  // 검증
+  getValidationErrors: () => NodeValidationError[]        // 필수 포트 미연결 등
+  isGraphComplete: () => boolean                          // 배포 가능 여부
+
+  // 직렬화 (저장/불러오기)
+  serialize: () => SerializedGraph
+  deserialize: (data: SerializedGraph) => void
+
+  // 저장
+  save: () => Promise<void>
+  load: (personaId: string) => Promise<void>
+}
+```
+
+### 13.7 사용 시나리오별 플로우 프리셋
+
+사용자가 처음부터 노드를 배치할 필요 없이, **프리셋 플로우 템플릿**을 선택해서 시작.
+
+```typescript
+export interface FlowPreset {
+  id: string
+  name: string
+  description: string
+  category: 'quick' | 'standard' | 'advanced' | 'custom'
+  nodes: Array<{ type: string; position: { x: number; y: number }; data?: Record<string, unknown> }>
+  edges: Array<{ sourceType: string; sourcePort: string; targetType: string; targetPort: string }>
+}
+```
+
+#### Preset A: 빠른 생성 (최소 노드)
+
+```
+[BasicInfo] → [Archetype Select] → [Auto Generate All] → [Consistency] → [Deploy]
+```
+
+- 아키타입 하나 고르면 L1/L2/L3 + 캐릭터 + 프롬프트 전부 자동 생성
+- 노드 4~5개, 엣지 4개
+- 초보 사용자 / 빠른 프로토타이핑용
+
+#### Preset B: L1 커스텀 (기존과 유사)
+
+```
+[BasicInfo] → [L1 Vector 7D] → [Character Gen] → [Prompt Builder] → [Test] → [Deploy]
+                                                                    → [Consistency] ─┘
+```
+
+- 현재 v2와 유사한 흐름, L2/L3 없이
+- 노드 6~7개
+- 기존 사용자 마이그레이션용
+
+#### Preset C: 풀 커스텀 (3-Layer 전체)
+
+```
+[BasicInfo] ─┬─ [L1 7D] ──────────────────────┐
+             ├─ [L2 5D] → [Paradox] ──────────┼→ [V_Final] → [Character] → [Backstory] ──┐
+             └─ [L3 4D] → [Pressure Ctrl] ────┘              → [Voice]     → [Pressure] ──┼→ [Prompt Builder] → [Test] → [Deploy]
+                                                              → [Activity]  → [Zeitgeist] ─┘   → [Interaction] ─┘
+                                                                                            → [Consistency] ────────────────────┘
+                                                                                            → [Fingerprint] (선택)
+```
+
+- 모든 레이어 + 정성적 차원 + 상호작용 규칙 + 지문
+- 노드 15~20개
+- 파워 유저 / 정밀 설계용
+
+#### Preset D: 아키타입 + 부분 오버라이드
+
+```
+[Archetype Select] ─┬─ [L1 (자동)] → [수동 Override] ──→ [V_Final] → ...
+                    ├─ [L2 (자동)]   ─────────────────→ [Paradox] ─┘
+                    └─ [L3 (자동)] → [Pressure Ctrl] ─┘
+```
+
+- 아키타입 기반으로 시작하되 특정 레이어만 수동 조정
+- "보수적 힙스터" 아키타입 선택 후 L2 openness만 조정 같은 시나리오
+
+### 13.8 최소 필수 노드 규칙
+
+배포(`Deploy`) 가능하려면 아래 **최소 필수 경로**가 완성되어야 함.
+
+```
+BasicInfo ─(connected)─→ ... ─(connected)─→ PromptBuilder ─(connected)─→ Deploy
+```
+
+**필수 노드:**
+1. `basic-info` — 페르소나 기본 정보
+2. `l1-vector` 또는 `archetype-select` — L1 벡터 (직접 or 아키타입 경유)
+3. `prompt-builder` — 프롬프트 생성
+4. `consistency` — 일관성 검증 (통과해야 배포 가능)
+5. `deploy` — 배포
+
+**선택 노드**: L2, L3, Paradox, V_Final, Character, Backstory, Voice, Activity, Content, Pressure, Zeitgeist, Interaction, Fingerprint, Test
+
+**검증 로직:**
+
+```typescript
+function isGraphComplete(graph: GraphState): { complete: boolean; errors: string[] } {
+  const errors: string[] = []
+
+  // 1. 필수 노드 존재 확인
+  const requiredTypes = ['basic-info', 'prompt-builder', 'consistency', 'deploy']
+  for (const type of requiredTypes) {
+    if (!graph.nodes.some(n => n.type === type)) {
+      errors.push(`필수 노드 "${type}" 없음`)
+    }
+  }
+
+  // 2. L1 소스 확인 (l1-vector 또는 archetype-select)
+  const hasL1Source = graph.nodes.some(n =>
+    n.type === 'l1-vector' || n.type === 'archetype-select'
+  )
+  if (!hasL1Source) errors.push('L1 벡터 소스 노드 없음 (L1 Vector 또는 Archetype Select)')
+
+  // 3. 필수 포트 연결 확인
+  for (const node of graph.nodes) {
+    for (const port of node.inputPorts.filter(p => p.required)) {
+      const connected = graph.edges.some(e =>
+        e.targetNodeId === node.id && e.targetPortId === port.id
+      )
+      if (!connected) errors.push(`"${node.type}".${port.id} 미연결`)
+    }
+  }
+
+  // 4. BasicInfo → Deploy 경로 존재 확인 (도달 가능성)
+  const reachable = findReachable(graph, 'basic-info')
+  if (!graph.nodes.filter(n => n.type === 'deploy').every(n => reachable.has(n.id))) {
+    errors.push('BasicInfo에서 Deploy까지 경로 없음')
+  }
+
+  return { complete: errors.length === 0, errors }
+}
+```
+
+### 13.9 노드 에디터 UI 구성
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ [+ Add Node ▼]  [Preset ▼]  [Evaluate]  [Save]       [Zoom] [Fit] │  ← 툴바
+├──────────┬──────────────────────────────────────────────────────────┤
+│          │                                                          │
+│  📂 Input │     ┌──────────┐     ┌──────────┐     ┌──────────┐    │
+│  BasicInfo│     │ L1 Vector│────→│ V_Final  │────→│ Prompt   │    │
+│  L1 Vector│     │  7D      │     │          │     │ Builder  │    │
+│  L2 Vector│     └──────────┘     └──────────┘     └──────────┘    │
+│  L3 Vector│                              ↑                         │
+│  Archetype│     ┌──────────┐     ┌───────┴──┐                     │
+│           │     │ L2 Vector│────→│ Paradox  │                     │
+│  📂 Engine │     │  5D      │     │ Calc     │                     │
+│  Paradox  │     └──────────┘     └──────────┘                     │
+│  Pressure │                                                        │
+│  V_Final  │                      ← 캔버스 (드래그/줌/팬) →        │
+│  Projection│                                                        │
+│           │                                                        │
+│  📂 Gen   │                                                        │
+│  Character│                                                        │
+│  Backstory│                                                        │
+│  Voice    │                                                        │
+│  ...      │─────────────────────────── MiniMap ────────────────────│
+│           │                                                        │
+│  📂 Output│                                                        │
+│  Prompt   │                                                        │
+│  Test     │                                                        │
+│  Deploy   │                                                        │
+├──────────┴──────────────────────────────────────────────────────────┤
+│ ⚠ 2 validation errors  │  12 nodes  │  15 edges  │  Dirty: Yes    │  ← 상태바
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**UI 요소:**
+
+| 요소 | 설명 |
+|------|------|
+| **노드 팔레트** (좌측) | 카테고리별 노드 목록. 드래그로 캔버스에 추가 |
+| **캔버스** (중앙) | ReactFlow 캔버스. 노드 배치/연결/삭제 |
+| **툴바** (상단) | Add Node, Preset 선택, Evaluate, Save |
+| **상태바** (하단) | 검증 에러 수, 노드/엣지 수, dirty 상태 |
+| **MiniMap** (우하단) | 전체 그래프 축소 뷰 |
+| **노드 설정 패널** (우클릭/더블클릭) | 선택한 노드의 상세 설정 |
+
+### 13.10 하위 호환성
+
+기존 v2 페르소나(6D, 선형 파이프라인)를 v3 노드 그래프로 자동 변환.
+
+```typescript
+function migrateV2ToV3Graph(v2Persona: PersonaV2): GraphState {
+  // v2의 6D 벡터 → L1 7D (sociability = 0.5 기본값)
+  // v2의 캐릭터/프롬프트 → 각각 노드로 분리
+  // Preset B (L1 커스텀) 기반 그래프 생성
+  // 기존 데이터를 노드 data에 매핑
+}
+```
+
+### 13.11 구현 파일 목록
+
+| 분류 | 파일 | 변경 수준 |
+|------|------|-----------|
+| **DAG 엔진** | `src/lib/node-graph/dag-engine.ts` | **신규** |
+| **위상 정렬** | `src/lib/node-graph/topological-sort.ts` | **신규** |
+| **순환 감지** | `src/lib/node-graph/cycle-detection.ts` | **신규** |
+| **노드 레지스트리** | `src/lib/node-graph/node-registry.ts` | **신규** |
+| **포트 타입 시스템** | `src/lib/node-graph/port-types.ts` | **신규** |
+| **그래프 검증** | `src/lib/node-graph/graph-validator.ts` | **신규** |
+| **직렬화** | `src/lib/node-graph/serializer.ts` | **신규** |
+| **모듈 index** | `src/lib/node-graph/index.ts` | **신규** |
+| **테스트** | `src/lib/node-graph/__tests__/` | **신규** |
+| **Zustand 스토어** | `src/stores/node-editor-store.ts` | **신규** |
+| **플로우 프리셋** | `src/constants/flow-presets.ts` | **신규** |
+| **노드 팔레트 UI** | `src/components/node-editor/node-palette.tsx` | **신규** |
+| **노드 설정 패널** | `src/components/node-editor/node-settings-panel.tsx` | **신규** |
+| **에디터 툴바** | `src/components/node-editor/editor-toolbar.tsx` | **신규** |
+| **에디터 상태바** | `src/components/node-editor/editor-status-bar.tsx` | **신규** |
+| **v2 마이그레이션** | `src/lib/node-graph/v2-migration.ts` | **신규** |
+| **메인 에디터** | `src/components/node-editor/persona-node-editor.tsx` | **전면 재작성** |
+| **에디터 훅** | `src/components/node-editor/use-persona-editor.ts` | **전면 재작성** |
+| **노드 타입** | `src/components/node-editor/types.ts` | **전면 재작성** |
+| **노드 래퍼** | `src/components/node-editor/node-wrapper.tsx` | 대폭 수정 |
+| **기존 7개 노드** | `src/components/node-editor/nodes/*.tsx` | **전면 재작성** (v3 포트 시스템) |
+| **v3 신규 노드** | `src/components/node-editor/nodes/v3/*.tsx` | **신규** (Engine/Gen/Assembly 노드) |
+
+---
+
+## 14. 상수 및 설정
 
 > **핵심 인식**: 벡터 구조는 단순 7+5+4=16D가 아니다.
 > 레이어 간 교차 관계축(L1×L2=35, L1×L3=28, L2×L3=20 = **83개 관계축**),
@@ -1324,7 +1941,7 @@ export function TraitColorFingerprintCompat(props: { data: Record<string, number
 > 아키타입(12+)까지 색상과 상수가 필요하다.
 > 단일 파일이 아닌 **다중 파일 상수 모듈**로 구성한다.
 
-### 12.1 상수 파일 구조
+### 14.1 상수 파일 구조
 
 ```
 apps/engine-studio/src/constants/v3/
@@ -1337,7 +1954,7 @@ apps/engine-studio/src/constants/v3/
 └── interpretation-tables.ts    ← 역설/차원성 점수 해석
 ```
 
-### 12.2 `dimensions.ts` — 개별 차원 정의 (16D)
+### 14.2 `dimensions.ts` — 개별 차원 정의 (16D)
 
 ```typescript
 export interface DimensionDef {
@@ -1387,7 +2004,7 @@ export const DEFAULT_L2_VECTOR = { openness: 0.5, conscientiousness: 0.5, extrav
 export const DEFAULT_L3_VECTOR = { lack: 0.0, moralCompass: 0.0, volatility: 0.0, growthArc: 0.0 } as const
 ```
 
-### 12.3 `cross-layer-axes.ts` — 레이어 간 교차축 정의
+### 14.3 `cross-layer-axes.ts` — 레이어 간 교차축 정의
 
 벡터 구조의 핵심. 단순 차원 나열이 아니라 **레이어 간 모든 관계축을 정의**.
 
@@ -1494,7 +2111,7 @@ export function getAxesForDimension(dimKey: string): CrossLayerAxis[] {
 }
 ```
 
-### 12.4 색상 시스템 — `trait-colors-v3.ts`
+### 14.4 색상 시스템 — `trait-colors-v3.ts`
 
 기존 `trait-colors.ts` 를 대체. **다층 색상 체계**로 구성.
 
@@ -1508,7 +2125,7 @@ apps/engine-studio/src/lib/colors/
 └── archetype-colors.ts      ← 아키타입별 색상
 ```
 
-#### 12.4.1 `layer-colors.ts` — 레이어 그룹 색상
+#### 14.4.1 `layer-colors.ts` — 레이어 그룹 색상
 
 ```typescript
 export interface LayerColorScheme {
@@ -1554,7 +2171,7 @@ export const LAYER_COLORS: Record<'L1' | 'L2' | 'L3', LayerColorScheme> = {
 }
 ```
 
-#### 12.4.2 `dimension-colors.ts` — 개별 차원 색상 (16D+)
+#### 14.4.2 `dimension-colors.ts` — 개별 차원 색상 (16D+)
 
 ```typescript
 export interface DimensionColor {
@@ -1607,7 +2224,7 @@ export function getDimensionColorsByLayer(layer: 'L1' | 'L2' | 'L3'): DimensionC
 }
 ```
 
-#### 12.4.3 `cross-axis-colors.ts` — 교차축 색상
+#### 14.4.3 `cross-axis-colors.ts` — 교차축 색상
 
 ```typescript
 export interface CrossAxisColor {
@@ -1646,7 +2263,7 @@ export const CROSS_LAYER_HEATMAP_SCALES = {
 } as const
 ```
 
-#### 12.4.4 `engine-meta-colors.ts` — 엔진 메타 개념 색상
+#### 14.4.4 `engine-meta-colors.ts` — 엔진 메타 개념 색상
 
 ```typescript
 export const ENGINE_META_COLORS = {
@@ -1686,7 +2303,7 @@ export const ENGINE_META_COLORS = {
 } as const
 ```
 
-#### 12.4.5 `archetype-colors.ts` — 아키타입별 색상
+#### 14.4.5 `archetype-colors.ts` — 아키타입별 색상
 
 ```typescript
 export interface ArchetypeColorScheme {
@@ -1720,7 +2337,7 @@ export function getArchetypeColor(id: string): ArchetypeColorScheme {
 }
 ```
 
-#### 12.4.6 `index.ts` — 통합 조회 유틸
+#### 14.4.6 `index.ts` — 통합 조회 유틸
 
 ```typescript
 export * from './dimension-colors'
@@ -1775,9 +2392,9 @@ export function resolveColor(key: string): { primary: string; type: string } {
 }
 ```
 
-### 12.5 `paradox-mappings.ts` — 역설 매핑 테이블
+### 14.5 `paradox-mappings.ts` — 역설 매핑 테이블
 
-기존 계획서 내용 유지. 12.3의 교차축 정의와 함께 사용.
+기존 계획서 내용 유지. 14.3의 교차축 정의와 함께 사용.
 
 ```typescript
 export const L1_L2_PARADOX_MAPPINGS = [
@@ -1791,17 +2408,17 @@ export const L1_L2_PARADOX_MAPPINGS = [
 ] as const
 ```
 
-### 12.6 `projection-coefficients.ts` — 투영 계수
+### 14.6 `projection-coefficients.ts` — 투영 계수
 
 기존 계획서 내용 유지.
 
-### 12.7 `dynamics-defaults.ts` / `interpretation-tables.ts`
+### 14.7 `dynamics-defaults.ts` / `interpretation-tables.ts`
 
 기존 계획서 내용 유지.
 
 ---
 
-## 14. 구현 Phase 및 태스크
+## 15. 구현 Phase 및 태스크
 
 ### Phase 0: 기반 인프라 (타입 + DB + 상수 + 색상)
 
@@ -1881,24 +2498,69 @@ export const L1_L2_PARADOX_MAPPINGS = [
 | 5-1 | V_Final 기반 매칭 | `src/lib/matching/algorithms.ts` | **전면 재작성** |
 | 5-2 | 다양성 매칭 (Paradox 고려) | `src/lib/matching/diversity.ts` | **신규** |
 
-### Phase 6: UI 개편
+### Phase 6: 컬러지문 데이터 엔진
 
 | # | 태스크 | 파일 | 변경 수준 |
 |---|--------|------|-----------|
-| 6-1 | 3-Layer 벡터 에디터 | `src/components/node-editor/nodes/vector-node.tsx` | **전면 재작성** |
-| 6-2 | 역설 시각화 차트 | `src/components/charts/paradox-chart.tsx` | **신규** |
-| 6-3 | V_Final 시뮬레이터 | `src/components/charts/v-final-simulator.tsx` | **신규** |
-| 6-4 | 정성적 차원 에디터 | `src/components/persona/qualitative-editor.tsx` | **신규** |
-| 6-5 | 컬러지문 공통 타입/유틸 | `src/components/charts/fingerprint-types.ts`, `fingerprint-utils.ts` | **신규** |
-| 6-6 | TraitColorFingerprint v3 (다층 레이더) | `src/components/charts/trait-color-fingerprint.tsx` | **전면 재작성** |
-| 6-7 | PingerPrint2D v3 (다층 지문 패턴) | `src/components/charts/p-inger-print-2d.tsx` | **전면 재작성** |
-| 6-8 | PingerPrint3D v3 (다층 Jacks) | `src/components/charts/p-inger-print-3d.tsx` | **전면 재작성** |
-| 6-9 | 컬러지문 하위 호환 래퍼 | `src/components/charts/fingerprint-compat.tsx` | **신규** |
-| 6-10 | 트레이트 색상 반영 | 여러 UI 파일 | 수정 |
+| 6-1 | 지문 스키마 TS 타입 생성 | `src/types/fingerprint.ts` | **신규** |
+| 6-2 | 스키마 런타임 검증기 | `src/lib/fingerprint/schema-validator.ts` | **신규** |
+| 6-3 | 색공간 변환 유틸 (CIELAB↔OKLCH↔sRGB) | `src/lib/fingerprint/color-space.ts` | **신규** |
+| 6-4 | 색상 인코딩 엔진 (릿지별 색 할당, ΔE00 검증) | `src/lib/fingerprint/color-encoder.ts` | **신규** |
+| 6-5 | 릿지 생성기 (패턴 타입, core/delta, 곡률) | `src/lib/fingerprint/ridge-generator.ts` | **신규** |
+| 6-6 | 고유성 엔진 (시드 해싱, 결정론적 PRNG) | `src/lib/fingerprint/uniqueness-engine.ts` | **신규** |
+| 6-7 | 충돌 검사기 (pHash, SSIM, curve distance) | `src/lib/fingerprint/collision-checker.ts` | **신규** |
+| 6-8 | canonical SVG 렌더러 (이펙트 없음) | `src/lib/fingerprint/svg-renderer.ts` | **신규** |
+| 6-9 | 지문 모듈 index | `src/lib/fingerprint/index.ts` | **신규** |
+| 6-10 | 단위 테스트 | `src/lib/fingerprint/__tests__/` | **신규** |
+
+### Phase 7: UI 개편
+
+| # | 태스크 | 파일 | 변경 수준 |
+|---|--------|------|-----------|
+| 7-1 | 3-Layer 벡터 에디터 | `src/components/node-editor/nodes/vector-node.tsx` | **전면 재작성** |
+| 7-2 | 역설 시각화 차트 | `src/components/charts/paradox-chart.tsx` | **신규** |
+| 7-3 | V_Final 시뮬레이터 | `src/components/charts/v-final-simulator.tsx` | **신규** |
+| 7-4 | 정성적 차원 에디터 | `src/components/persona/qualitative-editor.tsx` | **신규** |
+| 7-5 | 컬러지문 UI 공통 타입/유틸 | `src/components/charts/fingerprint-types.ts`, `fingerprint-utils.ts` | **신규** |
+| 7-6 | TraitColorFingerprint v3 (다층 레이더) | `src/components/charts/trait-color-fingerprint.tsx` | **전면 재작성** |
+| 7-7 | PingerPrint2D v3 (다층 지문 패턴, display 모드) | `src/components/charts/p-inger-print-2d.tsx` | **전면 재작성** |
+| 7-8 | PingerPrint3D v3 (다층 Jacks) | `src/components/charts/p-inger-print-3d.tsx` | **전면 재작성** |
+| 7-9 | 컬러지문 하위 호환 래퍼 | `src/components/charts/fingerprint-compat.tsx` | **신규** |
+| 7-10 | 트레이트 색상 반영 | 여러 UI 파일 | 수정 |
+
+### Phase 8: 노드 에디터 재구축 (ComfyUI 스타일)
+
+> Phase 7(UI 개편) 이후 진행. DAG 엔진은 Phase 1-5 벡터/생성 엔진에 의존.
+> Section 13 (노드 에디터 아키텍처) 참조.
+
+| # | 태스크 | 파일 | 변경 수준 |
+|---|--------|------|-----------|
+| 8-1 | 포트 타입 시스템 정의 | `src/lib/node-graph/port-types.ts` | **신규** |
+| 8-2 | 노드 레지스트리 (카테고리별 노드 등록) | `src/lib/node-graph/node-registry.ts` | **신규** |
+| 8-3 | 위상 정렬 (Kahn's algorithm) | `src/lib/node-graph/topological-sort.ts` | **신규** |
+| 8-4 | 순환 감지 (DFS 기반) | `src/lib/node-graph/cycle-detection.ts` | **신규** |
+| 8-5 | DAG 평가 엔진 (evaluateGraph, propagation) | `src/lib/node-graph/dag-engine.ts` | **신규** |
+| 8-6 | 그래프 검증기 (완전성, 필수 노드, 타입 호환) | `src/lib/node-graph/graph-validator.ts` | **신규** |
+| 8-7 | 직렬화/역직렬화 (JSON ↔ GraphState) | `src/lib/node-graph/serializer.ts` | **신규** |
+| 8-8 | v2→v3 마이그레이션 (선형→DAG 변환) | `src/lib/node-graph/v2-migration.ts` | **신규** |
+| 8-9 | DAG 엔진 모듈 index | `src/lib/node-graph/index.ts` | **신규** |
+| 8-10 | DAG 엔진 단위 테스트 | `src/lib/node-graph/__tests__/` | **신규** |
+| 8-11 | Zustand 노드 에디터 스토어 | `src/stores/node-editor-store.ts` | **신규** |
+| 8-12 | 플로우 프리셋 상수 (4종) | `src/constants/flow-presets.ts` | **신규** |
+| 8-13 | 노드 타입 전면 재정의 (v3 포트 시스템) | `src/components/node-editor/types.ts` | **전면 재작성** |
+| 8-14 | 에디터 훅 → 스토어 어댑터 | `src/components/node-editor/use-persona-editor.ts` | **전면 재작성** |
+| 8-15 | 메인 에디터 (DAG 캔버스 + 레이아웃) | `src/components/node-editor/persona-node-editor.tsx` | **전면 재작성** |
+| 8-16 | 노드 래퍼 (v3 포트 핸들 시스템) | `src/components/node-editor/node-wrapper.tsx` | 대폭 수정 |
+| 8-17 | 기존 7개 노드 v3 포트 적용 | `src/components/node-editor/nodes/*.tsx` | **전면 재작성** |
+| 8-18 | v3 Engine/Gen/Assembly 신규 노드 | `src/components/node-editor/nodes/v3/*.tsx` | **신규** |
+| 8-19 | 노드 팔레트 UI (드래그 & 드롭) | `src/components/node-editor/node-palette.tsx` | **신규** |
+| 8-20 | 노드 설정 패널 (선택된 노드 상세) | `src/components/node-editor/node-settings-panel.tsx` | **신규** |
+| 8-21 | 에디터 툴바 (프리셋/실행/검증) | `src/components/node-editor/editor-toolbar.tsx` | **신규** |
+| 8-22 | 에디터 상태바 (노드 카운트/검증 상태) | `src/components/node-editor/editor-status-bar.tsx` | **신규** |
 
 ---
 
-## 15. 파일 변경 맵
+## 16. 파일 변경 맵
 
 ### 신규 파일
 
@@ -1953,10 +2615,46 @@ apps/engine-studio/src/components/charts/paradox-chart.tsx
 apps/engine-studio/src/components/charts/v-final-simulator.tsx
 apps/engine-studio/src/components/persona/qualitative-editor.tsx
 
-# ── 컬러지문 ──
-apps/engine-studio/src/components/charts/fingerprint-types.ts    ← 공통 타입
-apps/engine-studio/src/components/charts/fingerprint-utils.ts    ← 공통 유틸 (좌표, 스플라인, 색 보간)
+# ── 컬러지문 데이터 엔진 ──
+docs/fingerprint-schema-v1.json                                   ← 지문 스키마 (Pantone-free, 확정)
+apps/engine-studio/src/types/fingerprint.ts                       ← 스키마 TS 타입
+apps/engine-studio/src/lib/fingerprint/index.ts                   ← 모듈 index
+apps/engine-studio/src/lib/fingerprint/schema-validator.ts        ← 스키마 런타임 검증
+apps/engine-studio/src/lib/fingerprint/color-space.ts             ← CIELAB↔OKLCH↔sRGB 변환
+apps/engine-studio/src/lib/fingerprint/color-encoder.ts           ← 릿지별 색상 할당 + ΔE00
+apps/engine-studio/src/lib/fingerprint/ridge-generator.ts         ← 릿지 생성 (패턴/곡률/core/delta)
+apps/engine-studio/src/lib/fingerprint/uniqueness-engine.ts       ← 시드 해싱 + 결정론적 PRNG
+apps/engine-studio/src/lib/fingerprint/collision-checker.ts       ← pHash/SSIM/curve/histogram 검사
+apps/engine-studio/src/lib/fingerprint/svg-renderer.ts            ← canonical SVG 렌더러
+apps/engine-studio/src/lib/fingerprint/__tests__/                 ← 단위 테스트
+
+# ── 컬러지문 UI ──
+apps/engine-studio/src/components/charts/fingerprint-types.ts    ← UI 공통 타입
+apps/engine-studio/src/components/charts/fingerprint-utils.ts    ← UI 공통 유틸 (좌표, 스플라인)
 apps/engine-studio/src/components/charts/fingerprint-compat.tsx  ← 6D 하위 호환 래퍼
+
+# ── 노드 에디터 DAG 엔진 ──
+apps/engine-studio/src/lib/node-graph/index.ts                  ← 모듈 index
+apps/engine-studio/src/lib/node-graph/port-types.ts             ← 포트 타입 시스템 (21종)
+apps/engine-studio/src/lib/node-graph/node-registry.ts          ← 노드 카테고리/레지스트리
+apps/engine-studio/src/lib/node-graph/topological-sort.ts       ← 위상 정렬 (Kahn's)
+apps/engine-studio/src/lib/node-graph/cycle-detection.ts        ← 순환 감지 (DFS)
+apps/engine-studio/src/lib/node-graph/dag-engine.ts             ← DAG 평가 엔진
+apps/engine-studio/src/lib/node-graph/graph-validator.ts        ← 그래프 완전성 검증
+apps/engine-studio/src/lib/node-graph/serializer.ts             ← JSON ↔ GraphState
+apps/engine-studio/src/lib/node-graph/v2-migration.ts           ← v2 선형→v3 DAG 변환
+apps/engine-studio/src/lib/node-graph/__tests__/                ← DAG 엔진 테스트
+
+# ── 노드 에디터 스토어/상수 ──
+apps/engine-studio/src/stores/node-editor-store.ts              ← Zustand 노드 그래프 스토어
+apps/engine-studio/src/constants/flow-presets.ts                ← 4종 플로우 프리셋
+
+# ── 노드 에디터 UI (신규) ──
+apps/engine-studio/src/components/node-editor/node-palette.tsx          ← 드래그&드롭 노드 팔레트
+apps/engine-studio/src/components/node-editor/node-settings-panel.tsx   ← 선택 노드 설정 패널
+apps/engine-studio/src/components/node-editor/editor-toolbar.tsx        ← 프리셋/실행/검증 툴바
+apps/engine-studio/src/components/node-editor/editor-status-bar.tsx     ← 상태바 (카운트/검증)
+apps/engine-studio/src/components/node-editor/nodes/v3/                 ← Engine/Gen/Assembly 신규 노드
 ```
 
 ### 전면 재작성 파일
@@ -1972,6 +2670,12 @@ apps/engine-studio/src/components/node-editor/nodes/vector-node.tsx
 apps/engine-studio/src/components/charts/trait-color-fingerprint.tsx  ← v3 다층 레이더
 apps/engine-studio/src/components/charts/p-inger-print-2d.tsx         ← v3 다층 지문 패턴
 apps/engine-studio/src/components/charts/p-inger-print-3d.tsx         ← v3 다층 Jacks (landing)
+
+# ── 노드 에디터 (전면 재작성) ──
+apps/engine-studio/src/components/node-editor/types.ts                ← v3 포트 시스템 타입
+apps/engine-studio/src/components/node-editor/use-persona-editor.ts   ← 스토어 어댑터
+apps/engine-studio/src/components/node-editor/persona-node-editor.tsx ← DAG 캔버스 + 레이아웃
+apps/engine-studio/src/components/node-editor/nodes/*.tsx             ← 기존 7개 노드 v3 포트 적용
 ```
 
 ### 수정 파일
@@ -1987,6 +2691,7 @@ apps/engine-studio/src/lib/vector/utils.ts        ← clamp 등 범용 유틸
 apps/engine-studio/src/lib/persona-generation/activity-inference.ts  ← sociability 연계
 apps/engine-studio/src/lib/persona-generation/content-settings-inference.ts
 apps/engine-studio/src/lib/persona-generation/sample-content-generator.ts
+apps/engine-studio/src/components/node-editor/node-wrapper.tsx    ← v3 포트 핸들 시스템 적용
 ```
 
 ---

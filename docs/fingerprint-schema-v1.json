@@ -1,0 +1,826 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deepsight.ai/schemas/fingerprint_schema_v1.json",
+  "title": "DeepSight Fingerprint Color Signature Schema v1",
+  "description": "Human-like fingerprint topology + per-ridge color encoding + future scanner readiness. Pantone-free, OKLCH+CIELAB dual color space.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile_id",
+    "created_at",
+    "generator",
+    "persona_binding",
+    "layers",
+    "topology",
+    "ridge_style",
+    "color_fingerprint",
+    "render_profile",
+    "uniqueness",
+    "collision_handling",
+    "validation",
+    "future_scanner",
+    "artifacts"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "profile_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{8,64}$",
+      "description": "Unique ID for this fingerprint profile"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "engine_name",
+        "engine_version",
+        "seed_hash_sha256",
+        "random_source"
+      ],
+      "properties": {
+        "engine_name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 64
+        },
+        "engine_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "seed_hash_sha256": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$",
+          "description": "Deterministic seed: hash(persona_vector + schema_version + salt)"
+        },
+        "random_source": {
+          "type": "string",
+          "enum": ["deterministic_prng", "hybrid_prng"]
+        }
+      }
+    },
+    "persona_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "persona_id",
+        "vector_version",
+        "pressure_coefficient",
+        "blend_alpha",
+        "blend_beta",
+        "persona_vector",
+        "projection"
+      ],
+      "properties": {
+        "persona_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]{6,64}$"
+        },
+        "vector_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "pressure_coefficient": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "P value — affects layer ridge weights dynamically"
+        },
+        "blend_alpha": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "L2 blend weight (alpha + beta must equal 1.0)"
+        },
+        "blend_beta": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "L3 blend weight (alpha + beta must equal 1.0)"
+        },
+        "persona_vector": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["L1", "L2", "L3"],
+          "properties": {
+            "L1": {
+              "type": "array",
+              "minItems": 7,
+              "maxItems": 7,
+              "items": { "type": "number", "minimum": 0, "maximum": 1 },
+              "description": "Social Persona 7D: [depth, lens, stance, scope, taste, purpose, sociability]"
+            },
+            "L2": {
+              "type": "array",
+              "minItems": 5,
+              "maxItems": 5,
+              "items": { "type": "number", "minimum": 0, "maximum": 1 },
+              "description": "Core Temperament/OCEAN 5D: [openness, conscientiousness, extraversion, agreeableness, neuroticism]"
+            },
+            "L3": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "items": { "type": "number", "minimum": 0, "maximum": 1 },
+              "description": "Narrative Drive 4D: [lack, moralCompass, volatility, growthArc]"
+            }
+          }
+        },
+        "projection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mapping_matrix_version",
+            "target_axes"
+          ],
+          "properties": {
+            "mapping_matrix_version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32
+            },
+            "target_axes": {
+              "type": "array",
+              "minItems": 7,
+              "maxItems": 7,
+              "items": {
+                "type": "string",
+                "enum": [
+                  "depth",
+                  "lens",
+                  "stance",
+                  "scope",
+                  "taste",
+                  "purpose",
+                  "sociability"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "layers": {
+      "type": "array",
+      "description": "Fixed 3-layer ridge profile. ridge_weight is derived from pressure_coefficient.",
+      "minItems": 3,
+      "maxItems": 3,
+      "prefixItems": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "layer_id",
+            "source_dim",
+            "projected_axes_7",
+            "ridge_weight",
+            "ridge_weight_formula",
+            "roughness",
+            "prominence"
+          ],
+          "properties": {
+            "layer_id": { "type": "string", "const": "L1" },
+            "source_dim": { "type": "integer", "const": 7 },
+            "projected_axes_7": {
+              "type": "array",
+              "minItems": 7,
+              "maxItems": 7,
+              "items": { "type": "number", "minimum": 0, "maximum": 1 }
+            },
+            "ridge_weight": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Current weight (computed from pressure)"
+            },
+            "ridge_weight_formula": {
+              "type": "string",
+              "description": "Formula: e.g. '(1 - P) * 0.7 + 0.3' — L1 dominant at low P, recedes at high P"
+            },
+            "roughness": { "type": "number", "minimum": 0, "maximum": 1 },
+            "prominence": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "layer_id",
+            "source_dim",
+            "projected_axes_7",
+            "ridge_weight",
+            "ridge_weight_formula",
+            "roughness",
+            "prominence"
+          ],
+          "properties": {
+            "layer_id": { "type": "string", "const": "L2" },
+            "source_dim": { "type": "integer", "const": 5 },
+            "projected_axes_7": {
+              "type": "array",
+              "minItems": 7,
+              "maxItems": 7,
+              "items": { "type": "number", "minimum": 0, "maximum": 1 }
+            },
+            "ridge_weight": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Current weight (computed from pressure)"
+            },
+            "ridge_weight_formula": {
+              "type": "string",
+              "description": "Formula: e.g. 'P * alpha * 0.7 + 0.15' — L2 emerges under pressure"
+            },
+            "roughness": { "type": "number", "minimum": 0, "maximum": 1 },
+            "prominence": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "layer_id",
+            "source_dim",
+            "projected_axes_7",
+            "ridge_weight",
+            "ridge_weight_formula",
+            "roughness",
+            "prominence"
+          ],
+          "properties": {
+            "layer_id": { "type": "string", "const": "L3" },
+            "source_dim": { "type": "integer", "const": 4 },
+            "projected_axes_7": {
+              "type": "array",
+              "minItems": 7,
+              "maxItems": 7,
+              "items": { "type": "number", "minimum": 0, "maximum": 1 }
+            },
+            "ridge_weight": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Current weight (computed from pressure)"
+            },
+            "ridge_weight_formula": {
+              "type": "string",
+              "description": "Formula: e.g. 'P * beta * 0.5 + 0.05' — L3 subtle influence"
+            },
+            "roughness": { "type": "number", "minimum": 0, "maximum": 1 },
+            "prominence": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      ],
+      "items": false
+    },
+    "topology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pattern_type",
+        "pattern_type_rule",
+        "core_points",
+        "delta_points",
+        "ridge_count",
+        "minutiae_density",
+        "self_intersection_allowed"
+      ],
+      "properties": {
+        "pattern_type": {
+          "type": "string",
+          "enum": [
+            "ulnar_loop",
+            "radial_loop",
+            "plain_whorl",
+            "double_loop_whorl",
+            "central_pocket_whorl",
+            "plain_arch",
+            "tented_arch"
+          ]
+        },
+        "pattern_type_rule": {
+          "type": "string",
+          "description": "Deterministic mapping: L1 dominant axis → pattern type. e.g. 'depth_dominant → plain_whorl'"
+        },
+        "core_points": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["x", "y"],
+            "properties": {
+              "x": { "type": "number", "minimum": 0, "maximum": 1 },
+              "y": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          }
+        },
+        "delta_points": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["x", "y"],
+            "properties": {
+              "x": { "type": "number", "minimum": 0, "maximum": 1 },
+              "y": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          }
+        },
+        "ridge_count": {
+          "type": "integer",
+          "minimum": 40,
+          "maximum": 800
+        },
+        "minutiae_density": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 0.4
+        },
+        "self_intersection_allowed": {
+          "type": "boolean",
+          "const": false
+        }
+      }
+    },
+    "ridge_style": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "line_cap",
+        "line_join",
+        "line_width_px",
+        "line_spacing_px",
+        "thickness_variation_ratio",
+        "spacing_variation_ratio",
+        "anti_aliasing"
+      ],
+      "properties": {
+        "line_cap": {
+          "type": "string",
+          "enum": ["round", "butt", "square"]
+        },
+        "line_join": {
+          "type": "string",
+          "enum": ["round", "miter", "bevel"]
+        },
+        "line_width_px": {
+          "type": "number",
+          "minimum": 3,
+          "maximum": 24,
+          "description": "Recommended: 6-10px for digital"
+        },
+        "line_spacing_px": {
+          "type": "number",
+          "minimum": 3,
+          "maximum": 32,
+          "description": "Recommended: 6-12px for digital"
+        },
+        "thickness_variation_ratio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.35
+        },
+        "spacing_variation_ratio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.35
+        },
+        "anti_aliasing": {
+          "type": "string",
+          "enum": ["off", "low", "medium"]
+        }
+      }
+    },
+    "color_fingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assignment_mode",
+        "color_space_internal",
+        "color_space_render",
+        "min_adjacent_delta_e00",
+        "max_global_delta_e00"
+      ],
+      "properties": {
+        "assignment_mode": {
+          "type": "string",
+          "enum": ["FORMULA", "EXPLICIT"],
+          "description": "FORMULA: algorithmic color assignment. EXPLICIT: per-ridge manual colors."
+        },
+        "color_space_internal": {
+          "type": "string",
+          "const": "CIELAB_D50",
+          "description": "Internal standard: CIELAB with D50 illuminant. Device-independent, open standard, no licensing."
+        },
+        "color_space_render": {
+          "type": "string",
+          "const": "OKLCH",
+          "description": "UI rendering: OKLCH for perceptually uniform interpolation. CSS oklch() native support."
+        },
+        "min_adjacent_delta_e00": {
+          "type": "number",
+          "minimum": 5,
+          "maximum": 30,
+          "description": "Minimum color difference between adjacent ridges (ΔE00)"
+        },
+        "max_global_delta_e00": {
+          "type": "number",
+          "minimum": 20,
+          "maximum": 100,
+          "description": "Maximum allowable color range across all ridges"
+        },
+        "formula": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "hue_seed_deg",
+            "hue_step_deg",
+            "lightness_min",
+            "lightness_max",
+            "chroma_min",
+            "chroma_max"
+          ],
+          "properties": {
+            "hue_seed_deg": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 360,
+              "description": "Starting hue angle (derived from persona vector seed)"
+            },
+            "hue_step_deg": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 180,
+              "description": "Hue rotation per ridge"
+            },
+            "lightness_min": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "lightness_max": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "chroma_min": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "chroma_max": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "ridge_colors": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1200,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ridge_index",
+              "hex",
+              "oklch",
+              "lab",
+              "delta_e00_to_prev"
+            ],
+            "properties": {
+              "ridge_index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2000
+              },
+              "hex": {
+                "type": "string",
+                "pattern": "^#([0-9a-fA-F]{6})$",
+                "description": "sRGB hex — derived from lab, for display convenience"
+              },
+              "oklch": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["l", "c", "h"],
+                "properties": {
+                  "l": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "c": { "type": "number", "minimum": 0, "maximum": 0.4 },
+                  "h": { "type": "number", "minimum": 0, "maximum": 360 }
+                },
+                "description": "OKLCH — for UI rendering and perceptually uniform interpolation"
+              },
+              "lab": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["L", "a", "b"],
+                "properties": {
+                  "L": { "type": "number", "minimum": 0, "maximum": 100 },
+                  "a": { "type": "number", "minimum": -128, "maximum": 127 },
+                  "b": { "type": "number", "minimum": -128, "maximum": 127 }
+                },
+                "description": "CIELAB D50 — internal standard, device-independent"
+              },
+              "delta_e00_to_prev": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "assignment_mode": { "const": "FORMULA" } },
+            "required": ["assignment_mode"]
+          },
+          "then": {
+            "required": ["formula"]
+          }
+        },
+        {
+          "if": {
+            "properties": { "assignment_mode": { "const": "EXPLICIT" } },
+            "required": ["assignment_mode"]
+          },
+          "then": {
+            "required": ["ridge_colors"]
+          }
+        }
+      ]
+    },
+    "render_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "render_mode",
+        "canvas_size_px",
+        "background",
+        "dpi",
+        "required_exports"
+      ],
+      "properties": {
+        "render_mode": {
+          "type": "string",
+          "enum": ["canonical", "display"],
+          "description": "canonical: no effects, scanner-optimized storage. display: effects allowed, visual aesthetics for UI."
+        },
+        "canvas_size_px": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height"],
+          "properties": {
+            "width": { "type": "integer", "minimum": 512, "maximum": 8192 },
+            "height": { "type": "integer", "minimum": 512, "maximum": 8192 }
+          }
+        },
+        "background": {
+          "type": "string",
+          "enum": ["transparent", "solid_white", "solid_black"]
+        },
+        "dpi": {
+          "type": "integer",
+          "minimum": 72,
+          "maximum": 1200
+        },
+        "required_exports": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": ["svg", "png", "meta_json"]
+          },
+          "description": "canonical mode requires ['svg', 'meta_json']. display mode may omit some."
+        },
+        "display_effects": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "blur": { "type": "boolean", "default": false },
+            "glow": { "type": "boolean", "default": false },
+            "shadow": { "type": "boolean", "default": false }
+          },
+          "description": "Only applied when render_mode = 'display'. Ignored for 'canonical'."
+        }
+      }
+    },
+    "uniqueness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fingerprint_hash_sha256",
+        "perceptual_hash_64",
+        "registry_scope"
+      ],
+      "properties": {
+        "fingerprint_hash_sha256": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "perceptual_hash_64": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{16}$"
+        },
+        "registry_scope": {
+          "type": "string",
+          "enum": ["global", "tenant", "project"]
+        }
+      }
+    },
+    "collision_handling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "comparison_metrics",
+        "retry_policy",
+        "on_exceed"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "const": true
+        },
+        "comparison_metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "phash_hamming_min",
+            "ssim_max",
+            "curve_distance_min",
+            "color_histogram_intersection_max"
+          ],
+          "properties": {
+            "phash_hamming_min": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64,
+              "default": 8,
+              "description": "Hamming distance must be >= this value"
+            },
+            "ssim_max": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.85,
+              "description": "Structural similarity must be <= this value"
+            },
+            "curve_distance_min": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.15,
+              "description": "Topology curve distance must be >= this value"
+            },
+            "color_histogram_intersection_max": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.7,
+              "description": "Color histogram overlap must be <= this value"
+            }
+          }
+        },
+        "retry_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["max_retry", "salt_increment_strategy"],
+          "properties": {
+            "max_retry": { "type": "integer", "minimum": 1, "maximum": 1000 },
+            "salt_increment_strategy": {
+              "type": "string",
+              "enum": ["+1_integer", "uuid_v4", "timestamp_ns"]
+            }
+          }
+        },
+        "on_exceed": {
+          "type": "string",
+          "enum": [
+            "manual_review",
+            "reject_generation",
+            "fallback_template"
+          ]
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "checks"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["pass", "fail", "warning"]
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "passed", "threshold", "observed"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "enum": [
+                  "ridge_width_min",
+                  "ridge_spacing_min",
+                  "no_self_intersection",
+                  "adjacent_delta_e00_min",
+                  "uniqueness_phash",
+                  "uniqueness_ssim",
+                  "core_delta_presence",
+                  "topology_continuity",
+                  "lab_gamut_valid",
+                  "blend_alpha_beta_sum"
+                ]
+              },
+              "passed": { "type": "boolean" },
+              "threshold": {},
+              "observed": {}
+            }
+          }
+        }
+      }
+    },
+    "future_scanner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scanner_ready",
+        "channels",
+        "qr_payload_embedded",
+        "decode_mode_hint"
+      ],
+      "properties": {
+        "scanner_ready": { "type": "boolean", "const": true },
+        "channels": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "enum": ["geometry", "color", "layer_dynamics", "metadata_lookup"]
+          }
+        },
+        "qr_payload_embedded": { "type": "boolean", "const": false },
+        "decode_mode_hint": {
+          "type": "string",
+          "enum": ["geometry_first", "color_first", "hybrid_weighted"]
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["svg_uri", "png_uri", "meta_json_uri"],
+      "properties": {
+        "svg_uri": {
+          "type": "string",
+          "format": "uri-reference"
+        },
+        "png_uri": {
+          "type": "string",
+          "format": "uri-reference"
+        },
+        "meta_json_uri": {
+          "type": "string",
+          "format": "uri-reference"
+        }
+      }
+    },
+    "x_runtime_rules": {
+      "type": "array",
+      "description": "Constraints not expressible in pure JSON Schema — enforced at runtime",
+      "items": { "type": "string" },
+      "default": [
+        "blend_alpha + blend_beta must equal 1.0",
+        "if assignment_mode=EXPLICIT then ridge_colors.length must equal topology.ridge_count",
+        "for all adjacent ridges: delta_e00_to_prev >= min_adjacent_delta_e00",
+        "line_width_px <= line_spacing_px * 1.2",
+        "core_points and delta_points must lie inside convex hull of ridge paths",
+        "all ridge paths must have no self-intersection",
+        "ridge_weight values must match ridge_weight_formula evaluated at current pressure_coefficient",
+        "lab values must be within sRGB gamut (for hex derivation) — warn if out of gamut",
+        "render_mode=canonical requires display_effects all false"
+      ]
+    }
+  }
+}
