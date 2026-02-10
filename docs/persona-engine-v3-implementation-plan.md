@@ -18,6 +18,7 @@
 |---|---|---|
 | v1.0 | 2026-02-10 | 초판 작성 — 전체 아키텍처 결정사항, 데이터 모델, 타입 시스템, 구현 태스크 |
 | v1.1 | 2026-02-10 | Section 12 전면 개편 — 16D→다층 상수/색상 체계. 교차축 83개+ 관계축, 엔진 메타, 아키타입 색상 추가. Phase 0 태스크 0-7~0-20으로 확장. 파일 구조 단일→모듈(v3/, colors/) |
+| v1.2 | 2026-02-10 | Section 12 신설 — 컬러지문(P-inger Print) 시스템. TraitColorFingerprint/PingerPrint2D/PingerPrint3D v3 설계. Phase 6 태스크 6-5~6-9 추가. 파일 변경 맵 업데이트 |
 
 ---
 
@@ -34,9 +35,10 @@
 9. [생성 파이프라인](#9-생성-파이프라인)
 10. [매칭 알고리즘](#10-매칭-알고리즘)
 11. [일관성 검증](#11-일관성-검증)
-12. [상수 및 설정](#12-상수-및-설정)
-13. [구현 Phase 및 태스크](#13-구현-phase-및-태스크)
-14. [파일 변경 맵](#14-파일-변경-맵)
+12. [컬러지문 (P-inger Print) 시스템](#12-컬러지문-p-inger-print-시스템)
+13. [상수 및 설정](#13-상수-및-설정)
+14. [구현 Phase 및 태스크](#14-구현-phase-및-태스크)
+15. [파일 변경 맵](#15-파일-변경-맵)
 
 ---
 
@@ -1060,7 +1062,261 @@ export function calculateV3MatchingScore(
 
 ---
 
-## 12. 상수 및 설정
+## 12. 컬러지문 (P-inger Print) 시스템
+
+### 12.1 현재 상태 — 6D 하드코딩
+
+현재 컬러지문 컴포넌트 3종이 존재하며, **모두 6D `TRAIT_DIMENSIONS`에 하드코딩**되어 있다.
+
+| 컴포넌트 | 파일 위치 (4개 앱에 중복) | 형태 | 핵심 로직 |
+|----------|--------------------------|------|-----------|
+| `TraitColorFingerprint` | `components/charts/trait-color-fingerprint.tsx` | 레이더 차트 + 컬러 섹터 | 6D 축별 방사형 그라디언트, Catmull-Rom 스플라인 |
+| `PingerPrint2D` | `components/p-inger-print-2d.tsx` | 지문 소용돌이 패턴 | 6D → 릿지 개수, 소용돌이 회전, 비대칭, 주름, 불규칙성, 중심오프셋 |
+| `PingerPrint3D` | `components/p-inger-print-3d.tsx` (landing만) | Three.js Jacks 오브젝트 | 6D → 팔 6개 길이/굵기/크롬 컬러 |
+
+**중복 현황**: PingerPrint2D는 4개 앱에 각각 복사됨, TraitColorFingerprint는 engine-studio + persona-world에 복사됨
+
+### 12.2 v3 컬러지문 설계 원칙
+
+3-Layer 구조에서 컬러지문은 단순 차원 수 확장이 아니라, **레이어 간 관계를 시각적으로 표현**해야 한다.
+
+```
+기존: 6D 값 → 단일 패턴
+v3:   3-Layer × 교차 관계 → 다층 시각 표현
+```
+
+**핵심 원칙:**
+1. **레이어 시각 분리**: L1/L2/L3가 시각적으로 구분 가능해야 함
+2. **역설(Paradox) 표현**: L1↔L2 모순이 시각적으로 드러나야 함
+3. **압력(Pressure) 반영**: P값에 따라 지문이 동적으로 변형
+4. **확장성**: 향후 차원/레이어 추가 시 코드 수정 최소화
+
+### 12.3 `TraitColorFingerprint` v3 — 다층 레이더 차트
+
+기존 단일 레이더 차트를 **3중 레이어 레이더**로 진화.
+
+```
+데이터 입력:
+{
+  l1: { depth: 0.8, lens: 0.3, ... },           // 7D — 외부 링(메인)
+  l2: { openness: 0.6, ... },                    // 5D — 내부 링
+  l3: { lack: 0.7, ... },                        // 4D — 코어 마크
+  paradoxScore: 0.45,                             // 중심 글로우 색상 결정
+  pressure?: number,                              // V_Final 오버레이 (선택)
+}
+```
+
+**시각 구조:**
+
+```
+┌─────────────────────────────┐
+│                             │
+│    L1 레이더 (7축, 외곽)     │  ← 기존과 유사하지만 7D
+│      ┌───────────────┐      │
+│      │ L2 레이더      │      │  ← 내부, 5축, OCEAN
+│      │  (5축, 내부)   │      │     축 위치는 L1 대응축과 정렬
+│      │   ┌───────┐   │      │
+│      │   │L3 마크 │   │      │  ← 중심 영역, 4개 심볼
+│      │   └───────┘   │      │
+│      └───────────────┘      │
+│                             │
+│  [역설 인디케이터: 대응축     │  ← L1↔L2 역설 페어를
+│   사이 점선 + 색상 강도]     │     시각적으로 연결
+│                             │
+└─────────────────────────────┘
+```
+
+```typescript
+interface TraitColorFingerprintV3Props {
+  l1: Record<string, number>             // L1 Social (7D)
+  l2?: Record<string, number>            // L2 Temperament (5D, 선택)
+  l3?: Record<string, number>            // L3 Narrative (4D, 선택)
+  paradoxScore?: number                  // 0.0~1.0
+  pressure?: number                      // V_Final 오버레이용
+  vFinal?: number[]                      // V_Final 벡터 (7D)
+
+  size?: number
+  mode?: 'compact' | 'full' | 'detail'  // compact=L1만, full=L1+L2, detail=전체
+  showLabels?: boolean
+  showGrid?: boolean
+  showValues?: boolean
+  showParadoxLinks?: boolean             // 역설 페어 연결선
+  showVFinalOverlay?: boolean            // V_Final 오버레이
+  interactive?: boolean                  // 호버 시 상세 정보
+}
+```
+
+**핵심 시각 요소:**
+
+| 요소 | 설명 | 색상 소스 |
+|------|------|-----------|
+| L1 외곽 레이더 | 7축 레이더 차트 (메인) | `dimension-colors.ts` L1 |
+| L2 내부 레이더 | 5축 레이더 차트, L1보다 작은 반경 | `dimension-colors.ts` L2 |
+| L3 코어 심볼 | 중심부 4개 방사형 마크 (lack=원, moral=십자, volatility=번개, growth=화살) | `dimension-colors.ts` L3 |
+| 역설 연결선 | L1↔L2 대응 축을 점선으로 연결, 역설 크면 빨강, 작으면 초록 | `cross-axis-colors.ts` |
+| 중심 글로우 | paradoxScore에 따라 중심 방사 글로우 색상 변화 | `engine-meta-colors.ts` paradoxScore |
+| V_Final 오버레이 | 반투명 7축 레이더 (V_Final 벡터) — 압력에 따라 L1과의 차이 시각화 | `engine-meta-colors.ts` vFinal |
+
+### 12.4 `PingerPrint2D` v3 — 다층 지문 패턴
+
+기존 소용돌이 패턴을 **3겹 릿지 레이어**로 확장.
+
+```
+데이터 입력: 동일 (l1, l2, l3, paradoxScore, pressure)
+```
+
+**시각 구조:**
+
+```
+┌────────────────────────────────────┐
+│                                    │
+│  ╔══════════════════════════╗      │
+│  ║  외곽 릿지 (L1 = 7D)     ║      │  ← 현재와 유사
+│  ║  ┌──────────────────┐   ║      │     depth → 릿지 밀도
+│  ║  │ 중간 릿지 (L2)    │   ║      │     lens → 소용돌이 회전
+│  ║  │ ┌────────────┐   │   ║      │     stance → 비대칭
+│  ║  │ │ 코어 릿지   │   │   ║      │     ...
+│  ║  │ │  (L3)      │   │   ║      │
+│  ║  │ └────────────┘   │   ║      │
+│  ║  └──────────────────┘   ║      │
+│  ╚══════════════════════════╝      │
+│                                    │
+└────────────────────────────────────┘
+```
+
+**L1 → 릿지 변형 (기존 6D 로직 확장):**
+
+| 6D 파라미터 | v3 매핑 (L1 7D) | 추가: L2 영향 | 추가: L3 영향 |
+|------------|----------------|--------------|--------------|
+| `ridgeCount` | depth (릿지 밀도) | openness → 밀도 배율 | — |
+| `spiralTurns` | lens (회전 수) | neuroticism → 떨림 | volatility → 불규칙 강도 |
+| `asymmetry` | stance (비대칭) | agreeableness → 대칭/비대칭 | moralCompass → 경직도 |
+| `wrinkleFactor` | scope (세부 주름) | conscientiousness → 정교함 | — |
+| `irregularity` | taste (불규칙성) | openness → 실험적 변형 | growthArc → 패턴 변화율 |
+| `centerOffset` | purpose (중심 이동) | — | lack → 중심 불안정 |
+| **NEW** `layerGap` | sociability | extraversion → 레이어 간격 | — |
+
+**L2 중간 릿지 레이어:**
+- L1 릿지 안쪽에 별도 릿지 세트 생성
+- L2 OCEAN 5D가 릿지 형태를 결정
+- 색상: L2 레이어 그룹색 (앰버 계열)
+- L1↔L2 paradoxScore가 높을수록 두 릿지 레이어의 패턴 차이가 커짐 (시각적 모순)
+
+**L3 코어 릿지 레이어:**
+- 가장 안쪽, 어두운 색상 (바이올렛 계열)
+- 4D가 코어 패턴의 "결" 을 결정
+- lack → 중심 공백 크기 (결핍이 클수록 중심이 비어있음)
+- moralCompass → 릿지 정렬도 (엄격할수록 정렬)
+- volatility → 릿지 요동 (높을수록 끊기는 릿지)
+- growthArc → 릿지 방향성 (높을수록 나선이 바깥으로 퍼짐)
+
+```typescript
+interface PingerPrint2DV3Props {
+  l1: Record<string, number>
+  l2?: Record<string, number>
+  l3?: Record<string, number>
+  paradoxScore?: number
+  pressure?: number
+
+  size?: number
+  mode?: 'l1-only' | 'l1-l2' | 'full'    // 레이어 표시 범위
+  showLabel?: boolean
+  animate?: boolean                        // pressure 변화 시 애니메이션
+}
+```
+
+### 12.5 `PingerPrint3D` v3 — 다층 Jacks 오브젝트
+
+기존 6팔 Jacks를 **3단계 팔 구조**로 확장.
+
+```
+현재: 6개 팔 (L1 6D)
+v3:   7개 외팔 (L1) + 5개 내팔 (L2) + 4개 코어 마크 (L3) = 16 요소
+      + 역설 연결 아크 (paradox 페어 사이 빛 아크)
+      + 압력 반응 (P에 따라 외팔 수축, 내팔 팽창 — 가면이 벗겨지는 시각화)
+```
+
+```typescript
+interface PingerPrint3DV3Props {
+  l1: Record<string, number>
+  l2?: Record<string, number>
+  l3?: Record<string, number>
+  paradoxScore?: number
+  pressure?: number
+
+  size?: number
+  autoRotate?: boolean
+  showLabel?: boolean
+  showParadoxArcs?: boolean              // 역설 페어 빛 아크
+  pressureAnimation?: boolean            // 압력 반응 애니메이션
+}
+```
+
+**시각 구조:**
+
+| 요소 | 형태 | 색상 |
+|------|------|------|
+| L1 외팔 (7개) | 크롬 실린더 + 구체 팁 | L1 차원 색상 (블루 계열) |
+| L2 내팔 (5개) | 작은 크롬 실린더 (L1 팔 사이) | L2 차원 색상 (앰버 계열) |
+| L3 코어 마크 (4개) | 중심부 부유하는 작은 결정체 | L3 차원 색상 (바이올렛 계열) |
+| 역설 아크 | L1↔L2 대응 팔 사이 빛 곡선 | paradox 크기에 비례한 빨강~초록 |
+| 중심 구체 | paradoxScore에 따라 글로우 강도 변화 | paradoxScore 스케일 색상 |
+| **압력 반응** | P 증가 시: L1 팔 수축 + L2 팔 팽창 (본성 드러남) | V_Final 색상 |
+
+### 12.6 컬러지문 공통 사항
+
+#### 코드 공유 전략
+
+현재 4개 앱에 컴포넌트가 **복사**되어 있음. v3에서는 공유 패키지로 통합.
+
+```
+packages/shared-ui/                      ← 신규 패키지 or 기존에 있으면 거기에 추가
+├── src/
+│   ├── fingerprint/
+│   │   ├── index.ts
+│   │   ├── trait-color-fingerprint.tsx   ← v3 레이더 차트
+│   │   ├── p-inger-print-2d.tsx         ← v3 2D 지문
+│   │   ├── p-inger-print-3d.tsx         ← v3 3D Jacks (lazy load)
+│   │   ├── types.ts                     ← 공통 Props 타입
+│   │   └── utils.ts                     ← 공통 유틸 (좌표 계산, 스플라인 등)
+│   └── ...
+```
+
+또는 shared-ui 패키지가 없으면 engine-studio에 canonical을 두고 다른 앱에서 import.
+
+#### 하위 호환성
+
+기존 6D `data: Record<string, number>` 인터페이스를 유지하는 래퍼 제공.
+
+```typescript
+// 호환 래퍼 — 기존 6D data를 l1으로 변환
+export function TraitColorFingerprintCompat(props: { data: Record<string, number>; ... }) {
+  return <TraitColorFingerprintV3 l1={props.data} mode="compact" ... />
+}
+```
+
+#### mode별 렌더링 가이드
+
+| mode | L1 | L2 | L3 | 역설 | 용도 |
+|------|----|----|----|----|------|
+| `compact` | O | - | - | - | 목록 썸네일, 카드 |
+| `l1-l2` | O | O | - | O | 상세 프로필 |
+| `full` | O | O | O | O | 편집기, 분석 대시보드 |
+
+### 12.7 구현 파일 목록
+
+| 컴포넌트 | 파일 | 변경 수준 |
+|----------|------|-----------|
+| TraitColorFingerprintV3 | `src/components/charts/trait-color-fingerprint.tsx` | **전면 재작성** |
+| PingerPrint2DV3 | `src/components/charts/p-inger-print-2d.tsx` | **전면 재작성** |
+| PingerPrint3DV3 | `src/components/charts/p-inger-print-3d.tsx` | **전면 재작성** |
+| 공통 타입 | `src/components/charts/fingerprint-types.ts` | **신규** |
+| 공통 유틸 | `src/components/charts/fingerprint-utils.ts` | **신규** |
+| 호환 래퍼 | `src/components/charts/fingerprint-compat.tsx` | **신규** |
+
+---
+
+## 13. 상수 및 설정
 
 > **핵심 인식**: 벡터 구조는 단순 7+5+4=16D가 아니다.
 > 레이어 간 교차 관계축(L1×L2=35, L1×L3=28, L2×L3=20 = **83개 관계축**),
@@ -1545,7 +1801,7 @@ export const L1_L2_PARADOX_MAPPINGS = [
 
 ---
 
-## 13. 구현 Phase 및 태스크
+## 14. 구현 Phase 및 태스크
 
 ### Phase 0: 기반 인프라 (타입 + DB + 상수 + 색상)
 
@@ -1633,12 +1889,16 @@ export const L1_L2_PARADOX_MAPPINGS = [
 | 6-2 | 역설 시각화 차트 | `src/components/charts/paradox-chart.tsx` | **신규** |
 | 6-3 | V_Final 시뮬레이터 | `src/components/charts/v-final-simulator.tsx` | **신규** |
 | 6-4 | 정성적 차원 에디터 | `src/components/persona/qualitative-editor.tsx` | **신규** |
-| 6-5 | 레이더 차트 확장 | `src/components/charts/` | 수정 |
-| 6-6 | 트레이트 색상 반영 | 여러 UI 파일 | 수정 |
+| 6-5 | 컬러지문 공통 타입/유틸 | `src/components/charts/fingerprint-types.ts`, `fingerprint-utils.ts` | **신규** |
+| 6-6 | TraitColorFingerprint v3 (다층 레이더) | `src/components/charts/trait-color-fingerprint.tsx` | **전면 재작성** |
+| 6-7 | PingerPrint2D v3 (다층 지문 패턴) | `src/components/charts/p-inger-print-2d.tsx` | **전면 재작성** |
+| 6-8 | PingerPrint3D v3 (다층 Jacks) | `src/components/charts/p-inger-print-3d.tsx` | **전면 재작성** |
+| 6-9 | 컬러지문 하위 호환 래퍼 | `src/components/charts/fingerprint-compat.tsx` | **신규** |
+| 6-10 | 트레이트 색상 반영 | 여러 UI 파일 | 수정 |
 
 ---
 
-## 14. 파일 변경 맵
+## 15. 파일 변경 맵
 
 ### 신규 파일
 
@@ -1692,6 +1952,11 @@ apps/engine-studio/src/lib/matching/diversity.ts
 apps/engine-studio/src/components/charts/paradox-chart.tsx
 apps/engine-studio/src/components/charts/v-final-simulator.tsx
 apps/engine-studio/src/components/persona/qualitative-editor.tsx
+
+# ── 컬러지문 ──
+apps/engine-studio/src/components/charts/fingerprint-types.ts    ← 공통 타입
+apps/engine-studio/src/components/charts/fingerprint-utils.ts    ← 공통 유틸 (좌표, 스플라인, 색 보간)
+apps/engine-studio/src/components/charts/fingerprint-compat.tsx  ← 6D 하위 호환 래퍼
 ```
 
 ### 전면 재작성 파일
@@ -1704,6 +1969,9 @@ apps/engine-studio/src/lib/persona-generation/prompt-builder.ts
 apps/engine-studio/src/lib/persona-generation/index.ts
 apps/engine-studio/src/lib/matching/algorithms.ts
 apps/engine-studio/src/components/node-editor/nodes/vector-node.tsx
+apps/engine-studio/src/components/charts/trait-color-fingerprint.tsx  ← v3 다층 레이더
+apps/engine-studio/src/components/charts/p-inger-print-2d.tsx         ← v3 다층 지문 패턴
+apps/engine-studio/src/components/charts/p-inger-print-3d.tsx         ← v3 다층 Jacks (landing)
 ```
 
 ### 수정 파일
