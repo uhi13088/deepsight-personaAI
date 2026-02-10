@@ -5,7 +5,7 @@
 > **문서 정보**
 >
 > - 작성일: 2026-02-10
-> - 버전: v1.5
+> - 버전: v1.6
 > - 상태: 확정 — 구현 대기
 > - 관련 문서: `docs/persona-engine-v3-design.md` (설계서)
 > - 목적: 설계서의 "무엇을"에 대응하는 "어떻게" — 이 문서만 보고 구현 가능
@@ -22,6 +22,7 @@
 | v1.3 | 2026-02-10 | Section 12 전면 확장 — "미래 스캐너 디코딩 가능 지문" 스키마 v1 확정. Pantone 완전 제거, CIELAB(D50)+OKLCH 이중 색공간. 6대 고정 규칙, 패턴↔벡터 매핑, 고유성 엔진, 색상 인코딩, canonical/display 이중 렌더. Phase 6(지문 데이터 엔진) 신설, 기존 UI→Phase 7. `docs/fingerprint-schema-v1.json` 추가 |
 | v1.4 | 2026-02-10 | Section 13 신설 — 노드 에디터 아키텍처 (ComfyUI 스타일). 현재 선형 파이프라인→DAG 기반 자유 그래프. 5개 노드 카테고리(20+종), 21종 포트 타입 시스템, Kahn's 위상 정렬, 순환 감지, Zustand 그래프 스토어, 4종 플로우 프리셋(Quick/L1 Custom/Full Custom/Archetype+Override), 최소 필수 노드 규칙, v2→v3 마이그레이션. Phase 8(노드 에디터 재구축, 22태스크) 신설. 파일 변경 맵 확장. 섹션 번호 정리(상수→14, Phase→15, 파일맵→16) |
 | v1.5 | 2026-02-10 | 품질 아키텍처 3대 핵심 추가 — Section 15(PersonaWorld RAG 구현: 컨텍스트 빌더, Voice 앵커, 관계 기억, 캐싱), Section 16(품질 피드백 루프 구현: 4대 측정 엔진, Few-shot 자동 수집, 대시보드), Section 17(LLM 모델 전략 구현: 3-Tier 라우터, Prompt Caching, Provider Adapter). Phase 9(RAG+피드백+모델 전략, 18태스크) 신설. 파일 변경 맵 확장. 섹션 재번호(Phase→18, 파일맵→19) |
+| v1.6 | 2026-02-10 | 교차축 계산 엔진 + Paradox Score 확장 (T27) — Section 6 전면 개편: 83축 교차축 스코어 계산 엔진(CrossAxisProfile, 관계유형별 공식 4종), L1↔L3/L2↔L3 역설 지표, Extended Paradox Score(3-Layer 가중 합산). Section 5 확장: VFinalResult에 crossAxisProfile+paradoxProfile 추가. Phase 1 태스크 1-4~1-9로 확장(교차축 엔진, 역방향 매핑 테이블). 파일 변경 맵: cross-axis.ts, cross-axis-inversions.ts 추가 |
 
 ---
 
@@ -551,6 +552,8 @@ where:
 import { clamp } from './utils'
 import { projectL2toL1 } from './projection'
 import { projectL3toL1 } from './projection'
+import { calculateCrossAxisProfile } from './cross-axis'
+import { calculateExtendedParadoxScore } from './paradox'
 import type {
   SocialPersonaVector,
   CoreTemperamentVector,
@@ -581,6 +584,12 @@ export function calculateVFinal(
     clamp((1 - P) * v + P * (alpha * l2Proj[i] + beta * l3Proj[i]))
   )
 
+  // 교차축 프로필 계산 (83축 전체)
+  const crossAxisProfile = calculateCrossAxisProfile(l1, l2, l3)
+
+  // 확장 Paradox Score (L1↔L2 + L1↔L3 + L2↔L3)
+  const paradoxProfile = calculateExtendedParadoxScore(l1, l2, l3)
+
   return {
     vector,
     pressure: P,
@@ -591,6 +600,8 @@ export function calculateVFinal(
     },
     l2Projected: l2Proj,
     l3Projected: l3Proj,
+    crossAxisProfile,    // NEW: 83축 스코어 + 요약
+    paradoxProfile,      // NEW: 3-layer 역설 상세
   }
 }
 ```
@@ -625,12 +636,18 @@ P=0.7 (압박):
 
 ---
 
-## 6. Paradox Score 계산
+## 6. Paradox Score + 교차축 계산 엔진
 
-### 6.1 공식 (L2 균등 가중 방식)
+> **핵심**: 3-Layer 구조는 단순 7+5+4=16이 아니다.
+> 레이어 간 교차 상호작용(83축)이 실제 캐릭터 해상도를 결정한다.
+> 이 섹션은 83축 전체의 스코어를 실제 계산하는 엔진을 정의한다.
+
+### 6.1 L1↔L2 Paradox Score (기존 — 유지)
+
+L1↔L2 역설은 "가면 vs 본성" 긴장의 핵심 지표. 기존 공식 유지.
 
 ```
-paradoxScore = (
+l1l2ParadoxScore = (
   opennessParadox +
   neuroticismParadox +
   agreeablenessParadox +
@@ -646,33 +663,283 @@ where:
   conscientiousnessParadox = avg( |purpose - conscientiousness|, |scope - conscientiousness| )
 ```
 
-### 6.2 구현 파일
+### 6.2 교차축 계산 엔진 (Cross-Axis Computation Engine)
+
+#### 6.2.1 교차축 스코어 계산 원리
+
+83개 교차축 각각에 대해 **관계 유형(relationship)**에 따라 다른 공식으로 스코어를 계산한다.
+
+| 관계 유형 | 공식 | 의미 | 예시 |
+|-----------|------|------|------|
+| `paradox` | `\|dimA - f(dimB)\|` | 차이가 클수록 강한 역설 | stance(0.9) × agreeableness(0.9) → 0.8 |
+| `reinforcing` | `1 - \|dimA - dimB\|` | 같은 방향일수록 강화 | depth(0.9) × openness(0.9) → 0.98 |
+| `modulating` | `dimA × dimB` | 한 축이 다른 축의 표현 강도를 조절 | moralCompass(0.9) × stance(0.9) → 0.81 |
+| `neutral` | `(dimA + dimB) / 2` | 독립적 — 평균값 참조용 | scope(0.5) × extraversion(0.5) → 0.5 |
+
+> `f(dimB)`: 역방향 매핑인 경우 `1 - dimB`, 정방향이면 `dimB` 그대로.
+> 역방향 여부는 `PARADOX_MAPPINGS`의 `direction` 필드로 결정.
+
+#### 6.2.2 타입 정의
+
+```typescript
+// src/lib/vector/cross-axis.ts
+
+interface CrossAxisScore {
+  axisId: string                          // "l1_depth__l2_openness"
+  type: 'L1xL2' | 'L1xL3' | 'L2xL3'
+  relationship: 'paradox' | 'reinforcing' | 'modulating' | 'neutral'
+  score: number                           // 0.0~1.0
+  dimA: { layer: 'L1' | 'L2' | 'L3'; key: string; value: number }
+  dimB: { layer: 'L1' | 'L2' | 'L3'; key: string; value: number }
+  interpretation: string                  // highHigh/highLow/lowHigh/lowLow 중 해당 텍스트
+}
+
+interface CrossAxisProfile {
+  axes: CrossAxisScore[]                  // 83개 전체
+  byType: {
+    l1l2: CrossAxisScore[]                // 35개
+    l1l3: CrossAxisScore[]                // 28개
+    l2l3: CrossAxisScore[]                // 20개
+  }
+  summary: {
+    paradoxCount: number                  // relationship=paradox & score > 0.5인 축 수
+    reinforcingCount: number              // relationship=reinforcing & score > 0.7인 축 수
+    modulatingIntensity: number           // modulating 축들의 평균 스코어
+    dominantRelationship: 'paradox' | 'reinforcing' | 'modulating' | 'neutral'
+    characterComplexity: number           // 0.0~1.0 — 전체 캐릭터 복잡도
+  }
+}
+```
+
+#### 6.2.3 계산 엔진
+
+```typescript
+import { CROSS_LAYER_AXES } from '@/constants/v3/cross-layer-axes'
+import type {
+  SocialPersonaVector,
+  CoreTemperamentVector,
+  NarrativeDriveVector,
+} from '@deepsight/shared-types'
+
+const L1_ACCESSOR = (l1: SocialPersonaVector, key: string) =>
+  l1[key as keyof SocialPersonaVector] as number
+const L2_ACCESSOR = (l2: CoreTemperamentVector, key: string) =>
+  l2[key as keyof CoreTemperamentVector] as number
+const L3_ACCESSOR = (l3: NarrativeDriveVector, key: string) =>
+  l3[key as keyof NarrativeDriveVector] as number
+
+function getLayerValue(
+  layer: 'L1' | 'L2' | 'L3',
+  key: string,
+  l1: SocialPersonaVector,
+  l2: CoreTemperamentVector,
+  l3: NarrativeDriveVector,
+): number {
+  if (layer === 'L1') return L1_ACCESSOR(l1, key)
+  if (layer === 'L2') return L2_ACCESSOR(l2, key)
+  return L3_ACCESSOR(l3, key)
+}
+
+/**
+ * 관계 유형별 스코어 계산.
+ * 핵심: paradox = 차이, reinforcing = 일치, modulating = 곱, neutral = 평균
+ */
+function computeAxisScore(
+  valA: number,
+  valB: number,
+  relationship: string,
+  invert: boolean,
+): number {
+  const effectiveB = invert ? 1 - valB : valB
+
+  switch (relationship) {
+    case 'paradox':
+      return Math.abs(valA - effectiveB)
+    case 'reinforcing':
+      return 1 - Math.abs(valA - effectiveB)
+    case 'modulating':
+      return valA * effectiveB
+    case 'neutral':
+    default:
+      return (valA + effectiveB) / 2
+  }
+}
+
+/**
+ * 해석 텍스트 선택 (highHigh/highLow/lowHigh/lowLow)
+ */
+function selectInterpretation(
+  valA: number,
+  valB: number,
+  interpretation: { highHigh: string; highLow: string; lowHigh: string; lowLow: string },
+): string {
+  const threshold = 0.5
+  if (valA >= threshold && valB >= threshold) return interpretation.highHigh
+  if (valA >= threshold && valB < threshold) return interpretation.highLow
+  if (valA < threshold && valB >= threshold) return interpretation.lowHigh
+  return interpretation.lowLow
+}
+
+export function calculateCrossAxisProfile(
+  l1: SocialPersonaVector,
+  l2: CoreTemperamentVector,
+  l3: NarrativeDriveVector,
+): CrossAxisProfile {
+  const axes: CrossAxisScore[] = CROSS_LAYER_AXES.map(axis => {
+    // 축의 두 차원 값 가져오기
+    const layerA = axis.type.split('x')[0] as 'L1' | 'L2' | 'L3'
+    const layerB = axis.type.split('x')[1] as 'L1' | 'L2' | 'L3'
+    const keyA = axis.l1Dim ?? axis.l2Dim!
+    const keyB = axis.l2Dim ?? axis.l3Dim!
+
+    const valA = getLayerValue(layerA, keyA, l1, l2, l3)
+    const valB = getLayerValue(layerB, keyB, l1, l2, l3)
+
+    // 역방향 여부 (L1↔L2 매핑에서 neuroticism, agreeableness는 역방향)
+    const invert = isInverseMapping(axis.id)
+
+    return {
+      axisId: axis.id,
+      type: axis.type,
+      relationship: axis.relationship,
+      score: computeAxisScore(valA, valB, axis.relationship, invert),
+      dimA: { layer: layerA, key: keyA, value: valA },
+      dimB: { layer: layerB, key: keyB, value: valB },
+      interpretation: selectInterpretation(valA, valB, axis.interpretation),
+    }
+  })
+
+  // 유형별 분류
+  const byType = {
+    l1l2: axes.filter(a => a.type === 'L1xL2'),
+    l1l3: axes.filter(a => a.type === 'L1xL3'),
+    l2l3: axes.filter(a => a.type === 'L2xL3'),
+  }
+
+  // 요약 통계
+  const paradoxAxes = axes.filter(a => a.relationship === 'paradox' && a.score > 0.5)
+  const reinforcingAxes = axes.filter(a => a.relationship === 'reinforcing' && a.score > 0.7)
+  const modulatingAxes = axes.filter(a => a.relationship === 'modulating')
+  const modulatingIntensity = modulatingAxes.length > 0
+    ? modulatingAxes.reduce((sum, a) => sum + a.score, 0) / modulatingAxes.length
+    : 0
+
+  // 지배적 관계 유형 판정
+  const counts = { paradox: paradoxAxes.length, reinforcing: reinforcingAxes.length }
+  const dominantRelationship = counts.paradox > counts.reinforcing ? 'paradox' : 'reinforcing'
+
+  // 캐릭터 복잡도: paradox 비율 + modulating 강도 가중
+  const characterComplexity = Math.min(1.0,
+    (paradoxAxes.length / axes.length) * 1.5 + modulatingIntensity * 0.3
+  )
+
+  return {
+    axes,
+    byType,
+    summary: {
+      paradoxCount: paradoxAxes.length,
+      reinforcingCount: reinforcingAxes.length,
+      modulatingIntensity,
+      dominantRelationship,
+      characterComplexity,
+    },
+  }
+}
+```
+
+### 6.3 L1↔L3 역설 지표
+
+L1(가면) ↔ L3(욕망) 간 역설. "표면적 행동과 내면의 욕망이 얼마나 충돌하는가"를 측정한다.
+
+```
+의미 있는 L1↔L3 역설 쌍:
+
+| L1 (가면) | L3 (욕망) | 관계 | 역설 의미 |
+|-----------|-----------|------|-----------|
+| depth | lack | modulating | 결핍이 분석 집착을 만드는가 |
+| stance | lack | paradox | 비판적인데 인정 결핍 → 공격적 방어기제 |
+| lens | volatility | paradox | 논리적인데 감정 기복 큼 → 이성과 감정의 전쟁 |
+| sociability | growthArc | modulating | 성장하면서 사교성이 변하는가 |
+| purpose | lack | reinforcing | 결핍이 목적의식을 강화하는가 |
+| taste | growthArc | modulating | 성장하면서 취향이 넓어지는가 |
+| scope | moralCompass | modulating | 도덕 기준이 관심 범위를 제한하는가 |
+
+l1l3ParadoxScore = 교차축 프로필에서 L1xL3 유형 중
+                    relationship='paradox'인 축들의 평균 스코어
+```
+
+### 6.4 L2↔L3 역설 지표
+
+L2(본성/OCEAN) ↔ L3(욕망) 간 역설. "타고난 기질과 내면의 욕망이 얼마나 충돌하는가".
+
+```
+의미 있는 L2↔L3 역설 쌍:
+
+| L2 (OCEAN) | L3 (욕망) | 관계 | 역설 의미 |
+|-----------|-----------|------|-----------|
+| neuroticism | volatility | reinforcing | 이중 불안정 → 극적 감정 표출 |
+| agreeableness | moralCompass | modulating | 우호적인데 도덕 기준 높음 → 자비로운 심판자 |
+| openness | growthArc | reinforcing | 개방적이면서 성장 의지 → 끊임없는 탐험가 |
+| conscientiousness | lack | paradox | 성실한데 결핍 큼 → 강박적 성취자 |
+| extraversion | lack | paradox | 외향적인데 결핍 큼 → 관심 갈구하는 연예인 |
+| neuroticism | moralCompass | paradox | 불안한데 도덕 기준 높음 → 자기 검열이 극심한 사람 |
+
+l2l3ParadoxScore = 교차축 프로필에서 L2xL3 유형 중
+                    relationship='paradox'인 축들의 평균 스코어
+```
+
+### 6.5 확장 Paradox Score (Extended)
+
+기존 단일 paradoxScore를 **3-layer 확장형**으로 교체한다.
+
+```
+ExtendedParadoxScore = w₁ × l1l2Score + w₂ × l1l3Score + w₃ × l2l3Score
+
+where:
+  w₁ = 0.50  (L1↔L2: 가면 vs 본성 — 캐릭터의 핵심 긴장)
+  w₂ = 0.30  (L1↔L3: 가면 vs 욕망 — 행동과 욕구의 괴리)
+  w₃ = 0.20  (L2↔L3: 본성 vs 욕망 — 기질과 열망의 충돌)
+
+  l1l2Score = 기존 calculateParadoxScore(l1, l2) (6.1의 공식)
+  l1l3Score = mean(crossAxisProfile.byType.l1l3
+               .filter(a => a.relationship === 'paradox')
+               .map(a => a.score))
+  l2l3Score = mean(crossAxisProfile.byType.l2l3
+               .filter(a => a.relationship === 'paradox')
+               .map(a => a.score))
+```
+
+**하위 호환성**: `paradoxScore` 필드는 기존과 같은 단일 number를 반환한다. 상세가 필요한 곳에서는 `paradoxProfile`을 참조한다.
+
+### 6.6 확장 구현
 
 `apps/engine-studio/src/lib/vector/paradox.ts`
 
 ```typescript
-import type { SocialPersonaVector, CoreTemperamentVector, ParadoxConfig } from '@deepsight/shared-types'
+import type {
+  SocialPersonaVector,
+  CoreTemperamentVector,
+  NarrativeDriveVector,
+} from '@deepsight/shared-types'
+import type { CrossAxisProfile } from './cross-axis'
 
-export function calculateParadoxScore(
+// ── 가중치 ──
+const W_L1L2 = 0.50
+const W_L1L3 = 0.30
+const W_L2L3 = 0.20
+
+// ── 기존 L1↔L2 Paradox (유지) ──
+export function calculateL1L2ParadoxScore(
   l1: SocialPersonaVector,
   l2: CoreTemperamentVector,
 ): number {
-  // Openness 그룹 (depth + taste)
   const opennessParadox = (
     Math.abs(l1.depth - l2.openness) +
     Math.abs(l1.taste - l2.openness)
   ) / 2
-
-  // Neuroticism (역방향)
   const neuroticismParadox = Math.abs(l1.lens - (1 - l2.neuroticism))
-
-  // Agreeableness (역방향)
   const agreeablenessParadox = Math.abs(l1.stance - (1 - l2.agreeableness))
-
-  // Extraversion
   const extraversionParadox = Math.abs(l1.sociability - l2.extraversion)
-
-  // Conscientiousness 그룹 (purpose + scope)
   const conscientiousnessParadox = (
     Math.abs(l1.purpose - l2.conscientiousness) +
     Math.abs(l1.scope - l2.conscientiousness)
@@ -687,50 +954,90 @@ export function calculateParadoxScore(
   ) / 5
 }
 
-export function buildParadoxConfig(
+// ── 교차축 기반 L1↔L3, L2↔L3 Paradox ──
+function layerParadoxFromProfile(
+  profile: CrossAxisProfile,
+  type: 'L1xL3' | 'L2xL3',
+): number {
+  const paradoxAxes = profile.byType[type === 'L1xL3' ? 'l1l3' : 'l2l3']
+    .filter(a => a.relationship === 'paradox')
+  if (paradoxAxes.length === 0) return 0
+  return paradoxAxes.reduce((sum, a) => sum + a.score, 0) / paradoxAxes.length
+}
+
+// ── 확장 Paradox Score ──
+interface ParadoxProfile {
+  l1l2: number              // 가면 vs 본성 (기존)
+  l1l3: number              // 가면 vs 욕망 (신규)
+  l2l3: number              // 본성 vs 욕망 (신규)
+  overall: number           // 가중 합산 (= paradoxScore 필드)
+  dimensionality: number    // 종형 곡선 차원성
+  dominant: {
+    layer: 'L1xL2' | 'L1xL3' | 'L2xL3'
+    score: number
+  }
+}
+
+export function calculateExtendedParadoxScore(
   l1: SocialPersonaVector,
   l2: CoreTemperamentVector,
-): ParadoxConfig {
-  const score = calculateParadoxScore(l1, l2)
+  l3: NarrativeDriveVector,
+  crossAxisProfile?: CrossAxisProfile,
+): ParadoxProfile {
+  const l1l2 = calculateL1L2ParadoxScore(l1, l2)
 
-  // 개별 매핑 점수 계산
-  const mappings = buildParadoxMappings(l1, l2)
+  // crossAxisProfile이 없으면 L1↔L3, L2↔L3는 0으로 (하위 호환)
+  const l1l3 = crossAxisProfile
+    ? layerParadoxFromProfile(crossAxisProfile, 'L1xL3')
+    : 0
+  const l2l3 = crossAxisProfile
+    ? layerParadoxFromProfile(crossAxisProfile, 'L2xL3')
+    : 0
 
-  // 가장 큰 역설 찾기
-  const dominant = mappings.reduce((max, m) =>
-    m.tensionScore > max.tensionScore ? m : max
-  )
+  const overall = W_L1L2 * l1l2 + W_L1L3 * l1l3 + W_L2L3 * l2l3
+
+  // 가장 강한 역설 레이어
+  const scores = [
+    { layer: 'L1xL2' as const, score: l1l2 },
+    { layer: 'L1xL3' as const, score: l1l3 },
+    { layer: 'L2xL3' as const, score: l2l3 },
+  ]
+  const dominant = scores.reduce((max, s) => s.score > max.score ? s : max)
 
   return {
-    mappings,
-    overallParadoxScore: score,
-    dimensionalityScore: calculateDimensionality(score),
-    dominantParadox: {
-      l1: dominant.l1Dimension,
-      l2: dominant.l2Dimension,
-      score: dominant.tensionScore,
-    },
+    l1l2,
+    l1l3,
+    l2l3,
+    overall,
+    dimensionality: calculateDimensionality(overall),
+    dominant,
   }
 }
 
 function calculateDimensionality(paradoxScore: number): number {
-  // 역설 점수 0.2~0.5 범위가 가장 높은 차원성 (너무 낮으면 평면적, 너무 높으면 비일관)
-  // 0.35 근처에서 최대값 1.0, 양 극단에서 감소하는 종형 곡선
   const optimal = 0.35
   const sigma = 0.2
   return Math.exp(-Math.pow(paradoxScore - optimal, 2) / (2 * sigma * sigma))
 }
 ```
 
-### 6.3 역설 점수 해석
+### 6.7 역설 점수 해석 (확장)
 
-| 점수 범위 | 해석 | 캐릭터 느낌 |
-|-----------|------|-------------|
+| overall 범위 | 해석 | 캐릭터 느낌 |
+|-------------|------|-------------|
 | 0.00~0.10 | 극히 낮음 | "보이는 그대로" — 평면적이지만 신뢰감 |
 | 0.10~0.25 | 낮음 | 약간의 깊이가 있는 일관된 캐릭터 |
 | 0.25~0.45 | **최적 (높은 차원성)** | 풍부한 내면 — "알수록 새로운 면이 보이는 사람" |
 | 0.45~0.65 | 높음 | 극적인 캐릭터 — 겉과 속이 많이 다름 |
 | 0.65~1.00 | 극히 높음 | 주의 필요 — L3 서사로 잘 설명되지 않으면 비일관적으로 느껴짐 |
+
+**레이어별 역설 해석** (신규):
+
+| 레이어 쌍 | 높으면 | 낮으면 |
+|-----------|--------|--------|
+| L1↔L2 (가면vs본성) | 겉과 속이 많이 다름 — 깊이 있는 캐릭터 | 겉과 속이 일치 — 투명한 캐릭터 |
+| L1↔L3 (가면vs욕망) | 행동과 욕구가 충돌 — 내적 갈등형 | 행동이 욕구를 충실히 반영 — 목적형 |
+| L2↔L3 (본성vs욕망) | 타고난 기질과 열망이 충돌 — 자기 변혁형 | 기질이 열망을 자연스럽게 지원 — 안정형 |
 
 ---
 
@@ -2955,10 +3262,12 @@ function generateLightResponse(
 | 1-1 | 벡터 유틸리티 (clamp, validate 등) | `src/lib/vector/utils.ts` | 수정 |
 | 1-2 | L2→L1 투영 | `src/lib/vector/projection.ts` | **신규** |
 | 1-3 | L3→L1 투영 | `src/lib/vector/projection.ts` | **신규** (같은 파일) |
-| 1-4 | Paradox Score 계산기 | `src/lib/vector/paradox.ts` | **신규** |
-| 1-5 | V_Final 계산 엔진 | `src/lib/vector/v-final.ts` | **신규** |
-| 1-6 | 벡터 모듈 re-export | `src/lib/vector/index.ts` | 수정 |
-| 1-7 | 단위 테스트 | `src/lib/vector/__tests__/` | **신규** |
+| 1-4 | 교차축 계산 엔진 (83축 스코어) | `src/lib/vector/cross-axis.ts` | **신규** |
+| 1-5 | 교차축 역방향 매핑 테이블 | `src/constants/v3/cross-axis-inversions.ts` | **신규** |
+| 1-6 | Extended Paradox Score (L1↔L2 + L1↔L3 + L2↔L3) | `src/lib/vector/paradox.ts` | **신규** |
+| 1-7 | V_Final 계산 엔진 (CrossAxisProfile 포함) | `src/lib/vector/v-final.ts` | **신규** |
+| 1-8 | 벡터 모듈 re-export | `src/lib/vector/index.ts` | 수정 |
+| 1-9 | 단위 테스트 (교차축 + 확장 Paradox 포함) | `src/lib/vector/__tests__/` | **신규** |
 
 ### Phase 2: 생성 파이프라인 재구성
 
@@ -3122,10 +3431,14 @@ apps/engine-studio/src/lib/colors/engine-meta-colors.ts ← P, V_Final, α/β, P
 apps/engine-studio/src/lib/colors/archetype-colors.ts   ← 아키타입별 색상 (12+, 확장 가능)
 
 # ── 벡터 엔진 ──
-apps/engine-studio/src/lib/vector/projection.ts   ← L2→L1, L3→L1 투영
-apps/engine-studio/src/lib/vector/paradox.ts      ← Paradox Score 계산
-apps/engine-studio/src/lib/vector/v-final.ts      ← V_Final 계산 엔진
-apps/engine-studio/src/lib/vector/__tests__/      ← 벡터 엔진 테스트
+apps/engine-studio/src/lib/vector/projection.ts    ← L2→L1, L3→L1 투영
+apps/engine-studio/src/lib/vector/cross-axis.ts    ← 교차축 계산 엔진 (83축 스코어)
+apps/engine-studio/src/lib/vector/paradox.ts       ← Extended Paradox Score (3-Layer)
+apps/engine-studio/src/lib/vector/v-final.ts       ← V_Final 계산 엔진 (CrossAxisProfile 포함)
+apps/engine-studio/src/lib/vector/__tests__/       ← 벡터 엔진 테스트
+
+# ── 교차축 상수 ──
+apps/engine-studio/src/constants/v3/cross-axis-inversions.ts  ← 역방향 매핑 테이블
 
 # ── 생성 파이프라인 ──
 apps/engine-studio/src/lib/persona-generation/archetypes.ts       ← 아키타입 템플릿
