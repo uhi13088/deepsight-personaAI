@@ -13,17 +13,25 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-- [ ] **T30: 일관성 검증 완성 + 차원 표기 수정**
-  - 범위: 설계서 §11, 구현계획서 §11 + 양쪽 문서 전체
-  - AC1: L2↔L3 정합성 검증 알고리즘 구체화
-  - AC2: 정성적↔정량적 검증 알고리즘 구체화 (nlpKeywords↔벡터)
-  - AC3: 교차축 일관성 검증 추가
-  - AC4: "16D" 표기 → "기저 16D / 유효 106D+" 양쪽 문서 전체 수정
-  - AC5: 구현계획서 Phase 태스크 + 파일 변경 맵 반영
+(없음)
 
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T30: 일관성 검증 완성 + 차원 표기 수정** ✅ 2026-02-10
+  - 변경: `docs/persona-engine-v3-design.md` (v3.0-draft.7)
+    - §11 전면 개편: 6-Category 검증(구조/L1↔L2/L2↔L3/정성↔정량/교차축/동적)
+    - C(L2↔L3): lack↔Paradox, volatility↔neuroticism, scope↔openness, moralCompass↔agreeableness
+    - D(정성↔정량): 서사↔Init벡터, Voice↔L1(LLM), Triggers↔L3
+    - E(교차축): 스코어 범위, 관계유형별, EPS 재계산 검증
+    - 종합 일관성 점수 공식 (가중 category pass rate)
+    - "16D"→"기저 16D / 유효 106D+" 13개소 수정
+  - 변경: `docs/persona-engine-v3-implementation-plan.md` (v1.9)
+    - §11 전면 개편: ValidationIssue/ValidationResult 타입, C/D/E 구현 코드
+    - Phase 2 태스크 2-7 확장 (6-Category)
+    - "16D"→"기저 16D / 유효 106D+" 8개소 수정
+  - 테스트: 설계 문서 — 코드 구현 아님
 
 - [x] **T29: 비정량↔정량 연결 알고리즘 구체화** ✅ 2026-02-10
   - 변경: `docs/persona-engine-v3-design.md` (v3.0-draft.6)
