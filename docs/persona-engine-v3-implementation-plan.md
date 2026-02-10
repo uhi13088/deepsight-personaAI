@@ -5,7 +5,7 @@
 > **문서 정보**
 >
 > - 작성일: 2026-02-10
-> - 버전: v1.0
+> - 버전: v1.5
 > - 상태: 확정 — 구현 대기
 > - 관련 문서: `docs/persona-engine-v3-design.md` (설계서)
 > - 목적: 설계서의 "무엇을"에 대응하는 "어떻게" — 이 문서만 보고 구현 가능
@@ -21,6 +21,7 @@
 | v1.2 | 2026-02-10 | Section 12 신설 — 컬러지문(P-inger Print) 시스템. 3종 컴포넌트 v3 설계 |
 | v1.3 | 2026-02-10 | Section 12 전면 확장 — "미래 스캐너 디코딩 가능 지문" 스키마 v1 확정. Pantone 완전 제거, CIELAB(D50)+OKLCH 이중 색공간. 6대 고정 규칙, 패턴↔벡터 매핑, 고유성 엔진, 색상 인코딩, canonical/display 이중 렌더. Phase 6(지문 데이터 엔진) 신설, 기존 UI→Phase 7. `docs/fingerprint-schema-v1.json` 추가 |
 | v1.4 | 2026-02-10 | Section 13 신설 — 노드 에디터 아키텍처 (ComfyUI 스타일). 현재 선형 파이프라인→DAG 기반 자유 그래프. 5개 노드 카테고리(20+종), 21종 포트 타입 시스템, Kahn's 위상 정렬, 순환 감지, Zustand 그래프 스토어, 4종 플로우 프리셋(Quick/L1 Custom/Full Custom/Archetype+Override), 최소 필수 노드 규칙, v2→v3 마이그레이션. Phase 8(노드 에디터 재구축, 22태스크) 신설. 파일 변경 맵 확장. 섹션 번호 정리(상수→14, Phase→15, 파일맵→16) |
+| v1.5 | 2026-02-10 | 품질 아키텍처 3대 핵심 추가 — Section 15(PersonaWorld RAG 구현: 컨텍스트 빌더, Voice 앵커, 관계 기억, 캐싱), Section 16(품질 피드백 루프 구현: 4대 측정 엔진, Few-shot 자동 수집, 대시보드), Section 17(LLM 모델 전략 구현: 3-Tier 라우터, Prompt Caching, Provider Adapter). Phase 9(RAG+피드백+모델 전략, 18태스크) 신설. 파일 변경 맵 확장. 섹션 재번호(Phase→18, 파일맵→19) |
 
 ---
 
@@ -40,8 +41,11 @@
 12. [컬러지문 (P-inger Print) 시스템](#12-컬러지문-p-inger-print-시스템)
 13. [노드 에디터 아키텍처 (ComfyUI 스타일)](#13-노드-에디터-아키텍처-comfyui-스타일)
 14. [상수 및 설정](#14-상수-및-설정)
-15. [구현 Phase 및 태스크](#15-구현-phase-및-태스크)
-16. [파일 변경 맵](#16-파일-변경-맵)
+15. [PersonaWorld RAG 구현](#15-personaworld-rag-구현)
+16. [품질 피드백 루프 구현](#16-품질-피드백-루프-구현)
+17. [LLM 모델 전략 구현](#17-llm-모델-전략-구현)
+18. [구현 Phase 및 태스크](#18-구현-phase-및-태스크)
+19. [파일 변경 맵](#19-파일-변경-맵)
 
 ---
 
@@ -2418,7 +2422,506 @@ export const L1_L2_PARADOX_MAPPINGS = [
 
 ---
 
-## 15. 구현 Phase 및 태스크
+## 15. PersonaWorld RAG 구현
+
+> 설계서 Section 15 (PersonaWorld RAG — 페르소나의 장기 기억) 참조.
+> 이 섹션은 "어떻게 구현할 것인가"에 집중한다.
+
+### 15.1 아키텍처 개요
+
+```
+LLM 호출 시 프롬프트 구성:
+┌─────────────────────────────────────────┐
+│ [A] 시스템 프롬프트 (고정, 캐시 대상)       │
+│     벡터/역설/Voice 정의 (~2,000 tok)      │
+├─────────────────────────────────────────┤
+│ [B] Voice 앵커 (PersonaWorld 검색)        │
+│     최근 포스트/댓글 5~10개 (~500 tok)     │
+├─────────────────────────────────────────┤
+│ [C] 관계 기억 (조건부 검색)                │
+│     상호작용 대상과의 최근 대화 (~800 tok)  │
+├─────────────────────────────────────────┤
+│ [D] 관심사 연속성 (검색)                   │
+│     최근 좋아요/리포스트 주제 (~100 tok)    │
+├─────────────────────────────────────────┤
+│ [E] 현재 컨텍스트 + 유저 입력 (~500 tok)   │
+└─────────────────────────────────────────┘
+총: ~3,900 tok (기존 2,500 대비 +55%)
+```
+
+### 15.2 컨텍스트 빌더
+
+```typescript
+// src/lib/rag/context-builder.ts
+
+interface RAGContext {
+  voiceAnchor: string       // [B] 최근 글에서 추출한 Voice 앵커
+  relationMemory: string    // [C] 관계 기억 (대화 상대 있을 때)
+  interestContinuity: string // [D] 최근 관심사 요약
+  totalTokens: number        // 토큰 예상치
+}
+
+interface ContextBuilderOptions {
+  personaId: string
+  interactionTargetId?: string  // 대화 상대 (있으면 관계 기억 검색)
+  maxVoiceAnchors: number       // default: 5
+  maxInteractions: number       // default: 10
+  maxLikes: number              // default: 10
+}
+
+/**
+ * PersonaWorld DB에서 페르소나의 최근 활동을 검색하여
+ * LLM 프롬프트에 주입할 RAG 컨텍스트를 구성한다.
+ *
+ * 핵심 원칙:
+ * - Voice 앵커 = 페르소나가 "실제로 쓴 글" → few-shot 역할
+ * - 관계 기억 = 특정 상대와의 최근 대화 이력 → 관계 톤 유지
+ * - 관심사 연속성 = 최근 좋아요/리포스트 주제 → 화제 연속성
+ */
+async function buildPersonaContext(
+  options: ContextBuilderOptions
+): Promise<RAGContext>
+```
+
+### 15.3 Voice 앵커 검색 로직
+
+```typescript
+// src/lib/rag/voice-anchor.ts
+
+/**
+ * 페르소나의 최근 포스트/댓글에서 Voice 앵커를 추출한다.
+ *
+ * 검색 우선순위:
+ * 1. 최근 포스트 (본인 작성) — Voice의 가장 강한 증거
+ * 2. 최근 댓글 (본인 작성) — 대화 스타일 증거
+ *
+ * 포맷: "[{timeAgo}] {content.slice(0, 200)}"
+ * → LLM에게 "이 페르소나가 실제로 이렇게 말한다"는 few-shot 앵커
+ */
+async function extractVoiceAnchors(
+  personaId: string,
+  limit: number
+): Promise<string>
+```
+
+### 15.4 관계 기억 검색 로직
+
+```typescript
+// src/lib/rag/relation-memory.ts
+
+/**
+ * 두 페르소나 간 최근 상호작용 이력을 검색한다.
+ *
+ * 검색 범위:
+ * - A가 B의 포스트에 단 댓글
+ * - B가 A의 포스트에 단 댓글
+ * - A/B 간 댓글 체인 (대화)
+ *
+ * 결과: 시간순 정렬된 상호작용 요약
+ * → "어제 논쟁했음", "3일 전 칭찬함" 등 관계 톤 유지
+ */
+async function extractRelationMemory(
+  personaId: string,
+  targetId: string,
+  limit: number
+): Promise<string>
+```
+
+### 15.5 관심사 연속성 검색 로직
+
+```typescript
+// src/lib/rag/interest-continuity.ts
+
+/**
+ * 페르소나의 최근 좋아요/리포스트에서 관심 주제를 추출한다.
+ *
+ * 방법: 최근 좋아요한 콘텐츠의 태그/주제를 빈도순 정렬
+ * 결과: "이번 주 관심사: 독립영화, 재즈, 도시 건축"
+ */
+async function extractInterestContinuity(
+  personaId: string,
+  limit: number
+): Promise<string>
+```
+
+### 15.6 캐싱 전략
+
+```typescript
+// 호출당 DB 쿼리 3~4회 → 캐싱 필수
+
+interface RAGCacheConfig {
+  voiceAnchorTTL: 300        // 5분 — 포스트는 자주 안 바뀜
+  relationMemoryTTL: 60      // 1분 — 대화 중에는 빠르게 갱신
+  interestTTL: 600           // 10분 — 관심사는 천천히 변함
+}
+
+/**
+ * 캐시 키 규칙:
+ * - voice:{personaId}      → voiceAnchor
+ * - relation:{personaId}:{targetId} → relationMemory
+ * - interest:{personaId}   → interestContinuity
+ *
+ * 구현: 인메모리 LRU 캐시 (Phase 9에서 Redis 전환 가능)
+ */
+```
+
+---
+
+## 16. 품질 피드백 루프 구현
+
+> 설계서 Section 16 (품질 피드백 루프) 참조.
+> 이 섹션은 4대 측정 엔진의 구체적 구현 명세에 집중한다.
+
+### 16.1 품질 측정 엔진 인터페이스
+
+```typescript
+// src/lib/quality/types.ts
+
+interface QualityMetrics {
+  paradoxExpression: number   // 0.0~1.0 — 역설이 표현되었는가
+  voiceConsistency: number    // 0.0~1.0 — 과거 글과 일관적인가
+  pressureResponse: number    // 0.0~1.0 — P 변화에 자연스러운가
+  userSatisfaction: number    // 0.0~1.0 — 유저가 만족하는가
+  overall: number             // 4개의 가중 평균
+}
+
+interface QualityEvalInput {
+  personaId: string
+  generatedText: string
+  task: 'post' | 'comment' | 'review' | 'chat'
+  pressure?: number
+  interactionTargetId?: string
+}
+
+/**
+ * 메인 품질 측정 함수.
+ * 생성된 텍스트를 4대 지표로 자동 평가한다.
+ */
+async function evaluateQuality(
+  input: QualityEvalInput
+): Promise<QualityMetrics>
+```
+
+### 16.2 역설 표현 스코어 (Paradox Expression Score)
+
+```typescript
+// src/lib/quality/paradox-expression.ts
+
+/**
+ * 측정 파이프라인:
+ * 1. 페르소나의 L1↔L2 역설 쌍 중 상위 3개 추출
+ * 2. 각 역설을 자연어로 변환:
+ *    stance(0.8)↔agreeableness(0.9) → "비판적이면서 공감적인"
+ * 3. 경량 모델(GPT-4o mini)로 텍스트 분석:
+ *    "이 텍스트에서 '{역설 자연어}'가 표현되었는가?"
+ *    → 0.0~1.0 스코어
+ * 4. 상위 3개 역설의 스코어 평균
+ *
+ * 비용: ~3원/평가 (mini 1회 호출)
+ * 빈도: 전수 평가 아님 — 샘플링 (10% 또는 Heavy tier 호출만)
+ */
+async function measureParadoxExpression(
+  personaId: string,
+  generatedText: string
+): Promise<number>
+```
+
+### 16.3 Voice 일관성 스코어 (Voice Consistency Score)
+
+```typescript
+// src/lib/quality/voice-consistency.ts
+
+/**
+ * LLM 없이 규칙 기반으로 측정 (비용 0원):
+ *
+ * 1. 페르소나의 최근 글 10개에서 특징 추출:
+ *    - avgSentenceLength: 평균 문장 길이
+ *    - exclamationRate: 감탄사 비율
+ *    - questionRate: 의문문 비율
+ *    - vocabLevel: 어휘 수준 (고유 어휘 / 전체 단어)
+ *    - speechPatternHits: 말버릇 출현 횟수
+ *
+ * 2. 새로 생성된 글에서 동일 특징 추출
+ *
+ * 3. 코사인 유사도 계산
+ *    유사도 < 0.6 → Voice drift 경고
+ *    유사도 < 0.4 → Voice 심각 이탈
+ */
+interface VoiceFeatures {
+  avgSentenceLength: number
+  exclamationRate: number
+  questionRate: number
+  vocabLevel: number
+  speechPatternHits: number
+}
+
+function extractVoiceFeatures(text: string, speechPatterns: string[]): VoiceFeatures
+function cosineSimilarity(a: VoiceFeatures, b: VoiceFeatures): number
+```
+
+### 16.4 Pressure 반응 자연스러움 (Pressure Response Score)
+
+```typescript
+// src/lib/quality/pressure-response.ts
+
+/**
+ * 배치 테스트로 측정 (실시간 아님):
+ *
+ * 1. 같은 페르소나에게 P=0.1, 0.4, 0.7, 1.0으로 동일 질문
+ * 2. 4개 응답의 감정 톤을 분석 (mini 모델):
+ *    → sentimentScore: -1.0(극부정) ~ 1.0(극긍정)
+ *    → intensityScore: 0.0(차분) ~ 1.0(격렬)
+ * 3. 변화량이 단조 증가하는지 검증:
+ *    - P↑ → intensity↑ (정상)
+ *    - P↑ → intensity↓ (비정상 → 경고)
+ *
+ * 빈도: 아키타입별 주 1회 배치 실행
+ * 비용: ~48원/아키타입/주 (mini 4회 × 12 아키타입)
+ */
+interface PressureTestResult {
+  pressure: number
+  sentimentScore: number
+  intensityScore: number
+}
+
+async function runPressureTest(
+  personaId: string,
+  testPrompt: string
+): Promise<PressureTestResult[]>
+```
+
+### 16.5 Few-shot 라이브러리 자동 수집
+
+```typescript
+// src/lib/quality/few-shot-collector.ts
+
+/**
+ * 품질 높은 응답을 자동 수집하여 Few-shot 예시 DB 구축.
+ *
+ * 수집 기준:
+ * - paradoxExpression ≥ 0.8
+ * - voiceConsistency ≥ 0.7
+ * - 유저 LIKE 피드백
+ *
+ * 저장 구조:
+ * - 역설 유형별 분류 (stance↔agreeableness, sociability↔extraversion 등)
+ * - 유형당 최대 10개 유지 (FIFO로 교체)
+ *
+ * 활용:
+ * - 동일 역설 유형 페르소나 생성 시 few-shot 2~3개 주입
+ * - Voice 앵커와 함께 프롬프트에 포함
+ */
+interface FewShotExample {
+  id: string
+  paradoxType: string          // 예: 'stance_agreeableness'
+  paradoxScore: number
+  qualityScore: number
+  generatedText: string
+  context: string              // 어떤 상황에서 생성되었는지
+  collectedAt: Date
+}
+
+interface FewShotLibrary {
+  [paradoxType: string]: FewShotExample[]  // 최대 10개/유형
+}
+```
+
+### 16.6 품질 대시보드 데이터
+
+```typescript
+// src/lib/quality/dashboard.ts
+
+/**
+ * 1단계 (v3 출시): 수동 확인용 대시보드 데이터 API
+ *
+ * 집계 단위:
+ * - 아키타입별 평균 품질 지표
+ * - 역설 유형별 표현 성공률
+ * - Voice drift 발생 빈도 (턴 수 기준)
+ * - Pressure 구간별 자연스러움
+ *
+ * 2단계 (v3.1): 문제 패턴 자동 감지 → 알림
+ * 3단계 (v3.2): Few-shot 자동 교체, 프롬프트 A/B 자동 실행
+ */
+interface QualityDashboardData {
+  archetypeMetrics: Record<string, QualityMetrics>
+  paradoxTypeSuccess: Record<string, number>
+  voiceDriftDistribution: { turnCount: number; driftRate: number }[]
+  pressureCurveByArchetype: Record<string, PressureTestResult[]>
+  fewShotLibrarySize: Record<string, number>
+}
+```
+
+---
+
+## 17. LLM 모델 전략 구현
+
+> 설계서 Section 17 (LLM 모델 전략) 참조.
+> 이 섹션은 3-Tier 라우터, Prompt Caching, Provider Adapter의 구체적 구현에 집중한다.
+
+### 17.1 모델 설정
+
+```typescript
+// src/lib/llm/model-config.ts
+
+const MODEL_TIERS = {
+  heavy: {
+    provider: 'anthropic' as const,
+    model: 'claude-sonnet-4-5-20250929',
+    maxTokens: 4096,
+    costPerInputMToken: 3.0,    // $3/M input
+    costPerOutputMToken: 15.0,  // $15/M output
+  },
+  medium: {
+    provider: 'openai' as const,
+    model: 'gpt-4o-mini',
+    maxTokens: 4096,
+    costPerInputMToken: 0.15,   // $0.15/M input
+    costPerOutputMToken: 0.60,  // $0.60/M output
+  },
+  light: {
+    provider: 'rule-based' as const,
+    model: null,                 // LLM 호출 없음
+    maxTokens: 0,
+    costPerInputMToken: 0,
+    costPerOutputMToken: 0,
+  },
+} as const
+
+type ModelTier = keyof typeof MODEL_TIERS
+```
+
+### 17.2 동적 Tier 라우터
+
+```typescript
+// src/lib/llm/tier-router.ts
+
+interface TierRoutingInput {
+  personaId: string
+  paradoxScore: number
+  task: 'persona-generation' | 'review' | 'post' | 'comment' | 'chat' | 'reaction'
+  pressure?: number
+  triggerDetected?: boolean
+  conflictScore?: number
+  expectedResponseLength?: number
+}
+
+/**
+ * 동적 분기 로직 (설계서 17.3):
+ *
+ * Heavy (Sonnet):
+ *   - paradoxScore > 0.5
+ *   - pressure > 0.4
+ *   - triggerDetected
+ *   - conflictScore > 0.7
+ *   - task == 'persona-generation'
+ *   - task == 'review'
+ *
+ * Light (규칙 기반):
+ *   - expectedResponseLength < 50
+ *   - task == 'reaction'
+ *
+ * Medium (mini): 그 외 전부
+ */
+function routeToTier(input: TierRoutingInput): ModelTier
+```
+
+### 17.3 Provider Adapter
+
+```typescript
+// src/lib/llm/provider-adapter.ts
+
+interface LLMRequest {
+  systemPrompt: string
+  ragContext?: string         // PersonaWorld RAG
+  messages: { role: 'user' | 'assistant'; content: string }[]
+  tier: ModelTier
+  enableCaching?: boolean     // Prompt Caching 활성화
+}
+
+interface LLMResponse {
+  content: string
+  tier: ModelTier
+  inputTokens: number
+  outputTokens: number
+  cached: boolean             // 캐시 히트 여부
+  latencyMs: number
+}
+
+/**
+ * Provider별 분기 + Prompt Caching 적용.
+ *
+ * Anthropic (Heavy tier):
+ *   - cache_control: { type: 'ephemeral' } 적용
+ *   - 시스템 프롬프트 + 벡터/역설 정의를 캐시 블록으로
+ *   - RAG 컨텍스트는 변동이므로 별도 블록
+ *
+ * OpenAI (Medium tier):
+ *   - 자동 prefix caching (별도 설정 불필요)
+ *
+ * Rule-based (Light tier):
+ *   - LLM 호출 없음 → Voice 템플릿에서 랜덤 선택
+ */
+async function callLLM(request: LLMRequest): Promise<LLMResponse>
+```
+
+### 17.4 Prompt Caching 구현 (Anthropic)
+
+```typescript
+// src/lib/llm/providers/anthropic.ts
+
+/**
+ * Anthropic cache_control 구조:
+ *
+ * system: [
+ *   {
+ *     type: 'text',
+ *     text: systemPrompt + personaVectorDef,  // ~2,000 tok (고정)
+ *     cache_control: { type: 'ephemeral' }    // 5분 TTL
+ *   },
+ *   {
+ *     type: 'text',
+ *     text: ragContext                         // ~1,900 tok (변동)
+ *   }
+ * ]
+ *
+ * 캐시 적중 시:
+ * - input 비용 82% 절감 (고정부분)
+ * - 같은 페르소나의 연속 대화에서 효과 극대
+ *
+ * 주의: cache_control 블록 최소 1,024 tok 필요
+ *       → 시스템 프롬프트 2,000 tok이므로 조건 충족
+ */
+```
+
+### 17.5 Light Tier: 규칙 기반 생성기
+
+```typescript
+// src/lib/llm/providers/rule-based.ts
+
+/**
+ * LLM 호출 없이 생성하는 경량 응답.
+ *
+ * 용도: 좋아요, 짧은 반응 ("ㅋㅋ", "와 대박"), 리포스트 코멘트
+ *
+ * 로직:
+ * 1. persona.voice.speechPatterns에서 패턴 추출
+ * 2. persona.voice.exclamations에서 감탄사 추출
+ * 3. 현재 감정 상태 (pressure 기반)에 맞는 템플릿 선택
+ * 4. 변형: speechPattern + 감탄사 + 약간의 랜덤성
+ *
+ * 비용: 0원
+ * 품질: 단문 반응에서는 LLM과 구분 불가능
+ */
+function generateLightResponse(
+  persona: PersonaProfile,
+  context: InteractionContext
+): string
+```
+
+---
+
+## 18. 구현 Phase 및 태스크
 
 ### Phase 0: 기반 인프라 (타입 + DB + 상수 + 색상)
 
@@ -2558,9 +3061,41 @@ export const L1_L2_PARADOX_MAPPINGS = [
 | 8-21 | 에디터 툴바 (프리셋/실행/검증) | `src/components/node-editor/editor-toolbar.tsx` | **신규** |
 | 8-22 | 에디터 상태바 (노드 카운트/검증 상태) | `src/components/node-editor/editor-status-bar.tsx` | **신규** |
 
+### Phase 9: PersonaWorld RAG + 품질 피드백 + 모델 전략
+
+> Phase 2(생성 파이프라인) 이후 진행 가능. Phase 8(노드 에디터)과 병렬 가능.
+> Section 15 (RAG), Section 16 (피드백 루프), Section 17 (모델 전략) 참조.
+
+| # | 태스크 | 파일 | 변경 수준 |
+|---|--------|------|-----------|
+| 9-1 | Voice 앵커 검색 로직 | `src/lib/rag/voice-anchor.ts` | **신규** |
+| 9-2 | 관계 기억 검색 로직 | `src/lib/rag/relation-memory.ts` | **신규** |
+| 9-3 | 관심사 연속성 검색 로직 | `src/lib/rag/interest-continuity.ts` | **신규** |
+| 9-4 | RAG 컨텍스트 빌더 (통합) | `src/lib/rag/context-builder.ts` | **신규** |
+| 9-5 | RAG 캐시 매니저 (LRU) | `src/lib/rag/cache-manager.ts` | **신규** |
+| 9-6 | RAG 모듈 index | `src/lib/rag/index.ts` | **신규** |
+| 9-7 | RAG 단위 테스트 | `src/lib/rag/__tests__/` | **신규** |
+| 9-8 | LLM 모델 설정 (3-Tier) | `src/lib/llm/model-config.ts` | **신규** |
+| 9-9 | 동적 Tier 라우터 | `src/lib/llm/tier-router.ts` | **신규** |
+| 9-10 | Provider Adapter (통합) | `src/lib/llm/provider-adapter.ts` | **신규** |
+| 9-11 | Anthropic Provider + Prompt Caching | `src/lib/llm/providers/anthropic.ts` | **신규** |
+| 9-12 | OpenAI Provider | `src/lib/llm/providers/openai.ts` | **신규** |
+| 9-13 | Light Provider (규칙 기반) | `src/lib/llm/providers/rule-based.ts` | **신규** |
+| 9-14 | LLM 모듈 index | `src/lib/llm/index.ts` | **신규** |
+| 9-15 | 품질 측정 타입 | `src/lib/quality/types.ts` | **신규** |
+| 9-16 | 역설 표현 스코어 측정기 | `src/lib/quality/paradox-expression.ts` | **신규** |
+| 9-17 | Voice 일관성 스코어 측정기 | `src/lib/quality/voice-consistency.ts` | **신규** |
+| 9-18 | Pressure 반응 테스트기 | `src/lib/quality/pressure-response.ts` | **신규** |
+| 9-19 | Few-shot 라이브러리 수집기 | `src/lib/quality/few-shot-collector.ts` | **신규** |
+| 9-20 | 품질 대시보드 데이터 API | `src/lib/quality/dashboard.ts` | **신규** |
+| 9-21 | 품질 모듈 index | `src/lib/quality/index.ts` | **신규** |
+| 9-22 | 품질 측정 단위 테스트 | `src/lib/quality/__tests__/` | **신규** |
+| 9-23 | 기존 프롬프트 빌더에 RAG 통합 | `src/lib/persona-generation/prompt-builder.ts` | 수정 |
+| 9-24 | 기존 생성 파이프라인에 Tier 라우터 통합 | `src/lib/persona-generation/index.ts` | 수정 |
+
 ---
 
-## 16. 파일 변경 맵
+## 19. 파일 변경 맵
 
 ### 신규 파일
 
@@ -2645,6 +3180,34 @@ apps/engine-studio/src/lib/node-graph/serializer.ts             ← JSON ↔ Gra
 apps/engine-studio/src/lib/node-graph/v2-migration.ts           ← v2 선형→v3 DAG 변환
 apps/engine-studio/src/lib/node-graph/__tests__/                ← DAG 엔진 테스트
 
+# ── RAG 모듈 ──
+apps/engine-studio/src/lib/rag/index.ts                    ← 모듈 index
+apps/engine-studio/src/lib/rag/context-builder.ts          ← RAG 컨텍스트 빌더 (통합)
+apps/engine-studio/src/lib/rag/voice-anchor.ts             ← Voice 앵커 검색
+apps/engine-studio/src/lib/rag/relation-memory.ts          ← 관계 기억 검색
+apps/engine-studio/src/lib/rag/interest-continuity.ts      ← 관심사 연속성 검색
+apps/engine-studio/src/lib/rag/cache-manager.ts            ← LRU 캐시 매니저
+apps/engine-studio/src/lib/rag/__tests__/                  ← RAG 단위 테스트
+
+# ── LLM 모듈 ──
+apps/engine-studio/src/lib/llm/index.ts                    ← 모듈 index
+apps/engine-studio/src/lib/llm/model-config.ts             ← 3-Tier 모델 설정
+apps/engine-studio/src/lib/llm/tier-router.ts              ← 동적 Tier 라우터
+apps/engine-studio/src/lib/llm/provider-adapter.ts         ← Provider 통합 어댑터
+apps/engine-studio/src/lib/llm/providers/anthropic.ts      ← Anthropic + Prompt Caching
+apps/engine-studio/src/lib/llm/providers/openai.ts         ← OpenAI Provider
+apps/engine-studio/src/lib/llm/providers/rule-based.ts     ← 규칙 기반 경량 생성기
+
+# ── 품질 측정 모듈 ──
+apps/engine-studio/src/lib/quality/index.ts                ← 모듈 index
+apps/engine-studio/src/lib/quality/types.ts                ← 품질 지표 타입
+apps/engine-studio/src/lib/quality/paradox-expression.ts   ← 역설 표현 스코어
+apps/engine-studio/src/lib/quality/voice-consistency.ts    ← Voice 일관성 스코어
+apps/engine-studio/src/lib/quality/pressure-response.ts    ← Pressure 반응 테스트
+apps/engine-studio/src/lib/quality/few-shot-collector.ts   ← Few-shot 자동 수집기
+apps/engine-studio/src/lib/quality/dashboard.ts            ← 품질 대시보드 데이터
+apps/engine-studio/src/lib/quality/__tests__/              ← 품질 측정 테스트
+
 # ── 노드 에디터 스토어/상수 ──
 apps/engine-studio/src/stores/node-editor-store.ts              ← Zustand 노드 그래프 스토어
 apps/engine-studio/src/constants/flow-presets.ts                ← 4종 플로우 프리셋
@@ -2691,6 +3254,8 @@ apps/engine-studio/src/lib/vector/utils.ts        ← clamp 등 범용 유틸
 apps/engine-studio/src/lib/persona-generation/activity-inference.ts  ← sociability 연계
 apps/engine-studio/src/lib/persona-generation/content-settings-inference.ts
 apps/engine-studio/src/lib/persona-generation/sample-content-generator.ts
+apps/engine-studio/src/lib/persona-generation/prompt-builder.ts  ← RAG 컨텍스트 통합
+apps/engine-studio/src/lib/persona-generation/index.ts           ← Tier 라우터 통합
 apps/engine-studio/src/components/node-editor/node-wrapper.tsx    ← v3 포트 핸들 시스템 적용
 ```
 
