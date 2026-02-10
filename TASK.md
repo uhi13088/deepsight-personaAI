@@ -19,17 +19,23 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-- [ ] **T29: 비정량↔정량 연결 알고리즘 구체화**
-  - 범위: 설계서 §5.3-5.7, 구현계획서 §9
-  - AC1: ① Init — NLP 키워드→벡터 delta 매핑 테이블 구체화 (추출 방법 + 규칙)
-  - AC2: ② Override — 트리거 감지 알고리즘 + delta 결정 규칙 + 복귀 곡선 명세
-  - AC3: ③ Adapt — 매 인터랙션 보정 공식 구체화
-  - AC4: ④ Express — 벡터 상태→습관 발현 확률 공식 구체화
-  - AC5: 구현계획서 Phase 태스크 + 파일 변경 맵 반영
+(없음)
 
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T29: 비정량↔정량 연결 알고리즘 구체화** ✅ 2026-02-10
+  - 변경: `docs/persona-engine-v3-design.md` (v3.0-draft.6)
+    - §5.3 Init: LLM 구조화 키워드 추출, 의미 카테고리→벡터 매핑 테이블, delta 적용 규칙
+    - §5.4 Override: 2단계 트리거 감지, override/additive delta, 지수 감쇠 복귀 곡선
+    - §5.5 Adapt: UIV 3축 분석, 차원별 α, 모멘텀, ±0.3 드리프트 클램프
+    - §5.6 Express: 파생 상태값 5종, sigmoid 범용 공식, quirk 스키마
+  - 변경: `docs/persona-engine-v3-implementation-plan.md` (v1.8)
+    - §9.3~9.6 상호작용 모듈 구현 상세 (Init/Override/Adapt/Express 코드)
+    - Phase 4 태스크 확장 (4-1~4-9: 타입, 상수, 테스트 포함)
+    - 파일 변경 맵: 상호작용 모듈 9개 항목 추가
+  - 테스트: 설계 문서 — 코드 구현 아님
 
 - [x] **T28: 매칭 알고리즘 다층 확장** ✅ 2026-02-10
   - 변경: `docs/persona-engine-v3-design.md` (v3.0-draft.5)
