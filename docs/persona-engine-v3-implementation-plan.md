@@ -17,6 +17,7 @@
 | 버전 | 날짜 | 변경 내용 |
 |---|---|---|
 | v1.0 | 2026-02-10 | 초판 작성 — 전체 아키텍처 결정사항, 데이터 모델, 타입 시스템, 구현 태스크 |
+| v1.1 | 2026-02-10 | Section 12 전면 개편 — 16D→다층 상수/색상 체계. 교차축 83개+ 관계축, 엔진 메타, 아키타입 색상 추가. Phase 0 태스크 0-7~0-20으로 확장. 파일 구조 단일→모듈(v3/, colors/) |
 
 ---
 
@@ -1061,36 +1062,492 @@ export function calculateV3MatchingScore(
 
 ## 12. 상수 및 설정
 
-### 12.1 새 상수 파일
+> **핵심 인식**: 벡터 구조는 단순 7+5+4=16D가 아니다.
+> 레이어 간 교차 관계축(L1×L2=35, L1×L3=28, L2×L3=20 = **83개 관계축**),
+> 트리플 조합(7×5×4=**140개**), 역설 페어(7개), 엔진 메타(P, α, β, V_Final),
+> 아키타입(12+)까지 색상과 상수가 필요하다.
+> 단일 파일이 아닌 **다중 파일 상수 모듈**로 구성한다.
 
-`apps/engine-studio/src/constants/vector-v3.ts`
+### 12.1 상수 파일 구조
 
-포함 내용:
-- `L1_DIMENSIONS`: L1 차원 정보 (key, name, label, low, high, description, color)
-- `L2_DIMENSIONS`: L2 차원 정보
-- `L3_DIMENSIONS`: L3 차원 정보
-- `L1_L2_PARADOX_MAPPINGS`: 역설 매핑 테이블 (7개)
-- `L3_PROJECTION_COEFFICIENTS`: L3→L1 투영 계수 (Beta v1)
-- `DEFAULT_DYNAMICS_CONFIG`: 기본 동적 설정
-- `PARADOX_SCORE_INTERPRETATION`: 역설 점수 해석 테이블
-- `DEFAULT_L1_VECTOR`: 기본 L1 벡터 (모든 차원 0.5)
-- `DEFAULT_L2_VECTOR`: 기본 L2 벡터 (모든 차원 0.5)
-- `DEFAULT_L3_VECTOR`: 기본 L3 벡터 (모든 차원 0.0 — 서사 없음)
+```
+apps/engine-studio/src/constants/v3/
+├── index.ts                    ← 통합 re-export
+├── dimensions.ts               ← 개별 차원 정의 (L1/L2/L3)
+├── paradox-mappings.ts         ← L1↔L2 역설 매핑 테이블
+├── projection-coefficients.ts  ← L2→L1, L3→L1 투영 계수
+├── cross-layer-axes.ts         ← 레이어 간 교차축 정의 (83개)
+├── dynamics-defaults.ts        ← 동적 설정 기본값
+└── interpretation-tables.ts    ← 역설/차원성 점수 해석
+```
 
-### 12.2 트레이트 색상 확장
+### 12.2 `dimensions.ts` — 개별 차원 정의 (16D)
 
-`apps/engine-studio/src/lib/trait-colors.ts` → 16D로 확장
+```typescript
+export interface DimensionDef {
+  key: string
+  layer: 'L1' | 'L2' | 'L3'
+  name: string              // 영문 표시명
+  label: string             // 한글 표시명
+  low: string               // 0.0 쪽 레이블
+  high: string              // 1.0 쪽 레이블
+  description: string
+}
 
-레이어별 색상 그룹:
-- L1 (Social): 기존 6개 색상 유지 + sociability 추가 (보라 계열)
-- L2 (OCEAN): 새 색상 5개 (따뜻한 계열 — 주황/산호/골드 등)
-- L3 (Narrative): 새 색상 4개 (어두운 계열 — 남색/자주/진녹 등)
+// L1 Social Persona (7D)
+export const L1_DIMENSIONS: DimensionDef[] = [
+  { key: 'depth',       layer: 'L1', name: 'Depth',       label: '분석 깊이',  low: '직관적',   high: '심층적',   description: '콘텐츠를 얼마나 깊이 분석하는지' },
+  { key: 'lens',        layer: 'L1', name: 'Lens',        label: '판단 렌즈',  low: '감성적',   high: '논리적',   description: '감성적 vs 논리적 판단 성향' },
+  { key: 'stance',      layer: 'L1', name: 'Stance',      label: '평가 태도',  low: '수용적',   high: '비판적',   description: '콘텐츠에 대한 수용/비판 정도' },
+  { key: 'scope',       layer: 'L1', name: 'Scope',       label: '관심 범위',  low: '핵심만',   high: '디테일',   description: '핵심 요약 vs 세부 사항 관심도' },
+  { key: 'taste',       layer: 'L1', name: 'Taste',       label: '취향 성향',  low: '클래식',   high: '실험적',   description: '검증된 작품 vs 실험적 작품 선호' },
+  { key: 'purpose',     layer: 'L1', name: 'Purpose',     label: '소비 목적',  low: '오락',     high: '의미 추구', description: '가벼운 오락 vs 의미 추구' },
+  { key: 'sociability', layer: 'L1', name: 'Sociability', label: '사회적 성향', low: '독립적',   high: '사교적',   description: '혼자 소비 vs 함께 나누기 선호' },
+]
+
+// L2 Core Temperament / OCEAN (5D)
+export const L2_DIMENSIONS: DimensionDef[] = [
+  { key: 'openness',          layer: 'L2', name: 'Openness',          label: '개방성',   low: '보수적',   high: '개방적',   description: '새로운 경험과 아이디어에 대한 수용도' },
+  { key: 'conscientiousness', layer: 'L2', name: 'Conscientiousness', label: '성실성',   low: '유연한',   high: '체계적',   description: '계획성과 꼼꼼함의 정도' },
+  { key: 'extraversion',      layer: 'L2', name: 'Extraversion',      label: '외향성',   low: '내향적',   high: '외향적',   description: '에너지의 원천 (내부 vs 외부)' },
+  { key: 'agreeableness',     layer: 'L2', name: 'Agreeableness',     label: '친화성',   low: '독립적',   high: '협조적',   description: '타인과의 조화를 추구하는 정도' },
+  { key: 'neuroticism',       layer: 'L2', name: 'Neuroticism',       label: '신경성',   low: '안정적',   high: '민감한',   description: '감정적 반응성과 불안 수준' },
+]
+
+// L3 Narrative Drive (4D)
+export const L3_DIMENSIONS: DimensionDef[] = [
+  { key: 'lack',         layer: 'L3', name: 'Lack',         label: '결핍',     low: '충족',     high: '결핍',     description: '내면의 결핍 — 행동의 원인 (cause)' },
+  { key: 'moralCompass', layer: 'L3', name: 'Moral Compass', label: '도덕 나침반', low: '유연한',   high: '엄격한',   description: '판단의 기준 — 옳고 그름의 잣대 (criteria)' },
+  { key: 'volatility',   layer: 'L3', name: 'Volatility',   label: '변동성',   low: '안정적',   high: '폭발적',   description: '감정/행동의 불안정성 (instability)' },
+  { key: 'growthArc',    layer: 'L3', name: 'Growth Arc',   label: '성장 곡선', low: '정체',     high: '변화',     description: '변화의 방향성 (direction)' },
+]
+
+// 전체 차원 (순서 보장)
+export const ALL_DIMENSIONS = [...L1_DIMENSIONS, ...L2_DIMENSIONS, ...L3_DIMENSIONS] as const
+
+// 기본 벡터값
+export const DEFAULT_L1_VECTOR = { depth: 0.5, lens: 0.5, stance: 0.5, scope: 0.5, taste: 0.5, purpose: 0.5, sociability: 0.5 } as const
+export const DEFAULT_L2_VECTOR = { openness: 0.5, conscientiousness: 0.5, extraversion: 0.5, agreeableness: 0.5, neuroticism: 0.5 } as const
+export const DEFAULT_L3_VECTOR = { lack: 0.0, moralCompass: 0.0, volatility: 0.0, growthArc: 0.0 } as const
+```
+
+### 12.3 `cross-layer-axes.ts` — 레이어 간 교차축 정의
+
+벡터 구조의 핵심. 단순 차원 나열이 아니라 **레이어 간 모든 관계축을 정의**.
+
+```typescript
+export interface CrossLayerAxis {
+  id: string                        // 고유 ID (예: "l1_depth__l2_openness")
+  l1Dim?: string                    // L1 차원 키 (없으면 해당 레이어 미관여)
+  l2Dim?: string                    // L2 차원 키
+  l3Dim?: string                    // L3 차원 키
+  type: 'L1xL2' | 'L1xL3' | 'L2xL3' | 'L1xL2xL3'
+  relationship: 'paradox' | 'reinforcing' | 'modulating' | 'neutral'
+  label: string                     // 한글 설명
+  interpretation: {
+    highHigh: string                // 둘 다 높을 때 의미
+    highLow: string                 // 첫번째 높고 두번째 낮을 때
+    lowHigh: string
+    lowLow: string
+  }
+}
+
+// ── L1×L2 교차축 (7×5 = 35개) ──
+// 역설 매핑된 7개는 relationship: 'paradox'
+// 나머지 28개는 관계 유형별 분류
+export const L1_L2_AXES: CrossLayerAxis[] = [
+  // === 역설 매핑 (Primary) ===
+  {
+    id: 'l1_depth__l2_openness',
+    l1Dim: 'depth', l2Dim: 'openness',
+    type: 'L1xL2', relationship: 'paradox',
+    label: '분석 깊이 × 개방성',
+    interpretation: {
+      highHigh: '깊이 있는 분석을 개방적으로 수행',
+      highLow: '깊이 분석하지만 보수적 관점 — 고전주의적 학자',
+      lowHigh: '직관적이지만 열린 마음 — 탐험적 감상자',
+      lowLow: '직관적이고 보수적 — 습관적 소비자',
+    },
+  },
+  // ... (7개 paradox 매핑 + 28개 일반 교차축 전체 정의)
+  // 구현 시 전체 35개를 작성한다.
+]
+
+// ── L1×L3 교차축 (7×4 = 28개) ──
+export const L1_L3_AXES: CrossLayerAxis[] = [
+  {
+    id: 'l1_stance__l3_lack',
+    l1Dim: 'stance', l3Dim: 'lack',
+    type: 'L1xL3', relationship: 'modulating',
+    label: '평가 태도 × 결핍',
+    interpretation: {
+      highHigh: '비판적이면서 내면 결핍 큼 — 공격적 방어기제',
+      highLow: '비판적이지만 충족됨 — 자신감 있는 비평가',
+      lowHigh: '수용적이지만 내면 결핍 큼 — 타인 인정 갈구',
+      lowLow: '수용적이고 충족됨 — 평온한 감상자',
+    },
+  },
+  // ... (28개 전체 정의)
+]
+
+// ── L2×L3 교차축 (5×4 = 20개) ──
+export const L2_L3_AXES: CrossLayerAxis[] = [
+  {
+    id: 'l2_neuroticism__l3_volatility',
+    l2Dim: 'neuroticism', l3Dim: 'volatility',
+    type: 'L2xL3', relationship: 'reinforcing',
+    label: '신경성 × 변동성',
+    interpretation: {
+      highHigh: '감정적으로 민감하고 불안정 — 예측 불가 반응',
+      highLow: '민감하지만 안정적 — 내면에서 처리',
+      lowHigh: '안정적이지만 행동은 폭발적 — 서프라이즈형',
+      lowLow: '안정적이고 예측 가능 — 바위 같은 존재',
+    },
+  },
+  // ... (20개 전체 정의)
+]
+
+// ── L1×L2×L3 트리플 조합 (핵심 조합만 정의 — 전체 140개 중 대표 패턴) ──
+export const NOTABLE_TRIPLE_AXES: CrossLayerAxis[] = [
+  {
+    id: 'l1_stance__l2_agreeableness__l3_lack',
+    l1Dim: 'stance', l2Dim: 'agreeableness', l3Dim: 'lack',
+    type: 'L1xL2xL3', relationship: 'paradox',
+    label: '비판적 가면 × 높은 친화성 × 큰 결핍 — "인정받고 싶은 독설가"',
+    interpretation: {
+      highHigh: '비판적이지만 본성은 친화적, 결핍이 원인',
+      highLow: '비판적이고 독립적, 결핍 없음 — 진짜 비평가',
+      lowHigh: '수용적이고 친화적, 결핍이 큼 — 의존적',
+      lowLow: '수용적이고 독립적, 충족됨 — 자족적',
+    },
+  },
+  // 대표 패턴 20~30개를 선별하여 정의
+  // 140개 전부를 정의하는 것은 비실용적이므로, 아키타입 설명에서 사용되는 핵심 조합만
+]
+
+// 전체 교차축 통합
+export const ALL_CROSS_AXES = [...L1_L2_AXES, ...L1_L3_AXES, ...L2_L3_AXES, ...NOTABLE_TRIPLE_AXES] as const
+
+// 관계 유형 필터 유틸
+export function getAxesByRelationship(rel: CrossLayerAxis['relationship']): CrossLayerAxis[] {
+  return ALL_CROSS_AXES.filter(a => a.relationship === rel)
+}
+
+export function getAxesForDimension(dimKey: string): CrossLayerAxis[] {
+  return ALL_CROSS_AXES.filter(a => a.l1Dim === dimKey || a.l2Dim === dimKey || a.l3Dim === dimKey)
+}
+```
+
+### 12.4 색상 시스템 — `trait-colors-v3.ts`
+
+기존 `trait-colors.ts` 를 대체. **다층 색상 체계**로 구성.
+
+```
+apps/engine-studio/src/lib/colors/
+├── index.ts                 ← 통합 re-export + lookup 유틸
+├── dimension-colors.ts      ← 16D 개별 차원 색상
+├── layer-colors.ts          ← 3개 레이어 그룹 색상
+├── cross-axis-colors.ts     ← 교차축/역설 페어 색상
+├── engine-meta-colors.ts    ← 엔진 메타 개념 색상
+└── archetype-colors.ts      ← 아키타입별 색상
+```
+
+#### 12.4.1 `layer-colors.ts` — 레이어 그룹 색상
+
+```typescript
+export interface LayerColorScheme {
+  /** 레이어 대표색 */
+  primary: string
+  /** 연한 배경색 */
+  bg: string
+  /** 보더/강조색 */
+  border: string
+  /** 차트에서 영역 채움색 (opacity 포함) */
+  fill: string
+  /** 텍스트/라벨색 */
+  text: string
+  /** CSS 그라디언트 (왼→오) */
+  gradient: string
+}
+
+export const LAYER_COLORS: Record<'L1' | 'L2' | 'L3', LayerColorScheme> = {
+  L1: {
+    primary: '#3B82F6',     // Blue-500
+    bg: '#EFF6FF',          // Blue-50
+    border: '#93C5FD',      // Blue-300
+    fill: 'rgba(59,130,246,0.15)',
+    text: '#1E40AF',        // Blue-800
+    gradient: 'linear-gradient(90deg, #DBEAFE, #3B82F6)',
+  },
+  L2: {
+    primary: '#F59E0B',     // Amber-500
+    bg: '#FFFBEB',          // Amber-50
+    border: '#FCD34D',      // Amber-300
+    fill: 'rgba(245,158,11,0.15)',
+    text: '#92400E',        // Amber-800
+    gradient: 'linear-gradient(90deg, #FEF3C7, #F59E0B)',
+  },
+  L3: {
+    primary: '#8B5CF6',     // Violet-500
+    bg: '#F5F3FF',          // Violet-50
+    border: '#C4B5FD',      // Violet-300
+    fill: 'rgba(139,92,246,0.15)',
+    text: '#5B21B6',        // Violet-800
+    gradient: 'linear-gradient(90deg, #EDE9FE, #8B5CF6)',
+  },
+}
+```
+
+#### 12.4.2 `dimension-colors.ts` — 개별 차원 색상 (16D+)
+
+```typescript
+export interface DimensionColor {
+  /** 차트/지문에서 사용하는 대표색 */
+  primary: string
+  /** 게이지 그라디언트 시작색 (low 쪽) */
+  from: string
+  /** 게이지 그라디언트 종료색 (high 쪽) */
+  to: string
+}
+
+export interface DimensionColorConfig {
+  key: string
+  layer: 'L1' | 'L2' | 'L3'
+  color: DimensionColor
+}
+
+export const DIMENSION_COLORS: DimensionColorConfig[] = [
+  // ── L1 Social Persona (7D) — 블루 계열 기반 ──
+  { key: 'depth',       layer: 'L1', color: { primary: '#3B82F6', from: '#BFDBFE', to: '#1E3A8A' } },
+  { key: 'lens',        layer: 'L1', color: { primary: '#10B981', from: '#FDA4AF', to: '#059669' } },
+  { key: 'stance',      layer: 'L1', color: { primary: '#F59E0B', from: '#BBF7D0', to: '#EF4444' } },
+  { key: 'scope',       layer: 'L1', color: { primary: '#EF4444', from: '#FEF08A', to: '#7C3AED' } },
+  { key: 'taste',       layer: 'L1', color: { primary: '#8B5CF6', from: '#FDE68A', to: '#D946EF' } },
+  { key: 'purpose',     layer: 'L1', color: { primary: '#EC4899', from: '#FED7AA', to: '#4338CA' } },
+  { key: 'sociability', layer: 'L1', color: { primary: '#6366F1', from: '#E0E7FF', to: '#4F46E5' } }, // NEW
+
+  // ── L2 Core Temperament / OCEAN (5D) — 따뜻한 계열 ──
+  { key: 'openness',          layer: 'L2', color: { primary: '#F97316', from: '#FED7AA', to: '#C2410C' } },
+  { key: 'conscientiousness', layer: 'L2', color: { primary: '#EAB308', from: '#FEF9C3', to: '#A16207' } },
+  { key: 'extraversion',      layer: 'L2', color: { primary: '#F43F5E', from: '#FECDD3', to: '#BE123C' } },
+  { key: 'agreeableness',     layer: 'L2', color: { primary: '#FB923C', from: '#FFEDD5', to: '#EA580C' } },
+  { key: 'neuroticism',       layer: 'L2', color: { primary: '#D97706', from: '#FDE68A', to: '#92400E' } },
+
+  // ── L3 Narrative Drive (4D) — 어두운/깊은 계열 ──
+  { key: 'lack',         layer: 'L3', color: { primary: '#7C3AED', from: '#EDE9FE', to: '#4C1D95' } },
+  { key: 'moralCompass', layer: 'L3', color: { primary: '#6D28D9', from: '#DDD6FE', to: '#3B0764' } },
+  { key: 'volatility',   layer: 'L3', color: { primary: '#A855F7', from: '#F3E8FF', to: '#7E22CE' } },
+  { key: 'growthArc',    layer: 'L3', color: { primary: '#9333EA', from: '#E9D5FF', to: '#581C87' } },
+]
+
+/** key로 차원 색상 조회 */
+export function getDimensionColor(key: string): DimensionColor | undefined {
+  return DIMENSION_COLORS.find(d => d.key === key)?.color
+}
+
+/** 레이어별 차원 색상 필터 */
+export function getDimensionColorsByLayer(layer: 'L1' | 'L2' | 'L3'): DimensionColorConfig[] {
+  return DIMENSION_COLORS.filter(d => d.layer === layer)
+}
+```
+
+#### 12.4.3 `cross-axis-colors.ts` — 교차축 색상
+
+```typescript
+export interface CrossAxisColor {
+  /** 히트맵/상관 차트 대표색 */
+  primary: string
+  /** 역설 강도 그라디언트 (0→1) */
+  gradient: [string, string, string]  // [low, mid, high]
+}
+
+// ── L1↔L2 역설 페어 색상 (7개) ──
+// 두 차원의 색상을 혼합한 고유 색상
+export const PARADOX_PAIR_COLORS: Record<string, CrossAxisColor> = {
+  'depth_openness':              { primary: '#7C5BF0', gradient: ['#EFF6FF', '#7C5BF0', '#4C1D95'] },
+  'lens_neuroticism':            { primary: '#A3884D', gradient: ['#FEF3C7', '#A3884D', '#78350F'] },
+  'stance_agreeableness':        { primary: '#E8783B', gradient: ['#FFEDD5', '#E8783B', '#9A3412'] },
+  'scope_conscientiousness':     { primary: '#D4A017', gradient: ['#FEF9C3', '#D4A017', '#713F12'] },
+  'taste_openness':              { primary: '#C865D9', gradient: ['#F3E8FF', '#C865D9', '#701A75'] },
+  'purpose_conscientiousness':   { primary: '#D4871F', gradient: ['#FEF3C7', '#D4871F', '#78350F'] },
+  'sociability_extraversion':    { primary: '#E05287', gradient: ['#FECDD3', '#E05287', '#881337'] },
+}
+
+// ── 교차 관계 유형별 색상 ──
+export const RELATIONSHIP_TYPE_COLORS: Record<string, string> = {
+  paradox: '#EF4444',       // 역설 — 빨강
+  reinforcing: '#22C55E',   // 강화 — 초록
+  modulating: '#F59E0B',    // 변조 — 앰버
+  neutral: '#94A3B8',       // 중립 — 슬레이트
+}
+
+// ── 히트맵용 교차축 색상 스케일 ──
+// L1×L2(35), L1×L3(28), L2×L3(20) 히트맵에서 사용
+export const CROSS_LAYER_HEATMAP_SCALES = {
+  L1xL2: { cold: '#DBEAFE', neutral: '#FEF3C7', hot: '#EF4444' },  // 블루→앰버→레드
+  L1xL3: { cold: '#DBEAFE', neutral: '#EDE9FE', hot: '#7C3AED' },  // 블루→바이올렛→딥퍼플
+  L2xL3: { cold: '#FFFBEB', neutral: '#F3E8FF', hot: '#581C87' },  // 앰버→라벤더→딥바이올렛
+} as const
+```
+
+#### 12.4.4 `engine-meta-colors.ts` — 엔진 메타 개념 색상
+
+```typescript
+export const ENGINE_META_COLORS = {
+  /** 역설 점수 (Paradox Score) — 빨강 계열 */
+  paradoxScore: {
+    primary: '#EF4444',
+    scale: ['#FEE2E2', '#FECACA', '#FCA5A5', '#F87171', '#EF4444', '#DC2626', '#B91C1C'],
+    //        0-15%     15-30%    30-45%    45-60%    60-75%    75-90%    90-100%
+  },
+  /** 압력 계수 (Pressure P) — 오렌지 게이지 */
+  pressure: {
+    primary: '#F97316',
+    scale: ['#FED7AA', '#FDBA74', '#FB923C', '#F97316', '#EA580C', '#C2410C'],
+    //        P=0       P=0.2     P=0.4     P=0.6     P=0.8     P=1.0
+  },
+  /** V_Final 벡터 — 그린 계열 (최종 결과) */
+  vFinal: {
+    primary: '#22C55E',
+    bg: '#F0FDF4',
+    border: '#86EFAC',
+  },
+  /** α 가중치 (L2 본성) — 앰버 */
+  alpha: {
+    primary: '#F59E0B',
+    range: ['#FEF3C7', '#F59E0B'],
+  },
+  /** β 가중치 (L3 서사) — 바이올렛 */
+  beta: {
+    primary: '#8B5CF6',
+    range: ['#EDE9FE', '#8B5CF6'],
+  },
+  /** 차원성 점수 (Dimensionality) — 시안 계열 */
+  dimensionality: {
+    primary: '#06B6D4',
+    scale: ['#CFFAFE', '#67E8F9', '#22D3EE', '#06B6D4', '#0891B2'],
+  },
+} as const
+```
+
+#### 12.4.5 `archetype-colors.ts` — 아키타입별 색상
+
+```typescript
+export interface ArchetypeColorScheme {
+  id: string
+  primary: string
+  bg: string
+  accent: string
+}
+
+// 확장 가능한 배열 구조 — 새 아키타입 추가 시 항목만 추가
+export const ARCHETYPE_COLORS: ArchetypeColorScheme[] = [
+  { id: 'gentle-critic',      primary: '#6366F1', bg: '#EEF2FF', accent: '#818CF8' },
+  { id: 'passionate-explorer', primary: '#EC4899', bg: '#FDF2F8', accent: '#F472B6' },
+  { id: 'cold-analyst',       primary: '#0EA5E9', bg: '#F0F9FF', accent: '#38BDF8' },
+  { id: 'warm-nostalgic',     primary: '#F97316', bg: '#FFF7ED', accent: '#FB923C' },
+  { id: 'social-butterfly',   primary: '#A855F7', bg: '#FAF5FF', accent: '#C084FC' },
+  { id: 'lonely-snob',        primary: '#1E293B', bg: '#F8FAFC', accent: '#475569' },
+  { id: 'conservative-hipster', primary: '#84CC16', bg: '#F7FEE7', accent: '#A3E635' },
+  { id: 'lazy-perfectionist', primary: '#EAB308', bg: '#FEFCE8', accent: '#FACC15' },
+  { id: 'kind-contrarian',    primary: '#14B8A6', bg: '#F0FDFA', accent: '#2DD4BF' },
+  { id: 'anxious-leader',     primary: '#F43F5E', bg: '#FFF1F2', accent: '#FB7185' },
+  { id: 'quiet-revolutionary', primary: '#7C3AED', bg: '#F5F3FF', accent: '#A78BFA' },
+  { id: 'hedonist-philosopher', primary: '#D946EF', bg: '#FDF4FF', accent: '#E879F9' },
+]
+
+/** 아키타입 ID로 색상 조회. 미등록 아키타입은 기본 회색 반환 */
+export function getArchetypeColor(id: string): ArchetypeColorScheme {
+  return ARCHETYPE_COLORS.find(a => a.id === id) ?? {
+    id, primary: '#64748B', bg: '#F8FAFC', accent: '#94A3B8',
+  }
+}
+```
+
+#### 12.4.6 `index.ts` — 통합 조회 유틸
+
+```typescript
+export * from './dimension-colors'
+export * from './layer-colors'
+export * from './cross-axis-colors'
+export * from './engine-meta-colors'
+export * from './archetype-colors'
+
+import { DIMENSION_COLORS, type DimensionColor } from './dimension-colors'
+import { LAYER_COLORS, type LayerColorScheme } from './layer-colors'
+import { PARADOX_PAIR_COLORS, RELATIONSHIP_TYPE_COLORS } from './cross-axis-colors'
+import { ENGINE_META_COLORS } from './engine-meta-colors'
+import { getArchetypeColor } from './archetype-colors'
+
+/**
+ * 만능 색상 조회 — key 하나로 어떤 색상이든 찾아줌
+ *
+ * @example
+ * resolveColor('depth')           → L1 차원 색상
+ * resolveColor('openness')        → L2 차원 색상
+ * resolveColor('L1')              → 레이어 그룹 색상
+ * resolveColor('depth_openness')  → 역설 페어 색상
+ * resolveColor('paradoxScore')    → 엔진 메타 색상
+ * resolveColor('@gentle-critic')  → 아키타입 색상 (@ prefix)
+ */
+export function resolveColor(key: string): { primary: string; type: string } {
+  // 1. 레이어 그룹
+  if (key in LAYER_COLORS) {
+    return { primary: LAYER_COLORS[key as keyof typeof LAYER_COLORS].primary, type: 'layer' }
+  }
+  // 2. 개별 차원
+  const dim = DIMENSION_COLORS.find(d => d.key === key)
+  if (dim) return { primary: dim.color.primary, type: 'dimension' }
+  // 3. 역설 페어
+  if (key in PARADOX_PAIR_COLORS) {
+    return { primary: PARADOX_PAIR_COLORS[key].primary, type: 'paradox-pair' }
+  }
+  // 4. 관계 유형
+  if (key in RELATIONSHIP_TYPE_COLORS) {
+    return { primary: RELATIONSHIP_TYPE_COLORS[key], type: 'relationship' }
+  }
+  // 5. 엔진 메타
+  if (key in ENGINE_META_COLORS) {
+    return { primary: (ENGINE_META_COLORS as Record<string, { primary: string }>)[key].primary, type: 'engine' }
+  }
+  // 6. 아키타입 (@prefix)
+  if (key.startsWith('@')) {
+    return { primary: getArchetypeColor(key.slice(1)).primary, type: 'archetype' }
+  }
+  // fallback
+  return { primary: '#94A3B8', type: 'unknown' }
+}
+```
+
+### 12.5 `paradox-mappings.ts` — 역설 매핑 테이블
+
+기존 계획서 내용 유지. 12.3의 교차축 정의와 함께 사용.
+
+```typescript
+export const L1_L2_PARADOX_MAPPINGS = [
+  { l1: 'depth',       l2: 'openness',          type: 'primary',   invert: false },
+  { l1: 'lens',        l2: 'neuroticism',       type: 'primary',   invert: true  },
+  { l1: 'stance',      l2: 'agreeableness',     type: 'primary',   invert: true  },
+  { l1: 'scope',       l2: 'conscientiousness', type: 'secondary', invert: false },
+  { l1: 'taste',       l2: 'openness',          type: 'secondary', invert: false },
+  { l1: 'purpose',     l2: 'conscientiousness', type: 'primary',   invert: false },
+  { l1: 'sociability', l2: 'extraversion',      type: 'primary',   invert: false },
+] as const
+```
+
+### 12.6 `projection-coefficients.ts` — 투영 계수
+
+기존 계획서 내용 유지.
+
+### 12.7 `dynamics-defaults.ts` / `interpretation-tables.ts`
+
+기존 계획서 내용 유지.
 
 ---
 
 ## 13. 구현 Phase 및 태스크
 
-### Phase 0: 기반 인프라 (타입 + DB + 상수)
+### Phase 0: 기반 인프라 (타입 + DB + 상수 + 색상)
 
 | # | 태스크 | 파일 | 변경 수준 |
 |---|--------|------|-----------|
@@ -1100,9 +1557,20 @@ export function calculateV3MatchingScore(
 | 0-4 | 앱 타입 re-export | `apps/engine-studio/src/types/index.ts` | 수정 |
 | 0-5 | Prisma 스키마 확장 | `apps/engine-studio/prisma/schema.prisma` | 수정 |
 | 0-6 | DB 마이그레이션 | `prisma migrate dev` | 실행 |
-| 0-7 | v3 상수 파일 생성 | `apps/engine-studio/src/constants/vector-v3.ts` | **신규** |
-| 0-8 | 트레이트 색상 16D 확장 | `apps/engine-studio/src/lib/trait-colors.ts` | 수정 |
-| 0-9 | 기존 Vector6D 중복 정리 | 여러 파일 (6곳) | 수정 |
+| 0-7 | v3 상수 모듈 — dimensions.ts | `src/constants/v3/dimensions.ts` | **신규** |
+| 0-8 | v3 상수 모듈 — paradox-mappings.ts | `src/constants/v3/paradox-mappings.ts` | **신규** |
+| 0-9 | v3 상수 모듈 — projection-coefficients.ts | `src/constants/v3/projection-coefficients.ts` | **신규** |
+| 0-10 | v3 상수 모듈 — cross-layer-axes.ts (83개+) | `src/constants/v3/cross-layer-axes.ts` | **신규** |
+| 0-11 | v3 상수 모듈 — dynamics/interpretation | `src/constants/v3/dynamics-defaults.ts`, `interpretation-tables.ts` | **신규** |
+| 0-12 | v3 상수 모듈 — index.ts | `src/constants/v3/index.ts` | **신규** |
+| 0-13 | 색상 모듈 — dimension-colors.ts (16D) | `src/lib/colors/dimension-colors.ts` | **신규** |
+| 0-14 | 색상 모듈 — layer-colors.ts (3 레이어) | `src/lib/colors/layer-colors.ts` | **신규** |
+| 0-15 | 색상 모듈 — cross-axis-colors.ts (역설+히트맵) | `src/lib/colors/cross-axis-colors.ts` | **신규** |
+| 0-16 | 색상 모듈 — engine-meta-colors.ts | `src/lib/colors/engine-meta-colors.ts` | **신규** |
+| 0-17 | 색상 모듈 — archetype-colors.ts (12+) | `src/lib/colors/archetype-colors.ts` | **신규** |
+| 0-18 | 색상 모듈 — index.ts + resolveColor 유틸 | `src/lib/colors/index.ts` | **신규** |
+| 0-19 | 기존 trait-colors.ts 호환 래퍼 | `src/lib/trait-colors.ts` | 수정 (새 모듈 re-export) |
+| 0-20 | 기존 Vector6D 중복 정리 | 여러 파일 (6곳) | 수정 |
 
 ### Phase 1: 핵심 벡터 엔진
 
@@ -1175,25 +1643,52 @@ export function calculateV3MatchingScore(
 ### 신규 파일
 
 ```
+# ── 타입 ──
 packages/shared-types/src/persona-v3.ts          ← v3 공유 타입
 apps/engine-studio/src/types/persona-v3.ts        ← 앱 레벨 v3 타입
-apps/engine-studio/src/constants/vector-v3.ts     ← v3 상수 (투영 계수, 매핑 테이블 등)
+
+# ── 상수 모듈 (v3/) ──
+apps/engine-studio/src/constants/v3/index.ts                 ← 통합 re-export
+apps/engine-studio/src/constants/v3/dimensions.ts            ← 16D 차원 정의 + 기본값
+apps/engine-studio/src/constants/v3/paradox-mappings.ts      ← L1↔L2 역설 매핑 (7개)
+apps/engine-studio/src/constants/v3/projection-coefficients.ts ← L2→L1, L3→L1 투영 계수
+apps/engine-studio/src/constants/v3/cross-layer-axes.ts      ← 교차축 정의 (83개+ 관계축)
+apps/engine-studio/src/constants/v3/dynamics-defaults.ts     ← 동적 설정 기본값
+apps/engine-studio/src/constants/v3/interpretation-tables.ts ← 점수 해석 테이블
+
+# ── 색상 모듈 (colors/) ──
+apps/engine-studio/src/lib/colors/index.ts              ← 통합 re-export + resolveColor()
+apps/engine-studio/src/lib/colors/dimension-colors.ts   ← 16D 개별 차원 색상
+apps/engine-studio/src/lib/colors/layer-colors.ts       ← 3개 레이어 그룹 색상
+apps/engine-studio/src/lib/colors/cross-axis-colors.ts  ← 역설 페어(7) + 히트맵 스케일
+apps/engine-studio/src/lib/colors/engine-meta-colors.ts ← P, V_Final, α/β, Paradox Score
+apps/engine-studio/src/lib/colors/archetype-colors.ts   ← 아키타입별 색상 (12+, 확장 가능)
+
+# ── 벡터 엔진 ──
 apps/engine-studio/src/lib/vector/projection.ts   ← L2→L1, L3→L1 투영
 apps/engine-studio/src/lib/vector/paradox.ts      ← Paradox Score 계산
 apps/engine-studio/src/lib/vector/v-final.ts      ← V_Final 계산 엔진
 apps/engine-studio/src/lib/vector/__tests__/      ← 벡터 엔진 테스트
+
+# ── 생성 파이프라인 ──
 apps/engine-studio/src/lib/persona-generation/archetypes.ts       ← 아키타입 템플릿
 apps/engine-studio/src/lib/persona-generation/paradox-designer.ts ← 역설 설계 엔진
 apps/engine-studio/src/lib/persona-generation/backstory-generator.ts
 apps/engine-studio/src/lib/persona-generation/voice-generator.ts
 apps/engine-studio/src/lib/persona-generation/pressure-generator.ts
 apps/engine-studio/src/lib/persona-generation/zeitgeist-generator.ts
+
+# ── 상호작용 ──
 apps/engine-studio/src/lib/interaction/initialization.ts
 apps/engine-studio/src/lib/interaction/override.ts
 apps/engine-studio/src/lib/interaction/adaptation.ts
 apps/engine-studio/src/lib/interaction/expression.ts
 apps/engine-studio/src/lib/interaction/index.ts
+
+# ── 매칭 ──
 apps/engine-studio/src/lib/matching/diversity.ts
+
+# ── UI ──
 apps/engine-studio/src/components/charts/paradox-chart.tsx
 apps/engine-studio/src/components/charts/v-final-simulator.tsx
 apps/engine-studio/src/components/persona/qualitative-editor.tsx
@@ -1217,8 +1712,8 @@ apps/engine-studio/src/components/node-editor/nodes/vector-node.tsx
 packages/shared-types/src/index.ts                ← re-export 추가
 apps/engine-studio/src/types/index.ts             ← re-export 추가
 apps/engine-studio/prisma/schema.prisma           ← 모델/필드 추가
-apps/engine-studio/src/constants/index.ts         ← v3 상수 re-export
-apps/engine-studio/src/lib/trait-colors.ts        ← 16D 확장
+apps/engine-studio/src/constants/index.ts         ← v3 상수 모듈 re-export
+apps/engine-studio/src/lib/trait-colors.ts        ← 새 colors/ 모듈 re-export 래퍼로 변경
 apps/engine-studio/src/lib/vector/index.ts        ← re-export 추가
 apps/engine-studio/src/lib/vector/utils.ts        ← clamp 등 범용 유틸
 apps/engine-studio/src/lib/persona-generation/activity-inference.ts  ← sociability 연계
