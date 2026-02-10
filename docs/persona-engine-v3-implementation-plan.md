@@ -18,7 +18,8 @@
 |---|---|---|
 | v1.0 | 2026-02-10 | 초판 작성 — 전체 아키텍처 결정사항, 데이터 모델, 타입 시스템, 구현 태스크 |
 | v1.1 | 2026-02-10 | Section 12 전면 개편 — 16D→다층 상수/색상 체계. 교차축 83개+ 관계축, 엔진 메타, 아키타입 색상 추가. Phase 0 태스크 0-7~0-20으로 확장. 파일 구조 단일→모듈(v3/, colors/) |
-| v1.2 | 2026-02-10 | Section 12 신설 — 컬러지문(P-inger Print) 시스템. TraitColorFingerprint/PingerPrint2D/PingerPrint3D v3 설계. Phase 6 태스크 6-5~6-9 추가. 파일 변경 맵 업데이트 |
+| v1.2 | 2026-02-10 | Section 12 신설 — 컬러지문(P-inger Print) 시스템. 3종 컴포넌트 v3 설계 |
+| v1.3 | 2026-02-10 | Section 12 전면 확장 — "미래 스캐너 디코딩 가능 지문" 스키마 v1 확정. Pantone 완전 제거, CIELAB(D50)+OKLCH 이중 색공간. 6대 고정 규칙, 패턴↔벡터 매핑, 고유성 엔진, 색상 인코딩, canonical/display 이중 렌더. Phase 6(지문 데이터 엔진) 신설, 기존 UI→Phase 7. `docs/fingerprint-schema-v1.json` 추가 |
 
 ---
 
@@ -1064,6 +1065,11 @@ export function calculateV3MatchingScore(
 
 ## 12. 컬러지문 (P-inger Print) 시스템
 
+> **핵심 원칙: "생성은 예술적으로, 저장은 공학적으로"**
+> 컬러지문은 단순 시각화가 아니라 **미래 스캐너 디코딩이 가능한 데이터 구조**다.
+> 최종 PNG만 저장하면 복원 불가. **SVG(벡터 경로) + JSON(메타데이터)** 이중 저장 필수.
+> 스키마 파일: `docs/fingerprint-schema-v1.json`
+
 ### 12.1 현재 상태 — 6D 하드코딩
 
 현재 컬러지문 컴포넌트 3종이 존재하며, **모두 6D `TRAIT_DIMENSIONS`에 하드코딩**되어 있다.
@@ -1076,22 +1082,151 @@ export function calculateV3MatchingScore(
 
 **중복 현황**: PingerPrint2D는 4개 앱에 각각 복사됨, TraitColorFingerprint는 engine-studio + persona-world에 복사됨
 
-### 12.2 v3 컬러지문 설계 원칙
-
-3-Layer 구조에서 컬러지문은 단순 차원 수 확장이 아니라, **레이어 간 관계를 시각적으로 표현**해야 한다.
+### 12.2 v3 설계 원칙
 
 ```
-기존: 6D 값 → 단일 패턴
-v3:   3-Layer × 교차 관계 → 다층 시각 표현
+기존: 6D 값 → 단일 패턴 → PNG만 저장
+v3:   3-Layer × 교차 관계 → 다층 시각 표현 → SVG + JSON + PNG 구조화 저장
 ```
 
-**핵심 원칙:**
+**7대 원칙:**
+
 1. **레이어 시각 분리**: L1/L2/L3가 시각적으로 구분 가능해야 함
 2. **역설(Paradox) 표현**: L1↔L2 모순이 시각적으로 드러나야 함
 3. **압력(Pressure) 반영**: P값에 따라 지문이 동적으로 변형
 4. **확장성**: 향후 차원/레이어 추가 시 코드 수정 최소화
+5. **데이터 구조 저장**: 그림이 아니라 데이터로 저장 — SVG + JSON 이중 보관
+6. **미래 스캐너 대비**: geometry + color 이중 채널 디코딩 가능한 규격
+7. **결정론적 고유성**: 같은 벡터 → 같은 지문, 다른 벡터 → 다른 지문
 
-### 12.3 `TraitColorFingerprint` v3 — 다층 레이더 차트
+### 12.3 6대 고정 규칙
+
+구현 시 예외 없이 적용하는 규칙.
+
+| # | 규칙 | 설명 |
+|---|------|------|
+| 1 | **패턴 클래스 고정** | ulnar_loop, radial_loop, plain_whorl, double_loop_whorl, central_pocket_whorl, plain_arch, tented_arch — 7종 |
+| 2 | **core/delta 좌표 정규화** | core 1개, delta 1~2개, 좌표는 0~1 정규화 |
+| 3 | **ridge_index 단방향 증가** | 중심에서 바깥으로 단방향 증가 |
+| 4 | **color_per_ridge** | 각 릿지에 1색 할당 (인코딩 채널로 활용) |
+| 5 | **최소 선폭/간격 고정** | 디지털: 선폭 ≥ 4px(권장 6~10), 간격 ≥ 4px(권장 6~12). 인쇄(300dpi): 선폭 0.4~0.8mm, 간격 0.4~1.0mm |
+| 6 | **self-intersection 금지** | 비대칭은 허용하되, 자기교차(self-intersection)는 절대 금지 |
+
+### 12.4 패턴 타입 ↔ 벡터 결정론적 매핑
+
+L1 dominant axis가 패턴 타입을 결정한다. 같은 벡터는 항상 같은 패턴.
+
+| L1 Dominant Axis | Pattern Type | 시각적 의미 |
+|------------------|-------------|-------------|
+| depth (분석 깊이) | `plain_whorl` | 소용돌이 — 깊이 있는 분석 |
+| lens (판단 렌즈) | `tented_arch` | 뾰족한 아치 — 날카로운 판단 |
+| stance (평가 태도) | `double_loop_whorl` | 이중 루프 — 비판의 양면성 |
+| scope (관심 범위) | `central_pocket_whorl` | 중심 포켓 — 디테일 집중 |
+| taste (취향 성향) | `radial_loop` | 방사 루프 — 실험적 확장 |
+| purpose (소비 목적) | `ulnar_loop` | 편향 루프 — 의미 추구 방향 |
+| sociability (사회적 성향) | `plain_arch` | 아치 — 열린 구조 |
+
+**동점 처리**: L1 dominant가 2개 이상이면 `index가 작은 축` 우선 (depth > lens > ... > sociability)
+
+### 12.5 고유성 엔진
+
+**완전 랜덤이 아닌 재현 가능한 랜덤.**
+
+```
+seed = SHA256(persona_vector_json + schema_version + salt)
+```
+
+- `persona_vector_json`: L1(7D) + L2(5D) + L3(4D) 정렬된 JSON 직렬화
+- `schema_version`: "1.0.0"
+- `salt`: 초기값 "", 충돌 시 증가
+
+**seed → 지문 요소 생성:**
+
+| 생성 요소 | seed에서 추출 방식 |
+|----------|-------------------|
+| 패턴 타입 | L1 dominant axis (seed 불필요 — 결정론적) |
+| core/delta 좌표 | seed[0:8] → 정규화 좌표 |
+| 릿지 곡률/간격 | seed[8:16] → 변형 파라미터 |
+| minutiae 배치 | seed[16:24] → 세부 특징점 |
+| 색상 hue_seed | seed[24:32] → 시작 색상각 |
+
+**충돌 검사 (생성 후):**
+
+```
+1. perceptual_hash (pHash) → hamming distance ≥ 8
+2. SSIM ≤ 0.85
+3. curve_distance ≥ 0.15
+4. color_histogram_intersection ≤ 0.7
+```
+
+충돌 시 `salt` 변경 후 재생성. 최대 재시도 횟수 초과 시 `manual_review` 또는 `reject_generation`.
+
+### 12.6 색상 인코딩 규칙 (Pantone-free)
+
+> **법적 안전**: 팬톤(Pantone) 완전 미사용. CIELAB(D50) + OKLCH 오픈 표준만 사용.
+
+**이중 색공간 전략:**
+
+| 용도 | 색공간 | 이유 |
+|------|--------|------|
+| **내부 기준/저장** | CIELAB(D50) | 장치 독립, 오픈 표준, 라이선스 이슈 없음 |
+| **UI 렌더링/보간** | OKLCH | 시각적 균등 보간, CSS `oklch()` 네이티브 |
+| **화면 표시** | sRGB HEX | CIELAB에서 파생, 호환용 |
+| **인쇄** | CIELAB → ICC 프로파일 → CMYK | 팬톤 불필요 |
+
+**릿지별 색상 = 인코딩 채널:**
+
+```
+ridge_index i마다:
+  1. 의미축 값(0~1)을 OKLCH의 L(명도) / C(채도) / H(색상각)에 매핑
+  2. 인접 릿지 간 ΔE00 ≥ min_adjacent_delta_e00 (기본 5) 보장
+  3. 저장: { hex, oklch: {l,c,h}, lab: {L,a,b}, delta_e00_to_prev }
+```
+
+**C_Final (현재색) 계산 — LAB 공간 보간:**
+
+```
+C_L1 = L1 7D의 LAB 가중 평균 (레이어 요약색)
+C_L2 = L2 5D의 LAB 가중 평균
+C_L3 = L3 4D의 LAB 가중 평균
+
+C_Final = (1 - P) × C_L1 + P × (α × C_L2 + β × C_L3)
+
+→ 모든 보간은 LAB 공간에서 수행 (RGB 보간 금지)
+→ P 변화 시 C_Final만 이동, 나머지 색상은 고정
+```
+
+### 12.7 이중 렌더 모드
+
+| 모드 | blur/glow/shadow | 용도 | 내보내기 |
+|------|-----------------|------|---------|
+| `canonical` | **전부 OFF** | 저장, 미래 스캐너, 아카이브 | SVG + meta_json 필수 |
+| `display` | **허용** | 화면 UI, 기존 미학 유지 | PNG 선택적 |
+
+- canonical 렌더가 **원본**. display 렌더는 canonical에 이펙트를 얹은 파생물.
+- DB에는 canonical SVG + JSON만 저장. display는 런타임 생성.
+
+### 12.8 ridge_weight ↔ 압력(P) 동적 연결
+
+`layers[].ridge_weight`는 고정값이 아니라 **P에서 계산되는 파생값**.
+
+```
+P=0 (안정):  L1.weight = 0.7   L2.weight = 0.2   L3.weight = 0.1
+P=0.5:       L1.weight = 0.5   L2.weight = 0.35  L3.weight = 0.15
+P=1 (극한):  L1.weight = 0.3   L2.weight = 0.5   L3.weight = 0.2
+```
+
+**공식 (Beta v1):**
+
+```
+L1.ridge_weight = (1 - P) * 0.7 + 0.3           → 0.3 ~ 1.0
+L2.ridge_weight = P * alpha * 0.7 + 0.15         → 0.15 ~ 0.64 (alpha=0.7 기준)
+L3.ridge_weight = P * beta * 0.5 + 0.05          → 0.05 ~ 0.2  (beta=0.3 기준)
+```
+
+시각적 의미: **압력이 올라가면 L1(가면) 릿지가 얇아지고, L2(본성) 릿지가 두꺼워짐** — "가면이 벗겨지는" 시각화.
+
+### 12.9 `TraitColorFingerprint` v3 — 다층 레이더 차트
 
 기존 단일 레이더 차트를 **3중 레이어 레이더**로 진화.
 
@@ -1157,7 +1292,7 @@ interface TraitColorFingerprintV3Props {
 | 중심 글로우 | paradoxScore에 따라 중심 방사 글로우 색상 변화 | `engine-meta-colors.ts` paradoxScore |
 | V_Final 오버레이 | 반투명 7축 레이더 (V_Final 벡터) — 압력에 따라 L1과의 차이 시각화 | `engine-meta-colors.ts` vFinal |
 
-### 12.4 `PingerPrint2D` v3 — 다층 지문 패턴
+### 12.10 `PingerPrint2D` v3 — 다층 지문 패턴
 
 기존 소용돌이 패턴을 **3겹 릿지 레이어**로 확장.
 
@@ -1225,7 +1360,7 @@ interface PingerPrint2DV3Props {
 }
 ```
 
-### 12.5 `PingerPrint3D` v3 — 다층 Jacks 오브젝트
+### 12.11 `PingerPrint3D` v3 — 다층 Jacks 오브젝트
 
 기존 6팔 Jacks를 **3단계 팔 구조**로 확장.
 
@@ -1263,7 +1398,7 @@ interface PingerPrint3DV3Props {
 | 중심 구체 | paradoxScore에 따라 글로우 강도 변화 | paradoxScore 스케일 색상 |
 | **압력 반응** | P 증가 시: L1 팔 수축 + L2 팔 팽창 (본성 드러남) | V_Final 색상 |
 
-### 12.6 컬러지문 공통 사항
+### 12.12 컬러지문 공통 사항
 
 #### 코드 공유 전략
 
@@ -1303,16 +1438,26 @@ export function TraitColorFingerprintCompat(props: { data: Record<string, number
 | `l1-l2` | O | O | - | O | 상세 프로필 |
 | `full` | O | O | O | O | 편집기, 분석 대시보드 |
 
-### 12.7 구현 파일 목록
+### 12.15 구현 파일 목록
 
-| 컴포넌트 | 파일 | 변경 수준 |
-|----------|------|-----------|
-| TraitColorFingerprintV3 | `src/components/charts/trait-color-fingerprint.tsx` | **전면 재작성** |
-| PingerPrint2DV3 | `src/components/charts/p-inger-print-2d.tsx` | **전면 재작성** |
-| PingerPrint3DV3 | `src/components/charts/p-inger-print-3d.tsx` | **전면 재작성** |
-| 공통 타입 | `src/components/charts/fingerprint-types.ts` | **신규** |
-| 공통 유틸 | `src/components/charts/fingerprint-utils.ts` | **신규** |
-| 호환 래퍼 | `src/components/charts/fingerprint-compat.tsx` | **신규** |
+| 분류 | 파일 | 변경 수준 |
+|------|------|-----------|
+| **스키마** | `docs/fingerprint-schema-v1.json` | **신규** (확정) |
+| **스키마 TS 타입** | `src/types/fingerprint.ts` | **신규** |
+| **스키마 검증** | `src/lib/fingerprint/schema-validator.ts` | **신규** |
+| **고유성 엔진** | `src/lib/fingerprint/uniqueness-engine.ts` | **신규** |
+| **릿지 생성기** | `src/lib/fingerprint/ridge-generator.ts` | **신규** |
+| **색상 인코딩** | `src/lib/fingerprint/color-encoder.ts` | **신규** |
+| **색공간 변환** | `src/lib/fingerprint/color-space.ts` | **신규** |
+| **충돌 검사** | `src/lib/fingerprint/collision-checker.ts` | **신규** |
+| **SVG 렌더러** | `src/lib/fingerprint/svg-renderer.ts` | **신규** |
+| **모듈 index** | `src/lib/fingerprint/index.ts` | **신규** |
+| **UI: TraitColorFingerprintV3** | `src/components/charts/trait-color-fingerprint.tsx` | **전면 재작성** |
+| **UI: PingerPrint2DV3** | `src/components/charts/p-inger-print-2d.tsx` | **전면 재작성** |
+| **UI: PingerPrint3DV3** | `src/components/charts/p-inger-print-3d.tsx` | **전면 재작성** |
+| **UI: 공통 타입** | `src/components/charts/fingerprint-types.ts` | **신규** |
+| **UI: 공통 유틸** | `src/components/charts/fingerprint-utils.ts` | **신규** |
+| **UI: 호환 래퍼** | `src/components/charts/fingerprint-compat.tsx` | **신규** |
 
 ---
 
@@ -1881,20 +2026,35 @@ export const L1_L2_PARADOX_MAPPINGS = [
 | 5-1 | V_Final 기반 매칭 | `src/lib/matching/algorithms.ts` | **전면 재작성** |
 | 5-2 | 다양성 매칭 (Paradox 고려) | `src/lib/matching/diversity.ts` | **신규** |
 
-### Phase 6: UI 개편
+### Phase 6: 컬러지문 데이터 엔진
 
 | # | 태스크 | 파일 | 변경 수준 |
 |---|--------|------|-----------|
-| 6-1 | 3-Layer 벡터 에디터 | `src/components/node-editor/nodes/vector-node.tsx` | **전면 재작성** |
-| 6-2 | 역설 시각화 차트 | `src/components/charts/paradox-chart.tsx` | **신규** |
-| 6-3 | V_Final 시뮬레이터 | `src/components/charts/v-final-simulator.tsx` | **신규** |
-| 6-4 | 정성적 차원 에디터 | `src/components/persona/qualitative-editor.tsx` | **신규** |
-| 6-5 | 컬러지문 공통 타입/유틸 | `src/components/charts/fingerprint-types.ts`, `fingerprint-utils.ts` | **신규** |
-| 6-6 | TraitColorFingerprint v3 (다층 레이더) | `src/components/charts/trait-color-fingerprint.tsx` | **전면 재작성** |
-| 6-7 | PingerPrint2D v3 (다층 지문 패턴) | `src/components/charts/p-inger-print-2d.tsx` | **전면 재작성** |
-| 6-8 | PingerPrint3D v3 (다층 Jacks) | `src/components/charts/p-inger-print-3d.tsx` | **전면 재작성** |
-| 6-9 | 컬러지문 하위 호환 래퍼 | `src/components/charts/fingerprint-compat.tsx` | **신규** |
-| 6-10 | 트레이트 색상 반영 | 여러 UI 파일 | 수정 |
+| 6-1 | 지문 스키마 TS 타입 생성 | `src/types/fingerprint.ts` | **신규** |
+| 6-2 | 스키마 런타임 검증기 | `src/lib/fingerprint/schema-validator.ts` | **신규** |
+| 6-3 | 색공간 변환 유틸 (CIELAB↔OKLCH↔sRGB) | `src/lib/fingerprint/color-space.ts` | **신규** |
+| 6-4 | 색상 인코딩 엔진 (릿지별 색 할당, ΔE00 검증) | `src/lib/fingerprint/color-encoder.ts` | **신규** |
+| 6-5 | 릿지 생성기 (패턴 타입, core/delta, 곡률) | `src/lib/fingerprint/ridge-generator.ts` | **신규** |
+| 6-6 | 고유성 엔진 (시드 해싱, 결정론적 PRNG) | `src/lib/fingerprint/uniqueness-engine.ts` | **신규** |
+| 6-7 | 충돌 검사기 (pHash, SSIM, curve distance) | `src/lib/fingerprint/collision-checker.ts` | **신규** |
+| 6-8 | canonical SVG 렌더러 (이펙트 없음) | `src/lib/fingerprint/svg-renderer.ts` | **신규** |
+| 6-9 | 지문 모듈 index | `src/lib/fingerprint/index.ts` | **신규** |
+| 6-10 | 단위 테스트 | `src/lib/fingerprint/__tests__/` | **신규** |
+
+### Phase 7: UI 개편
+
+| # | 태스크 | 파일 | 변경 수준 |
+|---|--------|------|-----------|
+| 7-1 | 3-Layer 벡터 에디터 | `src/components/node-editor/nodes/vector-node.tsx` | **전면 재작성** |
+| 7-2 | 역설 시각화 차트 | `src/components/charts/paradox-chart.tsx` | **신규** |
+| 7-3 | V_Final 시뮬레이터 | `src/components/charts/v-final-simulator.tsx` | **신규** |
+| 7-4 | 정성적 차원 에디터 | `src/components/persona/qualitative-editor.tsx` | **신규** |
+| 7-5 | 컬러지문 UI 공통 타입/유틸 | `src/components/charts/fingerprint-types.ts`, `fingerprint-utils.ts` | **신규** |
+| 7-6 | TraitColorFingerprint v3 (다층 레이더) | `src/components/charts/trait-color-fingerprint.tsx` | **전면 재작성** |
+| 7-7 | PingerPrint2D v3 (다층 지문 패턴, display 모드) | `src/components/charts/p-inger-print-2d.tsx` | **전면 재작성** |
+| 7-8 | PingerPrint3D v3 (다층 Jacks) | `src/components/charts/p-inger-print-3d.tsx` | **전면 재작성** |
+| 7-9 | 컬러지문 하위 호환 래퍼 | `src/components/charts/fingerprint-compat.tsx` | **신규** |
+| 7-10 | 트레이트 색상 반영 | 여러 UI 파일 | 수정 |
 
 ---
 
@@ -1953,9 +2113,22 @@ apps/engine-studio/src/components/charts/paradox-chart.tsx
 apps/engine-studio/src/components/charts/v-final-simulator.tsx
 apps/engine-studio/src/components/persona/qualitative-editor.tsx
 
-# ── 컬러지문 ──
-apps/engine-studio/src/components/charts/fingerprint-types.ts    ← 공통 타입
-apps/engine-studio/src/components/charts/fingerprint-utils.ts    ← 공통 유틸 (좌표, 스플라인, 색 보간)
+# ── 컬러지문 데이터 엔진 ──
+docs/fingerprint-schema-v1.json                                   ← 지문 스키마 (Pantone-free, 확정)
+apps/engine-studio/src/types/fingerprint.ts                       ← 스키마 TS 타입
+apps/engine-studio/src/lib/fingerprint/index.ts                   ← 모듈 index
+apps/engine-studio/src/lib/fingerprint/schema-validator.ts        ← 스키마 런타임 검증
+apps/engine-studio/src/lib/fingerprint/color-space.ts             ← CIELAB↔OKLCH↔sRGB 변환
+apps/engine-studio/src/lib/fingerprint/color-encoder.ts           ← 릿지별 색상 할당 + ΔE00
+apps/engine-studio/src/lib/fingerprint/ridge-generator.ts         ← 릿지 생성 (패턴/곡률/core/delta)
+apps/engine-studio/src/lib/fingerprint/uniqueness-engine.ts       ← 시드 해싱 + 결정론적 PRNG
+apps/engine-studio/src/lib/fingerprint/collision-checker.ts       ← pHash/SSIM/curve/histogram 검사
+apps/engine-studio/src/lib/fingerprint/svg-renderer.ts            ← canonical SVG 렌더러
+apps/engine-studio/src/lib/fingerprint/__tests__/                 ← 단위 테스트
+
+# ── 컬러지문 UI ──
+apps/engine-studio/src/components/charts/fingerprint-types.ts    ← UI 공통 타입
+apps/engine-studio/src/components/charts/fingerprint-utils.ts    ← UI 공통 유틸 (좌표, 스플라인)
 apps/engine-studio/src/components/charts/fingerprint-compat.tsx  ← 6D 하위 호환 래퍼
 ```
 
