@@ -19,6 +19,55 @@
 
 ## ✅ DONE (완료)
 
+- [x] **T30: 일관성 검증 완성 + 차원 표기 수정** ✅ 2026-02-10
+  - 변경: `docs/persona-engine-v3-design.md` (v3.0-draft.7)
+    - §11 전면 개편: 6-Category 검증(구조/L1↔L2/L2↔L3/정성↔정량/교차축/동적)
+    - C(L2↔L3): lack↔Paradox, volatility↔neuroticism, scope↔openness, moralCompass↔agreeableness
+    - D(정성↔정량): 서사↔Init벡터, Voice↔L1(LLM), Triggers↔L3
+    - E(교차축): 스코어 범위, 관계유형별, EPS 재계산 검증
+    - 종합 일관성 점수 공식 (가중 category pass rate)
+    - "16D"→"기저 16D / 유효 106D+" 13개소 수정
+  - 변경: `docs/persona-engine-v3-implementation-plan.md` (v1.9)
+    - §11 전면 개편: ValidationIssue/ValidationResult 타입, C/D/E 구현 코드
+    - Phase 2 태스크 2-7 확장 (6-Category)
+    - "16D"→"기저 16D / 유효 106D+" 8개소 수정
+  - 테스트: 설계 문서 — 코드 구현 아님
+
+- [x] **T29: 비정량↔정량 연결 알고리즘 구체화** ✅ 2026-02-10
+  - 변경: `docs/persona-engine-v3-design.md` (v3.0-draft.6)
+    - §5.3 Init: LLM 구조화 키워드 추출, 의미 카테고리→벡터 매핑 테이블, delta 적용 규칙
+    - §5.4 Override: 2단계 트리거 감지, override/additive delta, 지수 감쇠 복귀 곡선
+    - §5.5 Adapt: UIV 3축 분석, 차원별 α, 모멘텀, ±0.3 드리프트 클램프
+    - §5.6 Express: 파생 상태값 5종, sigmoid 범용 공식, quirk 스키마
+  - 변경: `docs/persona-engine-v3-implementation-plan.md` (v1.8)
+    - §9.3~9.6 상호작용 모듈 구현 상세 (Init/Override/Adapt/Express 코드)
+    - Phase 4 태스크 확장 (4-1~4-9: 타입, 상수, 테스트 포함)
+    - 파일 변경 맵: 상호작용 모듈 9개 항목 추가
+  - 테스트: 설계 문서 — 코드 구현 아님
+
+- [x] **T28: 매칭 알고리즘 다층 확장** ✅ 2026-02-10
+  - 변경: `docs/persona-engine-v3-design.md` (v3.0-draft.5)
+    - §10 전면 개편: V_Final 단일 매칭→3-Tier 다층 매칭(Basic/Advanced/Exploration)
+    - 비정량적 보정(Voice+서사 ±0.1), 피드 믹싱(60/30/10)
+    - 매칭 결과 구조(explainability breakdown)
+  - 변경: `docs/persona-engine-v3-implementation-plan.md` (v1.7)
+    - §10 전면 개편: 3-Tier 매칭 엔진(10.1~10.8), 타입 정의, Tier별 구현 코드
+    - Phase 5 태스크 확장 (5-1~5-7: 매칭 모듈 6개 신규 파일)
+    - 파일 변경 맵: types.ts, basic/advanced/exploration/qualitative-matching.ts, engine.ts 추가
+  - 테스트: 설계 문서 — 코드 구현 아님
+
+- [x] **T27: 교차축 계산 엔진 + Paradox Score 확장 + V_Final 확장** ✅ 2026-02-10
+  - 변경: `docs/persona-engine-v3-design.md` (v3.0-draft.5)
+    - §3.6.3 확장: Paradox Score → 3-Layer 확장형 (L1↔L2 + L1↔L3 + L2↔L3 가중 합산)
+    - §3.8.4 신설: 교차축 스코어 계산 (83축, 관계 유형별 공식 4종, CrossAxisProfile)
+  - 변경: `docs/persona-engine-v3-implementation-plan.md` (v1.6)
+    - §5 확장: VFinalResult에 crossAxisProfile + paradoxProfile 추가
+    - §6 전면 개편: 교차축 계산 엔진 + Extended Paradox Score (6.1~6.7)
+    - Phase 1 태스크 확장 (1-4~1-9: cross-axis.ts, inversions 테이블)
+    - 파일 변경 맵 추가 (cross-axis.ts, cross-axis-inversions.ts)
+  - 변경: `TASK.md` (T27-T30 티켓 등록)
+  - 테스트: 설계 문서 — 코드 구현 아님
+
 - [x] **T26: P-inger Print 시스템 + Features 멀티페이지 + Persona Engine Studio** ✅ 2026-02-09
   - 변경: `apps/landing/src/lib/trait-colors.ts` (신규)
   - 변경: `apps/landing/src/components/p-inger-print-2d.tsx` (신규 — SVG 지문 패턴, 6D 기반 릿지 변형)
