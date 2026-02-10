@@ -5,7 +5,7 @@
 > **문서 정보**
 >
 > - 작성일: 2026-02-10
-> - 버전: v1.6
+> - 버전: v1.7
 > - 상태: 확정 — 구현 대기
 > - 관련 문서: `docs/persona-engine-v3-design.md` (설계서)
 > - 목적: 설계서의 "무엇을"에 대응하는 "어떻게" — 이 문서만 보고 구현 가능
@@ -23,6 +23,7 @@
 | v1.4 | 2026-02-10 | Section 13 신설 — 노드 에디터 아키텍처 (ComfyUI 스타일). 현재 선형 파이프라인→DAG 기반 자유 그래프. 5개 노드 카테고리(20+종), 21종 포트 타입 시스템, Kahn's 위상 정렬, 순환 감지, Zustand 그래프 스토어, 4종 플로우 프리셋(Quick/L1 Custom/Full Custom/Archetype+Override), 최소 필수 노드 규칙, v2→v3 마이그레이션. Phase 8(노드 에디터 재구축, 22태스크) 신설. 파일 변경 맵 확장. 섹션 번호 정리(상수→14, Phase→15, 파일맵→16) |
 | v1.5 | 2026-02-10 | 품질 아키텍처 3대 핵심 추가 — Section 15(PersonaWorld RAG 구현: 컨텍스트 빌더, Voice 앵커, 관계 기억, 캐싱), Section 16(품질 피드백 루프 구현: 4대 측정 엔진, Few-shot 자동 수집, 대시보드), Section 17(LLM 모델 전략 구현: 3-Tier 라우터, Prompt Caching, Provider Adapter). Phase 9(RAG+피드백+모델 전략, 18태스크) 신설. 파일 변경 맵 확장. 섹션 재번호(Phase→18, 파일맵→19) |
 | v1.6 | 2026-02-10 | 교차축 계산 엔진 + Paradox Score 확장 (T27) — Section 6 전면 개편: 83축 교차축 스코어 계산 엔진(CrossAxisProfile, 관계유형별 공식 4종), L1↔L3/L2↔L3 역설 지표, Extended Paradox Score(3-Layer 가중 합산). Section 5 확장: VFinalResult에 crossAxisProfile+paradoxProfile 추가. Phase 1 태스크 1-4~1-9로 확장(교차축 엔진, 역방향 매핑 테이블). 파일 변경 맵: cross-axis.ts, cross-axis-inversions.ts 추가 |
+| v1.7 | 2026-02-10 | 매칭 알고리즘 다층 확장 (T28) — Section 10 전면 개편: 7D 코사인 유사도→3-Tier 매칭(Basic/Advanced/Exploration). Tier별 차원 조합(V_Final 7D + 교차축 83축 + Paradox 호환 + 비정량적 보정). 피드 믹싱 전략(60/30/10), 통합 매칭 엔진, MatchingResult 타입. Phase 5 태스크 5-1~5-7로 확장. 파일 변경 맵: 매칭 모듈 6개 파일 추가 |
 
 ---
 
@@ -1317,43 +1318,300 @@ export interface PersonaV3GenerationResult {
 
 ## 10. 매칭 알고리즘
 
-### 10.1 v3 매칭 전략
+> **핵심 변경**: 기존 7D 코사인 유사도 → 다층 매칭.
+> 기저 벡터(7D) + 교차축 프로필(83축) + 비정량적 차원까지 활용.
+
+### 10.1 매칭 전략 개요
 
 ```
-기본 매칭: 유저 L1(7D) vs 페르소나 V_Final(P=상황별)
-심화 매칭: 유저 L1+L2 vs 페르소나 V_Final (유저 L2가 있을 때)
-탐색 매칭: 높은 Paradox Score 페르소나 우선 추천 (다양성)
+┌──────────────────────────────────────────────────────────┐
+│  3-Tier 매칭 전략                                         │
+│                                                          │
+│  Tier 1: 기본 매칭 — 7D V_Final + 교차축 유사도           │
+│  Tier 2: 심화 매칭 — 유저 L1+L2 + 교차축 구조 매칭       │
+│  Tier 3: 탐색 매칭 — Paradox 호환 + 교차축 다양성         │
+│                                                          │
+│  + 비정량적 보정: Voice 유사도, 서사 호환성               │
+└──────────────────────────────────────────────────────────┘
 ```
 
-### 10.2 매칭 점수 계산
+### 10.2 타입 정의
 
 ```typescript
-export function calculateV3MatchingScore(
-  userL1: SocialPersonaVector,
-  persona: {
-    social: SocialPersonaVector,
-    temperament: CoreTemperamentVector,
-    narrative: NarrativeDriveVector,
-    dynamics: DynamicsConfig,
-  },
-  context: { pressure: number; algorithm: AlgorithmType },
-): MatchingResult {
+// src/lib/matching/types.ts
 
-  // 1. 페르소나의 V_Final 계산 (현재 상황의 압력 수준)
+type MatchingTier = 'basic' | 'advanced' | 'exploration'
+
+interface MatchingInput {
+  userL1: SocialPersonaVector
+  userL2?: CoreTemperamentVector          // 심화 매칭용 (온보딩 설문)
+  userVoiceProfile?: VoiceProfile         // 비정량적 매칭용
+  persona: {
+    social: SocialPersonaVector
+    temperament: CoreTemperamentVector
+    narrative: NarrativeDriveVector
+    dynamics: DynamicsConfig
+    voiceProfile?: VoiceProfile
+    backstory?: BackstoryDimension
+    crossAxisProfile?: CrossAxisProfile   // 사전 캐시 또는 실시간 계산
+  }
+  context: {
+    pressure: number
+    tier: MatchingTier
+  }
+}
+
+interface MatchingResult {
+  score: number                           // 0.0~1.0 — 최종 통합 점수
+  tier: MatchingTier
+  breakdown: {
+    vectorScore: number                   // 7D V_Final 유사도
+    crossAxisScore: number                // 교차축 프로필 유사도
+    paradoxCompatibility: number          // Paradox 호환성
+    qualitativeScore: number              // 비정량적 보정
+  }
+  vFinal: VFinalResult
+  explanation: string                     // "추천 이유" (LLM용)
+}
+```
+
+### 10.3 Tier 1: 기본 매칭
+
+**7D V_Final 유사도(70%) + 교차축 프로필 유사도(30%)** 가중 합산.
+
+```typescript
+// src/lib/matching/basic-matching.ts
+
+/**
+ * 교차축 유사도: 유저와 페르소나의 CrossAxisProfile을 비교.
+ * 같은 축에서 비슷한 스코어 → 높은 유사도 = "성격 구조가 비슷하다".
+ * paradox/reinforcing 축에 가중치를 부여하여 캐릭터 깊이 반영.
+ */
+function basicMatch(input: MatchingInput): MatchingResult {
+  const { userL1, persona, context } = input
+
+  // 1. V_Final 계산 (crossAxisProfile 포함)
   const vFinal = calculateVFinal(
-    persona.social,
-    persona.temperament,
-    persona.narrative,
-    persona.dynamics,
-    context.pressure,
+    persona.social, persona.temperament,
+    persona.narrative, persona.dynamics, context.pressure,
   )
 
-  // 2. 유저 L1과 V_Final 비교 (7D)
+  // 2. 7D 벡터 유사도 (기존)
   const userArr = socialVectorToArray(userL1)
-  const score = hybridSimilarity(userArr, vFinal.vector, weights, 0.6)
+  const vectorScore = hybridSimilarity(userArr, vFinal.vector, WEIGHTS, 0.6)
 
-  return { score, vFinal, breakdown: getDimensionBreakdown(userArr, vFinal.vector) }
+  // 3. 교차축 프로필 유사도 (신규)
+  const userCrossAxis = calculateCrossAxisFromL1(userL1)
+  const crossAxisScore = crossAxisSimilarity(
+    userCrossAxis, vFinal.crossAxisProfile,
+  )
+
+  const score = vectorScore * 0.7 + crossAxisScore * 0.3
+
+  return {
+    score, tier: 'basic',
+    breakdown: { vectorScore, crossAxisScore, paradoxCompatibility: 0, qualitativeScore: 0 },
+    vFinal,
+    explanation: buildExplanation('basic', vectorScore, crossAxisScore),
+  }
 }
+
+/**
+ * 교차축 유사도: 83축 스코어 배열의 가중 코사인 유사도.
+ * paradox 축 ×1.5, reinforcing ×1.2, modulating ×1.0, neutral ×0.5.
+ */
+function crossAxisSimilarity(a: CrossAxisProfile, b: CrossAxisProfile): number {
+  const weights = a.axes.map(ax => {
+    if (ax.relationship === 'paradox') return 1.5
+    if (ax.relationship === 'reinforcing') return 1.2
+    if (ax.relationship === 'modulating') return 1.0
+    return 0.5
+  })
+  return weightedCosineSimilarity(
+    a.axes.map(ax => ax.score),
+    b.axes.map(ax => ax.score),
+    weights,
+  )
+}
+```
+
+### 10.4 Tier 2: 심화 매칭
+
+**유저 L2(OCEAN)가 있을 때** 활성화. 정식 교차축 + Paradox 호환성.
+
+```typescript
+// src/lib/matching/advanced-matching.ts
+
+/**
+ * 심화 매칭 = V_Final(50%) + 교차축(30%) + Paradox 호환성(20%)
+ *
+ * Paradox 호환성:
+ * - 유사 매칭: 같은 역설 유형이 비슷한 강도 → 공감
+ * - 보완 매칭: 다른 역설 유형이 강함 → 새로운 관점 (세렌디피티)
+ * - compatibility = 0.7 × similarity + 0.3 × complementarity
+ */
+function advancedMatch(input: MatchingInput): MatchingResult {
+  const { userL1, userL2, persona, context } = input
+  if (!userL2) return basicMatch(input) // fallback
+
+  const vFinal = calculateVFinal(
+    persona.social, persona.temperament,
+    persona.narrative, persona.dynamics, context.pressure,
+  )
+
+  const vectorScore = hybridSimilarity(
+    socialVectorToArray(userL1), vFinal.vector, WEIGHTS, 0.6,
+  )
+
+  // 정식 교차축 (유저 L1+L2로 계산)
+  const userCrossAxis = calculateCrossAxisProfile(userL1, userL2, DEFAULT_L3)
+  const crossAxisScore = crossAxisSimilarity(userCrossAxis, vFinal.crossAxisProfile)
+
+  // Paradox 호환성
+  const userParadox = calculateExtendedParadoxScore(userL1, userL2, DEFAULT_L3)
+  const paradoxCompatibility = calculateParadoxCompatibility(
+    userParadox, vFinal.paradoxProfile,
+  )
+
+  const score = vectorScore * 0.5 + crossAxisScore * 0.3 + paradoxCompatibility * 0.2
+
+  return {
+    score, tier: 'advanced',
+    breakdown: { vectorScore, crossAxisScore, paradoxCompatibility, qualitativeScore: 0 },
+    vFinal,
+    explanation: buildExplanation('advanced', vectorScore, crossAxisScore, paradoxCompatibility),
+  }
+}
+
+/**
+ * Paradox 호환성 계산.
+ * similarity = 1 - |user.overall - persona.overall|
+ * complementarity = dominant layer가 다르면 0.8, 같으면 0.3
+ */
+function calculateParadoxCompatibility(
+  userP: ParadoxProfile,
+  personaP: ParadoxProfile,
+): number {
+  const similarity = 1 - Math.abs(userP.overall - personaP.overall)
+  const complementarity = userP.dominant.layer !== personaP.dominant.layer ? 0.8 : 0.3
+  return similarity * 0.7 + complementarity * 0.3
+}
+```
+
+### 10.5 Tier 3: 탐색 매칭
+
+**"아직 만나지 못한 유형의 페르소나"** 추천. 유사성이 아닌 **차별성**을 최대화.
+
+```typescript
+// src/lib/matching/exploration-matching.ts
+
+/**
+ * 탐색 매칭 = Paradox 다양성(40%) + 교차축 차별성(40%) + 아키타입 신선도(20%)
+ */
+function explorationMatch(
+  input: MatchingInput,
+  recentArchetypes: string[],
+): MatchingResult {
+  const { userL1, persona, context } = input
+
+  const vFinal = calculateVFinal(
+    persona.social, persona.temperament,
+    persona.narrative, persona.dynamics, context.pressure,
+  )
+
+  // Paradox 다양성: 유저와 "다른" 역설 강도 선호
+  const userParadox = calculateL1L2ParadoxScore(userL1, DEFAULT_L2)
+  const paradoxDiversity = Math.abs(vFinal.paradoxProfile.overall - userParadox)
+
+  // 교차축 차별성: 유저와 "다른" 구조 선호
+  const userCrossAxis = calculateCrossAxisFromL1(userL1)
+  const crossAxisDivergence = 1 - crossAxisSimilarity(
+    userCrossAxis, vFinal.crossAxisProfile,
+  )
+
+  // 아키타입 신선도: 최근 안 만난 유형 우선
+  const archetypeFreshness = recentArchetypes.includes(persona.archetypeId) ? 0.2 : 1.0
+
+  const score = paradoxDiversity * 0.4 + crossAxisDivergence * 0.4 + archetypeFreshness * 0.2
+
+  return {
+    score, tier: 'exploration',
+    breakdown: {
+      vectorScore: 0, crossAxisScore: crossAxisDivergence,
+      paradoxCompatibility: paradoxDiversity, qualitativeScore: archetypeFreshness,
+    },
+    vFinal,
+    explanation: buildExplanation('exploration', paradoxDiversity, crossAxisDivergence),
+  }
+}
+```
+
+### 10.6 비정량적 매칭 보정
+
+모든 Tier에 적용. Voice 유사도 + 서사 호환성으로 **±0.1 보정**.
+
+```typescript
+// src/lib/matching/qualitative-matching.ts
+
+/**
+ * Voice 유사도 (60%): tonalMood 일치, speechPatterns 중첩, 어휘 수준 차이
+ * 서사 호환성 (40%): backstory.nlpKeywords와 유저 관심사 키워드 교집합
+ * 결과: (raw - 0.5) × 0.2 → ±0.1 보정값
+ */
+interface QualitativeBonus {
+  voiceSimilarity: number         // 0.0~1.0
+  narrativeCompatibility: number  // 0.0~1.0
+  combined: number                // -0.1 ~ +0.1
+}
+
+function calculateQualitativeBonus(
+  userVoice?: VoiceProfile,
+  userInterests?: string[],
+  personaVoice?: VoiceProfile,
+  personaBackstory?: BackstoryDimension,
+): QualitativeBonus
+
+function compareVoiceProfiles(a: VoiceProfile, b: VoiceProfile): number
+```
+
+### 10.7 통합 매칭 엔진
+
+```typescript
+// src/lib/matching/engine.ts
+
+export function matchPersona(input: MatchingInput): MatchingResult {
+  // Tier 분기
+  let result: MatchingResult
+  switch (input.context.tier) {
+    case 'basic':       result = basicMatch(input); break
+    case 'advanced':    result = advancedMatch(input); break
+    case 'exploration': result = explorationMatch(input, []); break
+  }
+
+  // 비정량적 보정
+  const bonus = calculateQualitativeBonus(
+    input.userVoiceProfile, undefined,
+    input.persona.voiceProfile, input.persona.backstory,
+  )
+  result.score = Math.max(0, Math.min(1, result.score + bonus.combined))
+  result.breakdown.qualitativeScore = bonus.combined
+
+  return result
+}
+```
+
+### 10.8 피드 혼합 전략
+
+```
+피드 구성 시 3개 Tier 혼합:
+  기본 매칭: 60% (유사한 페르소나)
+  탐색 매칭: 30% (새로운 유형)
+  심화 매칭: 10% (유저 L2가 있을 때만, 없으면 기본에 합산)
+
+인터리빙 규칙:
+  - 연속 3개 이상 같은 Tier 금지
+  - Paradox Score 0.3~0.5 구간 페르소나 우선 (최적 차원성)
+  - 최근 1시간 내 상호작용한 페르소나 중복 제거
 ```
 
 ---
@@ -3303,12 +3561,17 @@ function generateLightResponse(
 | 4-4 | 표현 로직 | `src/lib/interaction/expression.ts` | **신규** |
 | 4-5 | 모듈 index | `src/lib/interaction/index.ts` | **신규** |
 
-### Phase 5: 매칭 알고리즘 재구성
+### Phase 5: 매칭 알고리즘 재구성 (3-Tier 다층 매칭)
 
 | # | 태스크 | 파일 | 변경 수준 |
 |---|--------|------|-----------|
-| 5-1 | V_Final 기반 매칭 | `src/lib/matching/algorithms.ts` | **전면 재작성** |
-| 5-2 | 다양성 매칭 (Paradox 고려) | `src/lib/matching/diversity.ts` | **신규** |
+| 5-1 | 매칭 타입 정의 (MatchingInput, MatchingResult, MatchingTier) | `src/lib/matching/types.ts` | **신규** |
+| 5-2 | Tier 1 Basic 매칭 (V_Final 70% + 교차축 유사도 30%) | `src/lib/matching/basic-matching.ts` | **신규** |
+| 5-3 | Tier 2 Advanced 매칭 (V_Final 50% + 교차축 30% + Paradox 호환 20%) | `src/lib/matching/advanced-matching.ts` | **신규** |
+| 5-4 | Tier 3 Exploration 매칭 (Paradox 다양성 40% + 교차축 발산 40% + 아키타입 신선도 20%) | `src/lib/matching/exploration-matching.ts` | **신규** |
+| 5-5 | 비정량적 매칭 보정 (Voice 유사도 + 서사 호환성 → ±0.1) | `src/lib/matching/qualitative-matching.ts` | **신규** |
+| 5-6 | 통합 매칭 엔진 + 피드 믹싱 (60/30/10) | `src/lib/matching/engine.ts` | **신규** |
+| 5-7 | 기존 알고리즘 V_Final+교차축 통합 재작성 | `src/lib/matching/algorithms.ts` | **전면 재작성** |
 
 ### Phase 6: 컬러지문 데이터 엔진
 
@@ -3455,8 +3718,13 @@ apps/engine-studio/src/lib/interaction/adaptation.ts
 apps/engine-studio/src/lib/interaction/expression.ts
 apps/engine-studio/src/lib/interaction/index.ts
 
-# ── 매칭 ──
-apps/engine-studio/src/lib/matching/diversity.ts
+# ── 매칭 (3-Tier 다층 매칭) ──
+apps/engine-studio/src/lib/matching/types.ts                  ← 매칭 타입 (MatchingInput, MatchingResult, MatchingTier)
+apps/engine-studio/src/lib/matching/basic-matching.ts         ← Tier 1 Basic (V_Final + 교차축 유사도)
+apps/engine-studio/src/lib/matching/advanced-matching.ts      ← Tier 2 Advanced (+ Paradox 호환)
+apps/engine-studio/src/lib/matching/exploration-matching.ts   ← Tier 3 Exploration (다양성 극대화)
+apps/engine-studio/src/lib/matching/qualitative-matching.ts   ← 비정량적 보정 (Voice + 서사)
+apps/engine-studio/src/lib/matching/engine.ts                 ← 통합 매칭 엔진 + 피드 믹싱
 
 # ── UI ──
 apps/engine-studio/src/components/charts/paradox-chart.tsx
