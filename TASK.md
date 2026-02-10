@@ -7,14 +7,6 @@
 
 ## 📋 QUEUE (대기)
 
-- [ ] **T28: 매칭 알고리즘 다층 확장**
-  - 범위: 설계서 §10, 구현계획서 §10
-  - AC1: 기본 매칭 = 7D V_Final + 교차축 프로필 유사도 (가중 합산)
-  - AC2: 심화 매칭 = 유저 L1+L2 vs 페르소나 V_Final + 교차축 (코드 명세)
-  - AC3: 탐색 매칭 = Paradox 호환성 + 교차축 다양성 기반 추천
-  - AC4: 비정량적 차원 매칭 (Voice 유사도, 서사 호환성) 설계
-  - AC5: 구현계획서 Phase 태스크 + 파일 변경 맵 반영
-
 - [ ] **T29: 비정량↔정량 연결 알고리즘 구체화**
   - 범위: 설계서 §5.3-5.7, 구현계획서 §9
   - AC1: ① Init — NLP 키워드→벡터 delta 매핑 테이블 구체화 (추출 방법 + 규칙)
@@ -40,6 +32,17 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T28: 매칭 알고리즘 다층 확장** ✅ 2026-02-10
+  - 변경: `docs/persona-engine-v3-design.md` (v3.0-draft.5)
+    - §10 전면 개편: V_Final 단일 매칭→3-Tier 다층 매칭(Basic/Advanced/Exploration)
+    - 비정량적 보정(Voice+서사 ±0.1), 피드 믹싱(60/30/10)
+    - 매칭 결과 구조(explainability breakdown)
+  - 변경: `docs/persona-engine-v3-implementation-plan.md` (v1.7)
+    - §10 전면 개편: 3-Tier 매칭 엔진(10.1~10.8), 타입 정의, Tier별 구현 코드
+    - Phase 5 태스크 확장 (5-1~5-7: 매칭 모듈 6개 신규 파일)
+    - 파일 변경 맵: types.ts, basic/advanced/exploration/qualitative-matching.ts, engine.ts 추가
+  - 테스트: 설계 문서 — 코드 구현 아님
 
 - [x] **T27: 교차축 계산 엔진 + Paradox Score 확장 + V_Final 확장** ✅ 2026-02-10
   - 변경: `docs/persona-engine-v3-design.md` (v3.0-draft.5)
