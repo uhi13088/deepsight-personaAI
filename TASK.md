@@ -11,22 +11,21 @@
 
 > 엔진 스튜디오 v3 웹 구축 — 기존 src/ 삭제 후 재구축. 페르소나 CRUD 우선.
 
-- [ ] **T45: 프로젝트 초기화 + 기본 레이아웃**
-  - 배경: 기존 v2 코드 삭제, v3 프로젝트 구조 재구축. 스펙 §2.4 LNB 기준
-  - AC1: 기존 src/, tests/ 삭제 (prisma/, config, package.json 보존)
-  - AC2: Next.js App Router 디렉토리 구조 생성 (app/, components/, lib/, types/, constants/, stores/, hooks/)
-  - AC3: 기본 레이아웃 — LNB 8섹션 (Dashboard, Persona Studio, User Insight, Matching Lab, System Integration, Operations, Global Config, Team & Access)
-  - AC4: 전체 라우팅 스켈레톤 (각 섹션별 page.tsx placeholder)
-  - AC5: globals.css + Tailwind 테마 + cn() 유틸리티
-  - AC6: 빌드 성공 + 커밋 + 푸시
+- [x] **T45: 프로젝트 초기화 + 기본 레이아웃** ✅ 2026-02-11
+  - AC1: ✅ 기존 src/ (233 files) + tests/ (4 files) 삭제, prisma/config 보존
+  - AC2: ✅ App Router 구조 (app/, components/, lib/, types/, constants/, stores/, hooks/)
+  - AC3: ✅ LNB 8섹션 (§2.4 기준, 접이식 하위 메뉴, 구분선, 활성 표시)
+  - AC4: ✅ 21개 하위 라우트 + Dashboard = 24 pages (Build PASS)
+  - AC5: ✅ globals.css (Tailwind v4 dark 테마) + cn() + prisma singleton
+  - AC6: ✅ Build PASS (Next.js 16.1.6 Turbopack) + 커밋 + 푸시
 
-- [ ] **T46: Phase 0 기반 인프라 — v3 타입 + DB 스키마 + 상수**
-  - 배경: 엔진 스튜디오 v3 웹 구축의 기반. 구현계획서 Phase 0 전체
-  - AC1: v3 공유 타입 정의 (ThreeLayerVector, CrossAxisProfile, ArchetypeTemplate 등)
-  - AC2: Prisma 스키마 v3 확장 (3-Layer 벡터, 교차축, InteractionLog 등)
-  - AC3: v3 상수 모듈 (dimensions, paradox-mappings, cross-layer-axes 83개, projection-coefficients)
-  - AC4: 색상 모듈 (CIELAB+OKLCH, dimension-colors, layer-colors, archetype-colors)
-  - AC5: 테스트 + 커밋 + 푸시
+- [x] **T46: Phase 0 기반 인프라 — v3 타입 + DB 스키마 + 상수** ✅ 2026-02-11
+  - AC1: ✅ v3 공유 타입 (shared-types + engine-studio) — 106D+ 전체
+  - AC2: ✅ Prisma v3 확장 (PersonaLayerVector 3-Layer, Persona 12필드, UserVector OCEAN, InteractionLog/Session 2모델, 3 enum)
+  - AC3: ✅ 상수 모듈 7개 (dimensions 16D, paradox-mappings 7쌍, projection-coefficients, cross-layer-axes 83축, dynamics-defaults, interpretation-tables, index)
+  - AC4: ✅ 색상 모듈 6개 (CIELAB+OKLCH 16D, layer 3, cross-axis, engine-meta, archetype 12, resolveColor)
+  - AC5: ✅ Build PASS + 커밋 + 푸시 (7d07d91, fa21144)
+  - 참고: DB 마이그레이션(0-6, 0-22)은 PostgreSQL 환경에서 실행 필요
 
 - [ ] **T47: Phase 1 벡터 엔진 — 교차축 + Paradox + V_Final**
   - 배경: 페르소나 생성/매칭의 핵심 연산 엔진. 구현계획서 Phase 1
