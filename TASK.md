@@ -27,14 +27,13 @@
   - AC5: ✅ Build PASS + 커밋 + 푸시 (7d07d91, fa21144)
   - 참고: DB 마이그레이션(0-6, 0-22)은 PostgreSQL 환경에서 실행 필요
 
-- [ ] **T47: Phase 1 벡터 엔진 — 교차축 + Paradox + V_Final**
-  - 배경: 페르소나 생성/매칭의 핵심 연산 엔진. 구현계획서 Phase 1
-  - AC1: 벡터 유틸리티 (clamp, validate, normalize)
-  - AC2: L2→L1, L3→L1 투영 로직
-  - AC3: 교차축 계산 엔진 (83축 스코어, 관계유형 4종)
-  - AC4: Extended Paradox Score (L1↔L2 + L1↔L3 + L2↔L3)
-  - AC5: V_Final 계산 엔진 (CrossAxisProfile 포함)
-  - AC6: 단위 테스트 + 커밋 + 푸시
+- [x] **T47: Phase 1 벡터 엔진 — 교차축 + Paradox + V_Final** ✅ 2026-02-11
+  - AC1: ✅ 벡터 유틸리티 (clamp, validateVector, euclideanDistance, cosineSimilarity)
+  - AC2: ✅ L2→L1 투영 (5D→7D, invert 포함), L3→L1 투영 (4D→7D, 0.5 baseline + coefficients)
+  - AC3: ✅ 교차축 계산 엔진 (83축, paradox/reinforcing/modulating/neutral 4종 score formula)
+  - AC4: ✅ Extended Paradox Score (w1=0.50×L1↔L2 + w2=0.30×L1↔L3 + w3=0.20×L2↔L3) + Dimensionality bell curve
+  - AC5: ✅ V_Final = clamp((1-P)×L1 + P×(α×L2proj + β×L3proj)), vFinalToVector 변환
+  - AC6: ✅ 단위 테스트 5파일 41개 전부 PASS + Build PASS + 커밋 (38679ab)
 
 - [ ] **T48: 페르소나 목록 페이지 + API**
   - 배경: 페르소나 관리의 진입점. 스펙 §3.1.1 + §11.1.1
