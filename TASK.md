@@ -19,6 +19,75 @@
 
 ## ✅ DONE (완료)
 
+- [x] **T36: 전체 문서 "106D+" 표기 통일** ✅ 2026-02-11
+  - 배경: T35에서 developer-console.md만 정리 완료. 나머지 5개 문서에 54개소 잔존
+  - AC1: `docs/specs/engine-studio.md` ✅ — 19개소 수정, 버전 v3.1→v3.2, 커스텀 가중치→페르소나 필터 API
+  - AC2: `docs/specs/persona-world.md` ✅ — 6개소 수정
+  - AC3: `docs/design/persona-engine-v3.md` ✅ — 15개소 수정 (변경이력 1건 유지), 버전 v3.0-draft.10 추가
+  - AC4: `docs/design/persona-engine-v3-impl.md` ✅ — 9개소 수정 (변경이력 2건 유지), 버전 v1.12 추가
+  - AC5: `docs/design/persona-world-v3.md` ✅ — 2개소 수정
+  - 잔여: 변경이력 테이블 내 5건 (역사적 기록, 의도적 유지)
+
+- [x] **T35: 개발자콘솔 과금 구조 전면 개편 — 6-Tier + LLM 2-Tier** ✅ 2026-02-11
+  - 배경: v3 106D+ 엔진 기준으로 과금 구조 재설계. 기업고객 사용 시나리오별 보수적 원가 분석 완료
+  - AC1: `docs/specs/developer-console.md` §8 전면 개편 ✅
+    - 6-Tier 과금 (Starter $199/Pro $499/Max $1,499 + Ent.S $3,500/Ent.G $5,000/Ent.Sc $15,000)
+    - 활성 PW 페르소나 기반 과금 (50/100/350/800/1,500/5,000+추가)
+    - Enterprise 3단계 분리 (랜딩→ "Enterprise 문의", 내부 선택)
+    - 커스텀 가중치 전면 삭제 (품질 저하 + 비용 증가 리스크)
+    - 전담 매니저: Ent.G 1:5, Ent.Sc 1:2 (공유 모델)
+  - AC2: LLM 모델 전략 반영 ✅
+    - 3-Tier LLM 라우터 → 2-Tier (텍스트=Sonnet, 비텍스트=규칙)
+    - Prompt Caching 적용 (시스템 프롬프트 캐싱, 생성 텍스트는 매번 새로)
+    - PW 페르소나 월 COGS ~$0.62/개 (ALL Sonnet 기준)
+  - AC3: 용어 정리 ✅ — 잔여 표현 전면 삭제 → "106D+" only
+  - AC4: 전체 문서 일관성 수정 ✅
+    - §5 Key 제한 테이블: Free/4-tier → 6-tier
+    - §8.2 결제 실패: "Free 플랜 다운그레이드" → "API 접근 일시 정지"
+    - §8.3 청구서 예시: Pro $199 → $499, 토큰→PW 페르소나 과금
+    - §9 Rate Limit: Free/3-tier → 6-tier
+    - §12 기술 지원: Free/4-tier → 6-tier (Ent 전담 매니저 비율 포함)
+    - §13 팀원 초대 제한: Free/4-tier → 6-tier
+    - 버전: v3.1 → v3.2
+    - Webhook 예시 금액 갱신
+
+- [x] **T34: 스펙 문서 v3 엔진 기준 전면 업데이트** ✅ 2026-02-11
+  - 배경: 3개 스펙 문서가 v2(6D) 기준이었음. v3(106D+) 기준으로 전면 수정
+  - 변경: `docs/specs/engine-studio.md` (v3.0 → v3.1)
+    - 벡터 설정: 6D 단일 → 3-Layer(L1 7D + L2 5D + L3 4D) + 교차축 83개 + Paradox Score
+    - 매칭: 3-Layer(벡터/규칙/LLM) → 3-Tier(Basic/Advanced/Exploration) 전면 개편
+    - LLM 컨텍스트 분석 → 정성↔정량 변환 4대 알고리즘(Init/Override/Adapt/Express)
+    - Vector6D → ThreeLayerVector(SocialPersona+CoreTemperament+NarrativeDrive)
+    - DB: VECTOR(6) → VECTOR(16), 검증: 6-Category 일관성 검사
+  - 변경: `docs/specs/developer-console.md` (v3.0 → v3.1)
+    - 매칭 기능 비교: Layer→Tier 구조, LLM 애드온→통합
+    - 과금: use_llm_context → matching_tier, Tier별 비용 통합
+    - API 예시: matching_tier 옵션, 퀄리티 비교 v3 기준
+  - 변경: `docs/specs/persona-world.md`
+    - 6D→3-Layer 전체 13개소 수정
+    - 활동성 매핑: 4특성→8특성(ActivityTraitsV3)
+    - Vector6D→ThreeLayerVector 코드 업데이트
+  - 테스트: 스펙 문서 — 코드 구현 아님
+
+- [x] **T33: ConsumptionMemory 레이어 추가 — 비공개 소비 기록 기반 장기 기억** ✅ 2026-02-11
+  - 배경: 페르소나가 컨텐츠를 소비해도 매번 리뷰를 쓰면 봇 느낌. 기억(Memory)과 활동(Activity)을 분리해야 함
+  - 변경: `docs/design/persona-engine-v3.md` (v3.0-draft.8 → v3.0-draft.9)
+    - §15.2 데이터 소스에 ConsumptionLog 추가
+    - §15.3 RAG 컨텍스트에 [E] 소비 기억 ~200 tok 신설 (4→5 검색 항목)
+    - §15.4 "소비↔기억 괴리" 문제 해결 패턴 추가
+    - §15.5 비용 재산정 (3,900→4,100 tok, 127→134원/월)
+  - 변경: `docs/design/persona-world-v3.md` (v1.0-draft.1 → v1.0-draft.2)
+    - §7.1 데이터 소스에 ConsumptionLog 추가
+    - §7.6 신설: 소비 기억 ConsumptionMemory (설계 동기, 스키마, 기록 트리거 4종, RAG 검색 전략, 자연스러운 언급 패턴 4종)
+    - §7.7 비용 테이블 재산정 (4,800→5,000 tok)
+  - 변경: `docs/design/persona-world-v3-impl.md` (v1.0-draft.1 → v1.0-draft.2)
+    - §2.3 ConsumptionLog Prisma 모델 + enum 신설
+    - §3.1 ConsumptionRecord/ContentType/Source 타입 추가
+    - §3.2~3.3 ragContext에 consumptionMemory 필드 추가
+    - §5.5 consumption-manager 함수 시그니처 3종 (recordConsumption/getConsumptionContext/getConsumptionStats)
+    - PW-0-8/PW-2-9/PW-2-10 태스크 추가, 파일 변경 맵에 consumption-manager.ts 추가
+  - 테스트: 설계 문서 — 코드 구현 아님
+
 - [x] **T32: PersonaWorld v3 설계서 + 구현계획서** ✅ 2026-02-11
   - 신규: `docs/persona-world-design.md` (v1.0-draft.1)
     - §1 개요, §2 시스템 아키텍처, §3 3-Layer→활동성 매핑
@@ -55,11 +124,9 @@
     - D(정성↔정량): 서사↔Init벡터, Voice↔L1(LLM), Triggers↔L3
     - E(교차축): 스코어 범위, 관계유형별, EPS 재계산 검증
     - 종합 일관성 점수 공식 (가중 category pass rate)
-    - "16D"→"기저 16D / 유효 106D+" 13개소 수정
   - 변경: `docs/persona-engine-v3-implementation-plan.md` (v1.9)
     - §11 전면 개편: ValidationIssue/ValidationResult 타입, C/D/E 구현 코드
     - Phase 2 태스크 2-7 확장 (6-Category)
-    - "16D"→"기저 16D / 유효 106D+" 8개소 수정
   - 테스트: 설계 문서 — 코드 구현 아님
 
 - [x] **T29: 비정량↔정량 연결 알고리즘 구체화** ✅ 2026-02-10

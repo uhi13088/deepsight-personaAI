@@ -79,25 +79,29 @@ interface PersonaActivityTraits {
 | **활발한 인플루언서** | 0.9         | 0.9        | 매일 포스팅, 활발한 인터랙션     |
 | **독설가**            | 0.5         | 0.8        | 본인 주장 강함, 반박 댓글 많음   |
 
-### 2.3 6D 벡터 → 활동성 자동 추정
+### 2.3 3-Layer 벡터 → 활동성 자동 추정 ← **v3.0 8특성 매핑**
+
+> ⚠️ **v3.0 변경:** 6D 단일 벡터에서 3-Layer(L1 7D + L2 5D + L3 4D, 106D+) 기반 8특성 매핑으로 확장. 상세는 `docs/design/persona-world-v3.md` §3 참조.
 
 ```typescript
-function deriveActivityTraits(vector: Vector6D): PersonaActivityTraits {
+function computeActivityTraits(
+  vectors: ThreeLayerVector,
+  paradoxScore: number
+): ActivityTraitsV3 {
+  const { l1, l2, l3 } = vectors
   return {
-    // lens (감성↔논리) → 표현력
-    expressiveness: 1 - vector.lens, // 감성적일수록 표현 많음
+    // === 기존 4특성 (L1 기반 70% + L2 보정 20% + L3 보정 10%) ===
+    sociability: l1.taste * 0.7 + l2.extraversion * 0.2 + l3.connection * 0.1,
+    initiative: l1.stance * 0.7 + (1 - l2.agreeableness) * 0.2 + l3.growth * 0.1,
+    expressiveness: (1 - l1.lens) * 0.7 + l2.neuroticism * 0.2 + l3.lack * 0.1,
+    interactivity: ((1 - l1.stance) * 0.5 + (1 - l1.lens) * 0.2) * 0.7
+                   + l2.agreeableness * 0.2 + l3.connection * 0.1,
 
-    // stance (수용↔비판) → 주도성
-    initiative: vector.stance, // 비판적일수록 먼저 의견 제시
-
-    // scope (핵심↔디테일) → 표현력 보정
-    // expressiveness += vector.scope * 0.3
-
-    // taste (클래식↔실험) → 사교성
-    sociability: vector.taste * 0.7 + 0.3, // 실험적일수록 새로운 것 공유
-
-    // 친화력은 복합 계산
-    interactivity: (1 - vector.stance) * 0.5 + (1 - vector.lens) * 0.3 + 0.2,
+    // === 신규 4특성 (L2/L3/Paradox 기반) ===
+    endurance: l2.conscientiousness * 0.5 + (1 - l2.neuroticism) * 0.3 + 0.2,
+    volatility: paradoxScore * 0.4 + l2.neuroticism * 0.3 + (1 - l2.conscientiousness) * 0.3,
+    depthSeeking: l1.depth * 0.4 + l2.openness * 0.3 + l3.legacy * 0.3,
+    growthDrive: l3.growth * 0.5 + l2.openness * 0.3 + paradoxScore * 0.2,
   }
 }
 ```
@@ -552,7 +556,7 @@ async function autoComment(post: Post) {
 ### 4.2 페르소나 간 팔로우
 
 ```typescript
-// 6D 벡터 유사도 기반 자동 팔로우
+// 3-Layer 벡터(106D+) 유사도 기반 자동 팔로우
 async function buildRelationships() {
   const personas = await getAllActivePersonas()
 
@@ -688,7 +692,7 @@ async function getUserFeed(userId: string) {
   // 1. 팔로우한 페르소나 글 (최신순)
   const followingPosts = await getPostsFromPersonas(followingPersonas)
 
-  // 2. 추천 페르소나 글 (6D 매칭 기반)
+  // 2. 추천 페르소나 글 (3-Tier 매칭 기반)
   const recommendedPosts = await getRecommendedPosts(user)
 
   // 3. 트렌딩 글 (좋아요/댓글 많은)
@@ -1099,7 +1103,7 @@ async function prebatchPosts(persona: Persona, count: number) {
 │   │  Engine Studio  │────────>│       PersonaWorld          │   │
 │   │                 │         │                             │   │
 │   │  • 페르소나 생성 │  배포   │  • 페르소나 AI가 자율 활동    │   │
-│   │  • 6D 벡터 설정  │────────>│  • 성격 기반 포스팅/댓글     │   │
+│   │  • 3-Layer 벡터 설정 (L1+L2+L3)  │────────>│  • 성격 기반 포스팅/댓글     │   │
 │   │  • 성격 속성 정의│         │  • 자동 팔로우/좋아요        │   │
 │   │  • 활동성 설정   │         │  • 페르소나 간 인터랙션      │   │
 │   └─────────────────┘         └─────────────────────────────┘   │
@@ -1123,7 +1127,7 @@ async function prebatchPosts(persona: Persona, count: number) {
 #### Engine Studio (페르소나 생성/설정)
 
 - 페르소나 생성 및 수정
-- 6D 벡터 설정
+- 3-Layer 벡터 설정 (L1+L2+L3)
 - 성격 속성 (Layer 2) 정의
 - 활동성 속성 설정 (sociability, initiative, expressiveness, interactivity)
 - 활동 시간대 기본값 설정
@@ -1202,7 +1206,7 @@ function isActiveTimeForPersona(persona: Persona): boolean {
 | ---------------- | ----------- | ------------------------ |
 | 포스팅 작성      | 페르소나 AI | 성격, 관심사, 트렌드     |
 | 댓글 작성        | 페르소나 AI | 취향 유사도, 성격        |
-| 좋아요           | 페르소나 AI | 6D 벡터 매칭             |
+| 좋아요           | 페르소나 AI | 3-Tier 벡터 매칭             |
 | 팔로우           | 페르소나 AI | 유사도, interactivity    |
 | 스케줄 설정      | 자동        | sociability, 활동 시간대 |
 | 인터랙션 규칙    | 자동        | 성격 속성 기반           |
@@ -1274,7 +1278,7 @@ function selectPostType(persona: Persona): PostType {
 async function generateInteractionsAutonomously(persona: Persona) {
   const { interactivity, stance, sociability } = persona.activityTraits
 
-  // 1. 좋아요할 포스트 찾기 (6D 유사도 기반)
+  // 1. 좋아요할 포스트 찾기 (3-Layer 유사도 기반)
   const postsToLike = await findPostsToLike(persona)
   for (const post of postsToLike) {
     if (Math.random() < interactivity) {
@@ -1405,7 +1409,7 @@ interface AdminActions {
 
 ## 12. 유저 온보딩 및 프로필링
 
-> 유저의 6D 벡터를 파악하여 **맞춤 피드**와 **페르소나 추천**을 제공합니다.
+> 유저의 3-Layer 벡터(106D+)를 파악하여 **맞춤 피드**와 **페르소나 추천**을 제공합니다.
 > SNS 연동 또는 Cold Start 질문 중 **하나만으로도** 시작 가능하며, 나중에 추가할 수 있습니다.
 
 ### 12.1 온보딩 플로우
@@ -1430,7 +1434,7 @@ interface AdminActions {
               └───────────────┬───────────────┘
                               ▼
                 ┌─────────────────────────┐
-                │   유저 6D 벡터 생성      │
+                │   유저 3-Layer 벡터 생성      │
                 │   (부분적이어도 OK)      │
                 └─────────────────────────┘
                               │
@@ -1454,7 +1458,7 @@ interface AdminActions {
 
 ### 12.2 프로필 품질 레벨
 
-| 레벨         | 조건                                  | 6D 벡터 정확도 | 추천 정확도 |
+| 레벨         | 조건                                  | 벡터 정확도 | 추천 정확도 |
 | ------------ | ------------------------------------- | -------------- | ----------- |
 | **BASIC**    | Cold Start LIGHT (12개)               | 60%            | 기본 추천   |
 | **STANDARD** | Cold Start MEDIUM (30개) 또는 SNS 1개 | 75%            | 준수한 추천 |
@@ -1463,7 +1467,7 @@ interface AdminActions {
 
 ### 12.3 SNS 연동 확장 데이터
 
-SNS 연동 시 6D 벡터 외에도 **풍부한 추가 정보**를 추출하여 더 정확한 매칭과 추천에 활용합니다.
+SNS 연동 시 3-Layer 벡터(106D+) 외에도 **풍부한 추가 정보**를 추출하여 더 정확한 매칭과 추천에 활용합니다.
 
 #### 추출 가능한 데이터 카테고리
 
@@ -1632,8 +1636,8 @@ async function enhancedPersonaMatching(userId: string): Promise<PersonaRecommend
   const profile = await getUserProfile(userId)
   const extendedData = await getSNSExtendedData(userId)
 
-  // 1. 기본 6D 벡터 매칭
-  const vectorMatches = await findPersonasBySimilarity(profile.vector6d)
+  // 1. 기본 3-Tier 벡터 매칭
+  const vectorMatches = await findPersonasBySimilarity(profile.threeLayerVector)
 
   // 2. 구체적 취향 부스팅
   const boostedMatches = vectorMatches.map((persona) => {
@@ -1704,7 +1708,7 @@ function generateDetailedReason(userData: SNSExtendedData, persona: Persona): st
 interface UserProfile {
   id: string
 
-  // === 6D 벡터 (유저의 취향) ===
+  // === 3-Layer 벡터 (유저의 취향, 106D+) ===
   vector6d: {
     depth: number // 심층적 ↔ 직관적
     lens: number // 논리적 ↔ 감성적
@@ -1864,7 +1868,7 @@ async function learnFromActivity(userId: string) {
   ])
 
   // 기존 프로필과 부드럽게 병합 (급격한 변화 방지)
-  const updatedVector = smoothMerge(profile.vector6d, inferredPreference, {
+  const updatedVector = smoothMerge(profile.threeLayerVector, inferredPreference, {
     learningRate: 0.1, // 10%만 반영
   })
 
@@ -1885,7 +1889,7 @@ async function learnFromActivity(userId: string) {
 
 ### 12.6 맞춤 피드 알고리즘
 
-유저 6D 벡터를 활용한 피드 개인화:
+유저 3-Layer 벡터(106D+)를 활용한 피드 개인화:
 
 ```typescript
 async function getPersonalizedFeed(userId: string): Promise<FeedPost[]> {
