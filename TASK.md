@@ -35,13 +35,12 @@
   - AC5: ✅ V_Final = clamp((1-P)×L1 + P×(α×L2proj + β×L3proj)), vFinalToVector 변환
   - AC6: ✅ 단위 테스트 5파일 41개 전부 PASS + Build PASS + 커밋 (38679ab)
 
-- [ ] **T48: 페르소나 목록 페이지 + API**
-  - 배경: 페르소나 관리의 진입점. 스펙 §3.1.1 + §11.1.1
-  - AC1: GET /internal/personas API (필터링, 페이지네이션, 정렬)
-  - AC2: 카드 그리드 레이아웃 (프로필 이미지, 이름, 주요 성향, 상태)
-  - AC3: 고급 필터링 (상태, 아키타입 12종, 벡터 범위, Paradox Score, 교차축 패턴)
-  - AC4: 검색, 정렬, 페이지네이션
-  - AC5: 테스트 + 커밋 + 푸시
+- [x] **T48: 페르소나 목록 페이지 + API** ✅ 2026-02-11
+  - AC1: ✅ GET /api/internal/personas (상태/소스/아키타입/검색/벡터범위/Paradox범위/교차축 필터, 5종 정렬, 페이지네이션)
+  - AC2: ✅ PersonaCard 카드 그리드 (프로필, 이름, 상태 뱃지 8종, 아키타입 라벨, 주요 성향 Top3, Paradox %)
+  - AC3: ✅ PersonaFilters (상태 칩, 아키타입 12종 멀티셀렉, L1/L2/L3 16D 범위 슬라이더, EPS Range)
+  - AC4: ✅ 검색(이름+설명), 정렬 5종+오름/내림, PersonaPagination 페이지 크기 선택
+  - AC5: ✅ shadcn/ui 6종 + usePersonas hook + 테스트 7파일 73개 PASS + Build PASS (a52840a)
 
 - [ ] **T49: 페르소나 생성 플로우 (4-Step)**
   - 배경: 핵심 기능. 스펙 §3.1.2 + 구현계획서 Phase 2
