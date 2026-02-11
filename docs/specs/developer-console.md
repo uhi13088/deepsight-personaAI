@@ -7,7 +7,7 @@
 **문서 정보**
 
 - 작성일: 2026\. 01\. 12
-- 버전: v3.2 (3-Layer Orthogonal Multi-Vector — 106D+)
+- 버전: v3.3 (3-Layer Orthogonal Multi-Vector — 106D+)
 - 대상: 외부 개발자, 고객사, 파트너사
 
 ---
@@ -2210,6 +2210,284 @@ ws.close();
 }
 
 };
+
+---
+
+### 9.3.9 POST /v1/personas/filter ← v3.2 추가
+
+Enterprise 고객이 대규모 페르소나 풀(5,000+)에서 자사 서비스에 적합한 페르소나를 **다차원 조건으로 정밀 검색**합니다. 기존 `GET /v1/personas`의 role/expertise 단순 필터와 달리, 106D+ 벡터 시스템의 전체 차원을 활용한 고급 필터링을 제공합니다.
+
+**Rate Limit:** Starter 50/분, Pro 200/분, Max 500/분, Ent.S 1,000/분, Ent.G 3,000/분, Ent.Sc 무제한
+
+**Request:**
+
+```json
+{
+  "filters": {
+    "archetype": {
+      "include": ["ironic-philosopher", "wounded-critic"],
+      "exclude": ["lazy-perfectionist"]
+    },
+    "vectors": {
+      "l1": {
+        "depth":       { "min": 0.6, "max": 1.0 },
+        "lens":        { "min": 0.7 },
+        "stance":      { "min": 0.5, "max": 0.8 }
+      },
+      "l2": {
+        "openness":    { "min": 0.6 },
+        "neuroticism": { "max": 0.4 }
+      },
+      "l3": {
+        "volatility":  { "min": 0.3, "max": 0.7 },
+        "growthArc":   { "min": 0.5 }
+      }
+    },
+    "paradox": {
+      "extendedScore": { "min": 0.4, "max": 0.8 },
+      "l1l2Score":     { "min": 0.3 },
+      "l1l3Score":     { "min": 0.2 }
+    },
+    "crossAxis": {
+      "patterns": [
+        {
+          "axisId": "l1_depth__l2_openness",
+          "relationship": "paradox",
+          "scoreRange": { "min": 0.5 }
+        }
+      ]
+    },
+    "matchingTier": "advanced",
+    "role": "Reviewer",
+    "expertise": ["영화", "드라마"],
+    "status": "ACTIVE"
+  },
+  "sort": {
+    "field": "paradox.extendedScore",
+    "order": "desc"
+  },
+  "pagination": {
+    "page": 1,
+    "limit": 20
+  }
+}
+```
+
+**필터 파라미터 상세:**
+
+| 파라미터 | 타입 | 설명 | 필수 |
+|---------|------|------|------|
+| `filters.archetype.include` | string[] | 포함할 아키타입 ID 목록 (OR 조건) | 선택 |
+| `filters.archetype.exclude` | string[] | 제외할 아키타입 ID 목록 | 선택 |
+| `filters.vectors.l1.[dim]` | { min?, max? } | L1 Social Persona 차원별 범위 (0.0~1.0) | 선택 |
+| `filters.vectors.l2.[dim]` | { min?, max? } | L2 Core Temperament 차원별 범위 (0.0~1.0) | 선택 |
+| `filters.vectors.l3.[dim]` | { min?, max? } | L3 Narrative Drive 차원별 범위 (0.0~1.0) | 선택 |
+| `filters.paradox.extendedScore` | { min?, max? } | Extended Paradox Score 범위 (0.0~1.0) | 선택 |
+| `filters.paradox.l1l2Score` | { min?, max? } | L1↔L2 역설 지표 범위 | 선택 |
+| `filters.paradox.l1l3Score` | { min?, max? } | L1↔L3 역설 지표 범위 | 선택 |
+| `filters.paradox.l2l3Score` | { min?, max? } | L2↔L3 역설 지표 범위 | 선택 |
+| `filters.crossAxis.patterns` | object[] | 교차축 패턴 필터 (axisId + 관계유형 + 점수 범위) | 선택 |
+| `filters.matchingTier` | string | 매칭 전략 필터: `basic` / `advanced` / `exploration` | 선택 |
+| `filters.role` | string | 역할 필터 (Reviewer, Curator, Educator 등) | 선택 |
+| `filters.expertise` | string[] | 전문 분야 필터 (OR 조건) | 선택 |
+| `filters.status` | string | 상태 필터: `ACTIVE` / `DRAFT` / `ARCHIVED` | 선택 |
+| `sort.field` | string | 정렬 기준 (아래 표 참조) | 선택 |
+| `sort.order` | string | `asc` / `desc` (기본: `desc`) | 선택 |
+| `pagination.page` | integer | 페이지 번호 (기본: 1) | 선택 |
+| `pagination.limit` | integer | 페이지당 개수 (기본: 20, 최대: 100) | 선택 |
+
+**정렬 가능 필드:**
+
+| field | 설명 |
+|-------|------|
+| `paradox.extendedScore` | Extended Paradox Score |
+| `paradox.l1l2Score` | L1↔L2 역설 지표 |
+| `vectors.l1.[dim]` | L1 특정 차원 값 (예: `vectors.l1.depth`) |
+| `vectors.l2.[dim]` | L2 특정 차원 값 |
+| `vectors.l3.[dim]` | L3 특정 차원 값 |
+| `createdAt` | 생성일 |
+| `name` | 이름 (가나다/ABC) |
+
+**아키타입 ID 목록:**
+
+| ID | 한글명 | 핵심 역설 |
+|----|--------|-----------|
+| `ironic-philosopher` | 아이러니한 철학자 | 논리↔불안 |
+| `wounded-critic` | 상처받은 비평가 | 비판↔공감 |
+| `social-introvert` | 사교적 내향인 | 사교↔내부수렴 |
+| `lazy-perfectionist` | 게으른 완벽주의자 | 디테일↔즉흥 |
+| `conservative-hipster` | 보수적 힙스터 | 실험↔보수 |
+| `empathetic-arguer` | 공감하는 논객 | 논리+의미↔공감 |
+| `free-guardian` | 자유로운 수호자 | 오락↔체계 |
+| `quiet-enthusiast` | 조용한 열정가 | 내향↔호기심 |
+| `emotional-pragmatist` | 감성적 실용가 | 감성↔성실 |
+| `dangerous-mentor` | 위험한 멘토 | 의미+심층↔이기 |
+| `volatile-intellectual` | 폭발하는 지성인 | 논리↔폭발 |
+| `growing-cynic` | 성장하는 냉소가 | 비판↔성장 |
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "personas": [
+      {
+        "id": "persona_a8f2c",
+        "name": "아이러니한 철학자 #42",
+        "archetype": {
+          "id": "ironic-philosopher",
+          "label": "아이러니한 철학자"
+        },
+        "role": "Reviewer",
+        "expertise": ["영화", "도서"],
+        "description": "논리적으로 분석하지만 결론에서 불안을 드러내는 비평가",
+        "vectors": {
+          "l1": { "depth": 0.85, "lens": 0.90, "stance": 0.75, "scope": 0.80, "taste": 0.35, "purpose": 0.70, "sociability": 0.30 },
+          "l2": { "openness": 0.75, "conscientiousness": 0.60, "extraversion": 0.35, "agreeableness": 0.45, "neuroticism": 0.70 },
+          "l3": { "lack": 0.65, "moralCompass": 0.55, "volatility": 0.50, "growthArc": 0.60 }
+        },
+        "paradox": {
+          "extendedScore": 0.72,
+          "l1l2Score": 0.68,
+          "l1l3Score": 0.55,
+          "l2l3Score": 0.42,
+          "dominantParadox": "논리적 깊이 × 높은 신경성 — 분석할수록 불안"
+        },
+        "crossAxisHighlights": [
+          { "axisId": "l1_depth__l2_openness", "score": 0.78, "relationship": "paradox" },
+          { "axisId": "l1_lens__l2_neuroticism", "score": 0.65, "relationship": "paradox" }
+        ],
+        "status": "ACTIVE",
+        "createdAt": "2026-01-15T09:30:00Z"
+      }
+    ],
+    "appliedFilters": {
+      "archetype": { "include": ["ironic-philosopher", "wounded-critic"], "exclude": ["lazy-perfectionist"] },
+      "vectorRanges": 3,
+      "paradoxRange": true,
+      "crossAxisPatterns": 1
+    },
+    "filterStats": {
+      "totalMatched": 47,
+      "archetypeDistribution": {
+        "ironic-philosopher": 28,
+        "wounded-critic": 19
+      }
+    }
+  },
+  "meta": {
+    "pagination": {
+      "current_page": 1,
+      "total_pages": 3,
+      "total_count": 47
+    }
+  }
+}
+```
+
+**빈 필터 (모든 페르소나 조회):**
+
+```json
+{
+  "filters": {},
+  "pagination": { "page": 1, "limit": 50 }
+}
+```
+
+**코드 샘플 — TypeScript (Node.js):**
+
+```typescript
+import { DeepSightClient } from '@deepsight/sdk'
+
+const client = new DeepSightClient({ apiKey: process.env.DEEPSIGHT_API_KEY })
+
+// 역설 점수 높은 영화 리뷰어 필터링
+const result = await client.personas.filter({
+  filters: {
+    archetype: { include: ['ironic-philosopher', 'wounded-critic'] },
+    vectors: {
+      l1: {
+        depth: { min: 0.6 },     // 깊이 있는 분석
+        lens: { min: 0.5 },      // 논리 성향 이상
+      },
+    },
+    paradox: {
+      extendedScore: { min: 0.5 },  // 역설 점수 0.5 이상
+    },
+    role: 'Reviewer',
+    expertise: ['영화'],
+  },
+  sort: { field: 'paradox.extendedScore', order: 'desc' },
+  pagination: { page: 1, limit: 20 },
+})
+
+console.log(`${result.filterStats.totalMatched}개 매칭`)
+for (const persona of result.personas) {
+  console.log(`${persona.name} (EPS: ${persona.paradox.extendedScore})`)
+}
+```
+
+**코드 샘플 — Python:**
+
+```python
+from deepsight import DeepSightClient
+
+client = DeepSightClient(api_key="ds_live_xxx")
+
+# L3 서사적 욕망이 강한 페르소나 검색
+result = client.personas.filter(
+    filters={
+        "vectors": {
+            "l3": {
+                "lack": {"min": 0.5},        # 내면 결핍 높음
+                "growthArc": {"min": 0.6},    # 성장 의지 강함
+            }
+        },
+        "paradox": {
+            "extendedScore": {"min": 0.4, "max": 0.8}
+        }
+    },
+    sort={"field": "vectors.l3.growthArc", "order": "desc"},
+    pagination={"page": 1, "limit": 50}
+)
+
+print(f"총 {result['filterStats']['totalMatched']}개 매칭")
+for persona in result["personas"]:
+    l3 = persona["vectors"]["l3"]
+    print(f"  {persona['name']} — lack:{l3['lack']:.2f}, growth:{l3['growthArc']:.2f}")
+```
+
+**코드 샘플 — cURL:**
+
+```bash
+curl -X POST https://api.deepsight.ai/v1/personas/filter \
+  -H "Authorization: Bearer ds_live_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filters": {
+      "archetype": { "include": ["social-introvert"] },
+      "vectors": {
+        "l1": { "sociability": { "min": 0.6 } },
+        "l2": { "extraversion": { "max": 0.4 } }
+      }
+    },
+    "pagination": { "page": 1, "limit": 10 }
+  }'
+```
+
+**에러 응답:**
+
+| 조건 | 코드 | 에러 |
+|------|------|------|
+| 잘못된 아키타입 ID | 400 | `INVALID_FIELD: archetype "unknown-type" is not valid` |
+| 벡터 범위 초과 (>1.0 또는 <0.0) | 400 | `INVALID_FIELD: vector range must be 0.0~1.0` |
+| min > max | 400 | `INVALID_FIELD: min (0.8) cannot be greater than max (0.3)` |
+| 존재하지 않는 교차축 ID | 400 | `INVALID_FIELD: crossAxis "invalid_axis" not found` |
+| 인증 실패 | 401 | `UNAUTHORIZED` |
+| Rate Limit 초과 | 429 | `RATE_LIMITED` |
+
+---
 
 ## 9.4 에러 코드
 

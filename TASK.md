@@ -7,15 +7,6 @@
 
 ## 📋 QUEUE (대기)
 
-- [ ] **T39: 페르소나 필터 API 정식 스펙**
-  - 배경: Enterprise 고객이 5,000+ 페르소나에서 자사에 맞는 걸 선택해야 함. 현재 API는 role/expertise만 지원
-  - AC1: `docs/specs/developer-console.md` §9 — 필터 API 엔드포인트 정식 스펙
-    - POST /v1/personas/filter (archetype, traits 범위, Paradox Score, dimensionality 등)
-    - Request/Response 예시, 코드 샘플
-  - AC2: `docs/specs/engine-studio.md` — 내부 필터링 UI 스펙 보강
-    - 아키타입, Paradox Score 범위, 교차축 패턴 필터 추가
-  - AC3: 커밋 + 푸시
-
 - [ ] **T40: 노드 파라미터 편집 UI 스펙**
   - 배경: 각 노드의 설정 패널 UI가 미정의. 슬라이더/드롭다운/텍스트 등 구체적 인터랙션 필요
   - AC1: `docs/specs/engine-studio.md` — 노드별 파라미터 편집 UI 컴포넌트 스펙
@@ -30,6 +21,24 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T39: 페르소나 필터 API 정식 스펙** ✅ 2026-02-11
+  - AC1: `docs/specs/developer-console.md` §9.3.9 — POST /v1/personas/filter 정식 스펙 (v3.3)
+    - 다차원 필터: archetype(include/exclude), vectors(L1/L2/L3 차원별 범위), paradox(EPS/L1L2/L1L3/L2L3), crossAxis(패턴 필터)
+    - 정렬: paradox.extendedScore, vectors.[dim], createdAt, name
+    - 아키타입 12종 ID/한글명/핵심역설 레퍼런스 테이블
+    - Request/Response JSON 예시, appliedFilters/filterStats 포함
+    - 코드 샘플 3종 (TypeScript SDK, Python SDK, cURL)
+    - 에러 응답 6종 정의
+    - Rate Limit: Starter 50~Ent.Sc 무제한
+  - AC2: `docs/specs/engine-studio.md` §3.1.1 — 필터링 UI 전면 개편 (v3.3)
+    - 기본 필터: 상태 칩, 정렬 드롭다운
+    - 아키타입 필터: 12종 멀티 선택 칩 (컬러 도트, 제외 토글)
+    - 벡터 범위 필터: L1(7D)/L2(5D)/L3(4D) 차원별 Range Slider (접이식)
+    - Paradox Score 필터: EPS Range Slider + 구간 레이블 + 역설 지표 세부
+    - 교차축 패턴 필터: 83축 드롭다운 + 관계유형 뱃지 + 점수 범위 (최대 5개)
+    - 필터 상태 표시: 뱃지 카운트, 칩 나열, 실시간 결과 개수
+  - AC3: 커밋 + 푸시
 
 - [x] **T38: 노드 에디터 분기 노드(Conditional/Switch) 추가 설계** ✅ 2026-02-11
   - AC1: `docs/design/persona-engine-v3.md` §14.9 — Control Flow 3종 설계 (v3.0-draft.12)
