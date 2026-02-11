@@ -19,6 +19,25 @@
 
 ## ✅ DONE (완료)
 
+- [x] **T33: ConsumptionMemory 레이어 추가 — 비공개 소비 기록 기반 장기 기억** ✅ 2026-02-11
+  - 배경: 페르소나가 컨텐츠를 소비해도 매번 리뷰를 쓰면 봇 느낌. 기억(Memory)과 활동(Activity)을 분리해야 함
+  - 변경: `docs/design/persona-engine-v3.md` (v3.0-draft.8 → v3.0-draft.9)
+    - §15.2 데이터 소스에 ConsumptionLog 추가
+    - §15.3 RAG 컨텍스트에 [E] 소비 기억 ~200 tok 신설 (4→5 검색 항목)
+    - §15.4 "소비↔기억 괴리" 문제 해결 패턴 추가
+    - §15.5 비용 재산정 (3,900→4,100 tok, 127→134원/월)
+  - 변경: `docs/design/persona-world-v3.md` (v1.0-draft.1 → v1.0-draft.2)
+    - §7.1 데이터 소스에 ConsumptionLog 추가
+    - §7.6 신설: 소비 기억 ConsumptionMemory (설계 동기, 스키마, 기록 트리거 4종, RAG 검색 전략, 자연스러운 언급 패턴 4종)
+    - §7.7 비용 테이블 재산정 (4,800→5,000 tok)
+  - 변경: `docs/design/persona-world-v3-impl.md` (v1.0-draft.1 → v1.0-draft.2)
+    - §2.3 ConsumptionLog Prisma 모델 + enum 신설
+    - §3.1 ConsumptionRecord/ContentType/Source 타입 추가
+    - §3.2~3.3 ragContext에 consumptionMemory 필드 추가
+    - §5.5 consumption-manager 함수 시그니처 3종 (recordConsumption/getConsumptionContext/getConsumptionStats)
+    - PW-0-8/PW-2-9/PW-2-10 태스크 추가, 파일 변경 맵에 consumption-manager.ts 추가
+  - 테스트: 설계 문서 — 코드 구현 아님
+
 - [x] **T32: PersonaWorld v3 설계서 + 구현계획서** ✅ 2026-02-11
   - 신규: `docs/persona-world-design.md` (v1.0-draft.1)
     - §1 개요, §2 시스템 아키텍처, §3 3-Layer→활동성 매핑

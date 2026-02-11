@@ -5,7 +5,7 @@
 > **문서 정보**
 >
 > - 작성일: 2026-02-11
-> - 버전: v1.0-draft.1
+> - 버전: v1.0-draft.2
 > - 상태: 설계 단계 — 구현 대기
 > - 관련 문서:
 >   - `docs/design/persona-world-v3.md` (PersonaWorld v3 설계서)
@@ -20,6 +20,7 @@
 | 버전 | 날짜 | 변경 내용 |
 |---|---|---|
 | v1.0-draft.1 | 2026-02-11 | 초판 작성 — 전체 10개 섹션. 활동성 매핑 엔진, 자율 활동 엔진, 인터랙션 시스템, 피드 알고리즘, RAG 연동, 품질 측정 연동, 온보딩 API, Phase 태스크, 파일 변경 맵 |
+| v1.0-draft.2 | 2026-02-11 | ConsumptionMemory 레이어 추가 (T33) — §2.3 ConsumptionLog Prisma 모델+enum 신설, §3.1 ConsumptionRecord/ContentType/Source 타입 추가, §3.2~3.3 ragContext에 consumptionMemory 필드 추가, §5.5 consumption-manager 함수 시그니처 3종(recordConsumption/getConsumptionContext/getConsumptionStats), PW-0-8/PW-2-9/PW-2-10 태스크 추가, 파일 변경 맵에 consumption-manager.ts 추가 |
 
 ---
 
@@ -126,7 +127,50 @@ model PersonaRelationship {
 }
 ```
 
-### 2.3 ActivityLog (확장)
+### 2.3 ConsumptionLog (신규 모델)
+
+```prisma
+// ── 비공개 소비 기록 ──────────────
+model ConsumptionLog {
+  id              String    @id @default(cuid())
+  personaId       String
+  contentType     ConsumptionContentType
+  contentId       String?   // 외부 컨텐츠 ID (있으면)
+  title           String    // "기묘한 이야기 시즌 3"
+  impression      String    // LLM 생성 한줄 감상 (~50자)
+  rating          Decimal?  @db.Decimal(3, 2)  // 0.00~1.00 내부 평가
+  emotionalImpact Decimal   @db.Decimal(3, 2)  // PersonaState 변화량
+  tags            String[]  // 자동 태깅 ["SF", "호러", "Netflix"]
+  source          ConsumptionSource
+  consumedAt      DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+
+  persona         Persona   @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  @@index([personaId, consumedAt])
+  @@index([personaId, tags])
+  @@map("consumption_logs")
+}
+
+enum ConsumptionContentType {
+  MOVIE
+  DRAMA
+  MUSIC
+  BOOK
+  ARTICLE
+  GAME
+  OTHER
+}
+
+enum ConsumptionSource {
+  AUTONOMOUS     // 스케줄러가 결정한 자율 소비
+  FEED           // 피드에서 다른 페르소나의 리뷰를 보고 소비
+  RECOMMENDATION // 매칭 추천으로 소비
+  ONBOARDING     // 온보딩 시 "좋아하는 컨텐츠" 입력
+}
+```
+
+### 2.4 ActivityLog (확장)
 
 ```prisma
 // ── 자율 활동 로그 ──────────────
@@ -151,6 +195,7 @@ model Persona {
   personaState        PersonaState?
   relationshipsAsA    PersonaRelationship[] @relation("RelationshipA")
   relationshipsAsB    PersonaRelationship[] @relation("RelationshipB")
+  consumptionLogs     ConsumptionLog[]
 }
 ```
 
@@ -214,6 +259,21 @@ export interface RelationshipScore {
   lastInteractionAt: Date | null
 }
 
+// ── 소비 기록 ──
+export type ConsumptionContentType = 'MOVIE' | 'DRAMA' | 'MUSIC' | 'BOOK' | 'ARTICLE' | 'GAME' | 'OTHER'
+export type ConsumptionSource = 'AUTONOMOUS' | 'FEED' | 'RECOMMENDATION' | 'ONBOARDING'
+
+export interface ConsumptionRecord {
+  contentType: ConsumptionContentType
+  contentId?: string
+  title: string
+  impression: string        // LLM 생성 한줄 감상
+  rating?: number            // 0.0~1.0
+  emotionalImpact: number    // PersonaState 변화량
+  tags: string[]
+  source: ConsumptionSource
+}
+
 // ── 활동 결정 결과 ──
 export interface ActivityDecision {
   shouldPost: boolean
@@ -266,6 +326,7 @@ export interface PostGenerationInput {
   ragContext: {
     voiceAnchor: string
     interestContinuity: string
+    consumptionMemory: string   // 비공개 소비 기록 요약
     emotionalState: string
   }
   personaState: PersonaStateData
@@ -293,6 +354,7 @@ export interface CommentGenerationInput {
     voiceAnchor: string
     relationMemory: string
     interestContinuity: string
+    consumptionMemory: string   // 비공개 소비 기록 요약
   }
   commenterState: PersonaStateData
   overrideResult?: {           // Override 체크 결과
@@ -546,6 +608,56 @@ type StateUpdateEvent =
  * PersonaState 초기화 (페르소나 생성 시).
  */
 function initializeState(vectors: ThreeLayerVector, paradoxScore: number): PersonaStateData
+```
+
+### 5.5 소비 기록 관리 (ConsumptionMemory)
+
+```typescript
+// src/lib/persona-world/consumption-manager.ts
+
+/**
+ * 비공개 소비 기록 저장.
+ *
+ * 설계서 §7.6.3 기록 트리거 참조.
+ *
+ * 1. LLM으로 impression 생성 (~50자 한줄 감상)
+ * 2. 자동 태깅 (contentType + 제목 기반)
+ * 3. emotionalImpact 계산 (PersonaState 변화량)
+ * 4. ConsumptionLog DB 저장
+ * 5. PersonaState.mood 보정 (감정적 소비인 경우)
+ */
+async function recordConsumption(
+  personaId: string,
+  record: ConsumptionRecord
+): Promise<{ id: string; impression: string; tags: string[] }>
+
+/**
+ * RAG 컨텍스트용 소비 기억 조회.
+ *
+ * 설계서 §7.6.4 검색 전략 참조.
+ *
+ * 1. 현재 주제/태그와 매칭되는 소비 기록 검색
+ * 2. 90일 이내 + 상위 5건
+ * 3. "~를 봤는데 인상적이었다" 형태로 요약 (~200 tok)
+ */
+async function getConsumptionContext(
+  personaId: string,
+  currentTags?: string[],
+  currentTopic?: string
+): Promise<string>
+
+/**
+ * 페르소나의 최근 소비 통계 조회 (주제 선택 참고용).
+ */
+async function getConsumptionStats(
+  personaId: string,
+  days: number
+): Promise<{
+  totalCount: number
+  byType: Record<ConsumptionContentType, number>
+  topTags: Array<{ tag: string; count: number }>
+  avgRating: number
+}>
 ```
 
 ---
@@ -854,6 +966,7 @@ async function learnFromActivity(
 | PW-0-5 | PersonaActivityLog v3 확장 | `prisma/schema.prisma` | 수정 |
 | PW-0-6 | DB 마이그레이션 | `prisma migrate dev` | 실행 |
 | PW-0-7 | PersonaWorld 상수 (포스트 타입 친화도 테이블) | `src/lib/persona-world/constants.ts` | **신규** |
+| PW-0-8 | ConsumptionLog Prisma 모델 + enum | `prisma/schema.prisma` | 수정 |
 
 ### PW-Phase 1: 활동성 매핑 + 상태 관리
 
@@ -880,6 +993,8 @@ async function learnFromActivity(
 | PW-2-6 | 자율 활동 엔진 통합 + 모듈 index | `src/lib/persona-world/index.ts` | **신규** |
 | PW-2-7 | 자율 활동 단위 테스트 | `src/lib/persona-world/__tests__/scheduler.test.ts` | **신규** |
 | PW-2-8 | 스케줄러 API Route | `src/app/api/persona-world/scheduler/route.ts` | **전면 재작성** |
+| PW-2-9 | 소비 기록 매니저 (기록 + RAG 조회 + 통계) | `src/lib/persona-world/consumption-manager.ts` | **신규** |
+| PW-2-10 | 소비 기록 단위 테스트 | `src/lib/persona-world/__tests__/consumption-manager.test.ts` | **신규** |
 
 ### PW-Phase 3: 인터랙션 시스템
 
@@ -947,6 +1062,7 @@ apps/engine-studio/src/lib/persona-world/topic-selector.ts               ← 주
 apps/engine-studio/src/lib/persona-world/content-generator.ts            ← LLM 콘텐츠 생성
 apps/engine-studio/src/lib/persona-world/scheduler.ts                    ← 자율 활동 스케줄러
 apps/engine-studio/src/lib/persona-world/paradox-activity.ts             ← Paradox 발현 로직
+apps/engine-studio/src/lib/persona-world/consumption-manager.ts          ← 비공개 소비 기록 관리
 apps/engine-studio/src/lib/persona-world/quality-monitor.ts              ← 품질 모니터링 통합
 apps/engine-studio/src/lib/persona-world/index.ts                        ← 모듈 index
 
