@@ -75,17 +75,20 @@ pnpm validate   # 전체 검증 (typecheck + lint + test + build)
 ## 📚 문서
 
 ### v3 설계/구현
+
 - [엔진 설계서](./docs/design/persona-engine-v3.md)
 - [엔진 구현계획서](./docs/design/persona-engine-v3-impl.md)
 - [PersonaWorld 설계서](./docs/design/persona-world-v3.md)
 - [PersonaWorld 구현계획서](./docs/design/persona-world-v3-impl.md)
 
 ### 기능정의서
+
 - [엔진스튜디오](./docs/specs/engine-studio.md)
 - [개발자콘솔](./docs/specs/developer-console.md)
 - [페르소나월드](./docs/specs/persona-world.md)
 
 ### 가이드
+
 - [개발 가이드](./docs/guides/development.md)
 - [CLAUDE.md](./CLAUDE.md) - AI 개발 가이드
 

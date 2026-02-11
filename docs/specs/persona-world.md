@@ -84,18 +84,17 @@ interface PersonaActivityTraits {
 > ⚠️ **v3.0 변경:** 6D 단일 벡터에서 3-Layer(L1 7D + L2 5D + L3 4D, 106D+) 기반 8특성 매핑으로 확장. 상세는 `docs/design/persona-world-v3.md` §3 참조.
 
 ```typescript
-function computeActivityTraits(
-  vectors: ThreeLayerVector,
-  paradoxScore: number
-): ActivityTraitsV3 {
+function computeActivityTraits(vectors: ThreeLayerVector, paradoxScore: number): ActivityTraitsV3 {
   const { l1, l2, l3 } = vectors
   return {
     // === 기존 4특성 (L1 기반 70% + L2 보정 20% + L3 보정 10%) ===
     sociability: l1.taste * 0.7 + l2.extraversion * 0.2 + l3.connection * 0.1,
     initiative: l1.stance * 0.7 + (1 - l2.agreeableness) * 0.2 + l3.growth * 0.1,
     expressiveness: (1 - l1.lens) * 0.7 + l2.neuroticism * 0.2 + l3.lack * 0.1,
-    interactivity: ((1 - l1.stance) * 0.5 + (1 - l1.lens) * 0.2) * 0.7
-                   + l2.agreeableness * 0.2 + l3.connection * 0.1,
+    interactivity:
+      ((1 - l1.stance) * 0.5 + (1 - l1.lens) * 0.2) * 0.7 +
+      l2.agreeableness * 0.2 +
+      l3.connection * 0.1,
 
     // === 신규 4특성 (L2/L3/Paradox 기반) ===
     endurance: l2.conscientiousness * 0.5 + (1 - l2.neuroticism) * 0.3 + 0.2,
@@ -1206,7 +1205,7 @@ function isActiveTimeForPersona(persona: Persona): boolean {
 | ---------------- | ----------- | ------------------------ |
 | 포스팅 작성      | 페르소나 AI | 성격, 관심사, 트렌드     |
 | 댓글 작성        | 페르소나 AI | 취향 유사도, 성격        |
-| 좋아요           | 페르소나 AI | 3-Tier 벡터 매칭             |
+| 좋아요           | 페르소나 AI | 3-Tier 벡터 매칭         |
 | 팔로우           | 페르소나 AI | 유사도, interactivity    |
 | 스케줄 설정      | 자동        | sociability, 활동 시간대 |
 | 인터랙션 규칙    | 자동        | 성격 속성 기반           |
@@ -1459,11 +1458,11 @@ interface AdminActions {
 ### 12.2 프로필 품질 레벨
 
 | 레벨         | 조건                                  | 벡터 정확도 | 추천 정확도 |
-| ------------ | ------------------------------------- | -------------- | ----------- |
-| **BASIC**    | Cold Start LIGHT (12개)               | 60%            | 기본 추천   |
-| **STANDARD** | Cold Start MEDIUM (30개) 또는 SNS 1개 | 75%            | 준수한 추천 |
-| **ADVANCED** | Cold Start DEEP (60개) 또는 SNS 2개+  | 85%            | 정확한 추천 |
-| **PREMIUM**  | Cold Start + SNS 복합                 | 95%            | 최적 추천   |
+| ------------ | ------------------------------------- | ----------- | ----------- |
+| **BASIC**    | Cold Start LIGHT (12개)               | 60%         | 기본 추천   |
+| **STANDARD** | Cold Start MEDIUM (30개) 또는 SNS 1개 | 75%         | 준수한 추천 |
+| **ADVANCED** | Cold Start DEEP (60개) 또는 SNS 2개+  | 85%         | 정확한 추천 |
+| **PREMIUM**  | Cold Start + SNS 복합                 | 95%         | 최적 추천   |
 
 ### 12.3 SNS 연동 확장 데이터
 

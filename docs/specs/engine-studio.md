@@ -749,16 +749,19 @@ Developer Console (External)
 **필터링:** ← **v3.2 전면 개편**
 
 기본 필터:
+
 - **상태별:** Active(활성), Draft(임시저장), Archived(보관). 칩 토글.
 - **정렬:** 최신순 / 이름순 / Paradox Score순 / 일관성 점수순. 드롭다운.
 
 아키타입 필터:
+
 - **아키타입 선택:** 12종 아키타입 멀티 선택 칩. 각 칩에 아키타입 컬러 도트 표시.
   - 아이러니한 철학자, 상처받은 비평가, 사교적 내향인, 게으른 완벽주의자, 보수적 힙스터, 공감하는 논객, 자유로운 수호자, 조용한 열정가, 감성적 실용가, 위험한 멘토, 폭발하는 지성인, 성장하는 냉소가
   - "전체" 칩 선택 시 아키타입 필터 해제.
 - **아키타입 제외:** 선택된 아키타입을 우클릭 → "제외" 토글. 제외 칩은 취소선 표시.
 
 벡터 범위 필터 (접이식 패널):
+
 - **L1 Social Persona (7D):** 각 차원별 Range Slider (0.0~1.0). 드래그로 min/max 설정.
   - depth(분석 깊이), lens(판단 렌즈), stance(평가 태도), scope(관심 범위), taste(취향 성향), purpose(소비 목적), sociability(사회적 성향)
   - 슬라이더 양쪽에 low/high 레이블 표시 (예: "직관적" ↔ "심층적")
@@ -768,12 +771,14 @@ Developer Console (External)
 - "범위 초기화" 버튼: 모든 슬라이더를 0.0~1.0으로 리셋.
 
 Paradox Score 필터:
+
 - **Extended Paradox Score:** 단일 Range Slider (0.0~1.0).
   - 슬라이더 하단에 구간 레이블: 0~0.3 "낮음" / 0.3~0.6 "보통" / 0.6~1.0 "높음"
   - 현재 선택 범위 수치 표시 (예: "0.45 ~ 0.85")
 - **역설 지표 세부:** 접이식. L1↔L2 / L1↔L3 / L2↔L3 개별 Range Slider.
 
 교차축 패턴 필터 (고급):
+
 - **"고급 필터" 토글** 클릭 시 표시. 기본 숨김.
 - **교차축 선택:** 드롭다운으로 83개 교차축 중 선택. 최대 5개까지 필터 추가.
   - 각 축에 관계 유형 뱃지 표시: 🔴 paradox / 🟢 reinforcing / 🔵 modulating / ⚪ neutral
@@ -781,6 +786,7 @@ Paradox Score 필터:
 - **"필터 추가" 버튼:** 교차축 필터 행 추가. "×" 버튼으로 개별 삭제.
 
 필터 상태 표시:
+
 - 활성 필터 개수를 "필터" 버튼에 뱃지로 표시 (예: "필터 (5)")
 - 적용된 필터를 검색바 하단에 칩으로 나열. 각 칩에 "×" 삭제 버튼.
 - "모든 필터 초기화" 링크.
@@ -2253,6 +2259,7 @@ Archived ─\[Restore\]→ Draft
 ```
 
 **공통 UI 규칙:**
+
 - 패널 너비: 320px 고정 (캔버스 우측 사이드바)
 - 노드 미선택 시: "노드를 선택하세요" 안내 메시지
 - 설정 변경 시: **실시간 Eager 평가** (Eager 노드) 또는 **변경 표시** (Manual 노드)
@@ -2264,30 +2271,31 @@ Archived ─\[Restore\]→ Draft
 
 #### ① basic-info — 기본 정보
 
-| 필드 | UI 컴포넌트 | 제약 |
-|------|------------|------|
-| 이름 (name) | Text Input | 필수. 2~30자 |
-| 역할 (role) | Dropdown | 필수. Reviewer / Curator / Educator / Companion / Analyst |
-| 설명 (description) | Text Area (3줄) | 선택. 100자 이내 |
-| 전문 분야 (expertise) | Tag Input (멀티) | 선택. 칩 추가/삭제. 자동 완성 |
-| 나이 (demographics.age) | Number Input | 선택. 10~100 |
-| 성별 (demographics.gender) | Dropdown | 선택. male / female / non-binary / undisclosed |
-| 세대 (demographics.generation) | Dropdown | 선택. gen-z / millennial / gen-x / boomer |
-| 지역 (demographics.region) | Text Input | 선택. 자유 입력 |
+| 필드                           | UI 컴포넌트      | 제약                                                      |
+| ------------------------------ | ---------------- | --------------------------------------------------------- |
+| 이름 (name)                    | Text Input       | 필수. 2~30자                                              |
+| 역할 (role)                    | Dropdown         | 필수. Reviewer / Curator / Educator / Companion / Analyst |
+| 설명 (description)             | Text Area (3줄)  | 선택. 100자 이내                                          |
+| 전문 분야 (expertise)          | Tag Input (멀티) | 선택. 칩 추가/삭제. 자동 완성                             |
+| 나이 (demographics.age)        | Number Input     | 선택. 10~100                                              |
+| 성별 (demographics.gender)     | Dropdown         | 선택. male / female / non-binary / undisclosed            |
+| 세대 (demographics.generation) | Dropdown         | 선택. gen-z / millennial / gen-x / boomer                 |
+| 지역 (demographics.region)     | Text Input       | 선택. 자유 입력                                           |
 
 #### ② l1-vector — Social Persona (7D)
 
-| 차원 | 레이블 | Low ↔ High | UI 컴포넌트 |
-|------|--------|------------|------------|
-| depth | 분석 깊이 | 직관적 ↔ 심층적 | Range Slider (0.0~1.0, step 0.01) |
-| lens | 판단 렌즈 | 감성적 ↔ 논리적 | Range Slider |
-| stance | 평가 태도 | 수용적 ↔ 비판적 | Range Slider |
-| scope | 관심 범위 | 핵심만 ↔ 디테일 | Range Slider |
-| taste | 취향 성향 | 클래식 ↔ 실험적 | Range Slider |
-| purpose | 소비 목적 | 오락 ↔ 의미 추구 | Range Slider |
-| sociability | 사회적 성향 | 독립적 ↔ 사교적 | Range Slider |
+| 차원        | 레이블      | Low ↔ High       | UI 컴포넌트                       |
+| ----------- | ----------- | ---------------- | --------------------------------- |
+| depth       | 분석 깊이   | 직관적 ↔ 심층적  | Range Slider (0.0~1.0, step 0.01) |
+| lens        | 판단 렌즈   | 감성적 ↔ 논리적  | Range Slider                      |
+| stance      | 평가 태도   | 수용적 ↔ 비판적  | Range Slider                      |
+| scope       | 관심 범위   | 핵심만 ↔ 디테일  | Range Slider                      |
+| taste       | 취향 성향   | 클래식 ↔ 실험적  | Range Slider                      |
+| purpose     | 소비 목적   | 오락 ↔ 의미 추구 | Range Slider                      |
+| sociability | 사회적 성향 | 독립적 ↔ 사교적  | Range Slider                      |
 
 **슬라이더 UI:**
+
 - 트랙 좌측에 Low 레이블, 우측에 High 레이블 표시
 - 핸들 위에 현재 값 툴팁 (예: "0.72")
 - 배경 그라데이션: 차원별 컬러 (CIELAB 기반 색상 코드 적용)
@@ -2295,35 +2303,37 @@ Archived ─\[Restore\]→ Draft
 
 #### ③ l2-vector — Core Temperament / OCEAN (5D)
 
-| 차원 | 레이블 | Low ↔ High | UI 컴포넌트 |
-|------|--------|------------|------------|
-| openness | 개방성 | 보수적 ↔ 개방적 | Range Slider (0.0~1.0) |
-| conscientiousness | 성실성 | 유연한 ↔ 체계적 | Range Slider |
-| extraversion | 외향성 | 내향적 ↔ 외향적 | Range Slider |
-| agreeableness | 친화성 | 독립적 ↔ 협조적 | Range Slider |
-| neuroticism | 신경성 | 안정적 ↔ 민감한 | Range Slider |
+| 차원              | 레이블 | Low ↔ High      | UI 컴포넌트            |
+| ----------------- | ------ | --------------- | ---------------------- |
+| openness          | 개방성 | 보수적 ↔ 개방적 | Range Slider (0.0~1.0) |
+| conscientiousness | 성실성 | 유연한 ↔ 체계적 | Range Slider           |
+| extraversion      | 외향성 | 내향적 ↔ 외향적 | Range Slider           |
+| agreeableness     | 친화성 | 독립적 ↔ 협조적 | Range Slider           |
+| neuroticism       | 신경성 | 안정적 ↔ 민감한 | Range Slider           |
 
 #### ④ l3-vector — Narrative Drive (4D)
 
-| 차원 | 레이블 | Low ↔ High | UI 컴포넌트 |
-|------|--------|------------|------------|
-| lack | 결핍 | 충족 ↔ 결핍 | Range Slider (0.0~1.0) |
-| moralCompass | 도덕 나침반 | 유연한 ↔ 엄격한 | Range Slider |
-| volatility | 변동성 | 안정적 ↔ 폭발적 | Range Slider |
-| growthArc | 성장 곡선 | 정체 ↔ 변화 | Range Slider |
+| 차원         | 레이블      | Low ↔ High      | UI 컴포넌트            |
+| ------------ | ----------- | --------------- | ---------------------- |
+| lack         | 결핍        | 충족 ↔ 결핍     | Range Slider (0.0~1.0) |
+| moralCompass | 도덕 나침반 | 유연한 ↔ 엄격한 | Range Slider           |
+| volatility   | 변동성      | 안정적 ↔ 폭발적 | Range Slider           |
+| growthArc    | 성장 곡선   | 정체 ↔ 변화     | Range Slider           |
 
 **L3 특수 규칙:**
+
 - L3는 선택적 레이어. "L3 활성화" 체크박스로 전체 On/Off
 - 비활성 시 슬라이더 회색 처리 + 값 0.0으로 리셋
 
 #### ⑤ archetype-select — 아키타입 선택
 
-| 필드 | UI 컴포넌트 | 상세 |
-|------|------------|------|
-| 아키타입 (archetypeId) | Visual Dropdown | 12종 아키타입 카드 그리드 (2열). 카드에 이름, 핵심 역설, 컬러 도트, 한줄 설명 표시. 선택 시 L1/L2/L3 슬라이더에 기준값 자동 반영 |
-| 변동 시드 (varianceSeed) | Slider (0.0~1.0) + 🎲 | 0.0=기준값 그대로, 1.0=최대 변동. 🎲 버튼으로 랜덤 시드 생성 |
+| 필드                     | UI 컴포넌트           | 상세                                                                                                                             |
+| ------------------------ | --------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| 아키타입 (archetypeId)   | Visual Dropdown       | 12종 아키타입 카드 그리드 (2열). 카드에 이름, 핵심 역설, 컬러 도트, 한줄 설명 표시. 선택 시 L1/L2/L3 슬라이더에 기준값 자동 반영 |
+| 변동 시드 (varianceSeed) | Slider (0.0~1.0) + 🎲 | 0.0=기준값 그대로, 1.0=최대 변동. 🎲 버튼으로 랜덤 시드 생성                                                                     |
 
 **아키타입 선택 시 연동:**
+
 - L1/L2/L3 벡터 노드에 기준값 자동 적용 (toast 안내: "아키타입 기준값이 적용되었습니다")
 - varianceSeed에 따라 기준값 ± 변동 범위 내에서 랜덤 분산
 - 수동으로 벡터를 변경하면 아키타입 표시 옆에 "(커스텀)" 뱃지
@@ -2335,6 +2345,7 @@ Archived ─\[Restore\]→ Draft
 **설정 없음.** "L1, L2, L3 벡터에서 자동으로 Extended Paradox Score를 계산합니다." 안내 텍스트만 표시.
 
 출력 미리보기(읽기 전용):
+
 - Extended Paradox Score: `0.72`
 - L1↔L2 역설: `0.68`
 - L1↔L3 역설: `0.55`
@@ -2342,11 +2353,11 @@ Archived ─\[Restore\]→ Draft
 
 #### ⑦ pressure-ctrl — 압박 제어
 
-| 필드 | UI 컴포넌트 | 제약 |
-|------|------------|------|
-| 압박 최소 (pressureMin) | Number Input | 0.0~1.0. 기본 0.0 |
-| 압박 최대 (pressureMax) | Number Input | 0.0~1.0. 기본 1.0. ≥ pressureMin |
-| 기준선 (baseline) | Slider (0.0~1.0) | 기본 0.3. 평상시 압박 수준 |
+| 필드                    | UI 컴포넌트      | 제약                             |
+| ----------------------- | ---------------- | -------------------------------- |
+| 압박 최소 (pressureMin) | Number Input     | 0.0~1.0. 기본 0.0                |
+| 압박 최대 (pressureMax) | Number Input     | 0.0~1.0. 기본 1.0. ≥ pressureMin |
+| 기준선 (baseline)       | Slider (0.0~1.0) | 기본 0.3. 평상시 압박 수준       |
 
 **검증 연동:** pressureMin > pressureMax 시 빨간 테두리 + 에러 메시지
 
@@ -2355,19 +2366,21 @@ Archived ─\[Restore\]→ Draft
 **설정 없음.** "V_Final = (1-P)·L1 + P·(α·L2_proj + β·L3_proj) 공식으로 자동 계산합니다." 안내 텍스트.
 
 출력 미리보기(읽기 전용):
+
 - V_Final 7D 벡터값 가로 바 차트
 - 현재 Pressure 값
 
 #### ⑨ projection — 투영 설정
 
-| 필드 | UI 컴포넌트 | 제약 |
-|------|------------|------|
-| α (L2 가중치) | Linked Dual Slider | 0.0~1.0. α+β=1.0 자동 연동 |
-| β (L3 가중치) | Linked Dual Slider | 0.0~1.0. α 변경 시 β=1-α 자동 |
-| 압박 임계값 (pressureThreshold) | Slider (0.0~1.0) | 기본 0.5. 이 값 이상이면 L2/L3 영향 증가 |
-| 적응률 (adaptabilityRate) | Slider (0.0~1.0) | 기본 0.5. Adapt 알고리즘 학습 속도 |
+| 필드                            | UI 컴포넌트        | 제약                                     |
+| ------------------------------- | ------------------ | ---------------------------------------- |
+| α (L2 가중치)                   | Linked Dual Slider | 0.0~1.0. α+β=1.0 자동 연동               |
+| β (L3 가중치)                   | Linked Dual Slider | 0.0~1.0. α 변경 시 β=1-α 자동            |
+| 압박 임계값 (pressureThreshold) | Slider (0.0~1.0)   | 기본 0.5. 이 값 이상이면 L2/L3 영향 증가 |
+| 적응률 (adaptabilityRate)       | Slider (0.0~1.0)   | 기본 0.5. Adapt 알고리즘 학습 속도       |
 
 **Linked Dual Slider:**
+
 - α와 β가 하나의 트랙 위에 표시 (시소 형태)
 - α 핸들을 오른쪽으로 드래그하면 β가 자동으로 줄어듦
 - 중앙에 현재 비율 표시: "α: 0.60 | β: 0.40"
@@ -2378,11 +2391,12 @@ Generation 노드 6종(character-gen, backstory-gen, voice-gen, content-gen, pre
 
 #### ⑩~⑫, ⑭~⑯ 공통: LLM 기반 Generation 노드 (6종)
 
-| 필드 | UI 컴포넌트 | 상세 |
-|------|------------|------|
+| 필드                             | UI 컴포넌트                | 상세                                                 |
+| -------------------------------- | -------------------------- | ---------------------------------------------------- |
 | 커스텀 지시 (customInstructions) | Text Area (5줄, 확장 가능) | 선택. LLM 프롬프트에 추가 지시 주입. 기본: 빈 문자열 |
 
 **텍스트 에어리어 기능:**
+
 - 플레이스홀더에 노드별 예시 표시:
   - character-gen: "예: '유머 감각을 강조하되 비꼬는 느낌 없이'"
   - backstory-gen: "예: '2000년대 초반 서울 배경으로'"
@@ -2399,18 +2413,20 @@ Generation 노드 6종(character-gen, backstory-gen, voice-gen, content-gen, pre
 **설정 없음.** "L1 벡터에서 8가지 활동 성향을 규칙 기반으로 자동 추론합니다." 안내 텍스트.
 
 출력 미리보기(읽기 전용):
+
 - 8개 활동 성향 미니 바 차트 (postFrequency, replyRate, initiativeRate, shareRate, browseRatio, peakActivity, contentDiversity, engagementDepth)
 
 ### 3.10.5 Assembly 노드 (2종)
 
 #### ⑰ prompt-builder — 프롬프트 조립
 
-| 필드 | UI 컴포넌트 | 상세 |
-|------|------------|------|
-| 템플릿 프리셋 | Dropdown | "기본" / "상세" / "최소" / "커스텀". 기본: "기본" |
+| 필드                                 | UI 컴포넌트        | 상세                                                      |
+| ------------------------------------ | ------------------ | --------------------------------------------------------- |
+| 템플릿 프리셋                        | Dropdown           | "기본" / "상세" / "최소" / "커스텀". 기본: "기본"         |
 | 템플릿 오버라이드 (templateOverride) | Code Editor (JSON) | "커스텀" 선택 시에만 활성. 프롬프트 템플릿 JSON 직접 편집 |
 
 **프리셋별 설명:**
+
 - 기본: 6개 Generation 출력을 표준 순서로 조립 (권장)
 - 상세: 교차축 프로필 + Paradox 해석까지 프롬프트에 포함
 - 최소: Voice + Character만 포함 (비용 절감)
@@ -2427,25 +2443,27 @@ Generation 노드 6종(character-gen, backstory-gen, voice-gen, content-gen, pre
 **설정 없음.** "6-Category 일관성 검증을 자동으로 수행합니다." 안내 텍스트.
 
 출력 미리보기(읽기 전용):
+
 - 종합 일관성 점수: `0.87`
 - 6개 카테고리별 pass/warning/fail 상태 칩
 
 #### ⑳ fingerprint — P-inger Print 생성
 
-| 필드 | UI 컴포넌트 | 상세 |
-|------|------------|------|
+| 필드             | UI 컴포넌트       | 상세                                                                                                   |
+| ---------------- | ----------------- | ------------------------------------------------------------------------------------------------------ |
 | 렌더 모드 (mode) | Radio Group (3개) | `compact` (레이더 차트만) / `l1-l2` (레이더 + 2D 지문) / `full` (레이더 + 2D + 3D Jacks). 기본: `full` |
 
 **미리보기:** 선택된 모드에 따라 P-inger Print 미리보기 렌더링.
 
 #### ㉑ test-sim — 테스트 시뮬레이션
 
-| 필드 | UI 컴포넌트 | 상세 |
-|------|------------|------|
-| 테스트 시나리오 (testScenarios) | Checkbox List | 기본 시나리오 5종 체크리스트 + "커스텀 추가" 버튼 |
-| 시나리오 수 (sampleCount) | Number Stepper | 1~10. 기본: 3. 각 시나리오당 생성 횟수 |
+| 필드                            | UI 컴포넌트    | 상세                                              |
+| ------------------------------- | -------------- | ------------------------------------------------- |
+| 테스트 시나리오 (testScenarios) | Checkbox List  | 기본 시나리오 5종 체크리스트 + "커스텀 추가" 버튼 |
+| 시나리오 수 (sampleCount)       | Number Stepper | 1~10. 기본: 3. 각 시나리오당 생성 횟수            |
 
 **기본 시나리오 5종:**
+
 - ☑ 영화 리뷰 요청 — "최근 본 영화에 대해 이야기해주세요"
 - ☑ 의견 대립 — "저는 이 영화가 최고라고 생각하는데요?"
 - ☑ 추천 요청 — "오늘 뭐 볼까요?"
@@ -2453,16 +2471,18 @@ Generation 노드 6종(character-gen, backstory-gen, voice-gen, content-gen, pre
 - ☐ 전문 분석 — "이 감독의 작품 세계관에 대해 분석해주세요"
 
 **커스텀 시나리오 추가:**
+
 - `[+ 시나리오 추가]` 버튼 → Text Input 행 추가 (description + userMessage)
 - 각 행에 `×` 삭제 버튼
 
 #### ㉒ deploy — 배포
 
-| 필드 | UI 컴포넌트 | 상세 |
-|------|------------|------|
+| 필드                          | UI 컴포넌트       | 상세                                                            |
+| ----------------------------- | ----------------- | --------------------------------------------------------------- |
 | 배포 환경 (targetEnvironment) | Radio Group (2개) | `staging` (스테이징) / `production` (프로덕션). 기본: `staging` |
 
 **production 선택 시 경고:**
+
 - 주의 배너: "프로덕션 배포 시 즉시 서비스에 반영됩니다. 일관성 검증을 통과했는지 확인하세요."
 - 일관성 검증 미통과 상태면 `[Deploy]` 버튼 비활성 + 사유 표시
 
@@ -2470,45 +2490,48 @@ Generation 노드 6종(character-gen, backstory-gen, voice-gen, content-gen, pre
 
 #### ㉓ conditional — 조건 분기
 
-| 필드 | UI 컴포넌트 | 조건부 표시 |
-|------|------------|------------|
-| 조건 유형 (conditionType) | Dropdown | 항상 표시. threshold / range / enum / exists |
-| 연산자 (operator) | Dropdown | `threshold` 선택 시만. > / >= / < / <= / == / != |
-| 임계값 (threshold) | Number Input | `threshold` 선택 시만. 소수점 2자리 |
-| 범위 최소 (rangeMin) | Number Input | `range` 선택 시만 |
-| 범위 최대 (rangeMax) | Number Input | `range` 선택 시만. ≥ rangeMin |
-| 열거값 (enumValue) | Text Input | `enum` 선택 시만 |
-| True 레이블 (trueLabel) | Text Input | 항상 표시. 기본: "True". UI 가이드용 |
-| False 레이블 (falseLabel) | Text Input | 항상 표시. 기본: "False". UI 가이드용 |
+| 필드                      | UI 컴포넌트  | 조건부 표시                                      |
+| ------------------------- | ------------ | ------------------------------------------------ |
+| 조건 유형 (conditionType) | Dropdown     | 항상 표시. threshold / range / enum / exists     |
+| 연산자 (operator)         | Dropdown     | `threshold` 선택 시만. > / >= / < / <= / == / != |
+| 임계값 (threshold)        | Number Input | `threshold` 선택 시만. 소수점 2자리              |
+| 범위 최소 (rangeMin)      | Number Input | `range` 선택 시만                                |
+| 범위 최대 (rangeMax)      | Number Input | `range` 선택 시만. ≥ rangeMin                    |
+| 열거값 (enumValue)        | Text Input   | `enum` 선택 시만                                 |
+| True 레이블 (trueLabel)   | Text Input   | 항상 표시. 기본: "True". UI 가이드용             |
+| False 레이블 (falseLabel) | Text Input   | 항상 표시. 기본: "False". UI 가이드용            |
 
 **조건 유형별 UI 전환:**
+
 - `threshold`: [연산자 드롭다운] [임계값 입력] — 예: `> 0.6`
 - `range`: [최소 입력] `≤ value ≤` [최대 입력] — 예: `0.3 ≤ value ≤ 0.7`
 - `enum`: [열거값 입력] — 예: `SAGE`
 - `exists`: 추가 입력 없음 — "값이 존재하면 True" 안내
 
 **분기 미리보기:**
+
 - 노드 하단에 True/False 라벨 및 연결된 다음 노드 이름 표시
 - 마지막 평가 결과: "조건 충족 → True 경로" (초록) / "조건 미충족 → False 경로" (빨강)
 
 #### ㉔ switch — 다중 분기
 
-| 필드 | UI 컴포넌트 | 조건부 표시 |
-|------|------------|------------|
-| 분류 모드 (switchMode) | Dropdown | 항상 표시. threshold-band / enum-match |
+| 필드                   | UI 컴포넌트 | 조건부 표시                            |
+| ---------------------- | ----------- | -------------------------------------- |
+| 분류 모드 (switchMode) | Dropdown    | 항상 표시. threshold-band / enum-match |
 
 **threshold-band 모드:**
 
-| 필드 | UI 컴포넌트 | 상세 |
-|------|------------|------|
-| 구간 목록 (bands) | Dynamic Row Editor | 행 추가/삭제 가능. 기본 3행 (Low/Med/High) |
-| 구간 ID (band.id) | Text Input | 행당. 출력 포트 이름 |
-| 구간 레이블 (band.label) | Text Input | 행당. UI 표시명 |
-| 구간 하한 (band.min) | Number Input | 행당. 이전 band.max와 자동 연결 |
-| 구간 상한 (band.max) | Number Input | 행당. 다음 band.min과 자동 연결 |
-| 기본 케이스 (defaultCaseId) | Dropdown | 구간 ID 중 선택. 매칭 없을 때 |
+| 필드                        | UI 컴포넌트        | 상세                                       |
+| --------------------------- | ------------------ | ------------------------------------------ |
+| 구간 목록 (bands)           | Dynamic Row Editor | 행 추가/삭제 가능. 기본 3행 (Low/Med/High) |
+| 구간 ID (band.id)           | Text Input         | 행당. 출력 포트 이름                       |
+| 구간 레이블 (band.label)    | Text Input         | 행당. UI 표시명                            |
+| 구간 하한 (band.min)        | Number Input       | 행당. 이전 band.max와 자동 연결            |
+| 구간 상한 (band.max)        | Number Input       | 행당. 다음 band.min과 자동 연결            |
+| 기본 케이스 (defaultCaseId) | Dropdown           | 구간 ID 중 선택. 매칭 없을 때              |
 
 **band 편집 UI:**
+
 ```
 [Low    ] [0.00] ~ [0.33]  [×]
 [Medium ] [0.33] ~ [0.66]  [×]
@@ -2516,20 +2539,22 @@ Generation 노드 6종(character-gen, backstory-gen, voice-gen, content-gen, pre
 [+ 구간 추가]
 기본 케이스: [High ▾]
 ```
+
 - 구간 간 빈틈 발생 시 경고: "0.33~0.34 구간에 빈틈이 있습니다"
 - 구간 겹침 시 에러: "Low와 Medium 구간이 겹칩니다"
 
 **enum-match 모드:**
 
-| 필드 | UI 컴포넌트 | 상세 |
-|------|------------|------|
-| 케이스 목록 (enumCases) | Dynamic Row Editor | 행 추가/삭제 가능 |
-| 케이스 ID (case.id) | Text Input | 행당. 출력 포트 이름 |
-| 케이스 레이블 (case.label) | Text Input | 행당. UI 표시명 |
-| 매칭 값 (case.matchValues) | Tag Input (멀티) | 행당. 여러 값 매칭 (OR) |
-| 기본 케이스 (defaultCaseId) | Dropdown | 케이스 ID 중 선택 |
+| 필드                        | UI 컴포넌트        | 상세                    |
+| --------------------------- | ------------------ | ----------------------- |
+| 케이스 목록 (enumCases)     | Dynamic Row Editor | 행 추가/삭제 가능       |
+| 케이스 ID (case.id)         | Text Input         | 행당. 출력 포트 이름    |
+| 케이스 레이블 (case.label)  | Text Input         | 행당. UI 표시명         |
+| 매칭 값 (case.matchValues)  | Tag Input (멀티)   | 행당. 여러 값 매칭 (OR) |
+| 기본 케이스 (defaultCaseId) | Dropdown           | 케이스 ID 중 선택       |
 
 **enum-match 편집 UI:**
+
 ```
 [sage      ] Sage       → [SAGE] [sage] [현자]    [×]
 [hero      ] Hero       → [HERO] [hero] [영웅]    [×]
@@ -2540,42 +2565,43 @@ Generation 노드 6종(character-gen, backstory-gen, voice-gen, content-gen, pre
 
 #### ㉕ merge — 분기 합류
 
-| 필드 | UI 컴포넌트 | 상세 |
-|------|------------|------|
+| 필드                      | UI 컴포넌트       | 상세                                                                                                     |
+| ------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------- |
 | 합류 전략 (mergeStrategy) | Radio Group (2개) | `first-active` (첫 번째 활성 입력 사용) / `combine` (모든 활성 입력을 배열로 합침). 기본: `first-active` |
 
 **전략별 안내:**
+
 - first-active: "Conditional 분기 합류에 적합합니다. 활성 입력 중 첫 번째 값만 출력합니다."
 - combine: "병렬 생성 결과 수집에 적합합니다. 모든 활성 입력을 배열로 합칩니다."
 
 ### 3.10.8 설정 패널 공통 UI 컴포넌트 명세
 
-| 컴포넌트 | shadcn/ui 기반 | 규격 |
-|---------|---------------|------|
-| Range Slider | `Slider` | 0.0~1.0, step 0.01. 트랙 좌우 레이블. 핸들 툴팁 |
-| Number Input | `Input type="number"` | step 0.01. 스피너 버튼. 범위 검증 |
-| Text Input | `Input` | maxLength 적용. 실시간 글자 수 표시 |
-| Text Area | `Textarea` | 줄 수 기본 3~5. 드래그로 확장 가능 |
-| Dropdown | `Select` | 검색 가능 (`Combobox` 패턴). 선택지 5개 이상 시 |
-| Radio Group | `RadioGroup` | 2~3개 선택지. 가로 배치 |
-| Checkbox List | `Checkbox` 목록 | 체크/해제 토글. 전체 선택 가능 |
-| Tag Input | `Badge` + `Input` | 칩 추가/삭제. Enter로 추가, ×로 삭제 |
-| Dynamic Row Editor | 커스텀 | 행 추가/삭제. 드래그 정렬 가능. 최소 1행 |
-| Linked Dual Slider | 커스텀 (`Slider` 변형) | 시소 형태. 합계 고정 (1.0) |
-| Code Editor | `Textarea` + 모노스페이스 | JSON 구문 강조. 포매팅 버튼 |
-| Number Stepper | `Input` + ±버튼 | 정수. 최소/최대 제약 |
+| 컴포넌트           | shadcn/ui 기반            | 규격                                            |
+| ------------------ | ------------------------- | ----------------------------------------------- |
+| Range Slider       | `Slider`                  | 0.0~1.0, step 0.01. 트랙 좌우 레이블. 핸들 툴팁 |
+| Number Input       | `Input type="number"`     | step 0.01. 스피너 버튼. 범위 검증               |
+| Text Input         | `Input`                   | maxLength 적용. 실시간 글자 수 표시             |
+| Text Area          | `Textarea`                | 줄 수 기본 3~5. 드래그로 확장 가능              |
+| Dropdown           | `Select`                  | 검색 가능 (`Combobox` 패턴). 선택지 5개 이상 시 |
+| Radio Group        | `RadioGroup`              | 2~3개 선택지. 가로 배치                         |
+| Checkbox List      | `Checkbox` 목록           | 체크/해제 토글. 전체 선택 가능                  |
+| Tag Input          | `Badge` + `Input`         | 칩 추가/삭제. Enter로 추가, ×로 삭제            |
+| Dynamic Row Editor | 커스텀                    | 행 추가/삭제. 드래그 정렬 가능. 최소 1행        |
+| Linked Dual Slider | 커스텀 (`Slider` 변형)    | 시소 형태. 합계 고정 (1.0)                      |
+| Code Editor        | `Textarea` + 모노스페이스 | JSON 구문 강조. 포매팅 버튼                     |
+| Number Stepper     | `Input` + ±버튼           | 정수. 최소/최대 제약                            |
 
 ### 3.10.9 노드 설정 유무 요약
 
-| 카테고리 | 설정 있음 | 설정 없음 (자동) |
-|----------|----------|----------------|
-| Input (5) | basic-info, l1-vector, l2-vector, l3-vector, archetype-select | — |
-| Engine (4) | pressure-ctrl, projection | paradox-calc, v-final |
-| Generation (7) | character-gen, backstory-gen, voice-gen, content-gen, pressure-gen, zeitgeist-gen | activity-gen |
-| Assembly (2) | prompt-builder | interaction-rules |
-| Output (4) | fingerprint, test-sim, deploy | consistency |
-| Control Flow (3) | conditional, switch, merge | — |
-| **합계** | **19종** | **6종** |
+| 카테고리         | 설정 있음                                                                         | 설정 없음 (자동)      |
+| ---------------- | --------------------------------------------------------------------------------- | --------------------- |
+| Input (5)        | basic-info, l1-vector, l2-vector, l3-vector, archetype-select                     | —                     |
+| Engine (4)       | pressure-ctrl, projection                                                         | paradox-calc, v-final |
+| Generation (7)   | character-gen, backstory-gen, voice-gen, content-gen, pressure-gen, zeitgeist-gen | activity-gen          |
+| Assembly (2)     | prompt-builder                                                                    | interaction-rules     |
+| Output (4)       | fingerprint, test-sim, deploy                                                     | consistency           |
+| Control Flow (3) | conditional, switch, merge                                                        | —                     |
+| **합계**         | **19종**                                                                          | **6종**               |
 
 ---
 
@@ -5157,12 +5183,12 @@ Provide weight adjustments in JSON format:
 
 ### 5.1.7.6 플랜별 매칭 Tier 적용
 
-| 플랜       | Basic (L1 코사인) | Advanced (+ 교차축) | Exploration (+ 정성정량) | 비용       |
-| :--------- | :---------------- | :------------------ | :----------------------- | :--------- |
+| 플랜       | Basic (L1 코사인) | Advanced (+ 교차축) | Exploration (+ 정성정량) | 비용        |
+| :--------- | :---------------- | :------------------ | :----------------------- | :---------- |
 | Free       | ✅                | ✅                  | ✅                       | 호출량 제한 |
-| Starter    | ✅                | ✅                  | ✅                       | 초과 과금  |
-| Pro        | ✅                | ✅                  | ✅                       | **포함**   |
-| Enterprise | ✅                | ✅                  | ✅ + 커스텀 가중치       | 포함       |
+| Starter    | ✅                | ✅                  | ✅                       | 초과 과금   |
+| Pro        | ✅                | ✅                  | ✅                       | **포함**    |
+| Enterprise | ✅                | ✅                  | ✅ + 커스텀 가중치       | 포함        |
 
 **API 요청 옵션:**
 
@@ -5372,33 +5398,33 @@ return analysis\\\["weights"\\\]
 
 ┌─────────────────────────────────────────────────────────────┐
 
-│ Tier 3: Exploration — 정성정량 변환 + Integrity Score        │
+│ Tier 3: Exploration — 정성정량 변환 + Integrity Score │
 
-│ └─ Init/Override/Adapt/Express + 6-Category 검증            │
-
-├─────────────────────────────────────────────────────────────┤
-
-│ Tier 2: Advanced — 교차축 가중 매칭                          │
-
-│ └─ 83개 교차축 스코어 + Extended Paradox Score               │
+│ └─ Init/Override/Adapt/Express + 6-Category 검증 │
 
 ├─────────────────────────────────────────────────────────────┤
 
-│ Tier 1: Basic — 기저 벡터 코사인 유사도                      │
+│ Tier 2: Advanced — 교차축 가중 매칭 │
 
-│ └─ L1(7D) + L2(5D) + L3(4D) = 106D+ 코사인 유사도           │
+│ └─ 83개 교차축 스코어 + Extended Paradox Score │
+
+├─────────────────────────────────────────────────────────────┤
+
+│ Tier 1: Basic — 기저 벡터 코사인 유사도 │
+
+│ └─ L1(7D) + L2(5D) + L3(4D) = 106D+ 코사인 유사도 │
 
 └─────────────────────────────────────────────────────────────┘
 
 ### 5.1.9.2 플랜별 기능
 
-| 기능                          | Starter | Pro  | Max  | Enterprise |
-| :---------------------------- | :------ | :--- | :--- | :--------- |
-| Tier 1: Basic (106D+ 벡터)    | ✅      | ✅   | ✅   | ✅         |
-| Tier 2: Advanced (교차축 83)  | ✅      | ✅   | ✅   | ✅         |
-| Tier 3: Exploration (정성정량) | ✅      | ✅   | ✅   | ✅         |
-| 스마트 캐싱                   | ✅      | ✅   | ✅   | ✅         |
-| 페르소나 필터 API             | ❌      | ❌   | ❌   | ✅         |
+| 기능                           | Starter | Pro | Max | Enterprise |
+| :----------------------------- | :------ | :-- | :-- | :--------- |
+| Tier 1: Basic (106D+ 벡터)     | ✅      | ✅  | ✅  | ✅         |
+| Tier 2: Advanced (교차축 83)   | ✅      | ✅  | ✅  | ✅         |
+| Tier 3: Exploration (정성정량) | ✅      | ✅  | ✅  | ✅         |
+| 스마트 캐싱                    | ✅      | ✅  | ✅  | ✅         |
+| 페르소나 필터 API              | ❌      | ❌  | ❌  | ✅         |
 
 ### 5.1.9.3 매칭 흐름 (v3 통합)
 
@@ -5411,6 +5437,7 @@ return analysis\\\["weights"\\\]
                                             → 일관성 검증 → 결과 반환
 
 **Tier 자동 선택 로직:**
+
 - API에서 `matching_tier` 미지정 시 → `exploration` (기본값)
 - 응답 지연 우선 시 → `basic` (가장 빠름)
 
@@ -5421,7 +5448,7 @@ return analysis\\\["weights"\\\]
 | Starter    | $0.00025       | 106D+ 전체 연산 (3-Tier 매칭 + 정성정량 + 응답 LLM) |
 | Pro        | $0.00025       | 106D+ 전체 연산 (3-Tier 매칭 + 정성정량 + 응답 LLM) |
 | Max        | $0.00025       | 106D+ 전체 연산 (3-Tier 매칭 + 정성정량 + 응답 LLM) |
-| Enterprise | $0.00025       | 위 + RAG 장기기억 + 페르소나 필터 API                |
+| Enterprise | $0.00025       | 위 + RAG 장기기억 + 페르소나 필터 API               |
 
 ※ 스마트 캐싱으로 실제 LLM 호출은 20% 수준. 나머지는 캐시 히트.
 
@@ -5456,30 +5483,30 @@ return analysis\\\["weights"\\\]
 
 - L1 벡터: Depth=0.8, Lens=0.9, Stance=0.7, Scope=0.8, Taste=0.4, Purpose=0.7, Consistency=0.8
 
-| 매칭 Tier                 | 1순위               | 2순위               | 3순위                 |
-| :------------------------ | :------------------ | :------------------ | :-------------------- |
-| Basic (106D+ 벡터)        | 시네필 평론가 (97%) | 독설 비평가 (80%)   | 클래식 감상가 (57%)   |
-| Advanced (+ 교차축)       | 시네필 평론가 (95%) | 트렌드 분석가 (82%) | 독설 비평가 (78%)     |
-| Exploration (인터스텔라)  | 시네필 평론가 (89%) | 트렌드 분석가 (85%) | 실험영화 마니아 (75%) |
+| 매칭 Tier                | 1순위               | 2순위               | 3순위                 |
+| :----------------------- | :------------------ | :------------------ | :-------------------- |
+| Basic (106D+ 벡터)       | 시네필 평론가 (97%) | 독설 비평가 (80%)   | 클래식 감상가 (57%)   |
+| Advanced (+ 교차축)      | 시네필 평론가 (95%) | 트렌드 분석가 (82%) | 독설 비평가 (78%)     |
+| Exploration (인터스텔라) | 시네필 평론가 (89%) | 트렌드 분석가 (85%) | 실험영화 마니아 (75%) |
 
 **사용자: 힐링 추구자**
 
 - L1 벡터: Depth=0.4, Lens=0.2, Stance=0.2, Scope=0.3, Taste=0.3, Purpose=0.6, Consistency=0.4
 
-| 매칭 Tier                 | 1순위                 | 2순위                 | 3순위                 |
-| :------------------------ | :-------------------- | :-------------------- | :-------------------- |
-| Basic (106D+ 벡터)        | 힐링 큐레이터 (88%)   | 감성 에세이스트 (83%) | 대중문화 해설자 (72%) |
-| Advanced (+ 교차축)       | 힐링 큐레이터 (96%)   | 감성 에세이스트 (90%) | 대중문화 해설자 (75%) |
-| Exploration (노트북)      | 감성 에세이스트 (95%) | 힐링 큐레이터 (93%)   | 대중문화 해설자 (78%) |
+| 매칭 Tier            | 1순위                 | 2순위                 | 3순위                 |
+| :------------------- | :-------------------- | :-------------------- | :-------------------- |
+| Basic (106D+ 벡터)   | 힐링 큐레이터 (88%)   | 감성 에세이스트 (83%) | 대중문화 해설자 (72%) |
+| Advanced (+ 교차축)  | 힐링 큐레이터 (96%)   | 감성 에세이스트 (90%) | 대중문화 해설자 (75%) |
+| Exploration (노트북) | 감성 에세이스트 (95%) | 힐링 큐레이터 (93%)   | 대중문화 해설자 (78%) |
 
 ### 5.1.10.4 결론
 
-| 항목           | 결론                                                                    |
-| :------------- | :---------------------------------------------------------------------- |
-| Basic          | 106D+ 코사인으로 기본 성향 매칭 82% 충족                                 |
-| Advanced       | 83개 교차축 가중치로 5%p 향상, 연산 비용 미미                            |
-| Exploration    | 정성정량 변환(Init/Adapt) + Voice 보정으로 7%p 추가 향상                  |
-| 종합           | Exploration Tier가 최고 품질. 캐싱으로 비용 효율적                        |
+| 항목        | 결론                                                     |
+| :---------- | :------------------------------------------------------- |
+| Basic       | 106D+ 코사인으로 기본 성향 매칭 82% 충족                 |
+| Advanced    | 83개 교차축 가중치로 5%p 향상, 연산 비용 미미            |
+| Exploration | 정성정량 변환(Init/Adapt) + Voice 보정으로 7%p 추가 향상 |
+| 종합        | Exploration Tier가 최고 품질. 캐싱으로 비용 효율적       |
 
 ---
 
@@ -5910,13 +5937,13 @@ return sum(weighted\\\_similarities) / total\\\_confidence \\\* 100
 
 **v3.0 테스트 유형:**
 
-| 테스트 유형         | 설명                  | 예시                           |
-| :------------------ | :-------------------- | :----------------------------- |
+| 테스트 유형         | 설명                  | 예시                             |
+| :------------------ | :-------------------- | :------------------------------- |
 | **Tier 테스트**     | 매칭 Tier 비교        | Basic vs Advanced vs Exploration |
-| **가중치 테스트**   | 교차축 가중치 비교    | L1×L2 가중치 1.2x vs 1.0x       |
-| **임계값 테스트**   | Paradox 발현 임계값   | 0.6 vs 0.55                     |
-| **페르소나 테스트** | 새 페르소나 효과 검증 | 기존 풀 vs 신규 추가            |
-| **레이어 테스트**   | 3-Layer 차원 기여도   | L1/L2/L3 개별 기여도 분석       |
+| **가중치 테스트**   | 교차축 가중치 비교    | L1×L2 가중치 1.2x vs 1.0x        |
+| **임계값 테스트**   | Paradox 발현 임계값   | 0.6 vs 0.55                      |
+| **페르소나 테스트** | 새 페르소나 효과 검증 | 기존 풀 vs 신규 추가             |
+| **레이어 테스트**   | 3-Layer 차원 기여도   | L1/L2/L3 개별 기여도 분석        |
 
 **v3.0 차원별 A/B 테스트:**
 
@@ -8672,15 +8699,15 @@ CREATE INDEX idx_persona_vectors_is_current ON PersonaVectors(is_current) WHERE 
 
 **필드 설명:**
 
-| 필드              | 타입      | 설명                   |
-| :---------------- | :-------- | :--------------------- |
-| id                | UUID      | 고유 식별자            |
-| persona_id        | UUID      | 페르소나 FK            |
-| version           | INT       | 벡터 버전              |
-| depth\~consistency | DECIMAL   | L1 각 차원 값 (0\~1)             |
+| 필드               | 타입       | 설명                              |
+| :----------------- | :--------- | :-------------------------------- |
+| id                 | UUID       | 고유 식별자                       |
+| persona_id         | UUID       | 페르소나 FK                       |
+| version            | INT        | 벡터 버전                         |
+| depth\~consistency | DECIMAL    | L1 각 차원 값 (0\~1)              |
 | normalized_vector  | VECTOR(16) | L2 정규화된 106D+ 벡터 (L1+L2+L3) |
-| is_current        | BOOLEAN   | 현재 활성 버전 여부    |
-| created_at        | TIMESTAMP | 생성 일시              |
+| is_current         | BOOLEAN    | 현재 활성 버전 여부               |
+| created_at         | TIMESTAMP  | 생성 일시                         |
 
 ---
 

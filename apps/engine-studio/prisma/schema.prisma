@@ -1,5 +1,5 @@
 // DeepSight AI Engine Studio - Database Schema
-// v3.0 - 6D Vector System
+// v3.0 - 106D+ Multi-Layer Vector System
 
 generator client {
   provider = "prisma-client-js"
@@ -161,6 +161,25 @@ model Persona {
   // === 샘플 콘텐츠 ===
   sampleContents  Json?           // 자동 생성된 샘플 콘텐츠
 
+  // === v3.0 NEW: 3-Layer Paradox & Dynamics (JSON) ===
+  paradoxConfig       Json?           // ParadoxConfig type
+  dynamicsConfig      Json?           // DynamicsConfig type
+
+  // === v3.0 NEW: Qualitative Dimensions (JSON) ===
+  backstory           Json?           // BackstoryDimension
+  pressureContext     Json?           // PressureContext
+  voiceProfile        Json?           // VoiceProfile
+  zeitgeist           Json?           // ZeitgeistProfile
+
+  // === v3.0 NEW: Interaction Rules (JSON) ===
+  interactionRules    Json?           // InteractionRules (Init/Override/Adapt/Express)
+
+  // === v3.0 NEW: Archetype & Scores ===
+  archetypeId         String?
+  paradoxScore        Decimal?        @db.Decimal(4, 3) // 0.000~1.000
+  dimensionalityScore Decimal?        @db.Decimal(4, 3) // 0.000~1.000
+  engineVersion       String?         @default("3.0")
+
   // === 타임스탬프 ===
   createdById     String
   createdBy       User            @relation("CreatedBy", fields: [createdById], references: [id])
@@ -171,9 +190,11 @@ model Persona {
 
   // Relations
   vectors         PersonaVector[]
+  layerVectors    PersonaLayerVector[]
   matchingLogs    MatchingLog[]
   feedbacks       Feedback[]
   testResults     PersonaTestResult[]
+  interactionSessions InteractionSession[]
   posts           PersonaPost[]
   givenLikes      PersonaPostLike[] @relation("PersonaLikes")
   givenComments   PersonaComment[] @relation("PersonaComments")
@@ -190,7 +211,7 @@ model PersonaVector {
   persona   Persona  @relation(fields: [personaId], references: [id], onDelete: Cascade)
   version   Int      @default(1)
 
-  // 6D Vector (v3.0)
+  // 6D Vector (legacy — backward compat)
   depth     Decimal  @db.Decimal(3, 2)  // 분석 깊이: 직관적(0.0) ↔ 심층적(1.0)
   lens      Decimal  @db.Decimal(3, 2)  // 판단 렌즈: 감성적(0.0) ↔ 논리적(1.0)
   stance    Decimal  @db.Decimal(3, 2)  // 평가 태도: 수용적(0.0) ↔ 비판적(1.0)
@@ -201,6 +222,42 @@ model PersonaVector {
   createdAt DateTime @default(now())
 
   @@map("persona_vectors")
+}
+
+// ============================================
+// v3.0 NEW: 3-Layer 벡터 저장 (106D+)
+// ============================================
+
+model PersonaLayerVector {
+  id        String    @id @default(cuid())
+  personaId String
+  persona   Persona   @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  layerType LayerType
+  version   Int       @default(1)
+
+  // Decimal(4,3) = 0.000~1.000 range
+  // SOCIAL(L1): dim1~dim7, TEMPERAMENT(L2): dim1~dim5, NARRATIVE(L3): dim1~dim4
+  dim1      Decimal?  @db.Decimal(4, 3)
+  dim2      Decimal?  @db.Decimal(4, 3)
+  dim3      Decimal?  @db.Decimal(4, 3)
+  dim4      Decimal?  @db.Decimal(4, 3)
+  dim5      Decimal?  @db.Decimal(4, 3)
+  dim6      Decimal?  @db.Decimal(4, 3)
+  dim7      Decimal?  @db.Decimal(4, 3)
+
+  createdAt DateTime  @default(now())
+
+  @@unique([personaId, layerType, version])
+  @@index([personaId])
+  @@index([layerType])
+  @@map("persona_layer_vectors")
+}
+
+enum LayerType {
+  SOCIAL        // Layer 1: 7D (depth, lens, stance, scope, taste, purpose, sociability)
+  TEMPERAMENT   // Layer 2: 5D (openness, conscientiousness, extraversion, agreeableness, neuroticism)
+  NARRATIVE     // Layer 3: 4D (lack, moralCompass, volatility, growthArc)
 }
 
 enum PersonaVisibility {
@@ -259,13 +316,25 @@ model UserVector {
   userId          String   @unique
   onboardingLevel OnboardingLevel @default(LIGHT)
 
-  // 6D Vector
+  // 6D Vector (L1 기본)
   depth           Decimal  @db.Decimal(3, 2)
   lens            Decimal  @db.Decimal(3, 2)
   stance          Decimal  @db.Decimal(3, 2)
   scope           Decimal  @db.Decimal(3, 2)
   taste           Decimal  @db.Decimal(3, 2)
   purpose         Decimal  @db.Decimal(3, 2)
+
+  // v3.0 NEW: L1 7th dimension
+  sociability     Decimal? @db.Decimal(3, 2)
+
+  // v3.0 NEW: L2 OCEAN (optional — SNS 연동 시 채워짐)
+  openness        Decimal? @db.Decimal(3, 2)
+  conscientiousness Decimal? @db.Decimal(3, 2)
+  extraversion    Decimal? @db.Decimal(3, 2)
+  agreeableness   Decimal? @db.Decimal(3, 2)
+  neuroticism     Decimal? @db.Decimal(3, 2)
+
+  hasOceanProfile Boolean  @default(false)
 
   archetype       String?
   confidenceScores Json?
@@ -1423,6 +1492,105 @@ enum EventPriority {
   NORMAL
   HIGH
   CRITICAL
+}
+
+// ============================================
+// v3.0 NEW: InteractionLog — 인터랙션 로그
+// ============================================
+
+model InteractionLog {
+  id            String    @id @default(cuid())
+  sessionId     String
+  session       InteractionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  turnNumber    Int
+  timestamp     DateTime  @default(now())
+
+  // Participants
+  initiatorType ParticipantType
+  initiatorId   String
+  receiverType  ParticipantType
+  receiverId    String
+
+  // Interaction Type
+  interactionType InteractionType
+
+  // Content
+  userMessage         String?  @db.Text
+  personaResponse     String?  @db.Text
+  responseLengthTokens Int?
+
+  // Vector Snapshot
+  pressure            Decimal? @db.Decimal(3, 2)
+  activeLayer         String?
+  vFinalDrift         Decimal? @db.Decimal(4, 3)
+  paradoxActivation   Decimal? @db.Decimal(4, 3)
+
+  // Behavior Tags (JSON)
+  behaviorTags        Json?    // { userSentiment, personaTone, triggerActivated, quirkFired, topicCategory }
+
+  // Quality Metrics (computed later)
+  contextRecall       Decimal? @db.Decimal(4, 3)
+  settingConsistency  Decimal? @db.Decimal(4, 3)
+  voiceDrift          Decimal? @db.Decimal(4, 3)
+
+  createdAt           DateTime @default(now())
+
+  @@index([sessionId])
+  @@index([initiatorId, initiatorType])
+  @@index([receiverId, receiverType])
+  @@index([interactionType])
+  @@index([timestamp])
+  @@map("interaction_logs")
+}
+
+model InteractionSession {
+  id            String    @id @default(cuid())
+  personaId     String
+  persona       Persona   @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  userId        String
+
+  startedAt     DateTime  @default(now())
+  endedAt       DateTime?
+  totalTurns    Int       @default(0)
+
+  // Session Aggregates
+  avgPressure   Decimal?  @db.Decimal(3, 2)
+  peakPressure  Decimal?  @db.Decimal(3, 2)
+  dominantTopic String?
+
+  // Quality Score (computed after session ends)
+  integrityScore Decimal? @db.Decimal(4, 3)
+
+  // Network Analysis (Phase 10+)
+  edgeWeight          Decimal? @db.Decimal(5, 3)
+  semanticSimilarity  Decimal? @db.Decimal(4, 3)
+  sentimentValence    Decimal? @db.Decimal(3, 2)
+
+  logs          InteractionLog[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([personaId])
+  @@index([userId])
+  @@index([personaId, userId])
+  @@map("interaction_sessions")
+}
+
+enum ParticipantType {
+  PERSONA
+  USER
+  CONTENT
+}
+
+enum InteractionType {
+  CONVERSATION
+  COMMENT
+  REPLY
+  REACTION
+  POST
+  MENTION
 }
 
 // ============================================
