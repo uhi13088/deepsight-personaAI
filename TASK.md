@@ -7,10 +7,7 @@
 
 ## 📋 QUEUE (대기)
 
-- [ ] **T40: 노드 파라미터 편집 UI 스펙**
-  - 배경: 각 노드의 설정 패널 UI가 미정의. 슬라이더/드롭다운/텍스트 등 구체적 인터랙션 필요
-  - AC1: `docs/specs/engine-studio.md` — 노드별 파라미터 편집 UI 컴포넌트 스펙
-  - AC2: 커밋 + 푸시
+(없음)
 
 ---
 
@@ -21,6 +18,19 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T40: 노드 파라미터 편집 UI 스펙** ✅ 2026-02-11
+  - AC1: `docs/specs/engine-studio.md` §3.10 — 노드별 파라미터 편집 UI 컴포넌트 스펙 (v3.3)
+    - 설정 패널 공통 레이아웃 (320px 사이드바, 리셋/적용, Eager/Manual 연동)
+    - Input 5종: basic-info(8필드), l1-vector(7D 슬라이더), l2-vector(5D), l3-vector(4D+활성화 체크), archetype-select(카드 그리드+변동 시드)
+    - Engine 4종: pressure-ctrl(min/max/baseline), projection(α+β 링크드 듀얼 슬라이더)
+    - Generation 7종: customInstructions 텍스트 에어리어 (노드별 플레이스홀더 예시)
+    - Assembly 2종: prompt-builder(프리셋 드롭다운+JSON 편집)
+    - Output 4종: fingerprint(3모드 라디오), test-sim(체크리스트+커스텀), deploy(staging/production)
+    - Control Flow 3종: conditional(조건유형별 동적 UI), switch(band/enum 편집기), merge(전략 라디오)
+    - 공통 UI 컴포넌트 명세 12종 (shadcn/ui 기반)
+    - 설정 있음 19종 / 설정 없음 6종 요약
+  - AC2: 커밋 + 푸시
 
 - [x] **T39: 페르소나 필터 API 정식 스펙** ✅ 2026-02-11
   - AC1: `docs/specs/developer-console.md` §9.3.9 — POST /v1/personas/filter 정식 스펙 (v3.3)
