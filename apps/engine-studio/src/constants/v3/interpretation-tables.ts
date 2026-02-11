@@ -120,6 +120,22 @@ export const CROSS_AXIS_INTERPRETATION: Record<
   },
 }
 
+// ── Archetype Labels (12종, 설계서 §7) ─────────────────────
+export const ARCHETYPE_LABELS: Record<string, string> = {
+  "ironic-philosopher": "아이러니한 철학자",
+  "wounded-critic": "상처받은 비평가",
+  "social-introvert": "사교적 내향인",
+  "lazy-perfectionist": "게으른 완벽주의자",
+  "conservative-hipster": "보수적 힙스터",
+  "empathetic-arguer": "공감하는 논객",
+  "free-guardian": "자유로운 수호자",
+  "quiet-enthusiast": "조용한 열정가",
+  "emotional-pragmatist": "감성적 실용가",
+  "dangerous-mentor": "위험한 멘토",
+  "volatile-intellectual": "폭발하는 지성인",
+  "growing-cynic": "성장하는 냉소가",
+}
+
 // ── 6-Category Validation Thresholds (§11) ──────────────────
 export const VALIDATION_THRESHOLDS = {
   // C1: L3.lack ≥ 0.7 AND Paradox < 0.2 → Warning
