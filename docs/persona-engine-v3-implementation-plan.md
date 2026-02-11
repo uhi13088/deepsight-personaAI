@@ -5,7 +5,7 @@
 > **문서 정보**
 >
 > - 작성일: 2026-02-10
-> - 버전: v1.10
+> - 버전: v1.11
 > - 상태: 확정 — 구현 대기
 > - 관련 문서: `docs/persona-engine-v3-design.md` (설계서)
 > - 목적: 설계서의 "무엇을"에 대응하는 "어떻게" — 이 문서만 보고 구현 가능
@@ -27,6 +27,7 @@
 | v1.8 | 2026-02-10 | 비정량↔정량 연결 알고리즘 구체화 (T29) — Section 9 확장(9.3~9.6): ① Init(LLM 구조화 키워드 추출, 의미 카테고리→벡터 매핑 테이블, delta 적용 규칙), ② Override(2단계 트리거 감지, override/additive delta, 지수 감쇠 복귀 곡선 λ=0.7-0.6×volatility), ③ Adapt(UIV 3축 분석, 차원별 α, 모멘텀, ±0.3 드리프트 클램프), ④ Express(파생 상태값 5종, sigmoid 확률 공식, 쿨다운). Phase 4 태스크 4-1~4-9로 확장. 파일 변경 맵: 상호작용 모듈 9개 항목 추가 |
 | v1.9 | 2026-02-10 | 일관성 검증 완성 + 차원 표기 수정 (T30) — Section 11 전면 개편: 6-Category 검증 엔진(A구조/BL1↔L2/CL2↔L3/D정성↔정량/E교차축/F동적), ValidationIssue/ValidationResult 타입, 카테고리별 구현 코드(C: L2↔L3 정합성 4종, D: 정성↔정량 3종 LLM 기반, E: 교차축 3종), 종합 일관성 점수 공식. "16D" 표기→"기저 16D / 유효 106D+" 양쪽 문서 전체 수정. Phase 2 태스크 2-7 확장(6-Category) |
 | v1.10 | 2026-02-11 | 품질 측정 강화 (T31) — Section 3.4 InteractionLog/InteractionSession Prisma 모델 신설(턴 로그+세션 집계+네트워크 분석 예약 필드). Section 16 확장: §16.7 Auto-Interview 구현(질문 생성기+벡터 추론+차원별 비교), §16.8 Persona Integrity Score 구현(ContextRecall+SettingConsistency+CharacterStability), §16.9 인터랙션 로그 수집기(세션 관리+턴 로깅+메트릭 집계). Phase 9 태스크 9-23~9-32로 확장(Auto-Interview, Integrity Score, Logger, Prisma 마이그레이션). 파일 변경 맵: 품질 모듈 3개 파일 추가(auto-interview.ts, integrity-score.ts, interaction-logger.ts) |
+| v1.11 | 2026-02-11 | Phase 태스크 재배치 — InteractionLog 스키마→Phase 0(0-21~0-22, 기반 인프라), Auto-Interview→Phase 2(2-11~2-13, 생성 직후 품질 게이트), Integrity Score+Logger는 Phase 9 유지(9-23~9-29로 재번호). Phase 0 제목에 인터랙션 로그 스키마, Phase 2 제목에 Auto-Interview 품질 게이트 추가 |
 
 ---
 
@@ -4534,7 +4535,7 @@ function generateLightResponse(
 
 ## 18. 구현 Phase 및 태스크
 
-### Phase 0: 기반 인프라 (타입 + DB + 상수 + 색상)
+### Phase 0: 기반 인프라 (타입 + DB + 상수 + 색상 + 인터랙션 로그 스키마)
 
 | # | 태스크 | 파일 | 변경 수준 |
 |---|--------|------|-----------|
@@ -4558,6 +4559,8 @@ function generateLightResponse(
 | 0-18 | 색상 모듈 — index.ts + resolveColor 유틸 | `src/lib/colors/index.ts` | **신규** |
 | 0-19 | 기존 trait-colors.ts 호환 래퍼 | `src/lib/trait-colors.ts` | 수정 (새 모듈 re-export) |
 | 0-20 | 기존 Vector6D 중복 정리 | 여러 파일 (6곳) | 수정 |
+| 0-21 | InteractionLog / InteractionSession Prisma 모델 추가 | `prisma/schema.prisma` | 수정 |
+| 0-22 | InteractionLog DB 마이그레이션 | `prisma migrate dev` | 실행 |
 
 ### Phase 1: 핵심 벡터 엔진
 
@@ -4573,7 +4576,7 @@ function generateLightResponse(
 | 1-8 | 벡터 모듈 re-export | `src/lib/vector/index.ts` | 수정 |
 | 1-9 | 단위 테스트 (교차축 + 확장 Paradox 포함) | `src/lib/vector/__tests__/` | **신규** |
 
-### Phase 2: 생성 파이프라인 재구성
+### Phase 2: 생성 파이프라인 재구성 + Auto-Interview 품질 게이트
 
 | # | 태스크 | 파일 | 변경 수준 |
 |---|--------|------|-----------|
@@ -4587,6 +4590,9 @@ function generateLightResponse(
 | 2-8 | 프롬프트 빌더 (전체 레이어) | `src/lib/persona-generation/prompt-builder.ts` | **전면 재작성** |
 | 2-9 | 메인 파이프라인 | `src/lib/persona-generation/index.ts` | **전면 재작성** |
 | 2-10 | 샘플 콘텐츠 생성기 | `src/lib/persona-generation/sample-content-generator.ts` | 수정 |
+| 2-11 | Auto-Interview 질문 생성기 (레이어별 20문항) | `src/lib/quality/auto-interview.ts` | **신규** |
+| 2-12 | Auto-Interview 벡터 추론 + 품질 게이트 (pass/warning/fail) | `src/lib/quality/auto-interview.ts` | **신규** |
+| 2-13 | Auto-Interview 단위 테스트 | `src/lib/quality/__tests__/auto-interview.test.ts` | **신규** |
 
 ### Phase 3: 정성적 차원
 
@@ -4712,16 +4718,13 @@ function generateLightResponse(
 | 9-20 | 품질 대시보드 데이터 API | `src/lib/quality/dashboard.ts` | **신규** |
 | 9-21 | 품질 모듈 index | `src/lib/quality/index.ts` | **신규** |
 | 9-22 | 품질 측정 단위 테스트 | `src/lib/quality/__tests__/` | **신규** |
-| 9-23 | Auto-Interview 질문 생성기 | `src/lib/quality/auto-interview.ts` | **신규** |
-| 9-24 | Auto-Interview 벡터 추론 (LLM-as-Judge) | `src/lib/quality/auto-interview.ts` | **신규** |
-| 9-25 | Persona Integrity Score — Context Recall | `src/lib/quality/integrity-score.ts` | **신규** |
-| 9-26 | Persona Integrity Score — Setting Consistency | `src/lib/quality/integrity-score.ts` | **신규** |
-| 9-27 | Persona Integrity Score — Character Stability | `src/lib/quality/integrity-score.ts` | **신규** |
-| 9-28 | 인터랙션 로그 수집기 | `src/lib/quality/interaction-logger.ts` | **신규** |
-| 9-29 | Prisma 마이그레이션 (InteractionLog + InteractionSession) | `prisma/schema.prisma` | 수정 |
-| 9-30 | Auto-Interview + Integrity + Logger 단위 테스트 | `src/lib/quality/__tests__/` | **신규** |
-| 9-31 | 기존 프롬프트 빌더에 RAG 통합 | `src/lib/persona-generation/prompt-builder.ts` | 수정 |
-| 9-32 | 기존 생성 파이프라인에 Tier 라우터 통합 | `src/lib/persona-generation/index.ts` | 수정 |
+| 9-23 | Persona Integrity Score — Context Recall | `src/lib/quality/integrity-score.ts` | **신규** |
+| 9-24 | Persona Integrity Score — Setting Consistency | `src/lib/quality/integrity-score.ts` | **신규** |
+| 9-25 | Persona Integrity Score — Character Stability | `src/lib/quality/integrity-score.ts` | **신규** |
+| 9-26 | 인터랙션 로그 수집기 (세션 관리 + 턴 로깅) | `src/lib/quality/interaction-logger.ts` | **신규** |
+| 9-27 | Integrity Score + Logger 단위 테스트 | `src/lib/quality/__tests__/` | **신규** |
+| 9-28 | 기존 프롬프트 빌더에 RAG 통합 | `src/lib/persona-generation/prompt-builder.ts` | 수정 |
+| 9-29 | 기존 생성 파이프라인에 Tier 라우터 통합 | `src/lib/persona-generation/index.ts` | 수정 |
 
 ---
 
