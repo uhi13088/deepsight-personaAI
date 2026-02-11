@@ -19,6 +19,24 @@
 
 ## ✅ DONE (완료)
 
+- [x] **T34: 스펙 문서 v3 엔진 기준 전면 업데이트** ✅ 2026-02-11
+  - 배경: 3개 스펙 문서가 v2(6D) 기준이었음. v3(기저 16D / 유효 106D+) 기준으로 전면 수정
+  - 변경: `docs/specs/engine-studio.md` (v3.0 → v3.1)
+    - 벡터 설정: 6D 단일 → 3-Layer(L1 7D + L2 5D + L3 4D) + 교차축 83개 + Paradox Score
+    - 매칭: 3-Layer(벡터/규칙/LLM) → 3-Tier(Basic/Advanced/Exploration) 전면 개편
+    - LLM 컨텍스트 분석 → 정성↔정량 변환 4대 알고리즘(Init/Override/Adapt/Express)
+    - Vector6D → ThreeLayerVector(SocialPersona+CoreTemperament+NarrativeDrive)
+    - DB: VECTOR(6) → VECTOR(16), 검증: 6-Category 일관성 검사
+  - 변경: `docs/specs/developer-console.md` (v3.0 → v3.1)
+    - 매칭 기능 비교: Layer→Tier 구조, LLM 애드온→통합
+    - 과금: use_llm_context → matching_tier, Tier별 비용 통합
+    - API 예시: matching_tier 옵션, 퀄리티 비교 v3 기준
+  - 변경: `docs/specs/persona-world.md`
+    - 6D→3-Layer 전체 13개소 수정
+    - 활동성 매핑: 4특성→8특성(ActivityTraitsV3)
+    - Vector6D→ThreeLayerVector 코드 업데이트
+  - 테스트: 스펙 문서 — 코드 구현 아님
+
 - [x] **T33: ConsumptionMemory 레이어 추가 — 비공개 소비 기록 기반 장기 기억** ✅ 2026-02-11
   - 배경: 페르소나가 컨텐츠를 소비해도 매번 리뷰를 쓰면 봇 느낌. 기억(Memory)과 활동(Activity)을 분리해야 함
   - 변경: `docs/design/persona-engine-v3.md` (v3.0-draft.8 → v3.0-draft.9)
