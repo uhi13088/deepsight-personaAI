@@ -19,6 +19,29 @@
 
 ## ✅ DONE (완료)
 
+- [x] **T35: 개발자콘솔 과금 구조 전면 개편 — 6-Tier + LLM 2-Tier** ✅ 2026-02-11
+  - 배경: v3 106D+ 엔진 기준으로 과금 구조 재설계. 기업고객 사용 시나리오별 보수적 원가 분석 완료
+  - AC1: `docs/specs/developer-console.md` §8 전면 개편 ✅
+    - 6-Tier 과금 (Starter $199/Pro $499/Max $1,499 + Ent.S $3,500/Ent.G $5,000/Ent.Sc $15,000)
+    - 활성 PW 페르소나 기반 과금 (50/100/350/800/1,500/5,000+추가)
+    - Enterprise 3단계 분리 (랜딩→ "Enterprise 문의", 내부 선택)
+    - 커스텀 가중치 전면 삭제 (품질 저하 + 비용 증가 리스크)
+    - 전담 매니저: Ent.G 1:5, Ent.Sc 1:2 (공유 모델)
+  - AC2: LLM 모델 전략 반영 ✅
+    - 3-Tier LLM 라우터 → 2-Tier (텍스트=Sonnet, 비텍스트=규칙)
+    - Prompt Caching 적용 (시스템 프롬프트 캐싱, 생성 텍스트는 매번 새로)
+    - PW 페르소나 월 COGS ~$0.62/개 (ALL Sonnet 기준)
+  - AC3: 용어 정리 ✅ — "16D" 잔여 표현 전면 삭제 → "106D+" only
+  - AC4: 전체 문서 일관성 수정 ✅
+    - §5 Key 제한 테이블: Free/4-tier → 6-tier
+    - §8.2 결제 실패: "Free 플랜 다운그레이드" → "API 접근 일시 정지"
+    - §8.3 청구서 예시: Pro $199 → $499, 토큰→PW 페르소나 과금
+    - §9 Rate Limit: Free/3-tier → 6-tier
+    - §12 기술 지원: Free/4-tier → 6-tier (Ent 전담 매니저 비율 포함)
+    - §13 팀원 초대 제한: Free/4-tier → 6-tier
+    - 버전: v3.1 → v3.2
+    - Webhook 예시 금액 갱신
+
 - [x] **T34: 스펙 문서 v3 엔진 기준 전면 업데이트** ✅ 2026-02-11
   - 배경: 3개 스펙 문서가 v2(6D) 기준이었음. v3(기저 16D / 유효 106D+) 기준으로 전면 수정
   - 변경: `docs/specs/engine-studio.md` (v3.0 → v3.1)
