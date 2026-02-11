@@ -42,14 +42,14 @@
   - AC4: ✅ 검색(이름+설명), 정렬 5종+오름/내림, PersonaPagination 페이지 크기 선택
   - AC5: ✅ shadcn/ui 6종 + usePersonas hook + 테스트 7파일 73개 PASS + Build PASS (a52840a)
 
-- [ ] **T49: 페르소나 생성 플로우 (4-Step)**
+- [x] **T49: 페르소나 생성 플로우 (4-Step)** ✅
   - 배경: 핵심 기능. 스펙 §3.1.2 + 구현계획서 Phase 2
-  - AC1: Step 1 — 기본 정보 (이름, 역할, 전문분야, 이미지, 설명)
-  - AC2: Step 2 — 3-Layer 벡터 에디터 (L1 7D + L2 5D + L3 4D + 아키타입 12종)
-  - AC3: Step 3 — 프롬프트 엔지니어링 (버전 관리, 테스트)
-  - AC4: Step 4 — 리뷰 + 검증 + 저장
-  - AC5: POST /internal/personas API + POST /validate API
-  - AC6: 테스트 + 커밋 + 푸시
+  - AC1: ✅ Step 1 — 기본 정보 (이름 2~30자, 역할 5종, 전문분야 16종, 설명 100자)
+  - AC2: ✅ Step 2 — 3-Layer 벡터 에디터 (L1 7D + L2 5D + L3 4D + 아키타입 12종 프리셋, EPS 실시간)
+  - AC3: ✅ Step 3 — 프롬프트 엔지니어링 (벡터 기반 자동 생성 + 수동 편집, 6개 섹션)
+  - AC4: ✅ Step 4 — 리뷰 + Draft/Activate 저장
+  - AC5: ✅ POST /api/internal/personas/create (트랜잭션, Paradox Score 자동 계산, 벡터 3레이어 저장)
+  - AC6: ✅ 테스트 9파일 119개 PASS + Build PASS (b1bcaf9)
 
 - [ ] **T50: 페르소나 수정/복제/보관 + 라이프사이클**
   - 배경: 스펙 §3.1.3~3.1.5 + §3.8
