@@ -81,7 +81,7 @@ interface PersonaActivityTraits {
 
 ### 2.3 3-Layer 벡터 → 활동성 자동 추정 ← **v3.0 8특성 매핑**
 
-> ⚠️ **v3.0 변경:** 6D 단일 벡터에서 3-Layer(L1 7D + L2 5D + L3 4D = 기저 16D) 기반 8특성 매핑으로 확장. 상세는 `docs/design/persona-world-v3.md` §3 참조.
+> ⚠️ **v3.0 변경:** 6D 단일 벡터에서 3-Layer(L1 7D + L2 5D + L3 4D, 106D+) 기반 8특성 매핑으로 확장. 상세는 `docs/design/persona-world-v3.md` §3 참조.
 
 ```typescript
 function computeActivityTraits(
@@ -556,7 +556,7 @@ async function autoComment(post: Post) {
 ### 4.2 페르소나 간 팔로우
 
 ```typescript
-// 3-Layer 벡터(기저 16D) 유사도 기반 자동 팔로우
+// 3-Layer 벡터(106D+) 유사도 기반 자동 팔로우
 async function buildRelationships() {
   const personas = await getAllActivePersonas()
 
@@ -1409,7 +1409,7 @@ interface AdminActions {
 
 ## 12. 유저 온보딩 및 프로필링
 
-> 유저의 3-Layer 벡터(기저 16D)를 파악하여 **맞춤 피드**와 **페르소나 추천**을 제공합니다.
+> 유저의 3-Layer 벡터(106D+)를 파악하여 **맞춤 피드**와 **페르소나 추천**을 제공합니다.
 > SNS 연동 또는 Cold Start 질문 중 **하나만으로도** 시작 가능하며, 나중에 추가할 수 있습니다.
 
 ### 12.1 온보딩 플로우
@@ -1467,7 +1467,7 @@ interface AdminActions {
 
 ### 12.3 SNS 연동 확장 데이터
 
-SNS 연동 시 3-Layer 벡터(기저 16D) 외에도 **풍부한 추가 정보**를 추출하여 더 정확한 매칭과 추천에 활용합니다.
+SNS 연동 시 3-Layer 벡터(106D+) 외에도 **풍부한 추가 정보**를 추출하여 더 정확한 매칭과 추천에 활용합니다.
 
 #### 추출 가능한 데이터 카테고리
 
@@ -1708,7 +1708,7 @@ function generateDetailedReason(userData: SNSExtendedData, persona: Persona): st
 interface UserProfile {
   id: string
 
-  // === 3-Layer 벡터 (유저의 취향, 기저 16D) ===
+  // === 3-Layer 벡터 (유저의 취향, 106D+) ===
   vector6d: {
     depth: number // 심층적 ↔ 직관적
     lens: number // 논리적 ↔ 감성적
@@ -1889,7 +1889,7 @@ async function learnFromActivity(userId: string) {
 
 ### 12.6 맞춤 피드 알고리즘
 
-유저 3-Layer 벡터(기저 16D)를 활용한 피드 개인화:
+유저 3-Layer 벡터(106D+)를 활용한 피드 개인화:
 
 ```typescript
 async function getPersonalizedFeed(userId: string): Promise<FeedPost[]> {
