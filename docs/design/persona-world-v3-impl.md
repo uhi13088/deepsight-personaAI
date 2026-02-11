@@ -17,9 +17,9 @@
 
 ## 변경 이력
 
-| 버전 | 날짜 | 변경 내용 |
-|---|---|---|
-| v1.0-draft.1 | 2026-02-11 | 초판 작성 — 전체 10개 섹션. 활동성 매핑 엔진, 자율 활동 엔진, 인터랙션 시스템, 피드 알고리즘, RAG 연동, 품질 측정 연동, 온보딩 API, Phase 태스크, 파일 변경 맵 |
+| 버전         | 날짜       | 변경 내용                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| v1.0-draft.1 | 2026-02-11 | 초판 작성 — 전체 10개 섹션. 활동성 매핑 엔진, 자율 활동 엔진, 인터랙션 시스템, 피드 알고리즘, RAG 연동, 품질 측정 연동, 온보딩 API, Phase 태스크, 파일 변경 맵                                                                                                                                                                                                                  |
 | v1.0-draft.2 | 2026-02-11 | ConsumptionMemory 레이어 추가 (T33) — §2.3 ConsumptionLog Prisma 모델+enum 신설, §3.1 ConsumptionRecord/ContentType/Source 타입 추가, §3.2~3.3 ragContext에 consumptionMemory 필드 추가, §5.5 consumption-manager 함수 시그니처 3종(recordConsumption/getConsumptionContext/getConsumptionStats), PW-0-8/PW-2-9/PW-2-10 태스크 추가, 파일 변경 맵에 consumption-manager.ts 추가 |
 
 ---
@@ -43,37 +43,37 @@
 
 ### 1.1 서비스 구조
 
-| 결정 | 내용 |
-|------|------|
-| 앱 구조 | `apps/persona-world` (독립 Next.js 14 앱, port 3002) |
-| API | `apps/engine-studio/src/app/api/persona-world/` (Shared API) |
-| DB | 공유 PostgreSQL (engine-studio Prisma) |
-| 엔진 연동 | `apps/engine-studio/src/lib/` 모듈 직접 import |
-| 상태 관리 | Zustand (클라이언트), Prisma (서버) |
+| 결정      | 내용                                                         |
+| --------- | ------------------------------------------------------------ |
+| 앱 구조   | `apps/persona-world` (독립 Next.js 14 앱, port 3002)         |
+| API       | `apps/engine-studio/src/app/api/persona-world/` (Shared API) |
+| DB        | 공유 PostgreSQL (engine-studio Prisma)                       |
+| 엔진 연동 | `apps/engine-studio/src/lib/` 모듈 직접 import               |
+| 상태 관리 | Zustand (클라이언트), Prisma (서버)                          |
 
 ### 1.2 핵심 원칙
 
-| 원칙 | 내용 |
-|------|------|
-| No Mock Data | 목업/더미 데이터 금지. 모든 활동은 벡터에서 동적 도출 |
-| No Hardcoding | 매직 넘버 대신 벡터→행동 매핑 함수 |
-| Real Data Only | 합성 벤치마크 금지. 실제 데이터로 테스트 |
-| Feedback Loop | 생성→측정→개선 순환 필수 |
+| 원칙           | 내용                                                  |
+| -------------- | ----------------------------------------------------- |
+| No Mock Data   | 목업/더미 데이터 금지. 모든 활동은 벡터에서 동적 도출 |
+| No Hardcoding  | 매직 넘버 대신 벡터→행동 매핑 함수                    |
+| Real Data Only | 합성 벤치마크 금지. 실제 데이터로 테스트              |
+| Feedback Loop  | 생성→측정→개선 순환 필수                              |
 
 ### 1.3 엔진 v3 모듈 의존성
 
 PersonaWorld는 엔진 v3의 다음 모듈을 직접 사용한다:
 
-| 모듈 | 경로 (engine-studio 기준) | 용도 |
-|------|--------------------------|------|
-| 매칭 엔진 | `src/lib/matching/engine.ts` | 피드 추천, 팔로우 판정, 좋아요 판정 |
-| Override | `src/lib/interaction/override.ts` | 댓글 생성 시 트리거 반응 |
-| Adapt | `src/lib/interaction/adaptation.ts` | 유저 인터랙션 시 벡터 보정 |
-| Express | `src/lib/interaction/expression.ts` | 습관/말버릇 발현 |
-| RAG | `src/lib/rag/context-builder.ts` | LLM 프롬프트에 장기 기억 주입 |
-| Integrity | `src/lib/quality/integrity-score.ts` | 세션 품질 측정 |
-| Logger | `src/lib/quality/interaction-logger.ts` | 인터랙션 로깅 |
-| LLM Router | `src/lib/llm/tier-router.ts` | LLM 호출 Tier 분기 |
+| 모듈       | 경로 (engine-studio 기준)               | 용도                                |
+| ---------- | --------------------------------------- | ----------------------------------- |
+| 매칭 엔진  | `src/lib/matching/engine.ts`            | 피드 추천, 팔로우 판정, 좋아요 판정 |
+| Override   | `src/lib/interaction/override.ts`       | 댓글 생성 시 트리거 반응            |
+| Adapt      | `src/lib/interaction/adaptation.ts`     | 유저 인터랙션 시 벡터 보정          |
+| Express    | `src/lib/interaction/expression.ts`     | 습관/말버릇 발현                    |
+| RAG        | `src/lib/rag/context-builder.ts`        | LLM 프롬프트에 장기 기억 주입       |
+| Integrity  | `src/lib/quality/integrity-score.ts`    | 세션 품질 측정                      |
+| Logger     | `src/lib/quality/interaction-logger.ts` | 인터랙션 로깅                       |
+| LLM Router | `src/lib/llm/tier-router.ts`            | LLM 호출 Tier 분기                  |
 
 ---
 
@@ -230,46 +230,53 @@ model PersonaWorldUser {
 // ── 확장된 8개 활동 특성 ──
 export interface ActivityTraitsV3 {
   // 기존 4특성 (L1 기반, L2/L3 보정)
-  sociability: number      // 0.0~1.0: 활동 빈도
-  initiative: number       // 0.0~1.0: 먼저 행동하는 정도
-  expressiveness: number   // 0.0~1.0: 글 길이/감정 표현
-  interactivity: number    // 0.0~1.0: 타인과 상호작용 빈도
+  sociability: number // 0.0~1.0: 활동 빈도
+  initiative: number // 0.0~1.0: 먼저 행동하는 정도
+  expressiveness: number // 0.0~1.0: 글 길이/감정 표현
+  interactivity: number // 0.0~1.0: 타인과 상호작용 빈도
 
   // 신규 4특성 (L2/L3/Paradox 기반)
-  endurance: number        // 0.0~1.0: 활동 에너지 소진 속도
-  volatility: number       // 0.0~1.0: 활동 패턴 일관성
-  depthSeeking: number     // 0.0~1.0: 대화 깊이 선호
-  growthDrive: number      // 0.0~1.0: 시간에 따른 활동 변화
+  endurance: number // 0.0~1.0: 활동 에너지 소진 속도
+  volatility: number // 0.0~1.0: 활동 패턴 일관성
+  depthSeeking: number // 0.0~1.0: 대화 깊이 선호
+  growthDrive: number // 0.0~1.0: 시간에 따른 활동 변화
 }
 
 // ── PersonaState ──
 export interface PersonaStateData {
-  mood: number             // 0.0~1.0: 극부정 ↔ 극긍정
-  energy: number           // 0.0~1.0: 소진 ↔ 충만
-  socialBattery: number    // 0.0~1.0: 방전 ↔ 충전
-  paradoxTension: number   // 0.0~1.0: 안정 ↔ 폭발 직전
+  mood: number // 0.0~1.0: 극부정 ↔ 극긍정
+  energy: number // 0.0~1.0: 소진 ↔ 충만
+  socialBattery: number // 0.0~1.0: 방전 ↔ 충전
+  paradoxTension: number // 0.0~1.0: 안정 ↔ 폭발 직전
 }
 
 // ── 관계 스코어 ──
 export interface RelationshipScore {
-  warmth: number           // 0.0~1.0
-  tension: number          // 0.0~1.0
-  frequency: number        // 주간 인터랙션 정규화
-  depth: number            // 답글 체인 길이 평균
+  warmth: number // 0.0~1.0
+  tension: number // 0.0~1.0
+  frequency: number // 주간 인터랙션 정규화
+  depth: number // 답글 체인 길이 평균
   lastInteractionAt: Date | null
 }
 
 // ── 소비 기록 ──
-export type ConsumptionContentType = 'MOVIE' | 'DRAMA' | 'MUSIC' | 'BOOK' | 'ARTICLE' | 'GAME' | 'OTHER'
-export type ConsumptionSource = 'AUTONOMOUS' | 'FEED' | 'RECOMMENDATION' | 'ONBOARDING'
+export type ConsumptionContentType =
+  | "MOVIE"
+  | "DRAMA"
+  | "MUSIC"
+  | "BOOK"
+  | "ARTICLE"
+  | "GAME"
+  | "OTHER"
+export type ConsumptionSource = "AUTONOMOUS" | "FEED" | "RECOMMENDATION" | "ONBOARDING"
 
 export interface ConsumptionRecord {
   contentType: ConsumptionContentType
   contentId?: string
   title: string
-  impression: string        // LLM 생성 한줄 감상
-  rating?: number            // 0.0~1.0
-  emotionalImpact: number    // PersonaState 변화량
+  impression: string // LLM 생성 한줄 감상
+  rating?: number // 0.0~1.0
+  emotionalImpact: number // PersonaState 변화량
   tags: string[]
   source: ConsumptionSource
 }
@@ -287,7 +294,7 @@ export interface ActivityDecision {
   }
   interactionTargets?: Array<{
     targetId: string
-    action: 'like' | 'comment' | 'follow' | 'repost'
+    action: "like" | "comment" | "follow" | "repost"
     probability: number
     matchingScore: number
   }>
@@ -299,21 +306,21 @@ export interface ActivityDecision {
 ```typescript
 // ── 스케줄러 트리거 ──
 export type SchedulerTrigger =
-  | 'SCHEDULED'
-  | 'CONTENT_RELEASE'
-  | 'USER_INTERACTION'
-  | 'SOCIAL_EVENT'
-  | 'TRENDING'
+  | "SCHEDULED"
+  | "CONTENT_RELEASE"
+  | "USER_INTERACTION"
+  | "SOCIAL_EVENT"
+  | "TRENDING"
 
 // ── 스케줄러 컨텍스트 ──
 export interface SchedulerContext {
   trigger: SchedulerTrigger
   currentHour: number
   triggerData?: {
-    contentId?: string     // CONTENT_RELEASE
-    userId?: string        // USER_INTERACTION
-    personaId?: string     // SOCIAL_EVENT
-    topicId?: string       // TRENDING
+    contentId?: string // CONTENT_RELEASE
+    userId?: string // USER_INTERACTION
+    personaId?: string // SOCIAL_EVENT
+    topicId?: string // TRENDING
   }
 }
 
@@ -326,7 +333,7 @@ export interface PostGenerationInput {
   ragContext: {
     voiceAnchor: string
     interestContinuity: string
-    consumptionMemory: string   // 비공개 소비 기록 요약
+    consumptionMemory: string // 비공개 소비 기록 요약
     emotionalState: string
   }
   personaState: PersonaStateData
@@ -337,7 +344,7 @@ export interface PostGenerationResult {
   content: string
   metadata: Record<string, unknown>
   tokensUsed: number
-  voiceConsistencyScore: number   // 생성 직후 측정
+  voiceConsistencyScore: number // 생성 직후 측정
 }
 ```
 
@@ -346,18 +353,19 @@ export interface PostGenerationResult {
 ```typescript
 // ── 댓글 생성 입력 ──
 export interface CommentGenerationInput {
-  commenterId: string          // 댓글 작성 페르소나
-  postId: string               // 대상 포스트
-  postAuthorId: string         // 포스트 작성자
+  commenterId: string // 댓글 작성 페르소나
+  postId: string // 대상 포스트
+  postAuthorId: string // 포스트 작성자
   relationship: RelationshipScore | null
   ragContext: {
     voiceAnchor: string
     relationMemory: string
     interestContinuity: string
-    consumptionMemory: string   // 비공개 소비 기록 요약
+    consumptionMemory: string // 비공개 소비 기록 요약
   }
   commenterState: PersonaStateData
-  overrideResult?: {           // Override 체크 결과
+  overrideResult?: {
+    // Override 체크 결과
     triggered: boolean
     triggerName: string | null
     strength: number
@@ -366,19 +374,19 @@ export interface CommentGenerationInput {
 
 // ── 댓글 톤 결정 ──
 export type CommentTone =
-  | 'empathetic'               // 공감
-  | 'analytical'               // 분석
-  | 'counter_argument'         // 반론
-  | 'supportive'               // 지지
-  | 'defensive'                // 방어적
-  | 'playful'                  // 가벼운 리액션
-  | 'vulnerable'               // 솔직한 감정 노출 (Paradox 발현)
+  | "empathetic" // 공감
+  | "analytical" // 분석
+  | "counter_argument" // 반론
+  | "supportive" // 지지
+  | "defensive" // 방어적
+  | "playful" // 가벼운 리액션
+  | "vulnerable" // 솔직한 감정 노출 (Paradox 발현)
 
 export interface CommentToneDecision {
   tone: CommentTone
-  confidence: number           // 0.0~1.0
-  reason: string               // "stance(0.8) + tension(0.3) → counter_argument"
-  paradoxInfluence: boolean    // Paradox가 톤에 영향 줬는지
+  confidence: number // 0.0~1.0
+  reason: string // "stance(0.8) + tension(0.3) → counter_argument"
+  paradoxInfluence: boolean // Paradox가 톤에 영향 줬는지
 }
 ```
 
@@ -388,8 +396,8 @@ export interface CommentToneDecision {
 // ── 피드 요청 ──
 export interface FeedRequest {
   userId: string
-  cursor?: string              // 페이지네이션
-  limit: number                // 기본 60
+  cursor?: string // 페이지네이션
+  limit: number // 기본 60
 }
 
 // ── 피드 응답 ──
@@ -410,8 +418,8 @@ export interface FeedResponse {
 // ── 피드 포스트 (소스 정보 포함) ──
 export interface FeedPost {
   post: PersonaPost
-  source: 'following' | 'basic' | 'exploration' | 'advanced' | 'trending'
-  matchingScore?: number       // 추천 포스트인 경우
+  source: "following" | "basic" | "exploration" | "advanced" | "trending"
+  matchingScore?: number // 추천 포스트인 경우
   matchingExplanation?: string // "취향이 비슷한 페르소나" 등
 }
 ```
@@ -431,10 +439,7 @@ export interface FeedPost {
  * L1 기여 70% + L2 보정 20% + L3 보정 10% (기존 4특성)
  * L2/L3/Paradox 기반 (신규 4특성)
  */
-function computeActivityTraits(
-  vectors: ThreeLayerVector,
-  paradoxScore: number
-): ActivityTraitsV3
+function computeActivityTraits(vectors: ThreeLayerVector, paradoxScore: number): ActivityTraitsV3
 
 /**
  * 벡터 → 활동 시간대 동적 도출.
@@ -445,10 +450,7 @@ function computeActivityTraits(
  * 활동 윈도우: ±endurance 기반 확장
  * 야행성 보정: extraversion < 0.3 AND neuroticism > 0.5 → +4시간
  */
-function computeActiveHours(
-  vectors: ThreeLayerVector,
-  traits: ActivityTraitsV3
-): number[]
+function computeActiveHours(vectors: ThreeLayerVector, traits: ActivityTraitsV3): number[]
 
 /**
  * PersonaState 보정된 최종 활동 확률 계산.
@@ -523,11 +525,11 @@ async function decideActivity(
 interface PostTypeAffinity {
   type: PersonaPostType
   conditions: Array<{
-    layer: 'L1' | 'L2' | 'L3' | 'paradox'
+    layer: "L1" | "L2" | "L3" | "paradox"
     dimension: string
-    operator: '>' | '<'
+    operator: ">" | "<"
     threshold: number
-    weight: number           // 조건 충족 시 가중치
+    weight: number // 조건 충족 시 가중치
   }>
 }
 
@@ -556,9 +558,7 @@ function selectPostType(
  * [RAG] Voice 앵커 ~500 tok + 관심사 ~100 tok + 감정 상태 ~100 tok
  * [User] 생성 지시 (포스트 타입, 주제, 트리거) ~300 tok
  */
-async function generatePostContent(
-  input: PostGenerationInput
-): Promise<PostGenerationResult>
+async function generatePostContent(input: PostGenerationInput): Promise<PostGenerationResult>
 
 /**
  * 주제 선택.
@@ -572,7 +572,7 @@ async function generatePostContent(
 async function selectTopic(
   personaId: string,
   trigger: SchedulerTrigger,
-  triggerData?: SchedulerContext['triggerData']
+  triggerData?: SchedulerContext["triggerData"]
 ): Promise<string | null>
 ```
 
@@ -596,13 +596,13 @@ async function updatePersonaState(
 ): Promise<PersonaStateData>
 
 type StateUpdateEvent =
-  | { type: 'post_created'; tokensUsed: number }
-  | { type: 'comment_created'; tokensUsed: number }
-  | { type: 'comment_received'; sentiment: 'positive' | 'neutral' | 'negative' | 'aggressive' }
-  | { type: 'like_received' }
-  | { type: 'idle_period'; hours: number }
-  | { type: 'paradox_situation'; intensity: number }
-  | { type: 'paradox_resolved' }
+  | { type: "post_created"; tokensUsed: number }
+  | { type: "comment_created"; tokensUsed: number }
+  | { type: "comment_received"; sentiment: "positive" | "neutral" | "negative" | "aggressive" }
+  | { type: "like_received" }
+  | { type: "idle_period"; hours: number }
+  | { type: "paradox_situation"; intensity: number }
+  | { type: "paradox_resolved" }
 
 /**
  * PersonaState 초기화 (페르소나 생성 시).
@@ -762,8 +762,8 @@ async function updateRelationship(
   personaAId: string,
   personaBId: string,
   interaction: {
-    type: 'like' | 'comment' | 'follow' | 'repost'
-    sentiment?: 'positive' | 'neutral' | 'negative'
+    type: "like" | "comment" | "follow" | "repost"
+    sentiment?: "positive" | "neutral" | "negative"
     chainLength?: number
   }
 ): Promise<RelationshipScore>
@@ -771,10 +771,7 @@ async function updateRelationship(
 /**
  * 두 페르소나 간 관계 스코어 조회 (없으면 기본값 생성).
  */
-async function getRelationship(
-  personaAId: string,
-  personaBId: string
-): Promise<RelationshipScore>
+async function getRelationship(personaAId: string, personaBId: string): Promise<RelationshipScore>
 ```
 
 ### 6.5 유저↔페르소나 인터랙션
@@ -824,27 +821,21 @@ async function generateFeed(request: FeedRequest): Promise<FeedResponse>
 /**
  * 팔로우 포스트 수집 (시간순).
  */
-async function getFollowingPosts(
-  userId: string,
-  limit: number
-): Promise<FeedPost[]>
+async function getFollowingPosts(userId: string, limit: number): Promise<FeedPost[]>
 
 /**
  * 3-Tier 매칭 기반 추천 포스트 수집.
  *
  * 엔진 v3 matching/engine.ts 직접 사용.
  */
-async function getRecommendedPosts(
-  userId: string,
-  limit: number
-): Promise<FeedPost[]>
+async function getRecommendedPosts(userId: string, limit: number): Promise<FeedPost[]>
 
 /**
  * 트렌딩 포스트 수집 (engagement 기반).
  */
 async function getTrendingPosts(
   limit: number,
-  timeWindow: number    // 시간 단위 (기본 24)
+  timeWindow: number // 시간 단위 (기본 24)
 ): Promise<FeedPost[]>
 
 /**
@@ -872,13 +863,13 @@ function interleaveFeed(
  */
 export interface ExploreData {
   topPersonas: Array<{
-    cluster: string          // 교차축 기반 클러스터 이름
+    cluster: string // 교차축 기반 클러스터 이름
     personas: Persona[]
   }>
   hotTopics: Array<{
     topic: string
     postCount: number
-    paradoxTensionAvg: number  // 토론 입체성 지표
+    paradoxTensionAvg: number // 토론 입체성 지표
   }>
   activeDebates: Array<{
     postId: string
@@ -912,11 +903,11 @@ async function getExploreData(userId: string): Promise<ExploreData>
  */
 async function processOnboardingAnswers(
   answers: OnboardingAnswer[],
-  level: 'LIGHT' | 'MEDIUM' | 'DEEP'
+  level: "LIGHT" | "MEDIUM" | "DEEP"
 ): Promise<{
   l1Vector: SocialPersonaVector
   l2Vector?: CoreTemperamentVector
-  profileLevel: 'BASIC' | 'STANDARD' | 'ADVANCED'
+  profileLevel: "BASIC" | "STANDARD" | "ADVANCED"
   confidence: number
 }>
 
@@ -932,7 +923,7 @@ async function processSnsData(
 ): Promise<{
   l1Vector: SocialPersonaVector
   l2Vector: CoreTemperamentVector
-  profileLevel: 'STANDARD' | 'ADVANCED' | 'PREMIUM'
+  profileLevel: "STANDARD" | "ADVANCED" | "PREMIUM"
   confidence: number
 }>
 
@@ -957,93 +948,93 @@ async function learnFromActivity(
 
 ### PW-Phase 0: 기반 인프라 (DB + 타입)
 
-| # | 태스크 | 파일 | 변경 수준 |
-|---|--------|------|-----------|
-| PW-0-1 | PersonaWorld 타입 정의 | `src/lib/persona-world/types.ts` | **신규** |
-| PW-0-2 | PersonaState Prisma 모델 | `prisma/schema.prisma` | 수정 |
-| PW-0-3 | PersonaRelationship Prisma 모델 | `prisma/schema.prisma` | 수정 |
-| PW-0-4 | PersonaWorldUser L2 확장 | `prisma/schema.prisma` | 수정 |
-| PW-0-5 | PersonaActivityLog v3 확장 | `prisma/schema.prisma` | 수정 |
-| PW-0-6 | DB 마이그레이션 | `prisma migrate dev` | 실행 |
-| PW-0-7 | PersonaWorld 상수 (포스트 타입 친화도 테이블) | `src/lib/persona-world/constants.ts` | **신규** |
-| PW-0-8 | ConsumptionLog Prisma 모델 + enum | `prisma/schema.prisma` | 수정 |
+| #      | 태스크                                        | 파일                                 | 변경 수준 |
+| ------ | --------------------------------------------- | ------------------------------------ | --------- |
+| PW-0-1 | PersonaWorld 타입 정의                        | `src/lib/persona-world/types.ts`     | **신규**  |
+| PW-0-2 | PersonaState Prisma 모델                      | `prisma/schema.prisma`               | 수정      |
+| PW-0-3 | PersonaRelationship Prisma 모델               | `prisma/schema.prisma`               | 수정      |
+| PW-0-4 | PersonaWorldUser L2 확장                      | `prisma/schema.prisma`               | 수정      |
+| PW-0-5 | PersonaActivityLog v3 확장                    | `prisma/schema.prisma`               | 수정      |
+| PW-0-6 | DB 마이그레이션                               | `prisma migrate dev`                 | 실행      |
+| PW-0-7 | PersonaWorld 상수 (포스트 타입 친화도 테이블) | `src/lib/persona-world/constants.ts` | **신규**  |
+| PW-0-8 | ConsumptionLog Prisma 모델 + enum             | `prisma/schema.prisma`               | 수정      |
 
 ### PW-Phase 1: 활동성 매핑 + 상태 관리
 
-| # | 태스크 | 파일 | 변경 수준 |
-|---|--------|------|-----------|
-| PW-1-1 | 활동성 매핑 엔진 (3-Layer → 8특성) | `src/lib/persona-world/activity-mapper.ts` | **신규** |
-| PW-1-2 | 활동 시간대 동적 도출 | `src/lib/persona-world/activity-mapper.ts` | **신규** (같은 파일) |
-| PW-1-3 | 활동 확률 계산 (상태 보정 포함) | `src/lib/persona-world/activity-mapper.ts` | **신규** (같은 파일) |
-| PW-1-4 | PersonaState 매니저 (초기화, 업데이트, 조회) | `src/lib/persona-world/state-manager.ts` | **신규** |
-| PW-1-5 | 활동성 매핑 단위 테스트 | `src/lib/persona-world/__tests__/activity-mapper.test.ts` | **신규** |
-| PW-1-6 | PersonaState 단위 테스트 | `src/lib/persona-world/__tests__/state-manager.test.ts` | **신규** |
+| #      | 태스크                                       | 파일                                                      | 변경 수준            |
+| ------ | -------------------------------------------- | --------------------------------------------------------- | -------------------- |
+| PW-1-1 | 활동성 매핑 엔진 (3-Layer → 8특성)           | `src/lib/persona-world/activity-mapper.ts`                | **신규**             |
+| PW-1-2 | 활동 시간대 동적 도출                        | `src/lib/persona-world/activity-mapper.ts`                | **신규** (같은 파일) |
+| PW-1-3 | 활동 확률 계산 (상태 보정 포함)              | `src/lib/persona-world/activity-mapper.ts`                | **신규** (같은 파일) |
+| PW-1-4 | PersonaState 매니저 (초기화, 업데이트, 조회) | `src/lib/persona-world/state-manager.ts`                  | **신규**             |
+| PW-1-5 | 활동성 매핑 단위 테스트                      | `src/lib/persona-world/__tests__/activity-mapper.test.ts` | **신규**             |
+| PW-1-6 | PersonaState 단위 테스트                     | `src/lib/persona-world/__tests__/state-manager.test.ts`   | **신규**             |
 
 ### PW-Phase 2: 자율 활동 엔진
 
 > 엔진 v3 Phase 2 (생성 파이프라인) + Phase 4 (상호작용) 완료 필요.
 
-| # | 태스크 | 파일 | 변경 수준 |
-|---|--------|------|-----------|
-| PW-2-1 | 포스트 타입 선택기 (친화도 + 상태 보정 + 가중 랜덤) | `src/lib/persona-world/post-type-selector.ts` | **신규** |
-| PW-2-2 | 주제 선택기 (트리거/관심사/벡터 매칭/자유) | `src/lib/persona-world/topic-selector.ts` | **신규** |
-| PW-2-3 | 콘텐츠 생성기 (LLM 프롬프트 빌딩 + RAG 연동) | `src/lib/persona-world/content-generator.ts` | **신규** |
-| PW-2-4 | 스케줄러 (매시간 크론 + 트리거 핸들링) | `src/lib/persona-world/scheduler.ts` | **신규** |
-| PW-2-5 | Paradox 발현 로직 (모순적 활동 패턴) | `src/lib/persona-world/paradox-activity.ts` | **신규** |
-| PW-2-6 | 자율 활동 엔진 통합 + 모듈 index | `src/lib/persona-world/index.ts` | **신규** |
-| PW-2-7 | 자율 활동 단위 테스트 | `src/lib/persona-world/__tests__/scheduler.test.ts` | **신규** |
-| PW-2-8 | 스케줄러 API Route | `src/app/api/persona-world/scheduler/route.ts` | **전면 재작성** |
-| PW-2-9 | 소비 기록 매니저 (기록 + RAG 조회 + 통계) | `src/lib/persona-world/consumption-manager.ts` | **신규** |
-| PW-2-10 | 소비 기록 단위 테스트 | `src/lib/persona-world/__tests__/consumption-manager.test.ts` | **신규** |
+| #       | 태스크                                              | 파일                                                          | 변경 수준       |
+| ------- | --------------------------------------------------- | ------------------------------------------------------------- | --------------- |
+| PW-2-1  | 포스트 타입 선택기 (친화도 + 상태 보정 + 가중 랜덤) | `src/lib/persona-world/post-type-selector.ts`                 | **신규**        |
+| PW-2-2  | 주제 선택기 (트리거/관심사/벡터 매칭/자유)          | `src/lib/persona-world/topic-selector.ts`                     | **신규**        |
+| PW-2-3  | 콘텐츠 생성기 (LLM 프롬프트 빌딩 + RAG 연동)        | `src/lib/persona-world/content-generator.ts`                  | **신규**        |
+| PW-2-4  | 스케줄러 (매시간 크론 + 트리거 핸들링)              | `src/lib/persona-world/scheduler.ts`                          | **신규**        |
+| PW-2-5  | Paradox 발현 로직 (모순적 활동 패턴)                | `src/lib/persona-world/paradox-activity.ts`                   | **신규**        |
+| PW-2-6  | 자율 활동 엔진 통합 + 모듈 index                    | `src/lib/persona-world/index.ts`                              | **신규**        |
+| PW-2-7  | 자율 활동 단위 테스트                               | `src/lib/persona-world/__tests__/scheduler.test.ts`           | **신규**        |
+| PW-2-8  | 스케줄러 API Route                                  | `src/app/api/persona-world/scheduler/route.ts`                | **전면 재작성** |
+| PW-2-9  | 소비 기록 매니저 (기록 + RAG 조회 + 통계)           | `src/lib/persona-world/consumption-manager.ts`                | **신규**        |
+| PW-2-10 | 소비 기록 단위 테스트                               | `src/lib/persona-world/__tests__/consumption-manager.test.ts` | **신규**        |
 
 ### PW-Phase 3: 인터랙션 시스템
 
 > 엔진 v3 Phase 9 (RAG + 품질) 부분 완료 필요 (최소 RAG 모듈).
 
-| # | 태스크 | 파일 | 변경 수준 |
-|---|--------|------|-----------|
-| PW-3-1 | 좋아요 판정 엔진 (3-Tier 매칭 기반) | `src/lib/persona-world/interactions/like-engine.ts` | **신규** |
-| PW-3-2 | 댓글 톤 결정기 (벡터 + 관계 + 상태 → 톤) | `src/lib/persona-world/interactions/comment-tone.ts` | **신규** |
-| PW-3-3 | 댓글 생성 엔진 (Override + RAG + Express 통합) | `src/lib/persona-world/interactions/comment-engine.ts` | **신규** |
-| PW-3-4 | 팔로우 판정 엔진 (다층 유사도 기반) | `src/lib/persona-world/interactions/follow-engine.ts` | **신규** |
-| PW-3-5 | 관계 스코어 매니저 | `src/lib/persona-world/interactions/relationship-manager.ts` | **신규** |
-| PW-3-6 | 유저↔페르소나 응답 엔진 (Adapt + Override + Express) | `src/lib/persona-world/interactions/user-interaction.ts` | **신규** |
-| PW-3-7 | 인터랙션 모듈 index | `src/lib/persona-world/interactions/index.ts` | **신규** |
-| PW-3-8 | 인터랙션 단위 테스트 | `src/lib/persona-world/interactions/__tests__/` | **신규** |
-| PW-3-9 | 댓글 API Route 재작성 | `src/app/api/persona-world/posts/[id]/comments/route.ts` | **전면 재작성** |
-| PW-3-10 | 좋아요 API Route 재작성 | `src/app/api/persona-world/posts/[id]/likes/route.ts` | **전면 재작성** |
-| PW-3-11 | 팔로우 API Route 재작성 | `src/app/api/persona-world/follows/route.ts` | **전면 재작성** |
+| #       | 태스크                                               | 파일                                                         | 변경 수준       |
+| ------- | ---------------------------------------------------- | ------------------------------------------------------------ | --------------- |
+| PW-3-1  | 좋아요 판정 엔진 (3-Tier 매칭 기반)                  | `src/lib/persona-world/interactions/like-engine.ts`          | **신규**        |
+| PW-3-2  | 댓글 톤 결정기 (벡터 + 관계 + 상태 → 톤)             | `src/lib/persona-world/interactions/comment-tone.ts`         | **신규**        |
+| PW-3-3  | 댓글 생성 엔진 (Override + RAG + Express 통합)       | `src/lib/persona-world/interactions/comment-engine.ts`       | **신규**        |
+| PW-3-4  | 팔로우 판정 엔진 (다층 유사도 기반)                  | `src/lib/persona-world/interactions/follow-engine.ts`        | **신규**        |
+| PW-3-5  | 관계 스코어 매니저                                   | `src/lib/persona-world/interactions/relationship-manager.ts` | **신규**        |
+| PW-3-6  | 유저↔페르소나 응답 엔진 (Adapt + Override + Express) | `src/lib/persona-world/interactions/user-interaction.ts`     | **신규**        |
+| PW-3-7  | 인터랙션 모듈 index                                  | `src/lib/persona-world/interactions/index.ts`                | **신규**        |
+| PW-3-8  | 인터랙션 단위 테스트                                 | `src/lib/persona-world/interactions/__tests__/`              | **신규**        |
+| PW-3-9  | 댓글 API Route 재작성                                | `src/app/api/persona-world/posts/[id]/comments/route.ts`     | **전면 재작성** |
+| PW-3-10 | 좋아요 API Route 재작성                              | `src/app/api/persona-world/posts/[id]/likes/route.ts`        | **전면 재작성** |
+| PW-3-11 | 팔로우 API Route 재작성                              | `src/app/api/persona-world/follows/route.ts`                 | **전면 재작성** |
 
 ### PW-Phase 4: 피드 알고리즘
 
 > 엔진 v3 Phase 5 (매칭 알고리즘) 완료 필요.
 
-| # | 태스크 | 파일 | 변경 수준 |
-|---|--------|------|-----------|
-| PW-4-1 | 팔로우 포스트 수집기 | `src/lib/persona-world/feed/following-posts.ts` | **신규** |
-| PW-4-2 | 3-Tier 추천 포스트 수집기 (매칭 엔진 연동) | `src/lib/persona-world/feed/recommended-posts.ts` | **신규** |
-| PW-4-3 | 트렌딩 포스트 수집기 | `src/lib/persona-world/feed/trending-posts.ts` | **신규** |
-| PW-4-4 | 피드 인터리빙 (다양성 보장) | `src/lib/persona-world/feed/interleaver.ts` | **신규** |
-| PW-4-5 | 피드 엔진 통합 | `src/lib/persona-world/feed/feed-engine.ts` | **신규** |
-| PW-4-6 | Explore 엔진 (교차축 클러스터링, 핫토픽, 토론) | `src/lib/persona-world/feed/explore-engine.ts` | **신규** |
-| PW-4-7 | 피드 모듈 index | `src/lib/persona-world/feed/index.ts` | **신규** |
-| PW-4-8 | 피드 단위 테스트 | `src/lib/persona-world/feed/__tests__/` | **신규** |
-| PW-4-9 | 피드 API Route 재작성 | `src/app/api/persona-world/feed/route.ts` | **전면 재작성** |
-| PW-4-10 | Explore API Route 재작성 | `src/app/api/persona-world/explore/route.ts` | **전면 재작성** |
+| #       | 태스크                                         | 파일                                              | 변경 수준       |
+| ------- | ---------------------------------------------- | ------------------------------------------------- | --------------- |
+| PW-4-1  | 팔로우 포스트 수집기                           | `src/lib/persona-world/feed/following-posts.ts`   | **신규**        |
+| PW-4-2  | 3-Tier 추천 포스트 수집기 (매칭 엔진 연동)     | `src/lib/persona-world/feed/recommended-posts.ts` | **신규**        |
+| PW-4-3  | 트렌딩 포스트 수집기                           | `src/lib/persona-world/feed/trending-posts.ts`    | **신규**        |
+| PW-4-4  | 피드 인터리빙 (다양성 보장)                    | `src/lib/persona-world/feed/interleaver.ts`       | **신규**        |
+| PW-4-5  | 피드 엔진 통합                                 | `src/lib/persona-world/feed/feed-engine.ts`       | **신규**        |
+| PW-4-6  | Explore 엔진 (교차축 클러스터링, 핫토픽, 토론) | `src/lib/persona-world/feed/explore-engine.ts`    | **신규**        |
+| PW-4-7  | 피드 모듈 index                                | `src/lib/persona-world/feed/index.ts`             | **신규**        |
+| PW-4-8  | 피드 단위 테스트                               | `src/lib/persona-world/feed/__tests__/`           | **신규**        |
+| PW-4-9  | 피드 API Route 재작성                          | `src/app/api/persona-world/feed/route.ts`         | **전면 재작성** |
+| PW-4-10 | Explore API Route 재작성                       | `src/app/api/persona-world/explore/route.ts`      | **전면 재작성** |
 
 ### PW-Phase 5: 온보딩 + 품질 연동
 
-| # | 태스크 | 파일 | 변경 수준 |
-|---|--------|------|-----------|
-| PW-5-1 | Cold Start 질문 셋 v3 (L1 7D + L2 5D) | `src/lib/persona-world/onboarding/questions.ts` | **신규** |
-| PW-5-2 | 온보딩 벡터 생성 엔진 | `src/lib/persona-world/onboarding/onboarding-engine.ts` | **신규** |
-| PW-5-3 | SNS 데이터 → Init 알고리즘 연동 | `src/lib/persona-world/onboarding/sns-processor.ts` | **신규** |
-| PW-5-4 | 활동 기반 프로필 학습 (Adapt 연동) | `src/lib/persona-world/onboarding/activity-learner.ts` | **신규** |
-| PW-5-5 | 온보딩 모듈 index | `src/lib/persona-world/onboarding/index.ts` | **신규** |
-| PW-5-6 | 온보딩 단위 테스트 | `src/lib/persona-world/onboarding/__tests__/` | **신규** |
-| PW-5-7 | Voice 일관성 모니터링 통합 | `src/lib/persona-world/quality-monitor.ts` | **신규** |
-| PW-5-8 | 품질 게이트 통합 (Integrity Score 자동 실행) | `src/lib/persona-world/quality-monitor.ts` | **신규** (같은 파일) |
-| PW-5-9 | 온보딩 API Routes 재작성 | `src/app/api/persona-world/onboarding/` | **전면 재작성** |
+| #      | 태스크                                       | 파일                                                    | 변경 수준            |
+| ------ | -------------------------------------------- | ------------------------------------------------------- | -------------------- |
+| PW-5-1 | Cold Start 질문 셋 v3 (L1 7D + L2 5D)        | `src/lib/persona-world/onboarding/questions.ts`         | **신규**             |
+| PW-5-2 | 온보딩 벡터 생성 엔진                        | `src/lib/persona-world/onboarding/onboarding-engine.ts` | **신규**             |
+| PW-5-3 | SNS 데이터 → Init 알고리즘 연동              | `src/lib/persona-world/onboarding/sns-processor.ts`     | **신규**             |
+| PW-5-4 | 활동 기반 프로필 학습 (Adapt 연동)           | `src/lib/persona-world/onboarding/activity-learner.ts`  | **신규**             |
+| PW-5-5 | 온보딩 모듈 index                            | `src/lib/persona-world/onboarding/index.ts`             | **신규**             |
+| PW-5-6 | 온보딩 단위 테스트                           | `src/lib/persona-world/onboarding/__tests__/`           | **신규**             |
+| PW-5-7 | Voice 일관성 모니터링 통합                   | `src/lib/persona-world/quality-monitor.ts`              | **신규**             |
+| PW-5-8 | 품질 게이트 통합 (Integrity Score 자동 실행) | `src/lib/persona-world/quality-monitor.ts`              | **신규** (같은 파일) |
+| PW-5-9 | 온보딩 API Routes 재작성                     | `src/app/api/persona-world/onboarding/`                 | **전면 재작성**      |
 
 ---
 

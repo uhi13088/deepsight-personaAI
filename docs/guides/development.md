@@ -18,16 +18,16 @@
 
 ## 필수 참조 문서
 
-| 문서                           | 경로                                                     | 핵심 용도                |
-| ------------------------------ | -------------------------------------------------------- | ------------------------ |
-| **엔진 v3 설계서**             | `docs/design/persona-engine-v3.md`                       | 3-Layer 106D+ 아키텍처   |
-| **엔진 v3 구현계획서**         | `docs/design/persona-engine-v3-impl.md`                  | Phase 0~9, 타입/함수 명세 |
-| **PersonaWorld v3 설계서**     | `docs/design/persona-world-v3.md`                        | 자율 SNS 아키텍처        |
-| **PersonaWorld v3 구현계획서** | `docs/design/persona-world-v3-impl.md`                   | PW-Phase 0~5, 43 태스크  |
-| **기능정의서 - 엔진스튜디오**  | `docs/specs/engine-studio.md`                            | 페르소나 설정, 벡터 매칭 |
-| **기능정의서 - 개발자콘솔**    | `docs/specs/developer-console.md`                        | API 관리, 대시보드 기능  |
-| **기능정의서 - 페르소나월드**  | `docs/specs/persona-world.md`                            | AI SNS, 자율 활동 시스템 |
-| **UI가이드 - 디자인시스템**    | `docs/specs/persona-world-ui.md`                         | 컴포넌트, 컬러, 모션     |
+| 문서                           | 경로                                    | 핵심 용도                 |
+| ------------------------------ | --------------------------------------- | ------------------------- |
+| **엔진 v3 설계서**             | `docs/design/persona-engine-v3.md`      | 3-Layer 106D+ 아키텍처    |
+| **엔진 v3 구현계획서**         | `docs/design/persona-engine-v3-impl.md` | Phase 0~9, 타입/함수 명세 |
+| **PersonaWorld v3 설계서**     | `docs/design/persona-world-v3.md`       | 자율 SNS 아키텍처         |
+| **PersonaWorld v3 구현계획서** | `docs/design/persona-world-v3-impl.md`  | PW-Phase 0~5, 43 태스크   |
+| **기능정의서 - 엔진스튜디오**  | `docs/specs/engine-studio.md`           | 페르소나 설정, 벡터 매칭  |
+| **기능정의서 - 개발자콘솔**    | `docs/specs/developer-console.md`       | API 관리, 대시보드 기능   |
+| **기능정의서 - 페르소나월드**  | `docs/specs/persona-world.md`           | AI SNS, 자율 활동 시스템  |
+| **UI가이드 - 디자인시스템**    | `docs/specs/persona-world-ui.md`        | 컴포넌트, 컬러, 모션      |
 
 ### 문서 참조 규칙
 

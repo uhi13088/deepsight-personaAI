@@ -39,12 +39,7 @@
     "generator": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "engine_name",
-        "engine_version",
-        "seed_hash_sha256",
-        "random_source"
-      ],
+      "required": ["engine_name", "engine_version", "seed_hash_sha256", "random_source"],
       "properties": {
         "engine_name": {
           "type": "string",
@@ -138,10 +133,7 @@
         "projection": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "mapping_matrix_version",
-            "target_axes"
-          ],
+          "required": ["mapping_matrix_version", "target_axes"],
           "properties": {
             "mapping_matrix_version": {
               "type": "string",
@@ -154,15 +146,7 @@
               "maxItems": 7,
               "items": {
                 "type": "string",
-                "enum": [
-                  "depth",
-                  "lens",
-                  "stance",
-                  "scope",
-                  "taste",
-                  "purpose",
-                  "sociability"
-                ]
+                "enum": ["depth", "lens", "stance", "scope", "taste", "purpose", "sociability"]
               }
             }
           }
@@ -496,13 +480,7 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": [
-              "ridge_index",
-              "hex",
-              "oklch",
-              "lab",
-              "delta_e00_to_prev"
-            ],
+            "required": ["ridge_index", "hex", "oklch", "lab", "delta_e00_to_prev"],
             "properties": {
               "ridge_index": {
                 "type": "integer",
@@ -569,13 +547,7 @@
     "render_profile": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "render_mode",
-        "canvas_size_px",
-        "background",
-        "dpi",
-        "required_exports"
-      ],
+      "required": ["render_mode", "canvas_size_px", "background", "dpi", "required_exports"],
       "properties": {
         "render_mode": {
           "type": "string",
@@ -624,11 +596,7 @@
     "uniqueness": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "fingerprint_hash_sha256",
-        "perceptual_hash_64",
-        "registry_scope"
-      ],
+      "required": ["fingerprint_hash_sha256", "perceptual_hash_64", "registry_scope"],
       "properties": {
         "fingerprint_hash_sha256": {
           "type": "string",
@@ -647,12 +615,7 @@
     "collision_handling": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "enabled",
-        "comparison_metrics",
-        "retry_policy",
-        "on_exceed"
-      ],
+      "required": ["enabled", "comparison_metrics", "retry_policy", "on_exceed"],
       "properties": {
         "enabled": {
           "type": "boolean",
@@ -712,11 +675,7 @@
         },
         "on_exceed": {
           "type": "string",
-          "enum": [
-            "manual_review",
-            "reject_generation",
-            "fallback_template"
-          ]
+          "enum": ["manual_review", "reject_generation", "fallback_template"]
         }
       }
     },
@@ -764,12 +723,7 @@
     "future_scanner": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "scanner_ready",
-        "channels",
-        "qr_payload_embedded",
-        "decode_mode_hint"
-      ],
+      "required": ["scanner_ready", "channels", "qr_payload_embedded", "decode_mode_hint"],
       "properties": {
         "scanner_ready": { "type": "boolean", "const": true },
         "channels": {
