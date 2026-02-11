@@ -7,17 +7,125 @@
 
 ## 📋 QUEUE (대기)
 
-(없음)
+- [ ] **T42: 매칭 설명 + 유저↔페르소나 일치도 시스템**
+  - 배경: 유저가 "왜 이 페르소나가 나와 맞는지" 이해할 수 있어야 함. 숫자가 아닌 자연어 설명 필수
+  - AC1: `docs/design/persona-engine-v3.md` — 매칭 설명 시스템 섹션 신설
+    - 유저↔페르소나 일치도 계산 공식 (차원별 %, 종합 %)
+    - LLM 기반 자연어 설명 생성 (Sonnet, 프롬프트 설계)
+    - 차원별 일치/불일치 하이라이트 로직
+    - 교차축 기반 "의외의 공통점" 발견 로직
+  - AC2: `docs/specs/persona-world.md` / `persona-world-ui.md` — 매칭 설명 UI 스펙
+    - 매칭 카드 UI (일치율 %, 차원별 바, 자연어 설명)
+    - "왜 추천했는지" 상세 뷰 (교차축 하이라이트, 역설 호환성)
+  - AC3: 커밋 + 푸시
+
+- [ ] **T43: 개발자 콘솔 유저 프로필 API v3 + 동의 관리**
+  - 배경: 유저 프로파일 데이터를 외부 플랫폼에 안전하게 공유. GDPR/개인정보 동의 필수
+  - AC1: `docs/specs/developer-console.md` §9 — 유저 프로필 API v3 확장
+    - GET /v1/users/{id}/profile v3 (L1+L2 벡터, 교차축, 동의 상태, 프로필 품질)
+    - POST /v1/users/{id}/onboarding v3 (L1 7D + L2 5D 응답)
+    - GET /v1/users/{id}/consent (동의 항목 조회)
+    - POST /v1/users/{id}/consent (동의 관리)
+  - AC2: `docs/specs/engine-studio.md` — 콜드스타트 질문 관리 UI
+    - 질문 세트 CRUD, 질문 순서/가중치 편집, 모드별(LIGHT/STANDARD/DEEP) 관리
+  - AC3: 커밋 + 푸시
 
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
 
-(없음)
+- [ ] **T44: 추가 질문 풀 126문항 SQL**
+  - 배경: T41에서 온보딩 24문항 설계 완료. 데일리 마이크로 질문용 추가 풀 필요 (매일 1문항 × ~4개월분)
+  - AC1: 126문항 SQL 마이그레이션 파일 작성
+    - L1 집중 42문항 (축당 6문항)
+    - L2 집중 30문항 (축당 6문항)
+    - L1↔L2 교차 36문항 (주요 조합 12쌍 × 3문항)
+    - 역설 심화 18문항 (역설 패턴 6종 × 3문항)
+  - AC2: 커밋 + 푸시
 
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T41: 콜드스타트 질문 v3 전면 재설계 — 유저 프로파일링 시스템 v3** ✅ 2026-02-11
+  - AC1: `docs/design/persona-engine-v3.md` §19 신설 (v3.0-draft.13) — 유저 프로파일링 시스템 v3
+    - 하이브리드 시나리오 질문 (L1+L2 동시 측정, 4지선다, delta 적용 공식)
+    - 3-Phase 24문항 구조 (8+8+8, Phase별 L1주력/L2주력/교차검증, ~4분)
+    - 이탈 정책 (Phase 단위 저장, 미완료 Phase만 리셋)
+    - 프로필 품질 등급 (STARTER/STANDARD/ADVANCED/EXPERT)
+    - 데일리 마이크로 질문 + 크레딧 (PW 내부 화폐, uncertainty 기반 출제)
+    - SNS 연동 (8개 플랫폼, 비용 분석, 2-Stage 최적화, 병합 공식)
+    - 적응형 질문 선택 알고리즘 (uncertainty 기반 + LLM 생성 fallback)
+    - DB 스키마 6개 테이블 (profiling_questions, user_profiling_answers, user_profiling_status, user_vectors, user_sns_connections, user_coin_transactions)
+    - 매칭 정밀도 수렴 모델 (σ/√n, SNS 부스트, 수렴 시뮬레이션)
+  - AC2: `docs/design/persona-world-v3.md` §9 전면 개편 (v1.0-draft.3) — 7개 하위 섹션
+    - 온보딩 플로우 (회원가입→3-Phase→매칭 프리뷰→PersonaWorld 진입)
+    - 하이브리드 시나리오 질문 UI (카드 레이아웃, 게이미피케이션, 진행 바)
+    - Phase 구조 + 이탈 정책 UX (안내 문구, Phase별 저장 규칙)
+    - SNS 연동 UI (8개 플랫폼, 동의 관리 GDPR, 분석 진행 화면)
+    - 데일리 마이크로 질문 + 크레딧 (보상 구조, 연속 스트릭 UI)
+    - Phase 간 매칭 프리뷰 (페르소나 카드, 레이더 차트, 역설 패턴 설명)
+    - 프로필 품질 등급 + 유저 대시보드 + Engine Studio 관리 연동
+  - AC3: 커밋 + 푸시
+
+- [x] **T40: 노드 파라미터 편집 UI 스펙** ✅ 2026-02-11
+  - AC1: `docs/specs/engine-studio.md` §3.10 — 노드별 파라미터 편집 UI 컴포넌트 스펙 (v3.3)
+    - 설정 패널 공통 레이아웃 (320px 사이드바, 리셋/적용, Eager/Manual 연동)
+    - Input 5종: basic-info(8필드), l1-vector(7D 슬라이더), l2-vector(5D), l3-vector(4D+활성화 체크), archetype-select(카드 그리드+변동 시드)
+    - Engine 4종: pressure-ctrl(min/max/baseline), projection(α+β 링크드 듀얼 슬라이더)
+    - Generation 7종: customInstructions 텍스트 에어리어 (노드별 플레이스홀더 예시)
+    - Assembly 2종: prompt-builder(프리셋 드롭다운+JSON 편집)
+    - Output 4종: fingerprint(3모드 라디오), test-sim(체크리스트+커스텀), deploy(staging/production)
+    - Control Flow 3종: conditional(조건유형별 동적 UI), switch(band/enum 편집기), merge(전략 라디오)
+    - 공통 UI 컴포넌트 명세 12종 (shadcn/ui 기반)
+    - 설정 있음 19종 / 설정 없음 6종 요약
+  - AC2: 커밋 + 푸시
+
+- [x] **T39: 페르소나 필터 API 정식 스펙** ✅ 2026-02-11
+  - AC1: `docs/specs/developer-console.md` §9.3.9 — POST /v1/personas/filter 정식 스펙 (v3.3)
+    - 다차원 필터: archetype(include/exclude), vectors(L1/L2/L3 차원별 범위), paradox(EPS/L1L2/L1L3/L2L3), crossAxis(패턴 필터)
+    - 정렬: paradox.extendedScore, vectors.[dim], createdAt, name
+    - 아키타입 12종 ID/한글명/핵심역설 레퍼런스 테이블
+    - Request/Response JSON 예시, appliedFilters/filterStats 포함
+    - 코드 샘플 3종 (TypeScript SDK, Python SDK, cURL)
+    - 에러 응답 6종 정의
+    - Rate Limit: Starter 50~Ent.Sc 무제한
+  - AC2: `docs/specs/engine-studio.md` §3.1.1 — 필터링 UI 전면 개편 (v3.3)
+    - 기본 필터: 상태 칩, 정렬 드롭다운
+    - 아키타입 필터: 12종 멀티 선택 칩 (컬러 도트, 제외 토글)
+    - 벡터 범위 필터: L1(7D)/L2(5D)/L3(4D) 차원별 Range Slider (접이식)
+    - Paradox Score 필터: EPS Range Slider + 구간 레이블 + 역설 지표 세부
+    - 교차축 패턴 필터: 83축 드롭다운 + 관계유형 뱃지 + 점수 범위 (최대 5개)
+    - 필터 상태 표시: 뱃지 카운트, 칩 나열, 실시간 결과 개수
+  - AC3: 커밋 + 푸시
+
+- [x] **T38: 노드 에디터 분기 노드(Conditional/Switch) 추가 설계** ✅ 2026-02-11
+  - AC1: `docs/design/persona-engine-v3.md` §14.9 — Control Flow 3종 설계 (v3.0-draft.12)
+    - Conditional Node (threshold/range/enum/exists 4종 조건, True/False 분기)
+    - Switch Node (threshold-band/enum-match 2종, N개 케이스 분기)
+    - Merge Node (first-active/combine 합류 전략)
+    - DAG 평가 엔진 활성 엣지 확장, 포트 타입 Any, 그래프 검증 분기 규칙 4종
+    - 유즈케이스 4종(역설 분기/아키타입 라우팅/L3 유무/검증 결과별 배포)
+    - 전체 노드 22→25종, 카테고리 5→6개
+  - AC2: `docs/design/persona-engine-v3-impl.md` §13.13 — 분기 노드 구현 스펙 (v1.14)
+    - ConditionalNodeData/SwitchNodeData/MergeNodeData 타입 정의
+    - executeConditional/executeSwitch/executeMerge 실행 함수
+    - evaluateGraphWithBranching (활성 엣지 추적, ExecutionPath, 비활성 경로 스킵)
+    - collectInputsFromActiveEdges 헬퍼
+    - 그래프 검증 분기 규칙 (합류 필수/데드엔드/도달 가능성/기본 케이스)
+    - 포트 타입 Any, 노드 레지스트리 Control Flow 카테고리
+    - Phase 8 태스크 8-27~8-30 추가
+  - AC3: 커밋 + 푸시
+
+- [x] **T37: 노드 에디터 execute() 로직 정의 — 22개 노드 전체** ✅ 2026-02-11
+  - AC1: `docs/design/persona-engine-v3.md` §14.8 — 22개 노드 execute() 설계 정의 (v3.0-draft.11)
+    - Input 5종, Engine 4종, Generation 7종, Assembly 2종, Output 4종
+    - 노드별 data/inputs/로직/output/평가전략 명시, 공식 참조(§3~§12)
+  - AC2: `docs/design/persona-engine-v3-impl.md` §13.12 — TypeScript 구현 수도코드 (v1.13)
+    - executeNode 디스패처, 22개 실행 함수, LLM 호출 어댑터 패턴
+    - 교차축 계산 헬퍼, Init delta 계산, 투영 행렬 적용
+    - Phase 8 태스크 8-23~8-26 추가
+  - AC3: 커밋 + 푸시
 
 - [x] **T36: 전체 문서 "106D+" 표기 통일** ✅ 2026-02-11
   - 배경: T35에서 developer-console.md만 정리 완료. 나머지 5개 문서에 54개소 잔존
