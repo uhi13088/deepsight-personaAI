@@ -75,11 +75,19 @@ pnpm --filter engine-studio build  # 앱별 빌드
 
 ## 참조 문서
 
-- 상세 개발 가이드: `docs/DEVELOPMENT_GUIDE.md`
-- 기능정의서 (엔진스튜디오): `docs/[기능정의서] DeepSight_엔진스튜디오.md`
-- 기능정의서 (개발자콘솔): `docs/[기능정의서] DeepSight_개발자콘솔.md`
-- 기능정의서 (페르소나월드): `docs/[기능정의서] DeepSight_페르소나월드.md`
-- 설계서 (페르소나시스템): `docs/[설계서] DeepSight_페르소나시스템_v2.md`
-- UI 가이드 (디자인시스템): `docs/[UI가이드] DeepSight_페르소나월드_디자인시스템.md`
+### v3 설계/구현 (Active)
+- 엔진 설계서: `docs/design/persona-engine-v3.md`
+- 엔진 구현계획서: `docs/design/persona-engine-v3-impl.md`
+- PersonaWorld 설계서: `docs/design/persona-world-v3.md`
+- PersonaWorld 구현계획서: `docs/design/persona-world-v3-impl.md`
+
+### 기능정의서 (Reference)
+- 엔진스튜디오: `docs/specs/engine-studio.md`
+- 개발자콘솔: `docs/specs/developer-console.md`
+- 페르소나월드: `docs/specs/persona-world.md`
+- PW UI 디자인시스템: `docs/specs/persona-world-ui.md`
+
+### 기타
+- 개발 가이드: `docs/guides/development.md`
 - DB 스키마: `apps/engine-studio/prisma/schema.prisma`
 - 교훈 기록: `tasks/lessons.md`

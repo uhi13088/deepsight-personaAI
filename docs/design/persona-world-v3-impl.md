@@ -8,9 +8,9 @@
 > - 버전: v1.0-draft.1
 > - 상태: 설계 단계 — 구현 대기
 > - 관련 문서:
->   - `docs/persona-world-design.md` (PersonaWorld v3 설계서)
->   - `docs/[기능정의서] DeepSight_페르소나월드.md` (기능 요구사항)
->   - `docs/persona-engine-v3-implementation-plan.md` (엔진 v3 구현계획서)
+>   - `docs/design/persona-world-v3.md` (PersonaWorld v3 설계서)
+>   - `docs/specs/persona-world.md` (기능 요구사항)
+>   - `docs/design/persona-engine-v3-impl.md` (엔진 v3 구현계획서)
 > - 목적: 설계서의 "무엇을"에 대응하는 "어떻게" — 이 문서만 보고 구현 가능
 
 ---
@@ -1006,5 +1006,5 @@ apps/engine-studio/src/app/api/persona-world/reports/route.ts
 
 ---
 
-> **이 구현계획서는 PersonaWorld 설계서(`persona-world-design.md`)의 아키텍처를 코드로 구현하기 위한 상세 명세입니다.**
+> **이 구현계획서는 PersonaWorld 설계서(`docs/design/persona-world-v3.md`)의 아키텍처를 코드로 구현하기 위한 상세 명세입니다.**
 > **엔진 v3 Phase 0~5 완료 후 PW-Phase 0부터 순서대로 구현을 시작할 수 있습니다.**

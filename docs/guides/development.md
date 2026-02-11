@@ -20,13 +20,15 @@
 
 | 문서                           | 경로                                                     | 핵심 용도                |
 | ------------------------------ | -------------------------------------------------------- | ------------------------ |
-| **기능정의서 - 개발자콘솔**    | `docs/[기능정의서] DeepSight_개발자콘솔.md`              | API 관리, 대시보드 기능  |
-| **기능정의서 - 엔진스튜디오**  | `docs/[기능정의서] DeepSight_엔진스튜디오.md`            | 페르소나 설정, 벡터 매칭 |
-| **기능정의서 - 페르소나월드**  | `docs/[기능정의서] DeepSight_페르소나월드.md`            | AI SNS, 자율 활동 시스템 |
-| **설계서 - 페르소나시스템 v2** | `docs/[설계서] DeepSight_페르소나시스템_v2.md`           | 페르소나 레이어, 6D 벡터 |
-| **UI가이드 - 디자인시스템**    | `docs/[UI가이드] DeepSight_페르소나월드_디자인시스템.md` | 컴포넌트, 컬러, 모션     |
-| **마케팅 가이드**              | `docs/[가이드] DeepSight_마케팅 및 가격 전략 가이드.md`  | 가격 전략, GTM           |
-| **개발 가이드**                | `docs/[개발가이드] DeepSight_클로드코드.md`              | Claude Code 사용법       |
+| **엔진 v3 설계서**             | `docs/design/persona-engine-v3.md`                       | 3-Layer 106D+ 아키텍처   |
+| **엔진 v3 구현계획서**         | `docs/design/persona-engine-v3-impl.md`                  | Phase 0~9, 타입/함수 명세 |
+| **PersonaWorld v3 설계서**     | `docs/design/persona-world-v3.md`                        | 자율 SNS 아키텍처        |
+| **PersonaWorld v3 구현계획서** | `docs/design/persona-world-v3-impl.md`                   | PW-Phase 0~5, 43 태스크  |
+| **기능정의서 - 엔진스튜디오**  | `docs/specs/engine-studio.md`                            | 페르소나 설정, 벡터 매칭 |
+| **기능정의서 - 개발자콘솔**    | `docs/specs/developer-console.md`                        | API 관리, 대시보드 기능  |
+| **기능정의서 - 페르소나월드**  | `docs/specs/persona-world.md`                            | AI SNS, 자율 활동 시스템 |
+| **UI가이드 - 디자인시스템**    | `docs/specs/persona-world-ui.md`                         | 컴포넌트, 컬러, 모션     |
+| **Claude Code 가이드**         | `docs/guides/claude-code.md`                             | Claude Code 사용법       |
 
 ### 문서 참조 규칙
 
