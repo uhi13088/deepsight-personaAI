@@ -7,21 +7,14 @@
 
 ## 📋 QUEUE (대기)
 
-- [ ] **T41: 콜드스타트 질문 v3 전면 재설계 — L1(7D) + L2(5D) 12차원**
-  - 배경: v2 콜드스타트(6D 기반)를 v3 106D+ 시스템에 맞게 완전 재설계. PersonaWorld 유저 프로파일링의 핵심
-  - AC1: `docs/design/persona-engine-v3.md` — 유저 프로파일링 시스템 v3 섹션 신설
-    - 유저 벡터 수집 범위 정의 (L1 7D + L2 5D, L3 미수집 확정)
-    - 질문 유형별 설계 원칙 (강제선택/시나리오/A·B비교/역설감지)
-    - 적응형 질문 선택 알고리즘 (신뢰도 기반 다음 질문 추천)
-    - Daily Micro-Learning 3문항 선택 로직
-  - AC2: `docs/design/persona-world-v3.md` §9 전면 개편
-    - LIGHT(14문항, 2분) → L1 7D
-    - STANDARD(36문항, 5분) → L1 7D + L2 5D
-    - DEEP(72문항, 10분) → L1 7D + L2 5D + 역설 감지 + 일관성 검증
-    - 질문 예시 전체 (차원별 2~8문항, 한글 실제 질문문)
-    - SNS → Init 알고리즘 연결 구체화
-    - 활동 기반 학습(Adapt) 구체화
-  - AC3: 커밋 + 푸시
+- [ ] **T44: 추가 질문 풀 126문항 SQL**
+  - 배경: T41에서 온보딩 24문항 설계 완료. 데일리 마이크로 질문용 추가 풀 필요 (매일 1문항 × ~4개월분)
+  - AC1: 126문항 SQL 마이그레이션 파일 작성
+    - L1 집중 42문항 (축당 6문항)
+    - L2 집중 30문항 (축당 6문항)
+    - L1↔L2 교차 36문항 (주요 조합 12쌍 × 3문항)
+    - 역설 심화 18문항 (역설 패턴 6종 × 3문항)
+  - AC2: 커밋 + 푸시
 
 - [ ] **T42: 매칭 설명 + 유저↔페르소나 일치도 시스템**
   - 배경: 유저가 "왜 이 페르소나가 나와 맞는지" 이해할 수 있어야 함. 숫자가 아닌 자연어 설명 필수
@@ -55,6 +48,27 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T41: 콜드스타트 질문 v3 전면 재설계 — 유저 프로파일링 시스템 v3** ✅ 2026-02-11
+  - AC1: `docs/design/persona-engine-v3.md` §19 신설 (v3.0-draft.13) — 유저 프로파일링 시스템 v3
+    - 하이브리드 시나리오 질문 (L1+L2 동시 측정, 4지선다, delta 적용 공식)
+    - 3-Phase 24문항 구조 (8+8+8, Phase별 L1주력/L2주력/교차검증, ~4분)
+    - 이탈 정책 (Phase 단위 저장, 미완료 Phase만 리셋)
+    - 프로필 품질 등급 (STARTER/STANDARD/ADVANCED/EXPERT)
+    - 데일리 마이크로 질문 + 크레딧 (PW 내부 화폐, uncertainty 기반 출제)
+    - SNS 연동 (8개 플랫폼, 비용 분석, 2-Stage 최적화, 병합 공식)
+    - 적응형 질문 선택 알고리즘 (uncertainty 기반 + LLM 생성 fallback)
+    - DB 스키마 6개 테이블 (profiling_questions, user_profiling_answers, user_profiling_status, user_vectors, user_sns_connections, user_coin_transactions)
+    - 매칭 정밀도 수렴 모델 (σ/√n, SNS 부스트, 수렴 시뮬레이션)
+  - AC2: `docs/design/persona-world-v3.md` §9 전면 개편 (v1.0-draft.3) — 7개 하위 섹션
+    - 온보딩 플로우 (회원가입→3-Phase→매칭 프리뷰→PersonaWorld 진입)
+    - 하이브리드 시나리오 질문 UI (카드 레이아웃, 게이미피케이션, 진행 바)
+    - Phase 구조 + 이탈 정책 UX (안내 문구, Phase별 저장 규칙)
+    - SNS 연동 UI (8개 플랫폼, 동의 관리 GDPR, 분석 진행 화면)
+    - 데일리 마이크로 질문 + 크레딧 (보상 구조, 연속 스트릭 UI)
+    - Phase 간 매칭 프리뷰 (페르소나 카드, 레이더 차트, 역설 패턴 설명)
+    - 프로필 품질 등급 + 유저 대시보드 + Engine Studio 관리 연동
+  - AC3: 커밋 + 푸시
 
 - [x] **T40: 노드 파라미터 편집 UI 스펙** ✅ 2026-02-11
   - AC1: `docs/specs/engine-studio.md` §3.10 — 노드별 파라미터 편집 UI 컴포넌트 스펙 (v3.3)
