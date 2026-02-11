@@ -26,13 +26,11 @@
 
 ---
 
-## guides/ — 개발/운영 가이드
+## guides/ — 개발 가이드
 
 | 문서 | 설명 |
 |------|------|
-| [development.md](guides/development.md) | 개발 가이드 — 기술 스택, 네이밍, API 설계 |
-| [deployment.md](guides/deployment.md) | 배포 가이드 |
-| [claude-code.md](guides/claude-code.md) | Claude Code 활용법 |
+| [development.md](guides/development.md) | 개발 가이드 — 기술 스택, 네이밍, API 설계, 배포 |
 
 ---
 
@@ -51,6 +49,7 @@
 | [persona-system-v2-design.md](archive/persona-system-v2-design.md) | v2 페르소나 설계서 (v3로 대체됨) |
 | [marketing-pricing-guide.md](archive/marketing-pricing-guide.md) | 마케팅/가격 전략 가이드 |
 | [landing-page-image-request.md](archive/landing-page-image-request.md) | 랜딩페이지 이미지 요청서 |
+| [claude-code-legacy.md](archive/claude-code-legacy.md) | Claude Code 가이드 (Python/FastAPI 기준, 구버전) |
 
 ---
 
