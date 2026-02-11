@@ -86,6 +86,24 @@
   - AC6: 6-Category 일관성 검증기 (구조/L1↔L2/L2↔L3/정성↔정량/교차축/동적)
   - AC7: 테스트 + 커밋 + 푸시
 
+- [ ] **T72: 정성적 차원 생성기 — Backstory + Voice + Pressure + Zeitgeist**
+  - 배경: 구현계획서 Phase 3. 벡터 너머의 정성적 페르소나 깊이
+  - AC1: Backstory 생성기 (배경 서사, 경험, 동기)
+  - AC2: Voice Profile 생성기 (말투, 어휘 수준, 커뮤니케이션 스타일)
+  - AC3: Pressure Context 생성기 (스트레스 반응, 압박 상황 행동 패턴)
+  - AC4: Zeitgeist Profile 생성기 (시대적 감수성, 트렌드 반응)
+  - AC5: 정성적 차원 에디터 UI (텍스트 에디터 + LLM 제안)
+  - AC6: 테스트 + 커밋 + 푸시
+
+- [ ] **T73: 하이브리드 연결 메커니즘 — Init/Override/Adapt/Express**
+  - 배경: 구현계획서 Phase 4. 정성↔정량 4대 알고리즘
+  - AC1: Init 알고리즘 (LLM 키워드 추출 → 의미 카테고리 → 벡터 delta)
+  - AC2: Override 알고리즘 (2단계 트리거 감지, override/additive delta, 지수 감쇠 복귀)
+  - AC3: Adapt 알고리즘 (UIV 3축 분석, 차원별 α 튜닝, 모멘텀, ±0.3 클램프)
+  - AC4: Express 알고리즘 (파생 상태값 5종, sigmoid 공식, quirk 스키마, cooldown)
+  - AC5: attitude→delta 매핑 상수 + 통합 InteractionEngine
+  - AC6: 단위 테스트 + 커밋 + 푸시
+
 - [ ] **T53: 프롬프트 엔지니어링 — 버전 관리 + 테스트 + 빌더**
   - 배경: 스펙 §3.3. 프롬프트 작성, 버전 관리, 테스트
   - AC1: 프롬프트 에디터 UI (basePrompt, reviewPrompt, postPrompt 등)
