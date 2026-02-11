@@ -19,6 +19,20 @@
 
 ## ✅ DONE (완료)
 
+- [x] **T31: 품질 측정 강화 — Auto-Interview + Integrity Score + 인터랙션 로그** ✅ 2026-02-11
+  - 변경: `docs/persona-engine-v3-design.md` (v3.0-draft.8)
+    - §16.6 Auto-Interview 프로토콜: 20문항(L1 7+L2 5+L3 4+역설 4), 벡터 추론, pass/warning/fail
+    - §16.7 Persona Integrity Score: CR(0.35)+SC(0.35)+CS(0.30), LLM-as-Judge
+    - §6.2 인터랙션 로그 스키마: 턴 단위 로그, 세션 메타데이터, 네트워크 분석용 엣지
+  - 변경: `docs/persona-engine-v3-implementation-plan.md` (v1.10)
+    - §3.4 InteractionLog/InteractionSession Prisma 모델 + TypeScript 타입
+    - §16.7 Auto-Interview 구현 (질문 생성기+벡터 추론+차원별 비교)
+    - §16.8 Persona Integrity Score 구현 (CR+SC+CS 3-component)
+    - §16.9 인터랙션 로그 수집기 (세션 관리+턴 로깅+메트릭 집계)
+    - Phase 9 태스크 9-23~9-32로 확장
+    - 파일 변경 맵: auto-interview.ts, integrity-score.ts, interaction-logger.ts 추가
+  - 테스트: 설계 문서 — 코드 구현 아님
+
 - [x] **T30: 일관성 검증 완성 + 차원 표기 수정** ✅ 2026-02-10
   - 변경: `docs/persona-engine-v3-design.md` (v3.0-draft.7)
     - §11 전면 개편: 6-Category 검증(구조/L1↔L2/L2↔L3/정성↔정량/교차축/동적)
