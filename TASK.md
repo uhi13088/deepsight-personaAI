@@ -7,7 +7,44 @@
 
 ## 📋 QUEUE (대기)
 
-(없음)
+- [ ] **T41: 콜드스타트 질문 v3 전면 재설계 — L1(7D) + L2(5D) 12차원**
+  - 배경: v2 콜드스타트(6D 기반)를 v3 106D+ 시스템에 맞게 완전 재설계. PersonaWorld 유저 프로파일링의 핵심
+  - AC1: `docs/design/persona-engine-v3.md` — 유저 프로파일링 시스템 v3 섹션 신설
+    - 유저 벡터 수집 범위 정의 (L1 7D + L2 5D, L3 미수집 확정)
+    - 질문 유형별 설계 원칙 (강제선택/시나리오/A·B비교/역설감지)
+    - 적응형 질문 선택 알고리즘 (신뢰도 기반 다음 질문 추천)
+    - Daily Micro-Learning 3문항 선택 로직
+  - AC2: `docs/design/persona-world-v3.md` §9 전면 개편
+    - LIGHT(14문항, 2분) → L1 7D
+    - STANDARD(36문항, 5분) → L1 7D + L2 5D
+    - DEEP(72문항, 10분) → L1 7D + L2 5D + 역설 감지 + 일관성 검증
+    - 질문 예시 전체 (차원별 2~8문항, 한글 실제 질문문)
+    - SNS → Init 알고리즘 연결 구체화
+    - 활동 기반 학습(Adapt) 구체화
+  - AC3: 커밋 + 푸시
+
+- [ ] **T42: 매칭 설명 + 유저↔페르소나 일치도 시스템**
+  - 배경: 유저가 "왜 이 페르소나가 나와 맞는지" 이해할 수 있어야 함. 숫자가 아닌 자연어 설명 필수
+  - AC1: `docs/design/persona-engine-v3.md` — 매칭 설명 시스템 섹션 신설
+    - 유저↔페르소나 일치도 계산 공식 (차원별 %, 종합 %)
+    - LLM 기반 자연어 설명 생성 (Sonnet, 프롬프트 설계)
+    - 차원별 일치/불일치 하이라이트 로직
+    - 교차축 기반 "의외의 공통점" 발견 로직
+  - AC2: `docs/specs/persona-world.md` / `persona-world-ui.md` — 매칭 설명 UI 스펙
+    - 매칭 카드 UI (일치율 %, 차원별 바, 자연어 설명)
+    - "왜 추천했는지" 상세 뷰 (교차축 하이라이트, 역설 호환성)
+  - AC3: 커밋 + 푸시
+
+- [ ] **T43: 개발자 콘솔 유저 프로필 API v3 + 동의 관리**
+  - 배경: 유저 프로파일 데이터를 외부 플랫폼에 안전하게 공유. GDPR/개인정보 동의 필수
+  - AC1: `docs/specs/developer-console.md` §9 — 유저 프로필 API v3 확장
+    - GET /v1/users/{id}/profile v3 (L1+L2 벡터, 교차축, 동의 상태, 프로필 품질)
+    - POST /v1/users/{id}/onboarding v3 (L1 7D + L2 5D 응답)
+    - GET /v1/users/{id}/consent (동의 항목 조회)
+    - POST /v1/users/{id}/consent (동의 관리)
+  - AC2: `docs/specs/engine-studio.md` — 콜드스타트 질문 관리 UI
+    - 질문 세트 CRUD, 질문 순서/가중치 편집, 모드별(LIGHT/STANDARD/DEEP) 관리
+  - AC3: 커밋 + 푸시
 
 ---
 
