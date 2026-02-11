@@ -7,16 +7,6 @@
 
 ## 📋 QUEUE (대기)
 
-- [ ] **T38: 노드 에디터 분기 노드(Conditional/Switch) 추가 설계**
-  - 배경: 현재 순수 DAG — 모든 노드 무조건 실행. 유니크한 페르소나 생성을 위한 조건부 분기 필요
-  - AC1: `docs/design/persona-engine-v3.md` §14 — Conditional Node, Switch Node 설계
-    - 멀티 아웃풋 포트, 조건 평가 로직, 분기별 실행 경로
-    - Paradox Score 기반 분기, 아키타입 기반 분기 등 유즈케이스
-  - AC2: `docs/design/persona-engine-v3-impl.md` §13 — 분기 노드 구현 스펙
-    - ConditionalNode/SwitchNode 타입, 포트 정의, DAG 평가 엔진 확장
-    - Phase 8 태스크 추가
-  - AC3: 커밋 + 푸시
-
 - [ ] **T39: 페르소나 필터 API 정식 스펙**
   - 배경: Enterprise 고객이 5,000+ 페르소나에서 자사에 맞는 걸 선택해야 함. 현재 API는 role/expertise만 지원
   - AC1: `docs/specs/developer-console.md` §9 — 필터 API 엔드포인트 정식 스펙
@@ -40,6 +30,24 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T38: 노드 에디터 분기 노드(Conditional/Switch) 추가 설계** ✅ 2026-02-11
+  - AC1: `docs/design/persona-engine-v3.md` §14.9 — Control Flow 3종 설계 (v3.0-draft.12)
+    - Conditional Node (threshold/range/enum/exists 4종 조건, True/False 분기)
+    - Switch Node (threshold-band/enum-match 2종, N개 케이스 분기)
+    - Merge Node (first-active/combine 합류 전략)
+    - DAG 평가 엔진 활성 엣지 확장, 포트 타입 Any, 그래프 검증 분기 규칙 4종
+    - 유즈케이스 4종(역설 분기/아키타입 라우팅/L3 유무/검증 결과별 배포)
+    - 전체 노드 22→25종, 카테고리 5→6개
+  - AC2: `docs/design/persona-engine-v3-impl.md` §13.13 — 분기 노드 구현 스펙 (v1.14)
+    - ConditionalNodeData/SwitchNodeData/MergeNodeData 타입 정의
+    - executeConditional/executeSwitch/executeMerge 실행 함수
+    - evaluateGraphWithBranching (활성 엣지 추적, ExecutionPath, 비활성 경로 스킵)
+    - collectInputsFromActiveEdges 헬퍼
+    - 그래프 검증 분기 규칙 (합류 필수/데드엔드/도달 가능성/기본 케이스)
+    - 포트 타입 Any, 노드 레지스트리 Control Flow 카테고리
+    - Phase 8 태스크 8-27~8-30 추가
+  - AC3: 커밋 + 푸시
 
 - [x] **T37: 노드 에디터 execute() 로직 정의 — 22개 노드 전체** ✅ 2026-02-11
   - AC1: `docs/design/persona-engine-v3.md` §14.8 — 22개 노드 execute() 설계 정의 (v3.0-draft.11)

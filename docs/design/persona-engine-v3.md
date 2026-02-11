@@ -5,7 +5,7 @@
 > **문서 정보**
 >
 > - 작성일: 2026-02-10
-> - 버전: v3.0-draft.11
+> - 버전: v3.0-draft.12
 > - 상태: 설계 단계
 > - 이전 버전: `docs/archive/persona-system-v2-design.md`
 
@@ -26,6 +26,7 @@
 | v3.0-draft.9 | 2026-02-11 | ConsumptionMemory 레이어 추가 (T33) — §15.2 데이터 소스에 ConsumptionLog 추가, §15.3 RAG 컨텍스트에 [E] 소비 기억 ~200 tok 신설 (4→5 검색 항목), §15.4 "소비↔기억 괴리" 문제 해결 패턴 추가, §15.5 비용 재산정 (3,900→4,100 tok, 127→134원/월) |
 | v3.0-draft.10 | 2026-02-11 | 용어 통일 (T36) — 전체 문서 "106D+" 표기 통일 |
 | v3.0-draft.11 | 2026-02-11 | 노드 실행 로직 (T37) — §14.8 신설: 22개 노드 execute() 정의. Input 5종(데이터 패스스루/벡터 검증/아키타입 로드), Engine 4종(Paradox 83축+EPS/Pressure 감쇠/V_Final 투영 합산/Projection α+β), Generation 7종(LLM Sonnet 구조화 출력, activity-gen만 규칙 기반), Assembly 2종(프롬프트 조립/Init-Override-Adapt-Express 규칙 병합), Output 4종(6-Category 검증/P-inger Print 3종/테스트 시뮬레이션/Deploy). 평가 전략 분류(Eager 14개/Manual 8개) |
+| v3.0-draft.12 | 2026-02-11 | 분기 노드 (T38) — §14.9 신설: Control Flow 카테고리 3종(Conditional/Switch/Merge). DAG 평가 엔진 활성 엣지 확장, 포트 타입 Any 추가, 그래프 검증 분기 규칙 4종. 유즈케이스 4종(역설 분기/아키타입 라우팅/L3 유무/검증 결과별 배포). 전체 노드 22→25종, 카테고리 5→6개 |
 
 ---
 
@@ -3059,6 +3060,312 @@ execute(data, inputs):
 | ⑳ | fingerprint | Output | 레이더 + 2D 지문 + 3D Jacks | Eager | — |
 | ㉑ | test-sim | Output | 테스트 시나리오 실행 + 품질 평가 | Manual | Sonnet |
 | ㉒ | deploy | Output | 최종 검증 + DB 저장 + 활성화 | Manual | — |
+
+### 14.9 분기 노드 (Control Flow Nodes)
+
+#### 14.9.1 설계 동기
+
+§14.8의 22개 노드는 DAG에서 **모든 노드가 무조건 실행**되는 구조이다. 그러나 실제 페르소나 설계에서는 **조건에 따라 다른 경로**를 택해야 하는 경우가 빈번하다:
+
+- **역설 강도별 분기**: Paradox Score가 높은 페르소나에게는 깊은 캐릭터 생성, 낮으면 간결한 생성
+- **아키타입별 라우팅**: 아키타입 유형에 따라 서로 다른 프롬프트 템플릿 사용
+- **레이어 유무 분기**: L3 벡터가 없으면 L1↔L2만으로 계산, 있으면 3-Layer 전체
+- **검증 결과별 분기**: 일관성 점수에 따라 자동 배포 / 수동 리뷰 / 재생성 경로 선택
+
+이를 위해 **Control Flow** 카테고리의 3개 노드를 추가한다:
+
+| 노드 | 역할 | 출력 포트 |
+|------|------|-----------|
+| **Conditional** | if-then-else — 하나의 조건 평가 → 2개 분기 | True, False |
+| **Switch** | 다중 분기 — 값 범위/열거형 매칭 → N개 분기 | Case1, Case2, ..., CaseN |
+| **Merge** | 분기 합류 — 여러 경로의 결과를 하나로 합침 | 단일 출력 |
+
+#### 14.9.2 DAG 평가 엔진 확장
+
+기존 `evaluateGraph`(§14.5)는 모든 노드를 무조건 실행한다. 분기를 지원하기 위해 **활성 엣지(Active Edge)** 개념을 도입한다.
+
+**핵심 변경:**
+1. 입력 노드(진입점)에서 나가는 모든 엣지는 **기본 활성**
+2. 일반 노드가 실행되면, 해당 노드에서 나가는 모든 엣지가 **활성**
+3. Conditional/Switch 노드가 실행되면, **조건에 맞는 출력 포트의 엣지만 활성**
+4. 노드는 **하나 이상의 활성 입력 엣지가 있어야** 실행됨. 없으면 **스킵**
+5. 스킵된 노드 하위의 모든 노드도 연쇄적으로 스킵 (활성 엣지 없음)
+
+```
+평가 순서 (확장):
+  sorted = topologicalSort(graph)
+  activeEdges = Set()
+  executionPath = []
+
+  for each nodeId in sorted:
+    node = graph.nodes[nodeId]
+    incomingEdges = node의 입력 엣지들
+
+    // 입력 엣지 중 활성인 것이 없으면 스킵
+    if (incomingEdges 존재 AND 활성 입력 엣지 없음):
+      executionPath.push({ nodeId, executed: false, reason: "비활성 경로" })
+      continue
+
+    // 활성 엣지에서만 입력 수집
+    inputs = collectInputsFromActiveEdges(node, activeEdges, results)
+
+    // 노드 실행
+    output = executeNode(node.type, node.data, inputs)
+    results.set(nodeId, output)
+
+    // 출력 엣지 활성화 결정
+    outgoingEdges = node에서 나가는 엣지들
+    if (node.type == 'conditional'):
+      branch = output.branchTaken  // 'true' | 'false'
+      branch 포트의 엣지만 활성화
+    elif (node.type == 'switch'):
+      activeCases = output.activeCases  // ['case_high'] 등
+      해당 case 포트의 엣지만 활성화
+    else:
+      모든 출력 엣지 활성화
+
+    executionPath.push({ nodeId, executed: true, branch? })
+```
+
+**실행 경로 추적**: 모든 노드의 실행/스킵 여부, 분기 결정 이유가 `executionPath`에 기록된다. UI에서 이를 시각적으로 표시한다 (활성 엣지는 굵게, 비활성은 회색 점선).
+
+#### 14.9.3 Conditional Node (조건 분기)
+
+하나의 값을 평가하여 True/False 두 경로로 분기한다.
+
+| 항목 | 값 |
+|------|-----|
+| 카테고리 | **Control Flow** |
+| data | `{ conditionType, operator?, threshold?, rangeMin?, rangeMax?, enumValue?, trueLabel?, falseLabel? }` |
+| 입력 포트 | `value: Any` — 평가할 값 (숫자, 문자열, 불리언) |
+| 출력 포트 | `true: Any`, `false: Any` — 조건 결과에 따른 분기 |
+| 평가 전략 | Eager |
+
+**조건 유형:**
+
+| conditionType | 평가 방식 | 예시 |
+|---------------|-----------|------|
+| `threshold` | `value [operator] threshold` | `extendedScore > 0.6` |
+| `range` | `rangeMin ≤ value ≤ rangeMax` | `0.3 ≤ consistency ≤ 0.7` |
+| `enum` | `value == enumValue` | `archetypeId == 'SAGE'` |
+| `exists` | `value != null && value != undefined` | L3 벡터 존재 여부 |
+
+```
+execute(data, inputs):
+  value = inputs.value
+  conditionMet = false
+
+  switch (data.conditionType):
+    case 'threshold':
+      conditionMet = evaluate(value, data.operator, data.threshold)
+    case 'range':
+      conditionMet = (value >= data.rangeMin AND value <= data.rangeMax)
+    case 'enum':
+      conditionMet = (value == data.enumValue)
+    case 'exists':
+      conditionMet = (value != null)
+
+  return {
+    branchTaken: conditionMet ? 'true' : 'false',
+    reason: describeCondition(data, value),
+    value: value   // 원본 값을 분기 경로로 패스스루
+  }
+```
+
+> **패스스루**: Conditional 노드는 입력 값을 **변환하지 않고** 그대로 선택된 분기로 전달한다. 이렇게 하면 분기 후 노드가 원래 타입의 데이터를 그대로 사용할 수 있다.
+
+#### 14.9.4 Switch Node (다중 분기)
+
+하나의 값을 여러 구간/케이스로 분류하여 N개 경로 중 하나로 분기한다.
+
+| 항목 | 값 |
+|------|-----|
+| 카테고리 | **Control Flow** |
+| data | `{ switchMode, bands?, enumCases?, defaultCaseId? }` |
+| 입력 포트 | `selector: Any` — 분류할 값 |
+| 출력 포트 | `case_[id]: Any` (동적 — 케이스 수만큼) |
+| 평가 전략 | Eager |
+
+**분류 모드:**
+
+| switchMode | 설명 | 출력 포트 예시 |
+|------------|------|----------------|
+| `threshold-band` | 숫자 구간 분류 | case_low (0~0.33), case_med (0.33~0.66), case_high (0.66~1.0) |
+| `enum-match` | 열거형 매칭 | case_sage, case_hero, case_caregiver, ... |
+
+```
+execute(data, inputs):
+  value = inputs.selector
+  activeCases = []
+
+  switch (data.switchMode):
+    case 'threshold-band':
+      for each band in data.bands:
+        if (value >= band.min AND value < band.max):
+          activeCases.push(band.id)
+          break
+      // 경계값 처리: 1.0이 마지막 band에 포함
+      if (activeCases.empty AND value == lastBand.max):
+        activeCases.push(lastBand.id)
+
+    case 'enum-match':
+      if (value in data.enumCases):
+        activeCases.push(data.enumCases[value].id)
+
+  // 매칭 없으면 default
+  if (activeCases.empty AND data.defaultCaseId):
+    activeCases.push(data.defaultCaseId)
+
+  return {
+    activeCases,
+    selectedValue: value,
+    caseLabel: describeCaseMatch(data, activeCases)
+  }
+```
+
+#### 14.9.5 Merge Node (분기 합류)
+
+여러 분기 경로의 결과를 하나로 합친다. Conditional/Switch로 갈라진 경로가 다시 만나는 지점에서 사용한다.
+
+| 항목 | 값 |
+|------|-----|
+| 카테고리 | **Control Flow** |
+| data | `{ mergeStrategy?: 'first-active' \| 'combine' }` |
+| 입력 포트 | `input_1: Any`, `input_2: Any`, ... (다중 입력, `multi: true`) |
+| 출력 포트 | `merged: Any` — 합류된 결과 |
+| 평가 전략 | Eager |
+
+**합류 전략:**
+
+| mergeStrategy | 설명 |
+|---------------|------|
+| `first-active` (기본) | 활성 입력 중 첫 번째 값을 출력. Conditional 분기 합류에 적합 (항상 하나만 활성) |
+| `combine` | 모든 활성 입력을 배열로 합쳐 출력. 병렬 생성 결과 수집에 적합 |
+
+```
+execute(data, inputs):
+  activeInputs = inputs에서 null/undefined가 아닌 값들
+
+  if (data.mergeStrategy == 'combine'):
+    return { merged: activeInputs }
+  else:  // 'first-active'
+    return { merged: activeInputs[0] }
+```
+
+#### 14.9.6 포트 타입 확장
+
+분기 노드를 위해 포트 타입 시스템(§14.4)에 다음을 추가한다:
+
+| 포트 타입 | 용도 | 호환성 |
+|-----------|------|--------|
+| `Any` | 범용 — 모든 타입의 데이터 수용 | 모든 기존 타입과 호환 |
+
+> **설계 결정**: `ConditionalBranch`나 `SwitchCase` 같은 별도 타입을 두지 않는다. 대신 `Any` 타입 하나로 통일하여, 분기 노드가 **어떤 데이터든 받아서 그대로 패스스루**하는 구조를 취한다. 이렇게 하면 기존 22개 노드의 포트 시스템을 수정하지 않아도 된다.
+
+**호환성 규칙 추가:**
+```
+PORT_COMPATIBILITY에 추가:
+  Any: [모든 기존 PortType]
+  각 기존 PortType에 'Any' 추가
+```
+
+#### 14.9.7 그래프 검증 확장
+
+분기 도입에 따라 그래프 검증(§13.8)에 다음 규칙을 추가한다:
+
+| 검증 규칙 | 수준 | 설명 |
+|-----------|------|------|
+| **분기 합류 필수** | Warning | Conditional/Switch에서 갈라진 경로가 Merge 없이 같은 노드에 연결되면 경고 |
+| **데드엔드 없음** | Warning | 분기 경로 중 Deploy까지 도달하지 못하는 경로가 있으면 경고 |
+| **도달 가능성** | Error | 어떤 Input에서도 도달할 수 없는 노드가 있으면 오류 |
+| **Switch 기본 케이스** | Info | Switch에 default 케이스가 없으면 참고 표시 (매칭 안 되면 전체 스킵) |
+
+#### 14.9.8 유즈케이스
+
+**① 역설 강도별 캐릭터 생성 분기**
+
+```
+[L1] → [L2] → [Paradox Calculator] → extendedScore
+                                          ↓
+                                    [Conditional: > 0.6?]
+                                    /                \
+                                 True              False
+                                 /                    \
+                    [Character Gen          [Character Gen
+                     (깊은 역설 강조)]        (단순 특성)]
+                                 \                    /
+                                    [Merge]
+                                      ↓
+                                [Prompt Builder] → [Deploy]
+```
+
+역설 점수가 높으면 복잡한 캐릭터 생성, 낮으면 간결한 생성. 같은 프롬프트 빌더로 합류.
+
+**② 아키타입별 프롬프트 라우팅**
+
+```
+[Archetype Select] → archetypeId
+                          ↓
+                    [Switch: enum-match]
+                    /      |       \
+                 SAGE    HERO   CAREGIVER
+                 /        |        \
+          [Sage      [Hero     [Caregiver
+           Voice]     Voice]     Voice]
+                 \        |        /
+                     [Merge]
+                       ↓
+                 [Prompt Builder]
+```
+
+아키타입마다 특화된 Voice 생성 프롬프트를 사용. 같은 Voice 타입으로 합류.
+
+**③ L3 유무에 따른 계산 분기**
+
+```
+[L1] → [L2] → [L3?]
+                 ↓
+           [Conditional: L3 exists?]
+           /                \
+        True              False
+        /                    \
+[Paradox 3-Layer]    [Paradox L1↔L2 only]
+        \                    /
+           [Merge]
+             ↓
+          [V_Final]
+```
+
+L3 벡터가 없으면 L1↔L2만으로 역설 계산. 하위 호환성의 분기적 구현.
+
+**④ 검증 결과별 배포 경로**
+
+```
+[Consistency Check] → score
+                        ↓
+                  [Switch: threshold-band]
+                  /        |          \
+               POOR     FAIR       GOOD
+               (< 0.7)  (0.7~0.9)  (≥ 0.9)
+               /          |           \
+          [재생성      [수동       [자동
+           경고]      리뷰 플래그]   Deploy]
+```
+
+일관성 점수에 따라 배포 경로가 달라짐. 낮으면 재생성 권고, 높으면 자동 배포.
+
+#### 14.9.9 노드 카테고리 최종 정리
+
+분기 노드 추가로 전체 노드는 6개 카테고리, **25종**이 된다:
+
+| 카테고리 | 노드 수 | 노드 목록 |
+|----------|---------|-----------|
+| **Input** | 5 | basic-info, l1-vector, l2-vector, l3-vector, archetype-select |
+| **Engine** | 4 | paradox-calc, pressure-ctrl, v-final, projection |
+| **Control Flow** | 3 | **conditional**, **switch**, **merge** |
+| **Generation** | 7 | character-gen, backstory-gen, voice-gen, activity-gen, content-gen, pressure-gen, zeitgeist-gen |
+| **Assembly** | 2 | prompt-builder, interaction-rules |
+| **Output** | 4 | consistency, fingerprint, test-sim, deploy |
 
 ---
 

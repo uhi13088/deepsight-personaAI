@@ -5,7 +5,7 @@
 > **문서 정보**
 >
 > - 작성일: 2026-02-10
-> - 버전: v1.13
+> - 버전: v1.14
 > - 상태: 확정 — 구현 대기
 > - 관련 문서: `docs/design/persona-engine-v3.md` (설계서)
 > - 목적: 설계서의 "무엇을"에 대응하는 "어떻게" — 이 문서만 보고 구현 가능
@@ -30,6 +30,7 @@
 | v1.11 | 2026-02-11 | Phase 태스크 재배치 — InteractionLog 스키마→Phase 0(0-21~0-22, 기반 인프라), Auto-Interview→Phase 2(2-11~2-13, 생성 직후 품질 게이트), Integrity Score+Logger는 Phase 9 유지(9-23~9-29로 재번호). Phase 0 제목에 인터랙션 로그 스키마, Phase 2 제목에 Auto-Interview 품질 게이트 추가 |
 | v1.12 | 2026-02-11 | 용어 통일 (T36) — 전체 문서 "106D+" 표기 통일 |
 | v1.13 | 2026-02-11 | 노드 실행 로직 (T37) — Section 13.12 신설: 22개 노드 executeNode() 구현 상세. 디스패처, Input 5종, Engine 4종(Paradox/Pressure/VFinal/Projection), Generation 7종(LLM 호출 패턴), Assembly 2종, Output 4종. 평가 전략별 실행 분류(Eager 14개/Manual 8개). Phase 8 태스크 8-23~8-26 추가(executor, helpers, prompts, tests) |
+| v1.14 | 2026-02-11 | 분기 노드 구현 스펙 (T38) — Section 13.13 신설: Control Flow 3종(Conditional/Switch/Merge) 실행 함수. ConditionalNodeData(threshold/range/enum/exists 4종 조건), SwitchNodeData(threshold-band/enum-match), MergeNodeData(first-active/combine). evaluateGraphWithBranching(활성 엣지 추적, ExecutionPath 기록, 비활성 경로 스킵). 그래프 검증 분기 규칙 4종(합류 필수/데드엔드/도달 가능성/기본 케이스). PortType에 'Any' 추가. 노드 레지스트리 Control Flow 카테고리. Phase 8 태스크 8-27~8-30 추가 |
 
 ---
 
@@ -4172,6 +4173,753 @@ T37에서 정의한 노드 실행 로직의 구현은 다음 파일에 집중된
 | `src/lib/node-graph/llm-prompts/` | Generation 노드용 LLM 프롬프트 템플릿 디렉토리 | **8-25 (신규)** |
 | `src/lib/node-graph/__tests__/node-executor.test.ts` | 노드 실행 함수 단위 테스트 | **8-26 (신규)** |
 
+### 13.13 분기 노드 실행 함수 (Control Flow Nodes)
+
+> 설계서 §14.9 참조. 3개의 Control Flow 노드(Conditional, Switch, Merge)와
+> DAG 평가 엔진의 활성 엣지(Active Edge) 확장을 구현한다.
+
+#### 13.13.1 분기 노드 타입 정의
+
+```typescript
+// src/lib/node-graph/control-flow-types.ts
+
+// ── Conditional Node ──
+
+type ConditionType = 'threshold' | 'range' | 'enum' | 'exists'
+type ComparisonOperator = '>' | '>=' | '<' | '<=' | '==' | '!='
+
+interface ConditionalNodeData {
+  conditionType: ConditionType
+  operator?: ComparisonOperator    // threshold 모드 전용
+  threshold?: number               // threshold 모드 전용
+  rangeMin?: number                // range 모드 전용
+  rangeMax?: number                // range 모드 전용
+  enumValue?: string               // enum 모드 전용
+  trueLabel?: string               // UI 표시용 (예: "High Paradox")
+  falseLabel?: string              // UI 표시용 (예: "Low Paradox")
+}
+
+interface ConditionalOutput {
+  branchTaken: 'true' | 'false'
+  reason: string                   // 분기 결정 이유 (UI 표시용)
+  value: unknown                   // 원본 값 패스스루
+}
+
+// ── Switch Node ──
+
+type SwitchMode = 'threshold-band' | 'enum-match'
+
+interface ThresholdBand {
+  id: string                       // 케이스 식별자 (예: "low", "med", "high")
+  label: string                    // UI 표시명
+  min: number                      // 구간 하한 (포함)
+  max: number                      // 구간 상한 (미포함, 마지막 band는 포함)
+}
+
+interface EnumCase {
+  id: string                       // 케이스 식별자
+  label: string                    // UI 표시명
+  matchValues: string[]            // 매칭할 값 목록 (OR 조건)
+}
+
+interface SwitchNodeData {
+  switchMode: SwitchMode
+  bands?: ThresholdBand[]          // threshold-band 모드 전용
+  enumCases?: EnumCase[]           // enum-match 모드 전용
+  defaultCaseId?: string           // 매칭 없을 때 기본 케이스
+}
+
+interface SwitchOutput {
+  activeCases: string[]            // 활성화된 케이스 ID 목록 (보통 1개)
+  selectedValue: unknown           // 원본 selector 값
+  caseLabel: string                // 매칭된 케이스 레이블
+}
+
+// ── Merge Node ──
+
+type MergeStrategy = 'first-active' | 'combine'
+
+interface MergeNodeData {
+  mergeStrategy?: MergeStrategy    // 기본: 'first-active'
+}
+
+interface MergeOutput {
+  merged: unknown                  // 합류된 결과
+  activeCount: number              // 활성 입력 개수
+  source: string                   // 어느 입력에서 왔는지 (first-active 시)
+}
+
+// ── Active Edge 추적 ──
+
+interface EdgeActivation {
+  edgeId: string
+  sourceNodeId: string
+  sourcePort: string
+  targetNodeId: string
+  targetPort: string
+  active: boolean
+}
+
+interface ExecutionPathEntry {
+  nodeId: string
+  nodeType: string
+  executed: boolean
+  reason?: string                  // 스킵 시 사유 (예: "비활성 경로")
+  branchTaken?: string             // Conditional/Switch의 분기 결과
+  duration?: number                // 실행 소요 시간 (ms)
+}
+
+interface BranchingEvaluationResult {
+  results: Map<string, NodeOutput>
+  executionPath: ExecutionPathEntry[]
+  activeEdges: Set<string>         // 활성화된 엣지 ID Set
+}
+```
+
+#### 13.13.2 분기 노드 실행 함수
+
+```typescript
+// src/lib/node-graph/node-executor.ts (executeNode 디스패처에 추가)
+
+// ── ㉓ conditional ──
+function executeConditional(
+  data: ConditionalNodeData,
+  inputs: Record<string, unknown>
+): ConditionalOutput {
+  const value = inputs.value
+
+  let conditionMet = false
+
+  switch (data.conditionType) {
+    case 'threshold': {
+      const numValue = Number(value)
+      if (Number.isNaN(numValue)) {
+        throw new NodeExecutionError('conditional',
+          `threshold 조건에 숫자가 아닌 값: ${String(value)}`)
+      }
+      conditionMet = evaluateComparison(numValue, data.operator!, data.threshold!)
+      break
+    }
+
+    case 'range': {
+      const numValue = Number(value)
+      if (Number.isNaN(numValue)) {
+        throw new NodeExecutionError('conditional',
+          `range 조건에 숫자가 아닌 값: ${String(value)}`)
+      }
+      conditionMet = numValue >= data.rangeMin! && numValue <= data.rangeMax!
+      break
+    }
+
+    case 'enum': {
+      conditionMet = String(value) === data.enumValue
+      break
+    }
+
+    case 'exists': {
+      conditionMet = value != null && value !== undefined
+      // 빈 객체/배열도 존재로 간주
+      break
+    }
+  }
+
+  return {
+    branchTaken: conditionMet ? 'true' : 'false',
+    reason: describeCondition(data, value, conditionMet),
+    value, // 패스스루 — 원본 값을 분기 경로로 전달
+  }
+}
+
+// ── ㉔ switch ──
+function executeSwitch(
+  data: SwitchNodeData,
+  inputs: Record<string, unknown>
+): SwitchOutput {
+  const value = inputs.selector
+  const activeCases: string[] = []
+
+  switch (data.switchMode) {
+    case 'threshold-band': {
+      const numValue = Number(value)
+      if (Number.isNaN(numValue)) {
+        throw new NodeExecutionError('switch',
+          `threshold-band에 숫자가 아닌 값: ${String(value)}`)
+      }
+      const bands = data.bands ?? []
+      for (let i = 0; i < bands.length; i++) {
+        const band = bands[i]
+        const isLast = i === bands.length - 1
+        // 마지막 band는 상한 포함 (<=), 나머지는 미포함 (<)
+        if (numValue >= band.min && (isLast ? numValue <= band.max : numValue < band.max)) {
+          activeCases.push(band.id)
+          break
+        }
+      }
+      break
+    }
+
+    case 'enum-match': {
+      const strValue = String(value)
+      const cases = data.enumCases ?? []
+      for (const c of cases) {
+        if (c.matchValues.includes(strValue)) {
+          activeCases.push(c.id)
+          break
+        }
+      }
+      break
+    }
+  }
+
+  // 매칭 없으면 default
+  if (activeCases.length === 0 && data.defaultCaseId) {
+    activeCases.push(data.defaultCaseId)
+  }
+
+  const matchedLabel = activeCases.length > 0
+    ? findCaseLabel(data, activeCases[0])
+    : '(매칭 없음)'
+
+  return {
+    activeCases,
+    selectedValue: value,
+    caseLabel: matchedLabel,
+  }
+}
+
+// ── ㉕ merge ──
+function executeMerge(
+  data: MergeNodeData,
+  inputs: Record<string, unknown>
+): MergeOutput {
+  // inputs는 collectInputsFromActiveEdges에 의해 활성 입력만 포함됨
+  const activeEntries = Object.entries(inputs).filter(([_, v]) => v != null)
+
+  if (activeEntries.length === 0) {
+    throw new NodeExecutionError('merge', '활성 입력이 없음 — 모든 분기가 비활성')
+  }
+
+  const strategy = data.mergeStrategy ?? 'first-active'
+
+  if (strategy === 'combine') {
+    return {
+      merged: activeEntries.map(([_, v]) => v),
+      activeCount: activeEntries.length,
+      source: activeEntries.map(([k]) => k).join('+'),
+    }
+  }
+
+  // first-active: 첫 번째 활성 입력 사용
+  const [sourceKey, sourceValue] = activeEntries[0]
+  return {
+    merged: sourceValue,
+    activeCount: activeEntries.length,
+    source: sourceKey,
+  }
+}
+```
+
+#### 13.13.3 헬퍼 함수
+
+```typescript
+// src/lib/node-graph/node-executor-helpers.ts (추가)
+
+/** threshold 비교 연산 */
+function evaluateComparison(
+  value: number,
+  operator: ComparisonOperator,
+  threshold: number
+): boolean {
+  switch (operator) {
+    case '>':  return value > threshold
+    case '>=': return value >= threshold
+    case '<':  return value < threshold
+    case '<=': return value <= threshold
+    case '==': return value === threshold
+    case '!=': return value !== threshold
+    default:   return false
+  }
+}
+
+/** 조건 결정 이유를 사람이 읽을 수 있는 문자열로 생성 */
+function describeCondition(
+  data: ConditionalNodeData,
+  value: unknown,
+  result: boolean
+): string {
+  const label = result ? (data.trueLabel ?? 'True') : (data.falseLabel ?? 'False')
+
+  switch (data.conditionType) {
+    case 'threshold':
+      return `${String(value)} ${data.operator} ${data.threshold} → ${label}`
+    case 'range':
+      return `${data.rangeMin} ≤ ${String(value)} ≤ ${data.rangeMax} → ${label}`
+    case 'enum':
+      return `${String(value)} == "${data.enumValue}" → ${label}`
+    case 'exists':
+      return `값 ${value != null ? '존재' : '없음'} → ${label}`
+  }
+}
+
+/** Switch 케이스의 레이블 조회 */
+function findCaseLabel(data: SwitchNodeData, caseId: string): string {
+  if (data.switchMode === 'threshold-band') {
+    return data.bands?.find(b => b.id === caseId)?.label ?? caseId
+  }
+  return data.enumCases?.find(c => c.id === caseId)?.label ?? caseId
+}
+```
+
+#### 13.13.4 DAG 평가 엔진 확장 — 활성 엣지 추적
+
+```typescript
+// src/lib/node-graph/dag-engine.ts (evaluateGraph 대체)
+
+const CONTROL_FLOW_NODES = new Set(['conditional', 'switch', 'merge'])
+
+/**
+ * 분기를 지원하는 DAG 평가 엔진.
+ *
+ * 핵심 변경:
+ * 1. activeEdges Set으로 엣지별 활성/비활성 추적
+ * 2. 노드 실행 전, 활성 입력 엣지가 하나도 없으면 스킵
+ * 3. Conditional/Switch는 조건에 맞는 출력 엣지만 활성화
+ * 4. 일반 노드는 모든 출력 엣지 활성화
+ * 5. executionPath로 전체 실행 경로 기록 (UI 시각화용)
+ */
+export async function evaluateGraphWithBranching(
+  graph: GraphState,
+  context: ExecuteContext,
+  options: { manualNodeId?: string }
+): Promise<BranchingEvaluationResult> {
+  const sorted = topologicalSort(graph)
+  const results = new Map<string, NodeOutput>()
+  const activeEdges = new Set<string>()  // 활성 엣지 ID
+  const executionPath: ExecutionPathEntry[] = []
+
+  // ── 진입점(Input 노드) 식별 ──
+  const entryNodes = new Set(
+    graph.nodes
+      .filter(n => getIncomingEdges(n.id, graph.edges).length === 0)
+      .map(n => n.id)
+  )
+
+  for (const nodeId of sorted) {
+    const node = graph.nodes.find(n => n.id === nodeId)!
+    const incomingEdges = getIncomingEdges(nodeId, graph.edges)
+
+    // ── Step 1: 활성 입력 확인 ──
+    const isEntryNode = entryNodes.has(nodeId)
+    if (!isEntryNode && incomingEdges.length > 0) {
+      const hasActiveInput = incomingEdges.some(e => activeEdges.has(e.id))
+      if (!hasActiveInput) {
+        // 활성 입력 없음 → 스킵
+        executionPath.push({
+          nodeId,
+          nodeType: node.type,
+          executed: false,
+          reason: '비활성 경로 — 활성 입력 엣지 없음',
+        })
+        continue
+      }
+    }
+
+    // ── Step 2: Manual 노드 처리 ──
+    if (MANUAL_NODES.has(node.type) && options.manualNodeId !== nodeId) {
+      const cached = graph.evaluationCache?.get(nodeId)
+      if (cached) {
+        results.set(nodeId, cached)
+        // 캐시 사용 시에도 출력 엣지 활성화
+        activateAllOutgoingEdges(nodeId, graph.edges, activeEdges)
+      }
+      executionPath.push({
+        nodeId,
+        nodeType: node.type,
+        executed: false,
+        reason: cached ? 'Manual — 캐시 사용' : 'Manual — 실행 대기',
+      })
+      continue
+    }
+
+    // ── Step 3: 입력 수집 (활성 엣지에서만) ──
+    const inputs = collectInputsFromActiveEdges(
+      node, graph.edges, results, activeEdges, isEntryNode
+    )
+
+    // ── Step 4: 노드 실행 ──
+    const startTime = Date.now()
+    const output = await executeNode(node.type, node.data, inputs, context)
+    results.set(nodeId, output)
+
+    // ── Step 5: 출력 엣지 활성화 결정 ──
+    const outgoingEdges = getOutgoingEdges(nodeId, graph.edges)
+
+    if (node.type === 'conditional') {
+      const condOutput = output as ConditionalOutput
+      for (const edge of outgoingEdges) {
+        // sourceHandle이 'true' 또는 'false' — branchTaken과 일치하면 활성
+        if (edge.sourceHandle === condOutput.branchTaken) {
+          activeEdges.add(edge.id)
+        }
+      }
+      executionPath.push({
+        nodeId,
+        nodeType: node.type,
+        executed: true,
+        branchTaken: condOutput.branchTaken,
+        duration: Date.now() - startTime,
+      })
+    } else if (node.type === 'switch') {
+      const switchOutput = output as SwitchOutput
+      for (const edge of outgoingEdges) {
+        // sourceHandle이 'case_[id]' — activeCases에 해당하면 활성
+        const caseId = edge.sourceHandle?.replace('case_', '')
+        if (caseId && switchOutput.activeCases.includes(caseId)) {
+          activeEdges.add(edge.id)
+        }
+      }
+      executionPath.push({
+        nodeId,
+        nodeType: node.type,
+        executed: true,
+        branchTaken: switchOutput.activeCases.join(','),
+        duration: Date.now() - startTime,
+      })
+    } else {
+      // 일반 노드: 모든 출력 엣지 활성
+      activateAllOutgoingEdges(nodeId, graph.edges, activeEdges)
+      executionPath.push({
+        nodeId,
+        nodeType: node.type,
+        executed: true,
+        duration: Date.now() - startTime,
+      })
+    }
+  }
+
+  return { results, executionPath, activeEdges }
+}
+
+/** 활성 엣지에서만 입력을 수집한다 */
+function collectInputsFromActiveEdges(
+  node: GraphNode,
+  edges: GraphEdge[],
+  results: Map<string, NodeOutput>,
+  activeEdges: Set<string>,
+  isEntryNode: boolean
+): Record<string, unknown> {
+  const inputs: Record<string, unknown> = {}
+  const incomingEdges = edges.filter(e => e.target === node.id)
+
+  for (const edge of incomingEdges) {
+    // 진입점 노드는 엣지 활성 여부 무관 (입력 엣지가 없으므로)
+    if (!isEntryNode && !activeEdges.has(edge.id)) {
+      continue  // 비활성 엣지 → 무시
+    }
+
+    const sourceOutput = results.get(edge.source)
+    if (sourceOutput != null) {
+      const portKey = edge.targetHandle ?? edge.sourceHandle ?? 'default'
+      inputs[portKey] = sourceOutput
+    }
+  }
+
+  return inputs
+}
+
+/** 노드의 모든 출력 엣지를 활성화 */
+function activateAllOutgoingEdges(
+  nodeId: string,
+  edges: GraphEdge[],
+  activeEdges: Set<string>
+): void {
+  for (const edge of edges) {
+    if (edge.source === nodeId) {
+      activeEdges.add(edge.id)
+    }
+  }
+}
+
+/** 특정 노드로 들어오는 엣지 목록 */
+function getIncomingEdges(nodeId: string, edges: GraphEdge[]): GraphEdge[] {
+  return edges.filter(e => e.target === nodeId)
+}
+
+/** 특정 노드에서 나가는 엣지 목록 */
+function getOutgoingEdges(nodeId: string, edges: GraphEdge[]): GraphEdge[] {
+  return edges.filter(e => e.source === nodeId)
+}
+```
+
+#### 13.13.5 그래프 검증 확장
+
+```typescript
+// src/lib/node-graph/graph-validator.ts (추가 규칙)
+
+/** 분기 관련 그래프 검증 규칙 */
+function validateBranchingRules(graph: GraphState): ValidationIssue[] {
+  const issues: ValidationIssue[] = []
+
+  const conditionals = graph.nodes.filter(n => n.type === 'conditional')
+  const switches = graph.nodes.filter(n => n.type === 'switch')
+  const merges = graph.nodes.filter(n => n.type === 'merge')
+
+  // ── 규칙 1: 분기 합류 필수 (Warning) ──
+  // Conditional/Switch에서 갈라진 경로가 Merge 없이 같은 노드에 연결되면 경고
+  for (const branchNode of [...conditionals, ...switches]) {
+    const outEdges = getOutgoingEdges(branchNode.id, graph.edges)
+    const targetNodes = new Set(outEdges.map(e => e.target))
+
+    // 각 분기 경로를 DFS로 추적하여 같은 노드에 도달하는지 확인
+    const pathTargets = new Map<string, Set<string>>()
+    for (const edge of outEdges) {
+      const reachable = collectReachableNodes(edge.target, graph)
+      pathTargets.set(edge.sourceHandle ?? 'default', reachable)
+    }
+
+    const allHandles = Array.from(pathTargets.keys())
+    for (let i = 0; i < allHandles.length; i++) {
+      for (let j = i + 1; j < allHandles.length; j++) {
+        const overlap = intersection(
+          pathTargets.get(allHandles[i])!,
+          pathTargets.get(allHandles[j])!
+        )
+        // 겹치는 노드가 Merge가 아닌 경우 경고
+        for (const nodeId of overlap) {
+          const node = graph.nodes.find(n => n.id === nodeId)
+          if (node && node.type !== 'merge') {
+            issues.push({
+              level: 'warning',
+              category: 'branching',
+              message: `${branchNode.type} "${branchNode.id}"의 분기 경로가 ` +
+                `Merge 없이 "${nodeId}"에서 합류합니다.`,
+              nodeId: branchNode.id,
+            })
+            break  // 하나만 보고
+          }
+        }
+      }
+    }
+  }
+
+  // ── 규칙 2: 데드엔드 없음 (Warning) ──
+  // 분기 경로 중 Deploy까지 도달하지 못하는 경로가 있으면 경고
+  const deployNodes = graph.nodes.filter(n => n.type === 'deploy')
+  const deployIds = new Set(deployNodes.map(n => n.id))
+
+  for (const branchNode of [...conditionals, ...switches]) {
+    const outEdges = getOutgoingEdges(branchNode.id, graph.edges)
+    for (const edge of outEdges) {
+      const reachable = collectReachableNodes(edge.target, graph)
+      const reachesAnyDeploy = [...deployIds].some(id => reachable.has(id))
+      if (!reachesAnyDeploy && reachable.size > 0) {
+        issues.push({
+          level: 'warning',
+          category: 'branching',
+          message: `${branchNode.type} "${branchNode.id}"의 ` +
+            `${edge.sourceHandle ?? 'default'} 경로가 Deploy에 도달하지 못합니다.`,
+          nodeId: branchNode.id,
+        })
+      }
+    }
+  }
+
+  // ── 규칙 3: 도달 가능성 (Error) ──
+  // 어떤 Input에서도 도달할 수 없는 노드가 있으면 오류
+  const entryNodes = graph.nodes.filter(
+    n => getIncomingEdges(n.id, graph.edges).length === 0
+  )
+  const allReachable = new Set<string>()
+  for (const entry of entryNodes) {
+    const reachable = collectReachableNodes(entry.id, graph)
+    reachable.add(entry.id)
+    for (const id of reachable) allReachable.add(id)
+  }
+  for (const node of graph.nodes) {
+    if (!allReachable.has(node.id)) {
+      issues.push({
+        level: 'error',
+        category: 'branching',
+        message: `노드 "${node.id}" (${node.type})는 어떤 입력에서도 도달할 수 없습니다.`,
+        nodeId: node.id,
+      })
+    }
+  }
+
+  // ── 규칙 4: Switch 기본 케이스 (Info) ──
+  for (const sw of switches) {
+    const swData = sw.data as SwitchNodeData
+    if (!swData.defaultCaseId) {
+      issues.push({
+        level: 'info',
+        category: 'branching',
+        message: `Switch "${sw.id}"에 기본 케이스가 없습니다. ` +
+          `매칭되지 않으면 모든 하위 경로가 스킵됩니다.`,
+        nodeId: sw.id,
+      })
+    }
+  }
+
+  return issues
+}
+
+/** BFS로 노드에서 도달 가능한 모든 노드 수집 */
+function collectReachableNodes(startId: string, graph: GraphState): Set<string> {
+  const visited = new Set<string>()
+  const queue = [startId]
+
+  while (queue.length > 0) {
+    const current = queue.shift()!
+    if (visited.has(current)) continue
+    visited.add(current)
+
+    const outEdges = getOutgoingEdges(current, graph.edges)
+    for (const edge of outEdges) {
+      if (!visited.has(edge.target)) {
+        queue.push(edge.target)
+      }
+    }
+  }
+
+  return visited
+}
+```
+
+#### 13.13.6 포트 타입 시스템 확장
+
+```typescript
+// src/lib/node-graph/port-types.ts (추가)
+
+// 기존 PortType 열거에 'Any' 추가
+export type PortType =
+  | 'BasicInfo' | 'L1Vector' | 'L2Vector' | 'L3Vector'
+  | 'ArchetypeConfig' | 'ParadoxProfile' | 'CrossAxisProfile'
+  | 'PressureConfig' | 'ProjectionConfig' | 'VFinalResult'
+  | 'CharacterData' | 'BackstoryData' | 'VoiceData' | 'ActivityData'
+  | 'ContentData' | 'PressureData' | 'ZeitgeistData'
+  | 'PromptSet' | 'InteractionRules' | 'ValidationResult'
+  | 'Fingerprint'
+  | 'Any'    // ← 신규: Control Flow 노드용 범용 타입
+
+// 호환성 규칙 확장
+export function isPortCompatible(source: PortType, target: PortType): boolean {
+  if (source === target) return true
+  // Any 타입은 모든 타입과 호환
+  if (source === 'Any' || target === 'Any') return true
+  // 기존 호환성 규칙 유지
+  return PORT_COMPATIBILITY[source]?.includes(target) ?? false
+}
+```
+
+#### 13.13.7 노드 레지스트리 확장
+
+```typescript
+// src/lib/node-graph/node-registry.ts (Control Flow 카테고리 추가)
+
+const CONTROL_FLOW_NODES: NodeDefinition[] = [
+  {
+    type: 'conditional',
+    category: 'control-flow',
+    label: 'Conditional',
+    description: '조건 평가 → True/False 분기',
+    inputs: [{ id: 'value', type: 'Any', label: '평가 값' }],
+    outputs: [
+      { id: 'true',  type: 'Any', label: 'True 분기' },
+      { id: 'false', type: 'Any', label: 'False 분기' },
+    ],
+    evaluationStrategy: 'eager',
+    defaultData: {
+      conditionType: 'threshold',
+      operator: '>',
+      threshold: 0.5,
+      trueLabel: 'True',
+      falseLabel: 'False',
+    } satisfies ConditionalNodeData,
+  },
+  {
+    type: 'switch',
+    category: 'control-flow',
+    label: 'Switch',
+    description: '다중 분기 — 값 범위/열거형 매칭',
+    inputs: [{ id: 'selector', type: 'Any', label: '분류 값' }],
+    outputs: [],  // 동적 — SwitchNodeData.bands/enumCases에서 생성
+    dynamicOutputs: true,
+    evaluationStrategy: 'eager',
+    defaultData: {
+      switchMode: 'threshold-band',
+      bands: [
+        { id: 'low',  label: 'Low',    min: 0,    max: 0.33 },
+        { id: 'med',  label: 'Medium', min: 0.33, max: 0.66 },
+        { id: 'high', label: 'High',   min: 0.66, max: 1.0  },
+      ],
+    } satisfies SwitchNodeData,
+  },
+  {
+    type: 'merge',
+    category: 'control-flow',
+    label: 'Merge',
+    description: '분기 합류 — 여러 경로를 하나로',
+    inputs: [],  // 동적 — 연결된 분기 수만큼 자동 생성
+    outputs: [{ id: 'merged', type: 'Any', label: '합류 결과' }],
+    dynamicInputs: true,
+    evaluationStrategy: 'eager',
+    defaultData: {
+      mergeStrategy: 'first-active',
+    } satisfies MergeNodeData,
+  },
+]
+
+// 카테고리 목록 확장 (6개)
+export const NODE_CATEGORIES = [
+  { id: 'input',        label: 'Input',        color: '#4CAF50' },
+  { id: 'engine',       label: 'Engine',       color: '#2196F3' },
+  { id: 'control-flow', label: 'Control Flow', color: '#FF9800' },  // ← 신규
+  { id: 'generation',   label: 'Generation',   color: '#9C27B0' },
+  { id: 'assembly',     label: 'Assembly',     color: '#607D8B' },
+  { id: 'output',       label: 'Output',       color: '#F44336' },
+] as const
+```
+
+#### 13.13.8 executeNode 디스패처 확장
+
+```typescript
+// src/lib/node-graph/node-executor.ts (디스패처에 3개 노드 추가)
+
+export async function executeNode(
+  type: string,
+  data: Record<string, unknown>,
+  inputs: Record<string, unknown>,
+  context: ExecuteContext
+): Promise<NodeOutput> {
+  switch (type) {
+    // ... 기존 22개 노드 (§13.12.2~13.12.6) ...
+
+    // ── Control Flow (§13.13.2) ──
+    case 'conditional':
+      return executeConditional(data as ConditionalNodeData, inputs)
+    case 'switch':
+      return executeSwitch(data as SwitchNodeData, inputs)
+    case 'merge':
+      return executeMerge(data as MergeNodeData, inputs)
+
+    default:
+      throw new NodeExecutionError('unknown', `알 수 없는 노드 타입: ${type}`)
+  }
+}
+```
+
+#### 13.13.9 구현 파일 및 Phase 8 태스크 추가
+
+T38에서 정의한 분기 노드의 구현은 다음 파일에 집중된다:
+
+| 파일 | 설명 | Phase 8 태스크 |
+|------|------|----------------|
+| `src/lib/node-graph/control-flow-types.ts` | 분기 노드 타입 정의 (Conditional/Switch/Merge/ActiveEdge) | **8-27 (신규)** |
+| `src/lib/node-graph/node-executor.ts` | executeNode 디스패처에 3개 노드 추가 | **8-23 확장** |
+| `src/lib/node-graph/dag-engine.ts` | evaluateGraphWithBranching + 활성 엣지 추적 | **8-28 (신규)** |
+| `src/lib/node-graph/graph-validator.ts` | 분기 검증 규칙 4종 추가 | **8-29 (신규)** |
+| `src/lib/node-graph/__tests__/control-flow.test.ts` | 분기 노드 단위 테스트 | **8-30 (신규)** |
+
 ---
 
 ## 14. 상수 및 설정
@@ -5608,6 +6356,10 @@ function generateLightResponse(
 | 8-24 | 실행 헬퍼 (교차축 계산, Init delta, 투영) | `src/lib/node-graph/node-executor-helpers.ts` | **신규** |
 | 8-25 | Generation 노드 LLM 프롬프트 템플릿 | `src/lib/node-graph/llm-prompts/` | **신규** |
 | 8-26 | 노드 실행 함수 단위 테스트 | `src/lib/node-graph/__tests__/node-executor.test.ts` | **신규** |
+| 8-27 | 분기 노드 타입 정의 (Control Flow) | `src/lib/node-graph/control-flow-types.ts` | **신규** |
+| 8-28 | DAG 엔진 분기 확장 (활성 엣지 추적) | `src/lib/node-graph/dag-engine.ts` | **확장** |
+| 8-29 | 그래프 검증 분기 규칙 4종 | `src/lib/node-graph/graph-validator.ts` | **확장** |
+| 8-30 | 분기 노드 단위 테스트 | `src/lib/node-graph/__tests__/control-flow.test.ts` | **신규** |
 
 ### Phase 9: PersonaWorld RAG + 품질 피드백 + 모델 전략
 
