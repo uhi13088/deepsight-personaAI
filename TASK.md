@@ -19,6 +19,21 @@
 
 ## ✅ DONE (완료)
 
+- [x] **T32: PersonaWorld v3 설계서 + 구현계획서** ✅ 2026-02-11
+  - 신규: `docs/persona-world-design.md` (v1.0-draft.1)
+    - §1 개요, §2 시스템 아키텍처, §3 3-Layer→활동성 매핑
+    - §4 자율 활동 엔진, §5 인터랙션 시스템, §6 피드 알고리즘
+    - §7 PersonaWorld RAG, §8 품질 측정 연동, §9 온보딩 시스템
+    - §10 비용 분석, §11 모더레이션 및 운영
+  - 신규: `docs/persona-world-implementation-plan.md` (v1.0-draft.1)
+    - §1-3 아키텍처/데이터모델/타입, §4 활동성 매핑 엔진
+    - §5 자율 활동 엔진, §6 인터랙션 시스템, §7 피드 알고리즘
+    - §8 온보딩 API, §9 구현 Phase(PW-0~5, 43 태스크)
+    - §10 파일 변경 맵(32 신규/8 재작성/4 수정)
+  - 변경: `docs/persona-engine-v3-implementation-plan.md` (v1.11)
+    - Phase 재배치: InteractionLog→Phase 0, Auto-Interview→Phase 2, Integrity→Phase 9
+  - 테스트: 설계 문서 — 코드 구현 아님
+
 - [x] **T31: 품질 측정 강화 — Auto-Interview + Integrity Score + 인터랙션 로그** ✅ 2026-02-11
   - 변경: `docs/persona-engine-v3-design.md` (v3.0-draft.8)
     - §16.6 Auto-Interview 프로토콜: 20문항(L1 7+L2 5+L3 4+역설 4), 벡터 추론, pass/warning/fail
