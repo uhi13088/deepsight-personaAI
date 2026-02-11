@@ -5,7 +5,7 @@
 > **문서 정보**
 >
 > - 작성일: 2026-02-10
-> - 버전: v3.0-draft.9
+> - 버전: v3.0-draft.11
 > - 상태: 설계 단계
 > - 이전 버전: `docs/archive/persona-system-v2-design.md`
 
@@ -25,6 +25,7 @@
 | v3.0-draft.8 | 2026-02-11 | 품질 측정 강화 (T31) — §16.6 Auto-Interview 프로토콜 신설: 20문항 행동 기반 벡터 검증(L1 7문항+L2 5문항+L3 4문항+역설 4문항), LLM-as-Judge 벡터 추론, pass/warning/fail 판정(≥0.85/0.70/0.70↓), 비용 ~90원/persona. §16.7 Persona Integrity Score 신설: 3-component(ContextRecall 0.35+SettingConsistency 0.35+CharacterStability 0.30), LLM-as-Judge 배경 반영도+설정 모순 탐지+규칙 기반 Voice 안정성, 비용 ~2원/20턴. §6.2 인터랙션 로그 스키마 신설: 턴 단위 로그 구조(벡터 스냅샷+행동 태그+품질 메트릭), 세션 메타데이터, 네트워크 분석용 엣지 데이터 예약 |
 | v3.0-draft.9 | 2026-02-11 | ConsumptionMemory 레이어 추가 (T33) — §15.2 데이터 소스에 ConsumptionLog 추가, §15.3 RAG 컨텍스트에 [E] 소비 기억 ~200 tok 신설 (4→5 검색 항목), §15.4 "소비↔기억 괴리" 문제 해결 패턴 추가, §15.5 비용 재산정 (3,900→4,100 tok, 127→134원/월) |
 | v3.0-draft.10 | 2026-02-11 | 용어 통일 (T36) — 전체 문서 "106D+" 표기 통일 |
+| v3.0-draft.11 | 2026-02-11 | 노드 실행 로직 (T37) — §14.8 신설: 22개 노드 execute() 정의. Input 5종(데이터 패스스루/벡터 검증/아키타입 로드), Engine 4종(Paradox 83축+EPS/Pressure 감쇠/V_Final 투영 합산/Projection α+β), Generation 7종(LLM Sonnet 구조화 출력, activity-gen만 규칙 기반), Assembly 2종(프롬프트 조립/Init-Override-Adapt-Express 규칙 병합), Output 4종(6-Category 검증/P-inger Print 3종/테스트 시뮬레이션/Deploy). 평가 전략 분류(Eager 14개/Manual 8개) |
 
 ---
 
@@ -2232,6 +2233,832 @@ v3 노드는 5개 카테고리로 분류된다:
 - 기존 7개 고정 노드 → v3 대응 노드로 변환
 - 선형 엣지 → 명시적 포트 연결로 변환
 - 중앙 훅 상태 → 각 노드의 data 필드로 분산
+
+### 14.8 노드 실행 로직 (Node Execute Specifications)
+
+DAG 평가 엔진(§14.5)이 위상 정렬 순서대로 각 노드를 실행할 때, 노드마다 **"입력을 받아 어떤 계산을 수행하고 무엇을 출력하는가"** 가 정확히 정의되어야 한다. 이 섹션은 22개 노드 각각의 `executeNode(type, data, inputs) → output` 로직을 정의한다.
+
+**범례:**
+- **data**: 노드 내부 설정값 (사용자가 노드 패널에서 직접 편집)
+- **inputs**: 엣지로 연결된 상위 노드의 출력값 (DAG 평가 엔진이 자동 수집)
+- **output**: 하위 노드로 전파될 계산 결과
+- **평가 전략**: Eager(입력 변경 시 즉시 재평가) / Manual(버튼 클릭 시만 평가) / Lazy(일괄)
+
+#### 14.8.1 Input 노드 (5종)
+
+**① basic-info — 기본 정보 입력**
+
+| 항목 | 값 |
+|------|-----|
+| data | `{ name, role, description, expertise, demographics: { age, gender, generation, region } }` |
+| inputs | — (진입점) |
+| 로직 | 순수 데이터 패스스루. 사용자 입력값을 그대로 출력한다. |
+| output | `BasicInfoData` — 페르소나 기본 정보 객체 |
+| 평가 전략 | Eager |
+
+```
+execute(data, inputs):
+  validate(data.name is not empty)
+  validate(data.role is not empty)
+  return { name, role, description, expertise, demographics } as BasicInfoData
+```
+
+**② l1-vector — L1 사회적 가면 벡터 (7D)**
+
+| 항목 | 값 |
+|------|-----|
+| data | `{ depth, lens, stance, scope, taste, purpose, sociability }` — 각 0.0~1.0 |
+| inputs | — (진입점) |
+| 로직 | 7개 슬라이더 값을 벡터로 패키징. 범위 검증 포함. |
+| output | `SocialPersonaVector` — 7D 벡터 |
+| 평가 전략 | Eager |
+
+```
+execute(data, inputs):
+  for each dim in [depth, lens, stance, scope, taste, purpose, sociability]:
+    validate(0.0 ≤ data[dim] ≤ 1.0)
+  return { depth, lens, stance, scope, taste, purpose, sociability } as SocialPersonaVector
+```
+
+**③ l2-vector — L2 본원적 기질 벡터 (5D)**
+
+| 항목 | 값 |
+|------|-----|
+| data | `{ openness, conscientiousness, extraversion, agreeableness, neuroticism }` — 각 0.0~1.0 |
+| inputs | — (진입점) |
+| 로직 | 5개 슬라이더 값을 OCEAN 벡터로 패키징. 범위 검증 포함. |
+| output | `CoreTemperamentVector` — 5D 벡터 |
+| 평가 전략 | Eager |
+
+```
+execute(data, inputs):
+  for each dim in [openness, conscientiousness, extraversion, agreeableness, neuroticism]:
+    validate(0.0 ≤ data[dim] ≤ 1.0)
+  return { openness, conscientiousness, extraversion, agreeableness, neuroticism } as CoreTemperamentVector
+```
+
+**④ l3-vector — L3 서사적 욕망 벡터 (4D)**
+
+| 항목 | 값 |
+|------|-----|
+| data | `{ lack, moralCompass, volatility, growthArc }` — 각 0.0~1.0 |
+| inputs | — (진입점) |
+| 로직 | 4개 슬라이더 값을 Narrative Drive 벡터로 패키징. 범위 검증 포함. |
+| output | `NarrativeDriveVector` — 4D 벡터 |
+| 평가 전략 | Eager |
+
+```
+execute(data, inputs):
+  for each dim in [lack, moralCompass, volatility, growthArc]:
+    validate(0.0 ≤ data[dim] ≤ 1.0)
+  return { lack, moralCompass, volatility, growthArc } as NarrativeDriveVector
+```
+
+**⑤ archetype-select — 아키타입 템플릿 선택**
+
+| 항목 | 값 |
+|------|-----|
+| data | `{ archetypeId, varianceSeed? }` — 12+ 아키타입 중 선택 |
+| inputs | — (진입점) |
+| 로직 | 아키타입 템플릿(§8)을 로드하고, 허용 변동 범위 내에서 분산(variance)을 적용하여 L1/L2/L3 기본값 + dynamics + voice 키워드를 출력한다. |
+| output | `ArchetypeConfig` — 아키타입 기반 전개 데이터 |
+| 평가 전략 | Eager |
+
+```
+execute(data, inputs):
+  template = loadArchetypeTemplate(data.archetypeId)   // §8.3 참조
+  seed = data.varianceSeed ?? generateSeed()
+
+  // 허용 변동 범위 내에서 랜덤 변형 (§9.2 벡터 다양성 주입)
+  l1Base = applyVariance(template.l1, template.l1Variance, seed)
+  l2Base = applyVariance(template.l2, template.l2Variance, seed)
+  l3Base = applyVariance(template.l3, template.l3Variance, seed)
+
+  return {
+    archetypeId: data.archetypeId,
+    l1Base,                      // SocialPersonaVector (7D)
+    l2Base,                      // CoreTemperamentVector (5D)
+    l3Base,                      // NarrativeDriveVector (4D)
+    dynamics: template.dynamics, // { alpha, beta, pressureThreshold, adaptabilityRate }
+    voiceKeywords: template.voiceKeywords,
+    paradoxDesign: template.paradoxDesign  // 의도적 역설 방향
+  } as ArchetypeConfig
+```
+
+> **포트 호환성**: ArchetypeConfig 출력은 L1/L2/L3 Vector 입력 포트에 직접 연결 가능(§13.4 PORT_COMPATIBILITY). 아키타입 선택 시 벡터 노드를 건너뛰고 바로 Engine 노드에 연결할 수 있다.
+
+#### 14.8.2 Engine 노드 (4종)
+
+**⑥ paradox-calc — Paradox Calculator (확장 역설 점수)**
+
+| 항목 | 값 |
+|------|-----|
+| data | — (설정 없음, 완전 자동) |
+| inputs | `L1: SocialPersonaVector`, `L2: CoreTemperamentVector`, `L3?: NarrativeDriveVector` |
+| 로직 | §3.6.3의 3-Layer 확장 공식 + §3.8.4의 83축 교차 스코어를 계산한다. |
+| output | `ParadoxResult` — 확장 역설 점수 + 교차축 프로필 |
+| 평가 전략 | Eager |
+
+```
+execute(data, inputs):
+  L1 = inputs.L1    // 필수
+  L2 = inputs.L2    // 필수
+  L3 = inputs.L3    // 선택
+
+  // ─── L1↔L2 Score (§3.6.2~3.6.3) ───
+  paradoxPairs = [
+    { l1: 'depth',       l2: 'openness',          type: 'primary',   dir: 'forward'  },
+    { l1: 'taste',       l2: 'openness',          type: 'secondary', dir: 'forward'  },
+    { l1: 'lens',        l2: 'neuroticism',       type: 'primary',   dir: 'inverse'  },
+    { l1: 'stance',      l2: 'agreeableness',     type: 'primary',   dir: 'inverse'  },
+    { l1: 'sociability', l2: 'extraversion',      type: 'primary',   dir: 'forward'  },
+    { l1: 'purpose',     l2: 'conscientiousness', type: 'primary',   dir: 'forward'  },
+    { l1: 'scope',       l2: 'conscientiousness', type: 'secondary', dir: 'forward'  },
+  ]
+  for each pair:
+    l2val = (pair.dir == 'inverse') ? (1 - L2[pair.l2]) : L2[pair.l2]
+    pair.score = abs(L1[pair.l1] - l2val)
+    pair.weight = (pair.type == 'primary') ? 1.0 : 0.5
+  l1l2Score = Σ(pair.score × pair.weight) / Σ(pair.weight)
+
+  // ─── 83축 교차 스코어 (§3.8.4) ───
+  crossAxisProfile = computeAllCrossAxisScores(L1, L2, L3)
+  // 관계 유형별 공식:
+  //   paradox:     |dimA - f(dimB)|
+  //   reinforcing: 1 - |dimA - dimB|
+  //   modulating:  dimA × dimB
+  //   neutral:     (dimA + dimB) / 2
+
+  // ─── L1↔L3 Score, L2↔L3 Score ───
+  if (L3 exists):
+    l1l3Score = 교차축 중 L1×L3 paradox 타입 축들의 평균 스코어
+    l2l3Score = 교차축 중 L2×L3 paradox 타입 축들의 평균 스코어
+  else:
+    l1l3Score = 0
+    l2l3Score = 0
+
+  // ─── Extended Paradox Score (§3.6.3) ───
+  extendedScore = 0.50 × l1l2Score + 0.30 × l1l3Score + 0.20 × l2l3Score
+
+  return {
+    l1l2Score,
+    l1l3Score,
+    l2l3Score,
+    extendedScore,
+    paradoxPairs,
+    crossAxisProfile   // 83축 전체 스코어 + summary
+  } as ParadoxResult
+```
+
+**⑦ pressure-ctrl — Pressure Controller (압박 제어)**
+
+| 항목 | 값 |
+|------|-----|
+| data | `{ pressureMin?, pressureMax?, baseline?, triggers[]? }` — 사용자 설정 가능 |
+| inputs | `L3: NarrativeDriveVector`, `DynamicsConfig?` |
+| 로직 | L3.volatility로부터 감쇠 상수를 계산하고, 압박 범위와 트리거 규칙을 구성한다. §5.4의 Override 로직의 파라미터를 정의하는 노드. |
+| output | `PressureConfig` — 압박 설정 |
+| 평가 전략 | Eager |
+
+```
+execute(data, inputs):
+  L3 = inputs.L3   // 선택 (없으면 기본값 사용)
+  dynamics = inputs.DynamicsConfig
+
+  volatility = L3?.volatility ?? 0.5
+
+  // 감쇠 상수 (§5.4 Stage 3)
+  decayConstant = 0.7 - 0.6 × volatility
+  // volatility 0.0 → λ=0.7 (빠른 복귀)
+  // volatility 1.0 → λ=0.1 (느린 복귀)
+
+  return {
+    range: {
+      min: data.pressureMin ?? 0.0,
+      max: data.pressureMax ?? 1.0
+    },
+    baseline: data.baseline ?? dynamics?.pressureBaseline ?? 0.1,
+    decayConstant,
+    volatility,
+    triggers: data.triggers ?? []   // 트리거 규칙 (pressure-gen에서 상세 생성)
+  } as PressureConfig
+```
+
+**⑧ v-final — V_Final Engine (최종 행동 벡터 합산)**
+
+| 항목 | 값 |
+|------|-----|
+| data | — (설정 없음, 완전 자동) |
+| inputs | `L1: SocialPersonaVector` (필수), `L2?: CoreTemperamentVector`, `L3?: NarrativeDriveVector`, `P: PressureConfig`, `DynamicsConfig` |
+| 로직 | §3.5.2 + §3.9의 V_Final 공식을 실행한다. L2/L3가 없으면 V_Final = L1 (하위 호환). |
+| output | `VFinalResult` — 7D 최종 행동 벡터 |
+| 평가 전략 | Eager |
+
+```
+execute(data, inputs):
+  L1 = inputs.L1   // 필수
+  L2 = inputs.L2   // 선택
+  L3 = inputs.L3   // 선택
+  pressure = inputs.P
+  dynamics = inputs.DynamicsConfig
+
+  // ─── L2/L3 없는 경우 (하위 호환) ───
+  if (L2 is absent AND L3 is absent):
+    return { vector7D: L1, pressure: 0, alpha: 0, beta: 0 } as VFinalResult
+
+  // ─── 파라미터 추출 ───
+  P = pressure?.baseline ?? 0.1
+  α = dynamics?.alpha ?? 0.6
+  β = dynamics?.beta ?? 0.4
+  validate(abs(α + β - 1.0) < 0.01)
+
+  // ─── L2→L1 투영 (§3.9.1) ───
+  projectedL2 = null
+  if (L2 exists):
+    projectedL2 = projectL2toL1(L2)    // 5×7 투영 계수 행렬 적용
+
+  // ─── L3→L1 투영 (§3.9.2) ───
+  projectedL3 = null
+  if (L3 exists):
+    projectedL3 = projectL3toL1(L3)    // 4×7 투영 계수 행렬 적용
+
+  // ─── V_Final 합산 (§3.5.2 + §3.9.3) ───
+  // V_Final(7D) = (1-P) × V_L1 + P × (α × Project_L2→L1 + β × Project_L3→L1)
+  innerBlend = vector7D_zero()
+  if (projectedL2 exists): innerBlend += α × projectedL2
+  if (projectedL3 exists): innerBlend += β × projectedL3
+  // α+β 조정 (한쪽만 있는 경우 비율 재정규화)
+  if (projectedL2 exists XOR projectedL3 exists): innerBlend = normalize_weight(innerBlend)
+
+  vector7D = (1 - P) × L1 + P × innerBlend
+
+  // 범위 클램프
+  for each dim in vector7D: vector7D[dim] = clamp(vector7D[dim], 0.0, 1.0)
+
+  return {
+    vector7D,
+    projectedL2,
+    projectedL3,
+    pressure: P,
+    alpha: α,
+    beta: β
+  } as VFinalResult
+```
+
+**⑨ projection — Projection Config (투영 설정)**
+
+| 항목 | 값 |
+|------|-----|
+| data | `{ alpha?, beta?, pressureThreshold?, adaptabilityRate? }` — 사용자 설정 가능 |
+| inputs | `DynamicsConfig?` (아키타입에서 전달된 기본값) |
+| 로직 | α/β 가중치, 압박 임계값, 적응률을 설정한다. α+β=1.0 제약을 강제한다. |
+| output | `ProjectionConfig` (DynamicsConfig 호환) |
+| 평가 전략 | Eager |
+
+```
+execute(data, inputs):
+  defaults = inputs.DynamicsConfig ?? { alpha: 0.6, beta: 0.4, pressureThreshold: 0.6, adaptabilityRate: 0.3 }
+
+  α = data.alpha ?? defaults.alpha
+  β = data.beta ?? defaults.beta
+
+  // α + β = 1.0 강제
+  if (abs(α + β - 1.0) > 0.01):
+    β = 1.0 - α   // alpha 우선, beta 자동 보정
+
+  return {
+    alpha: α,
+    beta: β,
+    pressureThreshold: data.pressureThreshold ?? defaults.pressureThreshold,
+    adaptabilityRate: clamp(data.adaptabilityRate ?? defaults.adaptabilityRate, 0.0, 1.0)
+  } as ProjectionConfig
+```
+
+#### 14.8.3 Generation 노드 (7종)
+
+Generation 노드는 벡터/메타데이터를 입력받아 **비정량적 콘텐츠를 생성**한다. LLM 호출이 필요한 노드와 규칙 기반 노드가 혼재하며, 모두 Manual 평가 전략(사용자가 "Generate" 버튼 클릭 시 실행)을 따른다.
+
+**⑩ character-gen — Character Generator (캐릭터 생성)**
+
+| 항목 | 값 |
+|------|-----|
+| data | `{ customInstructions? }` — 추가 지시 (선택) |
+| inputs | `V_Final: VFinalResult`, `BasicInfo: BasicInfoData`, `Archetype?: ArchetypeConfig` |
+| 로직 | V_Final + BasicInfo + 아키타입 정보를 LLM에 전달하여 성격 특성, 행동 패턴, 대화 스타일을 생성한다. |
+| output | `CharacterData` — 구조화된 캐릭터 프로필 |
+| 평가 전략 | **Manual** (LLM 호출 비용) |
+
+```
+execute(data, inputs):
+  prompt = buildCharacterPrompt(
+    vFinal: inputs.V_Final.vector7D,
+    basicInfo: inputs.BasicInfo,
+    archetype: inputs.Archetype?.archetypeId,
+    paradoxDesign: inputs.Archetype?.paradoxDesign,
+    customInstructions: data.customInstructions
+  )
+  // LLM 구조화 출력 — JSON 스키마 강제
+  result = LLM_Sonnet.generate(prompt, schema: CharacterDataSchema)
+
+  return {
+    traits: result.traits,              // ["지적 호기심이 강함", "타인의 감정에 민감", ...]
+    behaviorPatterns: result.patterns,   // 상황별 행동 규칙
+    socialStyle: result.socialStyle,     // 대인 관계 스타일
+    dialogueStyle: result.dialogueStyle, // 대화 방식 (직설/우회/유머 등)
+    motivation: result.motivation        // 핵심 동기 서술
+  } as CharacterData
+```
+
+**⑪ backstory-gen — Backstory Generator (서사적 기원 생성)**
+
+| 항목 | 값 |
+|------|-----|
+| data | `{ customInstructions? }` |
+| inputs | `L1: SocialPersonaVector`, `L2: CoreTemperamentVector`, `L3?: NarrativeDriveVector`, `Paradox: ParadoxResult` |
+| 로직 | L1↔L2 역설 패턴을 분석하여 "왜 겉과 속이 다른지"를 설명하는 서사를 LLM으로 생성한다. 생성된 서사에서 Init 키워드를 추출하여 벡터 보정 delta도 함께 출력한다(§5.3). |
+| output | `BackstoryDimension` — 서사적 기원 + Init delta |
+| 평가 전략 | **Manual** |
+
+```
+execute(data, inputs):
+  // 역설 패턴 분석 → LLM 프롬프트 컨텍스트
+  paradoxContext = describePradoxPatterns(inputs.Paradox.paradoxPairs)
+  // 예: "stance(0.7, 비판적) ↔ agreeableness(0.8, 공감적) — 겉은 까칠하지만 속은 따뜻함"
+
+  prompt = buildBackstoryPrompt(
+    l1: inputs.L1,
+    l2: inputs.L2,
+    l3: inputs.L3,
+    paradoxContext,
+    customInstructions: data.customInstructions
+  )
+  result = LLM_Sonnet.generate(prompt, schema: BackstorySchema)
+
+  // ─── Init 키워드 추출 (§5.3) ───
+  initResult = LLM_Sonnet.extractKeywords(result.backstory, schema: InitKeywordSchema)
+  initDeltas = computeInitDeltas(initResult.keywords)   // 카테고리→벡터 매핑 테이블 적용
+
+  return {
+    backstory: result.backstory,
+    ghost: result.ghost,                     // 과거의 상처
+    hiddenDesire: result.hiddenDesire,        // 무의식적 욕망
+    traumaTriggers: result.traumaTriggers,    // ["돈 문제", "무시당함", ...]
+    narrativeIdentity: result.narrativeIdentity,
+    initDeltas                                // { dimension: delta } 매핑
+  } as BackstoryDimension
+```
+
+**⑫ voice-gen — Voice Generator (고유한 목소리 생성)**
+
+| 항목 | 값 |
+|------|-----|
+| data | `{ customInstructions? }` |
+| inputs | `L1: SocialPersonaVector`, `Character: CharacterData` |
+| 로직 | L1 벡터와 캐릭터 특성으로부터 말투, 어휘 수준, 감탄사, 문장 구조를 LLM으로 생성한다(§4.3). |
+| output | `VoiceProfile` — 고유한 목소리 프로필 |
+| 평가 전략 | **Manual** |
+
+```
+execute(data, inputs):
+  prompt = buildVoicePrompt(
+    l1: inputs.L1,
+    character: inputs.Character,
+    customInstructions: data.customInstructions
+  )
+  result = LLM_Sonnet.generate(prompt, schema: VoiceProfileSchema)
+
+  return {
+    speechPatterns: result.speechPatterns,   // ["솔직히 말하자면,", "이건 좀 아이러니한데,"]
+    vocabulary: result.vocabulary,            // { level, preferredWords[], avoidWords[] }
+    sentenceStructure: result.sentenceStructure, // { avgLength, style, insertionClauses }
+    exclamations: result.exclamations,        // ["허,", "글쎄요,", "크흠,"]
+    dialect: result.dialect                   // null | { region, markers[] }
+  } as VoiceProfile
+```
+
+**⑬ activity-gen — Activity Inference (활동 추론)**
+
+| 항목 | 값 |
+|------|-----|
+| data | — (설정 없음) |
+| inputs | `L1: SocialPersonaVector`, `Character: CharacterData` |
+| 로직 | L1 벡터와 캐릭터 특성으로부터 8가지 활동 성향을 **규칙 기반**으로 추론한다. LLM 호출 없음. |
+| output | `ActivityConfig` — 활동 성향 프로필 |
+| 평가 전략 | Eager (규칙 기반, 비용 0) |
+
+```
+execute(data, inputs):
+  L1 = inputs.L1
+  char = inputs.Character
+
+  return {
+    initiative:     clamp(L1.sociability × 0.6 + L1.stance × 0.4, 0, 1),
+    expressiveness: clamp(L1.depth × 0.5 + L1.scope × 0.3 + L1.sociability × 0.2, 0, 1),
+    interactivity:  clamp(L1.sociability × 0.7 + L1.purpose × 0.3, 0, 1),
+    contentCreation:clamp(L1.depth × 0.4 + L1.taste × 0.3 + L1.purpose × 0.3, 0, 1),
+    curiosity:      clamp(L1.taste × 0.5 + L1.scope × 0.3 + L1.depth × 0.2, 0, 1),
+    consistency:    clamp((1 - char.dialogueStyle.variability ?? 0.5) × 0.7 + L1.purpose × 0.3, 0, 1),
+    emotionalRange: clamp(L1.lens × 0.3 + (1 - L1.lens) × 0.3 + L1.sociability × 0.4, 0, 1),
+    adaptability:   clamp(L1.sociability × 0.5 + (1 - L1.stance) × 0.5, 0, 1)
+  } as ActivityConfig
+```
+
+**⑭ content-gen — Content Style Generator (콘텐츠 스타일)**
+
+| 항목 | 값 |
+|------|-----|
+| data | `{ customInstructions? }` |
+| inputs | `V_Final: VFinalResult`, `Character: CharacterData` |
+| 로직 | V_Final과 캐릭터 특성으로부터 콘텐츠 취향, 리뷰 스타일, 장르 친화도를 LLM으로 생성한다. |
+| output | `ContentSettings` — 콘텐츠 스타일 설정 |
+| 평가 전략 | **Manual** |
+
+```
+execute(data, inputs):
+  prompt = buildContentStylePrompt(
+    vFinal: inputs.V_Final.vector7D,
+    character: inputs.Character,
+    customInstructions: data.customInstructions
+  )
+  result = LLM_Sonnet.generate(prompt, schema: ContentSettingsSchema)
+
+  return {
+    genreAffinities: result.genreAffinities,   // [{ genre, affinity, reason }]
+    reviewStyle: result.reviewStyle,             // { tone, depth, structure }
+    contentPreferences: result.contentPreferences, // { formats[], themes[], avoidTopics[] }
+    recommendationBias: result.recommendationBias  // 추천 편향 설정
+  } as ContentSettings
+```
+
+**⑮ pressure-gen — Pressure Context Generator (압박 맥락 생성)**
+
+| 항목 | 값 |
+|------|-----|
+| data | `{ customInstructions? }` |
+| inputs | `L3: NarrativeDriveVector`, `Paradox: ParadoxResult` |
+| 로직 | L3의 volatility/lack + 역설 구조로부터 트리거 조건, 오버라이드 규칙, 감쇠 설정을 LLM으로 생성한다(§5.4). |
+| output | `PressureContext` — 압박 맥락 + 트리거 규칙 |
+| 평가 전략 | **Manual** |
+
+```
+execute(data, inputs):
+  prompt = buildPressureContextPrompt(
+    l3: inputs.L3,
+    paradoxPairs: inputs.Paradox.paradoxPairs,
+    extendedScore: inputs.Paradox.extendedScore,
+    customInstructions: data.customInstructions
+  )
+  result = LLM_Sonnet.generate(prompt, schema: PressureContextSchema)
+
+  return {
+    triggers: result.triggers,     // [{ triggerId, keywords[], context, effects[] }] (§5.4 Stage 1~2)
+    decayRules: result.decayRules, // 복귀 곡선 파라미터 (§5.4 Stage 3)
+    overrideRules: result.overrideRules,     // 벡터 오버라이드 규칙
+    quirksDefinition: result.quirksDefinition // 습관 발현 규칙 (§5.6)
+  } as PressureContext
+```
+
+**⑯ zeitgeist-gen — Zeitgeist Profile Generator (시대정신 생성)**
+
+| 항목 | 값 |
+|------|-----|
+| data | `{ customInstructions? }` |
+| inputs | `BasicInfo: BasicInfoData` |
+| 로직 | BasicInfo의 인구통계(세대, 지역)로부터 시대정신, 핵심 가치관, 문화적 원형을 생성한다(§4.4). |
+| output | `ZeitgeistProfile` — 시대정신 프로필 |
+| 평가 전략 | **Manual** |
+
+```
+execute(data, inputs):
+  prompt = buildZeitgeistPrompt(
+    demographics: inputs.BasicInfo.demographics,
+    role: inputs.BasicInfo.role,
+    customInstructions: data.customInstructions
+  )
+  result = LLM_Sonnet.generate(prompt, schema: ZeitgeistProfileSchema)
+
+  return {
+    generation: result.generation,             // "MILLENNIAL", "GEN_Z", etc.
+    coreValues: result.coreValues,             // ["지적 성실성", "예술적 진정성"]
+    culturalArchetype: result.culturalArchetype, // "SAGE", "REBEL", etc.
+    ethicalStance: result.ethicalStance          // { 환경: "...", 공정성: "..." }
+  } as ZeitgeistProfile
+```
+
+#### 14.8.4 Assembly 노드 (2종)
+
+Assembly 노드는 Generation 노드들의 출력을 **하나의 통합 구조**로 조립한다.
+
+**⑰ prompt-builder — Prompt Builder (프롬프트 조립)**
+
+| 항목 | 값 |
+|------|-----|
+| data | `{ templateOverride? }` — 프롬프트 템플릿 커스터마이즈 (선택) |
+| inputs | `Character: CharacterData`, `Voice: VoiceProfile`, `Backstory: BackstoryDimension`, `Pressure: PressureContext`, `Zeitgeist: ZeitgeistProfile`, `Content: ContentSettings` |
+| 로직 | 6개 Generation 출력을 섹션별로 조립하여 LLM 시스템 프롬프트를 구성한다. 이 프롬프트가 페르소나의 "영혼"이 된다. |
+| output | `PromptSet` — 시스템 프롬프트 + 벡터 컨텍스트 |
+| 평가 전략 | Eager (조립만, LLM 호출 없음) |
+
+```
+execute(data, inputs):
+  template = data.templateOverride ?? DEFAULT_PROMPT_TEMPLATE
+
+  systemPrompt = template.build({
+    // §1: 정체성
+    identity: {
+      character: inputs.Character,
+      backstory: inputs.Backstory,
+      zeitgeist: inputs.Zeitgeist
+    },
+    // §2: 행동 규칙
+    behavior: {
+      voice: inputs.Voice,
+      content: inputs.Content,
+      pressureTriggers: inputs.Pressure.triggers,
+      quirks: inputs.Pressure.quirksDefinition
+    },
+    // §3: 동적 지침
+    dynamics: {
+      overrideRules: inputs.Pressure.overrideRules,
+      decayRules: inputs.Pressure.decayRules
+    }
+  })
+
+  return {
+    systemPrompt,                          // 완성된 시스템 프롬프트 텍스트
+    vectorContext: {                        // 런타임에 주입될 벡터 참조
+      backstoryInitDeltas: inputs.Backstory.initDeltas,
+      pressureTriggerIds: inputs.Pressure.triggers.map(t => t.triggerId),
+      quirkIds: inputs.Pressure.quirksDefinition.map(q => q.id)
+    }
+  } as PromptSet
+```
+
+**⑱ interaction-rules — Interaction Rules (상호작용 규칙 조립)**
+
+| 항목 | 값 |
+|------|-----|
+| data | — (설정 없음) |
+| inputs | `Backstory: BackstoryDimension`, `Pressure: PressureContext`, `V_Final: VFinalResult` |
+| 로직 | §5의 4대 연결 로직(Init/Override/Adapt/Express)의 런타임 규칙을 조립한다. |
+| output | `InteractionRules` — 런타임 상호작용 규칙 세트 |
+| 평가 전략 | Eager (조립만) |
+
+```
+execute(data, inputs):
+  return {
+    // ① Init (§5.3): 서사→벡터 초기 보정
+    initConfig: {
+      deltas: inputs.Backstory.initDeltas,
+      clampRange: 0.4   // ±0.4 최대 보정
+    },
+
+    // ② Override (§5.4): 트리거→벡터 강제 변동
+    overrideConfig: {
+      triggers: inputs.Pressure.triggers,
+      overrideRules: inputs.Pressure.overrideRules,
+      decayRules: inputs.Pressure.decayRules
+    },
+
+    // ③ Adapt (§5.5): 유저 태도→실시간 보정
+    adaptConfig: {
+      baseVector: inputs.V_Final.vector7D,
+      adaptabilityRate: inputs.V_Final.alpha,  // 기본 적응률
+      driftClamp: 0.3,    // 기본값 대비 ±0.3 최대 이동
+      momentumWindow: 3    // 최근 3턴 모멘텀 계산
+    },
+
+    // ④ Express (§5.6): 벡터 상태→습관 발현
+    expressConfig: {
+      quirks: inputs.Pressure.quirksDefinition,
+      // 각 quirk: { id, stateKey, threshold, sensitivity, promptInstruction, cooldown }
+    }
+  } as InteractionRules
+```
+
+#### 14.8.5 Output 노드 (4종)
+
+**⑲ consistency — Consistency Check (6-Category 일관성 검증)**
+
+| 항목 | 값 |
+|------|-----|
+| data | — (설정 없음) |
+| inputs | 전체 데이터 (DAG의 모든 결과를 입력으로 받음) |
+| 로직 | §11의 6-Category 검증(A~F)을 실행한다. 모든 검증 항목의 통과율을 가중 합산하여 종합 점수를 산출한다. |
+| output | `ValidationResult` — 검증 결과 |
+| 평가 전략 | Eager |
+
+```
+execute(data, inputs):
+  errors = [], warnings = [], infos = []
+
+  // ─── A: 구조적 검증 (15%) ───
+  // 벡터 범위, 필수 필드, α+β=1.0
+  validateStructure(inputs) → errors/warnings
+
+  // ─── B: L1↔L2 역설 검증 (20%) ───
+  // 매핑 일관성, Paradox Score 범위
+  validateParadox(inputs.Paradox, inputs.Archetype) → warnings
+
+  // ─── C: L2↔L3 정합성 검증 (20%) ───
+  // C1: lack↔ParadoxScore, C2: volatility↔neuroticism
+  // C3: scope↔openness, C4: moralCompass↔agreeableness
+  validateL2L3Coherence(inputs.L2, inputs.L3, inputs.Paradox) → warnings/infos
+
+  // ─── D: 정성적↔정량적 검증 (20%) ───
+  // D1: 서사↔Init 벡터, D2: Voice↔L1, D3: Triggers↔L3
+  validateQualitative(inputs.Backstory, inputs.Voice, inputs.Pressure, inputs.L1, inputs.L3) → warnings
+
+  // ─── E: 교차축 일관성 검증 (15%) ───
+  // E1: 스코어 범위, E2: 관계 유형별 분포, E3: EPS 내부 일관성
+  validateCrossAxis(inputs.Paradox.crossAxisProfile) → errors/warnings
+
+  // ─── F: 동적 설정 검증 (10%) ───
+  // pressureRange, pressureDecay 유효성
+  validateDynamics(inputs.PressureConfig, inputs.ProjectionConfig) → errors
+
+  // ─── 종합 점수 (§11.7) ───
+  categoryScores = { A: passRate, B: passRate, C: passRate, D: passRate, E: passRate, F: passRate }
+  score = 0.15×A + 0.20×B + 0.20×C + 0.20×D + 0.15×E + 0.10×F
+
+  return {
+    score,             // 0.0 ~ 1.0
+    passed: score ≥ 0.7 AND errors.length == 0,
+    errors,            // Error 수준 항목
+    warnings,          // Warning 수준 항목
+    infos,             // Info 수준 항목
+    categoryScores     // 카테고리별 통과율
+  } as ValidationResult
+```
+
+**⑳ fingerprint — Fingerprint Generator (P-inger Print 생성)**
+
+| 항목 | 값 |
+|------|-----|
+| data | `{ mode?: 'compact' \| 'l1-l2' \| 'full' }` |
+| inputs | `L1: SocialPersonaVector`, `L2?: CoreTemperamentVector`, `L3?: NarrativeDriveVector`, `Paradox?: ParadoxResult`, `P?: PressureConfig` |
+| 로직 | §12의 3종 컴포넌트(레이더/2D 지문/3D Jacks)를 결정론적으로 생성한다. |
+| output | `FingerprintProfile` — 3종 시각화 데이터 |
+| 평가 전략 | Eager |
+
+```
+execute(data, inputs):
+  seed = SHA256(persona_id + version + timestamp)
+  mode = data.mode ?? 'full'
+
+  // ─── 다층 레이더 차트 (§12.3) ───
+  radarData = {
+    l1Axes: inputs.L1,                         // 외곽 원: 7축
+    l2Axes: (mode != 'compact') ? inputs.L2 : null,  // 중간 원: 5축
+    l3Axes: (mode == 'full') ? inputs.L3 : null,      // 내곽 원: 4축
+    paradoxConnectors: inputs.Paradox?.paradoxPairs.filter(p => p.score > 0.5)
+  }
+
+  // ─── 2D 지문 소용돌이 (§12.4~12.5) ───
+  print2d = generate2DFingerprint(
+    l1: inputs.L1,                  // 외부 릿지 구조
+    l2: inputs.L2,                  // 내부 릿지 질감
+    l3: inputs.L3,                  // 중심 패턴
+    vFinalColor: inputs.P,          // 색상 온도
+    seed,
+    rules: SIX_FIXED_RULES          // §12.5 6대 고정 규칙
+  )
+
+  // ─── 3D Jacks 오브젝트 (§12.6) ───
+  print3d = generate3DJacks(
+    l1Arms: 7,                      // L1 7개 팔
+    l2Arms: 5,                      // L2 5개 팔
+    l3Arms: 4,                      // L3 4개 팔 (맥동 애니메이션)
+    values: { l1: inputs.L1, l2: inputs.L2, l3: inputs.L3 },
+    seed
+  )
+
+  return {
+    radarData,
+    print2d: { canonical: print2d.svg, display: print2d.displaySvg },
+    print3d: print3d.config,
+    seed
+  } as FingerprintProfile
+```
+
+**㉑ test-sim — Test Simulation (테스트 시뮬레이션)**
+
+| 항목 | 값 |
+|------|-----|
+| data | `{ testScenarios?: TestScenario[], sampleCount?: number }` |
+| inputs | `PromptSet: PromptSet`, `Character: CharacterData` |
+| 로직 | 완성된 프롬프트로 테스트 시나리오를 실행하고, 페르소나의 응답 품질을 평가한다. |
+| output | `TestResult` — 테스트 결과 |
+| 평가 전략 | **Manual** (LLM 호출 비용) |
+
+```
+execute(data, inputs):
+  scenarios = data.testScenarios ?? DEFAULT_TEST_SCENARIOS
+  // 기본 시나리오: 일상 대화, 비판적 질문, 트라우마 트리거, 칭찬, 논쟁
+
+  results = []
+  for each scenario in scenarios:
+    // LLM에 시스템 프롬프트 + 테스트 유저 메시지 전달
+    response = LLM_Sonnet.generate(
+      systemPrompt: inputs.PromptSet.systemPrompt,
+      userMessage: scenario.userMessage
+    )
+
+    // 응답 품질 평가 (LLM 자기 평가)
+    evaluation = LLM_Sonnet.evaluate(
+      response,
+      criteria: {
+        characterConsistency: "캐릭터 설정과 응답이 일관되는가",
+        voiceConsistency: "말투/어휘가 Voice 프로필과 일치하는가",
+        paradoxExpression: "역설적 특성이 자연스럽게 드러나는가",
+        pressureResponse: "압박 상황에서 적절히 반응하는가"
+      }
+    )
+
+    results.push({ scenario, response, evaluation })
+
+  return {
+    scenarios: results,
+    overallScore: average(results.map(r => r.evaluation.overall)),
+    sampleOutputs: results.map(r => r.response)
+  } as TestResult
+```
+
+**㉒ deploy — Deploy (배포)**
+
+| 항목 | 값 |
+|------|-----|
+| data | `{ targetEnvironment?: 'staging' \| 'production' }` |
+| inputs | 전체 데이터 (DAG의 모든 결과) |
+| 로직 | 최종 검증 후 페르소나를 DB에 저장하고 활성화한다. Consistency Check가 통과(≥0.7)해야 실행 가능. |
+| output | — (사이드 이펙트: DB 저장 + 페르소나 활성화) |
+| 평가 전략 | **Manual** (명시적 배포 행위) |
+
+```
+execute(data, inputs):
+  // ─── 사전 검증 ───
+  validation = inputs.Consistency
+  if (validation.passed == false):
+    throw DeployError("일관성 검증 미통과 (score: {validation.score})")
+
+  if (validation.errors.length > 0):
+    throw DeployError("Error 수준 검증 항목 {count}개 존재")
+
+  // ─── 페르소나 객체 조립 ───
+  persona = assemblePersona({
+    basicInfo: inputs.BasicInfo,
+    vectors: { l1: inputs.L1, l2: inputs.L2, l3: inputs.L3 },
+    dynamics: inputs.ProjectionConfig,
+    paradox: inputs.Paradox,
+    character: inputs.Character,
+    backstory: inputs.Backstory,
+    voice: inputs.Voice,
+    activity: inputs.Activity,
+    content: inputs.Content,
+    pressure: inputs.PressureContext,
+    zeitgeist: inputs.Zeitgeist,
+    promptSet: inputs.PromptSet,
+    interactionRules: inputs.InteractionRules,
+    fingerprint: inputs.Fingerprint,
+    validation: inputs.Consistency,
+    testResult: inputs.TestResult
+  })
+
+  // ─── 저장 + 활성화 ───
+  env = data.targetEnvironment ?? 'staging'
+  await savePersona(persona, env)
+  if (env == 'production'):
+    await activatePersona(persona.id)
+
+  return { deployed: true, personaId: persona.id, environment: env }
+```
+
+#### 14.8.6 노드 실행 요약
+
+| # | 노드 | 타입 | 핵심 로직 | 평가 전략 | LLM |
+|---|------|------|-----------|-----------|-----|
+| ① | basic-info | Input | 데이터 패스스루 | Eager | — |
+| ② | l1-vector | Input | 7D 벡터 검증 | Eager | — |
+| ③ | l2-vector | Input | 5D 벡터 검증 | Eager | — |
+| ④ | l3-vector | Input | 4D 벡터 검증 | Eager | — |
+| ⑤ | archetype-select | Input | 템플릿 로드 + 분산 적용 | Eager | — |
+| ⑥ | paradox-calc | Engine | 확장 역설 점수 + 83축 교차 스코어 | Eager | — |
+| ⑦ | pressure-ctrl | Engine | 감쇠 상수 + 압박 범위 설정 | Eager | — |
+| ⑧ | v-final | Engine | V_Final = (1-P)·L1 + P·(α·L2_proj + β·L3_proj) | Eager | — |
+| ⑨ | projection | Engine | α/β + 임계값 + 적응률 설정 | Eager | — |
+| ⑩ | character-gen | Generation | 성격 특성 + 행동 패턴 생성 | Manual | Sonnet |
+| ⑪ | backstory-gen | Generation | 서사적 기원 + Init delta 추출 | Manual | Sonnet |
+| ⑫ | voice-gen | Generation | 말투 + 어휘 + 감탄사 생성 | Manual | Sonnet |
+| ⑬ | activity-gen | Generation | 8가지 활동 성향 추론 | Eager | — |
+| ⑭ | content-gen | Generation | 콘텐츠 취향 + 리뷰 스타일 | Manual | Sonnet |
+| ⑮ | pressure-gen | Generation | 트리거 + 오버라이드 + 습관 규칙 | Manual | Sonnet |
+| ⑯ | zeitgeist-gen | Generation | 세대정신 + 가치관 + 문화 원형 | Manual | Sonnet |
+| ⑰ | prompt-builder | Assembly | 6개 Generation 출력 → 시스템 프롬프트 | Eager | — |
+| ⑱ | interaction-rules | Assembly | Init/Override/Adapt/Express 규칙 조립 | Eager | — |
+| ⑲ | consistency | Output | 6-Category 검증 (A~F) | Eager | — |
+| ⑳ | fingerprint | Output | 레이더 + 2D 지문 + 3D Jacks | Eager | — |
+| ㉑ | test-sim | Output | 테스트 시나리오 실행 + 품질 평가 | Manual | Sonnet |
+| ㉒ | deploy | Output | 최종 검증 + DB 저장 + 활성화 | Manual | — |
 
 ---
 

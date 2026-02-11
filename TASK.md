@@ -7,7 +7,29 @@
 
 ## 📋 QUEUE (대기)
 
-(없음)
+- [ ] **T38: 노드 에디터 분기 노드(Conditional/Switch) 추가 설계**
+  - 배경: 현재 순수 DAG — 모든 노드 무조건 실행. 유니크한 페르소나 생성을 위한 조건부 분기 필요
+  - AC1: `docs/design/persona-engine-v3.md` §14 — Conditional Node, Switch Node 설계
+    - 멀티 아웃풋 포트, 조건 평가 로직, 분기별 실행 경로
+    - Paradox Score 기반 분기, 아키타입 기반 분기 등 유즈케이스
+  - AC2: `docs/design/persona-engine-v3-impl.md` §13 — 분기 노드 구현 스펙
+    - ConditionalNode/SwitchNode 타입, 포트 정의, DAG 평가 엔진 확장
+    - Phase 8 태스크 추가
+  - AC3: 커밋 + 푸시
+
+- [ ] **T39: 페르소나 필터 API 정식 스펙**
+  - 배경: Enterprise 고객이 5,000+ 페르소나에서 자사에 맞는 걸 선택해야 함. 현재 API는 role/expertise만 지원
+  - AC1: `docs/specs/developer-console.md` §9 — 필터 API 엔드포인트 정식 스펙
+    - POST /v1/personas/filter (archetype, traits 범위, Paradox Score, dimensionality 등)
+    - Request/Response 예시, 코드 샘플
+  - AC2: `docs/specs/engine-studio.md` — 내부 필터링 UI 스펙 보강
+    - 아키타입, Paradox Score 범위, 교차축 패턴 필터 추가
+  - AC3: 커밋 + 푸시
+
+- [ ] **T40: 노드 파라미터 편집 UI 스펙**
+  - 배경: 각 노드의 설정 패널 UI가 미정의. 슬라이더/드롭다운/텍스트 등 구체적 인터랙션 필요
+  - AC1: `docs/specs/engine-studio.md` — 노드별 파라미터 편집 UI 컴포넌트 스펙
+  - AC2: 커밋 + 푸시
 
 ---
 
@@ -18,6 +40,16 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T37: 노드 에디터 execute() 로직 정의 — 22개 노드 전체** ✅ 2026-02-11
+  - AC1: `docs/design/persona-engine-v3.md` §14.8 — 22개 노드 execute() 설계 정의 (v3.0-draft.11)
+    - Input 5종, Engine 4종, Generation 7종, Assembly 2종, Output 4종
+    - 노드별 data/inputs/로직/output/평가전략 명시, 공식 참조(§3~§12)
+  - AC2: `docs/design/persona-engine-v3-impl.md` §13.12 — TypeScript 구현 수도코드 (v1.13)
+    - executeNode 디스패처, 22개 실행 함수, LLM 호출 어댑터 패턴
+    - 교차축 계산 헬퍼, Init delta 계산, 투영 행렬 적용
+    - Phase 8 태스크 8-23~8-26 추가
+  - AC3: 커밋 + 푸시
 
 - [x] **T36: 전체 문서 "106D+" 표기 통일** ✅ 2026-02-11
   - 배경: T35에서 developer-console.md만 정리 완료. 나머지 5개 문서에 54개소 잔존
