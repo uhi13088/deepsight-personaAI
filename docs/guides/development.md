@@ -20,13 +20,14 @@
 
 | 문서                           | 경로                                                     | 핵심 용도                |
 | ------------------------------ | -------------------------------------------------------- | ------------------------ |
-| **기능정의서 - 개발자콘솔**    | `docs/[기능정의서] DeepSight_개발자콘솔.md`              | API 관리, 대시보드 기능  |
-| **기능정의서 - 엔진스튜디오**  | `docs/[기능정의서] DeepSight_엔진스튜디오.md`            | 페르소나 설정, 벡터 매칭 |
-| **기능정의서 - 페르소나월드**  | `docs/[기능정의서] DeepSight_페르소나월드.md`            | AI SNS, 자율 활동 시스템 |
-| **설계서 - 페르소나시스템 v2** | `docs/[설계서] DeepSight_페르소나시스템_v2.md`           | 페르소나 레이어, 6D 벡터 |
-| **UI가이드 - 디자인시스템**    | `docs/[UI가이드] DeepSight_페르소나월드_디자인시스템.md` | 컴포넌트, 컬러, 모션     |
-| **마케팅 가이드**              | `docs/[가이드] DeepSight_마케팅 및 가격 전략 가이드.md`  | 가격 전략, GTM           |
-| **개발 가이드**                | `docs/[개발가이드] DeepSight_클로드코드.md`              | Claude Code 사용법       |
+| **엔진 v3 설계서**             | `docs/design/persona-engine-v3.md`                       | 3-Layer 106D+ 아키텍처   |
+| **엔진 v3 구현계획서**         | `docs/design/persona-engine-v3-impl.md`                  | Phase 0~9, 타입/함수 명세 |
+| **PersonaWorld v3 설계서**     | `docs/design/persona-world-v3.md`                        | 자율 SNS 아키텍처        |
+| **PersonaWorld v3 구현계획서** | `docs/design/persona-world-v3-impl.md`                   | PW-Phase 0~5, 43 태스크  |
+| **기능정의서 - 엔진스튜디오**  | `docs/specs/engine-studio.md`                            | 페르소나 설정, 벡터 매칭 |
+| **기능정의서 - 개발자콘솔**    | `docs/specs/developer-console.md`                        | API 관리, 대시보드 기능  |
+| **기능정의서 - 페르소나월드**  | `docs/specs/persona-world.md`                            | AI SNS, 자율 활동 시스템 |
+| **UI가이드 - 디자인시스템**    | `docs/specs/persona-world-ui.md`                         | 컴포넌트, 컬러, 모션     |
 
 ### 문서 참조 규칙
 
@@ -652,6 +653,80 @@ NEXT_PUBLIC_ENGINE_STUDIO_URL="https://engine.deepsight.ai"
 NEXT_PUBLIC_PERSONA_WORLD_URL="https://persona.deepsight.ai"
 NEXT_PUBLIC_DEVELOPER_CONSOLE_URL="https://console.deepsight.ai"
 ```
+
+---
+
+## 프로덕션 배포
+
+### 배포 플랫폼
+
+- **Hosting**: Vercel (권장)
+- **Database**: Supabase PostgreSQL
+- **Cache**: Upstash Redis (선택)
+
+### Supabase 설정
+
+1. [Supabase Dashboard](https://supabase.com/dashboard) 접속
+2. "New Project" 클릭 → Region: `Northeast Asia (Seoul)` 권장
+
+**Connection String** (Settings > Database > Connection string):
+
+```
+# Transaction mode (pgBouncer) - Serverless/Edge용
+postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres?pgbouncer=true
+
+# Session mode - Prisma 마이그레이션용
+postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres
+```
+
+### Vercel 배포
+
+```bash
+# Vercel CLI 설치 및 로그인
+pnpm add -g vercel && vercel login
+
+# 각 앱에서 프로젝트 연결
+cd apps/engine-studio && vercel link
+cd apps/developer-console && vercel link
+```
+
+**도메인 설정** (Vercel Dashboard > Project > Settings > Domains):
+
+- engine-studio: `engine.deepsight.ai`
+- developer-console: `console.deepsight.ai`
+
+### Database 마이그레이션
+
+```bash
+cd apps/engine-studio
+
+# 스키마 푸시 (개발)
+pnpm prisma db push
+
+# 프로덕션 마이그레이션
+pnpm prisma migrate dev --name init
+pnpm prisma migrate deploy
+```
+
+### 배포 후 검증
+
+```bash
+curl https://engine.deepsight.ai/api/health
+curl https://console.deepsight.ai/api/health
+```
+
+1. 로그인 테스트
+2. 페르소나 생성/조회
+3. API 키 발급
+4. 매칭 시뮬레이터
+
+### 보안 체크리스트
+
+- [ ] `NEXTAUTH_SECRET` 32자 이상 랜덤 문자열
+- [ ] `SUPABASE_SERVICE_ROLE_KEY` Production에만 설정
+- [ ] `.env.local` 파일 `.gitignore`에 포함
+- [ ] API Rate Limiting 설정
+- [ ] CORS 설정 확인
 
 ---
 

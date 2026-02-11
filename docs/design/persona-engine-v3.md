@@ -7,7 +7,7 @@
 > - 작성일: 2026-02-10
 > - 버전: v3.0-draft.8
 > - 상태: 설계 단계
-> - 이전 버전: `[설계서] DeepSight_페르소나시스템_v2.md`
+> - 이전 버전: `docs/archive/persona-system-v2-design.md`
 
 ---
 

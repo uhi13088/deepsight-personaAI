@@ -8,10 +8,10 @@
 > - 버전: v1.0-draft.1
 > - 상태: 설계 단계
 > - 관련 문서:
->   - `docs/[기능정의서] DeepSight_페르소나월드.md` (기능 요구사항)
->   - `docs/persona-engine-v3-design.md` (페르소나 엔진 v3 설계서)
->   - `docs/persona-engine-v3-implementation-plan.md` (페르소나 엔진 v3 구현계획서)
->   - `docs/[UI가이드] DeepSight_페르소나월드_디자인시스템.md` (UI 디자인 시스템)
+>   - `docs/specs/persona-world.md` (기능 요구사항)
+>   - `docs/design/persona-engine-v3.md` (페르소나 엔진 v3 설계서)
+>   - `docs/design/persona-engine-v3-impl.md` (페르소나 엔진 v3 구현계획서)
+>   - `docs/specs/persona-world-ui.md` (UI 디자인 시스템)
 
 ---
 
@@ -1087,5 +1087,5 @@ Level 3: 전체 정지
 
 ---
 
-> **이 설계서는 기능정의서(`[기능정의서] DeepSight_페르소나월드.md`)의 기능 요구사항을 v3 106D+ 엔진 아키텍처 위에서 구현하기 위한 아키텍처 문서입니다.**
-> **구현 상세는 별도의 구현계획서(`persona-world-implementation-plan.md`)에서 다룹니다.**
+> **이 설계서는 기능정의서(`docs/specs/persona-world.md`)의 기능 요구사항을 v3 106D+ 엔진 아키텍처 위에서 구현하기 위한 아키텍처 문서입니다.**
+> **구현 상세는 별도의 구현계획서(`docs/design/persona-world-v3-impl.md`)에서 다룹니다.**

@@ -7,7 +7,7 @@
 > - 작성일: 2026-02-10
 > - 버전: v1.11
 > - 상태: 확정 — 구현 대기
-> - 관련 문서: `docs/persona-engine-v3-design.md` (설계서)
+> - 관련 문서: `docs/design/persona-engine-v3.md` (설계서)
 > - 목적: 설계서의 "무엇을"에 대응하는 "어떻게" — 이 문서만 보고 구현 가능
 
 ---
@@ -19,7 +19,7 @@
 | v1.0 | 2026-02-10 | 초판 작성 — 전체 아키텍처 결정사항, 데이터 모델, 타입 시스템, 구현 태스크 |
 | v1.1 | 2026-02-10 | Section 12 전면 개편 — 16D→다층 상수/색상 체계. 교차축 83개+ 관계축, 엔진 메타, 아키타입 색상 추가. Phase 0 태스크 0-7~0-20으로 확장. 파일 구조 단일→모듈(v3/, colors/) |
 | v1.2 | 2026-02-10 | Section 12 신설 — 컬러지문(P-inger Print) 시스템. 3종 컴포넌트 v3 설계 |
-| v1.3 | 2026-02-10 | Section 12 전면 확장 — "미래 스캐너 디코딩 가능 지문" 스키마 v1 확정. Pantone 완전 제거, CIELAB(D50)+OKLCH 이중 색공간. 6대 고정 규칙, 패턴↔벡터 매핑, 고유성 엔진, 색상 인코딩, canonical/display 이중 렌더. Phase 6(지문 데이터 엔진) 신설, 기존 UI→Phase 7. `docs/fingerprint-schema-v1.json` 추가 |
+| v1.3 | 2026-02-10 | Section 12 전면 확장 — "미래 스캐너 디코딩 가능 지문" 스키마 v1 확정. Pantone 완전 제거, CIELAB(D50)+OKLCH 이중 색공간. 6대 고정 규칙, 패턴↔벡터 매핑, 고유성 엔진, 색상 인코딩, canonical/display 이중 렌더. Phase 6(지문 데이터 엔진) 신설, 기존 UI→Phase 7. `docs/schemas/fingerprint-v1.json` 추가 |
 | v1.4 | 2026-02-10 | Section 13 신설 — 노드 에디터 아키텍처 (ComfyUI 스타일). 현재 선형 파이프라인→DAG 기반 자유 그래프. 5개 노드 카테고리(20+종), 21종 포트 타입 시스템, Kahn's 위상 정렬, 순환 감지, Zustand 그래프 스토어, 4종 플로우 프리셋(Quick/L1 Custom/Full Custom/Archetype+Override), 최소 필수 노드 규칙, v2→v3 마이그레이션. Phase 8(노드 에디터 재구축, 22태스크) 신설. 파일 변경 맵 확장. 섹션 번호 정리(상수→14, Phase→15, 파일맵→16) |
 | v1.5 | 2026-02-10 | 품질 아키텍처 3대 핵심 추가 — Section 15(PersonaWorld RAG 구현: 컨텍스트 빌더, Voice 앵커, 관계 기억, 캐싱), Section 16(품질 피드백 루프 구현: 4대 측정 엔진, Few-shot 자동 수집, 대시보드), Section 17(LLM 모델 전략 구현: 3-Tier 라우터, Prompt Caching, Provider Adapter). Phase 9(RAG+피드백+모델 전략, 18태스크) 신설. 파일 변경 맵 확장. 섹션 재번호(Phase→18, 파일맵→19) |
 | v1.6 | 2026-02-10 | 교차축 계산 엔진 + Paradox Score 확장 (T27) — Section 6 전면 개편: 83축 교차축 스코어 계산 엔진(CrossAxisProfile, 관계유형별 공식 4종), L1↔L3/L2↔L3 역설 지표, Extended Paradox Score(3-Layer 가중 합산). Section 5 확장: VFinalResult에 crossAxisProfile+paradoxProfile 추가. Phase 1 태스크 1-4~1-9로 확장(교차축 엔진, 역방향 매핑 테이블). 파일 변경 맵: cross-axis.ts, cross-axis-inversions.ts 추가 |
@@ -2395,7 +2395,7 @@ function computeConsistencyScore(issues: ValidationIssue[]): {
 > **핵심 원칙: "생성은 예술적으로, 저장은 공학적으로"**
 > 컬러지문은 단순 시각화가 아니라 **미래 스캐너 디코딩이 가능한 데이터 구조**다.
 > 최종 PNG만 저장하면 복원 불가. **SVG(벡터 경로) + JSON(메타데이터)** 이중 저장 필수.
-> 스키마 파일: `docs/fingerprint-schema-v1.json`
+> 스키마 파일: `docs/schemas/fingerprint-v1.json`
 
 ### 12.1 현재 상태 — 6D 하드코딩
 
@@ -2769,7 +2769,7 @@ export function TraitColorFingerprintCompat(props: { data: Record<string, number
 
 | 분류 | 파일 | 변경 수준 |
 |------|------|-----------|
-| **스키마** | `docs/fingerprint-schema-v1.json` | **신규** (확정) |
+| **스키마** | `docs/schemas/fingerprint-v1.json` | **신규** (확정) |
 | **스키마 TS 타입** | `src/types/fingerprint.ts` | **신규** |
 | **스키마 검증** | `src/lib/fingerprint/schema-validator.ts` | **신규** |
 | **고유성 엔진** | `src/lib/fingerprint/uniqueness-engine.ts` | **신규** |
@@ -4797,7 +4797,7 @@ apps/engine-studio/src/components/charts/v-final-simulator.tsx
 apps/engine-studio/src/components/persona/qualitative-editor.tsx
 
 # ── 컬러지문 데이터 엔진 ──
-docs/fingerprint-schema-v1.json                                   ← 지문 스키마 (Pantone-free, 확정)
+docs/schemas/fingerprint-v1.json                                   ← 지문 스키마 (Pantone-free, 확정)
 apps/engine-studio/src/types/fingerprint.ts                       ← 스키마 TS 타입
 apps/engine-studio/src/lib/fingerprint/index.ts                   ← 모듈 index
 apps/engine-studio/src/lib/fingerprint/schema-validator.ts        ← 스키마 런타임 검증

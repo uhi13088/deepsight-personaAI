@@ -1999,4 +1999,4 @@ function detectDiversityGaps(analysis: PoolAnalysis): DiversityGap[] {
 - 기존 6D 벡터 시스템: `docs/deepsight_engine_studio.md`
 - Cold Start 질문: `prisma/seed-data/cold-start-questions.ts`
 - 현재 Persona 스키마: `prisma/schema.prisma`
-- PersonaWorld 설계: `docs/persona-world-design.md`
+- PersonaWorld 설계: `docs/design/persona-world-v3.md`
