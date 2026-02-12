@@ -3,17 +3,17 @@
 // ═══════════════════════════════════════════════════════════════
 // 메인 노드 에디터 캔버스
 // T60-AC2: DAG 레이아웃, 줌/팬, 드래그&드롭
+// T128-AC1: executeGraph() 실제 연결
+// T128-AC2: serializeGraph + localStorage 저장/로드
+// T128-AC3: 실행 결과 패널 통합
 // ═══════════════════════════════════════════════════════════════
 
-import { useCallback, useMemo } from "react"
+import { useCallback, useMemo, useState } from "react"
 import {
   ReactFlow,
   Background,
   Controls,
   MiniMap,
-  useNodesState,
-  useEdgesState,
-  addEdge,
   type Connection,
   type Node,
   type Edge,
@@ -27,6 +27,9 @@ import { isPortCompatible } from "@/lib/node-graph/port-types"
 import type { PortType } from "@/lib/node-graph/port-types"
 import { wouldCreateCycle } from "@/lib/node-graph/topological-sort"
 import { validateGraph } from "@/lib/node-graph/graph-validator"
+import { executeGraph } from "@/lib/node-graph/execution-engine"
+import type { ExecutionEngineResult } from "@/lib/node-graph/execution-engine"
+import { serializeGraph, toJSON } from "@/lib/node-graph/serializer"
 import { getPreset } from "@/constants/flow-presets"
 
 import { NODE_TYPE_MAP } from "./node-types"
@@ -34,11 +37,14 @@ import { NodePalette } from "./node-palette"
 import { NodeSettingsPanel } from "./node-settings-panel"
 import { EditorToolbar } from "./editor-toolbar"
 import { EditorStatusBar } from "./editor-status-bar"
+import { ExecutionResultsPanel } from "./execution-results-panel"
 
 // ── 메인 컴포넌트 ────────────────────────────────────────────
 
 export function PersonaNodeEditor() {
   const store = useNodeEditorStore()
+  const [executionResult, setExecutionResult] = useState<ExecutionEngineResult | null>(null)
+  const [executeError, setExecuteError] = useState<string | null>(null)
 
   // ReactFlow 노드/엣지 변환
   const rfNodes: Node[] = useMemo(
@@ -175,6 +181,8 @@ export function PersonaNodeEditor() {
       const graph = preset.build()
       store.loadGraph(graph)
       store.setPresetId(presetId)
+      setExecutionResult(null)
+      setExecuteError(null)
     },
     [store]
   )
@@ -185,15 +193,48 @@ export function PersonaNodeEditor() {
     store.setValidationResult(result)
   }, [store])
 
-  // 실행 (placeholder)
-  const handleExecute = useCallback(() => {
+  // ── T128-AC1: 실제 실행 엔진 연결 ──────────────────────────
+
+  const handleExecute = useCallback(async () => {
+    // 1. 실행 전 검증
+    const validation = validateGraph(store.getGraphState())
+    store.setValidationResult(validation)
+
+    if (!validation.valid) {
+      setExecuteError("그래프 검증 실패. 에러를 확인하세요.")
+      return
+    }
+
+    // 2. 실행 상태 초기화
+    store.clearExecutionResults()
     store.setExecuting(true)
-    // 실제 실행은 T61에서 구현
-    setTimeout(() => store.setExecuting(false), 1000)
+    setExecutionResult(null)
+    setExecuteError(null)
+
+    try {
+      // 3. DAG 실행
+      const result = await executeGraph(store.getGraphState())
+
+      // 4. 결과 반영 (isExecuting=false 자동 설정)
+      store.setExecutionResults(result.state)
+      setExecutionResult(result)
+    } catch (err) {
+      store.setExecuting(false)
+      setExecuteError(err instanceof Error ? err.message : "실행 중 오류 발생")
+    }
   }, [store])
 
-  // 저장 (placeholder)
+  // ── T128-AC2: 저장/로드 ─────────────────────────────────────
+
   const handleSave = useCallback(() => {
+    const graphState = store.getGraphState()
+    if (graphState.nodes.length === 0) return
+
+    const personaId = store.personaId ?? "draft"
+    const serialized = serializeGraph(graphState, personaId, {
+      presetId: store.presetId ?? undefined,
+    })
+    localStorage.setItem(`node-graph-${personaId}`, toJSON(serialized))
     store.markClean()
   }, [store])
 
@@ -212,6 +253,16 @@ export function PersonaNodeEditor() {
         nodeCount={store.nodes.length}
         edgeCount={store.edges.length}
       />
+
+      {/* 실행 에러 표시 */}
+      {executeError && (
+        <div className="flex items-center justify-between border-b bg-red-50 px-4 py-1.5 text-xs text-red-700">
+          <span>{executeError}</span>
+          <button onClick={() => setExecuteError(null)} className="text-red-400 hover:text-red-600">
+            닫기
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         <NodePalette onAddNode={handleAddNode} />
@@ -245,6 +296,15 @@ export function PersonaNodeEditor() {
           />
         )}
       </div>
+
+      {/* T128-AC3: 실행 결과 패널 */}
+      {executionResult && (
+        <ExecutionResultsPanel
+          result={executionResult}
+          onClose={() => setExecutionResult(null)}
+          onNodeClick={(nodeId) => store.selectNode(nodeId)}
+        />
+      )}
 
       <EditorStatusBar validationResult={store.validationResult} zoom={store.zoom} />
     </div>
