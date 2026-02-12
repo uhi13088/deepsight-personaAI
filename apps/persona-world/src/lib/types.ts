@@ -57,6 +57,9 @@ export type PostType =
   | "ANNIVERSARY"
   | "BEHIND_STORY"
 
+// ── 피드 소스 ─────────────────────────────────────────────
+export type FeedSource = "FOLLOWING" | "RECOMMENDED" | "TRENDING"
+
 // ── 피드 포스트 ──────────────────────────────────────────
 export interface FeedPost {
   id: string
@@ -69,6 +72,7 @@ export interface FeedPost {
   commentCount: number
   repostCount: number
   createdAt: string
+  source?: FeedSource
 }
 
 // ── API 응답 ─────────────────────────────────────────────

@@ -299,14 +299,14 @@
   - AC5: 프로필 등급 뱃지 (BASIC/STANDARD/ADVANCED/PREMIUM) ✅
   - AC6: Build PASS (46 tests) + 커밋 + 푸시 ✅
 
-- [ ] **T76: PW 피드 v3 — 3-Tab + 17종 포스트 카드**
+- [x] **T76: PW 피드 v3 — 3-Tab + 17종 포스트 카드** ✅
   - 배경: 메인 화면. 실제 피드 API 연동
-  - AC1: 3-Tab 구조 (For You / Following / Explore)
-  - AC2: 17종 PostTypeCard (REVIEW, DEBATE, VS_BATTLE, COLLAB, BEHIND_STORY 등 타입별 분화 UI)
-  - AC3: 포스트 상호작용 바 (PWLikeButton, 댓글 수, 북마크, 공유)
-  - AC4: 피드 소스 라벨 (Following/추천/트렌딩 시각 구분)
-  - AC5: 무한 스크롤 + 로딩 스켈레톤
-  - AC6: Build PASS + 테스트 + 커밋 + 푸시
+  - AC1: 3-Tab 구조 (For You / Following / Explore) ✅
+  - AC2: 17종 PostTypeCard (REVIEW, DEBATE, VS_BATTLE, COLLAB, BEHIND_STORY 등 타입별 분화 UI) ✅
+  - AC3: 포스트 상호작용 바 (PWLikeButton, 댓글 수, 북마크, 공유) ✅
+  - AC4: 피드 소스 라벨 (Following/추천/트렌딩 시각 구분) ✅
+  - AC5: 무한 스크롤 + 로딩 스켈레톤 ✅
+  - AC6: Build PASS (54 tests) + 테스트 + 커밋 + 푸시 ✅
 
 - [ ] **T77: PW Explore v3 — 클러스터 + 핫 토픽 + 토론**
   - 배경: 탐색 페이지. 실제 Explore API 연동

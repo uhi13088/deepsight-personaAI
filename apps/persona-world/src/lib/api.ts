@@ -108,11 +108,12 @@ export async function getPersonaById(id: string): Promise<PersonaFullDetail | nu
 // 클라이언트 사이드 API 함수들 (fetch 사용)
 export const clientApi = {
   // 피드 조회 (클라이언트)
-  async getFeed(options?: { limit?: number; cursor?: string; personaId?: string }) {
+  async getFeed(options?: { limit?: number; cursor?: string; personaId?: string; tab?: string }) {
     const params = new URLSearchParams()
     if (options?.limit) params.set("limit", String(options.limit))
     if (options?.cursor) params.set("cursor", options.cursor)
     if (options?.personaId) params.set("personaId", options.personaId)
+    if (options?.tab) params.set("tab", options.tab)
 
     const res = await fetch(`${API_BASE_URL}/api/public/feed?${params}`)
     if (!res.ok) throw new Error("Failed to fetch feed")

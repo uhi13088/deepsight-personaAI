@@ -59,3 +59,52 @@ export const POST_TYPE_LABELS: Record<string, string> = {
   ANNIVERSARY: "기념일",
   BEHIND_STORY: "비하인드",
 }
+
+/** 포스트 타입별 이모지 */
+export const POST_TYPE_EMOJI: Record<string, string> = {
+  REVIEW: "\u2B50",
+  THOUGHT: "\uD83D\uDCAD",
+  RECOMMENDATION: "\uD83D\uDC4D",
+  REACTION: "\uD83D\uDE2E",
+  QUESTION: "\u2753",
+  LIST: "\uD83D\uDCCB",
+  THREAD: "\uD83E\uDDF5",
+  VS_BATTLE: "\u2694\uFE0F",
+  QNA: "\uD83D\uDCE9",
+  CURATION: "\uD83D\uDC8E",
+  DEBATE: "\uD83D\uDE4B",
+  MEME: "\uD83D\uDE02",
+  COLLAB: "\uD83E\uDD1D",
+  TRIVIA: "\uD83E\uDDE0",
+  PREDICTION: "\uD83D\uDD2E",
+  ANNIVERSARY: "\uD83C\uDF89",
+  BEHIND_STORY: "\uD83C\uDFAC",
+}
+
+/** 포스트 타입별 배경색 */
+export const POST_TYPE_COLORS: Record<string, string> = {
+  REVIEW: "bg-yellow-50 text-yellow-700",
+  THOUGHT: "bg-gray-50 text-gray-600",
+  RECOMMENDATION: "bg-green-50 text-green-700",
+  REACTION: "bg-orange-50 text-orange-700",
+  QUESTION: "bg-blue-50 text-blue-700",
+  LIST: "bg-indigo-50 text-indigo-700",
+  THREAD: "bg-purple-50 text-purple-700",
+  VS_BATTLE: "bg-red-50 text-red-700",
+  QNA: "bg-teal-50 text-teal-700",
+  CURATION: "bg-violet-50 text-violet-700",
+  DEBATE: "bg-rose-50 text-rose-700",
+  MEME: "bg-amber-50 text-amber-700",
+  COLLAB: "bg-cyan-50 text-cyan-700",
+  TRIVIA: "bg-fuchsia-50 text-fuchsia-700",
+  PREDICTION: "bg-indigo-50 text-indigo-700",
+  ANNIVERSARY: "bg-pink-50 text-pink-700",
+  BEHIND_STORY: "bg-slate-50 text-slate-700",
+}
+
+/** 피드 소스 라벨 */
+export const FEED_SOURCE_CONFIG: Record<string, { label: string; color: string }> = {
+  FOLLOWING: { label: "팔로잉", color: "bg-blue-50 text-blue-600" },
+  RECOMMENDED: { label: "추천", color: "bg-purple-50 text-purple-600" },
+  TRENDING: { label: "트렌딩", color: "bg-pink-50 text-pink-600" },
+}
