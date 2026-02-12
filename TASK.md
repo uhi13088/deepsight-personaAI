@@ -186,16 +186,16 @@
 
 > 인큐베이터, 컬러지문, 시스템 운영, 대시보드, RAG 연동.
 
-- [ ] **T62: 페르소나 인큐베이터 — Daily Batch + 자가발전**
+- [x] **T62: 페르소나 인큐베이터 — Daily Batch + 자가발전** ✅
   - 배경: 스펙 §3.6. 페르소나 지속 품질 개선 시스템
-  - AC1: Daily Batch 워크플로우 (스케줄링, 배치 실행, 결과 저장)
-  - AC2: 자가발전 시스템 (인터랙션 로그 기반 벡터 미세 조정)
-  - AC3: 콜드 스타트 운영 정책 (신규 페르소나 초기 학습)
-  - AC4: 비용 통제 정책 (LLM 호출 예산, 일일 상한)
-  - AC5: Golden Sample 관리 + 확장 전략
-  - AC6: 재검증 시스템 + 진화 전략
-  - AC7: 인큐베이터 대시보드 + 모니터링
-  - AC8: 테스트 + 커밋 + 푸시
+  - AC1: Daily Batch 워크플로우 (스케줄링, 배치 실행, 결과 저장) ✅ `batch-workflow.ts`
+  - AC2: 자가발전 시스템 (인터랙션 로그 기반 벡터 미세 조정) ✅ `self-evolution.ts`
+  - AC3: 콜드 스타트 운영 정책 (신규 페르소나 초기 학습) ✅ `cold-start.ts`
+  - AC4: 비용 통제 정책 (LLM 호출 예산, 일일 상한) ✅ `cost-control.ts`
+  - AC5: Golden Sample 관리 + 확장 전략 ✅ `golden-sample.ts`
+  - AC6: 재검증 시스템 + 진화 전략 ✅ `revalidation.ts`
+  - AC7: 인큐베이터 대시보드 + 모니터링 ✅ `dashboard.ts`
+  - AC8: 테스트 (40 tests PASS) + 빌드 PASS + 커밋
 
 - [ ] **T63: 컬러지문 데이터 엔진 — CIELAB+OKLCH 인코딩**
   - 배경: 구현계획서 Phase 6. 페르소나 고유 시각 식별자
