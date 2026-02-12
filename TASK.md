@@ -272,6 +272,82 @@
   - AC5: RAG→프롬프트 빌더 통합, Tier 라우터→생성 파이프라인 통합
   - AC6: 테스트 + 커밋 + 푸시
 
+### Phase PW-A: PersonaWorld 준비 — 디자인 시스템 (T74)
+
+> 엔진 완료 전 선행 가능한 순수 UI 작업. 목업 데이터 금지, shared-types import 기반.
+> 랜딩페이지는 통합 랜딩 하나로 사용 (별도 PW 랜딩 없음).
+
+- [ ] **T74: PW 디자인 시스템 완성 — shared-types + 신규 컴포넌트 + 6D 잔재 삭제**
+  - 배경: PW v3 재구축 전제조건. 타입은 shared-types에서 import, 로컬 재정의 금지
+  - AC1: shared-types v3 타입 import 설정 (PersonaV3, LayerVector, PostType 등 — 로컬 types.ts에서 re-export만)
+  - AC2: `lib/trait-colors.ts` 3-Layer 16D 색상 매핑 (engine-studio 상수 참조, 동기화)
+  - AC3: 디자인 시스템 신규 4종 — PWProfileRing, PWLikeButton, PWBadge, PWSpinner (UI 스펙 §4 준수, props 타이핑)
+  - AC4: 기존 6D 시각화 3파일 삭제 (trait-color-bar, trait-color-fingerprint, p-inger-print-2d)
+  - AC5: Build PASS + 테스트 + 커밋 + 푸시
+
+### Phase PW-B: PersonaWorld 페이지 구축 (T75~T79)
+
+> **선행조건: 엔진 Phase A 완료 (T45~T50)** — v3 API가 실제 데이터를 제공한 후 시작.
+> 모든 페이지는 실제 API 연동. 목업 데이터/하드코딩 절대 금지.
+
+- [ ] **T75: PW 온보딩 v3 — 3-Phase 질문 + 매칭 프리뷰**
+  - 배경: 설계서 §9. 실제 질문 API + 프로파일링 API 연동
+  - AC1: Phase 구조 UI (3-Phase × 8문항, 진행 바, Phase 간 전환)
+  - AC2: 시나리오 질문 카드 (4지선다, 선택 피드백, 게이미피케이션)
+  - AC3: Phase 간 매칭 프리뷰 (실제 매칭 API 호출, 페르소나 카드 + 유사도 %)
+  - AC4: 이탈 정책 UX (Phase 단위 저장, 미완료 Phase 리셋 경고)
+  - AC5: 프로필 등급 뱃지 (STARTER/STANDARD/ADVANCED/EXPERT)
+  - AC6: Build PASS + 테스트 + 커밋 + 푸시
+
+- [ ] **T76: PW 피드 v3 — 3-Tab + 17종 포스트 카드**
+  - 배경: 메인 화면. 실제 피드 API 연동
+  - AC1: 3-Tab 구조 (For You / Following / Explore)
+  - AC2: 17종 PostTypeCard (REVIEW, DEBATE, VS_BATTLE, COLLAB, BEHIND_STORY 등 타입별 분화 UI)
+  - AC3: 포스트 상호작용 바 (PWLikeButton, 댓글 수, 북마크, 공유)
+  - AC4: 피드 소스 라벨 (Following/추천/트렌딩 시각 구분)
+  - AC5: 무한 스크롤 + 로딩 스켈레톤
+  - AC6: Build PASS + 테스트 + 커밋 + 푸시
+
+- [ ] **T77: PW Explore v3 — 클러스터 + 핫 토픽 + 토론**
+  - 배경: 탐색 페이지. 실제 Explore API 연동
+  - AC1: Top 페르소나 클러스터 (역할/아키타입별 그룹 카드)
+  - AC2: 핫 토픽 섹션 (태그 기반, 참여 페르소나 수)
+  - AC3: 활성 토론 섹션 (대립 페르소나 페어 하이라이트)
+  - AC4: 신규 페르소나 하이라이트 (최근 생성, Auto-Interview 점수)
+  - AC5: 검색 + 아키타입/역할 필터
+  - AC6: Build PASS + 테스트 + 커밋 + 푸시
+
+- [ ] **T78: PW 페르소나 프로필 v3 — 3-Layer 시각화 + 상태**
+  - 배경: 페르소나 상세 페이지. 실제 페르소나 API 연동
+  - AC1: 3-Layer 멀티레이어 레이더 차트 (L1/L2/L3 오버레이, 레이어별 토글)
+  - AC2: PersonaState 표시 (mood/energy/socialBattery/paradoxTension 게이지)
+  - AC3: Paradox Score 시각화 + 교차축 하이라이트 Top 3
+  - AC4: 관계 미니맵 (팔로워/팔로잉, 관계 강도)
+  - AC5: 최근 포스트 타임라인 (17종 타입별 아이콘/레이아웃)
+  - AC6: Build PASS + 테스트 + 커밋 + 푸시
+
+- [ ] **T79: PW 유저 프로필 v3 + 댓글 + 알림**
+  - 배경: 유저 경험 완성. 실제 유저 API 연동
+  - AC1: 프로필 등급 + L1/L2 취향 벡터 시각화
+  - AC2: 데일리 마이크로 질문 UI (1문/로그인, 코인 보상, 스트릭)
+  - AC3: SNS 연동 UI (8개 플랫폼 카드, 동의 관리, 분석 진행)
+  - AC4: 댓글 UI + 톤 뱃지 (empathetic/analytical/counter_argument 등 8종)
+  - AC5: 알림 (페르소나 활동, 매칭 추천, 읽음 처리)
+  - AC6: Build PASS + 테스트 + 커밋 + 푸시
+
+### 보류: PW 백엔드 통합 (엔진 스튜디오 충돌 가능)
+
+> **엔진 스튜디오 작업 완료 후 상황 봐서 진행. Prisma 스키마 + API 라우트 변경 포함.**
+
+- 보류-1: Prisma 스키마 추가 (PersonaState, PersonaRelationship, ConsumptionLog 등)
+- 보류-2: API 라우트 재작성 (`/api/persona-world/*` 전체)
+- 보류-3: `user-store.ts` + `api.ts` 실제 API 연동 전환
+- 보류-4: 피드 알고리즘 3-Tier 매칭 엔진 연동
+- 보류-5: 자율 활동 엔진 (스케줄러, 콘텐츠 생성, RAG)
+- 보류-6: 품질 모니터링 (Auto-Interview, Integrity Score, Voice drift)
+
+---
+
 ### 별도 작업 (설계 문서 + 데이터)
 
 - [ ] **T42: 매칭 설명 + 유저↔페르소나 일치도 시스템** (설계 문서)
