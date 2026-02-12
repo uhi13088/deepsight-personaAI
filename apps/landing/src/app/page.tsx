@@ -132,18 +132,19 @@ const USE_CASES = [
     industry: "OTT 플랫폼",
     icon: "🎬",
     description:
-      "3-Layer 벡터로 분석된 취향 프로필과 Paradox Score 기반으로 페르소나가 추천 이유와 함께 콘텐츠 큐레이션",
+      "취향·성격·서사 3겹 프로필로 분석하고, 겉과 속의 모순까지 반영하여 페르소나가 추천 이유와 함께 콘텐츠 큐레이션",
   },
   {
     industry: "이커머스",
     icon: "🛍️",
-    description: "교차축 83축 분석으로 성향이 일치하는 리뷰어의 리뷰를 노출, 구매 결정 시간 단축",
+    description:
+      "취향과 성격의 심층 연결 패턴 분석으로 성향이 일치하는 리뷰어의 리뷰를 노출, 구매 결정 시간 단축",
   },
   {
     industry: "뉴스/미디어",
     icon: "📰",
     description:
-      "Extended Paradox Score로 필터버블 탈출, 3-Tier 매칭이 다양한 관점의 기사를 자동 노출",
+      "겉과 속의 모순 분석으로 필터버블 탈출, 3단계 매칭이 다양한 관점의 기사를 자동 노출",
   },
 ]
 
@@ -343,9 +344,10 @@ export default function HomePage() {
 
           <div className="mt-8 rounded-xl border border-gray-700 bg-white/5 p-4">
             <p className="text-sm text-gray-400">
-              <span className="font-semibold text-purple-400">Extended Paradox Score</span> — L1↔L2,
-              L1↔L3, L2↔L3 간 모순을 가중 합산하여 사용자의 &quot;복잡한 인간다움&quot;을
-              정량화합니다. 83개 교차축이 레이어 간 역설·강화·조절 패턴을 분석합니다.
+              <span className="font-semibold text-purple-400">겉과 속의 모순 점수</span> —
+              취향↔성격, 취향↔서사, 성격↔서사 간 모순을 종합하여 사용자의 &quot;복잡한
+              인간다움&quot;을 정량화합니다. 계층 간 연결 패턴이 역설·강화·조절 관계를 자동
+              분석합니다.
             </p>
           </div>
 
@@ -432,28 +434,28 @@ export default function HomePage() {
                   icon: Sparkles,
                   step: "01",
                   title: "Init — 서사 → 벡터 초기화",
-                  desc: "백스토리에서 키워드를 추출하고, 의미 카테고리→벡터 매핑 테이블로 초기 벡터 보정값(delta)을 산출합니다.",
+                  desc: "배경 이야기에서 핵심 키워드를 추출하고, 의미 분류표를 참조하여 초기 성격 프로필을 자동 산출합니다.",
                   color: "text-purple-600 border-purple-200 bg-purple-50",
                 },
                 {
                   icon: Flame,
                   step: "02",
                   title: "Override — 압박 → 벡터 변위",
-                  desc: "트리거 키워드 감지 시 벡터를 일시 이동시키고, L3 volatility에 비례하는 지수 감쇠 곡선으로 복귀합니다.",
+                  desc: "민감한 주제 감지 시 성격이 일시적으로 변하고, 감정 변동성에 비례하여 점차 원래 모습으로 돌아옵니다.",
                   color: "text-red-600 border-red-200 bg-red-50",
                 },
                 {
                   icon: RefreshCw,
                   step: "03",
                   title: "Adapt — 사용자 태도 → 실시간 조정",
-                  desc: "매 턴 사용자의 공격성·친밀도·정중함을 파싱하여, 차원별 적응률(α)과 모멘텀으로 페르소나가 미세 조정됩니다.",
+                  desc: "매 대화마다 사용자의 태도(공격성·친밀도·정중함)를 분석하여, 페르소나가 자연스럽게 미세 조정됩니다.",
                   color: "text-blue-600 border-blue-200 bg-blue-50",
                 },
                 {
                   icon: Heart,
                   step: "04",
                   title: "Express — 벡터 상태 → 행동 발현",
-                  desc: "갈등 점수, 결핍 점수 등 파생 상태값에서 시그모이드 확률로 고유 퀴크(말버릇·행동 패턴)가 발현됩니다.",
+                  desc: "갈등, 불안, 결핍 등 복합 감정 상태에서 고유한 말버릇·행동 패턴이 자연스럽게 발현됩니다.",
                   color: "text-pink-600 border-pink-200 bg-pink-50",
                 },
               ].map((item) => (
@@ -476,12 +478,12 @@ export default function HomePage() {
               <div>
                 <p className="font-semibold text-gray-900">품질 보증 3중 검증</p>
                 <p className="mt-1 text-sm text-gray-500">
-                  <span className="font-medium text-gray-700">Auto-Interview</span> 20문항 자동
-                  인터뷰로 벡터↔응답 일관성 검증 ·{" "}
-                  <span className="font-medium text-gray-700">6-Category Validation</span>{" "}
-                  구조·L1↔L2·L2↔L3·정성↔정량·교차축·동적 설정 6범주 검증 ·{" "}
-                  <span className="font-medium text-gray-700">Integrity Score</span> 런타임 대화 중
-                  인격 붕괴 감지 (Context Recall × Setting Consistency × Character Stability)
+                  <span className="font-medium text-gray-700">자동 인터뷰</span> 20문항으로
+                  성격↔응답 일관성 검증 ·{" "}
+                  <span className="font-medium text-gray-700">6범주 검증</span>{" "}
+                  구조·취향↔성격·성격↔서사·이야기↔수치·계층 간 연결·감정 반응 6범주 검증 ·{" "}
+                  <span className="font-medium text-gray-700">인격 일관성 점수</span> 실시간 대화 중
+                  인격 붕괴 감지 (대화 기억 정확도 · 설정 일관성 · 캐릭터 안정성)
                 </p>
               </div>
             </div>

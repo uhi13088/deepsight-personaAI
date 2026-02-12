@@ -32,12 +32,8 @@ const FEATURE_PAGES = [
     label: "MATCHING",
     title: "매칭 시스템",
     description:
-      "3-Tier 매칭(Basic/Advanced/Exploration)과 Extended Paradox Score를 결합하여, '왜 이 페르소나가 추천했는지' 설명할 수 있는 투명한 추천을 제공합니다.",
-    highlights: [
-      "3-Tier 매칭 파이프라인",
-      "설명 가능한 추천 이유",
-      "Paradox Score 기반 필터버블 탈출",
-    ],
+      "3단계 매칭(취향 유사도 → 심층 호환성 → 의외의 발견)과 겉과 속의 모순 분석을 결합하여, '왜 이 페르소나가 추천했는지' 설명할 수 있는 투명한 추천을 제공합니다.",
+    highlights: ["3단계 매칭 파이프라인", "설명 가능한 추천 이유", "모순 분석 기반 필터버블 탈출"],
   },
 ]
 

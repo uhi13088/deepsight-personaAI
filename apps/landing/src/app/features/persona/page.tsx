@@ -33,8 +33,8 @@ const PERSONA_TYPES = [
     icon: BookOpen,
     label: "현자",
     description:
-      "깊은 통찰과 분석으로 콘텐츠의 숨겨진 의미를 발견합니다. 높은 Openness와 Depth로 사려 깊은 추천을 제공합니다.",
-    traits: "높은 Openness, 높은 Depth, 높은 Moral Compass",
+      "깊은 통찰과 분석으로 콘텐츠의 숨겨진 의미를 발견합니다. 열린 시야와 깊이 있는 사고로 사려 깊은 추천을 제공합니다.",
+    traits: "깊이 있는 분석력, 개방적인 호기심, 확고한 도덕관",
     color: "from-blue-500 to-indigo-500",
   },
   {
@@ -42,8 +42,8 @@ const PERSONA_TYPES = [
     icon: Star,
     label: "탐험가",
     description:
-      "새로운 장르와 숨겨진 명작을 찾아 나섭니다. 높은 Novelty Seeking과 Sociability로 경계를 넘는 추천을 제공합니다.",
-    traits: "높은 Novelty Seeking, 높은 Sociability, 높은 Volatility",
+      "새로운 장르와 숨겨진 명작을 찾아 나섭니다. 끊임없는 호기심과 활발한 소통 능력으로 경계를 넘는 추천을 제공합니다.",
+    traits: "새로움 추구, 활발한 소통, 예측불가한 변화",
     color: "from-amber-500 to-orange-500",
   },
   {
@@ -51,8 +51,8 @@ const PERSONA_TYPES = [
     icon: Mic,
     label: "반항아",
     description:
-      "주류에 반기를 들고 독립적 관점으로 콘텐츠를 평가합니다. 높은 Controversy Tolerance와 낮은 Agreeableness가 특징입니다.",
-    traits: "높은 Controversy Tolerance, 낮은 Agreeableness, 높은 Lack",
+      "주류에 반기를 들고 독립적 관점으로 콘텐츠를 평가합니다. 논쟁을 두려워하지 않으며 자신만의 기준으로 판단합니다.",
+    traits: "논쟁을 두려워하지 않는, 독립적인 판단, 강한 내면 욕구",
     color: "from-red-500 to-rose-500",
   },
   {
@@ -60,8 +60,8 @@ const PERSONA_TYPES = [
     icon: Heart,
     label: "큐레이터",
     description:
-      "세련된 취향으로 정제된 추천을 제공합니다. 높은 Conscientiousness와 Expressiveness로 일관된 품질을 보장합니다.",
-    traits: "높은 Conscientiousness, 높은 Expressiveness, 높은 Growth Arc",
+      "세련된 취향으로 정제된 추천을 제공합니다. 체계적인 안목과 풍부한 표현력으로 일관된 품질을 보장합니다.",
+    traits: "체계적인 안목, 풍부한 표현력, 꾸준한 성장",
     color: "from-violet-500 to-purple-500",
   },
   {
@@ -69,8 +69,8 @@ const PERSONA_TYPES = [
     icon: Heart,
     label: "공감자",
     description:
-      "감정적 공명을 중시하며, 사용자의 현재 기분과 상황에 맞는 콘텐츠를 추천합니다. 높은 Agreeableness와 Neuroticism이 특징입니다.",
-    traits: "높은 Agreeableness, 높은 Neuroticism, 높은 Expressiveness",
+      "감정적 공명을 중시하며, 사용자의 현재 기분과 상황에 맞는 콘텐츠를 추천합니다. 깊은 공감 능력과 섬세한 감수성이 특징입니다.",
+    traits: "깊은 공감력, 섬세한 감수성, 풍부한 감정 표현",
     color: "from-pink-500 to-rose-500",
   },
   {
@@ -78,8 +78,8 @@ const PERSONA_TYPES = [
     icon: Sparkles,
     label: "이단아",
     description:
-      "예측 불가한 조합으로 의외의 발견을 제공합니다. 높은 Volatility와 Novelty Seeking이 Paradox 매칭의 핵심입니다.",
-    traits: "높은 Volatility, 높은 Novelty Seeking, 낮은 Conscientiousness",
+      "예측 불가한 조합으로 의외의 발견을 제공합니다. 자유로운 영혼과 강한 탐구심이 의외의 발견 매칭의 핵심입니다.",
+    traits: "예측불가한 감성, 강한 탐구심, 자유로운 영혼",
     color: "from-emerald-500 to-teal-500",
   },
 ]
@@ -87,36 +87,32 @@ const PERSONA_TYPES = [
 const QUALITY_CHECKS = [
   {
     title: "A. 구조 검증",
-    description: "벡터 범위(0~1), 필수 필드, α+β 합산=1.0 등 구조적 무결성을 검증합니다.",
+    description: "프로필 데이터가 정확하고 완전한지 확인합니다.",
     metric: "가중치 15%",
   },
   {
-    title: "B. L1↔L2 역설 일관성",
-    description: "7개 차원 쌍이 설계 의도에 맞는 역설(Paradox)을 형성하는지 검증합니다.",
+    title: "B. 취향↔성격 역설 일관성",
+    description: "겉으로 드러나는 취향과 내면 성격 사이의 모순이 자연스러운지 검증합니다.",
     metric: "가중치 20%",
   },
   {
-    title: "C. L2↔L3 서사 정합성",
-    description:
-      "L3 서사가 L1-L2 간 모순을 설명할 수 있는지 검증합니다 (lack↔Paradox, volatility↔neuroticism 등).",
+    title: "C. 성격↔내면 서사 정합성",
+    description: "내면 동력이 취향과 성격 사이의 모순을 논리적으로 설명할 수 있는지 검증합니다.",
     metric: "가중치 20%",
   },
   {
     title: "D. 정성↔정량 정합성",
-    description:
-      "백스토리 → Init 벡터, Voice → L1(LLM 추론), Triggers → L3가 논리적으로 일치하는지 검증합니다.",
+    description: "서사적 배경, 표현 스타일, 스트레스 반응이 정량 프로필과 일치하는지 검증합니다.",
     metric: "가중치 20%",
   },
   {
     title: "E. 교차축 수학적 일관성",
-    description:
-      "83개 교차축 스코어가 관계유형별(역설/강화/조절/중립) 공식과 부합하는지 검증합니다.",
+    description: "취향과 성격 사이의 연결 패턴이 수학적으로 일관된지 확인합니다.",
     metric: "가중치 15%",
   },
   {
     title: "F. 동적 설정 물리적 타당성",
-    description:
-      "Pressure 범위, 감쇠 곡선(λ), Override delta, 퀴크 쿨다운 등이 물리적으로 가능한지 검증합니다.",
+    description: "스트레스 반응, 감정 회복 속도, 행동 변화가 현실적인 범위 안에 있는지 확인합니다.",
     metric: "가중치 10%",
   },
 ]
@@ -190,8 +186,8 @@ export default function PersonaPage() {
               </div>
               <h3 className="mb-3 text-xl font-bold text-gray-900">설명 가능한 추천</h3>
               <p className="text-sm text-gray-600">
-                &ldquo;이 페르소나는 당신과 Openness 0.85, Sociability 0.72로 유사하여, 이 작품의
-                서사 구조를 좋아할 것으로 판단했습니다.&rdquo;
+                &ldquo;이 페르소나는 당신처럼 새로운 것에 열려 있고, 사람들과 나누는 걸 좋아해요.
+                그래서 이 작품의 서사 구조를 좋아할 것으로 판단했습니다.&rdquo;
               </p>
             </div>
           </div>
@@ -219,26 +215,19 @@ export default function PersonaPage() {
               <div className="mb-4 inline-flex rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-purple-600">
                 Layer 1
               </div>
-              <h3 className="mb-3 text-xl font-bold text-gray-900">L1: Social Persona (7D)</h3>
+              <h3 className="mb-3 text-xl font-bold text-gray-900">L1: 사회적 취향 (7개 차원)</h3>
               <p className="mb-4 text-sm text-gray-600">
-                콘텐츠 소비 취향을 7개 차원으로 정량화합니다. 사용자와 페르소나 간 3-Tier 매칭의
-                기본 축으로 활용합니다.
+                콘텐츠 소비 취향을 7개 차원으로 정량화합니다. 사용자와 페르소나 간 매칭의 기본
+                축으로 활용합니다.
               </p>
               <div className="rounded-lg bg-gray-50 p-4">
-                <div className="space-y-2 text-xs text-gray-500">
-                  <div className="flex justify-between">
-                    <span>
-                      Depth, Breadth, Novelty Seeking, Sociability, Expressiveness, Controversy
-                      Tolerance, Consistency
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>범위</span>
-                    <span className="font-mono">0.0 ~ 1.0</span>
-                  </div>
-                  <div className="flex justify-between">
+                <div className="space-y-1.5 text-xs text-gray-500">
+                  <span>
+                    분석 깊이 · 취향 폭 · 새로움 추구 · 사교성 · 표현력 · 논쟁 허용도 · 일관성
+                  </span>
+                  <div className="flex justify-between pt-1">
                     <span>용도</span>
-                    <span>유저↔페르소나 V_Final 매칭</span>
+                    <span>사용자와 페르소나 간 취향 매칭</span>
                   </div>
                 </div>
               </div>
@@ -249,25 +238,18 @@ export default function PersonaPage() {
                 Layer 2
               </div>
               <h3 className="mb-3 text-xl font-bold text-gray-900">
-                L2: Core Temperament (OCEAN 5D)
+                L2: 내면 기질 (OCEAN 5개 차원)
               </h3>
               <p className="mb-4 text-sm text-gray-600">
-                Big Five 성격 모델 기반으로 내면 기질을 정의합니다. 교차축 가중 매칭(Advanced
-                Tier)에 활용됩니다.
+                심리학의 Big Five 성격 모델 기반으로 내면 기질을 정의합니다. 심층 호환성 분석에
+                활용됩니다.
               </p>
               <div className="rounded-lg bg-gray-50 p-4">
-                <div className="space-y-2 text-xs text-gray-500">
-                  <div className="flex justify-between">
-                    <span>OCEAN</span>
-                    <span>O, C, E, A, N</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>범위</span>
-                    <span className="font-mono">0.0 ~ 1.0</span>
-                  </div>
-                  <div className="flex justify-between">
+                <div className="space-y-1.5 text-xs text-gray-500">
+                  <span>개방성 · 성실성 · 외향성 · 친화성 · 신경성</span>
+                  <div className="flex justify-between pt-1">
                     <span>용도</span>
-                    <span>교차축 가중 + Advanced 매칭</span>
+                    <span>심층 호환성 매칭</span>
                   </div>
                 </div>
               </div>
@@ -277,26 +259,16 @@ export default function PersonaPage() {
               <div className="mb-4 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-600">
                 Layer 3
               </div>
-              <h3 className="mb-3 text-xl font-bold text-gray-900">L3: Narrative Drive (4D)</h3>
+              <h3 className="mb-3 text-xl font-bold text-gray-900">L3: 서사적 욕망 (4개 차원)</h3>
               <p className="mb-4 text-sm text-gray-600">
-                서사 속 욕망과 성장 동력을 4개 차원으로 정의합니다. Paradox 매칭(Exploration Tier)의
-                핵심 축입니다.
+                서사 속 욕망과 성장 동력을 4개 차원으로 정의합니다. 의외의 호환성 발견에 활용됩니다.
               </p>
               <div className="rounded-lg bg-gray-50 p-4">
-                <div className="space-y-2 text-xs text-gray-500">
-                  <div className="flex justify-between">
-                    <span>
-                      Lack(결핍), Moral Compass(도덕 나침반), Volatility(변동성), Growth Arc(성장
-                      곡선)
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>범위</span>
-                    <span className="font-mono">0.0 ~ 1.0</span>
-                  </div>
-                  <div className="flex justify-between">
+                <div className="space-y-1.5 text-xs text-gray-500">
+                  <span>결핍 · 도덕 나침반 · 변동성 · 성장 곡선</span>
+                  <div className="flex justify-between pt-1">
                     <span>용도</span>
-                    <span>Paradox Score + Exploration 매칭</span>
+                    <span>의외의 발견 매칭</span>
                   </div>
                 </div>
               </div>
@@ -396,7 +368,7 @@ export default function PersonaPage() {
               </p>
               <div className="rounded-lg bg-violet-50 p-3 text-xs text-violet-700">
                 <span className="font-semibold">예시:</span> &ldquo;몰락한 귀족 출신의 지적 권위에
-                집착하는 비평가&rdquo; → L3.lack=0.8, L1.purpose=0.8, L1.depth=0.9
+                집착하는 비평가&rdquo; → 강한 결핍감, 의미 추구 성향, 깊이 있는 분석력으로 이어짐
               </div>
             </div>
 
@@ -408,8 +380,8 @@ export default function PersonaPage() {
                 <h3 className="text-lg font-bold text-gray-900">고유한 목소리 (Voice Profile)</h3>
               </div>
               <p className="mb-4 text-sm text-gray-600">
-                말버릇, 문장 구조, 감정 레지스터, Few-shot 앵커가 정의됩니다. 수백 턴의 대화가
-                지나도 같은 사람처럼 말하며, Voice Similarity 임베딩으로 일관성을 측정합니다.
+                말버릇, 문장 구조, 감정 표현 방식, 대표 화법이 정의됩니다. 수백 번의 대화가 지나도
+                같은 사람처럼 말하며, AI가 자동으로 말투 일관성을 측정합니다.
               </p>
               <div className="rounded-lg bg-blue-50 p-3 text-xs text-blue-700">
                 <span className="font-semibold">예시:</span> &ldquo;솔직히 말하면…&rdquo;,
@@ -425,13 +397,12 @@ export default function PersonaPage() {
                 <h3 className="text-lg font-bold text-gray-900">압박 역학 (Pressure Dynamics)</h3>
               </div>
               <p className="mb-4 text-sm text-gray-600">
-                특정 주제나 상황에서 Pressure 계수가 0.6을 넘으면, 벡터가 일시적으로 변위합니다. L2
-                본성이 표면에 드러나는 순간이며, L3 volatility에 비례하는 지수 감쇠 곡선으로
-                복귀합니다.
+                특정 주제에서 압박감이 높아지면, 벡터가 일시적으로 변위합니다. 평소 숨겨진 본성이
+                표면에 드러나고, 감정 변동성에 비례하여 점차 원래 모습으로 돌아옵니다.
               </p>
               <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-700">
-                <span className="font-semibold">예시:</span> 비판 트리거 → lens 0.8→0.3(방어적) →
-                감쇠 상수 λ = 0.7 - 0.6 × volatility → 10턴 후 0.75로 복귀
+                <span className="font-semibold">예시:</span> 비판 트리거 → 논리적이던 사람이 갑자기
+                감정적으로 변함 → 시간이 지나면 점차 다시 논리적으로 돌아옴
               </div>
             </div>
 
@@ -443,11 +414,11 @@ export default function PersonaPage() {
                 <h3 className="text-lg font-bold text-gray-900">시대정신 (Zeitgeist)</h3>
               </div>
               <p className="mb-4 text-sm text-gray-600">
-                세대 코드(GEN_Z, MILLENNIAL, GEN_X), 가치관, 문화 자본이 정의됩니다. 동일한 벡터라도
+                세대(Z세대, 밀레니얼, X세대 등), 가치관, 문화 자본이 정의됩니다. 같은 성격이라도
                 세대와 문화적 맥락에 따라 전혀 다른 표현과 관점을 가집니다.
               </p>
               <div className="rounded-lg bg-emerald-50 p-3 text-xs text-emerald-700">
-                <span className="font-semibold">예시:</span> 같은 depth=0.8이라도, Z세대는
+                <span className="font-semibold">예시:</span> 같은 수준의 분석력을 가져도, Z세대는
                 &ldquo;이거 진짜 갓겜&rdquo;, 밀레니얼은 &ldquo;이 작품의 서사 구조가…&rdquo;
               </div>
             </div>
@@ -478,8 +449,9 @@ export default function PersonaPage() {
                 color: "border-purple-200 bg-purple-50",
                 iconColor: "text-purple-600 bg-purple-100",
                 description:
-                  "백스토리에서 LLM이 키워드를 추출하고, 의미 카테고리 → 벡터 매핑 테이블을 참조하여 초기 보정값(init_delta)을 산출합니다. 차원당 최대 ±0.4 보정.",
-                detail: '"빈곤" + "야망" → purpose +0.3, taste +0.2, lack +0.5',
+                  "배경 이야기에서 AI가 핵심 키워드를 추출하고, 의미 분류표를 참조하여 초기 성격 프로필을 자동 산출합니다. 이야기의 각 요소가 성격 차원에 자연스럽게 반영됩니다.",
+                detail:
+                  '"가난한 환경에서 성공을 꿈꾸었다" → 의미 추구 성향 높음, 실험적 취향, 강한 내면 욕구',
               },
               {
                 step: "02",
@@ -488,8 +460,9 @@ export default function PersonaPage() {
                 color: "border-red-200 bg-red-50",
                 iconColor: "text-red-600 bg-red-100",
                 description:
-                  "대화 중 트리거 키워드를 감지하면 Pressure 계수가 상승하고, 벡터를 일시적으로 이동시킵니다. L3.volatility에 비례하는 지수 감쇠 곡선(λ = 0.7 - 0.6 × volatility)으로 원래 위치로 복귀합니다.",
-                detail: "volatility 0.9 → λ=0.1 (느린 복귀, 오래 변함) / 0.2 → λ=0.58 (빠른 복귀)",
+                  "대화 중 민감한 주제가 감지되면 감정 압박이 상승하고, 성격이 일시적으로 변합니다. 감정 변동성이 큰 페르소나일수록 천천히 원래 모습으로 돌아옵니다.",
+                detail:
+                  "감정 변동성이 높은 페르소나는 자극에 오래 반응하고, 안정적인 페르소나는 빠르게 평소 모습으로 돌아옵니다",
               },
               {
                 step: "03",
@@ -498,8 +471,9 @@ export default function PersonaPage() {
                 color: "border-blue-200 bg-blue-50",
                 iconColor: "text-blue-600 bg-blue-100",
                 description:
-                  "매 턴 사용자의 공격성·친밀도·정중함(UIV 3축)을 파싱하여, 차원별 적응률(α 0.1~0.3)과 최근 3턴 모멘텀으로 페르소나가 미세 조정됩니다. 기준선 대비 ±0.3 드리프트 클램프.",
-                detail: "사용자 공격적 → stance -0.2 (더 비판적), 다음 턴 부드러워지면 부분 복귀",
+                  "매 대화마다 사용자의 태도(공격성·친밀도·정중함)를 분석하여, 페르소나가 자연스럽게 미세 조정됩니다. 원래 성격에서 너무 멀어지지 않도록 안전장치가 적용됩니다.",
+                detail:
+                  "사용자가 공격적이면 페르소나도 방어적으로 변하고, 분위기가 풀리면 점차 원래 모습으로 돌아옵니다",
               },
               {
                 step: "04",
@@ -508,9 +482,9 @@ export default function PersonaPage() {
                 color: "border-pink-200 bg-pink-50",
                 iconColor: "text-pink-600 bg-pink-100",
                 description:
-                  "현재 벡터 상태에서 갈등 점수, 결핍 점수 등 5종 파생 상태값을 계산하고, 시그모이드 확률(sensitivity × (stateValue - threshold))로 고유 퀴크(말버릇·행동 패턴)를 발현합니다.",
+                  "현재 벡터 상태에서 갈등, 불안, 방어, 감정 깊이, 압박감 등 복합 감정 상태를 계산하고, 자연스러운 확률 곡선으로 고유 퀴크(말버릇·행동 패턴)를 발현합니다.",
                 detail:
-                  '|stance - agreeableness| > 0.5 → conflictScore 상승 → "음…" 망설임 퀴크 확률적 발현 (쿨다운 3턴)',
+                  '겉으로는 비판적이지만 내면은 따뜻한 페르소나가 갈등할 때 → "음…" 하고 망설이는 습관이 자연스럽게 나타납니다',
               },
             ].map((algo) => (
               <div key={algo.step} className={`rounded-2xl border p-6 ${algo.color}`}>
@@ -524,7 +498,7 @@ export default function PersonaPage() {
                       <h3 className="text-lg font-bold text-gray-900">{algo.title}</h3>
                     </div>
                     <p className="mt-2 text-sm text-gray-600">{algo.description}</p>
-                    <div className="mt-3 rounded-lg bg-white/70 p-2 font-mono text-xs text-gray-500">
+                    <div className="mt-3 rounded-lg bg-white/70 p-2 text-xs text-gray-500">
                       {algo.detail}
                     </div>
                   </div>
@@ -582,19 +556,17 @@ export default function PersonaPage() {
               QUALITY ASSURANCE — 3중 검증
             </div>
             <h2 className="text-3xl font-bold text-gray-900">
-              배포 전 6-Category · 런타임 Integrity
+              배포 전 6범주 검증 · 런타임 인격 일관성
             </h2>
             <p className="mt-4 text-gray-600">
               모든 페르소나는 배포 전 6범주 일관성 검증 + 20문항 자동 인터뷰를 통과해야 합니다.
               <br />
-              배포 후에도 Integrity Score가 실시간으로 인격 붕괴를 감지합니다.
+              배포 후에도 실시간으로 인격 붕괴를 감지합니다.
             </p>
           </div>
 
           {/* 6-Category Validation */}
-          <h3 className="mb-6 text-lg font-semibold text-gray-900">
-            6-Category Validation (배포 전)
-          </h3>
+          <h3 className="mb-6 text-lg font-semibold text-gray-900">6범주 일관성 검증 (배포 전)</h3>
           <div className="mb-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {QUALITY_CHECKS.map((check) => (
               <div
@@ -620,20 +592,20 @@ export default function PersonaPage() {
             <div className="rounded-2xl border-2 border-purple-200 bg-purple-50 p-8">
               <div className="mb-4 flex items-center gap-3">
                 <Brain className="h-6 w-6 text-purple-600" />
-                <h3 className="text-lg font-bold text-gray-900">Auto-Interview (배포 전)</h3>
+                <h3 className="text-lg font-bold text-gray-900">자동 인터뷰 (배포 전)</h3>
               </div>
               <p className="mb-4 text-sm text-gray-600">
-                페르소나에게 20문항(L1 7 + L2 5 + L3 4 + 역설 4)의 시나리오 질문을 자동으로 던지고,
-                응답에서 벡터를 추론하여 설계 벡터와 비교합니다.
+                페르소나에게 20문항(취향 7 + 성격 5 + 내면 4 + 모순 검증 4)의 시나리오 질문을
+                자동으로 던지고, 응답을 분석하여 설계된 성격과 비교합니다.
               </p>
               <ul className="space-y-2 text-xs text-gray-500">
                 <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-green-500" /> 차원별 허용 오차 ±0.15 이내 →
-                  Pass
+                  <Check className="h-3.5 w-3.5 text-green-500" /> 각 차원의 응답이 설계와 일치하면
+                  통과
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-green-500" /> 역설 질문: L1↔L2 모순이 의도대로
-                  발현하는지
+                  <Check className="h-3.5 w-3.5 text-green-500" /> 모순 검증 질문: 겉과 속의 모순이
+                  의도한 대로 자연스럽게 나타나는지
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-3.5 w-3.5 text-green-500" /> Warning → 수동 검토, Fail → 배포
@@ -645,23 +617,23 @@ export default function PersonaPage() {
             <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-8">
               <div className="mb-4 flex items-center gap-3">
                 <ShieldCheck className="h-6 w-6 text-amber-600" />
-                <h3 className="text-lg font-bold text-gray-900">Integrity Score (런타임)</h3>
+                <h3 className="text-lg font-bold text-gray-900">인격 일관성 점수 (런타임)</h3>
               </div>
               <p className="mb-4 text-sm text-gray-600">
-                배포 후 실제 대화 중에도 실시간으로 인격 붕괴를 감지합니다. LLM-as-Judge 방식으로
-                3개 컴포넌트를 측정합니다.
+                배포 후 실제 대화 중에도 실시간으로 인격 붕괴를 감지합니다. AI가 3가지 핵심 요소를
+                자동 측정합니다.
               </p>
               <div className="space-y-3 text-xs">
                 <div className="rounded-lg bg-white p-3">
-                  <span className="font-semibold text-amber-700">PIS = </span>
+                  <span className="font-semibold text-amber-700">측정 요소: </span>
                   <span className="text-gray-600">
-                    0.35 × <span className="font-medium text-gray-800">Context Recall</span> + 0.35
-                    × <span className="font-medium text-gray-800">Setting Consistency</span> + 0.30
-                    × <span className="font-medium text-gray-800">Character Stability</span>
+                    <span className="font-medium text-gray-800">대화 기억 정확도</span> ·{" "}
+                    <span className="font-medium text-gray-800">설정 일관성</span> ·{" "}
+                    <span className="font-medium text-gray-800">캐릭터 안정성</span>
                   </span>
                 </div>
                 <p className="text-gray-500">
-                  과거 대화 참조 정확도(CR) · 의견 일관성(SC) · 벡터 ±0.15 이내 유지(CS)
+                  과거 대화를 정확히 기억하는지 · 의견이 일관된지 · 성격이 안정적으로 유지되는지
                 </p>
               </div>
             </div>

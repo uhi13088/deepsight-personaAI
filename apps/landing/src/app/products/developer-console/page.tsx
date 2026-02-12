@@ -45,7 +45,7 @@ const API_FEATURES = [
     title: "유저-페르소나 매칭",
     badge: "Matching API",
     description:
-      "유저의 3-Layer 벡터와 페르소나 벡터 간 3-Tier 매칭 (Basic/Advanced/Exploration)으로 최적의 페르소나를 매칭합니다. 다양성 팩터를 포함하여 필터버블도 방지합니다.",
+      "유저의 3-Layer 프로필과 페르소나 프로필 간 3단계 매칭 (취향 유사도 → 심층 호환성 → 의외의 발견)으로 최적의 페르소나를 매칭합니다. 다양성 보정을 포함하여 필터버블도 방지합니다.",
     example: "음악 앱이 각 유저에게 맞춤 큐레이터 페르소나를 배정",
   },
   {
