@@ -1,19 +1,12 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Slider } from "@/components/ui/slider"
-import {
-  BASE_ARCHETYPES,
-  classifyUser,
-  createCustomArchetype,
-  addArchetype,
-  removeArchetype,
-  computeArchetypeStats,
-} from "@/lib/user-insight/user-archetype"
+import { classifyUser, computeArchetypeStats } from "@/lib/user-insight/user-archetype"
 import type { UserArchetype, UserArchetypeProfile } from "@/lib/user-insight/user-archetype"
 import { L1_DIMENSIONS } from "@/constants/v3/dimensions"
 import type { SocialPersonaVector, SocialDimension } from "@/types"
@@ -30,21 +23,49 @@ const DEFAULT_VECTOR: SocialPersonaVector = {
 }
 
 export default function ArchetypePage() {
-  const [archetypes, setArchetypes] = useState<UserArchetype[]>([...BASE_ARCHETYPES])
+  const [archetypes, setArchetypes] = useState<UserArchetype[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [testVector, setTestVector] = useState<SocialPersonaVector>({ ...DEFAULT_VECTOR })
   const [showAddForm, setShowAddForm] = useState(false)
   const [newName, setNewName] = useState("")
   const [newNameKo, setNewNameKo] = useState("")
   const [newDesc, setNewDesc] = useState("")
 
-  // 분류 테스트
+  // Fetch archetypes from API
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/user-insight/archetype")
+      const json = (await res.json()) as {
+        success: boolean
+        data?: { archetypes: UserArchetype[] }
+        error?: { code: string; message: string }
+      }
+      if (json.success && json.data) {
+        setArchetypes(json.data.archetypes)
+      } else {
+        setError(json.error?.message ?? "데이터를 불러오지 못했습니다")
+      }
+    } catch {
+      setError("서버와 통신 중 오류가 발생했습니다")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchData()
+  }, [fetchData])
+
+  // 분류 테스트 (archetypes가 비어있으면 null)
   const classification = useMemo(
-    () => classifyUser(testVector, archetypes),
+    () => (archetypes.length > 0 ? classifyUser(testVector, archetypes) : null),
     [testVector, archetypes]
   )
 
   // 통계 (샘플 프로필 기반)
   const sampleStats = useMemo(() => {
+    if (archetypes.length === 0) return []
     const profiles: UserArchetypeProfile[] = []
     for (const arch of archetypes) {
       if (arch.id === "hybrid") continue
@@ -54,33 +75,80 @@ export default function ArchetypePage() {
     return computeArchetypeStats(profiles)
   }, [archetypes])
 
-  const handleAddCustom = useCallback(() => {
+  const handleAddCustom = useCallback(async () => {
     if (!newName.trim() || !newNameKo.trim()) return
-    const custom = createCustomArchetype(
-      newName.trim(),
-      newNameKo.trim(),
-      newDesc.trim() || `${newNameKo} 커스텀 아키타입`,
-      { ...DEFAULT_VECTOR } as Record<SocialDimension, number>,
-      []
-    )
     try {
-      setArchetypes((prev) => addArchetype(prev, custom))
-      setNewName("")
-      setNewNameKo("")
-      setNewDesc("")
-      setShowAddForm(false)
+      const res = await fetch("/api/internal/user-insight/archetype", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add_custom",
+          name: newName.trim(),
+          nameKo: newNameKo.trim(),
+          description: newDesc.trim() || `${newNameKo} 커스텀 아키타입`,
+        }),
+      })
+      const json = (await res.json()) as {
+        success: boolean
+        data?: { archetypes: UserArchetype[] }
+        error?: { code: string; message: string }
+      }
+      if (json.success && json.data) {
+        setArchetypes(json.data.archetypes)
+        setNewName("")
+        setNewNameKo("")
+        setNewDesc("")
+        setShowAddForm(false)
+      }
     } catch {
-      // 중복 ID
+      // 추가 실패
     }
   }, [newName, newNameKo, newDesc])
 
-  const handleRemoveCustom = useCallback((id: string) => {
+  const handleRemoveCustom = useCallback(async (id: string) => {
     try {
-      setArchetypes((prev) => removeArchetype(prev, id))
+      const res = await fetch("/api/internal/user-insight/archetype", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "remove",
+          archetypeId: id,
+        }),
+      })
+      const json = (await res.json()) as {
+        success: boolean
+        data?: { archetypes: UserArchetype[] }
+        error?: { code: string; message: string }
+      }
+      if (json.success && json.data) {
+        setArchetypes(json.data.archetypes)
+      }
     } catch {
-      // 기본 아키타입 삭제 시도
+      // 삭제 실패
     }
   }, [])
+
+  if (loading) {
+    return (
+      <>
+        <Header title="Archetype Manager" description="유저 아키타입 10종 관리 및 분류 테스트" />
+        <div className="flex items-center justify-center p-8">
+          <div className="text-muted-foreground text-sm">데이터를 불러오는 중...</div>
+        </div>
+      </>
+    )
+  }
+
+  if (error) {
+    return (
+      <>
+        <Header title="Archetype Manager" description="유저 아키타입 10종 관리 및 분류 테스트" />
+        <div className="flex items-center justify-center p-8">
+          <div className="text-sm text-red-400">{error}</div>
+        </div>
+      </>
+    )
+  }
 
   return (
     <>
@@ -146,7 +214,7 @@ export default function ArchetypePage() {
                 />
                 <Button
                   size="sm"
-                  onClick={handleAddCustom}
+                  onClick={() => void handleAddCustom()}
                   disabled={!newName.trim() || !newNameKo.trim()}
                 >
                   추가
@@ -167,7 +235,7 @@ export default function ArchetypePage() {
                   </div>
                   {arch.isCustom && (
                     <button
-                      onClick={() => handleRemoveCustom(arch.id)}
+                      onClick={() => void handleRemoveCustom(arch.id)}
                       className="text-muted-foreground hover:text-destructive rounded p-1"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -204,8 +272,8 @@ export default function ArchetypePage() {
                       const dimDef = L1_DIMENSIONS.find((d) => d.key === t.dimension)
                       return (
                         <Badge key={i} variant="outline" className="text-[10px]">
-                          {dimDef?.label ?? t.dimension} {t.operator === "gte" ? "≥" : "≤"}{" "}
-                          {t.value}
+                          {dimDef?.label ?? t.dimension}{" "}
+                          {t.operator === "gte" ? "\u2265" : "\u2264"} {t.value}
                         </Badge>
                       )
                     })}
@@ -252,57 +320,65 @@ export default function ArchetypePage() {
 
             {/* 분류 결과 */}
             <div className="space-y-4">
-              <div className="rounded-lg border p-4">
-                <p className="text-muted-foreground mb-1 text-xs">1차 아키타입</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-bold">
-                    {classification.primaryArchetype.archetypeName}
-                  </span>
-                  <Badge variant="success">
-                    {(classification.primaryArchetype.confidence * 100).toFixed(0)}%
-                  </Badge>
-                </div>
-                <p className="text-muted-foreground mt-1 text-xs">
-                  거리: {classification.primaryArchetype.distance.toFixed(3)} · 규칙 매칭:{" "}
-                  {classification.primaryArchetype.matchedThresholds}/
-                  {classification.primaryArchetype.totalThresholds}
-                </p>
-              </div>
-
-              {classification.secondaryArchetype && (
-                <div className="rounded-lg border p-4">
-                  <p className="text-muted-foreground mb-1 text-xs">2차 아키타입</p>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">
-                      {classification.secondaryArchetype.archetypeName}
-                    </span>
-                    <Badge variant="muted">
-                      {(classification.secondaryArchetype.confidence * 100).toFixed(0)}%
-                    </Badge>
+              {classification ? (
+                <>
+                  <div className="rounded-lg border p-4">
+                    <p className="text-muted-foreground mb-1 text-xs">1차 아키타입</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-bold">
+                        {classification.primaryArchetype.archetypeName}
+                      </span>
+                      <Badge variant="success">
+                        {(classification.primaryArchetype.confidence * 100).toFixed(0)}%
+                      </Badge>
+                    </div>
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      거리: {classification.primaryArchetype.distance.toFixed(3)} · 규칙 매칭:{" "}
+                      {classification.primaryArchetype.matchedThresholds}/
+                      {classification.primaryArchetype.totalThresholds}
+                    </p>
                   </div>
+
+                  {classification.secondaryArchetype && (
+                    <div className="rounded-lg border p-4">
+                      <p className="text-muted-foreground mb-1 text-xs">2차 아키타입</p>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">
+                          {classification.secondaryArchetype.archetypeName}
+                        </span>
+                        <Badge variant="muted">
+                          {(classification.secondaryArchetype.confidence * 100).toFixed(0)}%
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 전체 순위 */}
+                  <div className="rounded-lg border p-3">
+                    <p className="text-muted-foreground mb-2 text-xs">전체 순위 (거리순)</p>
+                    <div className="space-y-1">
+                      {classification.allScores.slice(0, 5).map((score, i) => (
+                        <div
+                          key={score.archetypeId}
+                          className="flex items-center justify-between text-xs"
+                        >
+                          <span>
+                            <span className="text-muted-foreground mr-2">{i + 1}.</span>
+                            {score.archetypeName}
+                          </span>
+                          <span className="text-muted-foreground">
+                            d={score.distance.toFixed(2)} · {(score.confidence * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-muted-foreground text-sm">
+                  아키타입 데이터를 불러오는 중...
                 </div>
               )}
-
-              {/* 전체 순위 */}
-              <div className="rounded-lg border p-3">
-                <p className="text-muted-foreground mb-2 text-xs">전체 순위 (거리순)</p>
-                <div className="space-y-1">
-                  {classification.allScores.slice(0, 5).map((score, i) => (
-                    <div
-                      key={score.archetypeId}
-                      className="flex items-center justify-between text-xs"
-                    >
-                      <span>
-                        <span className="text-muted-foreground mr-2">{i + 1}.</span>
-                        {score.archetypeName}
-                      </span>
-                      <span className="text-muted-foreground">
-                        d={score.distance.toFixed(2)} · {(score.confidence * 100).toFixed(0)}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
         </div>

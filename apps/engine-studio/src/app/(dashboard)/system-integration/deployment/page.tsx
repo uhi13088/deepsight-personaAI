@@ -1,19 +1,9 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useMemo, useEffect } from "react"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  ENVIRONMENT_CONFIGS,
-  createDeployWorkflow,
-  advanceDeployStage,
-  createCanaryRelease,
-  advanceCanaryPhase,
-  updateCanaryMetrics,
-  evaluateCanaryRollback,
-  DEFAULT_CANARY_ROLLBACK_TRIGGERS,
-} from "@/lib/system-integration"
 import type {
   DeployWorkflow,
   DeployStage,
@@ -73,103 +63,249 @@ const ENV_STATUS_COLORS: Record<string, string> = {
   production: "border-emerald-500/30 bg-emerald-500/5",
 }
 
+// ── 타입 ──────────────────────────────────────────────────────
+
+interface RollbackTriggerDefault {
+  metric: "error_rate" | "response_time" | "satisfaction"
+  threshold: number
+}
+
+interface DeployData {
+  workflows: DeployWorkflow[]
+  environments: EnvironmentConfig[]
+  canary: CanaryRelease | null
+  rollbackTriggers: RollbackTriggerDefault[]
+}
+
 // ── 페이지 ────────────────────────────────────────────────────
 
 export default function DeploymentPage() {
-  // 배포 워크플로우 상태
-  const [workflow, setWorkflow] = useState<DeployWorkflow | null>(null)
-  const [currentStageIdx, setCurrentStageIdx] = useState(0)
-
-  // Canary Release 상태
-  const [canary, setCanary] = useState<CanaryRelease | null>(null)
-  const [canaryError, setCanaryError] = useState<string | null>(null)
+  const [data, setData] = useState<DeployData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // 선택된 환경
   const [selectedEnv, setSelectedEnv] = useState<EnvironmentConfig["environment"]>("development")
 
+  // Canary 에러 (UI 전용)
+  const [canaryError, setCanaryError] = useState<string | null>(null)
+
+  // 현재 워크플로우의 진행 중인 stage index 추적
+  const [currentStageIdx, setCurrentStageIdx] = useState(0)
+
   const STAGE_ORDER: DeployStage[] = useMemo(() => ["build", "test", "deploy", "verify"], [])
 
-  // 워크플로우 생성
-  const handleCreateWorkflow = useCallback(() => {
-    const wf = createDeployWorkflow("algorithm", "v1.2.0", selectedEnv, "admin@deepsight.ai")
-    setWorkflow(wf)
-    setCurrentStageIdx(0)
-    setCanary(null)
-    setCanaryError(null)
-  }, [selectedEnv])
+  // ── 데이터 로드 ─────────────────────────────────────────────
 
-  // 단계 진행 (성공)
-  const handleAdvanceStage = useCallback(() => {
-    if (!workflow || currentStageIdx >= STAGE_ORDER.length) return
-    const stage = STAGE_ORDER[currentStageIdx]
+  const fetchData = useCallback(async () => {
     try {
-      const updated = advanceDeployStage(workflow, stage, true, [`${stage} completed successfully`])
-      setWorkflow(updated)
-      setCurrentStageIdx((prev) => prev + 1)
-    } catch {
-      // 승인 필요 등
-    }
-  }, [workflow, currentStageIdx, STAGE_ORDER])
-
-  // 단계 실패 시뮬레이션
-  const handleFailStage = useCallback(() => {
-    if (!workflow || currentStageIdx >= STAGE_ORDER.length) return
-    const stage = STAGE_ORDER[currentStageIdx]
-    try {
-      const updated = advanceDeployStage(workflow, stage, false, [], `${stage} failed: timeout`)
-      setWorkflow(updated)
-    } catch {
-      // 이전 단계 미완료 등
-    }
-  }, [workflow, currentStageIdx, STAGE_ORDER])
-
-  // Canary 생성
-  const handleCreateCanary = useCallback(() => {
-    if (!workflow) return
-    const release = createCanaryRelease(workflow.id, 30)
-    setCanary(release)
-    setCanaryError(null)
-  }, [workflow])
-
-  // Canary 메트릭 업데이트 + 단계 진행
-  const handleAdvanceCanary = useCallback(() => {
-    if (!canary) return
-    try {
-      // 정상 메트릭으로 업데이트
-      const withMetrics = updateCanaryMetrics(canary, {
-        errorRatePercent: 1.2,
-        avgResponseTimeMs: 85,
-        matchingSatisfactionScore: 72,
-      })
-      const advanced = advanceCanaryPhase(withMetrics)
-      setCanary(advanced)
-      setCanaryError(null)
-    } catch (e) {
-      setCanaryError(e instanceof Error ? e.message : "진행 실패")
-    }
-  }, [canary])
-
-  // Canary 롤백 트리거 시뮬레이션
-  const handleSimulateRollbackTrigger = useCallback(() => {
-    if (!canary) return
-    try {
-      const withBadMetrics = updateCanaryMetrics(canary, {
-        errorRatePercent: 8.5,
-        avgResponseTimeMs: 350,
-        matchingSatisfactionScore: -15,
-      })
-      setCanary(withBadMetrics)
-      const evaluation = evaluateCanaryRollback(withBadMetrics)
-      if (evaluation.shouldRollback) {
-        setCanaryError(`Rollback triggered: ${evaluation.triggeredReasons.join("; ")}`)
+      const res = await fetch("/api/internal/system-integration/deploy")
+      const json = await res.json()
+      if (json.success) {
+        setData(json.data)
+      } else {
+        setError(json.error?.message ?? "데이터 로드 실패")
       }
-    } catch (e) {
-      setCanaryError(e instanceof Error ? e.message : "시뮬레이션 실패")
+    } catch {
+      setError("서버 연결 실패")
+    } finally {
+      setLoading(false)
     }
-  }, [canary])
+  }, [])
 
-  // 롤백 트리거 기본값
-  const rollbackTriggers = useMemo(() => DEFAULT_CANARY_ROLLBACK_TRIGGERS, [])
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  // ── 파생 상태 ───────────────────────────────────────────────
+
+  const workflow = data?.workflows[data.workflows.length - 1] ?? null
+  const canary = data?.canary ?? null
+  const environments = data?.environments ?? []
+  const rollbackTriggers = data?.rollbackTriggers ?? []
+
+  // ── 워크플로우 생성 ─────────────────────────────────────────
+
+  const handleCreateWorkflow = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/system-integration/deploy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create_workflow",
+          target: "algorithm",
+          targetVersion: "v1.2.0",
+          environment: selectedEnv,
+          createdBy: "admin@deepsight.ai",
+        }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        setCurrentStageIdx(0)
+        setCanaryError(null)
+        await fetchData()
+      }
+    } catch {
+      // handle error silently
+    }
+  }, [selectedEnv, fetchData])
+
+  // ── 단계 진행 (성공) ─────────────────────────────────────────
+
+  const handleAdvanceStage = useCallback(async () => {
+    if (!workflow || currentStageIdx >= STAGE_ORDER.length) return
+    const stage = STAGE_ORDER[currentStageIdx]
+    try {
+      const res = await fetch("/api/internal/system-integration/deploy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "advance_stage",
+          workflowId: workflow.id,
+          stage,
+          success: true,
+          logs: [`${stage} completed successfully`],
+        }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        setCurrentStageIdx((prev) => prev + 1)
+        await fetchData()
+      }
+    } catch {
+      // handle error silently
+    }
+  }, [workflow, currentStageIdx, STAGE_ORDER, fetchData])
+
+  // ── 단계 실패 시뮬레이션 ──────────────────────────────────────
+
+  const handleFailStage = useCallback(async () => {
+    if (!workflow || currentStageIdx >= STAGE_ORDER.length) return
+    const stage = STAGE_ORDER[currentStageIdx]
+    try {
+      const res = await fetch("/api/internal/system-integration/deploy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "advance_stage",
+          workflowId: workflow.id,
+          stage,
+          success: false,
+          logs: [],
+          error: `${stage} failed: timeout`,
+        }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        await fetchData()
+      }
+    } catch {
+      // handle error silently
+    }
+  }, [workflow, currentStageIdx, STAGE_ORDER, fetchData])
+
+  // ── Canary 생성 ─────────────────────────────────────────────
+
+  const handleCreateCanary = useCallback(async () => {
+    if (!workflow) return
+    try {
+      const res = await fetch("/api/internal/system-integration/deploy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create_canary",
+          workflowId: workflow.id,
+          durationMinutes: 30,
+        }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        setCanaryError(null)
+        await fetchData()
+      }
+    } catch {
+      // handle error silently
+    }
+  }, [workflow, fetchData])
+
+  // ── Canary 메트릭 업데이트 + 단계 진행 ───────────────────────
+
+  const handleAdvanceCanary = useCallback(async () => {
+    if (!workflow) return
+    try {
+      const res = await fetch("/api/internal/system-integration/deploy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "advance_canary",
+          workflowId: workflow.id,
+        }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        setCanaryError(null)
+        await fetchData()
+      } else {
+        setCanaryError(json.error?.message ?? "진행 실패")
+      }
+    } catch {
+      setCanaryError("서버 연결 실패")
+    }
+  }, [workflow, fetchData])
+
+  // ── Canary 롤백 트리거 시뮬레이션 ─────────────────────────────
+
+  const handleSimulateRollbackTrigger = useCallback(async () => {
+    if (!workflow) return
+    try {
+      const res = await fetch("/api/internal/system-integration/deploy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "simulate_rollback_trigger",
+          workflowId: workflow.id,
+        }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        const result = json.data as {
+          canary: CanaryRelease
+          shouldRollback: boolean
+          triggeredReasons: string[]
+        }
+        if (result.shouldRollback) {
+          setCanaryError(`Rollback triggered: ${result.triggeredReasons.join("; ")}`)
+        }
+        await fetchData()
+      }
+    } catch {
+      setCanaryError("시뮬레이션 실패")
+    }
+  }, [workflow, fetchData])
+
+  // ── 로딩/에러 UI ──────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <>
+        <Header title="Deployment Pipeline" description="API 배포 워크플로우 및 Canary Release" />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-muted-foreground text-sm">로딩 중...</div>
+        </div>
+      </>
+    )
+  }
+
+  if (error) {
+    return (
+      <>
+        <Header title="Deployment Pipeline" description="API 배포 워크플로우 및 Canary Release" />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-sm text-red-400">{error}</div>
+        </div>
+      </>
+    )
+  }
 
   return (
     <>
@@ -178,7 +314,7 @@ export default function DeploymentPage() {
       <div className="space-y-6 p-6">
         {/* ── 환경 카드 3종 ────────────────────────────── */}
         <div className="grid gap-4 lg:grid-cols-3">
-          {ENVIRONMENT_CONFIGS.map((env) => (
+          {environments.map((env) => (
             <button
               key={env.environment}
               onClick={() => setSelectedEnv(env.environment)}

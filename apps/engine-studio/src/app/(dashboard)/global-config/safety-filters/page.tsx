@@ -1,23 +1,17 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Shield, Plus, Trash2, Play, AlertTriangle, Lock } from "lucide-react"
-import {
-  createSafetyFilter,
-  evaluateFilter,
-  addForbiddenWord,
-  removeForbiddenWord,
-  getFilterLogSummary,
-} from "@/lib/global-config"
 import type {
-  SafetyFilter,
+  SafetyFilterConfig,
   FilterLevel,
   FilterAction,
   ForbiddenWord,
   FilterEvaluationResult,
+  FilterLogEntry,
 } from "@/lib/global-config"
 
 // ── Severity badge variant mapping ──────────────────────────────
@@ -48,17 +42,24 @@ const FILTER_LEVELS: { value: FilterLevel; label: string; description: string }[
   },
 ]
 
+// ── API response shape ───────────────────────────────────────
+interface LogSummary {
+  totalEntries: number
+  byAction: Record<FilterAction, number>
+  byLevel: Record<FilterLevel, number>
+  recentBlocks: FilterLogEntry[]
+}
+
+interface SafetyFilterData {
+  config: SafetyFilterConfig
+  logs: FilterLogEntry[]
+  logSummary: LogSummary
+}
+
 export default function SafetyFiltersPage() {
-  const [filter, setFilter] = useState<SafetyFilter>(() => {
-    // Initialize with some sample log entries
-    let f = createSafetyFilter()
-    const samples = ["안녕하세요", "폭력적인 내용", "좋은 하루 되세요", "차별 발언", "도박 사이트"]
-    for (const text of samples) {
-      const { updatedFilter } = evaluateFilter(f, text)
-      f = updatedFilter
-    }
-    return f
-  })
+  const [data, setData] = useState<SafetyFilterData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // ── New word form state ────────────────────────────────────────
   const [newWord, setNewWord] = useState("")
@@ -70,19 +71,47 @@ export default function SafetyFiltersPage() {
   const [testInput, setTestInput] = useState("")
   const [testResult, setTestResult] = useState<FilterEvaluationResult | null>(null)
 
-  const logSummary = useMemo(() => getFilterLogSummary(filter), [filter])
+  // ── Fetch data from API ────────────────────────────────────
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/global-config/safety")
+      const json = await res.json()
+      if (json.success && json.data) {
+        setData(json.data)
+      } else {
+        setError(json.error?.message ?? "데이터 로드 실패")
+      }
+    } catch {
+      setError("서버 연결 실패")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   // ── Filter level change ────────────────────────────────────────
-  const handleLevelChange = useCallback((level: FilterLevel) => {
-    setFilter((prev) => ({
-      ...prev,
-      config: { ...prev.config, level },
-    }))
+  const handleLevelChange = useCallback(async (level: FilterLevel) => {
     setTestResult(null)
+    try {
+      const res = await fetch("/api/internal/global-config/safety", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "changeLevel", level }),
+      })
+      const json = await res.json()
+      if (json.success && json.data) {
+        setData(json.data)
+      }
+    } catch {
+      // silently fail
+    }
   }, [])
 
   // ── Add forbidden word ─────────────────────────────────────────
-  const handleAddWord = useCallback(() => {
+  const handleAddWord = useCallback(async () => {
     if (!newWord.trim() || !newCategory.trim()) {
       setAddError("Word and category are required")
       return
@@ -94,32 +123,87 @@ export default function SafetyFiltersPage() {
         severity: newSeverity,
         exactMatch: false,
       }
-      setFilter((prev) => addForbiddenWord(prev, word))
-      setNewWord("")
-      setNewCategory("")
-      setNewSeverity("medium")
-      setAddError(null)
-    } catch (err) {
-      setAddError(err instanceof Error ? err.message : "Failed to add word")
+      const res = await fetch("/api/internal/global-config/safety", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "addWord", word }),
+      })
+      const json = await res.json()
+      if (json.success && json.data) {
+        setData(json.data)
+        setNewWord("")
+        setNewCategory("")
+        setNewSeverity("medium")
+        setAddError(null)
+      } else {
+        setAddError(json.error?.message ?? "Failed to add word")
+      }
+    } catch {
+      setAddError("Failed to add word")
     }
   }, [newWord, newCategory, newSeverity])
 
   // ── Remove forbidden word ──────────────────────────────────────
-  const handleRemoveWord = useCallback((word: string, category: string) => {
+  const handleRemoveWord = useCallback(async (word: string, category: string) => {
     try {
-      setFilter((prev) => removeForbiddenWord(prev, word, category))
+      const res = await fetch("/api/internal/global-config/safety", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "removeWord", word, category }),
+      })
+      const json = await res.json()
+      if (json.success && json.data) {
+        setData(json.data)
+      }
     } catch {
       // Word not found - already removed
     }
   }, [])
 
   // ── Test simulator ─────────────────────────────────────────────
-  const handleTestFilter = useCallback(() => {
+  const handleTestFilter = useCallback(async () => {
     if (!testInput.trim()) return
-    const { result, updatedFilter } = evaluateFilter(filter, testInput)
-    setTestResult(result)
-    setFilter(updatedFilter)
-  }, [filter, testInput])
+    try {
+      const res = await fetch("/api/internal/global-config/safety", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "evaluate", input: testInput }),
+      })
+      const json = await res.json()
+      if (json.success && json.data) {
+        setTestResult(json.data.result)
+        setData(json.data.filter)
+      }
+    } catch {
+      // silently fail
+    }
+  }, [testInput])
+
+  // ── Loading state ─────────────────────────────────────────────
+  if (loading) {
+    return (
+      <>
+        <Header title="Safety Filters" description="안전 필터 강도 및 금기어 관리" />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-muted-foreground text-sm">로딩 중...</div>
+        </div>
+      </>
+    )
+  }
+
+  // ── Error state ───────────────────────────────────────────────
+  if (error || !data) {
+    return (
+      <>
+        <Header title="Safety Filters" description="안전 필터 강도 및 금기어 관리" />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-sm text-red-400">{error ?? "데이터를 불러올 수 없습니다"}</div>
+        </div>
+      </>
+    )
+  }
+
+  const { config: filterConfig, logSummary } = data
 
   return (
     <>
@@ -133,14 +217,14 @@ export default function SafetyFiltersPage() {
             <h3 className="text-sm font-medium">Filter Level</h3>
             <Badge
               variant={
-                filter.config.level === "strict"
+                filterConfig.level === "strict"
                   ? "destructive"
-                  : filter.config.level === "moderate"
+                  : filterConfig.level === "moderate"
                     ? "warning"
                     : "info"
               }
             >
-              {filter.config.level}
+              {filterConfig.level}
             </Badge>
           </div>
 
@@ -150,7 +234,7 @@ export default function SafetyFiltersPage() {
                 key={level.value}
                 onClick={() => handleLevelChange(level.value)}
                 className={`rounded-lg border p-3 text-left transition-colors ${
-                  filter.config.level === level.value
+                  filterConfig.level === level.value
                     ? "border-primary bg-primary/10"
                     : "border-border hover:bg-accent"
                 }`}
@@ -168,7 +252,7 @@ export default function SafetyFiltersPage() {
             <div className="flex items-center gap-2">
               <Lock className="text-muted-foreground h-4 w-4" />
               <h3 className="text-sm font-medium">
-                Forbidden Words ({filter.config.forbiddenWords.length})
+                Forbidden Words ({filterConfig.forbiddenWords.length})
               </h3>
             </div>
           </div>
@@ -236,7 +320,7 @@ export default function SafetyFiltersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filter.config.forbiddenWords.map((fw) => (
+                {filterConfig.forbiddenWords.map((fw) => (
                   <tr
                     key={`${fw.word}-${fw.category}`}
                     className="border-border border-b last:border-0"

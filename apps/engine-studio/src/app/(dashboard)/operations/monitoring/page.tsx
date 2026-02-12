@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useMemo, useEffect } from "react"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -16,113 +16,17 @@ import {
   CheckCircle,
   XCircle,
 } from "lucide-react"
-import {
-  createMetricDataPoint,
-  evaluateThresholds,
-  searchLogs,
-  acknowledgeThresholdAlert,
-  DEFAULT_METRIC_THRESHOLDS,
-  DEFAULT_DASHBOARD_LAYOUT,
-} from "@/lib/operations"
+import { searchLogs, DEFAULT_METRIC_THRESHOLDS } from "@/lib/operations"
 import type {
   MetricDataPoint,
   ThresholdAlert,
   LogEntry,
   LogSearchFilter,
   MetricType,
+  MetricThreshold,
+  DashboardLayout,
   DashboardPanel,
 } from "@/lib/operations"
-
-// ── Sample data generators ────────────────────────────────────
-
-function generateSampleMetrics(): MetricDataPoint[] {
-  return [
-    createMetricDataPoint("cpu", 72.5, "server-1", { env: "prod" }),
-    createMetricDataPoint("memory", 68.3, "server-1", { env: "prod" }),
-    createMetricDataPoint("disk", 54.2, "server-1", { env: "prod" }),
-    createMetricDataPoint("network", 45.8, "server-1", { env: "prod" }),
-    createMetricDataPoint("api_latency", 320, "api-gateway", { env: "prod" }),
-    createMetricDataPoint("error_rate", 0.8, "api-gateway", { env: "prod" }),
-  ]
-}
-
-function generateSampleLogs(): LogEntry[] {
-  const now = Date.now()
-  return [
-    {
-      id: "log-1",
-      timestamp: now - 1000,
-      level: "error",
-      service: "api-gateway",
-      message: "Connection timeout to database pool",
-      metadata: { host: "db-primary" },
-      traceId: "trace-001",
-    },
-    {
-      id: "log-2",
-      timestamp: now - 5000,
-      level: "warn",
-      service: "worker",
-      message: "Queue depth exceeding threshold",
-      metadata: { queue: "persona-processing" },
-      traceId: "trace-002",
-    },
-    {
-      id: "log-3",
-      timestamp: now - 10000,
-      level: "info",
-      service: "api-gateway",
-      message: "Health check passed",
-      metadata: {},
-      traceId: null,
-    },
-    {
-      id: "log-4",
-      timestamp: now - 15000,
-      level: "error",
-      service: "matching-engine",
-      message: "Vector computation failed for persona batch",
-      metadata: { batchId: "batch-42" },
-      traceId: "trace-003",
-    },
-    {
-      id: "log-5",
-      timestamp: now - 20000,
-      level: "info",
-      service: "worker",
-      message: "Backup job completed successfully",
-      metadata: {},
-      traceId: null,
-    },
-    {
-      id: "log-6",
-      timestamp: now - 30000,
-      level: "debug",
-      service: "api-gateway",
-      message: "Request processed in 120ms",
-      metadata: {},
-      traceId: "trace-004",
-    },
-    {
-      id: "log-7",
-      timestamp: now - 45000,
-      level: "warn",
-      service: "matching-engine",
-      message: "Slow query detected: persona search took 2.3s",
-      metadata: { queryId: "q-789" },
-      traceId: "trace-005",
-    },
-    {
-      id: "log-8",
-      timestamp: now - 60000,
-      level: "fatal",
-      service: "worker",
-      message: "Out of memory error — process restarting",
-      metadata: { pid: "12345" },
-      traceId: null,
-    },
-  ]
-}
 
 // ── Metric type config ─────────────────────────────────────────
 
@@ -144,22 +48,58 @@ const LEVEL_COLORS: Record<LogEntry["level"], string> = {
   fatal: "text-red-600",
 }
 
+// ── API response type ──────────────────────────────────────────
+
+interface MonitoringData {
+  metrics: MetricDataPoint[]
+  logs: LogEntry[]
+  alerts: ThresholdAlert[]
+  thresholds: MetricThreshold[]
+  layout: DashboardLayout
+}
+
 export default function MonitoringPage() {
   // ── State ────────────────────────────────────────────────────
-  const [metrics, setMetrics] = useState<MetricDataPoint[]>(() => generateSampleMetrics())
-  const [alerts, setAlerts] = useState<ThresholdAlert[]>(() =>
-    evaluateThresholds(generateSampleMetrics(), DEFAULT_METRIC_THRESHOLDS)
-  )
-  const [logs] = useState<LogEntry[]>(() => generateSampleLogs())
+  const [data, setData] = useState<MonitoringData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Log search state
   const [logLevelFilter, setLogLevelFilter] = useState<LogEntry["level"] | "">("")
   const [logServiceFilter, setLogServiceFilter] = useState("")
   const [logKeyword, setLogKeyword] = useState("")
 
+  // ── Fetch data ──────────────────────────────────────────────
+
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/operations/monitoring")
+      const json = (await res.json()) as {
+        success: boolean
+        data?: MonitoringData
+        error?: { code: string; message: string }
+      }
+      if (json.success && json.data) {
+        setData(json.data)
+        setError(null)
+      } else {
+        setError(json.error?.message ?? "데이터 로드 실패")
+      }
+    } catch {
+      setError("서버 연결 실패")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
   // ── Derived data ─────────────────────────────────────────────
 
   const filteredLogs = useMemo(() => {
+    if (!data) return []
     const filter: LogSearchFilter = {
       startTime: null,
       endTime: null,
@@ -169,34 +109,65 @@ export default function MonitoringPage() {
       traceId: null,
       limit: 50,
     }
-    return searchLogs(logs, filter)
-  }, [logs, logLevelFilter, logServiceFilter, logKeyword])
+    return searchLogs(data.logs, filter)
+  }, [data, logLevelFilter, logServiceFilter, logKeyword])
 
   const availableServices = useMemo(() => {
-    const services = new Set(logs.map((l) => l.service))
+    if (!data) return []
+    const services = new Set(data.logs.map((l) => l.service))
     return Array.from(services).sort()
-  }, [logs])
+  }, [data])
 
   // ── Handlers ─────────────────────────────────────────────────
 
-  const handleRefreshMetrics = useCallback(() => {
-    const newMetrics = generateSampleMetrics()
-    setMetrics(newMetrics)
-    setAlerts(evaluateThresholds(newMetrics, DEFAULT_METRIC_THRESHOLDS))
+  const handleRefreshMetrics = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/operations/monitoring", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "refresh_metrics" }),
+      })
+      const json = (await res.json()) as {
+        success: boolean
+        data?: MonitoringData
+        error?: { code: string; message: string }
+      }
+      if (json.success && json.data) {
+        setData(json.data)
+      }
+    } catch {
+      // silent fail on refresh
+    }
   }, [])
 
-  const handleAcknowledgeAlert = useCallback((alertId: string) => {
-    setAlerts((prev) => prev.map((a) => (a.id === alertId ? acknowledgeThresholdAlert(a) : a)))
-  }, [])
+  const handleAcknowledgeAlert = useCallback(
+    async (alertId: string) => {
+      try {
+        const res = await fetch("/api/internal/operations/monitoring", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "acknowledge_alert", alertId }),
+        })
+        const json = (await res.json()) as { success: boolean }
+        if (json.success) {
+          await fetchData()
+        }
+      } catch {
+        // silent fail
+      }
+    },
+    [fetchData]
+  )
 
   // ── Helper to get metric value ───────────────────────────────
 
   const getMetricValue = useCallback(
     (type: MetricType): number => {
-      const point = metrics.find((m) => m.metricType === type)
+      if (!data) return 0
+      const point = data.metrics.find((m) => m.metricType === type)
       return point?.value ?? 0
     },
-    [metrics]
+    [data]
   )
 
   const getMetricStatus = useCallback(
@@ -221,6 +192,34 @@ export default function MonitoringPage() {
     [getMetricValue]
   )
 
+  // ── Loading state ───────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <>
+        <Header title="System Monitoring" description="실시간 시스템 모니터링 대시보드" />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-muted-foreground text-sm">로딩 중...</div>
+        </div>
+      </>
+    )
+  }
+
+  // ── Error state ─────────────────────────────────────────────
+
+  if (error) {
+    return (
+      <>
+        <Header title="System Monitoring" description="실시간 시스템 모니터링 대시보드" />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-sm text-red-400">{error}</div>
+        </div>
+      </>
+    )
+  }
+
+  if (!data) return null
+
   return (
     <>
       <Header title="System Monitoring" description="실시간 시스템 모니터링 대시보드" />
@@ -230,8 +229,8 @@ export default function MonitoringPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Activity className="h-4 w-4 text-emerald-400" />
-            <span className="text-sm font-medium">{DEFAULT_DASHBOARD_LAYOUT.name}</span>
-            <Badge variant="muted">{DEFAULT_DASHBOARD_LAYOUT.panels.length} 패널</Badge>
+            <span className="text-sm font-medium">{data.layout.name}</span>
+            <Badge variant="muted">{data.layout.panels.length} 패널</Badge>
           </div>
           <Button size="sm" variant="outline" onClick={handleRefreshMetrics}>
             <Activity className="mr-1.5 h-3.5 w-3.5" />
@@ -277,17 +276,17 @@ export default function MonitoringPage() {
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-400" />
               <h3 className="text-sm font-medium">임계값 알림</h3>
-              <Badge variant="muted">{alerts.length}건</Badge>
+              <Badge variant="muted">{data.alerts.length}건</Badge>
             </div>
           </div>
 
-          {alerts.length === 0 ? (
+          {data.alerts.length === 0 ? (
             <p className="text-muted-foreground py-4 text-center text-sm">
               현재 활성 알림이 없습니다
             </p>
           ) : (
             <div className="space-y-2">
-              {alerts.map((alert) => (
+              {data.alerts.map((alert) => (
                 <div
                   key={alert.id}
                   className="flex items-center justify-between rounded-md border px-3 py-2"
@@ -406,7 +405,7 @@ export default function MonitoringPage() {
         <div className="bg-card rounded-lg border p-4">
           <h3 className="mb-3 text-sm font-medium">대시보드 패널 구성</h3>
           <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
-            {DEFAULT_DASHBOARD_LAYOUT.panels.map((panel: DashboardPanel) => (
+            {data.layout.panels.map((panel: DashboardPanel) => (
               <div key={panel.id} className="rounded-md border px-3 py-2 text-xs">
                 <p className="font-medium">{panel.title}</p>
                 <p className="text-muted-foreground">

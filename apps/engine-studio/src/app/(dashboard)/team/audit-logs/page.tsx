@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -15,20 +15,7 @@ import {
   Clock,
   Filter,
 } from "lucide-react"
-import {
-  createAuditLog,
-  recordAuditEntry,
-  searchAuditLog,
-  exportAuditLog,
-  getAuditSummary,
-} from "@/lib/team"
-import type {
-  AuditLog,
-  AuditLogFilter,
-  AuditAction,
-  AuditTargetType,
-  AuditSummary,
-} from "@/lib/team"
+import type { AuditLogEntry, AuditAction, AuditTargetType, AuditSummary } from "@/lib/team"
 
 // ── Action labels ───────────────────────────────────────────────
 const ACTION_LABELS: Partial<Record<AuditAction, string>> = {
@@ -89,162 +76,6 @@ function getActionVariant(
   return "muted"
 }
 
-// ── Sample audit log initialization ─────────────────────────────
-function initializeAuditLog(): AuditLog {
-  let log = createAuditLog()
-
-  const now = Date.now()
-  const entries: Array<{
-    actorId: string
-    actorName: string
-    action: AuditAction
-    targetType: AuditTargetType
-    targetId: string
-    details: Record<string, string>
-    ip: string
-    offset: number
-  }> = [
-    {
-      actorId: "u1",
-      actorName: "Admin",
-      action: "team.created",
-      targetType: "team",
-      targetId: "team_1",
-      details: { name: "DeepSight" },
-      ip: "192.168.1.1",
-      offset: -86400000 * 5,
-    },
-    {
-      actorId: "u1",
-      actorName: "Admin",
-      action: "user.invited",
-      targetType: "user",
-      targetId: "u2",
-      details: { email: "engineer@deepsight.ai", role: "ai_engineer" },
-      ip: "192.168.1.1",
-      offset: -86400000 * 4,
-    },
-    {
-      actorId: "u1",
-      actorName: "Admin",
-      action: "user.invited",
-      targetType: "user",
-      targetId: "u3",
-      details: { email: "content@deepsight.ai", role: "content_manager" },
-      ip: "192.168.1.1",
-      offset: -86400000 * 4,
-    },
-    {
-      actorId: "u2",
-      actorName: "Kim Engineer",
-      action: "persona.created",
-      targetType: "persona",
-      targetId: "p1",
-      details: { name: "심층 분석가" },
-      ip: "10.0.0.5",
-      offset: -86400000 * 3,
-    },
-    {
-      actorId: "u2",
-      actorName: "Kim Engineer",
-      action: "persona.updated",
-      targetType: "persona",
-      targetId: "p1",
-      details: { field: "vectors", description: "L1 벡터 조정" },
-      ip: "10.0.0.5",
-      offset: -86400000 * 2,
-    },
-    {
-      actorId: "u2",
-      actorName: "Kim Engineer",
-      action: "matching.executed",
-      targetType: "matching",
-      targetId: "match_1",
-      details: { mode: "single", score: "0.87" },
-      ip: "10.0.0.5",
-      offset: -86400000 * 2,
-    },
-    {
-      actorId: "u3",
-      actorName: "Lee Content",
-      action: "content.created",
-      targetType: "content",
-      targetId: "c1",
-      details: { title: "트렌드 리포트 2024" },
-      ip: "10.0.0.10",
-      offset: -86400000,
-    },
-    {
-      actorId: "u3",
-      actorName: "Lee Content",
-      action: "content.published",
-      targetType: "content",
-      targetId: "c1",
-      details: { title: "트렌드 리포트 2024" },
-      ip: "10.0.0.10",
-      offset: -86400000,
-    },
-    {
-      actorId: "u1",
-      actorName: "Admin",
-      action: "settings.updated",
-      targetType: "settings",
-      targetId: "global",
-      details: { key: "matching.threshold", oldValue: "0.5", newValue: "0.6" },
-      ip: "192.168.1.1",
-      offset: -43200000,
-    },
-    {
-      actorId: "u2",
-      actorName: "Kim Engineer",
-      action: "persona.published",
-      targetType: "persona",
-      targetId: "p1",
-      details: { name: "심층 분석가" },
-      ip: "10.0.0.5",
-      offset: -3600000,
-    },
-    {
-      actorId: "u1",
-      actorName: "Admin",
-      action: "user.role_changed",
-      targetType: "user",
-      targetId: "u3",
-      details: { from: "content_manager", to: "analyst" },
-      ip: "192.168.1.1",
-      offset: -1800000,
-    },
-    {
-      actorId: "u2",
-      actorName: "Kim Engineer",
-      action: "matching.configured",
-      targetType: "matching",
-      targetId: "config_1",
-      details: { parameter: "diversity_weight", value: "0.3" },
-      ip: "10.0.0.5",
-      offset: -600000,
-    },
-  ]
-
-  for (const entry of entries) {
-    const entryLog = recordAuditEntry(log, {
-      actorId: entry.actorId,
-      actorName: entry.actorName,
-      action: entry.action,
-      targetType: entry.targetType,
-      targetId: entry.targetId,
-      details: entry.details,
-      ip: entry.ip,
-    })
-    // Override timestamp for demo
-    const lastEntry = entryLog.entries[entryLog.entries.length - 1]
-    lastEntry.timestamp = now + entry.offset
-    log = entryLog
-  }
-
-  return log
-}
-
 // ── Unique action types for filter dropdown ─────────────────────
 const FILTER_ACTION_TYPES: AuditAction[] = [
   "user.invited",
@@ -260,8 +91,17 @@ const FILTER_ACTION_TYPES: AuditAction[] = [
   "settings.updated",
 ]
 
+// ── API response type ───────────────────────────────────────────
+interface AuditApiData {
+  entries: AuditLogEntry[]
+  totalCount: number
+  summary: AuditSummary
+}
+
 export default function AuditLogsPage() {
-  const [auditLog] = useState<AuditLog>(() => initializeAuditLog())
+  const [data, setData] = useState<AuditApiData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // ── Filter state ────────────────────────────────────────────
   const [filterActor, setFilterActor] = useState("")
@@ -272,50 +112,107 @@ export default function AuditLogsPage() {
   // ── Expand state ────────────────────────────────────────────
   const [expandedEntry, setExpandedEntry] = useState<string | null>(null)
 
-  // ── Unique actors from log ──────────────────────────────────
-  const uniqueActors = useMemo(() => {
+  // ── Fetch data from API ───────────────────────────────────────
+  const fetchData = useCallback(async () => {
+    try {
+      const params = new URLSearchParams()
+      if (filterActor) params.set("actor", filterActor)
+      if (filterAction) params.set("action", filterAction)
+      if (filterTargetType) params.set("targetType", filterTargetType)
+      if (filterKeyword) params.set("keyword", filterKeyword)
+      params.set("limit", "100")
+      params.set("offset", "0")
+
+      const qs = params.toString()
+      const res = await fetch(`/api/internal/team/audit${qs ? `?${qs}` : ""}`)
+      const json = await res.json()
+      if (json.success) {
+        setData(json.data)
+        setError(null)
+      } else {
+        setError(json.error?.message ?? "데이터 로드 실패")
+      }
+    } catch {
+      setError("서버 연결 실패")
+    } finally {
+      setLoading(false)
+    }
+  }, [filterActor, filterAction, filterTargetType, filterKeyword])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  // ── Unique actors from fetched data ───────────────────────────
+  const uniqueActors = (() => {
+    if (!data) return []
     const actorMap = new Map<string, string>()
-    for (const entry of auditLog.entries) {
-      actorMap.set(entry.actorId, entry.actorName)
+    // Use summary's topActors as the source for unique actors
+    for (const actor of data.summary.topActors) {
+      actorMap.set(actor.actorId, actor.actorName)
     }
     return Array.from(actorMap.entries()).map(([id, name]) => ({ id, name }))
-  }, [auditLog])
+  })()
 
-  // ── Search filter ───────────────────────────────────────────
-  const searchFilter = useMemo(
-    (): AuditLogFilter => ({
-      dateRange: null,
-      actors: filterActor ? [filterActor] : null,
-      actions: filterAction ? [filterAction] : null,
-      targetTypes: filterTargetType ? [filterTargetType] : null,
-      keyword: filterKeyword || null,
-      limit: 100,
-      offset: 0,
-    }),
-    [filterActor, filterAction, filterTargetType, filterKeyword]
-  )
+  // ── CSV export via API ────────────────────────────────────────
+  const handleExport = useCallback(async () => {
+    try {
+      const params = new URLSearchParams()
+      if (filterActor) params.set("actor", filterActor)
+      if (filterAction) params.set("action", filterAction)
+      if (filterTargetType) params.set("targetType", filterTargetType)
+      if (filterKeyword) params.set("keyword", filterKeyword)
+      params.set("limit", "10000")
+      params.set("offset", "0")
 
-  // ── Filtered results ────────────────────────────────────────
-  const filteredLog = useMemo(() => {
-    return searchAuditLog(auditLog, searchFilter)
-  }, [auditLog, searchFilter])
+      const qs = params.toString()
+      const res = await fetch(`/api/internal/team/audit${qs ? `?${qs}` : ""}`)
+      const json = await res.json()
 
-  // ── Summary stats ───────────────────────────────────────────
-  const summary = useMemo((): AuditSummary => {
-    return getAuditSummary(auditLog)
-  }, [auditLog])
+      if (!json.success) {
+        alert(json.error?.message ?? "내보내기 실패")
+        return
+      }
 
-  // ── CSV export ──────────────────────────────────────────────
-  const handleExport = useCallback(() => {
-    const csv = exportAuditLog(auditLog, searchFilter)
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.href = url
-    link.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
-  }, [auditLog, searchFilter])
+      const exportData = json.data as AuditApiData
+      const header = "id,timestamp,actorId,actorName,action,targetType,targetId,details,ip"
+      const rows = exportData.entries.map((entry: AuditLogEntry) => {
+        const detailsStr = Object.entries(entry.details)
+          .map(([k, v]) => `${k}=${v}`)
+          .join("; ")
+
+        const escapeCSV = (value: string): string => {
+          if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+            return `"${value.replace(/"/g, '""')}"`
+          }
+          return value
+        }
+
+        return [
+          escapeCSV(entry.id),
+          new Date(entry.timestamp).toISOString(),
+          escapeCSV(entry.actorId),
+          escapeCSV(entry.actorName),
+          entry.action,
+          entry.targetType,
+          escapeCSV(entry.targetId),
+          escapeCSV(detailsStr),
+          entry.ip ?? "",
+        ].join(",")
+      })
+
+      const csv = [header, ...rows].join("\n")
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert("CSV 내보내기 실패")
+    }
+  }, [filterActor, filterAction, filterTargetType, filterKeyword])
 
   // ── Format timestamp ────────────────────────────────────────
   const formatTimestamp = useCallback((ts: number): string => {
@@ -329,6 +226,42 @@ export default function AuditLogsPage() {
       second: "2-digit",
     })
   }, [])
+
+  // ── Loading state ─────────────────────────────────────────────
+  if (loading) {
+    return (
+      <>
+        <Header title="Audit Logs" description="전체 작업 감사 로그" />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-muted-foreground text-sm">로딩 중...</div>
+        </div>
+      </>
+    )
+  }
+
+  // ── Error state ───────────────────────────────────────────────
+  if (error) {
+    return (
+      <>
+        <Header title="Audit Logs" description="전체 작업 감사 로그" />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-sm text-red-400">{error}</div>
+        </div>
+      </>
+    )
+  }
+
+  const entries = data?.entries ?? []
+  const totalCount = data?.totalCount ?? 0
+  const summary = data?.summary ?? {
+    totalEntries: 0,
+    actionCounts: {},
+    topActors: [],
+    recentActivity: [],
+    targetTypeCounts: {},
+    periodStart: null,
+    periodEnd: null,
+  }
 
   return (
     <>
@@ -467,7 +400,7 @@ export default function AuditLogsPage() {
               CSV 내보내기
             </Button>
           </div>
-          <p className="text-muted-foreground mt-2 text-xs">{filteredLog.totalCount}건 검색됨</p>
+          <p className="text-muted-foreground mt-2 text-xs">{totalCount}건 검색됨</p>
         </div>
 
         {/* Audit log table */}
@@ -495,7 +428,7 @@ export default function AuditLogsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredLog.entries.map((entry) => {
+                {entries.map((entry) => {
                   const isExpanded = expandedEntry === entry.id
                   return (
                     <tr key={entry.id} className="border-border group border-b last:border-0">
@@ -533,7 +466,7 @@ export default function AuditLogsPage() {
                     </tr>
                   )
                 })}
-                {filteredLog.entries.length === 0 && (
+                {entries.length === 0 && (
                   <tr>
                     <td colSpan={6} className="text-muted-foreground px-4 py-8 text-center text-sm">
                       조건에 맞는 로그가 없습니다
@@ -545,7 +478,7 @@ export default function AuditLogsPage() {
           </div>
 
           {/* Expanded detail rows */}
-          {filteredLog.entries.map((entry) => {
+          {entries.map((entry) => {
             if (expandedEntry !== entry.id) return null
             return (
               <div

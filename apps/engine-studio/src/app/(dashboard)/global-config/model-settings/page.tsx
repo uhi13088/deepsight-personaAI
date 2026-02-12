@@ -1,54 +1,114 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { DollarSign, Cpu, ArrowRightLeft } from "lucide-react"
-import { createModelConfig, recordSpend, getBudgetStatus, estimateCost } from "@/lib/global-config"
-import type { ModelConfig, ModelSpec, SupportedModel } from "@/lib/global-config"
+import { estimateCost } from "@/lib/global-config"
+import type { ModelConfig, ModelSpec, SupportedModel, MonthlyBudget } from "@/lib/global-config"
 
-// ── Sample spend data for demo ─────────────────────────────────
-function initializeWithSampleSpend(): ModelConfig {
-  const config = createModelConfig()
-  const budget = recordSpend(config.budget, 127.5)
-  return { ...config, budget }
+// ── API response shape ───────────────────────────────────────
+interface BudgetStatus {
+  usagePercent: number
+  remainingUsd: number
+  exceeded: boolean
+  triggeredAlerts: number[]
+}
+
+interface ModelConfigData {
+  models: ModelSpec[]
+  routingRules: ModelConfig["routingRules"]
+  defaultModel: SupportedModel
+  budget: MonthlyBudget
+  budgetStatus: BudgetStatus
 }
 
 export default function ModelSettingsPage() {
-  const [config, setConfig] = useState<ModelConfig>(() => initializeWithSampleSpend())
-  const [budgetLimit, setBudgetLimit] = useState<number>(config.budget.limitUsd)
+  const [data, setData] = useState<ModelConfigData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [budgetLimit, setBudgetLimit] = useState<number>(500)
 
-  const budgetStatus = useMemo(() => getBudgetStatus(config.budget), [config.budget])
+  // ── Fetch data from API ────────────────────────────────────
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/global-config/models")
+      const json = await res.json()
+      if (json.success && json.data) {
+        setData(json.data)
+        setBudgetLimit(json.data.budget.limitUsd)
+      } else {
+        setError(json.error?.message ?? "데이터 로드 실패")
+      }
+    } catch {
+      setError("서버 연결 실패")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   // ── Model toggle ─────────────────────────────────────────────
-  const handleToggleModel = useCallback((modelId: SupportedModel) => {
-    setConfig((prev) => ({
-      ...prev,
-      models: prev.models.map((m) => (m.id === modelId ? { ...m, enabled: !m.enabled } : m)),
-    }))
+  const handleToggleModel = useCallback(async (modelId: SupportedModel) => {
+    try {
+      const res = await fetch("/api/internal/global-config/models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "toggleModel", modelId }),
+      })
+      const json = await res.json()
+      if (json.success && json.data) {
+        setData(json.data)
+      }
+    } catch {
+      // silently fail
+    }
   }, [])
 
   // ── Budget slider ────────────────────────────────────────────
   const handleBudgetChange = useCallback((values: number[]) => {
     const newLimit = values[0]
     setBudgetLimit(newLimit)
-    setConfig((prev) => ({
-      ...prev,
-      budget: {
-        ...prev.budget,
-        limitUsd: newLimit,
-      },
-    }))
+  }, [])
+
+  const handleBudgetCommit = useCallback(async (values: number[]) => {
+    const newLimit = values[0]
+    try {
+      const res = await fetch("/api/internal/global-config/models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateBudgetLimit", limitUsd: newLimit }),
+      })
+      const json = await res.json()
+      if (json.success && json.data) {
+        setData(json.data)
+      }
+    } catch {
+      // silently fail
+    }
   }, [])
 
   // ── Record sample spend ──────────────────────────────────────
-  const handleRecordSpend = useCallback(() => {
-    setConfig((prev) => ({
-      ...prev,
-      budget: recordSpend(prev.budget, 25),
-    }))
+  const handleRecordSpend = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/global-config/models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "recordSpend", amountUsd: 25 }),
+      })
+      const json = await res.json()
+      if (json.success && json.data) {
+        setData(json.data)
+        setBudgetLimit(json.data.budget.limitUsd)
+      }
+    } catch {
+      // silently fail
+    }
   }, [])
 
   // ── Cost estimation helper ───────────────────────────────────
@@ -70,6 +130,32 @@ export default function ModelSettingsPage() {
     }
   }, [])
 
+  // ── Loading state ─────────────────────────────────────────────
+  if (loading) {
+    return (
+      <>
+        <Header title="Model Settings" description="LLM 모델 선택 및 비용 관리" />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-muted-foreground text-sm">로딩 중...</div>
+        </div>
+      </>
+    )
+  }
+
+  // ── Error state ───────────────────────────────────────────────
+  if (error || !data) {
+    return (
+      <>
+        <Header title="Model Settings" description="LLM 모델 선택 및 비용 관리" />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-sm text-red-400">{error ?? "데이터를 불러올 수 없습니다"}</div>
+        </div>
+      </>
+    )
+  }
+
+  const { models: config_models, routingRules, budget, budgetStatus } = data
+
   const progressPercent = Math.min(budgetStatus.usagePercent, 100)
   const progressColor = budgetStatus.exceeded
     ? "bg-red-500"
@@ -90,7 +176,7 @@ export default function ModelSettingsPage() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {config.models.map((model) => (
+            {config_models.map((model) => (
               <div
                 key={model.id}
                 className={`rounded-lg border p-4 transition-colors ${
@@ -178,7 +264,7 @@ export default function ModelSettingsPage() {
                 </tr>
               </thead>
               <tbody>
-                {config.models.map((model) => (
+                {config_models.map((model) => (
                   <tr key={model.id} className="border-border border-b last:border-0">
                     <td className="px-3 py-2 font-medium">{model.displayName}</td>
                     <td className="text-muted-foreground px-3 py-2 capitalize">{model.provider}</td>
@@ -228,6 +314,7 @@ export default function ModelSettingsPage() {
               max={5000}
               step={50}
               onValueChange={handleBudgetChange}
+              onValueCommit={handleBudgetCommit}
             />
             <div className="text-muted-foreground flex justify-between text-[10px]">
               <span>$50</span>
@@ -239,7 +326,7 @@ export default function ModelSettingsPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">
-                Current Spend: ${config.budget.currentSpendUsd.toFixed(2)}
+                Current Spend: ${budget.currentSpendUsd.toFixed(2)}
               </span>
               <span className="text-muted-foreground">
                 Remaining: ${budgetStatus.remainingUsd.toFixed(2)}
@@ -309,7 +396,7 @@ export default function ModelSettingsPage() {
                 </tr>
               </thead>
               <tbody>
-                {config.routingRules.map((rule) => (
+                {routingRules.map((rule) => (
                   <tr key={rule.taskType} className="border-border border-b last:border-0">
                     <td className="px-3 py-2">
                       <Badge variant="info" className="text-[10px]">
@@ -317,12 +404,12 @@ export default function ModelSettingsPage() {
                       </Badge>
                     </td>
                     <td className="px-3 py-2 font-medium">
-                      {config.models.find((m) => m.id === rule.primaryModel)?.displayName ??
+                      {config_models.find((m) => m.id === rule.primaryModel)?.displayName ??
                         rule.primaryModel}
                     </td>
                     <td className="text-muted-foreground px-3 py-2">
                       {rule.fallbackModel
-                        ? (config.models.find((m) => m.id === rule.fallbackModel)?.displayName ??
+                        ? (config_models.find((m) => m.id === rule.fallbackModel)?.displayName ??
                           rule.fallbackModel)
                         : "None"}
                     </td>

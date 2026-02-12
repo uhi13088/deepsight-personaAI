@@ -1,19 +1,9 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  createVersion,
-  bumpVersion,
-  diffVersions,
-  rollbackVersion,
-  setVersionTesting,
-  activateVersion,
-  deprecateVersion,
-  DEFAULT_VERSION_POLICY,
-} from "@/lib/system-integration"
 import type {
   AlgorithmVersion,
   AlgorithmVersionStatus,
@@ -56,171 +46,222 @@ const DIFF_CHANGE_LABELS: Record<DiffChangeType, string> = {
   modified: "Modified",
 }
 
-// ── 샘플 버전 생성 ───────────────────────────────────────────
-
-function createSampleVersions(): AlgorithmVersion[] {
-  const v1 = createVersion(
-    "matching",
-    "v1.0.0",
-    "admin@deepsight.ai",
-    "Initial matching algorithm",
-    "First stable release of 3-tier matching",
-    { threshold: 0.5, diversity_weight: 0.3, exploration_rate: 0.1 },
-    { l1: 0.4, l2: 0.3, l3: 0.2, cross_axis: 0.1 },
-    null
-  )
-
-  const v11 = createVersion(
-    "matching",
-    "v1.1.0",
-    "admin@deepsight.ai",
-    "Improved diversity scoring",
-    "Enhanced diversity index calculation",
-    { threshold: 0.55, diversity_weight: 0.4, exploration_rate: 0.1 },
-    { l1: 0.4, l2: 0.3, l3: 0.2, cross_axis: 0.1 },
-    "v1.0.0"
-  )
-
-  const v12 = createVersion(
-    "matching",
-    "v1.2.0",
-    "admin@deepsight.ai",
-    "Cross-axis optimization",
-    "Optimized cross-axis weight distribution",
-    { threshold: 0.55, diversity_weight: 0.4, exploration_rate: 0.15 },
-    { l1: 0.35, l2: 0.3, l3: 0.2, cross_axis: 0.15 },
-    "v1.1.0"
-  )
-
-  return [
-    { ...v1, status: "deprecated" as const },
-    { ...v11, status: "active" as const, deployedEnvironments: ["development", "staging"] },
-    { ...v12, status: "draft" as const },
-  ]
-}
-
 // ── 페이지 ────────────────────────────────────────────────────
 
 export default function VersionsPage() {
-  const [versions, setVersions] = useState<AlgorithmVersion[]>(() => createSampleVersions())
+  const [versions, setVersions] = useState<AlgorithmVersion[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   const [diff, setDiff] = useState<VersionDiff | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  // 버전 Bump
+  // ── 데이터 로드 ─────────────────────────────────────────────
+
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/system-integration/versions")
+      const json = await res.json()
+      if (json.success) {
+        setVersions(json.data.versions)
+      } else {
+        setError(json.error?.message ?? "데이터 로드 실패")
+      }
+    } catch {
+      setError("서버 연결 실패")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  // ── 버전 Bump ───────────────────────────────────────────────
+
   const handleBump = useCallback(
-    (bumpType: VersionBumpType) => {
-      const latest = versions[versions.length - 1]
-      if (!latest) return
+    async (bumpType: VersionBumpType) => {
       try {
-        const newVersionStr = bumpVersion(latest.version, bumpType)
-        const newVer = createVersion(
-          "matching",
-          newVersionStr,
-          "admin@deepsight.ai",
-          `${bumpType} bump from ${latest.version}`,
-          `${bumpType === "major" ? "Breaking change" : bumpType === "minor" ? "Feature update" : "Bug fix"}`,
-          { ...latest.config },
-          { ...latest.weights },
-          latest.version
-        )
-        setVersions((prev) => [...prev, newVer])
-        setActionError(null)
-      } catch (e) {
-        setActionError(e instanceof Error ? e.message : "Bump failed")
+        const res = await fetch("/api/internal/system-integration/versions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "bump",
+            bumpType,
+            category: "matching",
+          }),
+        })
+        const json = await res.json()
+        if (json.success) {
+          setActionError(null)
+          await fetchData()
+        } else {
+          setActionError(json.error?.message ?? "Bump failed")
+        }
+      } catch {
+        setActionError("서버 연결 실패")
       }
     },
-    [versions]
+    [fetchData]
   )
 
-  // Diff 비교
-  const handleDiff = useCallback(
-    (fromId: string, toId: string) => {
-      const from = versions.find((v) => v.id === fromId)
-      const to = versions.find((v) => v.id === toId)
-      if (!from || !to) return
-      try {
-        const result = diffVersions(from, to)
-        setDiff(result)
+  // ── Diff 비교 ───────────────────────────────────────────────
+
+  const handleDiff = useCallback(async (fromId: string, toId: string) => {
+    try {
+      const res = await fetch("/api/internal/system-integration/versions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "diff",
+          fromId,
+          toId,
+        }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        setDiff(json.data)
         setActionError(null)
-      } catch (e) {
-        setActionError(e instanceof Error ? e.message : "Diff failed")
+      } else {
+        setActionError(json.error?.message ?? "Diff failed")
+      }
+    } catch {
+      setActionError("서버 연결 실패")
+    }
+  }, [])
+
+  // ── 상태 전이: draft → testing ──────────────────────────────
+
+  const handleSetTesting = useCallback(
+    async (id: string) => {
+      try {
+        const res = await fetch("/api/internal/system-integration/versions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "set_testing",
+            versionId: id,
+          }),
+        })
+        const json = await res.json()
+        if (json.success) {
+          await fetchData()
+        } else {
+          setActionError(json.error?.message ?? "Set testing failed")
+        }
+      } catch {
+        setActionError("서버 연결 실패")
       }
     },
-    [versions]
+    [fetchData]
   )
 
-  // 상태 전이: draft → testing
-  const handleSetTesting = useCallback((id: string) => {
-    setVersions((prev) =>
-      prev.map((v) => {
-        if (v.id !== id) return v
-        try {
-          return setVersionTesting(v)
-        } catch {
-          return v
-        }
-      })
-    )
-  }, [])
+  // ── 상태 전이: testing → active ─────────────────────────────
 
-  // 상태 전이: testing → active
-  const handleActivate = useCallback((id: string) => {
-    setVersions((prev) => {
-      const target = prev.find((v) => v.id === id)
-      if (!target) return prev
+  const handleActivate = useCallback(
+    async (id: string) => {
       try {
-        const activated = activateVersion(target, prev, DEFAULT_VERSION_POLICY)
-        return prev.map((v) => (v.id === id ? activated : v))
-      } catch (e) {
-        setActionError(e instanceof Error ? e.message : "Activate failed")
-        return prev
-      }
-    })
-  }, [])
-
-  // 상태 전이: active → deprecated
-  const handleDeprecate = useCallback((id: string) => {
-    setVersions((prev) =>
-      prev.map((v) => {
-        if (v.id !== id) return v
-        try {
-          return deprecateVersion(v, "Replaced by newer version")
-        } catch {
-          return v
+        const res = await fetch("/api/internal/system-integration/versions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "activate",
+            versionId: id,
+          }),
+        })
+        const json = await res.json()
+        if (json.success) {
+          setActionError(null)
+          await fetchData()
+        } else {
+          setActionError(json.error?.message ?? "Activate failed")
         }
-      })
-    )
-  }, [])
+      } catch {
+        setActionError("서버 연결 실패")
+      }
+    },
+    [fetchData]
+  )
 
-  // 롤백
+  // ── 상태 전이: active → deprecated ──────────────────────────
+
+  const handleDeprecate = useCallback(
+    async (id: string) => {
+      try {
+        const res = await fetch("/api/internal/system-integration/versions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "deprecate",
+            versionId: id,
+          }),
+        })
+        const json = await res.json()
+        if (json.success) {
+          await fetchData()
+        } else {
+          setActionError(json.error?.message ?? "Deprecate failed")
+        }
+      } catch {
+        setActionError("서버 연결 실패")
+      }
+    },
+    [fetchData]
+  )
+
+  // ── 롤백 ───────────────────────────────────────────────────
+
   const handleRollback = useCallback(
-    (currentId: string, targetId: string) => {
-      const current = versions.find((v) => v.id === currentId)
-      const target = versions.find((v) => v.id === targetId)
-      if (!current || !target) return
+    async (currentId: string, targetId: string) => {
       try {
-        const { updatedCurrent, updatedTarget } = rollbackVersion(
-          current,
-          target,
-          "Performance regression detected",
-          "admin@deepsight.ai",
-          ["development"]
-        )
-        setVersions((prev) =>
-          prev.map((v) => {
-            if (v.id === currentId) return updatedCurrent
-            if (v.id === targetId) return updatedTarget
-            return v
-          })
-        )
-        setActionError(null)
-      } catch (e) {
-        setActionError(e instanceof Error ? e.message : "Rollback failed")
+        const res = await fetch("/api/internal/system-integration/versions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "rollback",
+            currentId,
+            targetId,
+          }),
+        })
+        const json = await res.json()
+        if (json.success) {
+          setActionError(null)
+          await fetchData()
+        } else {
+          setActionError(json.error?.message ?? "Rollback failed")
+        }
+      } catch {
+        setActionError("서버 연결 실패")
       }
     },
-    [versions]
+    [fetchData]
   )
+
+  // ── 로딩/에러 UI ──────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <>
+        <Header title="Version Control" description="알고리즘 버전 관리 및 롤백" />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-muted-foreground text-sm">로딩 중...</div>
+        </div>
+      </>
+    )
+  }
+
+  if (error) {
+    return (
+      <>
+        <Header title="Version Control" description="알고리즘 버전 관리 및 롤백" />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-sm text-red-400">{error}</div>
+        </div>
+      </>
+    )
+  }
 
   return (
     <>
