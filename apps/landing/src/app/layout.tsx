@@ -5,18 +5,28 @@ import "./globals.css"
 
 export const metadata: Metadata = {
   title: {
-    default: "DeepSight - AI 페르소나 기반 6D 벡터 추천 플랫폼",
+    default: "DeepSight - AI 페르소나 기반 3-Layer 벡터 추천 플랫폼",
     template: "%s | DeepSight",
   },
   icons: {
     icon: "/favicon.svg",
   },
   description:
-    "사용자 성향을 6차원으로 분석하고 AI 페르소나가 맞춤 콘텐츠를 큐레이션합니다. 설명 가능한 AI 추천 시스템.",
-  keywords: ["AI 추천", "페르소나", "6D 벡터", "개인화", "콘텐츠 큐레이션", "추천 시스템"],
+    "사용자 성향을 3-Layer 16차원으로 심층 분석하고 AI 페르소나가 맞춤 콘텐츠를 큐레이션합니다. 설명 가능한 AI 추천 시스템.",
+  keywords: [
+    "AI 추천",
+    "페르소나",
+    "3-Layer 벡터",
+    "개인화",
+    "콘텐츠 큐레이션",
+    "추천 시스템",
+    "OCEAN",
+    "Paradox Score",
+  ],
   openGraph: {
-    title: "DeepSight - AI 페르소나 기반 6D 벡터 추천 플랫폼",
-    description: "사용자 성향을 6차원으로 분석하고 AI 페르소나가 맞춤 콘텐츠를 큐레이션합니다.",
+    title: "DeepSight - AI 페르소나 기반 3-Layer 벡터 추천 플랫폼",
+    description:
+      "사용자 성향을 3-Layer 16차원으로 심층 분석하고 AI 페르소나가 맞춤 콘텐츠를 큐레이션합니다.",
     type: "website",
   },
 }

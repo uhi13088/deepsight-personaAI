@@ -29,7 +29,7 @@ const FEATURE_ITEMS = [
   {
     label: "소비자 취향 분석",
     href: "/features/taste-analysis",
-    desc: "6D 벡터 기반 정밀 프로파일링",
+    desc: "3-Layer 벡터 기반 심층 프로파일링",
     icon: Search,
   },
   {
