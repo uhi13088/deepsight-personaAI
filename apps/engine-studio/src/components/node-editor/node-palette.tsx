@@ -17,7 +17,7 @@ import type { NodeCategory, NodeDefinition } from "@/lib/node-graph/node-registr
 // ── 타입 ─────────────────────────────────────────────────────
 
 interface NodePaletteProps {
-  onAddNode: (nodeType: string, position: { x: number; y: number }) => void
+  onAddNode: (nodeType: string) => void
 }
 
 // ── 컴포넌트 ────────────────────────────────────────────────
@@ -30,14 +30,6 @@ export function NodePalette({ onAddNode }: NodePaletteProps) {
     event.dataTransfer.setData("application/persona-node", nodeType)
     event.dataTransfer.effectAllowed = "move"
   }, [])
-
-  const handleClickAdd = useCallback(
-    (nodeType: string) => {
-      // 캔버스 중앙에 추가
-      onAddNode(nodeType, { x: 300, y: 300 })
-    },
-    [onAddNode]
-  )
 
   return (
     <div className="bg-card w-56 overflow-y-auto border-r">
@@ -70,7 +62,7 @@ export function NodePalette({ onAddNode }: NodePaletteProps) {
                     definition={nodeDef}
                     color={color}
                     onDragStart={onDragStart}
-                    onClick={handleClickAdd}
+                    onClick={onAddNode}
                   />
                 ))}
               </div>
