@@ -365,12 +365,12 @@
   - AC5: 테스트 — activity-mapper.test.ts + state-manager.test.ts [PW-1-5, PW-1-6]
   - AC6: Build PASS + 테스트 PASS
 
-- [ ] **T105: PW-Phase 2a 포스트 타입 선택 + 주제 선택 + Paradox 발현**
+- [x] **T105: PW-Phase 2a 포스트 타입 선택 + 주제 선택 + Paradox 발현** ✅
   - 배경: 구현계획서 §5.2 + 설계서 §4.5. 17종 포스트 타입 친화도 기반 선택
-  - AC1: `post-type-selector.ts` — selectPostType (친화도 점수 계산, 상태 보정: mood<0.4→THOUGHT×2, paradoxTension>0.7→BEHIND_STORY×3, energy<0.3→REACTION×2, 가중 랜덤) [PW-2-1]
-  - AC2: `topic-selector.ts` — selectTopic (우선순위: 트리거→관심사연속→벡터매칭→자유주제) [PW-2-2]
-  - AC3: `paradox-activity.ts` — paradoxActivityChance = sigmoid(paradoxScore×3 - 1.5), 4종 Paradox 패턴 발현 [PW-2-5]
-  - AC4: Build PASS + 테스트 PASS
+  - AC1: ✅ `post-type-selector.ts` — selectPostType (친화도 점수 계산, 상태 보정: mood<0.4→THOUGHT×2, paradoxTension>0.7→BEHIND_STORY×3, energy<0.3→REACTION×2, 가중 랜덤) [PW-2-1]
+  - AC2: ✅ `topic-selector.ts` — selectTopic (우선순위: 트리거→관심사연속→벡터매칭→자유주제) [PW-2-2]
+  - AC3: ✅ `paradox-activity.ts` — paradoxActivityChance = sigmoid(paradoxScore×3 - 1.5), 4종 Paradox 패턴 발현 [PW-2-5]
+  - AC4: ✅ Build PASS + 테스트 56개 PASS (1472 total)
 
 - [ ] **T106: PW-Phase 2b 콘텐츠 생성기 + 소비 기록 관리**
   - 배경: 구현계획서 §5.3 + §5.5. LLM 콘텐츠 생성 + ConsumptionMemory
