@@ -11,6 +11,13 @@ import {
   BookOpen,
   Mic,
   Heart,
+  Zap,
+  Compass,
+  RefreshCw,
+  Flame,
+  ShieldCheck,
+  Brain,
+  Check,
 } from "lucide-react"
 import { PingerPrintShowcase } from "@/components/p-inger-print-showcase"
 
@@ -79,24 +86,38 @@ const PERSONA_TYPES = [
 
 const QUALITY_CHECKS = [
   {
-    title: "성격 일관성 검증",
-    description: "동일한 콘텐츠에 대해 반복 질의 시 일관된 관점을 유지하는지 테스트합니다.",
-    metric: "일관성 점수 70점 이상",
+    title: "A. 구조 검증",
+    description: "벡터 범위(0~1), 필수 필드, α+β 합산=1.0 등 구조적 무결성을 검증합니다.",
+    metric: "가중치 15%",
   },
   {
-    title: "3-Layer 벡터 정합성",
-    description: "응답이 설정된 3-Layer 벡터값에 부합하는지 자동으로 검증합니다.",
-    metric: "벡터 정합성 80% 이상",
+    title: "B. L1↔L2 역설 일관성",
+    description: "7개 차원 쌍이 설계 의도에 맞는 역설(Paradox)을 형성하는지 검증합니다.",
+    metric: "가중치 20%",
   },
   {
-    title: "차별화 검증",
-    description: "서로 다른 페르소나가 실제로 다른 관점을 제공하는지 비교 검증합니다.",
-    metric: "페르소나간 차이 점수",
+    title: "C. L2↔L3 서사 정합성",
+    description:
+      "L3 서사가 L1-L2 간 모순을 설명할 수 있는지 검증합니다 (lack↔Paradox, volatility↔neuroticism 등).",
+    metric: "가중치 20%",
   },
   {
-    title: "유해성 필터",
-    description: "부적절하거나 편향된 응답을 생성하지 않는지 안전성을 검증합니다.",
-    metric: "안전성 점수 95점 이상",
+    title: "D. 정성↔정량 정합성",
+    description:
+      "백스토리 → Init 벡터, Voice → L1(LLM 추론), Triggers → L3가 논리적으로 일치하는지 검증합니다.",
+    metric: "가중치 20%",
+  },
+  {
+    title: "E. 교차축 수학적 일관성",
+    description:
+      "83개 교차축 스코어가 관계유형별(역설/강화/조절/중립) 공식과 부합하는지 검증합니다.",
+    metric: "가중치 15%",
+  },
+  {
+    title: "F. 동적 설정 물리적 타당성",
+    description:
+      "Pressure 범위, 감쇠 곡선(λ), Override delta, 퀴크 쿨다운 등이 물리적으로 가능한지 검증합니다.",
+    metric: "가중치 10%",
   },
 ]
 
@@ -347,6 +368,173 @@ export default function PersonaPage() {
         </div>
       </section>
 
+      {/* Non-Quantitative Architecture */}
+      <section className="bg-gray-50 py-24">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="mb-16 text-center">
+            <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
+              QUALITATIVE ARCHITECTURE
+            </div>
+            <h2 className="text-3xl font-bold text-gray-900">벡터 너머의 인격 — 비정량적 4축</h2>
+            <p className="mt-4 text-gray-600">
+              3-Layer 벡터는 &ldquo;무엇을 좋아하는가&rdquo;를 정량화합니다. 하지만 살아있는
+              페르소나가 되려면 &ldquo;왜 그런 사람이 되었는가&rdquo;가 필요합니다.
+            </p>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="rounded-2xl border border-gray-200 bg-white p-8">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-50">
+                  <BookOpen className="h-5 w-5 text-violet-600" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">서사적 기원 (Backstory)</h3>
+              </div>
+              <p className="mb-4 text-sm text-gray-600">
+                모든 페르소나에는 과거의 상처(Ghost), 무의식적 욕망(Hidden Desire), 트라우마
+                트리거가 정의됩니다. 이 서사가 벡터의 &ldquo;이유&rdquo;가 됩니다.
+              </p>
+              <div className="rounded-lg bg-violet-50 p-3 text-xs text-violet-700">
+                <span className="font-semibold">예시:</span> &ldquo;몰락한 귀족 출신의 지적 권위에
+                집착하는 비평가&rdquo; → L3.lack=0.8, L1.purpose=0.8, L1.depth=0.9
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-8">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
+                  <Mic className="h-5 w-5 text-blue-600" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">고유한 목소리 (Voice Profile)</h3>
+              </div>
+              <p className="mb-4 text-sm text-gray-600">
+                말버릇, 문장 구조, 감정 레지스터, Few-shot 앵커가 정의됩니다. 수백 턴의 대화가
+                지나도 같은 사람처럼 말하며, Voice Similarity 임베딩으로 일관성을 측정합니다.
+              </p>
+              <div className="rounded-lg bg-blue-50 p-3 text-xs text-blue-700">
+                <span className="font-semibold">예시:</span> &ldquo;솔직히 말하면…&rdquo;,
+                &ldquo;아이러니하게도…&rdquo; 같은 입버릇 + 단문 위주 직설적 문체
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-8">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50">
+                  <Zap className="h-5 w-5 text-amber-600" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">압박 역학 (Pressure Dynamics)</h3>
+              </div>
+              <p className="mb-4 text-sm text-gray-600">
+                특정 주제나 상황에서 Pressure 계수가 0.6을 넘으면, 벡터가 일시적으로 변위합니다. L2
+                본성이 표면에 드러나는 순간이며, L3 volatility에 비례하는 지수 감쇠 곡선으로
+                복귀합니다.
+              </p>
+              <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-700">
+                <span className="font-semibold">예시:</span> 비판 트리거 → lens 0.8→0.3(방어적) →
+                감쇠 상수 λ = 0.7 - 0.6 × volatility → 10턴 후 0.75로 복귀
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-8">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50">
+                  <Compass className="h-5 w-5 text-emerald-600" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">시대정신 (Zeitgeist)</h3>
+              </div>
+              <p className="mb-4 text-sm text-gray-600">
+                세대 코드(GEN_Z, MILLENNIAL, GEN_X), 가치관, 문화 자본이 정의됩니다. 동일한 벡터라도
+                세대와 문화적 맥락에 따라 전혀 다른 표현과 관점을 가집니다.
+              </p>
+              <div className="rounded-lg bg-emerald-50 p-3 text-xs text-emerald-700">
+                <span className="font-semibold">예시:</span> 같은 depth=0.8이라도, Z세대는
+                &ldquo;이거 진짜 갓겜&rdquo;, 밀레니얼은 &ldquo;이 작품의 서사 구조가…&rdquo;
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Runtime Algorithms */}
+      <section className="py-24">
+        <div className="mx-auto max-w-5xl px-6">
+          <div className="mb-16 text-center">
+            <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
+              RUNTIME ENGINE
+            </div>
+            <h2 className="text-3xl font-bold text-gray-900">4대 런타임 알고리즘</h2>
+            <p className="mt-4 text-gray-600">
+              페르소나는 고정된 설정이 아닙니다. 서사에서 벡터를 초기화하고, 압박에 반응하고,
+              사용자에게 적응하며, 고유한 행동을 발현합니다.
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            {[
+              {
+                step: "01",
+                icon: Sparkles,
+                title: "Init — 서사 → 벡터 초기화",
+                color: "border-purple-200 bg-purple-50",
+                iconColor: "text-purple-600 bg-purple-100",
+                description:
+                  "백스토리에서 LLM이 키워드를 추출하고, 의미 카테고리 → 벡터 매핑 테이블을 참조하여 초기 보정값(init_delta)을 산출합니다. 차원당 최대 ±0.4 보정.",
+                detail: '"빈곤" + "야망" → purpose +0.3, taste +0.2, lack +0.5',
+              },
+              {
+                step: "02",
+                icon: Flame,
+                title: "Override — 압박 → 벡터 변위",
+                color: "border-red-200 bg-red-50",
+                iconColor: "text-red-600 bg-red-100",
+                description:
+                  "대화 중 트리거 키워드를 감지하면 Pressure 계수가 상승하고, 벡터를 일시적으로 이동시킵니다. L3.volatility에 비례하는 지수 감쇠 곡선(λ = 0.7 - 0.6 × volatility)으로 원래 위치로 복귀합니다.",
+                detail: "volatility 0.9 → λ=0.1 (느린 복귀, 오래 변함) / 0.2 → λ=0.58 (빠른 복귀)",
+              },
+              {
+                step: "03",
+                icon: RefreshCw,
+                title: "Adapt — 사용자 태도 → 실시간 조정",
+                color: "border-blue-200 bg-blue-50",
+                iconColor: "text-blue-600 bg-blue-100",
+                description:
+                  "매 턴 사용자의 공격성·친밀도·정중함(UIV 3축)을 파싱하여, 차원별 적응률(α 0.1~0.3)과 최근 3턴 모멘텀으로 페르소나가 미세 조정됩니다. 기준선 대비 ±0.3 드리프트 클램프.",
+                detail: "사용자 공격적 → stance -0.2 (더 비판적), 다음 턴 부드러워지면 부분 복귀",
+              },
+              {
+                step: "04",
+                icon: Heart,
+                title: "Express — 벡터 상태 → 행동 발현",
+                color: "border-pink-200 bg-pink-50",
+                iconColor: "text-pink-600 bg-pink-100",
+                description:
+                  "현재 벡터 상태에서 갈등 점수, 결핍 점수 등 5종 파생 상태값을 계산하고, 시그모이드 확률(sensitivity × (stateValue - threshold))로 고유 퀴크(말버릇·행동 패턴)를 발현합니다.",
+                detail:
+                  '|stance - agreeableness| > 0.5 → conflictScore 상승 → "음…" 망설임 퀴크 확률적 발현 (쿨다운 3턴)',
+              },
+            ].map((algo) => (
+              <div key={algo.step} className={`rounded-2xl border p-6 ${algo.color}`}>
+                <div className="flex gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white font-bold text-gray-400 shadow-sm">
+                    {algo.step}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <algo.icon className={`h-5 w-5 ${algo.iconColor.split(" ")[0]}`} />
+                      <h3 className="text-lg font-bold text-gray-900">{algo.title}</h3>
+                    </div>
+                    <p className="mt-2 text-sm text-gray-600">{algo.description}</p>
+                    <div className="mt-3 rounded-lg bg-white/70 p-2 font-mono text-xs text-gray-500">
+                      {algo.detail}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Persona Types */}
       <section className="bg-gray-50 py-24">
         <div className="mx-auto max-w-7xl px-6">
@@ -386,39 +574,97 @@ export default function PersonaPage() {
         </div>
       </section>
 
-      {/* Quality Verification */}
+      {/* Quality Verification — 3중 검증 */}
       <section className="py-24">
         <div className="mx-auto max-w-7xl px-6">
           <div className="mb-16 text-center">
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
-              QUALITY ASSURANCE
+              QUALITY ASSURANCE — 3중 검증
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">엄격한 품질 검증</h2>
+            <h2 className="text-3xl font-bold text-gray-900">
+              배포 전 6-Category · 런타임 Integrity
+            </h2>
             <p className="mt-4 text-gray-600">
-              모든 페르소나는 배포 전 다단계 품질 검증을 통과해야 합니다.
+              모든 페르소나는 배포 전 6범주 일관성 검증 + 20문항 자동 인터뷰를 통과해야 합니다.
               <br />
-              검증을 통과하지 못하면 사용자에게 노출되지 않습니다.
+              배포 후에도 Integrity Score가 실시간으로 인격 붕괴를 감지합니다.
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
+          {/* 6-Category Validation */}
+          <h3 className="mb-6 text-lg font-semibold text-gray-900">
+            6-Category Validation (배포 전)
+          </h3>
+          <div className="mb-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {QUALITY_CHECKS.map((check) => (
               <div
                 key={check.title}
-                className="flex gap-4 rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:shadow-lg"
+                className="flex gap-4 rounded-2xl border border-gray-200 bg-white p-5 transition-all hover:shadow-lg"
               >
                 <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-green-50">
                   <Shield className="h-5 w-5 text-green-600" />
                 </div>
                 <div>
-                  <h3 className="mb-1 text-base font-bold text-gray-900">{check.title}</h3>
-                  <p className="mb-2 text-sm text-gray-600">{check.description}</p>
+                  <h4 className="mb-1 text-sm font-bold text-gray-900">{check.title}</h4>
+                  <p className="mb-2 text-xs text-gray-600">{check.description}</p>
                   <span className="inline-flex rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-600">
                     {check.metric}
                   </span>
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Auto-Interview + Integrity Score */}
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="rounded-2xl border-2 border-purple-200 bg-purple-50 p-8">
+              <div className="mb-4 flex items-center gap-3">
+                <Brain className="h-6 w-6 text-purple-600" />
+                <h3 className="text-lg font-bold text-gray-900">Auto-Interview (배포 전)</h3>
+              </div>
+              <p className="mb-4 text-sm text-gray-600">
+                페르소나에게 20문항(L1 7 + L2 5 + L3 4 + 역설 4)의 시나리오 질문을 자동으로 던지고,
+                응답에서 벡터를 추론하여 설계 벡터와 비교합니다.
+              </p>
+              <ul className="space-y-2 text-xs text-gray-500">
+                <li className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-green-500" /> 차원별 허용 오차 ±0.15 이내 →
+                  Pass
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-green-500" /> 역설 질문: L1↔L2 모순이 의도대로
+                  발현하는지
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-green-500" /> Warning → 수동 검토, Fail → 배포
+                  차단
+                </li>
+              </ul>
+            </div>
+
+            <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-8">
+              <div className="mb-4 flex items-center gap-3">
+                <ShieldCheck className="h-6 w-6 text-amber-600" />
+                <h3 className="text-lg font-bold text-gray-900">Integrity Score (런타임)</h3>
+              </div>
+              <p className="mb-4 text-sm text-gray-600">
+                배포 후 실제 대화 중에도 실시간으로 인격 붕괴를 감지합니다. LLM-as-Judge 방식으로
+                3개 컴포넌트를 측정합니다.
+              </p>
+              <div className="space-y-3 text-xs">
+                <div className="rounded-lg bg-white p-3">
+                  <span className="font-semibold text-amber-700">PIS = </span>
+                  <span className="text-gray-600">
+                    0.35 × <span className="font-medium text-gray-800">Context Recall</span> + 0.35
+                    × <span className="font-medium text-gray-800">Setting Consistency</span> + 0.30
+                    × <span className="font-medium text-gray-800">Character Stability</span>
+                  </span>
+                </div>
+                <p className="text-gray-500">
+                  과거 대화 참조 정확도(CR) · 의견 일관성(SC) · 벡터 ±0.15 이내 유지(CS)
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>

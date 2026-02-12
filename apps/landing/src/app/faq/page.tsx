@@ -47,12 +47,12 @@ const FAQ_DATA: FaqSection[] = [
       {
         question: "3-Layer 벡터란 무엇인가요?",
         answer:
-          "3-Layer 벡터는 사용자의 콘텐츠 소비 성향을 3개 레이어, 총 16차원으로 정량화하는 프레임워크입니다. 각 차원은 0.0~1.0 범위의 값을 가집니다. L1 Content DNA(7D+Sociability): Depth(분석 깊이), Lens(판단 렌즈), Stance(평가 태도), Scope(관심 범위), Taste(취향 성향), Purpose(소비 목적), Sociability(사회적 소비 성향). L2 OCEAN 5D: Openness(개방성), Conscientiousness(성실성), Extraversion(외향성), Agreeableness(우호성), Neuroticism(신경성). L3 Narrative Drive 4D: Empathy(공감 욕구), Curiosity(지적 호기심), Escapism(현실 도피), Growth(성장 욕구)로 구성됩니다.",
+          "3-Layer 벡터는 사용자의 콘텐츠 소비 성향을 3개 레이어로 정량화하는 프레임워크입니다. 각 차원은 0.0~1.0 범위의 값을 가집니다. L1 Content DNA(7D+Sociability): Depth(분석 깊이), Lens(판단 렌즈), Stance(평가 태도), Scope(관심 범위), Taste(취향 성향), Purpose(소비 목적), Sociability(사회적 소비 성향). L2 OCEAN 5D: Openness(개방성), Conscientiousness(성실성), Extraversion(외향성), Agreeableness(우호성), Neuroticism(신경성). L3 Narrative Drive 4D: Empathy(공감 욕구), Curiosity(지적 호기심), Escapism(현실 도피), Growth(성장 욕구)로 구성됩니다.",
       },
       {
-        question: "왜 3-Layer 16차원인가요? 더 많거나 적으면 안 되나요?",
+        question: "왜 3-Layer 구조인가요?",
         answer:
-          "3-Layer 16차원은 콘텐츠 소비 성향을 충분히 구분하면서도, 계층적으로 구조화하여 설명 가능한 추천을 제공하는 균형점입니다. L1 Content DNA는 콘텐츠 소비 스타일, L2 OCEAN은 심리적 성향, L3 Narrative Drive는 서사 동기를 각각 담당합니다. 각 레이어는 콘텐츠 심리학과 소비자 행동 연구를 기반으로 설계되었습니다.",
+          "3-Layer 구조는 콘텐츠 소비 성향을 충분히 구분하면서도, 계층적으로 구조화하여 설명 가능한 추천을 제공하는 균형점입니다. L1 Social Persona는 콘텐츠 소비 스타일, L2 Core Temperament(OCEAN)은 심리적 성향, L3 Narrative Drive는 서사 동기를 각각 담당합니다. 여기에 서사적 기원, 고유한 목소리, 압박 역학, 시대정신 같은 비정량적 요소가 결합되어 단순한 벡터 이상의 '살아있는 인격'을 구성합니다.",
       },
       {
         question: "3-Layer 벡터는 어떻게 측정되나요?",

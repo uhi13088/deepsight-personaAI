@@ -1,6 +1,6 @@
 /**
  * v3 3-Layer 벡터 차원별 컬러 설정
- * L1 Social Persona (7D) + L2 Core Temperament/OCEAN (5D) + L3 Narrative Drive (4D) = 16D
+ * L1 Social Persona (7D) + L2 Core Temperament/OCEAN (5D) + L3 Narrative Drive (4D)
  * engine-studio/src/constants/colors/ 기준 색상 참조
  */
 
@@ -203,7 +203,7 @@ const L3_DIMENSIONS: TraitDimensionConfig[] = [
 ]
 
 // ---------------------------------------------------------------------------
-// 전체 3-Layer 16D 차원 배열
+// 전체 3-Layer 차원 배열
 // ---------------------------------------------------------------------------
 export const TRAIT_DIMENSIONS: TraitDimensionConfig[] = [
   ...L1_DIMENSIONS,

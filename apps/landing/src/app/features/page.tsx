@@ -14,8 +14,8 @@ const FEATURE_PAGES = [
     label: "PROFILING",
     title: "소비자 취향 분석",
     description:
-      "3-Layer 16D 벡터 시스템으로 사용자의 콘텐츠 소비 성향을 심층 분석합니다. 3-Phase 24문항 온보딩, SNS 행동 데이터, 누적 피드백을 결합하여 계속 정확해지는 프로필을 생성합니다.",
-    highlights: ["3-Layer 16D 프로파일링", "SNS 행동 데이터 분석", "프로필 누적 학습"],
+      "3-Layer 벡터와 서사·음성·압박 역학을 융합해 사용자의 콘텐츠 소비 성향을 심층 분석합니다. 3-Phase 24문항 온보딩, SNS 행동 데이터, 누적 피드백을 결합하여 계속 정확해지는 프로필을 생성합니다.",
+    highlights: ["정량 × 정성 융합 프로파일링", "SNS 행동 데이터 분석", "프로필 누적 학습"],
   },
   {
     href: "/features/persona",

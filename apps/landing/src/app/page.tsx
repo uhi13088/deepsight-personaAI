@@ -19,6 +19,11 @@ import {
   Heart,
   Flame,
   Sprout,
+  BookOpen,
+  Mic,
+  Zap,
+  RefreshCw,
+  ShieldCheck,
 } from "lucide-react"
 import { HeroOrbital } from "@/components/home/hero-orbital"
 
@@ -116,7 +121,7 @@ const LAYERS = [
 const ENGINE_STUDIO_URL = process.env.NEXT_PUBLIC_ENGINE_STUDIO_URL || "http://localhost:3000"
 
 const METRICS = [
-  { label: "벡터 차원 수", value: "3-Layer 16D", icon: MousePointer },
+  { label: "페르소나 엔진", value: "3-Layer", icon: MousePointer },
   { label: "활동 페르소나", value: "—", icon: Users, dynamic: true },
   { label: "추천 이유 설명", value: "투명", icon: Clock },
   { label: "필터버블 탈출", value: "다관점", icon: Star },
@@ -174,7 +179,7 @@ export default function HomePage() {
                 사용자를 심층 이해하다
               </h1>
               <p className="max-w-lg text-lg text-gray-600">
-                가면(L1) · 본성(L2) · 욕망(L3), 세 겹의 레이어로 사용자의 16차원 성향을 분석하고 AI
+                가면(L1) · 본성(L2) · 욕망(L3), 세 겹의 벡터로 사용자의 성향을 심층 분석하고 AI
                 페르소나가 &ldquo;왜 이 콘텐츠가 추천됐는지&rdquo; 명확히 설명하는 투명한 추천 엔진
               </p>
               <div className="flex flex-col gap-4 sm:flex-row">
@@ -304,7 +309,7 @@ export default function HomePage() {
           </h2>
           <p className="mx-auto mb-16 max-w-2xl text-lg text-gray-400">
             단순한 좋아요/싫어요를 넘어, 사용자의 콘텐츠 소비 성향을 가면(L1) · 본성(L2) · 욕망(L3)
-            세 겹 16차원으로 분석합니다.
+            세 겹의 벡터로 정량화하고, 서사·음성·압박 역학을 융합합니다.
           </p>
 
           <div className="grid gap-6 md:grid-cols-3">
@@ -350,6 +355,144 @@ export default function HomePage() {
               className="inline-flex items-center gap-2 text-purple-400 hover:text-purple-300"
             >
               자세히 알아보기
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Qualitative Architecture — 비정량적 요소 + 런타임 알고리즘 */}
+      <section className="py-24">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="mb-4 text-center text-sm font-semibold uppercase tracking-wider text-purple-600">
+            BEYOND VECTORS
+          </div>
+          <h2 className="mb-4 text-center text-4xl font-bold text-gray-900">숫자 너머의 인격</h2>
+          <p className="mx-auto mb-16 max-w-2xl text-center text-gray-600">
+            벡터만으로는 페르소나가 아닙니다. DeepSight는 서사적 기원, 고유한 목소리, 압박 역학,
+            시대정신까지 비정량적 요소를 융합해 &quot;살아 있는&quot; AI 인격을 만듭니다.
+          </p>
+
+          <div className="grid gap-8 md:grid-cols-2">
+            {/* 비정량적 4요소 */}
+            <div className="space-y-4">
+              <h3 className="mb-6 text-lg font-semibold text-gray-900">
+                페르소나를 구성하는 4가지 비정량적 축
+              </h3>
+              {[
+                {
+                  icon: BookOpen,
+                  title: "서사적 기원 (Backstory)",
+                  desc: "과거의 상처(Ghost), 무의식적 욕망, 트라우마 트리거 — 벡터의 '이유'를 서사로 정의합니다.",
+                  color: "text-violet-600 bg-violet-50",
+                },
+                {
+                  icon: Mic,
+                  title: "고유한 목소리 (Voice Profile)",
+                  desc: "말버릇, 문장 구조, 감정 레지스터, Few-shot 앵커 — 수백 턴이 지나도 같은 사람처럼 말합니다.",
+                  color: "text-blue-600 bg-blue-50",
+                },
+                {
+                  icon: Zap,
+                  title: "압박 역학 (Pressure Dynamics)",
+                  desc: "특정 주제/상황에서 벡터가 일시적으로 변하고, 지수 감쇠 곡선으로 복귀합니다. L2 본성이 표면에 드러나는 순간.",
+                  color: "text-amber-600 bg-amber-50",
+                },
+                {
+                  icon: Compass,
+                  title: "시대정신 (Zeitgeist)",
+                  desc: "세대 코드, 가치관, 문화 자본 — 같은 벡터라도 밀레니얼과 Z세대는 다르게 표현합니다.",
+                  color: "text-emerald-600 bg-emerald-50",
+                },
+              ].map((item) => (
+                <div
+                  key={item.title}
+                  className="flex gap-4 rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
+                >
+                  <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${item.color}`}
+                  >
+                    <item.icon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900">{item.title}</h4>
+                    <p className="mt-1 text-sm text-gray-500">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 4대 런타임 알고리즘 */}
+            <div className="space-y-4">
+              <h3 className="mb-6 text-lg font-semibold text-gray-900">
+                실시간으로 작동하는 4대 알고리즘
+              </h3>
+              {[
+                {
+                  icon: Sparkles,
+                  step: "01",
+                  title: "Init — 서사 → 벡터 초기화",
+                  desc: "백스토리에서 키워드를 추출하고, 의미 카테고리→벡터 매핑 테이블로 초기 벡터 보정값(delta)을 산출합니다.",
+                  color: "text-purple-600 border-purple-200 bg-purple-50",
+                },
+                {
+                  icon: Flame,
+                  step: "02",
+                  title: "Override — 압박 → 벡터 변위",
+                  desc: "트리거 키워드 감지 시 벡터를 일시 이동시키고, L3 volatility에 비례하는 지수 감쇠 곡선으로 복귀합니다.",
+                  color: "text-red-600 border-red-200 bg-red-50",
+                },
+                {
+                  icon: RefreshCw,
+                  step: "03",
+                  title: "Adapt — 사용자 태도 → 실시간 조정",
+                  desc: "매 턴 사용자의 공격성·친밀도·정중함을 파싱하여, 차원별 적응률(α)과 모멘텀으로 페르소나가 미세 조정됩니다.",
+                  color: "text-blue-600 border-blue-200 bg-blue-50",
+                },
+                {
+                  icon: Heart,
+                  step: "04",
+                  title: "Express — 벡터 상태 → 행동 발현",
+                  desc: "갈등 점수, 결핍 점수 등 파생 상태값에서 시그모이드 확률로 고유 퀴크(말버릇·행동 패턴)가 발현됩니다.",
+                  color: "text-pink-600 border-pink-200 bg-pink-50",
+                },
+              ].map((item) => (
+                <div key={item.step} className={`flex gap-4 rounded-xl border p-4 ${item.color}`}>
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white font-bold text-gray-400 shadow-sm">
+                    {item.step}
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900">{item.title}</h4>
+                    <p className="mt-1 text-sm text-gray-500">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-12 rounded-xl border border-gray-200 bg-gray-50 p-6">
+            <div className="flex items-start gap-3">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
+              <div>
+                <p className="font-semibold text-gray-900">품질 보증 3중 검증</p>
+                <p className="mt-1 text-sm text-gray-500">
+                  <span className="font-medium text-gray-700">Auto-Interview</span> 20문항 자동
+                  인터뷰로 벡터↔응답 일관성 검증 ·{" "}
+                  <span className="font-medium text-gray-700">6-Category Validation</span>{" "}
+                  구조·L1↔L2·L2↔L3·정성↔정량·교차축·동적 설정 6범주 검증 ·{" "}
+                  <span className="font-medium text-gray-700">Integrity Score</span> 런타임 대화 중
+                  인격 붕괴 감지 (Context Recall × Setting Consistency × Character Stability)
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 text-center">
+            <Link
+              href="/features/persona"
+              className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-500"
+            >
+              페르소나 아키텍처 자세히 보기
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

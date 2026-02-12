@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     icon: "/favicon.svg",
   },
   description:
-    "사용자 성향을 3-Layer 16차원으로 심층 분석하고 AI 페르소나가 맞춤 콘텐츠를 큐레이션합니다. 설명 가능한 AI 추천 시스템.",
+    "사용자 성향을 3-Layer 벡터로 심층 분석하고 AI 페르소나가 맞춤 콘텐츠를 큐레이션합니다. 설명 가능한 AI 추천 시스템.",
   keywords: [
     "AI 추천",
     "페르소나",
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "DeepSight - AI 페르소나 기반 3-Layer 벡터 추천 플랫폼",
     description:
-      "사용자 성향을 3-Layer 16차원으로 심층 분석하고 AI 페르소나가 맞춤 콘텐츠를 큐레이션합니다.",
+      "사용자 성향을 3-Layer 벡터로 심층 분석하고 AI 페르소나가 맞춤 콘텐츠를 큐레이션합니다.",
     type: "website",
   },
 }
