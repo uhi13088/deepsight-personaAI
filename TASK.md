@@ -389,13 +389,13 @@
 
 - [x] **T96** → DONE ✅ 2026-02-12
 
-- [ ] **T97: Matching Lab 3페이지 UI — Simulator + Tuning + Analytics**
-  - 배경: lib/matching/ 10파일 완성 (T57, T58). stub 페이지 3개를 실제 연구소 UI로 전환
-  - AC1: Matching Simulator — 유저 벡터 입력 (수동/랜덤), 3-Tier 매칭 실행, 결과 카드 (점수+순위+XAI 설명), 배치 시뮬레이션 통계
-  - AC2: Algorithm Tuning — 6종 하이퍼파라미터 슬라이더, 6장르 가중치 테이블, Grid Search/Bayesian 자동 튜닝 실행, A/B 테스트 관리
-  - AC3: Performance Analytics — KPI 대시보드 (CTR/만족도/다양성), Shannon entropy 다양성 지수, 트렌드 차트, 이상 탐지 알림, 리포트 생성/CSV 내보내기
-  - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/matching-lab/\*)
-  - AC5: 테스트 + Build PASS
+- [x] **T97** → DONE ✅ 2026-02-12
+  - Simulator 페이지: L1/L2/L3 벡터 입력, 3-Tier 매칭 실행, 결과 카드(XAI 설명), 배치 통계
+  - Tuning 페이지: 6종 하이퍼파라미터 슬라이더, 6장르 가중치, 자동 튜닝(Grid/Bayesian), A/B 테스트
+  - Analytics 페이지: 8종 KPI 대시보드, 다양성 지수, 트렌드, 이상 탐지, CSV 내보내기
+  - API 라우트: simulate/tuning/analytics 3개 라우트
+  - 테스트 40개 PASS, 빌드 PASS
+  - 파일: simulator/page.tsx, tuning/page.tsx, analytics/page.tsx, 3 API routes, matching-lab-ui.test.ts
 
 - [ ] **T98: System Integration 3페이지 UI — Deployment + Versions + Event Bus**
   - 배경: lib/system-integration/ 완성 (T66, ~2400줄). stub 페이지 3개를 실제 관리 UI로 전환
