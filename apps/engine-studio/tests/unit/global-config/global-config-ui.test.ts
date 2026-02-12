@@ -508,7 +508,7 @@ describe("AC3: API Endpoints Page Logic", () => {
 
   describe("Health summary", () => {
     it("counts endpoints by health status", () => {
-      let manager = createAPIEndpointManager()
+      const manager = createAPIEndpointManager()
       const { manager: m1, id: id1 } = registerAndGetId(manager, makeEndpoint({ path: "/a" }))
       const { manager: m2, id: id2 } = registerAndGetId(m1, makeEndpoint({ path: "/b" }))
       const { manager: m3 } = registerAndGetId(m2, makeEndpoint({ path: "/c" }))
@@ -534,7 +534,7 @@ describe("AC3: API Endpoints Page Logic", () => {
     })
 
     it("all endpoints down case", () => {
-      let manager = createAPIEndpointManager()
+      const manager = createAPIEndpointManager()
       const { manager: m, id } = registerAndGetId(manager, makeEndpoint({ path: "/a" }))
       let current = m
       for (let i = 0; i < 3; i++) {
@@ -559,7 +559,7 @@ describe("AC3: API Endpoints Page Logic", () => {
     })
 
     it("finds endpoints with deprecated status", () => {
-      let manager = createAPIEndpointManager()
+      const manager = createAPIEndpointManager()
       const { manager: m, id } = registerAndGetId(
         manager,
         makeEndpoint({ path: "/old", version: "v2" })

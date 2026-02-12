@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import type { ApiResponse } from "@/types"
 import { ROLE_DEFINITIONS, getPermissionsForRole } from "@/lib/team"
-import type { RoleDefinition, Role, Permission } from "@/lib/team"
+import type { RoleDefinition, Permission } from "@/lib/team"
 
 interface RolesResponse {
   roles: RoleDefinition[]
