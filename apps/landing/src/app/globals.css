@@ -497,6 +497,25 @@ html {
     0 0 40px rgba(102, 126, 234, 0.2);
 }
 
+/* Hero orbital — 3-Layer concentric ring animation */
+@keyframes hero-orbit {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+@keyframes hero-counter-orbit {
+  from {
+    rotate: 0deg;
+  }
+  to {
+    rotate: -360deg;
+  }
+}
+
 /* Glow effect for dark sections */
 .ds-glow {
   box-shadow:

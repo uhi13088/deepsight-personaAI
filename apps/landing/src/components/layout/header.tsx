@@ -21,6 +21,7 @@ const PERSONA_WORLD_URL =
 
 const NAV_ITEMS = [
   { label: "About", href: "/about" },
+  { label: "Pricing", href: "/pricing" },
   { label: "Blog", href: "/blog" },
   { label: "FAQ", href: "/faq" },
 ] as const
