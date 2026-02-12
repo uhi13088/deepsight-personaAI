@@ -74,6 +74,18 @@
   }
 }
 
+/* ── ReactFlow 노드 기본 스타일 리셋 ────────────────── */
+.react-flow__node {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  width: auto;
+  text-align: left;
+  font-size: inherit;
+  color: inherit;
+}
+
 /* ── ReactFlow 다크모드 오버라이드 ────────────────── */
 .dark .react-flow__background {
   background-color: #262624;
