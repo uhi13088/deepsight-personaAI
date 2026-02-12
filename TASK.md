@@ -397,7 +397,7 @@
   - 테스트 40개 PASS, 빌드 PASS
   - 파일: simulator/page.tsx, tuning/page.tsx, analytics/page.tsx, 3 API routes, matching-lab-ui.test.ts
 
-- [ ] **T98: System Integration 3페이지 UI — Deployment + Versions + Event Bus**
+- [x] **T98: System Integration 3페이지 UI — Deployment + Versions + Event Bus** → DONE ✅ 2026-02-12
   - 배경: lib/system-integration/ 완성 (T66, ~2400줄). stub 페이지 3개를 실제 관리 UI로 전환
   - AC1: Deployment Pipeline — 환경 3종 (DEV/STG/PROD) 상태 카드, 배포 워크플로우 타임라인 (build→test→deploy→verify), Canary Release 진행 게이지 (10%→50%→100%), 롤백 트리거 설정
   - AC2: Version Control — 알고리즘 버전 목록 테이블 (상태 뱃지), 시맨틱 버전 범프 (Major/Minor/Patch), 버전 Diff 비교 뷰, 롤백 영향도 분석 + 실행
@@ -405,7 +405,7 @@
   - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/system-integration/\*)
   - AC5: 테스트 + Build PASS
 
-- [ ] **T99: Operations 3페이지 UI — Monitoring + Incidents + Backup**
+- [x] **T99: Operations 3페이지 UI — Monitoring + Incidents + Backup** → DONE ✅ 2026-02-12
   - 배경: lib/operations/ 완성 (T67, ~1600줄). stub 페이지 3개를 실제 운영 UI로 전환
   - AC1: System Monitoring — 실시간 메트릭 카드 6종 (CPU/Memory/Disk/Network/API Latency/Error Rate), 임계값 알림 목록 (severity 컬러), 로그 검색 (레벨/소스/시간 필터), 대시보드 패널 레이아웃
   - AC2: Incident Management — 장애 목록 테이블 (P0~P3 severity 뱃지), 장애 생성/삼분류, 타임라인 워크플로우 (Declared→In Progress→Resolved→Closed), Post-mortem 작성 폼, MTTR 통계
@@ -413,7 +413,7 @@
   - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/operations/\*)
   - AC5: 테스트 + Build PASS
 
-- [ ] **T100: Global Config 3페이지 UI — Model Settings + Safety Filters + API Endpoints**
+- [x] **T100: Global Config 3페이지 UI — Model Settings + Safety Filters + API Endpoints** → DONE ✅ 2026-02-12
   - 배경: lib/global-config/ 완성 (T68, ~1800줄). stub 페이지 3개를 실제 설정 UI로 전환
   - AC1: Model Settings — LLM 모델 선택 카드 (GPT-4/Claude/Gemini 등), 모델별 비용 테이블, 일/월 예산 설정 슬라이더, 사용량 대시보드 (소비/잔여), 모델 라우팅 규칙 설정
   - AC2: Safety Filters — 필터 규칙 CRUD 테이블 (카테고리/심각도/활성 토글), 금지어 관리 (추가/삭제/일괄 업로드), 필터 로그 목록 (차단 이력+통계), 필터 테스트 시뮬레이터
@@ -421,7 +421,7 @@
   - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/global-config/\*)
   - AC5: 테스트 + Build PASS
 
-- [ ] **T101: Team & Access 3페이지 UI — Users + Roles + Audit Logs**
+- [x] **T101: Team & Access 3페이지 UI — Users + Roles + Audit Logs** → DONE ✅ 2026-02-12
   - 배경: lib/team/ 완성 (T69, ~1200줄). stub 페이지 3개를 실제 팀 관리 UI로 전환
   - AC1: Users — 팀 멤버 목록 테이블 (이름/이메일/역할/상태 뱃지), 멤버 초대 모달 (이메일+역할 선택), 멤버 비활성화/재활성화 토글, 멤버 역할 변경 드롭다운
   - AC2: Roles — 역할 4종 카드 (Admin/AI Engineer/Content Manager/Analyst), 권한 매트릭스 테이블 (리소스×액션 체크박스), 커스텀 역할 생성/수정, 역할별 멤버 수 표시
@@ -429,7 +429,7 @@
   - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/team/\*)
   - AC5: 테스트 + Build PASS
 
-- [ ] **T102: 테마 토글 (Light/Dark) — LNB 하단 테마 전환 버튼**
+- [x] **T102: 테마 토글 (Light/Dark) — LNB 하단 테마 전환 버튼** → DONE ✅ 2026-02-12
   - 배경: 엔진 스튜디오 전역 테마 지원. 다크 테마는 순수 블랙(#000) 아닌 다크 그레이 톤 (Claude 스타일)
   - AC1: ThemeProvider (next-themes) + globals.css CSS 변수 — light/dark 두 세트 정의, dark 배경 #1a1a2e~#2d2d3f 계열 (Claude 참고)
   - AC2: LNB 좌측 하단 테마 토글 버튼 (Sun/Moon 아이콘, 툴팁, 부드러운 전환 애니메이션)
