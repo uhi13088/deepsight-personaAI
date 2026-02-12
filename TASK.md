@@ -152,15 +152,15 @@
   - AC4: ✅ report.ts — 리포트 설정/생성(5섹션), KPI 요약+변화율, 개선 권고, CSV 내보내기
   - AC5: ✅ 테스트 74개 PASS (전체 641개) + Build PASS
 
-- [ ] **T59: 노드 에디터 — 기반 인프라 (DAG 엔진)**
+- [x] **T59: 노드 에디터 — 기반 인프라 (DAG 엔진)**
   - 배경: 구현계획서 Phase 8 전반. ComfyUI 스타일 DAG 에디터의 기반
-  - AC1: 포트 타입 시스템 (21개 타입, 호환성 매트릭스)
-  - AC2: 노드 레지스트리 (카테고리 7종, 25노드 등록)
-  - AC3: 위상 정렬 (Kahn's) + 순환 탐지 (DFS)
-  - AC4: DAG 평가 엔진 (노드 실행 순서, 활성 엣지 추적)
-  - AC5: 그래프 검증기 (연결 유효성, 분기 규칙 4종)
-  - AC6: 직렬화/역직렬화 + v2→v3 마이그레이션
-  - AC7: 단위 테스트 + 커밋 + 푸시
+  - AC1: ✅ port-types.ts — 22개 포트 타입(21+Any), 호환성 매트릭스, ArchetypeConfig→벡터 특수 호환
+  - AC2: ✅ node-registry.ts — 6카테고리 25노드 (Input5/Engine4/ControlFlow3/Gen7/Assembly2/Output4)
+  - AC3: ✅ topological-sort.ts — Kahn's 위상 정렬 + DFS 순환 탐지 + wouldCreateCycle 사전 체크
+  - AC4: ✅ dag-engine.ts — 실행 계획, 입력값 수집, 제어 흐름 활성 엣지 추적, upstream/downstream 탐색
+  - AC5: ✅ graph-validator.ts — 필수 노드/포트/연결 유효성 + 분기 규칙 4종 (Merge/DeadEnd/Reachability/SwitchDefault)
+  - AC6: ✅ serializer.ts — JSON 직렬화/역직렬화, v2→v3 마이그레이션(6D→7D), 변경 감지
+  - AC7: ✅ 테스트 55개 PASS (전체 696개) + Build PASS
 
 - [ ] **T60: 노드 에디터 — 캔버스 + 25노드 UI + 설정 패널**
   - 배경: 구현계획서 Phase 8 후반 + 스펙 §3.10. @xyflow/react 기반
