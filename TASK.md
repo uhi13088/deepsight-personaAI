@@ -51,14 +51,6 @@
   - AC5: ✅ POST /api/internal/personas/create (트랜잭션, Paradox Score 자동 계산, 벡터 3레이어 저장)
   - AC6: ✅ 테스트 9파일 119개 PASS + Build PASS (b1bcaf9)
 
-- [ ] **T50: 페르소나 수정/복제/보관 + 라이프사이클**
-  - 배경: 스펙 §3.1.3~3.1.5 + §3.8
-  - AC1: 페르소나 수정 (PUT API + 편집 UI + 벡터 버전 관리)
-  - AC2: 페르소나 복제 (DRAFT로 생성)
-  - AC3: 페르소나 보관/복원 (Archive/Restore)
-  - AC4: 라이프사이클 상태 전이 8종 (Draft→Review→Active→Standard→Legacy→Deprecated→Paused→Archived)
-  - AC5: 테스트 + 커밋 + 푸시
-
 ### Phase B: 엔진 핵심 기능 (T51~T61)
 
 > 벡터 에디터, 생성 파이프라인, 검증, 매칭 연구소, 노드 에디터.
@@ -386,7 +378,13 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-(없음)
+- [ ] **T50: 페르소나 수정/복제/보관 + 라이프사이클**
+  - 배경: 스펙 §3.1.3~3.1.5 + §3.8
+  - AC1: 페르소나 수정 (PUT API + 편집 UI + 벡터 버전 관리)
+  - AC2: 페르소나 복제 (DRAFT로 생성)
+  - AC3: 페르소나 보관/복원 (Archive/Restore)
+  - AC4: 라이프사이클 상태 전이 8종 (Draft→Review→Active→Standard→Legacy→Deprecated→Paused→Archived)
+  - AC5: 테스트 + 커밋 + 푸시
 
 ---
 
