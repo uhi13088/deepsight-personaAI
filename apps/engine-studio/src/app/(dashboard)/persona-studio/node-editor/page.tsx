@@ -74,7 +74,7 @@ export default function NodeEditorPage() {
     <Suspense
       fallback={
         <div className="flex h-[calc(100vh-64px)] items-center justify-center">
-          <div className="text-sm text-gray-500">로딩 중...</div>
+          <div className="text-muted-foreground text-sm">로딩 중...</div>
         </div>
       }
     >

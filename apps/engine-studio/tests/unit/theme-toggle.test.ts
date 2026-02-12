@@ -35,9 +35,9 @@ describe("T102: 테마 CSS 변수", () => {
     expect(darkBlock).toContain("--color-sidebar")
   })
 
-  it("dark 배경이 Claude 스타일 다크 그레이 (#1a1a2e 계열)이어야 한다", () => {
+  it("dark 배경이 다크 그레이 (#262624 계열)이어야 한다", () => {
     const darkBlock = css.slice(css.indexOf(".dark {"))
-    expect(darkBlock).toContain("#1a1a2e")
+    expect(darkBlock).toContain("#262624")
   })
 
   it("light 배경이 흰색 계열이어야 한다", () => {

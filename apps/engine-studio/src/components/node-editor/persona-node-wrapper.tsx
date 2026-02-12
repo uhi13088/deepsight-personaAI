@@ -49,7 +49,7 @@ export function PersonaNodeWrapper({
 
   return (
     <div
-      className={`relative min-w-[180px] max-w-[280px] rounded-lg border-2 bg-white shadow-sm ${selected ? "border-blue-500 shadow-md" : "border-gray-200"} `}
+      className={`bg-card relative min-w-[180px] max-w-[280px] rounded-lg border-2 shadow-sm ${selected ? "border-blue-500 shadow-md" : "border-border"} `}
       style={{ borderTopColor: categoryColor, borderTopWidth: "3px" }}
     >
       {/* 헤더 */}
@@ -78,7 +78,7 @@ export function PersonaNodeWrapper({
             background: getPortColor(port.type),
             width: 10,
             height: 10,
-            border: "2px solid white",
+            border: "2px solid var(--color-card, white)",
           }}
           title={`${port.label} (${port.type})${port.required ? " *" : ""}`}
         />
@@ -96,7 +96,7 @@ export function PersonaNodeWrapper({
             background: getPortColor(port.type),
             width: 10,
             height: 10,
-            border: "2px solid white",
+            border: "2px solid var(--color-card, white)",
           }}
           title={`${port.label} (${port.type})`}
         />
