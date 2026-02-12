@@ -58,7 +58,7 @@ export default function ContactPage() {
                 <MapPin className="h-7 w-7 text-green-600" />
               </div>
               <h3 className="mb-2 text-lg font-bold text-gray-900">오피스</h3>
-              <p className="text-gray-600">서울특별시</p>
+              <p className="text-gray-600">서울특별시 (상세 주소 추후 공개)</p>
               <p className="mt-2 text-sm text-gray-500">대한민국</p>
             </div>
           </div>

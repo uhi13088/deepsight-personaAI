@@ -29,7 +29,7 @@ const API_FEATURES = [
     title: "페르소나 카탈로그",
     badge: "Catalog API",
     description:
-      "DeepSight에 등록된 AI 페르소나를 검색하고 조회합니다. 역할, 전문분야, 6D 벡터 성향으로 필터링하여 서비스에 맞는 페르소나를 선택하세요.",
+      "DeepSight에 등록된 AI 페르소나를 검색하고 조회합니다. 역할, 전문분야, 3-Layer 벡터 성향으로 필터링하여 서비스에 맞는 페르소나를 선택하세요.",
     example: "OTT 서비스가 '영화 전문 리뷰어' 페르소나를 검색",
   },
   {
@@ -37,7 +37,7 @@ const API_FEATURES = [
     title: "유저 프로파일링",
     badge: "Profiling API",
     description:
-      "콜드스타트 질문셋을 제공받아 자사 유저의 6D 벡터 프로필을 생성합니다. SNS 연동 분석도 지원하여, 신규 유저에게도 즉시 개인화된 경험을 제공할 수 있습니다.",
+      "3-Phase 24문항 온보딩을 제공받아 자사 유저의 3-Layer 벡터 프로필 (L1+L2+L3)을 생성합니다. SNS 연동 분석도 지원하여, 신규 유저에게도 즉시 개인화된 경험을 제공할 수 있습니다.",
     example: "웹소설 플랫폼이 신규 가입자의 취향을 즉시 파악",
   },
   {
@@ -45,7 +45,7 @@ const API_FEATURES = [
     title: "유저-페르소나 매칭",
     badge: "Matching API",
     description:
-      "유저의 6D 벡터와 페르소나 벡터 간 코사인 유사도를 계산하여 최적의 페르소나를 매칭합니다. 다양성 팩터를 포함하여 필터버블도 방지합니다.",
+      "유저의 3-Layer 벡터와 페르소나 벡터 간 3-Tier 매칭 (Basic/Advanced/Exploration)으로 최적의 페르소나를 매칭합니다. 다양성 팩터를 포함하여 필터버블도 방지합니다.",
     example: "음악 앱이 각 유저에게 맞춤 큐레이터 페르소나를 배정",
   },
   {
@@ -207,14 +207,19 @@ const personas = await ds.personas.list({
   role: 'REVIEWER'
 })
 
-// 2. 우리 서비스 유저의 6D 프로필 생성
+// 2. 우리 서비스 유저의 3-Layer 프로필 생성
 const profile = await ds.profiles.create({
-  answers: coldStartAnswers
+  onboarding: {
+    phase1: coreAnswers,      // 8문항: L1 기본 성향
+    phase2: depthAnswers,     // 8문항: L2 심화 성향
+    phase3: contextAnswers,   // 8문항: L3 맥락 성향
+  }
 })
 
 // 3. 유저에게 맞는 페르소나 매칭
 const matches = await ds.match({
-  profileId: profile.id
+  profileId: profile.id,
+  matchingTier: 'advanced'  // basic | advanced | exploration
 })
 
 // 4. 페르소나가 추천 + 이유 설명

@@ -49,7 +49,7 @@ function fbmNoise(x: number, y: number, seed: number, octaves = 3): number {
 
 /**
  * P-inger Print 2D — Flow field 기반 진짜 지문 패턴
- * 6D 벡터가 flow field의 특성을 결정 → 각 페르소나별 고유한 지문
+ * v3 L1 벡터(7D)가 flow field의 특성을 결정 → 각 페르소나별 고유한 지문
  */
 export function PingerPrint2D({ data, size = 240, showLabel = true }: PingerPrint2DProps) {
   const uid = useId().replace(/:/g, "")
@@ -67,10 +67,18 @@ export function PingerPrint2D({ data, size = 240, showLabel = true }: PingerPrin
     const scope = data.scope ?? 0.5
     const taste = data.taste ?? 0.5
     const purpose = data.purpose ?? 0.5
+    const sociability = data.sociability ?? 0.5
 
-    // 6D로 시드 생성 (각 페르소나 고유)
+    // L1 7D로 시드 생성 (각 페르소나 고유)
     const seed = Math.floor(
-      (depth * 17 + lens * 31 + stance * 53 + scope * 97 + taste * 151 + purpose * 199) * 1000
+      (depth * 17 +
+        lens * 31 +
+        stance * 53 +
+        scope * 97 +
+        taste * 151 +
+        purpose * 199 +
+        sociability * 257) *
+        1000
     )
 
     // Core(소용돌이 중심) 위치 — stance, purpose로 결정

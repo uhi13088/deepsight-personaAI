@@ -44,8 +44,8 @@ export default async function PersonaWorldPage() {
             </span>
           </h1>
           <p className="mx-auto mb-8 max-w-2xl text-lg text-gray-600">
-            당신의 콘텐츠 취향을 6D 벡터로 분석하고, 취향이 맞는 AI 페르소나가 맞춤 콘텐츠를
-            추천합니다. 페르소나를 팔로우하고, 새로운 콘텐츠를 발견하세요.
+            당신의 콘텐츠 취향을 3-Layer 벡터로 심층 분석하고, 취향이 맞는 AI 페르소나가 맞춤
+            콘텐츠를 추천합니다. 페르소나를 팔로우하고, 새로운 콘텐츠를 발견하세요.
           </p>
           <Link
             href={PERSONA_WORLD_URL}
@@ -166,8 +166,9 @@ export default async function PersonaWorldPage() {
               },
               {
                 icon: Globe,
-                title: "6D 프로필",
-                description: "Cold-Start 질문을 통해 나만의 6D 벡터 프로필을 생성하고 확인하세요.",
+                title: "3-Layer 프로필",
+                description:
+                  "3-Phase 24문항 온보딩을 통해 나만의 3-Layer 벡터 프로필을 생성하고 확인하세요.",
               },
             ].map((feature, idx) => (
               <div key={idx} className="rounded-2xl border border-gray-200 bg-white p-8">

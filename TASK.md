@@ -7,209 +7,7 @@
 
 ## 📋 QUEUE (대기)
 
-### Phase L-0: 블로그 인프라 (T80)
-
-> 블로그는 실제 운영 예정. 동적 페이지 + DB 기반. 하드코딩/목업 금지.
-
-- [ ] **T80: 블로그 DB 스키마 + API + 동적 페이지**
-  - 배경: 블로그를 실제 운영할 예정. SQL 에디터를 통한 마이그레이션으로 글 등록. 하드코딩 금지
-  - AC1: Prisma BlogPost 모델 추가 (title, slug, content, excerpt, category, author, coverImage, publishedAt, viewCount, status)
-  - AC2: SQL 마이그레이션 파일 작성 (blog_posts 테이블 + 인덱스)
-  - AC3: GET /api/public/blog-posts API (페이지네이션, 카테고리 필터, 정렬)
-  - AC4: GET /api/public/blog-posts/[slug] API (단일 조회 + viewCount 증가)
-  - AC5: Landing `lib/api.ts` — 엔진 스튜디오 블로그 API 연동 (기존 함수 수정)
-  - AC6: Landing `blog/page.tsx` — 실 API 데이터 표시, 글 없으면 "아직 블로그 글이 없습니다" 빈 상태 UI
-  - AC7: Landing `blog/[slug]/page.tsx` — 실 API 데이터 표시, Markdown 렌더링
-  - AC8: Build PASS + 테스트 + 커밋 + 푸시
-
-### Phase L-1: 공통 인프라 — 6D → v3 3-Layer 전환 (T81~T82)
-
-> lib/ 유틸, 타입, 색상, API 클라이언트를 v3 기준으로 전환. 모든 페이지의 기반.
-
-- [ ] **T81: lib/ 공통 모듈 v3 전환 — trait-colors + utils + api**
-  - 배경: 현재 lib/ 전체가 6D 기준. v3 3-Layer(L1 7D + L2 5D + L3 4D) 기반으로 전환
-  - AC1: `lib/trait-colors.ts` — 6D 6개 → 3-Layer 16D 색상 매핑 (L1 7색 + L2 5색 + L3 4색, engine-studio 상수 참조)
-  - AC2: `lib/utils.ts` — `Vector6D` 인터페이스 삭제, 6D 벡터 유틸 함수 삭제 (calculateCosineSimilarity, calculateWeightedSimilarity 등)
-  - AC3: `lib/utils.ts` — `VECTOR_DIMENSION_LABELS` 6D 상수 삭제, `VECTOR_PRESETS` 6D 프리셋 삭제
-  - AC4: `lib/utils.ts` — `DBUserVector` 6D 인터페이스/변환 함수 삭제 (transformDBUserVectorToFrontend 등)
-  - AC5: `lib/api.ts` — `PersonaPublic` 인터페이스 v3 기준 수정 (vector → layerVectors, archetype 추가)
-  - AC6: `lib/api.ts` — 페르소나 수 조회 API 엔드포인트 v3 기준 확인 (/api/public/personas)
-  - AC7: `lib/api.ts` — `getTopPersonas` → 팔로워 기준 Top 3 조회 (PersonaWorld 실 데이터, 없으면 빈 배열)
-  - AC8: Build PASS + 커밋
-
-- [ ] **T82: layout.tsx + Header + Footer — 6D 잔재 제거 + v3 용어**
-  - 배경: 레이아웃/헤더/푸터에 6D 표현 잔재
-  - AC1: `layout.tsx` metadata — title/description/keywords/openGraph 전부 "6D 벡터" → "3-Layer AI 페르소나" 변경
-  - AC2: `header.tsx` FEATURE_ITEMS — "6D 벡터 기반 정밀 프로파일링" → "3-Layer 벡터 기반 심층 프로파일링"
-  - AC3: `footer.tsx` — "AI 페르소나 기반 6D 벡터 추천 플랫폼" → v3 표현 변경
-  - AC4: `footer.tsx` — Products 컬럼 "Inside DeepSight" → "Engine Studio" (이미 리다이렉트만 있음)
-  - AC5: Build PASS + 커밋
-
-### Phase L-2: 메인 페이지 + 히어로 (T83~T84)
-
-> 메인 페이지와 HeroOrbital 컴포넌트 v3 전환.
-
-- [ ] **T83: 메인 페이지 (page.tsx) v3 전면 개편**
-  - 배경: 메인 페이지 전체가 6D 기준. "6D 벡터로 사용자를 이해하다" 제목부터 모든 섹션 수정
-  - AC1: Hero 섹션 — 제목 "6D 벡터로 사용자를 이해하다" → v3 메시지 (3-Layer 강조)
-  - AC2: Hero 섹션 — 부제/설명문 v3 용어로 변경
-  - AC3: `VECTOR_DIMENSIONS` 상수 — 6D 6개 → v3 대표 차원 (L1 7D + Paradox + 교차축 등 핵심 특성 강조)
-  - AC4: "6D VECTOR SYSTEM" 섹션 — v3 3-Layer 구조 설명으로 전면 재작성 (L1/L2/L3 각각 카드)
-  - AC5: `METRICS` — "6D" → "3-Layer 16D", 페르소나 수 실 데이터 유지 (이미 API 호출)
-  - AC6: `METRICS` — 페르소나 수 API 호출 — v3 엔드포인트 확인 (/api/public/personas)
-  - AC7: `USE_CASES` — 3-Layer/Paradox/교차축 언급으로 설명 강화
-  - AC8: CTA 섹션 — 링크/문구 점검
-  - AC9: Build PASS + 커밋
-
-- [ ] **T84: HeroOrbital 컴포넌트 v3 전환**
-  - 배경: HeroOrbital이 6D 6개 차원 기준으로 궤도 구성. v3 구조 반영
-  - AC1: `VectorDimension` 인터페이스 — v3 구조 반영 (3-Layer 개념)
-  - AC2: Inner/Middle 궤도 — 6D slice(0,3)/slice(3,6) 대신 v3 핵심 요소로 재구성
-  - AC3: 중앙 카드 — "Your Vector Profile" → v3 용어
-  - AC4: 하단 매칭 결과 — "도플갱어: 유나 (92%)" 목업 → v3 3-Tier 매칭 용어 반영
-  - AC5: Build PASS + 커밋
-
-### Phase L-3: P-inger Print 컴포넌트 (T85)
-
-> 2D/3D 지문 시각화 컴포넌트의 6D → v3 전환.
-
-- [ ] **T85: P-inger Print 2D + 3D + Showcase v3 전환**
-  - 배경: PingerPrint2D/3D/Showcase 전부 6D 키(depth/lens/stance/scope/taste/purpose) 하드코딩
-  - AC1: `p-inger-print-2d.tsx` — 6D 키 추출 로직 → v3 L1 7D 키 기반으로 변경 (sociability 추가)
-  - AC2: `p-inger-print-2d.tsx` — 시드 계산 계수 6개→7개 (L1 기준), flow field 특성 재매핑
-  - AC3: `p-inger-print-2d.tsx` — 주석 "6D 벡터가 flow field" → v3 용어
-  - AC4: `p-inger-print-3d.tsx` — 6D 키 배열 → v3 L1 7D 키 배열
-  - AC5: `p-inger-print-3d.tsx` — 팔 방향/길이 매핑 6개→7개 (Jacks 형태 변경)
-  - AC6: `p-inger-print-3d.tsx` — 주석 "6D 벡터에 따라" → v3 용어
-  - AC7: `p-inger-print-showcase.tsx` — 예시 페르소나 data 6D→L1 7D (sociability 추가)
-  - AC8: `p-inger-print-showcase.tsx` — "6D 벡터값에 따라" → v3 용어, 벡터 테이블 L1 기준
-  - AC9: Build PASS + 커밋
-
-### Phase L-4: Features 서브페이지 (T86~T88)
-
-> features/ 허브 + 3개 서브페이지 v3 전면 개편.
-
-- [ ] **T86: Features 허브 + 취향 분석 페이지 v3 전면 개편**
-  - 배경: features/page.tsx + features/taste-analysis/page.tsx 전체가 6D 기준
-  - AC1: `features/page.tsx` — FEATURE_PAGES 설명 "6D 벡터 시스템" → "3-Layer 벡터 시스템"
-  - AC2: `features/page.tsx` — highlights "6D 벡터 프로파일링" → "3-Layer 프로파일링"
-  - AC3: `features/page.tsx` — 매칭 설명 "코사인 유사도" → "3-Tier 매칭" 언급
-  - AC4: `taste-analysis/page.tsx` metadata — "6D 벡터 프로파일링" → v3 용어
-  - AC5: `taste-analysis/page.tsx` Hero 설명 — "6D 벡터 시스템으로 6개 독립 차원" → "3-Layer 16D"
-  - AC6: `taste-analysis/page.tsx` VECTOR_DIMENSIONS — 6D 6개 → L1 7D + L2 5D + L3 4D (16D 전체 또는 L1 중심)
-  - AC7: `taste-analysis/page.tsx` "6D VECTOR SYSTEM" 섹션 제목 → "3-LAYER VECTOR SYSTEM"
-  - AC8: `taste-analysis/page.tsx` SNS 분석 섹션 — "6D 벡터 프로필" → "3-Layer 프로필"
-  - AC9: `taste-analysis/page.tsx` SNS_PLATFORMS — dimensions 설명 "depth, taste, purpose" → v3 L1/L2 차원명
-  - AC10: `taste-analysis/page.tsx` COLD_START_METHODS — "6D 벡터를 생성" → v3 용어, "3-Phase 24문항" 반영
-  - AC11: `taste-analysis/page.tsx` 프로필 품질 레벨 — BASIC/STANDARD/ADVANCED/PREMIUM → v3의 STARTER/STANDARD/ADVANCED/EXPERT 명칭 확인
-  - AC12: Build PASS + 커밋
-
-- [ ] **T87: Features AI 페르소나 페이지 v3 전면 개편**
-  - 배경: features/persona/page.tsx 전체가 6D/2-Layer 기준
-  - AC1: metadata — "6D 성격" → v3 용어
-  - AC2: CONCEPT 섹션 — "6D 벡터 프로필" 카드 → "3-Layer 벡터 프로필" (L1+L2+L3)
-  - AC3: "설명 가능한 추천" 카드 — "depth 0.85, lens 0.72" 예시 → v3 차원 + 매칭 설명 용어
-  - AC4: "2-LAYER SYSTEM" 섹션 → "3-LAYER SYSTEM" (L1 Social Persona + L2 Core Temperament + L3 Narrative Drive)
-  - AC5: Layer 1 카드 — "6D 벡터 시스템" → "L1: Social Persona (7D)"
-  - AC6: Layer 2 카드 — "캐릭터 속성" → "L2: Core Temperament (OCEAN 5D)" + 신규 Layer 3 카드 추가
-  - AC7: P-inger Print 설명 — "6D 벡터값으로부터 생성" → v3 용어
-  - AC8: P-inger Print 카드 — 2D/3D 설명 "Depth → 릿지 밀도" 등 6개 → v3 L1 7D 기준 7개 매핑
-  - AC9: PERSONA_TYPES — 4종(Casual/Enthusiast/Expert/Critic) → v3 12 아키타입 전부 또는 대표 선별
-  - AC10: PERSONA_TYPES traits — "낮은 depth, 낮은 lens" → v3 차원명 사용
-  - AC11: QUALITY_CHECKS — "6D 벡터 반영도" → "3-Layer 벡터 정합성", v3 6-Category 검증 반영
-  - AC12: Build PASS + 커밋
-
-- [ ] **T88: Features 매칭 시스템 페이지 v3 전면 개편**
-  - 배경: features/matching/page.tsx 전체가 코사인 유사도 단일 매칭 기준
-  - AC1: metadata — "코사인 유사도" → "3-Tier 매칭"
-  - AC2: Hero 설명 — v3 3-Tier 매칭 (Basic/Advanced/Exploration) 언급
-  - AC3: PIPELINE_STEPS — Step 01 "6D 벡터 프로필" → v3 3-Layer
-  - AC4: PIPELINE_STEPS — Step 02 "6D 벡터 간 코사인 유사도" → v3 Basic Tier (V_Final 기반) + Advanced/Exploration Tier 설명
-  - AC5: PIPELINE_STEPS — Step 03 "보너스 팩터" → v3 Paradox Score + 교차축 83축 활용
-  - AC6: "VECTOR MATCHING" 섹션 — 공식 "cosine_similarity(user_6D, persona_6D)" → v3 3-Tier 공식
-  - AC7: BONUS_FACTORS — v3 구조 반영 (세대/국가 → Paradox 호환성, 교차축 패턴 등)
-  - AC8: EXPLANATION_EXAMPLES — "분석 깊이 85%" → v3 차원명 + 3-Tier 매칭 결과 예시
-  - AC9: 비교 테이블 — "6D 벡터 코사인 유사도" → "3-Tier 매칭 (Basic/Advanced/Exploration)"
-  - AC10: Build PASS + 커밋
-
-### Phase L-5: Products 서브페이지 (T89~T91)
-
-> products/ 3개 페이지 v3 전환 + 실 데이터 연동.
-
-- [ ] **T89: Products PersonaWorld 페이지 — 실 데이터 + v3 전환**
-  - 배경: 목업 금지. 팔로워 Top 3 실 데이터. 데이터 없으면 빈 상태 표시
-  - AC1: "6D 벡터로 분석" → v3 용어
-  - AC2: TOP 3 페르소나 — `getTopPersonas` → 팔로워 기반 실 데이터 API 호출
-  - AC3: TOP 3 — 데이터 없을 때 "아직 활동 중인 페르소나가 없습니다" 빈 상태 UI
-  - AC4: 역할 뱃지 — 5종(REVIEWER/CURATOR/COMPANION/ANALYST/CREATIVE) → v3 12 아키타입 또는 5종 역할 확인
-  - AC5: "6D 프로필" 피처 제목 → v3 용어
-  - AC6: "Cold-Start 질문" → "3-Phase 24문항 온보딩"
-  - AC7: Build PASS + 커밋
-
-- [ ] **T90: Products Developer Console 페이지 v3 전환**
-  - 배경: API 스펙 전체가 6D 기준. v3 3-Tier 매칭 + 과금 6-Tier 반영
-  - AC1: CORE_APIS — "6D 벡터 성향으로 필터링" → v3 3-Layer 필터링
-  - AC2: CORE_APIS — "6D 벡터 프로필" → "3-Layer 벡터 프로필 (L1+L2+L3)"
-  - AC3: CORE_APIS — "코사인 유사도를 계산" → "3-Tier 매칭 (Basic/Advanced/Exploration)"
-  - AC4: Quick Start 코드 예시 — `coldStartAnswers` → v3 3-Phase 온보딩 구조
-  - AC5: 코드 예시 — `profiles.create` → v3 API 구조 반영 (matching_tier 옵션 등)
-  - AC6: "곧 출시됩니다" 배너 — 유지 또는 상태 업데이트
-  - AC7: Build PASS + 커밋
-
-- [ ] **T91: Products Engine Studio 페이지 v3 전환**
-  - 배경: 4단계 생성 파이프라인/품질 검증 설명이 6D 기준
-  - AC1: "6D 벡터 프로필과 캐릭터 속성" → "3-Layer 벡터 (L1 7D + L2 5D + L3 4D)"
-  - AC2: 품질 검증 — "6D 벡터에 부합" → "3-Layer 벡터 + 6-Category 일관성 검증"
-  - AC3: P-inger Print — "6D 벡터값" → v3 용어
-  - AC4: 다양성 관리 — "6D 벡터 분포" → "3-Layer 벡터 분포 + 아키타입 12종 균형"
-  - AC5: 4단계 파이프라인 — v3 노드 에디터/생성 파이프라인 반영 여부 검토
-  - AC6: Build PASS + 커밋
-
-### Phase L-6: About + FAQ + Contact (T92~T94)
-
-> 기타 페이지 v3 전환.
-
-- [ ] **T92: About 페이지 v3 전환**
-  - 배경: 팀 스토리, 로드맵, 미션 전부 6D 언급
-  - AC1: metadata — "6D 벡터 추천 시스템" → v3 용어
-  - AC2: 팀원 스토리 — "6D 벡터 시스템 설계" → v3 3-Layer 엔진 언급
-  - AC3: 미션 섹션 — "6개 차원으로 정량화" → "3-Layer 16D로 정량화"
-  - AC4: 로드맵 — Phase 1 "6D 벡터 시스템" 완료 표기 → v3 진행 상태 반영
-  - AC5: Build PASS + 커밋
-
-- [ ] **T93: FAQ 페이지 전면 재작성**
-  - 배경: FAQ 30개+ 항목 전체가 6D 기준. 가장 많은 6D 참조 (15개소 이상)
-  - AC1: "6D 벡터란 무엇인가요?" → "3-Layer 벡터란 무엇인가요?" (L1/L2/L3 설명)
-  - AC2: 6D 차원 설명 (Depth/Lens/Stance/Scope/Taste/Purpose) → v3 L1 7D + L2 5D + L3 4D 전체 설명
-  - AC3: 콜드스타트 질문 관련 — "A vs B 선택형" → "3-Phase 24문항 하이브리드 시나리오"
-  - AC4: 페르소나 관련 — "6D 벡터를 기반으로" → v3 3-Layer + 12 아키타입
-  - AC5: 매칭 관련 — "코사인 유사도" → "3-Tier 매칭 (Basic/Advanced/Exploration)"
-  - AC6: "다양성 팩터" → v3 "Extended Paradox Score" + 교차축 83축
-  - AC7: PersonaWorld 관련 — "6D 벡터 프로필" → v3 용어
-  - AC8: 전체 FAQ 항목 v3 용어 통일 점검
-  - AC9: Build PASS + 커밋
-
-- [ ] **T94: Contact 페이지 상세 정보 보완**
-  - 배경: 사소한 이슈. 주소 상세 없음, 이메일 플레이스홀더
-  - AC1: 이메일 — contact@deepsight.ai 유지 (env var 기반, 이대로 OK)
-  - AC2: 오피스 주소 — "서울특별시" → 상세 주소 또는 "서울특별시 (상세 주소 추후 공개)" 명시
-  - AC3: Build PASS + 커밋
-
-### Phase L-7: SEO + 메타데이터 전체 점검 (T95)
-
-> 모든 페이지의 SEO 메타데이터 v3 통일.
-
-- [ ] **T95: 전체 페이지 SEO 메타데이터 v3 통일**
-  - 배경: 각 페이지별 metadata에 "6D" 잔재. 검색 엔진 노출용 정확한 v3 표현 필요
-  - AC1: `layout.tsx` — title/description/keywords 6D → v3
-  - AC2: `features/page.tsx` — metadata description v3 반영
-  - AC3: `features/taste-analysis/page.tsx` — "6D 벡터 프로파일링" → v3
-  - AC4: `features/persona/page.tsx` — "6D 성격" → v3
-  - AC5: `features/matching/page.tsx` — "코사인 유사도" → v3
-  - AC6: `products/persona-world/page.tsx` — metadata v3 반영
-  - AC7: `about/page.tsx` — metadata v3 반영
-  - AC8: `blog/page.tsx` — "6D 벡터 기술" → v3
-  - AC9: Build PASS + 커밋
+(없음 — 랜딩 v3 전환 완료)
 
 ---
 
@@ -220,6 +18,55 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T95: 전체 페이지 SEO 메타데이터 v3 통일** ✅ 2026-02-12
+  - AC1~AC8: ✅ 전 페이지 metadata 6D 잔재 0건 확인 (layout/features/products/about/blog)
+  - AC9: ✅ 잔여 6D 코멘트 2건 수정 + Build PASS + 커밋 (e25a382)
+
+- [x] **T89-T94: Products + About + FAQ + Contact v3 전환** ✅ 2026-02-12
+  - T89: ✅ PersonaWorld — "6D 벡터" → "3-Layer 벡터", "Cold-Start" → "3-Phase 24문항 온보딩"
+  - T90: ✅ Developer Console — API 코드 예시 phase1/2/3 구조, matchingTier 옵션
+  - T91: ✅ Engine Studio — "3-Layer 벡터 분포 + 아키타입 12종 균형"
+  - T92: ✅ About — 전체 6D→3-Layer 전환 (미션/로드맵/스토리)
+  - T93: ✅ FAQ — 17개 항목 6D→v3 전환 (cold-start/매칭/페르소나/PersonaWorld)
+  - T94: ✅ Contact — 주소 "서울특별시 (상세 주소 추후 공개)" 명시
+  - Build PASS + 커밋 (5d896f8)
+
+- [x] **T86-T88: Features 허브 + 서브페이지 3종 v3 전면 개편** ✅ 2026-02-12
+  - T86: ✅ Features 허브 — "6D 벡터 시스템" → "3-Layer 16D 벡터 시스템", highlights 전환
+  - T86: ✅ 취향 분석 — L1 7D + 3-Phase 24문항 + STARTER/EXPERT 품질 레벨 + SNS v3 차원
+  - T87: ✅ AI 페르소나 — 3-LAYER SYSTEM, 6종 아키타입, L1 7D P-inger Print 매핑
+  - T88: ✅ 매칭 시스템 — 3-Tier 파이프라인, V_Final/교차축/Paradox 공식, 비교 테이블
+  - Build PASS + 커밋 (abf9c39)
+
+- [x] **T84-T85: HeroOrbital + P-inger Print v3 전환** ✅ 2026-02-12
+  - T84: ✅ "Your Vector Profile" → "Your 3-Layer Profile", "도플갱어" → "3-Tier 매칭"
+  - T85: ✅ 2D — sociability 시드 계수 추가, 3D — 7번째 팔 [0.7,0.7,0], Showcase — L1 7D 데이터
+  - Build PASS + 커밋 (197e663)
+
+- [x] **T83: 메인 페이지 v3 전면 개편** ✅ 2026-02-12
+  - AC1~AC8: ✅ HERO_DIMENSIONS 6종 (3-Layer 대표), LAYERS L1/L2/L3 카드, Extended Paradox Score 배너
+  - AC9: ✅ Build PASS + 커밋 (fe40468)
+
+- [x] **T82: layout + Header + Footer v3 전환** ✅ 2026-02-12
+  - AC1~AC4: ✅ metadata 6D→3-Layer, header "3-Layer 벡터 기반", footer "Engine Studio" 링크
+  - AC5: ✅ Build PASS + 커밋 (fdff970)
+
+- [x] **T81: lib/ 공통 모듈 v3 전환** ✅ 2026-02-12
+  - AC1: ✅ trait-colors.ts — 6D→3-Layer 16D (L1 7+L2 5+L3 4, layer 필드, LAYER_COLORS)
+  - AC2~AC4: ✅ utils.ts — Vector6D/cosine/presets/DB transforms 전량 삭제
+  - AC5~AC7: ✅ api.ts — archetypeId 추가
+  - AC8: ✅ Build PASS + 커밋 (abc317b)
+
+- [x] **T80: 블로그 DB 스키마 + API + 동적 페이지** ✅ 2026-02-12
+  - AC1: ✅ Prisma BlogPost 모델 (기존 스키마에 이미 존재 확인)
+  - AC2: ✅ SQL 마이그레이션 `006_blog_posts.sql` 작성 (BlogCategory enum, 인덱스 3개, FK)
+  - AC3: ✅ GET /api/public/blog API (페이지네이션, 카테고리 필터, publishedAt 정렬)
+  - AC4: ✅ GET /api/public/blog/[slug] API (단일 조회 + 비동기 viewCount 증가)
+  - AC5: ✅ GET /api/public/personas API (활성 페르소나 수 + 팔로워 Top 3, \_count 활용)
+  - AC6: ✅ Landing lib/api.ts — 기존 함수 구조 적합 확인 (수정 불필요)
+  - AC7: ✅ Landing blog 페이지 빈 상태 UI 확인 + "6D 벡터" → "3-Layer 벡터" 텍스트 수정
+  - AC8: ✅ Engine-studio Build PASS + Landing Build PASS + 커밋 + 푸시 (699e67c)
 
 - [x] **T49: 페르소나 생성 플로우 (4-Step)** ✅ 2026-02-11
   - AC1: ✅ Step 1 — 기본 정보 (이름 2~30자, 역할 5종, 전문분야 16종, 설명 100자)
