@@ -92,14 +92,14 @@
   - AC5: ✅ 정성적 차원 에디터 UI (4탭: 배경/보이스/압박/시대, 텍스트 에디터 + 자동 생성)
   - AC6: ✅ 테스트 18개 PASS (전체 198개) + Build PASS
 
-- [ ] **T73: 하이브리드 연결 메커니즘 — Init/Override/Adapt/Express**
+- [x] **T73: 하이브리드 연결 메커니즘 — Init/Override/Adapt/Express** ✅
   - 배경: 구현계획서 Phase 4. 정성↔정량 4대 알고리즘
-  - AC1: Init 알고리즘 (LLM 키워드 추출 → 의미 카테고리 → 벡터 delta)
-  - AC2: Override 알고리즘 (2단계 트리거 감지, override/additive delta, 지수 감쇠 복귀)
-  - AC3: Adapt 알고리즘 (UIV 3축 분석, 차원별 α 튜닝, 모멘텀, ±0.3 클램프)
-  - AC4: Express 알고리즘 (파생 상태값 5종, sigmoid 공식, quirk 스키마, cooldown)
-  - AC5: attitude→delta 매핑 상수 + 통합 InteractionEngine
-  - AC6: 단위 테스트 + 커밋 + 푸시
+  - AC1: ✅ Init 알고리즘 (LLM 키워드 추출 → 의미 카테고리 8종 → 벡터 delta, clamp)
+  - AC2: ✅ Override 알고리즘 (2단계 트리거 감지, override/additive delta, 지수 감쇠, 5 기본 규칙)
+  - AC3: ✅ Adapt 알고리즘 (UIV 3축, 차원별 α 튜닝 7D, 모멘텀, ±0.3 클램프, 배치 처리)
+  - AC4: ✅ Express 알고리즘 (파생 상태값 5종 sigmoid, 6 quirk 정의, cooldown, 조건 평가)
+  - AC5: ✅ attitude→delta 매핑 8종 + InteractionEngine (Init→Override→Adapt→Attitude→Express 파이프라인, drift 계산, reset)
+  - AC6: ✅ 테스트 49개 PASS (전체 247개) + Build PASS
 
 - [ ] **T53: 프롬프트 엔지니어링 — 버전 관리 + 테스트 + 빌더**
   - 배경: 스펙 §3.3. 프롬프트 작성, 버전 관리, 테스트
