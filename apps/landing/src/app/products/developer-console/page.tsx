@@ -37,7 +37,7 @@ const API_FEATURES = [
     title: "유저 프로파일링",
     badge: "Profiling API",
     description:
-      "3-Phase 24문항 온보딩을 제공받아 자사 유저의 3-Layer 벡터 프로필 (L1+L2+L3)을 생성합니다. SNS 연동 분석도 지원하여, 신규 유저에게도 즉시 개인화된 경험을 제공할 수 있습니다.",
+      "Quick(12문항, 1.5분) / Standard(30문항, 4분) / Deep(60문항, 8분) 3가지 온보딩 모드로 자사 유저의 3-Layer 프로필을 생성합니다. SNS 연동 분석도 지원하여, 신규 유저에게도 즉시 개인화된 경험을 제공할 수 있습니다.",
     example: "웹소설 플랫폼이 신규 가입자의 취향을 즉시 파악",
   },
   {
@@ -207,22 +207,23 @@ const personas = await ds.personas.list({
   role: 'REVIEWER'
 })
 
-// 2. 우리 서비스 유저의 3-Layer 프로필 생성
-const profile = await ds.profiles.create({
-  onboarding: {
-    phase1: coreAnswers,      // 8문항: L1 기본 성향
-    phase2: depthAnswers,     // 8문항: L2 심화 성향
-    phase3: contextAnswers,   // 8문항: L3 맥락 성향
-  }
+// 2. 온보딩 질문 가져오기 (Quick 12문항)
+const questions = await ds.onboarding.getQuestions({
+  mode: 'quick'  // 'quick' | 'standard' | 'deep'
 })
 
-// 3. 유저에게 맞는 페르소나 매칭
+// 3. 유저 응답으로 3-Layer 프로필 생성
+const profile = await ds.profiles.create({
+  answers: userAnswers  // 유저가 응답한 결과
+})
+
+// 4. 유저에게 맞는 페르소나 매칭
 const matches = await ds.match({
   profileId: profile.id,
-  matchingTier: 'advanced'  // basic | advanced | exploration
+  tier: 'advanced'  // basic | advanced | exploration
 })
 
-// 4. 페르소나가 추천 + 이유 설명
+// 5. 페르소나가 추천 + 이유 설명
 const recs = await ds.recommend({
   personaId: matches[0].id,
   profileId: profile.id

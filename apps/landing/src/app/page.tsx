@@ -385,25 +385,25 @@ export default function HomePage() {
                 {
                   icon: BookOpen,
                   title: "서사적 기원 (Backstory)",
-                  desc: "과거의 상처(Ghost), 무의식적 욕망, 트라우마 트리거 — 벡터의 '이유'를 서사로 정의합니다.",
+                  desc: "과거의 상처, 무의식적 욕망, 내면의 트리거 — 성격의 '이유'를 서사로 정의합니다.",
                   color: "text-violet-600 bg-violet-50",
                 },
                 {
                   icon: Mic,
                   title: "고유한 목소리 (Voice Profile)",
-                  desc: "말버릇, 문장 구조, 감정 레지스터, Few-shot 앵커 — 수백 턴이 지나도 같은 사람처럼 말합니다.",
+                  desc: "말버릇, 문장 구조, 감정 표현 범위, 대표 화법 — 수백 턴이 지나도 같은 사람처럼 말합니다.",
                   color: "text-blue-600 bg-blue-50",
                 },
                 {
                   icon: Zap,
                   title: "압박 역학 (Pressure Dynamics)",
-                  desc: "특정 주제/상황에서 벡터가 일시적으로 변하고, 지수 감쇠 곡선으로 복귀합니다. L2 본성이 표면에 드러나는 순간.",
+                  desc: "특정 주제나 상황에서 성격이 일시적으로 변하고, 점차 원래 모습으로 돌아옵니다. 숨겨진 본성이 표면에 드러나는 순간.",
                   color: "text-amber-600 bg-amber-50",
                 },
                 {
                   icon: Compass,
                   title: "시대정신 (Zeitgeist)",
-                  desc: "세대 코드, 가치관, 문화 자본 — 같은 벡터라도 밀레니얼과 Z세대는 다르게 표현합니다.",
+                  desc: "세대 코드, 가치관, 문화 자본 — 같은 성향이라도 밀레니얼과 Z세대는 다르게 표현합니다.",
                   color: "text-emerald-600 bg-emerald-50",
                 },
               ].map((item) => (

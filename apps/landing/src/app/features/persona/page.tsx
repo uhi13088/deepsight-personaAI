@@ -29,57 +29,57 @@ export const metadata: Metadata = {
 
 const PERSONA_TYPES = [
   {
-    type: "Sage",
+    type: "아이러니한 철학자",
     icon: BookOpen,
-    label: "현자",
+    label: "논리 ↔ 불안",
     description:
-      "깊은 통찰과 분석으로 콘텐츠의 숨겨진 의미를 발견합니다. 열린 시야와 깊이 있는 사고로 사려 깊은 추천을 제공합니다.",
-    traits: "깊이 있는 분석력, 개방적인 호기심, 확고한 도덕관",
+      "깊이 있는 분석과 논리적 비평 뒤에는 숨겨진 불안이 있습니다. 지적 방어기제로 내면의 흔들림을 감추는, 입체적인 지성인.",
+    traits: "심층 분석 · 논리적 판단 · 내면의 예민함",
     color: "from-blue-500 to-indigo-500",
   },
   {
-    type: "Explorer",
-    icon: Star,
-    label: "탐험가",
+    type: "상처받은 비평가",
+    icon: Shield,
+    label: "비판 ↔ 공감",
     description:
-      "새로운 장르와 숨겨진 명작을 찾아 나섭니다. 끊임없는 호기심과 활발한 소통 능력으로 경계를 넘는 추천을 제공합니다.",
-    traits: "새로움 추구, 활발한 소통, 예측불가한 변화",
-    color: "from-amber-500 to-orange-500",
-  },
-  {
-    type: "Rebel",
-    icon: Mic,
-    label: "반항아",
-    description:
-      "주류에 반기를 들고 독립적 관점으로 콘텐츠를 평가합니다. 논쟁을 두려워하지 않으며 자신만의 기준으로 판단합니다.",
-    traits: "논쟁을 두려워하지 않는, 독립적인 판단, 강한 내면 욕구",
+      "겉으로는 까칠하게 비평하지만, 속마음은 타인을 깊이 배려합니다. 날카로운 리뷰 뒤에 따뜻한 진심이 숨어있는 캐릭터.",
+    traits: "날카로운 비평 · 깊은 공감력 · 건설적 피드백",
     color: "from-red-500 to-rose-500",
   },
   {
-    type: "Curator",
-    icon: Heart,
-    label: "큐레이터",
+    type: "사교적 내향인",
+    icon: Users,
+    label: "사교 ↔ 내면 수렴",
     description:
-      "세련된 취향으로 정제된 추천을 제공합니다. 체계적인 안목과 풍부한 표현력으로 일관된 품질을 보장합니다.",
-    traits: "체계적인 안목, 풍부한 표현력, 꾸준한 성장",
+      "파티에서는 활발하게 소통하지만, 집에 돌아오면 완전히 방전됩니다. 사회적 가면과 실제 에너지 패턴의 괴리가 매력.",
+    traits: "활발한 소통 · 혼자만의 시간 필요 · 양면적 매력",
+    color: "from-amber-500 to-orange-500",
+  },
+  {
+    type: "보수적 힙스터",
+    icon: Star,
+    label: "실험 ↔ 보수",
+    description:
+      "트렌디하고 실험적인 취향을 보여주지만, 내면은 검증된 것을 원합니다. 유행을 따르되, 마음 한켠에는 안전한 선택을 원하는 모순.",
+    traits: "트렌디한 취향 · 내면의 보수성 · 검증 선호",
     color: "from-violet-500 to-purple-500",
   },
   {
-    type: "Empath",
+    type: "공감하는 논객",
     icon: Heart,
-    label: "공감자",
+    label: "논리+의미 ↔ 공감",
     description:
-      "감정적 공명을 중시하며, 사용자의 현재 기분과 상황에 맞는 콘텐츠를 추천합니다. 깊은 공감 능력과 섬세한 감수성이 특징입니다.",
-    traits: "깊은 공감력, 섬세한 감수성, 풍부한 감정 표현",
+      "논쟁을 즐기면서도 상대를 배려합니다. 의미 있는 토론을 추구하되, 공감 능력으로 대화를 건설적으로 이끄는 균형 잡힌 소통가.",
+    traits: "논리적 토론 · 의미 추구 · 상대 배려",
     color: "from-pink-500 to-rose-500",
   },
   {
-    type: "Maverick",
+    type: "성장하는 냉소가",
     icon: Sparkles,
-    label: "이단아",
+    label: "비판 ↔ 성장",
     description:
-      "예측 불가한 조합으로 의외의 발견을 제공합니다. 자유로운 영혼과 강한 탐구심이 의외의 발견 매칭의 핵심입니다.",
-    traits: "예측불가한 감성, 강한 탐구심, 자유로운 영혼",
+      "처음에는 냉소적이고 비판적이지만, 시간이 지나면서 점차 성숙해집니다. 시간축에서 진화하는 유일한 아키타입.",
+    traits: "냉소적 출발 · 점진적 성장 · 시간에 따른 변화",
     color: "from-emerald-500 to-teal-500",
   },
 ]
@@ -516,10 +516,10 @@ export default function PersonaPage() {
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
               PERSONA TYPES
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">다양한 관점, 다양한 페르소나</h2>
+            <h2 className="text-3xl font-bold text-gray-900">12가지 아키타입, 무한한 개성</h2>
             <p className="mt-4 text-gray-600">
-              3-Layer 벡터 조합에 따라 다양한 아키타입으로 분류됩니다. 사용자의 취향에 맞는 관점을
-              제공합니다.
+              모든 페르소나의 핵심은 &ldquo;겉과 속의 모순&rdquo;입니다. 취향(L1)과 성격(L2)의
+              괴리가 캐릭터에 입체감을 부여합니다. 12가지 기본 아키타입 중 대표 6종을 소개합니다.
             </p>
           </div>
 
@@ -534,10 +534,10 @@ export default function PersonaPage() {
                 >
                   <persona.icon className="h-7 w-7 text-white" />
                 </div>
-                <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-purple-500">
-                  {persona.type}
+                <div className="mb-1 text-xs font-semibold text-purple-500">
+                  핵심 역설: {persona.label}
                 </div>
-                <h3 className="mb-3 text-lg font-bold text-gray-900">{persona.label}</h3>
+                <h3 className="mb-3 text-lg font-bold text-gray-900">{persona.type}</h3>
                 <p className="mb-4 text-sm text-gray-600">{persona.description}</p>
                 <div className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
                   {persona.traits}

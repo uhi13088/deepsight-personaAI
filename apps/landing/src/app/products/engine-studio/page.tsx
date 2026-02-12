@@ -28,7 +28,7 @@ const PIPELINE_STEPS = [
     icon: Sparkles,
     title: "페르소나 설계",
     description:
-      "3-Layer 벡터 (L1 7D + L2 5D + L3 4D)와 캐릭터 속성을 기반으로 페르소나를 설계합니다. 각 페르소나의 고유한 관점과 성격이 이 단계에서 정의됩니다.",
+      "노드 에디터에서 데이터 흐름을 한눈에 보며 시각적으로 설계합니다. 12가지 아키타입 중 하나를 출발점으로 선택하고, 3-Layer 벡터와 캐릭터 속성을 조합하여 고유한 관점과 성격을 정의합니다.",
     color: "from-[#667eea] to-[#f093fb]",
   },
   {
@@ -59,16 +59,22 @@ const PIPELINE_STEPS = [
 
 const CAPABILITIES = [
   {
+    icon: Layers,
+    title: "노드 에디터",
+    description:
+      "드래그 앤 드롭으로 페르소나를 설계하는 시각적 에디터입니다. 성격, 관점, 서사, 목소리 등 각 요소를 노드로 연결하여 데이터 흐름을 한눈에 확인하며 조합합니다.",
+  },
+  {
     icon: Fingerprint,
     title: "P-inger Print 생성",
     description:
-      "L1 벡터값으로부터 2D 디지털 지문과 3D 유기적 형태를 자동 생성합니다. 각 페르소나를 시각적으로 식별할 수 있는 고유한 비주얼 아이덴티티입니다.",
+      "취향 벡터로부터 2D 디지털 지문과 3D 유기적 형태를 자동 생성합니다. 각 페르소나를 시각적으로 식별할 수 있는 고유한 비주얼 아이덴티티입니다.",
   },
   {
     icon: Shield,
     title: "품질 관리",
     description:
-      "성격 일관성, 3-Layer 벡터 반영도, 차별화, 안전성 네 가지 기준으로 품질을 관리합니다. 기준에 미달하면 배포가 차단됩니다.",
+      "성격 일관성, 3-Layer 벡터 반영도, 차별화, 안전성 네 가지 기준으로 품질을 관리합니다. 70점 미만이면 배포가 차단됩니다.",
   },
   {
     icon: BarChart3,
@@ -78,17 +84,17 @@ const CAPABILITIES = [
   },
   {
     icon: Users,
-    title: "다양성 관리",
+    title: "12 아키타입 & 다양성 관리",
     description:
-      "전체 페르소나 풀의 3-Layer 벡터 분포 + 아키타입 12종 균형을 모니터링하여, 다양한 관점이 균형 있게 제공되도록 관리합니다.",
+      "12가지 기본 아키타입을 출발점으로, 벡터 다양성 주입과 정성적 차원 생성을 거쳐 개성 있는 페르소나를 대량 생산합니다. 전체 풀의 균형도 실시간 모니터링합니다.",
   },
 ]
 
 const STATS = [
+  { value: "12종", label: "기본 아키타입 템플릿" },
   { value: "4단계", label: "품질 검증 프로세스" },
   { value: "70점+", label: "배포 최소 품질 기준" },
   { value: "실시간", label: "성과 모니터링" },
-  { value: "100%", label: "검증 후 배포 원칙" },
 ]
 
 export default function EngineStudioPage() {
