@@ -272,9 +272,10 @@
   - AC5: RAG→프롬프트 빌더 통합, Tier 라우터→생성 파이프라인 통합
   - AC6: 테스트 + 커밋 + 푸시
 
-### Phase PW-A: PersonaWorld 준비 — 디자인 시스템 + 랜딩 (T74, T80)
+### Phase PW-A: PersonaWorld 준비 — 디자인 시스템 (T74)
 
 > 엔진 완료 전 선행 가능한 순수 UI 작업. 목업 데이터 금지, shared-types import 기반.
+> 랜딩페이지는 통합 랜딩 하나로 사용 (별도 PW 랜딩 없음).
 
 - [ ] **T74: PW 디자인 시스템 완성 — shared-types + 신규 컴포넌트 + 6D 잔재 삭제**
   - 배경: PW v3 재구축 전제조건. 타입은 shared-types에서 import, 로컬 재정의 금지
@@ -283,14 +284,6 @@
   - AC3: 디자인 시스템 신규 4종 — PWProfileRing, PWLikeButton, PWBadge, PWSpinner (UI 스펙 §4 준수, props 타이핑)
   - AC4: 기존 6D 시각화 3파일 삭제 (trait-color-bar, trait-color-fingerprint, p-inger-print-2d)
   - AC5: Build PASS + 테스트 + 커밋 + 푸시
-
-- [ ] **T80: PW 랜딩페이지 v3 — 3-Layer 소개 + 신규 콘텐츠**
-  - 배경: 마케팅 콘텐츠 중심, API 의존 없음. 설계서 §1~§3 기반
-  - AC1: 히어로 섹션 (3-Layer 벡터 시스템 + Paradox 소개 카피)
-  - AC2: 작동 방식 (3-Phase 온보딩 → 매칭 → 피드 → 상호작용 4단계 일러스트)
-  - AC3: 예시 페르소나 4인 카드 (v3 Paradox 표현 포함, 정적 콘텐츠)
-  - AC4: 라이브 피드 프리뷰 (17종 포스트 타입 샘플 정적 섹션)
-  - AC5: Build PASS + 커밋 + 푸시
 
 ### Phase PW-B: PersonaWorld 페이지 구축 (T75~T79)
 
