@@ -1,24 +1,17 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
 import {
-  createTuningProfile,
-  updateParameter,
-  updateGenreWeight,
-  addGenre,
-  removeGenre,
-  DEFAULT_HYPERPARAMETERS,
-  DEFAULT_GENRE_WEIGHTS,
   createTuningExperiment,
   startExperiment,
   generateGridSearchCombinations,
 } from "@/lib/matching/tuning"
-import type { TuningProfile, TuningExperiment, HyperParameter } from "@/lib/matching/tuning"
+import type { TuningProfile, TuningExperiment } from "@/lib/matching/tuning"
 import {
   createMatchingABTest,
   startMatchingABTest,
@@ -26,8 +19,6 @@ import {
   completeMatchingABTest,
   rollbackMatchingABTest,
   evaluateABTestResult,
-  checkGuardrails,
-  DEFAULT_GUARDRAIL_CONFIG,
 } from "@/lib/matching/guardrails"
 import type {
   MatchingABTestConfig,
@@ -36,7 +27,6 @@ import type {
   ABTestVerdict,
 } from "@/lib/matching/guardrails"
 import type { SocialDimension } from "@/types"
-import { L1_DIMENSIONS } from "@/constants/v3/dimensions"
 import {
   SlidersHorizontal,
   FlaskConical,
@@ -82,8 +72,10 @@ type ActiveTab = "parameters" | "genres" | "autotuning" | "abtest"
 export default function TuningPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("parameters")
 
-  // 튜닝 프로필
-  const [profile, setProfile] = useState<TuningProfile>(() => createTuningProfile("기본 프로필"))
+  // 튜닝 프로필 (API에서 로드)
+  const [profile, setProfile] = useState<TuningProfile | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // 자동 튜닝 실험
   const [experiment, setExperiment] = useState<TuningExperiment | null>(null)
@@ -98,35 +90,112 @@ export default function TuningPage() {
   // 새 장르 추가
   const [newGenre, setNewGenre] = useState("")
 
-  // ── 하이퍼파라미터 핸들러 ──
-  const handleParamChange = useCallback((key: string, value: number) => {
-    setProfile((prev) => updateParameter(prev, key, value))
+  // 프로필 로드
+  useEffect(() => {
+    fetch("/api/internal/matching-lab/tuning")
+      .then((r) => r.json())
+      .then(
+        (d: {
+          success: boolean
+          data?: { profile: TuningProfile }
+          error?: { code: string; message: string }
+        }) => {
+          if (d.success && d.data) {
+            setProfile(d.data.profile)
+          } else {
+            setError(d.error?.message ?? "튜닝 프로필 로드 실패")
+          }
+        }
+      )
+      .catch(() => {
+        setError("튜닝 프로필 로드 실패")
+      })
+      .finally(() => {
+        setLoading(false)
+      })
   }, [])
+
+  // API PUT 호출 유틸리티
+  const updateProfileViaAPI = useCallback(async (body: Record<string, unknown>) => {
+    try {
+      const response = await fetch("/api/internal/matching-lab/tuning", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const data = (await response.json()) as {
+        success: boolean
+        data?: { profile: TuningProfile }
+        error?: { code: string; message: string }
+      }
+      if (data.success && data.data) {
+        setProfile(data.data.profile)
+      }
+    } catch {
+      // 업데이트 실패 시 무시
+    }
+  }, [])
+
+  // ── 하이퍼파라미터 핸들러 ──
+  const handleParamChange = useCallback(
+    (key: string, value: number) => {
+      // 즉시 낙관적 업데이트
+      setProfile((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          parameters: prev.parameters.map((p) =>
+            p.key === key ? { ...p, value: Math.max(p.min, Math.min(p.max, value)) } : p
+          ),
+          updatedAt: Date.now(),
+        }
+      })
+      void updateProfileViaAPI({ action: "update_parameter", key, value })
+    },
+    [updateProfileViaAPI]
+  )
 
   // ── 장르 가중치 핸들러 ──
   const handleGenreWeightChange = useCallback(
     (genre: string, dim: SocialDimension, value: number) => {
-      setProfile((prev) => updateGenreWeight(prev, genre, dim, value))
+      setProfile((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          genreWeights: prev.genreWeights.map((g) =>
+            g.genre === genre
+              ? { ...g, weights: { ...g.weights, [dim]: Math.max(0.5, Math.min(2.0, value)) } }
+              : g
+          ),
+          updatedAt: Date.now(),
+        }
+      })
+      void updateProfileViaAPI({
+        action: "update_genre_weight",
+        genre,
+        dimension: dim,
+        weight: value,
+      })
     },
-    []
+    [updateProfileViaAPI]
   )
 
   const handleAddGenre = useCallback(() => {
     if (!newGenre.trim()) return
-    try {
-      setProfile((prev) => addGenre(prev, newGenre.trim()))
-      setNewGenre("")
-    } catch {
-      // 이미 존재
-    }
-  }, [newGenre])
+    void updateProfileViaAPI({ action: "add_genre", genre: newGenre.trim() })
+    setNewGenre("")
+  }, [newGenre, updateProfileViaAPI])
 
-  const handleRemoveGenre = useCallback((genre: string) => {
-    setProfile((prev) => removeGenre(prev, genre))
-  }, [])
+  const handleRemoveGenre = useCallback(
+    (genre: string) => {
+      void updateProfileViaAPI({ action: "remove_genre", genre })
+    },
+    [updateProfileViaAPI]
+  )
 
-  // ── 자동 튜닝 핸들러 ──
+  // ── 자동 튜닝 핸들러 (auto tune action) ──
   const handleStartAutoTuning = useCallback(() => {
+    if (!profile) return
     const space = profile.parameters
       .filter((p) => p.key === "similarity_threshold" || p.key === "diversity_factor")
       .map((p) => ({
@@ -211,6 +280,22 @@ export default function TuningPage() {
     { key: "autotuning", label: "자동 튜닝", icon: <TestTubes className="h-3.5 w-3.5" /> },
     { key: "abtest", label: "A/B 테스트", icon: <TestTubes className="h-3.5 w-3.5" /> },
   ]
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-muted-foreground text-sm">데이터를 불러오는 중...</div>
+      </div>
+    )
+  }
+
+  if (error || !profile) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-sm text-red-400">{error ?? "프로필을 불러올 수 없습니다"}</div>
+      </div>
+    )
+  }
 
   return (
     <>

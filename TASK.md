@@ -552,6 +552,20 @@
   - AC5: 네비게이션 추가 — LNB Persona Studio 하위에 "Node Editor" 항목 추가
   - AC6: 테스트 + Build PASS — 프리셋 직렬화 라운드트립, 프리셋 실행, 실행 요약, 저장/로드 라운드트립 테스트
 
+### Phase F: 하드코딩 목업 데이터 제거 (T129)
+
+> T96~T102에서 구축한 18+ 페이지의 인라인 목업/샘플 데이터를 제거하고, 기존 API 라우트에서 동적으로 fetch하도록 전환.
+
+- [x] **T129: 하드코딩 목업 데이터 제거 — 전체 페이지 API 기반 동적 전환** → DONE ✅ 2026-02-12
+  - 배경: T96~T102에서 대시보드 UI 구축 시 각 페이지에 인라인 샘플 데이터 생성 함수(createSample*, generate* 등)를 포함. API 라우트는 이미 GET/POST 핸들러 완성. 페이지에서 API를 호출하여 동적으로 데이터를 로드/변경하도록 전환 필요
+  - AC1: System Integration 3페이지 (Deployment, Versions, Event Bus) — 인라인 목업 제거, useEffect + fetch로 전환, 뮤테이션 API 호출
+  - AC2: Operations 3페이지 (Monitoring, Incidents, Backup) — 인라인 목업 제거, useEffect + fetch로 전환, 뮤테이션 API 호출
+  - AC3: Global Config 3페이지 (Model Settings, Safety Filters, API Endpoints) — 인라인 목업 제거, useEffect + fetch로 전환, 뮤테이션 API 호출
+  - AC4: Team & Access 3페이지 (Users, Roles, Audit Logs) — 인라인 목업 제거, useEffect + fetch로 전환, 뮤테이션 API 호출
+  - AC5: Matching Lab 3페이지 (Simulator, Tuning, Analytics) — 인라인 목업 제거, useEffect + fetch로 전환, 뮤테이션 API 호출
+  - AC6: User Insight 3페이지 + Dashboard (Cold Start, Psychometric, Archetype, Dashboard) — 인라인 목업 제거, useEffect + fetch로 전환
+  - AC7: 테스트 + Build PASS
+
 ### Phase DC-A: 개발자콘솔 v3 기반 인프라 (T116~T117)
 
 > 선택적 리빌드: 핵심(Schema/Types/API) 재작성 + 벡터 무관 페이지(API Keys/Usage/Logs/Settings/Team) 보존.

@@ -1,99 +1,22 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  calculateMatchingKPIs,
-  calculateDiversityIndex,
-  analyzeTrend,
-  calculateChangeRate,
-  detectAnomalies,
-  buildAnalyticsDashboard,
-  KPI_TARGETS,
-} from "@/lib/matching/analytics"
-import type {
-  MatchingKPIs,
-  RawMatchingData,
-  TimeRange,
-  SegmentType,
-  TrendData,
-  TimeSeriesPoint,
-  AnomalyEvent,
-  AnalyticsDashboard,
-} from "@/lib/matching/analytics"
-import { generateRecommendations, kpisToCsvRows, csvRowsToString } from "@/lib/matching/report"
+import { KPI_TARGETS } from "@/lib/matching/analytics"
+import type { MatchingKPIs, TimeRange, TrendData, AnomalyEvent } from "@/lib/matching/analytics"
+import { kpisToCsvRows, csvRowsToString } from "@/lib/matching/report"
 import type { RecommendationItem } from "@/lib/matching/report"
 import {
-  BarChart3,
   TrendingUp,
   TrendingDown,
   Minus,
   AlertTriangle,
   Download,
-  RefreshCw,
   Target,
   Activity,
 } from "lucide-react"
-
-// ── 시뮬레이션용 데이터 생성 ─────────────────────────────────
-function generateSampleData(): RawMatchingData {
-  return {
-    totalMatches: 1250,
-    likedMatches: 940,
-    matchScores: Array.from({ length: 1250 }, () => 0.3 + Math.random() * 0.6),
-    top1Selections: 580,
-    totalRecommendations: 1250,
-    clicks: 420,
-    impressions: 1400,
-    dwellTimes: Array.from({ length: 800 }, () => 30 + Math.random() * 180),
-    uniqueVisitors: 500,
-    returnVisitors: 215,
-    promoters: 120,
-    passives: 80,
-    detractors: 45,
-    recommendedPersonaIds: Array.from(
-      { length: 1250 },
-      () => `persona_${Math.floor(Math.random() * 8)}`
-    ),
-  }
-}
-
-function generateBaseline(): MatchingKPIs {
-  return {
-    matchAccuracy: 0.72,
-    avgMatchScore: 0.71,
-    top1Accuracy: 0.44,
-    diversityIndex: 0.78,
-    ctr: 0.28,
-    avgDwellTime: 95,
-    returnRate: 0.38,
-    nps: 42,
-  }
-}
-
-function generateTrends(): TrendData[] {
-  const now = Date.now()
-  const metrics = [
-    { metric: "matchAccuracy", label: "매칭 정확도" },
-    { metric: "ctr", label: "CTR" },
-    { metric: "diversityIndex", label: "다양성 지수" },
-    { metric: "returnRate", label: "재방문율" },
-  ]
-
-  return metrics.map(({ metric, label }) => {
-    const base = 0.5 + Math.random() * 0.3
-    const points: TimeSeriesPoint[] = Array.from({ length: 14 }, (_, i) => ({
-      timestamp: now - (13 - i) * 86400000,
-      value: Math.max(0, Math.min(1, base + (Math.random() - 0.5) * 0.1)),
-    }))
-    const trend = analyzeTrend(points)
-    const changeRate = calculateChangeRate(points)
-
-    return { metric, points, trend, changeRate }
-  })
-}
 
 const TIME_RANGES: Array<{ key: TimeRange; label: string }> = [
   { key: "realtime", label: "실시간" },
@@ -116,23 +39,90 @@ const KPI_LABELS: Record<
   nps: { label: "NPS", format: "nps" },
 }
 
+interface AnalyticsData {
+  kpis: MatchingKPIs
+  anomalies: AnomalyEvent[]
+  recommendations: RecommendationItem[]
+  trends: TrendData[]
+  diversityInfo: {
+    uniquePersonaCount: number
+    totalRecommendations: number
+  }
+}
+
 export default function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState<TimeRange>("7d")
 
-  // 데이터
-  const rawData = useMemo(() => generateSampleData(), [])
-  const baseline = useMemo(() => generateBaseline(), [])
-  const kpis = useMemo(() => calculateMatchingKPIs(rawData), [rawData])
-  const trends = useMemo(() => generateTrends(), [])
-  const anomalies = useMemo(
-    () => detectAnomalies(kpis, baseline, [0.73, 0.71, 0.74, 0.72, 0.7]),
-    [kpis, baseline]
+  // API 데이터
+  const [data, setData] = useState<AnalyticsData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // 데이터 로드
+  const fetchData = useCallback((range: TimeRange) => {
+    setLoading(true)
+    setError(null)
+    fetch(`/api/internal/matching-lab/analytics?timeRange=${range}`)
+      .then((r) => r.json())
+      .then(
+        (d: {
+          success: boolean
+          data?: AnalyticsData
+          error?: { code: string; message: string }
+        }) => {
+          if (d.success && d.data) {
+            setData(d.data)
+          } else {
+            setError(d.error?.message ?? "분석 데이터 로드 실패")
+          }
+        }
+      )
+      .catch(() => {
+        setError("분석 데이터 로드 실패")
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+  }, [])
+
+  // 초기 로드
+  useEffect(() => {
+    fetch(`/api/internal/matching-lab/analytics?timeRange=7d`)
+      .then((r) => r.json())
+      .then(
+        (d: {
+          success: boolean
+          data?: AnalyticsData
+          error?: { code: string; message: string }
+        }) => {
+          if (d.success && d.data) {
+            setData(d.data)
+          } else {
+            setError(d.error?.message ?? "분석 데이터 로드 실패")
+          }
+        }
+      )
+      .catch(() => {
+        setError("분석 데이터 로드 실패")
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+  }, [])
+
+  // 시간 범위 변경 시 재요청
+  const handleTimeRangeChange = useCallback(
+    (range: TimeRange) => {
+      setTimeRange(range)
+      fetchData(range)
+    },
+    [fetchData]
   )
-  const recommendations = useMemo(() => generateRecommendations(kpis), [kpis])
 
   // CSV 내보내기
   const handleExportCsv = useCallback(() => {
-    const rows = kpisToCsvRows(kpis)
+    if (!data) return
+    const rows = kpisToCsvRows(data.kpis)
     const csv = csvRowsToString(rows)
     const blob = new Blob([csv], { type: "text/csv" })
     const url = URL.createObjectURL(blob)
@@ -141,7 +131,7 @@ export default function AnalyticsPage() {
     a.download = `matching-kpis-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
-  }, [kpis])
+  }, [data])
 
   const formatValue = useCallback((key: keyof MatchingKPIs, value: number): string => {
     const info = KPI_LABELS[key]
@@ -166,6 +156,24 @@ export default function AnalyticsPage() {
     return <Minus className="text-muted-foreground h-3.5 w-3.5" />
   }, [])
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-muted-foreground text-sm">데이터를 불러오는 중...</div>
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-sm text-red-400">{error ?? "데이터를 불러올 수 없습니다"}</div>
+      </div>
+    )
+  }
+
+  const { kpis, anomalies, recommendations, trends, diversityInfo } = data
+
   return (
     <>
       <Header title="Performance Analytics" description="매칭 성과 분석 및 리포트" />
@@ -177,7 +185,7 @@ export default function AnalyticsPage() {
             {TIME_RANGES.map((tr) => (
               <button
                 key={tr.key}
-                onClick={() => setTimeRange(tr.key)}
+                onClick={() => handleTimeRangeChange(tr.key)}
                 className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                   timeRange === tr.key
                     ? "border-primary bg-primary/10 text-primary"
@@ -387,13 +395,13 @@ export default function AnalyticsPage() {
             <div className="rounded-lg bg-blue-500/10 p-3 text-center">
               <p className="text-muted-foreground text-xs">고유 페르소나 수</p>
               <p className="mt-1 text-2xl font-bold text-blue-400">
-                {new Set(rawData.recommendedPersonaIds).size}
+                {diversityInfo.uniquePersonaCount}
               </p>
             </div>
             <div className="rounded-lg bg-amber-500/10 p-3 text-center">
               <p className="text-muted-foreground text-xs">총 추천 수</p>
               <p className="mt-1 text-2xl font-bold text-amber-400">
-                {rawData.recommendedPersonaIds.length}
+                {diversityInfo.totalRecommendations}
               </p>
             </div>
           </div>

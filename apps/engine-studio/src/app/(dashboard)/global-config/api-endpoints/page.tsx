@@ -1,113 +1,20 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Globe, Plus, Activity, Gauge, Heart } from "lucide-react"
-import {
-  createAPIEndpointManager,
-  registerEndpoint,
-  updateRateLimit,
-  getHealthSummary,
-  recordHealthCheck,
-  DEFAULT_RATE_LIMITS,
-  DEFAULT_HEALTH_CHECK,
-} from "@/lib/global-config"
+import { DEFAULT_RATE_LIMITS, DEFAULT_HEALTH_CHECK } from "@/lib/global-config"
 import type {
-  APIEndpointManager,
   APIEndpoint,
   HealthStatus,
   HTTPMethod,
   APIScope,
   APIVersion,
+  HealthCheckResult,
+  APIVersionInfo,
 } from "@/lib/global-config"
-
-// ── Sample endpoints ────────────────────────────────────────────
-const SAMPLE_ENDPOINTS: Array<Omit<APIEndpoint, "id">> = [
-  {
-    name: "Get Personas",
-    path: "/api/v2/personas",
-    method: "GET",
-    scope: "external",
-    version: "v2",
-    status: "active",
-    description: "List all personas with filtering",
-    rateLimit: { ...DEFAULT_RATE_LIMITS.external },
-    healthCheck: { ...DEFAULT_HEALTH_CHECK },
-    tags: ["personas", "list"],
-  },
-  {
-    name: "Create Persona",
-    path: "/api/v2/personas",
-    method: "POST",
-    scope: "external",
-    version: "v2",
-    status: "active",
-    description: "Create a new persona",
-    rateLimit: { ...DEFAULT_RATE_LIMITS.external },
-    healthCheck: { ...DEFAULT_HEALTH_CHECK },
-    tags: ["personas", "create"],
-  },
-  {
-    name: "Match User",
-    path: "/api/v3/match",
-    method: "POST",
-    scope: "external",
-    version: "v3",
-    status: "active",
-    description: "6D vector matching for user-persona",
-    rateLimit: { ...DEFAULT_RATE_LIMITS.external, requestsPerMinute: 120 },
-    healthCheck: { ...DEFAULT_HEALTH_CHECK },
-    tags: ["matching", "v3"],
-  },
-  {
-    name: "Internal Health",
-    path: "/api/internal/health",
-    method: "GET",
-    scope: "internal",
-    version: "v2",
-    status: "active",
-    description: "Internal health check endpoint",
-    rateLimit: { ...DEFAULT_RATE_LIMITS.internal },
-    healthCheck: { ...DEFAULT_HEALTH_CHECK },
-    tags: ["health", "internal"],
-  },
-  {
-    name: "Legacy Personas",
-    path: "/api/v1/personas",
-    method: "GET",
-    scope: "external",
-    version: "v1",
-    status: "deprecated",
-    description: "Legacy persona list (deprecated)",
-    rateLimit: { ...DEFAULT_RATE_LIMITS.external },
-    healthCheck: { ...DEFAULT_HEALTH_CHECK, enabled: false },
-    tags: ["personas", "legacy"],
-  },
-]
-
-function initializeManager(): APIEndpointManager {
-  let manager = createAPIEndpointManager()
-  for (const ep of SAMPLE_ENDPOINTS) {
-    manager = registerEndpoint(manager, ep)
-  }
-  // Record some sample health checks
-  for (const ep of manager.endpoints) {
-    if (ep.status === "active" && ep.healthCheck.enabled) {
-      const isHealthy = ep.path !== "/api/v3/match"
-      const responseTime = isHealthy ? 50 + Math.floor(Math.random() * 200) : 4200
-      manager = recordHealthCheck(
-        manager,
-        ep.id,
-        responseTime,
-        isHealthy,
-        isHealthy ? undefined : "High latency"
-      )
-    }
-  }
-  return manager
-}
 
 // ── Status badges ───────────────────────────────────────────────
 const STATUS_VARIANT: Record<string, "success" | "warning" | "destructive" | "muted"> = {
@@ -123,8 +30,26 @@ const HEALTH_VARIANT: Record<HealthStatus, "success" | "warning" | "destructive"
   unknown: "muted",
 }
 
+// ── API response shape ───────────────────────────────────────
+interface HealthSummary {
+  total: number
+  healthy: number
+  degraded: number
+  down: number
+  unknown: number
+}
+
+interface EndpointManagerData {
+  endpoints: APIEndpoint[]
+  versions: APIVersionInfo[]
+  healthResults: Record<string, HealthCheckResult>
+  healthSummary: HealthSummary
+}
+
 export default function ApiEndpointsPage() {
-  const [manager, setManager] = useState<APIEndpointManager>(() => initializeManager())
+  const [data, setData] = useState<EndpointManagerData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // ── New endpoint form state ──────────────────────────────────
   const [newName, setNewName] = useState("")
@@ -134,10 +59,29 @@ export default function ApiEndpointsPage() {
   const [newVersion, setNewVersion] = useState<APIVersion>("v3")
   const [registerError, setRegisterError] = useState<string | null>(null)
 
-  const healthSummary = useMemo(() => getHealthSummary(manager), [manager])
+  // ── Fetch data from API ────────────────────────────────────
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/global-config/endpoints")
+      const json = await res.json()
+      if (json.success && json.data) {
+        setData(json.data)
+      } else {
+        setError(json.error?.message ?? "데이터 로드 실패")
+      }
+    } catch {
+      setError("서버 연결 실패")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   // ── Register endpoint ────────────────────────────────────────
-  const handleRegister = useCallback(() => {
+  const handleRegister = useCallback(async () => {
     if (!newName.trim() || !newPath.trim()) {
       setRegisterError("Name and path are required")
       return
@@ -155,34 +99,84 @@ export default function ApiEndpointsPage() {
         healthCheck: { ...DEFAULT_HEALTH_CHECK },
         tags: [],
       }
-      setManager((prev) => registerEndpoint(prev, ep))
-      setNewName("")
-      setNewPath("")
-      setRegisterError(null)
-    } catch (err) {
-      setRegisterError(err instanceof Error ? err.message : "Failed to register endpoint")
+      const res = await fetch("/api/internal/global-config/endpoints", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "register", endpoint: ep }),
+      })
+      const json = await res.json()
+      if (json.success && json.data) {
+        setData(json.data)
+        setNewName("")
+        setNewPath("")
+        setRegisterError(null)
+      } else {
+        setRegisterError(json.error?.message ?? "Failed to register endpoint")
+      }
+    } catch {
+      setRegisterError("Failed to register endpoint")
     }
   }, [newName, newPath, newMethod, newScope, newVersion])
 
   // ── Run health check ─────────────────────────────────────────
-  const handleHealthCheck = useCallback((endpointId: string) => {
-    const success = Math.random() > 0.3
-    const responseTime = success ? 50 + Math.floor(Math.random() * 300) : 0
-    setManager((prev) =>
-      recordHealthCheck(
-        prev,
-        endpointId,
-        responseTime,
-        success,
-        success ? undefined : "Connection timeout"
-      )
-    )
+  const handleHealthCheck = useCallback(async (endpointId: string) => {
+    try {
+      const res = await fetch("/api/internal/global-config/endpoints", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "healthCheck", endpointId }),
+      })
+      const json = await res.json()
+      if (json.success && json.data) {
+        setData(json.data)
+      }
+    } catch {
+      // silently fail
+    }
   }, [])
 
   // ── Update rate limit ────────────────────────────────────────
-  const handleUpdateRateLimit = useCallback((endpointId: string, rpm: number) => {
-    setManager((prev) => updateRateLimit(prev, endpointId, { requestsPerMinute: rpm }))
+  const handleUpdateRateLimit = useCallback(async (endpointId: string, rpm: number) => {
+    try {
+      const res = await fetch("/api/internal/global-config/endpoints", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateRateLimit", endpointId, requestsPerMinute: rpm }),
+      })
+      const json = await res.json()
+      if (json.success && json.data) {
+        setData(json.data)
+      }
+    } catch {
+      // silently fail
+    }
   }, [])
+
+  // ── Loading state ─────────────────────────────────────────────
+  if (loading) {
+    return (
+      <>
+        <Header title="API Endpoints" description="내부/외부 API 엔드포인트 관리" />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-muted-foreground text-sm">로딩 중...</div>
+        </div>
+      </>
+    )
+  }
+
+  // ── Error state ───────────────────────────────────────────────
+  if (error || !data) {
+    return (
+      <>
+        <Header title="API Endpoints" description="내부/외부 API 엔드포인트 관리" />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-sm text-red-400">{error ?? "데이터를 불러올 수 없습니다"}</div>
+        </div>
+      </>
+    )
+  }
+
+  const { endpoints, healthResults, healthSummary } = data
 
   return (
     <>
@@ -296,7 +290,7 @@ export default function ApiEndpointsPage() {
         <div className="bg-card rounded-lg border p-4">
           <div className="mb-4 flex items-center gap-2">
             <Globe className="text-muted-foreground h-4 w-4" />
-            <h3 className="text-sm font-medium">Endpoints ({manager.endpoints.length})</h3>
+            <h3 className="text-sm font-medium">Endpoints ({endpoints.length})</h3>
           </div>
 
           <div className="overflow-x-auto">
@@ -325,8 +319,8 @@ export default function ApiEndpointsPage() {
                 </tr>
               </thead>
               <tbody>
-                {manager.endpoints.map((ep) => {
-                  const health = manager.healthResults.get(ep.id)
+                {endpoints.map((ep) => {
+                  const health = healthResults[ep.id]
                   const healthStatus: HealthStatus = health?.status ?? "unknown"
 
                   return (
@@ -462,13 +456,13 @@ export default function ApiEndpointsPage() {
           </div>
 
           {/* Per-endpoint rate limit adjustments */}
-          {manager.endpoints.filter((ep) => ep.status === "active").length > 0 && (
+          {endpoints.filter((ep) => ep.status === "active").length > 0 && (
             <div className="mt-4">
               <h4 className="text-muted-foreground mb-2 text-xs font-medium">
                 Per-Endpoint Rate Limits
               </h4>
               <div className="space-y-2">
-                {manager.endpoints
+                {endpoints
                   .filter((ep) => ep.status === "active")
                   .map((ep) => (
                     <div

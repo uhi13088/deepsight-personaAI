@@ -1,26 +1,14 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useMemo, useEffect } from "react"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  createEventBus,
-  subscribe,
-  unsubscribe,
-  createEvent,
-  publish,
-  getEventLog,
-  getEventStats,
-  generateSyncDelayReport,
-  measureSyncDelay,
-  SYNC_DELAY_TARGETS,
-  ALL_EVENT_TYPES,
-} from "@/lib/system-integration"
 import type {
-  EventBusState,
   EventType,
   EventStatus,
+  EventLogEntry,
+  EventSubscription,
   SyncDelayReport,
 } from "@/lib/system-integration"
 import {
@@ -77,134 +65,201 @@ const EVENT_TYPE_GROUPS: Record<string, EventType[]> = {
   Matching: ["matching.completed", "matching.failed"],
 }
 
-// ── 샘플 이벤트 버스 초기화 ──────────────────────────────────
+// ── 타입 ──────────────────────────────────────────────────────
 
-function initializeSampleBus(): EventBusState {
-  let bus = createEventBus(1000)
+interface SyncDelayTarget {
+  name: string
+  slaMs: number
+}
 
-  // 구독자 추가
-  bus = subscribe(
-    bus,
-    "api-engine",
-    ["persona.created", "persona.updated", "persona.activated", "algorithm.deployed"],
-    "https://api.deepsight.ai/webhooks"
-  )
-  bus = subscribe(
-    bus,
-    "dev-console",
-    ["persona.created", "persona.activated", "algorithm.deployed", "algorithm.rollback"],
-    "https://console.deepsight.ai/webhooks"
-  )
-  bus = subscribe(
-    bus,
-    "monitoring",
-    ["system.health_check", "system.alert", "matching.failed"],
-    "https://monitor.deepsight.ai/webhooks"
-  )
-
-  // 샘플 이벤트 발행
-  const sampleEvents: Array<{ type: EventType; payload: Record<string, unknown> }> = [
-    { type: "persona.created", payload: { name: "분석가 페르소나", id: "p_001" } },
-    { type: "persona.activated", payload: { name: "큐레이터 페르소나", id: "p_002" } },
-    { type: "algorithm.deployed", payload: { version: "v1.2.0", environment: "staging" } },
-    { type: "matching.completed", payload: { userId: "u_100", matchCount: 5 } },
-    { type: "system.health_check", payload: { status: "healthy", uptime: 99.9 } },
-    { type: "persona.updated", payload: { name: "감성 공감러", id: "p_003", field: "vectors" } },
-    { type: "matching.failed", payload: { userId: "u_200", error: "timeout" } },
-    {
-      type: "algorithm.config_changed",
-      payload: { key: "threshold", oldValue: 0.5, newValue: 0.55 },
-    },
-  ]
-
-  const source = { service: "engine-studio", instance: "demo-001" }
-  const metadata = { userId: "admin", userRole: "engineer", environment: "development" as const }
-
-  for (const { type, payload } of sampleEvents) {
-    const event = createEvent(type, payload, source, metadata)
-    bus = publish(bus, event)
+interface EventBusData {
+  subscriptions: EventSubscription[]
+  eventLog: EventLogEntry[]
+  stats: {
+    totalEvents: number
+    byType: Record<string, number>
+    byStatus: Record<string, number>
+    failedEvents: number
+    avgDeliveryTimeMs: number
   }
-
-  return bus
+  allEventTypes: EventType[]
+  syncDelayTargets: SyncDelayTarget[]
 }
 
 // ── 페이지 ────────────────────────────────────────────────────
 
 export default function EventBusPage() {
-  const [bus, setBus] = useState<EventBusState>(() => initializeSampleBus())
+  const [data, setData] = useState<EventBusData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   const [typeFilter, setTypeFilter] = useState<EventType | "all">("all")
   const [statusFilter, setStatusFilter] = useState<EventStatus | "all">("all")
   const [syncReport, setSyncReport] = useState<SyncDelayReport | null>(null)
 
-  // 통계
-  const stats = useMemo(() => getEventStats(bus), [bus])
+  // ── 데이터 로드 ─────────────────────────────────────────────
 
-  // 필터된 이벤트 로그
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/system-integration/events")
+      const json = await res.json()
+      if (json.success) {
+        setData(json.data)
+      } else {
+        setError(json.error?.message ?? "데이터 로드 실패")
+      }
+    } catch {
+      setError("서버 연결 실패")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  // ── 파생 상태 ───────────────────────────────────────────────
+
+  const stats = data?.stats ?? {
+    totalEvents: 0,
+    byType: {},
+    byStatus: { delivered: 0, failed: 0, pending: 0, retrying: 0 },
+    failedEvents: 0,
+    avgDeliveryTimeMs: 0,
+  }
+
+  const allEventTypes = data?.allEventTypes ?? []
+  const syncDelayTargets = data?.syncDelayTargets ?? []
+  const subscriptions = data?.subscriptions ?? []
+
+  // 필터된 이벤트 로그 (클라이언트 사이드 필터링)
   const filteredLog = useMemo(() => {
-    const filters: {
-      eventTypes?: EventType[]
-      status?: EventStatus[]
-      limit?: number
-    } = { limit: 50 }
+    if (!data) return []
+    let log = data.eventLog
 
     if (typeFilter !== "all") {
-      filters.eventTypes = [typeFilter]
+      log = log.filter((entry) => entry.event.eventType === typeFilter)
     }
     if (statusFilter !== "all") {
-      filters.status = [statusFilter]
+      log = log.filter((entry) => entry.status === statusFilter)
     }
 
-    return getEventLog(bus, filters)
-  }, [bus, typeFilter, statusFilter])
+    return log.slice(0, 50)
+  }, [data, typeFilter, statusFilter])
 
-  // 이벤트 발행
-  const handlePublishEvent = useCallback((eventType: EventType) => {
-    const source = { service: "engine-studio", instance: "demo-001" }
-    const metadata = { userId: "admin", userRole: "engineer", environment: "development" as const }
-    const event = createEvent(eventType, { manual: true, timestamp: Date.now() }, source, metadata)
-    setBus((prev) => publish(prev, event))
-  }, [])
+  // ── 이벤트 발행 ─────────────────────────────────────────────
 
-  // 구독 해제
-  const handleUnsubscribe = useCallback((subscriptionId: string) => {
+  const handlePublishEvent = useCallback(
+    async (eventType: EventType) => {
+      try {
+        const res = await fetch("/api/internal/system-integration/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "publish",
+            eventType,
+            payload: { manual: true, timestamp: Date.now() },
+          }),
+        })
+        const json = await res.json()
+        if (json.success) {
+          await fetchData()
+        }
+      } catch {
+        // handle error silently
+      }
+    },
+    [fetchData]
+  )
+
+  // ── 구독 해제 ───────────────────────────────────────────────
+
+  const handleUnsubscribe = useCallback(
+    async (subscriptionId: string) => {
+      try {
+        const res = await fetch("/api/internal/system-integration/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "unsubscribe",
+            subscriptionId,
+          }),
+        })
+        const json = await res.json()
+        if (json.success) {
+          await fetchData()
+        }
+      } catch {
+        // handle error silently
+      }
+    },
+    [fetchData]
+  )
+
+  // ── 새 구독 추가 ────────────────────────────────────────────
+
+  const handleAddSubscription = useCallback(async () => {
     try {
-      setBus((prev) => unsubscribe(prev, subscriptionId))
-    } catch {
-      // 이미 해제된 구독
-    }
-  }, [])
-
-  // 새 구독 추가
-  const handleAddSubscription = useCallback(() => {
-    setBus((prev) =>
-      subscribe(
-        prev,
-        `subscriber-${Date.now()}`,
-        ["persona.created", "persona.updated"],
-        `https://webhook-${Math.random().toString(36).slice(2, 6)}.example.com`
-      )
-    )
-  }, [])
-
-  // Sync Delay Report 생성
-  const handleGenerateSyncReport = useCallback(() => {
-    const metrics = bus.eventLog
-      .filter((entry) => entry.status === "delivered")
-      .map((entry) => {
-        const target = SYNC_DELAY_TARGETS[0]
-        return measureSyncDelay(
-          entry.event.eventId,
-          entry.event.timestamp,
-          entry.deliveredAt,
-          target
-        )
+      const res = await fetch("/api/internal/system-integration/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add_subscription",
+        }),
       })
-
-    if (metrics.length > 0) {
-      const report = generateSyncDelayReport(metrics, SYNC_DELAY_TARGETS[0].name)
-      setSyncReport(report)
+      const json = await res.json()
+      if (json.success) {
+        await fetchData()
+      }
+    } catch {
+      // handle error silently
     }
-  }, [bus.eventLog])
+  }, [fetchData])
+
+  // ── Sync Delay Report 생성 ──────────────────────────────────
+
+  const handleGenerateSyncReport = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/system-integration/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "generate_sync_report",
+        }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        setSyncReport(json.data)
+      }
+    } catch {
+      // handle error silently
+    }
+  }, [])
+
+  // ── 로딩/에러 UI ──────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <>
+        <Header title="Event Bus Monitor" description="실시간 이벤트 모니터링 및 동기화" />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-muted-foreground text-sm">로딩 중...</div>
+        </div>
+      </>
+    )
+  }
+
+  if (error) {
+    return (
+      <>
+        <Header title="Event Bus Monitor" description="실시간 이벤트 모니터링 및 동기화" />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-sm text-red-400">{error}</div>
+        </div>
+      </>
+    )
+  }
 
   return (
     <>
@@ -276,7 +331,7 @@ export default function EventBusPage() {
                 onChange={(e) => setTypeFilter(e.target.value as EventType | "all")}
               >
                 <option value="all">All Types</option>
-                {ALL_EVENT_TYPES.map((type) => (
+                {allEventTypes.map((type) => (
                   <option key={type} value={type}>
                     {type}
                   </option>
@@ -361,7 +416,7 @@ export default function EventBusPage() {
             </Button>
           </div>
           <div className="space-y-2">
-            {bus.subscriptions.map((sub) => (
+            {subscriptions.map((sub) => (
               <div
                 key={sub.id}
                 className={`flex items-center justify-between rounded-lg border px-4 py-2.5 ${
@@ -466,7 +521,7 @@ export default function EventBusPage() {
                 Generate a report to analyze sync delay metrics
               </p>
               <p className="text-muted-foreground mt-1 text-xs">
-                Target SLA: {SYNC_DELAY_TARGETS.map((t) => `${t.name} (${t.slaMs}ms)`).join(", ")}
+                Target SLA: {syncDelayTargets.map((t) => `${t.name} (${t.slaMs}ms)`).join(", ")}
               </p>
             </div>
           )}

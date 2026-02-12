@@ -1,22 +1,14 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useMemo, useEffect } from "react"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  MODE_CONFIG,
-  createQuestionSet,
-  addQuestion,
-  removeQuestion,
-  reorderQuestions,
-  validateQuestionSet,
-} from "@/lib/user-insight/cold-start"
+import { MODE_CONFIG, validateQuestionSet } from "@/lib/user-insight/cold-start"
 import type { OnboardingMode, QuestionSet, QuestionType } from "@/lib/user-insight/cold-start"
 import { L1_DIMENSIONS, L2_DIMENSIONS } from "@/constants/v3/dimensions"
 import { Plus, Trash2, ChevronUp, ChevronDown, CheckCircle2, AlertCircle } from "lucide-react"
-import type { SocialDimension, TemperamentDimension } from "@/types"
 
 const MODES: { key: OnboardingMode; label: string }[] = [
   { key: "quick", label: "Quick" },
@@ -38,11 +30,9 @@ const ALL_DIMENSIONS = [
 
 export default function ColdStartPage() {
   const [activeMode, setActiveMode] = useState<OnboardingMode>("quick")
-  const [sets, setSets] = useState<Record<OnboardingMode, QuestionSet>>(() => ({
-    quick: createQuestionSet("Quick Mode 기본", "quick"),
-    standard: createQuestionSet("Standard Mode 기본", "standard"),
-    deep: createQuestionSet("Deep Mode 기본", "deep"),
-  }))
+  const [sets, setSets] = useState<Record<OnboardingMode, QuestionSet> | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // 새 질문 입력 상태
   const [newText, setNewText] = useState("")
@@ -50,56 +40,156 @@ export default function ColdStartPage() {
   const [newDim, setNewDim] = useState(ALL_DIMENSIONS[0].key)
   const [newLayer, setNewLayer] = useState<"L1" | "L2">("L1")
 
-  const currentSet = sets[activeMode]
-  const config = MODE_CONFIG[activeMode]
-  const validation = useMemo(() => validateQuestionSet(currentSet), [currentSet])
+  // Fetch data from API
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/user-insight/cold-start")
+      const json = (await res.json()) as {
+        success: boolean
+        data?: { sets: Record<OnboardingMode, QuestionSet> }
+        error?: { code: string; message: string }
+      }
+      if (json.success && json.data) {
+        setSets(json.data.sets)
+      } else {
+        setError(json.error?.message ?? "데이터를 불러오지 못했습니다")
+      }
+    } catch {
+      setError("서버와 통신 중 오류가 발생했습니다")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
-  const handleAddQuestion = useCallback(() => {
+  useEffect(() => {
+    void fetchData()
+  }, [fetchData])
+
+  const currentSet = sets?.[activeMode] ?? null
+  const config = MODE_CONFIG[activeMode]
+  const validation = useMemo(
+    () => (currentSet ? validateQuestionSet(currentSet) : { valid: false, errors: ["로딩 중"] }),
+    [currentSet]
+  )
+
+  const handleAddQuestion = useCallback(async () => {
     if (!newText.trim()) return
     try {
-      const updated = addQuestion(currentSet, {
-        text: newText.trim(),
-        type: newType,
-        targetDimension: newDim as SocialDimension | TemperamentDimension,
-        targetLayer: newLayer,
-        options: [
-          { id: `opt_a_${Date.now()}`, text: "선택지 A", vectorDelta: { [newDim]: 0.3 } },
-          { id: `opt_b_${Date.now()}`, text: "선택지 B", vectorDelta: { [newDim]: -0.3 } },
-        ],
+      const res = await fetch("/api/internal/user-insight/cold-start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add_question",
+          mode: activeMode,
+          question: {
+            text: newText.trim(),
+            type: newType,
+            targetDimension: newDim,
+            targetLayer: newLayer,
+            options: [
+              { id: `opt_a_${Date.now()}`, text: "선택지 A", vectorDelta: { [newDim]: 0.3 } },
+              { id: `opt_b_${Date.now()}`, text: "선택지 B", vectorDelta: { [newDim]: -0.3 } },
+            ],
+          },
+        }),
       })
-      setSets((prev) => ({ ...prev, [activeMode]: updated }))
-      setNewText("")
-    } catch (e) {
-      // 최대 질문 수 초과
+      const json = (await res.json()) as {
+        success: boolean
+        data?: { sets: Record<OnboardingMode, QuestionSet> }
+        error?: { code: string; message: string }
+      }
+      if (json.success && json.data) {
+        setSets(json.data.sets)
+        setNewText("")
+      }
+    } catch {
+      // 질문 추가 실패
     }
-  }, [currentSet, newText, newType, newDim, newLayer, activeMode])
+  }, [activeMode, newText, newType, newDim, newLayer])
 
   const handleRemove = useCallback(
-    (questionId: string) => {
-      const updated = removeQuestion(currentSet, questionId)
-      setSets((prev) => ({ ...prev, [activeMode]: updated }))
+    async (questionId: string) => {
+      try {
+        const res = await fetch("/api/internal/user-insight/cold-start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "remove_question",
+            mode: activeMode,
+            questionId,
+          }),
+        })
+        const json = (await res.json()) as {
+          success: boolean
+          data?: { sets: Record<OnboardingMode, QuestionSet> }
+          error?: { code: string; message: string }
+        }
+        if (json.success && json.data) {
+          setSets(json.data.sets)
+        }
+      } catch {
+        // 질문 삭제 실패
+      }
     },
-    [currentSet, activeMode]
+    [activeMode]
   )
 
   const handleMoveUp = useCallback(
-    (index: number) => {
-      if (index === 0) return
+    async (index: number) => {
+      if (!currentSet || index === 0) return
       const ids = currentSet.questions.map((q) => q.id)
       ;[ids[index - 1], ids[index]] = [ids[index], ids[index - 1]]
-      const updated = reorderQuestions(currentSet, ids)
-      setSets((prev) => ({ ...prev, [activeMode]: updated }))
+      try {
+        const res = await fetch("/api/internal/user-insight/cold-start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "reorder_questions",
+            mode: activeMode,
+            questionIds: ids,
+          }),
+        })
+        const json = (await res.json()) as {
+          success: boolean
+          data?: { sets: Record<OnboardingMode, QuestionSet> }
+          error?: { code: string; message: string }
+        }
+        if (json.success && json.data) {
+          setSets(json.data.sets)
+        }
+      } catch {
+        // 순서 변경 실패
+      }
     },
     [currentSet, activeMode]
   )
 
   const handleMoveDown = useCallback(
-    (index: number) => {
-      if (index >= currentSet.questions.length - 1) return
+    async (index: number) => {
+      if (!currentSet || index >= currentSet.questions.length - 1) return
       const ids = currentSet.questions.map((q) => q.id)
       ;[ids[index], ids[index + 1]] = [ids[index + 1], ids[index]]
-      const updated = reorderQuestions(currentSet, ids)
-      setSets((prev) => ({ ...prev, [activeMode]: updated }))
+      try {
+        const res = await fetch("/api/internal/user-insight/cold-start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "reorder_questions",
+            mode: activeMode,
+            questionIds: ids,
+          }),
+        })
+        const json = (await res.json()) as {
+          success: boolean
+          data?: { sets: Record<OnboardingMode, QuestionSet> }
+          error?: { code: string; message: string }
+        }
+        if (json.success && json.data) {
+          setSets(json.data.sets)
+        }
+      } catch {
+        // 순서 변경 실패
+      }
     },
     [currentSet, activeMode]
   )
@@ -107,11 +197,36 @@ export default function ColdStartPage() {
   // 차원별 질문 수 카운트
   const dimCoverage = useMemo(() => {
     const counts: Record<string, number> = {}
+    if (!currentSet) return counts
     for (const q of currentSet.questions) {
       counts[q.targetDimension] = (counts[q.targetDimension] ?? 0) + 1
     }
     return counts
   }, [currentSet])
+
+  if (loading) {
+    return (
+      <>
+        <Header title="Cold Start Strategy" description="유저 온보딩 질문 설계 및 관리" />
+        <div className="flex items-center justify-center p-8">
+          <div className="text-muted-foreground text-sm">데이터를 불러오는 중...</div>
+        </div>
+      </>
+    )
+  }
+
+  if (error) {
+    return (
+      <>
+        <Header title="Cold Start Strategy" description="유저 온보딩 질문 설계 및 관리" />
+        <div className="flex items-center justify-center p-8">
+          <div className="text-sm text-red-400">{error}</div>
+        </div>
+      </>
+    )
+  }
+
+  if (!currentSet) return null
 
   return (
     <>
@@ -211,7 +326,9 @@ export default function ColdStartPage() {
               placeholder="질문 텍스트를 입력하세요"
               value={newText}
               onChange={(e) => setNewText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAddQuestion()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleAddQuestion()
+              }}
             />
             <select
               className="border-border bg-background rounded-md border px-3 py-2 text-sm"
@@ -243,7 +360,7 @@ export default function ColdStartPage() {
                 </option>
               ))}
             </select>
-            <Button size="sm" onClick={handleAddQuestion} disabled={!newText.trim()}>
+            <Button size="sm" onClick={() => void handleAddQuestion()} disabled={!newText.trim()}>
               <Plus className="mr-1 h-4 w-4" />
               추가
             </Button>
@@ -290,21 +407,21 @@ export default function ColdStartPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => handleMoveUp(i)}
+                            onClick={() => void handleMoveUp(i)}
                             disabled={i === 0}
                             className="text-muted-foreground hover:text-foreground rounded p-1 disabled:opacity-30"
                           >
                             <ChevronUp className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleMoveDown(i)}
+                            onClick={() => void handleMoveDown(i)}
                             disabled={i >= currentSet.questions.length - 1}
                             className="text-muted-foreground hover:text-foreground rounded p-1 disabled:opacity-30"
                           >
                             <ChevronDown className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleRemove(q.id)}
+                            onClick={() => void handleRemove(q.id)}
                             className="text-muted-foreground hover:text-destructive rounded p-1"
                           >
                             <Trash2 className="h-4 w-4" />

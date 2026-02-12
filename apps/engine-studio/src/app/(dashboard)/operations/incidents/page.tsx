@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useMemo, useEffect } from "react"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -15,13 +15,7 @@ import {
   FileText,
   BarChart3,
 } from "lucide-react"
-import {
-  createIncident,
-  advanceIncidentPhase,
-  calculateMTTR,
-  createPostMortem,
-  INCIDENT_SEVERITY_DEFINITIONS,
-} from "@/lib/operations"
+import { INCIDENT_SEVERITY_DEFINITIONS } from "@/lib/operations"
 import type { Incident, IncidentSeverity, IncidentPhase, PostMortem } from "@/lib/operations"
 
 // ── Severity badge mapping ─────────────────────────────────────
@@ -53,179 +47,27 @@ const PHASE_LABELS: Record<IncidentPhase, string> = {
   postmortem: "사후분석",
 }
 
-// ── Sample incidents ───────────────────────────────────────────
+// ── API response type ──────────────────────────────────────────
 
-function generateSampleIncidents(): Incident[] {
-  const now = Date.now()
-  return [
-    {
-      id: "INC-1001",
-      title: "API 게이트웨이 응답 지연",
-      severity: "P1",
-      phase: "investigating",
-      detectedAt: now - 45 * 60 * 1000,
-      resolvedAt: null,
-      commander: "김운영",
-      affectedServices: ["api-gateway", "matching-engine"],
-      timeline: [
-        {
-          timestamp: now - 45 * 60 * 1000,
-          phase: "detected",
-          actor: "monitoring-bot",
-          description: "API 응답시간 2초 초과 탐지",
-        },
-        {
-          timestamp: now - 40 * 60 * 1000,
-          phase: "triaged",
-          actor: "김운영",
-          description: "P1 분류, 담당자 배정",
-        },
-        {
-          timestamp: now - 35 * 60 * 1000,
-          phase: "investigating",
-          actor: "김운영",
-          description: "DB 커넥션 풀 조사 시작",
-        },
-      ],
-      rootCause: null,
-      mitigation: null,
-    },
-    {
-      id: "INC-1002",
-      title: "페르소나 매칭 엔진 OOM",
-      severity: "P0",
-      phase: "mitigating",
-      detectedAt: now - 90 * 60 * 1000,
-      resolvedAt: null,
-      commander: "박개발",
-      affectedServices: ["matching-engine", "worker"],
-      timeline: [
-        {
-          timestamp: now - 90 * 60 * 1000,
-          phase: "detected",
-          actor: "system",
-          description: "OOM 에러 발생",
-        },
-        {
-          timestamp: now - 85 * 60 * 1000,
-          phase: "triaged",
-          actor: "박개발",
-          description: "P0 분류",
-        },
-        {
-          timestamp: now - 80 * 60 * 1000,
-          phase: "investigating",
-          actor: "박개발",
-          description: "메모리 릭 조사",
-        },
-        {
-          timestamp: now - 60 * 60 * 1000,
-          phase: "mitigating",
-          actor: "박개발",
-          description: "메모리 제한 상향 및 재배포",
-        },
-      ],
-      rootCause: null,
-      mitigation: null,
-    },
-    {
-      id: "INC-1003",
-      title: "백업 작업 실패",
-      severity: "P2",
-      phase: "resolved",
-      detectedAt: now - 24 * 60 * 60 * 1000,
-      resolvedAt: now - 23 * 60 * 60 * 1000,
-      commander: "이인프라",
-      affectedServices: ["backup-service"],
-      timeline: [
-        {
-          timestamp: now - 24 * 60 * 60 * 1000,
-          phase: "detected",
-          actor: "cron-monitor",
-          description: "일일 백업 실패 감지",
-        },
-        {
-          timestamp: now - 23.5 * 60 * 60 * 1000,
-          phase: "triaged",
-          actor: "이인프라",
-          description: "P2 분류",
-        },
-        {
-          timestamp: now - 23.25 * 60 * 60 * 1000,
-          phase: "investigating",
-          actor: "이인프라",
-          description: "디스크 용량 조사",
-        },
-        {
-          timestamp: now - 23.1 * 60 * 60 * 1000,
-          phase: "mitigating",
-          actor: "이인프라",
-          description: "임시 스토리지 확보",
-        },
-        {
-          timestamp: now - 23 * 60 * 60 * 1000,
-          phase: "resolved",
-          actor: "이인프라",
-          description: "스토리지 확장 완료",
-        },
-      ],
-      rootCause: "디스크 용량 부족",
-      mitigation: "스토리지 볼륨 2배 확장",
-    },
-    {
-      id: "INC-1004",
-      title: "로그 수집기 지연",
-      severity: "P3",
-      phase: "resolved",
-      detectedAt: now - 3 * 24 * 60 * 60 * 1000,
-      resolvedAt: now - 3 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000,
-      commander: "최데브옵스",
-      affectedServices: ["log-collector"],
-      timeline: [
-        {
-          timestamp: now - 3 * 24 * 60 * 60 * 1000,
-          phase: "detected",
-          actor: "system",
-          description: "로그 수집 지연 탐지",
-        },
-        {
-          timestamp: now - 3 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000,
-          phase: "triaged",
-          actor: "최데브옵스",
-          description: "P3 분류",
-        },
-        {
-          timestamp: now - 3 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000,
-          phase: "investigating",
-          actor: "최데브옵스",
-          description: "버퍼 크기 조사",
-        },
-        {
-          timestamp: now - 3 * 24 * 60 * 60 * 1000 + 90 * 60 * 1000,
-          phase: "mitigating",
-          actor: "최데브옵스",
-          description: "버퍼 크기 증가",
-        },
-        {
-          timestamp: now - 3 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000,
-          phase: "resolved",
-          actor: "최데브옵스",
-          description: "정상화 확인",
-        },
-      ],
-      rootCause: "로그 버퍼 크기 부족",
-      mitigation: "버퍼 크기 4배 증가",
-    },
-  ]
+interface IncidentData {
+  incidents: Incident[]
+  postMortems: PostMortem[]
+  stats: {
+    totalIncidents: number
+    mttrMinutes: number
+    incidentsBySeverity: Record<IncidentSeverity, number>
+  }
 }
 
 export default function IncidentsPage() {
   // ── State ────────────────────────────────────────────────────
-  const [incidents, setIncidents] = useState<Incident[]>(() => generateSampleIncidents())
+  const [data, setData] = useState<IncidentData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   const [expandedIncident, setExpandedIncident] = useState<string | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showPostMortemForm, setShowPostMortemForm] = useState<string | null>(null)
-  const [postMortems, setPostMortems] = useState<PostMortem[]>([])
 
   // Create form state
   const [newTitle, setNewTitle] = useState("")
@@ -237,94 +79,175 @@ export default function IncidentsPage() {
   const [pmAffectedUsers, setPmAffectedUsers] = useState(0)
   const [pmDowntime, setPmDowntime] = useState(0)
 
+  // ── Fetch data ──────────────────────────────────────────────
+
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/operations/incidents")
+      const json = (await res.json()) as {
+        success: boolean
+        data?: IncidentData
+        error?: { code: string; message: string }
+      }
+      if (json.success && json.data) {
+        setData(json.data)
+        setError(null)
+      } else {
+        setError(json.error?.message ?? "데이터 로드 실패")
+      }
+    } catch {
+      setError("서버 연결 실패")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
   // ── Derived data ─────────────────────────────────────────────
 
   const activeIncidents = useMemo(
-    () => incidents.filter((i) => i.phase !== "resolved" && i.phase !== "postmortem"),
-    [incidents]
+    () =>
+      data ? data.incidents.filter((i) => i.phase !== "resolved" && i.phase !== "postmortem") : [],
+    [data]
   )
-
-  const resolvedIncidents = useMemo(
-    () => incidents.filter((i) => i.phase === "resolved" || i.phase === "postmortem"),
-    [incidents]
-  )
-
-  const mttr = useMemo(() => calculateMTTR(incidents), [incidents])
 
   const incidentsBySeverity = useMemo(() => {
-    const counts: Record<IncidentSeverity, number> = { P0: 0, P1: 0, P2: 0, P3: 0 }
-    for (const inc of incidents) {
-      counts[inc.severity]++
-    }
-    return counts
-  }, [incidents])
+    if (!data) return { P0: 0, P1: 0, P2: 0, P3: 0 }
+    return data.stats.incidentsBySeverity
+  }, [data])
+
+  const mttr = useMemo(() => {
+    if (!data) return 0
+    return data.stats.mttrMinutes
+  }, [data])
 
   // ── Handlers ─────────────────────────────────────────────────
 
-  const handleCreateIncident = useCallback(() => {
+  const handleCreateIncident = useCallback(async () => {
     if (!newTitle.trim()) return
     const services = newServices
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean)
-    const incident = createIncident(newTitle, newSeverity, services, "operator")
-    setIncidents((prev) => [incident, ...prev])
-    setNewTitle("")
-    setNewSeverity("P2")
-    setNewServices("")
-    setShowCreateForm(false)
-  }, [newTitle, newSeverity, newServices])
 
-  const handleAdvancePhase = useCallback((incidentId: string) => {
-    setIncidents((prev) =>
-      prev.map((inc) => {
-        if (inc.id !== incidentId) return inc
-        const currentIdx = PHASE_ORDER.indexOf(inc.phase)
-        const nextPhase = PHASE_ORDER[currentIdx + 1]
-        if (!nextPhase) return inc
-        try {
-          return advanceIncidentPhase(
-            inc,
-            nextPhase,
-            inc.commander ?? "operator",
-            `${PHASE_LABELS[nextPhase]} 단계로 전환`
-          )
-        } catch {
-          return inc
-        }
+    try {
+      const res = await fetch("/api/internal/operations/incidents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create_incident",
+          title: newTitle,
+          severity: newSeverity,
+          affectedServices: services,
+        }),
       })
-    )
-  }, [])
+      const json = (await res.json()) as { success: boolean }
+      if (json.success) {
+        setNewTitle("")
+        setNewSeverity("P2")
+        setNewServices("")
+        setShowCreateForm(false)
+        await fetchData()
+      }
+    } catch {
+      // silent fail
+    }
+  }, [newTitle, newSeverity, newServices, fetchData])
+
+  const handleAdvancePhase = useCallback(
+    async (incidentId: string) => {
+      if (!data) return
+      const incident = data.incidents.find((i) => i.id === incidentId)
+      if (!incident) return
+
+      const currentIdx = PHASE_ORDER.indexOf(incident.phase)
+      const nextPhase = PHASE_ORDER[currentIdx + 1]
+      if (!nextPhase) return
+
+      try {
+        const res = await fetch("/api/internal/operations/incidents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "advance_phase",
+            incidentId,
+            nextPhase,
+            actor: incident.commander ?? "operator",
+            description: `${PHASE_LABELS[nextPhase]} 단계로 전환`,
+          }),
+        })
+        const json = (await res.json()) as { success: boolean }
+        if (json.success) {
+          await fetchData()
+        }
+      } catch {
+        // silent fail
+      }
+    },
+    [data, fetchData]
+  )
 
   const handleCreatePostMortem = useCallback(
-    (incidentId: string) => {
-      const incident = incidents.find((i) => i.id === incidentId)
-      if (!incident || !pmRootCause.trim()) return
+    async (incidentId: string) => {
+      if (!pmRootCause.trim()) return
 
-      const pm = createPostMortem(
-        incident,
-        pmRootCause,
-        pmAffectedUsers,
-        pmDowntime,
-        false,
-        [
-          {
-            description: "모니터링 개선",
-            assignee: "ops-team",
-            dueDate: Date.now() + 7 * 86400000,
-            priority: "high",
-          },
-        ],
-        ["재발 방지 위해 알림 임계값 조정 필요"]
-      )
-      setPostMortems((prev) => [...prev, pm])
-      setPmRootCause("")
-      setPmAffectedUsers(0)
-      setPmDowntime(0)
-      setShowPostMortemForm(null)
+      try {
+        const res = await fetch("/api/internal/operations/incidents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "create_postmortem",
+            incidentId,
+            rootCause: pmRootCause,
+            affectedUsers: pmAffectedUsers,
+            downtimeMinutes: pmDowntime,
+          }),
+        })
+        const json = (await res.json()) as { success: boolean }
+        if (json.success) {
+          setPmRootCause("")
+          setPmAffectedUsers(0)
+          setPmDowntime(0)
+          setShowPostMortemForm(null)
+          await fetchData()
+        }
+      } catch {
+        // silent fail
+      }
     },
-    [incidents, pmRootCause, pmAffectedUsers, pmDowntime]
+    [pmRootCause, pmAffectedUsers, pmDowntime, fetchData]
   )
+
+  // ── Loading state ───────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <>
+        <Header title="Incident Management" description="장애 탐지, 대응, 사후 분석" />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-muted-foreground text-sm">로딩 중...</div>
+        </div>
+      </>
+    )
+  }
+
+  // ── Error state ─────────────────────────────────────────────
+
+  if (error) {
+    return (
+      <>
+        <Header title="Incident Management" description="장애 탐지, 대응, 사후 분석" />
+        <div className="flex items-center justify-center py-20">
+          <div className="text-sm text-red-400">{error}</div>
+        </div>
+      </>
+    )
+  }
+
+  if (!data) return null
 
   return (
     <>
@@ -355,14 +278,14 @@ export default function IncidentsPage() {
               <BarChart3 className="text-muted-foreground h-4 w-4" />
               <span className="text-muted-foreground text-xs">전체 장애</span>
             </div>
-            <p className="text-2xl font-bold">{incidents.length}</p>
+            <p className="text-2xl font-bold">{data.incidents.length}</p>
           </div>
           <div className="bg-card rounded-lg border p-4">
             <div className="mb-1 flex items-center gap-2">
               <FileText className="text-muted-foreground h-4 w-4" />
               <span className="text-muted-foreground text-xs">Post-Mortem</span>
             </div>
-            <p className="text-2xl font-bold">{postMortems.length}</p>
+            <p className="text-2xl font-bold">{data.postMortems.length}</p>
           </div>
         </div>
 
@@ -427,12 +350,12 @@ export default function IncidentsPage() {
 
         {/* ── Incident List ─────────────────────────────────── */}
         <div className="space-y-3">
-          {incidents.map((incident) => {
+          {data.incidents.map((incident) => {
             const isExpanded = expandedIncident === incident.id
             const currentPhaseIdx = PHASE_ORDER.indexOf(incident.phase)
             const canAdvance = currentPhaseIdx < PHASE_ORDER.length - 1
             const isResolved = incident.phase === "resolved" || incident.phase === "postmortem"
-            const hasPM = postMortems.some((pm) => pm.incidentId === incident.id)
+            const hasPM = data.postMortems.some((pm) => pm.incidentId === incident.id)
 
             return (
               <div key={incident.id} className="bg-card rounded-lg border">
