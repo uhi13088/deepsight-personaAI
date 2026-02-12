@@ -331,7 +331,7 @@ model Notification {
 }
 
 // ============================================
-// Persona Models (Core AI Feature)
+// Persona Models (v3 3-Layer 106D+)
 // ============================================
 
 model Persona {
@@ -340,17 +340,39 @@ model Persona {
   description         String?
   category            String?
   role                PersonaRole   @default(REVIEWER)
+  expertise           String[]      @default([])
   profileImageUrl     String?
 
-  // === 6D Vector dimensions ===
-  depth               Decimal       @default(0) @db.Decimal(3, 2) // 분석 깊이: 직관적(0.0) ↔ 심층적(1.0)
-  lens                Decimal       @default(0) @db.Decimal(3, 2) // 판단 렌즈: 감성적(0.0) ↔ 논리적(1.0)
-  stance              Decimal       @default(0) @db.Decimal(3, 2) // 평가 태도: 수용적(0.0) ↔ 비판적(1.0)
-  scope               Decimal       @default(0) @db.Decimal(3, 2) // 관심 범위: 핵심만(0.0) ↔ 디테일(1.0)
-  taste               Decimal       @default(0) @db.Decimal(3, 2) // 취향 성향: 클래식(0.0) ↔ 실험적(1.0)
-  purpose             Decimal       @default(0) @db.Decimal(3, 2) // 소비 목적: 오락(0.0) ↔ 의미추구(1.0)
+  // === Layer 1: Social Persona (7D) ===
+  depth               Decimal       @default(0) @db.Decimal(4, 3) // 직관적(0) ↔ 심층적(1)
+  lens                Decimal       @default(0) @db.Decimal(4, 3) // 감성적(0) ↔ 논리적(1)
+  stance              Decimal       @default(0) @db.Decimal(4, 3) // 수용적(0) ↔ 비판적(1)
+  scope               Decimal       @default(0) @db.Decimal(4, 3) // 핵심만(0) ↔ 디테일(1)
+  taste               Decimal       @default(0) @db.Decimal(4, 3) // 클래식(0) ↔ 실험적(1)
+  purpose             Decimal       @default(0) @db.Decimal(4, 3) // 오락(0) ↔ 의미추구(1)
+  sociability         Decimal       @default(0) @db.Decimal(4, 3) // 독립적(0) ↔ 사교적(1)
 
-  // === Layer 2: 캐릭터 속성 ===
+  // === Layer 2: Core Temperament / OCEAN (5D) ===
+  openness            Decimal?      @db.Decimal(4, 3) // 보수적(0) ↔ 개방적(1)
+  conscientiousness   Decimal?      @db.Decimal(4, 3) // 즉흥적(0) ↔ 원칙적(1)
+  extraversion        Decimal?      @db.Decimal(4, 3) // 내향적(0) ↔ 외향적(1)
+  agreeableness       Decimal?      @db.Decimal(4, 3) // 경쟁적(0) ↔ 협조적(1)
+  neuroticism         Decimal?      @db.Decimal(4, 3) // 안정(0) ↔ 불안정(1)
+
+  // === Layer 3: Narrative Drive (4D) ===
+  lack                Decimal?      @db.Decimal(4, 3) // 충족(0) ↔ 결핍(1)
+  moralCompass        Decimal?      @db.Decimal(4, 3) // 유연(0) ↔ 엄격(1)
+  volatility          Decimal?      @db.Decimal(4, 3) // 안정(0) ↔ 폭발적(1)
+  growthArc           Decimal?      @db.Decimal(4, 3) // 정체(0) ↔ 성장(1)
+
+  // === Paradox & Archetype ===
+  archetypeId         String?
+  extendedParadoxScore Decimal?     @db.Decimal(4, 3) // EPS: w1×L1↔L2 + w2×L1↔L3 + w3×L2↔L3
+  l1l2Score           Decimal?      @db.Decimal(4, 3)
+  l1l3Score           Decimal?      @db.Decimal(4, 3)
+  l2l3Score           Decimal?      @db.Decimal(4, 3)
+
+  // === 캐릭터 속성 ===
   handle              String?       // SNS 핸들 (@yuna_feels)
   tagline             String?       // 한줄 자기소개
   birthDate           DateTime?     // 생년월일
@@ -366,7 +388,6 @@ model Persona {
   viewingHabits       String?       // 시청 습관
 
   // === 활동성 속성 (PersonaWorld용) ===
-  sociability         Decimal?      @db.Decimal(3, 2) // 사교성 0.0~1.0
   initiative          Decimal?      @db.Decimal(3, 2) // 주도성 0.0~1.0
   expressiveness      Decimal?      @db.Decimal(3, 2) // 표현력 0.0~1.0
   interactivity       Decimal?      @db.Decimal(3, 2) // 친화력 0.0~1.0
@@ -419,6 +440,9 @@ enum PersonaStatus {
   DRAFT
   REVIEW
   ACTIVE
+  STANDARD
+  LEGACY
+  DEPRECATED
   PAUSED
   ARCHIVED
 }
@@ -445,23 +469,34 @@ enum PostFrequency {
   HYPERACTIVE
 }
 
+// ============================================
+// Match Models (v3)
+// ============================================
+
 model MatchResult {
   id                  String        @id @default(cuid())
   requestId           String
 
-  content             String        @db.Text
-  contentHash         String        // For caching
-
-  personaId           String
-  score               Float
-
-  // Individual dimension scores
+  // v1 fields (backward compat — cleaned up in T118)
+  content             String?       @db.Text
+  contentHash         String?
+  score               Float?
   depthScore          Float?
   lensScore           Float?
   stanceScore         Float?
   scopeScore          Float?
   tasteScore          Float?
   purposeScore        Float?
+
+  // v3 fields
+  userId              String?
+  personaId           String
+  matchingTier        MatchingTier  @default(BASIC)
+  overallScore        Float?
+  similarityScore     Float?
+  paradoxCompatibility Float?
+  contextRelevance    Float?
+  context             Json?
 
   processingTimeMs    Int
 
@@ -471,6 +506,8 @@ model MatchResult {
   feedback            MatchFeedback?
 
   @@index([contentHash])
+  @@index([userId])
+  @@index([personaId])
   @@map("match_results")
 }
 
@@ -489,6 +526,66 @@ model MatchFeedback {
 }
 
 // ============================================
+// User Vector & Consent Models (v3)
+// ============================================
+
+model UserVector {
+  id                  String          @id @default(cuid())
+  userId              String          @unique
+  organizationId      String
+  onboardingLevel     OnboardingLevel @default(QUICK)
+
+  // === Layer 1: Social Persona (7D) ===
+  depth               Decimal         @default(0) @db.Decimal(4, 3)
+  lens                Decimal         @default(0) @db.Decimal(4, 3)
+  stance              Decimal         @default(0) @db.Decimal(4, 3)
+  scope               Decimal         @default(0) @db.Decimal(4, 3)
+  taste               Decimal         @default(0) @db.Decimal(4, 3)
+  purpose             Decimal         @default(0) @db.Decimal(4, 3)
+  sociability         Decimal         @default(0) @db.Decimal(4, 3)
+
+  // === Layer 2: Core Temperament / OCEAN (5D, optional) ===
+  openness            Decimal?        @db.Decimal(4, 3)
+  conscientiousness   Decimal?        @db.Decimal(4, 3)
+  extraversion        Decimal?        @db.Decimal(4, 3)
+  agreeableness       Decimal?        @db.Decimal(4, 3)
+  neuroticism         Decimal?        @db.Decimal(4, 3)
+
+  hasOceanProfile     Boolean         @default(false)
+
+  // === 교차축 & 프로필 ===
+  crossAxes           Json?
+  archetype           String?
+  confidenceScores    Json?
+  profileQuality      ProfileQuality  @default(BASIC)
+
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@index([organizationId])
+  @@map("user_vectors")
+}
+
+model UserConsent {
+  id                  String        @id @default(cuid())
+  userId              String
+  organizationId      String
+  consentType         ConsentType
+  granted             Boolean       @default(false)
+  grantedAt           DateTime?
+  revokedAt           DateTime?
+  version             String        @default("1.0")
+  ipAddress           String?
+
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@unique([userId, organizationId, consentType])
+  @@index([organizationId])
+  @@map("user_consents")
+}
+
+// ============================================
 // Enums
 // ============================================
 
@@ -496,7 +593,11 @@ enum PlanType {
   FREE
   STARTER
   PRO
-  ENTERPRISE
+  MAX
+  ENTERPRISE      // legacy — maps to ENT_STARTER equivalent
+  ENT_STARTER
+  ENT_GROWTH
+  ENT_SCALE
 }
 
 enum MemberRole {
@@ -553,4 +654,32 @@ enum FeedbackType {
   POSITIVE
   NEGATIVE
   NEUTRAL
+  LIKE
+  DISLIKE
+}
+
+enum MatchingTier {
+  BASIC
+  ADVANCED
+  EXPLORATION
+}
+
+enum OnboardingLevel {
+  QUICK       // 12문항, 2분
+  STANDARD    // 30문항, 5분
+  DEEP        // 60문항, 15분
+}
+
+enum ConsentType {
+  DATA_COLLECTION
+  SNS_ANALYSIS
+  THIRD_PARTY_SHARING
+  MARKETING
+}
+
+enum ProfileQuality {
+  BASIC       // Cold Start QUICK
+  STANDARD    // Cold Start STANDARD 또는 SNS 1개
+  ADVANCED    // Cold Start DEEP 또는 SNS 2개+
+  PREMIUM     // Cold Start + SNS 복합
 }

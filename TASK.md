@@ -552,6 +552,139 @@
   - AC5: 네비게이션 추가 — LNB Persona Studio 하위에 "Node Editor" 항목 추가
   - AC6: 테스트 + Build PASS — 프리셋 직렬화 라운드트립, 프리셋 실행, 실행 요약, 저장/로드 라운드트립 테스트
 
+### Phase DC-A: 개발자콘솔 v3 기반 인프라 (T116~T117)
+
+> 선택적 리빌드: 핵심(Schema/Types/API) 재작성 + 벡터 무관 페이지(API Keys/Usage/Logs/Settings/Team) 보존.
+> 현재 v1 6D 아키텍처 → v3 3-Layer 106D+ 전환. 설계서: `docs/specs/developer-console.md`
+
+- [x] **T116: Prisma Schema v3 + 타입 시스템 재구축** ✅
+  - 배경: 현재 6D 스키마/타입 → v3 3-Layer 106D+ 전환. 모든 후속 작업의 기반
+  - AC1: Prisma Schema v3 — Persona 모델 (L1 7D + L2 5D + L3 4D + paradox + archetype), MatchResult v3
+  - AC2: PlanType enum 확장 (6-Tier: Starter/Pro/Max/EntStarter/EntGrowth/EntScale)
+  - AC3: UserVector 모델 (L1 7D + L2 5D + 교차축 + 프로필 품질)
+  - AC4: Consent 모델 (data_collection/sns_analysis/third_party_sharing/marketing)
+  - AC5: 공유 타입 정의 (v3 PersonaVector, ThreeLayerVector, ParadoxProfile 등 — shared-types import)
+  - AC6: 서비스 타입 업데이트 (DashboardMetrics, UsageStats 등 v3 호환)
+  - AC7: Build PASS
+
+- [ ] **T117: Billing 6-Tier 플랜 체계 업데이트**
+  - 배경: 스펙 §8.1.1 v3.1. 현재 4-Tier → 6-Tier 전환
+  - AC1: 플랜 데이터 상수 6-Tier (Starter $199 / Pro $499 / Max $1,499 / Ent.S $3,500 / Ent.G $5,000 / Ent.Sc $15,000)
+  - AC2: 플랜 비교 테이블 UI — 활성 PW 페르소나, 매칭 API, Rate Limit, API Keys, 팀원, SLA
+  - AC3: 초과 요금(Overage) — 매칭 API 초과 + PW 페르소나 초과 단가
+  - AC4: 연간 결제 20% 할인 토글 + Enterprise 문의 분기
+  - AC5: 매칭 기능 비교 섹션 (3-Tier 매칭 + 스마트 캐싱 + Prompt Caching)
+  - AC6: billing-service 타입 업데이트
+  - AC7: 테스트 + Build PASS
+
+### Phase DC-B: v1 Public API v3 재구축 (T118~T120)
+
+> 기존 6D v1 API 전체 삭제 후 v3 3-Layer 106D+ 기반 재구축.
+
+- [ ] **T118: v1 매칭/페르소나/피드백 API v3 전환**
+  - 배경: 현재 6D → v3 3-Layer 전환. 스펙 §9.3.1~§9.3.4
+  - AC1: `POST /v1/match` — user_id + context + options.matching_tier(basic/advanced/exploration)
+  - AC2: `GET /v1/personas` — role/expertise 필터 + v3 벡터 응답 (L1/L2/L3 + paradox)
+  - AC3: `GET /v1/personas/{id}` — v3 상세 (3-Layer 벡터 + paradox + 교차축)
+  - AC4: `POST /v1/feedback` — user_id + persona_id + feedback_type(LIKE/DISLIKE)
+  - AC5: `POST /v1/batch-match` — 배치 매칭 v3
+  - AC6: Rate Limit 헤더 (X-RateLimit-Limit/Remaining/Reset) + 플랜별 Rate Limit
+  - AC7: 테스트 + Build PASS
+
+- [ ] **T119: 페르소나 필터 API (§9.3.9)**
+  - 배경: Enterprise 고객용 106D+ 다차원 정밀 검색
+  - AC1: `POST /v1/personas/filter` — 아키타입 include/exclude 필터 (12종)
+  - AC2: 벡터 범위 필터 (L1 7D + L2 5D + L3 4D 각 차원 min/max)
+  - AC3: Paradox 범위 필터 (extendedScore, l1l2Score, l1l3Score, l2l3Score)
+  - AC4: 교차축 패턴 필터 (axisId + relationship + scoreRange)
+  - AC5: 정렬 7종 (paradox.extendedScore, vectors.l1.\*, createdAt, name 등)
+  - AC6: 응답: personas + appliedFilters + filterStats (아키타입 분포)
+  - AC7: 플랜별 Rate Limit (Starter 50/분 ~ Ent.Scale 무제한)
+  - AC8: 테스트 + Build PASS
+
+- [ ] **T120: v3.3 사용자 프로필/온보딩/동의 API**
+  - 배경: 스펙 §9.3.5~§9.3.11. 외부 플랫폼 유저 프로파일링 연동
+  - AC1: `GET /v1/users/{id}/profile` — 3-Layer 벡터 + 교차축 + 동의 + 프로필 품질
+  - AC2: `POST /v1/users/{id}/onboarding` — QUICK(12)/STANDARD(30)/DEEP(60) 온보딩
+  - AC3: `GET /v1/users/{id}/consent` — 동의 항목 4종 조회
+  - AC4: `POST /v1/users/{id}/consent` — 동의 생성/변경 + side_effects
+  - AC5: 동의 미취득 시 403 CONSENT_REQUIRED 처리
+  - AC6: 테스트 + Build PASS
+
+### Phase DC-C: UI 페이지 재구축/적응 (T121~T124)
+
+> Dashboard/Playground/Docs는 v1 하드코딩이므로 재구축. Support 신규. Webhooks 적응.
+
+- [ ] **T121: Dashboard v3 리팩토링**
+  - 배경: 현재 v1 메트릭 구조 → v3 호환 대시보드. 스펙 §4.1
+  - AC1: 핵심 지표 4카드 (API Calls, Success Rate, P95 Latency, Cost)
+  - AC2: 최근 7일 API 호출 추이 차트 + 최근 활동 로그
+  - AC3: 퀵 액션 (새 API Key 생성, 문서 보기, Playground 열기)
+  - AC4: 환영 메시지 + 오늘/이번달 사용량 요약
+  - AC5: dashboard-service v3 호환 업데이트
+  - AC6: 테스트 + Build PASS
+
+- [ ] **T122: API Playground v3 재구축**
+  - 배경: 현재 v1 엔드포인트 하드코딩 → v3 API 구조. 스펙 §12.1.3
+  - AC1: 엔드포인트 선택 (match, personas, personas/filter, feedback, onboarding, consent)
+  - AC2: 요청 파라미터 UI (JSON 에디터 + 필드별 폼)
+  - AC3: 인증 설정 (API Key 선택 / 직접 입력)
+  - AC4: 실행 + 응답 표시 (상태코드, 헤더, Body, 소요시간)
+  - AC5: cURL / Python / Node.js / Java 코드 자동 생성
+  - AC6: 요청 히스토리 (최근 10개)
+  - AC7: 테스트 + Build PASS
+
+- [ ] **T123: API Documentation v3 재구축**
+  - 배경: 현재 v1 문서 → v3 API 레퍼런스 + SDK 가이드. 스펙 §9 + §11 + §12.1
+  - AC1: Quick Start (5분 가이드 — Key 발급 → SDK 설치 → 첫 호출)
+  - AC2: API Reference — v3 전 엔드포인트 명세 (match, personas, filter, onboarding, consent)
+  - AC3: 인증 가이드 (API Key + 멀티테넌시 + 에러 코드)
+  - AC4: SDK 가이드 — Python / Node.js / Java / Go 코드 예제
+  - AC5: 통합 가이드 — 온보딩, 데일리 체크, 매칭, 피드백 루프
+  - AC6: 사이드바 네비게이션 + 코드 블록 복사 버튼
+  - AC7: 테스트 + Build PASS
+
+- [ ] **T124: Support 페이지 + Webhooks v3 적응**
+  - 배경: Support 재구축(§12) + Webhooks 이벤트명 v3 업데이트
+  - AC1: FAQ 아코디언 (스펙 §12.2.3 기준 4+ QA)
+  - AC2: 문의하기 폼 (유형 4종, 제목, 내용, 첨부, 우선순위)
+  - AC3: 플랜별 지원 채널 안내 (6-Tier 응답시간 테이블)
+  - AC4: 커뮤니티 링크 (Discord, 포럼, 뉴스레터, Status Page)
+  - AC5: Webhooks 이벤트 v3 업데이트 (persona.activated/deprecated/updated 등 §10.2)
+  - AC6: 테스트 + Build PASS
+
+### Phase DC-D: 대시보드/분석 고도화 (T125~T126)
+
+> 기존 보존 페이지(Usage/Logs) 고도화 + 실시간 모니터링/알림 추가.
+
+- [ ] **T125: 실시간 모니터링 + 알림 센터 + Usage 고도화**
+  - 배경: 스펙 §4.2 + §4.3 + §6.2~§6.3
+  - AC1: 실시간 지표 패널 — RPS, 성공률, 응답시간, 활성 연결 (5초 자동 갱신)
+  - AC2: 알림 센터 드롭다운 — 5종 알림 + 채널 설정 + 히스토리
+  - AC3: 엔드포인트별 상세 분석 — 시간대 패턴, 응답시간 P50/P90/P95/P99
+  - AC4: 비용 분석 + 시뮬레이터 — 예상 월말 비용, 플랜별 비용 비교
+  - AC5: 리포트 빌더 — PDF/CSV/JSON 내보내기
+  - AC6: 테스트 + Build PASS
+
+- [ ] **T126: Logs 고도화 (고급 검색 + 에러 분석)**
+  - 배경: 스펙 §7.2 + §7.3
+  - AC1: 고급 검색 쿼리 (status:400 AND endpoint:/v1/match AND duration:>500)
+  - AC2: 로그 상세 모달 (Request/Response 헤더+바디)
+  - AC3: 에러 대시보드 — 에러율 추이, 유형별 그룹화
+  - AC4: 에러 알림 설정 — 임계값 + 연속 에러 트리거
+  - AC5: 로그 내보내기 — JSONL/CSV (10,000건, 30일)
+  - AC6: 테스트 + Build PASS
+
+### Phase DC-E: 테스트 (T127)
+
+- [ ] **T127: 개발자콘솔 테스트 스위트**
+  - 배경: 현재 테스트 0개. CLAUDE.md "테스트 없이 완료 처리 금지"
+  - AC1: Vitest 설정 + vitest.config.ts
+  - AC2: v1 API 라우트 테스트 (match, personas, filter, feedback, onboarding, consent)
+  - AC3: 서비스 테스트 (billing, api-keys, dashboard, usage, logs, webhooks, team, settings)
+  - AC4: 유틸리티 테스트 (api-key-validator, usage-tracker, utils)
+  - AC5: 최소 150개 테스트 PASS + Build PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
