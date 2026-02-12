@@ -7,7 +7,380 @@
 
 ## 📋 QUEUE (대기)
 
-(없음 — 랜딩 v3 전환 완료)
+### Phase A: 핵심 페르소나 관리 (T45~T50)
+
+> 엔진 스튜디오 v3 웹 구축 — 기존 src/ 삭제 후 재구축. 페르소나 CRUD 우선.
+
+- [x] **T45: 프로젝트 초기화 + 기본 레이아웃** ✅ 2026-02-11
+  - AC1: ✅ 기존 src/ (233 files) + tests/ (4 files) 삭제, prisma/config 보존
+  - AC2: ✅ App Router 구조 (app/, components/, lib/, types/, constants/, stores/, hooks/)
+  - AC3: ✅ LNB 8섹션 (§2.4 기준, 접이식 하위 메뉴, 구분선, 활성 표시)
+  - AC4: ✅ 21개 하위 라우트 + Dashboard = 24 pages (Build PASS)
+  - AC5: ✅ globals.css (Tailwind v4 dark 테마) + cn() + prisma singleton
+  - AC6: ✅ Build PASS (Next.js 16.1.6 Turbopack) + 커밋 + 푸시
+
+- [x] **T46: Phase 0 기반 인프라 — v3 타입 + DB 스키마 + 상수** ✅ 2026-02-11
+  - AC1: ✅ v3 공유 타입 (shared-types + engine-studio) — 106D+ 전체
+  - AC2: ✅ Prisma v3 확장 (PersonaLayerVector 3-Layer, Persona 12필드, UserVector OCEAN, InteractionLog/Session 2모델, 3 enum)
+  - AC3: ✅ 상수 모듈 7개 (dimensions 16D, paradox-mappings 7쌍, projection-coefficients, cross-layer-axes 83축, dynamics-defaults, interpretation-tables, index)
+  - AC4: ✅ 색상 모듈 6개 (CIELAB+OKLCH 16D, layer 3, cross-axis, engine-meta, archetype 12, resolveColor)
+  - AC5: ✅ Build PASS + 커밋 + 푸시 (7d07d91, fa21144)
+  - 참고: DB 마이그레이션(0-6, 0-22)은 PostgreSQL 환경에서 실행 필요
+
+- [x] **T47: Phase 1 벡터 엔진 — 교차축 + Paradox + V_Final** ✅ 2026-02-11
+  - AC1: ✅ 벡터 유틸리티 (clamp, validateVector, euclideanDistance, cosineSimilarity)
+  - AC2: ✅ L2→L1 투영 (5D→7D, invert 포함), L3→L1 투영 (4D→7D, 0.5 baseline + coefficients)
+  - AC3: ✅ 교차축 계산 엔진 (83축, paradox/reinforcing/modulating/neutral 4종 score formula)
+  - AC4: ✅ Extended Paradox Score (w1=0.50×L1↔L2 + w2=0.30×L1↔L3 + w3=0.20×L2↔L3) + Dimensionality bell curve
+  - AC5: ✅ V_Final = clamp((1-P)×L1 + P×(α×L2proj + β×L3proj)), vFinalToVector 변환
+  - AC6: ✅ 단위 테스트 5파일 41개 전부 PASS + Build PASS + 커밋 (38679ab)
+
+- [x] **T48: 페르소나 목록 페이지 + API** ✅ 2026-02-11
+  - AC1: ✅ GET /api/internal/personas (상태/소스/아키타입/검색/벡터범위/Paradox범위/교차축 필터, 5종 정렬, 페이지네이션)
+  - AC2: ✅ PersonaCard 카드 그리드 (프로필, 이름, 상태 뱃지 8종, 아키타입 라벨, 주요 성향 Top3, Paradox %)
+  - AC3: ✅ PersonaFilters (상태 칩, 아키타입 12종 멀티셀렉, L1/L2/L3 16D 범위 슬라이더, EPS Range)
+  - AC4: ✅ 검색(이름+설명), 정렬 5종+오름/내림, PersonaPagination 페이지 크기 선택
+  - AC5: ✅ shadcn/ui 6종 + usePersonas hook + 테스트 7파일 73개 PASS + Build PASS (a52840a)
+
+- [x] **T49: 페르소나 생성 플로우 (4-Step)** ✅
+  - 배경: 핵심 기능. 스펙 §3.1.2 + 구현계획서 Phase 2
+  - AC1: ✅ Step 1 — 기본 정보 (이름 2~30자, 역할 5종, 전문분야 16종, 설명 100자)
+  - AC2: ✅ Step 2 — 3-Layer 벡터 에디터 (L1 7D + L2 5D + L3 4D + 아키타입 12종 프리셋, EPS 실시간)
+  - AC3: ✅ Step 3 — 프롬프트 엔지니어링 (벡터 기반 자동 생성 + 수동 편집, 6개 섹션)
+  - AC4: ✅ Step 4 — 리뷰 + Draft/Activate 저장
+  - AC5: ✅ POST /api/internal/personas/create (트랜잭션, Paradox Score 자동 계산, 벡터 3레이어 저장)
+  - AC6: ✅ 테스트 9파일 119개 PASS + Build PASS (b1bcaf9)
+
+- [x] **T50: 페르소나 수정/복제/보관 + 라이프사이클** ✅
+  - 배경: 스펙 §3.1.3~3.1.5 + §3.8
+  - AC1: ✅ 페르소나 수정 (GET/PUT /personas/[id] + 편집 UI 3탭 + 벡터 표시)
+  - AC2: ✅ 페르소나 복제 (POST /personas/[id]/duplicate, DRAFT+MUTATION 소스, parentPersonaId 추적)
+  - AC3: ✅ 페르소나 보관/복원 (라이프사이클 ARCHIVE/RESTORE 액션, archivedAt 타임스탬프)
+  - AC4: ✅ 라이프사이클 상태 전이 8종 (POST /personas/[id]/lifecycle, 전이 매트릭스, 위험 액션 확인)
+  - AC5: ✅ 테스트 10파일 143개 PASS + Build PASS (29 routes)
+
+### Phase B: 엔진 핵심 기능 (T51~T61)
+
+> 벡터 에디터, 생성 파이프라인, 검증, 매칭 연구소, 노드 에디터.
+
+- [x] **T51: 3-Layer 벡터 에디터 UI** ✅
+  - 배경: 스펙 §3.2 + 구현계획서 Phase 7. 벡터 시각적 편집의 핵심
+  - AC1: ✅ L1(7D) 슬라이더 에디터 (축별 컬러, 0.00~1.00, 실시간 미리보기)
+  - AC2: ✅ L2(5D) OCEAN 슬라이더 에디터
+  - AC3: ✅ L3(4D) Narrative Drive 에디터 (활성화 체크박스 포함)
+  - AC4: ✅ Paradox Score 시각화 (EPS + L1↔L2/L1↔L3/L2↔L3 분해)
+  - AC5: ✅ V_Final 실시간 시뮬레이터 (교차축 프로필 포함) — pressure 슬라이더, 레이어 기여도, 교차축 요약
+  - AC6: ✅ 아키타입 12종 카드 선택 UI (벡터 자동 적용)
+  - AC7: ✅ 테스트 143개 PASS + Build PASS
+
+- [x] **T52: 생성 파이프라인 v3 — 아키타입 + 벡터 생성 + 캐릭터** ✅
+  - 배경: 구현계획서 Phase 2. 페르소나 자동 생성의 핵심 엔진
+  - AC1: ✅ 아키타입 12종 템플릿 (벡터 범위, 캐릭터 시드, Paradox 범위, dynamics 기본값)
+  - AC2: ✅ 3-Layer 벡터 생성기 (다양성 분석, 빈 영역 우선, L1+L2+L3 동시 생성)
+  - AC3: ✅ Paradox 디자이너 (tension map, 긴장도 자동 조절, 범위 검증)
+  - AC4: ✅ 캐릭터 생성기 (이름, 역할, 전문분야, 배경, 말버릇, 퀴크, 습관, 관계)
+  - AC5: ✅ 활동성/콘텐츠 설정 추론 (PostFrequency, activeHours, reviewStyle, interactionStyle)
+  - AC6: ✅ 6-Category 일관성 검증기 (STRUCTURE/L1_L2/L2_L3/QUAL_QUANT/CROSS_AXIS/DYNAMIC)
+  - AC7: ✅ 테스트 37개 PASS (전체 180개) + Build PASS
+
+- [x] **T72: 정성적 차원 생성기 — Backstory + Voice + Pressure + Zeitgeist** ✅
+  - 배경: 구현계획서 Phase 3. 벡터 너머의 정성적 페르소나 깊이
+  - AC1: ✅ Backstory 생성기 (origin, formativeExperience, innerConflict, selfNarrative, nlpKeywords)
+  - AC2: ✅ Voice Profile 생성기 (speechStyle, habitualExpressions, mannerisms, activationThresholds)
+  - AC3: ✅ Pressure Context 생성기 (triggers, stressResponse, comfortZone)
+  - AC4: ✅ Zeitgeist Profile 생성기 (culturalReferences, generationalMarkers, socialAwareness, trendSensitivity)
+  - AC5: ✅ 정성적 차원 에디터 UI (4탭: 배경/보이스/압박/시대, 텍스트 에디터 + 자동 생성)
+  - AC6: ✅ 테스트 18개 PASS (전체 198개) + Build PASS
+
+- [x] **T73: 하이브리드 연결 메커니즘 — Init/Override/Adapt/Express** ✅
+  - 배경: 구현계획서 Phase 4. 정성↔정량 4대 알고리즘
+  - AC1: ✅ Init 알고리즘 (LLM 키워드 추출 → 의미 카테고리 8종 → 벡터 delta, clamp)
+  - AC2: ✅ Override 알고리즘 (2단계 트리거 감지, override/additive delta, 지수 감쇠, 5 기본 규칙)
+  - AC3: ✅ Adapt 알고리즘 (UIV 3축, 차원별 α 튜닝 7D, 모멘텀, ±0.3 클램프, 배치 처리)
+  - AC4: ✅ Express 알고리즘 (파생 상태값 5종 sigmoid, 6 quirk 정의, cooldown, 조건 평가)
+  - AC5: ✅ attitude→delta 매핑 8종 + InteractionEngine (Init→Override→Adapt→Attitude→Express 파이프라인, drift 계산, reset)
+  - AC6: ✅ 테스트 49개 PASS (전체 247개) + Build PASS
+
+- [x] **T53: 프롬프트 엔지니어링 — 버전 관리 + 테스트 + 빌더** ✅
+  - 배경: 스펙 §3.3. 프롬프트 작성, 버전 관리, 테스트
+  - AC1: ✅ 프롬프트 에디터 UI (5탭: base/review/post/comment/interaction, 프리셋 4종, 품질 테스트)
+  - AC2: ✅ 프롬프트 버전 관리 (시맨틱 버전 Major/Minor/Patch 자동 감지, diff 비교, 롤백)
+  - AC3: ✅ 프롬프트 테스트 (구조 분석, 톤 분석, 금지어 검사, 벡터 일관성, 종합 점수)
+  - AC4: ✅ 프롬프트 빌더 v3 (5종 프롬프트 생성, 벡터 기반 가이드, 프리셋 4종)
+  - AC5: ✅ 테스트 49개 PASS (전체 296개) + Build PASS
+
+- [x] **T54: 페르소나 검증 + 품질 측정** ✅
+  - 배경: 스펙 §3.4 + 구현계획서 Phase 2/9. 품질 게이트
+  - AC1: ✅ Auto-Interview 프로토콜 (20문항, L1 7+L2 5+L3 4+역설 4, 규칙기반 스코어링)
+  - AC2: ✅ Persona Integrity Score (CR 0.35 + SC 0.35 + CS 0.30, A~F 등급, 레이어별 분석)
+  - AC3: ✅ Quality Score (vectorBalance 30% + promptCompleteness 30% + interviewResult 30% + coherence 10%, 추천 사항)
+  - AC4: ✅ 수동 검증 워크플로우 (리뷰어 지정, 11개 체크리스트 4카테고리, 승인/반려/수정요청)
+  - AC5: ✅ 테스트 70개 PASS (전체 366개) + Build PASS
+
+- [x] **T55: 페르소나 테스트 + A/B 테스트 + 성과 모니터링** ✅
+  - 배경: 스펙 §3.5 + §3.7. 실제 콘텐츠 테스트 및 성과 추적
+  - AC1: ✅ 단일 콘텐츠 테스트 (톤 분석, 금지어 검사, 벡터 정합성, 길이 점수, 종합 품질)
+  - AC2: ✅ 대량 콘텐츠 테스트 (배치 실행, 일관성 분석, 이상치 감지, 통계)
+  - AC3: ✅ A/B 테스트 (트래픽 분배 3종, 상태 관리, 메트릭 비교, 유의미성 판정, 종합 승자)
+  - AC4: ✅ 페르소나 시뮬레이터 (다턴 대화, 압박 추정, 일관성 리포트, 추이 분석)
+  - AC5: ✅ 성과 모니터링 (CTR/만족도/체류/전환 지표, 4종 알림, 개선 제안, 대시보드 데이터)
+  - AC6: ✅ 테스트 61개 PASS (전체 427개) + Build PASS
+
+- [x] **T56: 유저 인사이트 엔진** ✅
+  - 배경: 스펙 §4. 유저 프로파일링 + 아키타입 관리
+  - AC1: ✅ 콜드 스타트 전략 관리 (Quick/Standard/Deep 3모드, 질문 세트 CRUD, 응답→벡터 추론, 신뢰도 계산)
+  - AC2: ✅ 심층 성향 분석 모델 (OCEAN→L1 매핑, 반전 탐지 Δ≥0.25, 잠재 특성 추출 3유형)
+  - AC3: ✅ 점진적 프로파일링 (8종 행동→신호 변환, 지수 감쇠 e^(-λd), 벡터 업데이트, ε-greedy 탐색)
+  - AC4: ✅ 유저 아키타입 분류 (10종 기본 아키타입, 유클리드 거리+규칙 하이브리드 분류, 커스텀 CRUD, 통계)
+  - AC5: ✅ 적응형 프로파일링 엔진 (CAT 기반 질문 선택, 데일리 체크 3문항+보상, 불성실 응답 방지+신뢰도)
+  - AC6: ✅ 테스트 77개 PASS (전체 504개) + Build PASS
+
+- [x] **T57: 매칭 연구소 — 시뮬레이터 + 알고리즘 튜닝** ✅
+  - 배경: 스펙 §5.1~§5.3. 3-Tier 매칭 핵심
+  - AC1: ✅ 3-Tier 매칭 엔진 (Basic 0.7V+0.3CAP / Advanced 0.5V+0.3CAP+0.2EPS / Exploration 다양성+발산+신선도)
+  - AC2: ✅ 매칭 시뮬레이터 (수동/랜덤 가상유저, 단일/배치 시뮬, 통계+분포+XAI 설명)
+  - AC3: ✅ 알고리즘 튜닝 (6종 하이퍼파라미터, 6장르 가중치, Grid Search/Bayesian 자동 튜닝)
+  - AC4: ✅ A/B 테스트 + Guardrails (5종 테스트타입, 만족도/에러 가드레일, 자동 롤백, 종합 판정)
+  - AC5: ✅ 시나리오 저장/공유 (CRUD, 공유 토큰, 복제, 검증)
+  - AC6: ✅ 테스트 63개 PASS (전체 567개) + Build PASS
+
+- [x] **T58: 매칭 연구소 — 성과 분석 + 매칭 설명 + 콘텐츠 평가**
+  - 배경: 스펙 §5.4~§5.6. 매칭 결과 분석 및 설명
+  - AC1: ✅ analytics.ts — KPI 계산, Shannon entropy 다양성 지수, 트렌드 분석, 이상 탐지, 대시보드 빌더
+  - AC2: ✅ explanation.ts — 운영자용 차원별 기여도 분석 + 사용자용 자연어 설명 (숫자 없이 2~3문장)
+  - AC3: ✅ content-review.ts — 리뷰 스타일 12종(3bit+특화4), 페르소나→스타일 매핑, 2단계 파이프라인, 비용 추정
+  - AC4: ✅ report.ts — 리포트 설정/생성(5섹션), KPI 요약+변화율, 개선 권고, CSV 내보내기
+  - AC5: ✅ 테스트 74개 PASS (전체 641개) + Build PASS
+
+- [x] **T59: 노드 에디터 — 기반 인프라 (DAG 엔진)**
+  - 배경: 구현계획서 Phase 8 전반. ComfyUI 스타일 DAG 에디터의 기반
+  - AC1: ✅ port-types.ts — 22개 포트 타입(21+Any), 호환성 매트릭스, ArchetypeConfig→벡터 특수 호환
+  - AC2: ✅ node-registry.ts — 6카테고리 25노드 (Input5/Engine4/ControlFlow3/Gen7/Assembly2/Output4)
+  - AC3: ✅ topological-sort.ts — Kahn's 위상 정렬 + DFS 순환 탐지 + wouldCreateCycle 사전 체크
+  - AC4: ✅ dag-engine.ts — 실행 계획, 입력값 수집, 제어 흐름 활성 엣지 추적, upstream/downstream 탐색
+  - AC5: ✅ graph-validator.ts — 필수 노드/포트/연결 유효성 + 분기 규칙 4종 (Merge/DeadEnd/Reachability/SwitchDefault)
+  - AC6: ✅ serializer.ts — JSON 직렬화/역직렬화, v2→v3 마이그레이션(6D→7D), 변경 감지
+  - AC7: ✅ 테스트 55개 PASS (전체 696개) + Build PASS
+
+- [x] **T60: 노드 에디터 — 캔버스 + 25노드 UI + 설정 패널**
+  - 배경: 구현계획서 Phase 8 후반 + 스펙 §3.10. @xyflow/react 기반
+  - AC1: ✅ node-editor-store.ts — Zustand 스토어 (노드/엣지 CRUD, 선택, 실행, 검증 상태)
+  - AC2: ✅ persona-node-editor.tsx — ReactFlow 캔버스 (연결 검증, 순환 방지, 드래그&드롭)
+  - AC3: ✅ persona-node-wrapper.tsx — 포트 핸들, 카테고리별 컬러, 실행 상태 배지
+  - AC4: ✅ node-types.tsx — 25노드 타입별 UI + NODE_TYPE_MAP 레지스트리
+  - AC5: ✅ node-palette.tsx — 카테고리별 접이식 팔레트, 드래그&드롭 + 클릭 추가
+  - AC6: ✅ node-settings-panel.tsx — 포트 정보, 데이터 편집 (숫자/문자열), 메타 정보
+  - AC7: ✅ editor-toolbar.tsx + editor-status-bar.tsx — 프리셋 4종 + flow-presets.ts
+  - AC8: ✅ 전체 696개 테스트 PASS + Build PASS
+
+- [x] **T61: 노드 에디터 — 실행 엔진 + 제어 흐름** ✅
+  - 배경: 구현계획서 Phase 8 실행부 + §14.8~§14.9
+  - AC1: ✅ node-executor.ts — 25노드 execute() 디스패처 (Input 5 + Engine 4 + CF 3 + Gen 7 + Assembly 2 + Output 4)
+  - AC2: ✅ llm-adapter.ts — LLM 인터페이스, 7노드 프롬프트 템플릿, 모델 라우팅 (sonnet/haiku)
+  - AC3: ✅ control-flow.ts — Conditional (threshold/range/enum/exists), Switch (band/enum-match), Merge (first-active/combine)
+  - AC4: ✅ execution-engine.ts — executeGraph/executeFromNode, ExecutionPath 로깅, 활성 엣지 추적, 비활성 경로 스킵
+  - AC5: ✅ 플로우 프리셋 4종 (T60에서 구현 완료)
+  - AC6: ✅ 전체 766개 테스트 PASS (T61: 70개 추가) + Build PASS
+
+### Phase C: 이후 확장 (T62~T71)
+
+> 인큐베이터, 컬러지문, 시스템 운영, 대시보드, RAG 연동.
+
+- [x] **T62: 페르소나 인큐베이터 — Daily Batch + 자가발전** ✅
+  - 배경: 스펙 §3.6. 페르소나 지속 품질 개선 시스템
+  - AC1: Daily Batch 워크플로우 (스케줄링, 배치 실행, 결과 저장) ✅ `batch-workflow.ts`
+  - AC2: 자가발전 시스템 (인터랙션 로그 기반 벡터 미세 조정) ✅ `self-evolution.ts`
+  - AC3: 콜드 스타트 운영 정책 (신규 페르소나 초기 학습) ✅ `cold-start.ts`
+  - AC4: 비용 통제 정책 (LLM 호출 예산, 일일 상한) ✅ `cost-control.ts`
+  - AC5: Golden Sample 관리 + 확장 전략 ✅ `golden-sample.ts`
+  - AC6: 재검증 시스템 + 진화 전략 ✅ `revalidation.ts`
+  - AC7: 인큐베이터 대시보드 + 모니터링 ✅ `dashboard.ts`
+  - AC8: 테스트 (40 tests PASS) + 빌드 PASS + 커밋
+
+- [x] **T63: 컬러지문 데이터 엔진 — CIELAB+OKLCH 인코딩** ✅
+  - 배경: 구현계획서 Phase 6. 페르소나 고유 시각 식별자
+  - AC1: 색상 공간 변환 (CIELAB↔OKLCH↔sRGB) ✅ `color-space.ts`
+  - AC2: 색상 인코더 (릿지별 할당, ΔE00 차이) ✅ `color-encoder.ts`
+  - AC3: 릿지 생성기 (패턴/코어/델타/곡률) ✅ `ridge-generator.ts`
+  - AC4: 유일성 엔진 (결정적 PRNG) ✅ `uniqueness-engine.ts`
+  - AC5: 충돌 검사기 (pHash/SSIM/커브/히스토그램) ✅ `collision-checker.ts`
+  - AC6: 정규 SVG 렌더러 ✅ `svg-renderer.ts`
+  - AC7: 단위 테스트 (69 tests PASS) + 빌드 PASS + 커밋
+
+- [x] **T64: 컬러지문 UI — TraitColor/PingerPrint v3** ✅
+  - 배경: 구현계획서 Phase 7. 멀티레이어 시각화
+  - AC1: TraitColorFingerprint v3 (멀티레이어 레이더 차트) ✅ `trait-color-fingerprint.tsx`
+  - AC2: PingerPrint2D v3 (멀티레이어 패턴) ✅ `p-inger-print-2d.tsx`
+  - AC3: PingerPrint3D v3 (멀티레이어 3D Jacks) ✅ `p-inger-print-3d.tsx`
+  - AC4: 지문 호환성 래퍼 (v2→v3 전환) ✅ `fingerprint-compat.tsx`
+  - AC5: 단위 테스트 (34 tests PASS) + 빌드 PASS + 커밋
+
+- [x] **T65: 소비자 여정 시뮬레이터** ✅
+  - 배경: 스펙 §5.7. B2B 고객 체험용 미리보기
+  - AC1: ✅ 시뮬레이터 UI (ConsumerProfile, UserDemographics, 매칭 결과 미리보기)
+  - AC2: ✅ 시뮬레이션 모드 (basic/detailed/comparison 3종)
+  - AC3: ✅ 데이터 소스 연동 (real_persona/virtual_user/synthetic)
+  - AC4: ✅ API 연동 가이드 (B2B 고객용 통합 가이드)
+  - AC5: ✅ 테스트 (35 tests PASS) + 빌드 PASS + 커밋
+
+- [x] **T66: 시스템 연동 관리** ✅
+  - 배경: 스펙 §6. 배포/버전/이벤트 버스
+  - AC1: ✅ API 배포 파이프라인 (DeployEnvironment, DeployWorkflow, CanaryRelease)
+  - AC2: ✅ 알고리즘 버전 관리 (parseVersion, activateVersion, deprecateVersion, diffVersions, rollbackVersion)
+  - AC3: ✅ 이벤트 버스 (createEventBus, subscribe, publish, getEventLog)
+  - AC4: ✅ 개발자 콘솔 연동 (API 문서 자동 생성, Changelog)
+  - AC5: ✅ 통합 테스트 자동화 (TestScenario, TestPipeline, TestReport)
+  - AC6: ✅ 테스트 (73 tests PASS) + 빌드 PASS + 커밋
+
+- [x] **T67: 운영 관리** ✅
+  - 배경: 스펙 §7. 시스템 모니터링 + 장애 대응 + 백업
+  - AC1: ✅ 시스템 모니터링 (MetricDataPoint, evaluateThresholds, searchLogs, buildMonitoringDashboard)
+  - AC2: ✅ 장애 대응 (createIncident, triageIncident, advanceIncidentPhase, resolveIncident, createPostMortem, calculateMTTR)
+  - AC3: ✅ 롤백/복구 (createRollbackRequest, analyzeRollbackImpact, executeRollbackStep, completeRollback)
+  - AC4: ✅ 백업/재해복구 (createBackupPolicy, createDRPlan, scheduleDRDrill, evaluateDRDrillResult)
+  - AC5: ✅ 용량 계획 (forecastLinear, generateCostOptimizations, generateScalingRecommendations, buildCapacityReport)
+  - AC6: ✅ 테스트 (107 tests PASS) + 빌드 PASS + 커밋
+
+- [x] **T68: 전역 설정 — 모델/비용 + 안전 필터 + API** ✅
+  - 배경: 스펙 §8. 엔진 전역 설정
+  - AC1: ✅ 모델 선택 + 비용 관리 (createModelConfig, resolveModel, estimateCost, recordSpend, getBudgetStatus)
+  - AC2: ✅ 안전 필터 (createSafetyFilter, evaluateFilter, addForbiddenWord, getFilterLogSummary)
+  - AC3: ✅ API 엔드포인트 관리 (registerEndpoint, updateRateLimit, recordHealthCheck, getHealthSummary)
+  - AC4: ✅ 테스트 (81 tests PASS) + 빌드 PASS + 커밋
+
+- [x] **T69: 팀 & 접근 관리** ✅
+  - 배경: 스펙 §2.4 + §9.1. 사용자/역할/감사
+  - AC1: ✅ 사용자 관리 (TeamMember, inviteMember, deactivateMember)
+  - AC2: ✅ 역할 권한 (Admin/AI Engineer/Content Manager/Analyst 4종, 권한 매트릭스)
+  - AC3: ✅ 감사 로그 (recordAuditEntry, searchAuditLog, exportAuditLog)
+  - AC4: ✅ 테스트 (45 tests PASS) + 빌드 PASS + 커밋
+
+- [x] **T70: 대시보드** ✅
+  - 배경: 스펙 §2.4. 시스템 전체 요약 화면
+  - AC1: ✅ 시스템 헬스 개요 (buildSystemHealth, healthScoreToGrade)
+  - AC2: ✅ 매칭 성과 요약 (TierDistribution, buildMatchingPerformance, calculateTrend)
+  - AC3: ✅ 최근 활동 로그 (ActivityEntry, buildActivityFeed, filterActivities)
+  - AC4: ✅ 퀵 액션 (DEFAULT_QUICK_ACTIONS, getAvailableActions)
+  - AC5: ✅ 테스트 (53 tests PASS) + 빌드 PASS + 커밋
+
+- [x] **T71: PersonaWorld RAG + LLM 전략 + 품질 피드백 루프** ✅
+  - 배경: 구현계획서 Phase 9. RAG/LLM/품질 통합
+  - AC1: ✅ RAG 시스템 (VoiceAnchor, RelationMemory, InterestContinuity, buildRAGContext, buildContextPrompt)
+  - AC2: ✅ LLM 전략 (2-Tier 모델 설정, routeToTier, createPromptCache, getCachedPrompt)
+  - AC3: ✅ 품질 피드백 (ParadoxExpressionScore, VoiceConsistencyMetric, PressureReactionTest)
+  - AC4: ✅ Few-shot 수집기 + 품질 대시보드 API
+  - AC5: ✅ RAG→프롬프트 빌더 통합 (integrateRAGWithPromptBuilder, integrateTierWithPipeline)
+  - AC6: ✅ 테스트 (85 tests PASS) + 빌드 PASS + 커밋
+
+### Phase PW-A: PersonaWorld 준비 — 디자인 시스템 (T74)
+
+> 엔진 완료 전 선행 가능한 순수 UI 작업. 목업 데이터 금지, shared-types import 기반.
+> 랜딩페이지는 통합 랜딩 하나로 사용 (별도 PW 랜딩 없음).
+
+- [ ] **T74: PW 디자인 시스템 완성 — shared-types + 신규 컴포넌트 + 6D 잔재 삭제**
+  - 배경: PW v3 재구축 전제조건. 타입은 shared-types에서 import, 로컬 재정의 금지
+  - AC1: shared-types v3 타입 import 설정 (PersonaV3, LayerVector, PostType 등 — 로컬 types.ts에서 re-export만)
+  - AC2: `lib/trait-colors.ts` 3-Layer 16D 색상 매핑 (engine-studio 상수 참조, 동기화)
+  - AC3: 디자인 시스템 신규 4종 — PWProfileRing, PWLikeButton, PWBadge, PWSpinner (UI 스펙 §4 준수, props 타이핑)
+  - AC4: 기존 6D 시각화 3파일 삭제 (trait-color-bar, trait-color-fingerprint, p-inger-print-2d)
+  - AC5: Build PASS + 테스트 + 커밋 + 푸시
+
+### Phase PW-B: PersonaWorld 페이지 구축 (T75~T79)
+
+> **선행조건: 엔진 Phase A 완료 (T45~T50)** — v3 API가 실제 데이터를 제공한 후 시작.
+> 모든 페이지는 실제 API 연동. 목업 데이터/하드코딩 절대 금지.
+
+- [ ] **T75: PW 온보딩 v3 — 3-Phase 질문 + 매칭 프리뷰**
+  - 배경: 설계서 §9. 실제 질문 API + 프로파일링 API 연동
+  - AC1: Phase 구조 UI (3-Phase × 8문항, 진행 바, Phase 간 전환)
+  - AC2: 시나리오 질문 카드 (4지선다, 선택 피드백, 게이미피케이션)
+  - AC3: Phase 간 매칭 프리뷰 (실제 매칭 API 호출, 페르소나 카드 + 유사도 %)
+  - AC4: 이탈 정책 UX (Phase 단위 저장, 미완료 Phase 리셋 경고)
+  - AC5: 프로필 등급 뱃지 (STARTER/STANDARD/ADVANCED/EXPERT)
+  - AC6: Build PASS + 테스트 + 커밋 + 푸시
+
+- [ ] **T76: PW 피드 v3 — 3-Tab + 17종 포스트 카드**
+  - 배경: 메인 화면. 실제 피드 API 연동
+  - AC1: 3-Tab 구조 (For You / Following / Explore)
+  - AC2: 17종 PostTypeCard (REVIEW, DEBATE, VS_BATTLE, COLLAB, BEHIND_STORY 등 타입별 분화 UI)
+  - AC3: 포스트 상호작용 바 (PWLikeButton, 댓글 수, 북마크, 공유)
+  - AC4: 피드 소스 라벨 (Following/추천/트렌딩 시각 구분)
+  - AC5: 무한 스크롤 + 로딩 스켈레톤
+  - AC6: Build PASS + 테스트 + 커밋 + 푸시
+
+- [ ] **T77: PW Explore v3 — 클러스터 + 핫 토픽 + 토론**
+  - 배경: 탐색 페이지. 실제 Explore API 연동
+  - AC1: Top 페르소나 클러스터 (역할/아키타입별 그룹 카드)
+  - AC2: 핫 토픽 섹션 (태그 기반, 참여 페르소나 수)
+  - AC3: 활성 토론 섹션 (대립 페르소나 페어 하이라이트)
+  - AC4: 신규 페르소나 하이라이트 (최근 생성, Auto-Interview 점수)
+  - AC5: 검색 + 아키타입/역할 필터
+  - AC6: Build PASS + 테스트 + 커밋 + 푸시
+
+- [ ] **T78: PW 페르소나 프로필 v3 — 3-Layer 시각화 + 상태**
+  - 배경: 페르소나 상세 페이지. 실제 페르소나 API 연동
+  - AC1: 3-Layer 멀티레이어 레이더 차트 (L1/L2/L3 오버레이, 레이어별 토글)
+  - AC2: PersonaState 표시 (mood/energy/socialBattery/paradoxTension 게이지)
+  - AC3: Paradox Score 시각화 + 교차축 하이라이트 Top 3
+  - AC4: 관계 미니맵 (팔로워/팔로잉, 관계 강도)
+  - AC5: 최근 포스트 타임라인 (17종 타입별 아이콘/레이아웃)
+  - AC6: Build PASS + 테스트 + 커밋 + 푸시
+
+- [ ] **T79: PW 유저 프로필 v3 + 댓글 + 알림**
+  - 배경: 유저 경험 완성. 실제 유저 API 연동
+  - AC1: 프로필 등급 + L1/L2 취향 벡터 시각화
+  - AC2: 데일리 마이크로 질문 UI (1문/로그인, 코인 보상, 스트릭)
+  - AC3: SNS 연동 UI (8개 플랫폼 카드, 동의 관리, 분석 진행)
+  - AC4: 댓글 UI + 톤 뱃지 (empathetic/analytical/counter_argument 등 8종)
+  - AC5: 알림 (페르소나 활동, 매칭 추천, 읽음 처리)
+  - AC6: Build PASS + 테스트 + 커밋 + 푸시
+
+### 보류: PW 백엔드 통합 (엔진 스튜디오 충돌 가능)
+
+> **엔진 스튜디오 작업 완료 후 상황 봐서 진행. Prisma 스키마 + API 라우트 변경 포함.**
+
+- 보류-1: Prisma 스키마 추가 (PersonaState, PersonaRelationship, ConsumptionLog 등)
+- 보류-2: API 라우트 재작성 (`/api/persona-world/*` 전체)
+- 보류-3: `user-store.ts` + `api.ts` 실제 API 연동 전환
+- 보류-4: 피드 알고리즘 3-Tier 매칭 엔진 연동
+- 보류-5: 자율 활동 엔진 (스케줄러, 콘텐츠 생성, RAG)
+- 보류-6: 품질 모니터링 (Auto-Interview, Integrity Score, Voice drift)
+
+---
+
+### 별도 작업 (설계 문서 + 데이터)
+
+- [ ] **T42: 매칭 설명 + 유저↔페르소나 일치도 시스템** (설계 문서)
+  - 배경: 유저가 "왜 이 페르소나가 나와 맞는지" 이해할 수 있어야 함. 숫자가 아닌 자연어 설명 필수
+  - AC1: `docs/design/persona-engine-v3.md` — 매칭 설명 시스템 섹션 신설
+    - 유저↔페르소나 일치도 계산 공식 (차원별 %, 종합 %)
+    - LLM 기반 자연어 설명 생성 (Sonnet, 프롬프트 설계)
+    - 차원별 일치/불일치 하이라이트 로직
+    - 교차축 기반 "의외의 공통점" 발견 로직
+  - AC2: `docs/specs/persona-world.md` / `persona-world-ui.md` — 매칭 설명 UI 스펙
+    - 매칭 카드 UI (일치율 %, 차원별 바, 자연어 설명)
+    - "왜 추천했는지" 상세 뷰 (교차축 하이라이트, 역설 호환성)
+  - AC3: 커밋 + 푸시
+
+- [ ] **T43: 개발자 콘솔 유저 프로필 API v3 + 동의 관리** (설계 문서)
+  - 배경: 유저 프로파일 데이터를 외부 플랫폼에 안전하게 공유. GDPR/개인정보 동의 필수
+  - AC1: `docs/specs/developer-console.md` §9 — 유저 프로필 API v3 확장
+    - GET /v1/users/{id}/profile v3 (L1+L2 벡터, 교차축, 동의 상태, 프로필 품질)
+    - POST /v1/users/{id}/onboarding v3 (L1 7D + L2 5D 응답)
+    - GET /v1/users/{id}/consent (동의 항목 조회)
+    - POST /v1/users/{id}/consent (동의 관리)
+  - AC2: `docs/specs/engine-studio.md` — 콜드스타트 질문 관리 UI
+    - 질문 세트 CRUD, 질문 순서/가중치 편집, 모드별(LIGHT/STANDARD/DEEP) 관리
+  - AC3: 커밋 + 푸시
+
+- [ ] **T44: 추가 질문 풀 126문항 SQL** (일시 보류)
+  - 배경: T41에서 온보딩 24문항 설계 완료. 데일리 마이크로 질문용 추가 풀 필요 (매일 1문항 × ~4개월분)
+  - AC1: 126문항 SQL 마이그레이션 파일 작성
+    - L1 집중 42문항 (축당 6문항)
+    - L2 집중 30문항 (축당 6문항)
+    - L1↔L2 교차 36문항 (주요 조합 12쌍 × 3문항)
+    - 역설 심화 18문항 (역설 패턴 6종 × 3문항)
+  - AC2: 커밋 + 푸시
 
 ---
 

@@ -8,6 +8,7 @@ import { Slider } from "@/components/ui/slider"
 import { ARCHETYPE_LABELS } from "@/constants/v3/interpretation-tables"
 import { calculateExtendedParadoxScore, calculateL1L2ParadoxScore } from "@/lib/vector/paradox"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
+import { calculateVFinal, vFinalToVector } from "@/lib/vector/v-final"
 import type {
   VectorFormData,
   SocialPersonaVector,
@@ -287,7 +288,7 @@ interface Step2Props {
   onNext: () => void
 }
 
-type ActiveTab = "l1" | "l2" | "l3" | "archetype" | "preview"
+type ActiveTab = "l1" | "l2" | "l3" | "archetype" | "preview" | "vfinal"
 
 export function Step2VectorEditor({ data, onChange, onPrev, onNext }: Step2Props) {
   const [activeTab, setActiveTab] = useState<ActiveTab>("l1")
@@ -323,6 +324,7 @@ export function Step2VectorEditor({ data, onChange, onPrev, onNext }: Step2Props
     { key: "l2", label: "L2 OCEAN (5D)" },
     { key: "l3", label: "L3 Narrative (4D)" },
     { key: "archetype", label: "아키타입" },
+    { key: "vfinal", label: "V_Final 시뮬레이터" },
     { key: "preview", label: "미리보기" },
   ]
 
@@ -401,6 +403,7 @@ export function Step2VectorEditor({ data, onChange, onPrev, onNext }: Step2Props
         {activeTab === "archetype" && (
           <ArchetypeSelector selectedId={data.archetypeId} onSelect={applyArchetype} />
         )}
+        {activeTab === "vfinal" && <VFinalSimulator l1={data.l1} l2={data.l2} l3={data.l3} />}
         {activeTab === "preview" && (
           <VectorPreview
             l1={data.l1 as unknown as Record<string, number>}
@@ -558,6 +561,186 @@ function VectorPreview({ l1, l2, paradoxProfile }: VectorPreviewProps) {
           </p>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── V_Final Simulator ───────────────────────────────────────
+
+function VFinalSimulator({
+  l1,
+  l2,
+  l3,
+}: {
+  l1: SocialPersonaVector
+  l2: CoreTemperamentVector
+  l3: NarrativeDriveVector
+}) {
+  const [pressure, setPressure] = useState(0.5)
+
+  const vFinalResult = useMemo(() => {
+    try {
+      return calculateVFinal(l1, l2, l3, pressure)
+    } catch {
+      return null
+    }
+  }, [l1, l2, l3, pressure])
+
+  const vFinalVector = useMemo(() => {
+    if (!vFinalResult) return null
+    return vFinalToVector(vFinalResult)
+  }, [vFinalResult])
+
+  const crossAxisProfile = useMemo(() => {
+    return calculateCrossAxisProfile(l1, l2, l3)
+  }, [l1, l2, l3])
+
+  return (
+    <div className="space-y-6">
+      {/* Pressure Slider */}
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-sm font-medium">상황 압력 (Pressure)</span>
+          <span className="font-mono text-sm font-bold">{pressure.toFixed(2)}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-muted-foreground text-[10px]">평온 (0.0)</span>
+          <Slider
+            value={[pressure]}
+            onValueChange={([v]) => setPressure(Math.round(v * 100) / 100)}
+            min={0}
+            max={1}
+            step={0.01}
+            className="flex-1"
+          />
+          <span className="text-muted-foreground text-[10px]">위기 (1.0)</span>
+        </div>
+        <p className="text-muted-foreground mt-1 text-xs">
+          압력이 높을수록 L2(본성)와 L3(욕망)가 더 강하게 드러납니다.
+        </p>
+      </div>
+
+      {/* Layer Contribution */}
+      {vFinalResult && (
+        <div className="border-border rounded-lg border p-3">
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider">레이어 기여도</h4>
+          <div className="flex gap-3">
+            <ContributionBar
+              label="L1 (가면)"
+              weight={vFinalResult.layerContributions.l1Weight}
+              color="bg-blue-500"
+            />
+            <ContributionBar
+              label="L2 (본성)"
+              weight={vFinalResult.layerContributions.l2Weight}
+              color="bg-green-500"
+            />
+            <ContributionBar
+              label="L3 (욕망)"
+              weight={vFinalResult.layerContributions.l3Weight}
+              color="bg-purple-500"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* V_Final Result */}
+      {vFinalVector && (
+        <div>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider">V_Final 결과 (7D)</h4>
+          <div className="space-y-2">
+            {L1_DIMS.map((dim) => {
+              const original = l1[dim.key]
+              const final = vFinalVector[dim.key]
+              const delta = final - original
+              return (
+                <div key={dim.key} className="flex items-center gap-3">
+                  <span className="w-20 shrink-0 text-xs font-medium">{dim.label}</span>
+                  <div className="bg-muted relative h-2 flex-1 overflow-hidden rounded-full">
+                    {/* Original L1 marker */}
+                    <div
+                      className="absolute top-0 h-2 w-0.5 bg-blue-300"
+                      style={{ left: `${original * 100}%` }}
+                    />
+                    {/* V_Final bar */}
+                    <div
+                      className="absolute inset-y-0 left-0 rounded-full bg-blue-500"
+                      style={{ width: `${final * 100}%` }}
+                    />
+                  </div>
+                  <span className="w-10 shrink-0 text-right font-mono text-xs">
+                    {final.toFixed(2)}
+                  </span>
+                  <span
+                    className={`w-12 shrink-0 text-right font-mono text-[10px] ${
+                      delta > 0.01
+                        ? "text-green-500"
+                        : delta < -0.01
+                          ? "text-red-500"
+                          : "text-muted-foreground"
+                    }`}
+                  >
+                    {delta > 0 ? "+" : ""}
+                    {delta.toFixed(2)}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Cross-Axis Summary */}
+      <div>
+        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider">
+          교차축 프로필 ({crossAxisProfile.axes.length}축)
+        </h4>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="border-border rounded border p-2 text-center">
+            <p className="text-muted-foreground text-[10px]">Paradox 축</p>
+            <p className="text-lg font-bold">{crossAxisProfile.summary.paradoxCount}</p>
+          </div>
+          <div className="border-border rounded border p-2 text-center">
+            <p className="text-muted-foreground text-[10px]">Reinforcing 축</p>
+            <p className="text-lg font-bold">{crossAxisProfile.summary.reinforcingCount}</p>
+          </div>
+          <div className="border-border rounded border p-2 text-center">
+            <p className="text-muted-foreground text-[10px]">Character Complexity</p>
+            <p className="text-lg font-bold">
+              {(crossAxisProfile.summary.characterComplexity * 100).toFixed(0)}%
+            </p>
+          </div>
+          <div className="border-border rounded border p-2 text-center">
+            <p className="text-muted-foreground text-[10px]">Modulating Intensity</p>
+            <p className="text-lg font-bold">
+              {(crossAxisProfile.summary.modulatingIntensity * 100).toFixed(0)}%
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ContributionBar({
+  label,
+  weight,
+  color,
+}: {
+  label: string
+  weight: number
+  color: string
+}) {
+  return (
+    <div className="flex-1 text-center">
+      <div className="bg-muted mx-auto h-16 w-6 overflow-hidden rounded">
+        <div
+          className={`${color} w-full rounded`}
+          style={{ height: `${weight * 100}%`, marginTop: `${(1 - weight) * 100}%` }}
+        />
+      </div>
+      <p className="mt-1 text-[10px] font-medium">{label}</p>
+      <p className="text-muted-foreground font-mono text-[10px]">{(weight * 100).toFixed(0)}%</p>
     </div>
   )
 }

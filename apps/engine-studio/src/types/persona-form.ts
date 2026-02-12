@@ -54,6 +54,10 @@ export interface VectorFormData {
 // ── Step 3: Prompt Engineering ──────────────────────────────
 export interface PromptFormData {
   basePrompt: string
+  reviewPrompt: string
+  postPrompt: string
+  commentPrompt: string
+  interactionPrompt: string
   promptVersion: string
 }
 
@@ -105,7 +109,11 @@ export const INITIAL_FORM_STATE: PersonaFormState = {
   },
   prompt: {
     basePrompt: "",
-    promptVersion: "1.0",
+    reviewPrompt: "",
+    postPrompt: "",
+    commentPrompt: "",
+    interactionPrompt: "",
+    promptVersion: "1.0.0",
   },
   saveAction: "DRAFT",
 }

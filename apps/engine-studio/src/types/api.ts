@@ -100,3 +100,68 @@ export interface PersonaListResponse {
     statusDistribution: Record<string, number>
   }
 }
+
+// ── Persona Detail API ────────────────────────────────────────
+
+export interface PersonaDetail {
+  id: string
+  name: string
+  role: string
+  expertise: string[]
+  description: string | null
+  profileImageUrl: string | null
+  status: string
+  source: string
+  archetypeId: string | null
+  parentPersonaId: string | null
+  paradoxScore: number | null
+  dimensionalityScore: number | null
+  qualityScore: number | null
+  validationScore: number | null
+  vectors: {
+    l1: Record<string, number> | null
+    l2: Record<string, number> | null
+    l3: Record<string, number> | null
+  }
+  basePrompt: string
+  promptVersion: string
+  createdAt: string
+  updatedAt: string
+  activatedAt: string | null
+  archivedAt: string | null
+}
+
+// ── Persona Update API ────────────────────────────────────────
+
+export interface UpdatePersonaBody {
+  name?: string
+  role?: string
+  expertise?: string[]
+  description?: string | null
+  profileImageUrl?: string | null
+  vectors?: {
+    l1: Record<string, number>
+    l2: Record<string, number>
+    l3: Record<string, number>
+  }
+  archetypeId?: string | null
+  basePrompt?: string
+}
+
+// ── Persona Duplicate API ─────────────────────────────────────
+
+export interface DuplicatePersonaBody {
+  newName: string
+}
+
+// ── Lifecycle Transition API ──────────────────────────────────
+
+export interface LifecycleTransitionBody {
+  action: string
+}
+
+export interface LifecycleTransitionResponse {
+  id: string
+  previousStatus: string
+  newStatus: string
+}

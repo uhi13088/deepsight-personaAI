@@ -47,7 +47,11 @@ const validVectors: VectorFormData = {
 const validPrompt: PromptFormData = {
   basePrompt:
     "이것은 테스트 프롬프트입니다. 최소 50자 이상이어야 합니다. 길이를 충분히 맞추기 위한 텍스트입니다.",
-  promptVersion: "1.0",
+  reviewPrompt: "",
+  postPrompt: "",
+  commentPrompt: "",
+  interactionPrompt: "",
+  promptVersion: "1.0.0",
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -281,6 +285,6 @@ describe("Form Constants", () => {
 
   it("INITIAL_FORM_STATE prompt defaults", () => {
     expect(INITIAL_FORM_STATE.prompt.basePrompt).toBe("")
-    expect(INITIAL_FORM_STATE.prompt.promptVersion).toBe("1.0")
+    expect(INITIAL_FORM_STATE.prompt.promptVersion).toBe("1.0.0")
   })
 })

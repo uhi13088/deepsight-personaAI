@@ -48,6 +48,10 @@ export function Step4Review({ formState, onPrev }: Step4Props) {
         },
         archetypeId: vectors.archetypeId,
         basePrompt: prompt.basePrompt,
+        reviewPrompt: prompt.reviewPrompt || null,
+        postPrompt: prompt.postPrompt || null,
+        commentPrompt: prompt.commentPrompt || null,
+        interactionPrompt: prompt.interactionPrompt || null,
         promptVersion: prompt.promptVersion,
         status: action === "ACTIVATE" ? "ACTIVE" : "DRAFT",
       }
@@ -139,9 +143,20 @@ export function Step4Review({ formState, onPrev }: Step4Props) {
 
         {/* Prompt */}
         <ReviewSection title="프롬프트">
-          <p className="text-muted-foreground text-xs">
-            {prompt.basePrompt.length}자, v{prompt.promptVersion}
-          </p>
+          <ReviewRow label="버전" value={`v${prompt.promptVersion}`} />
+          <ReviewRow label="기본" value={`${prompt.basePrompt.length}자`} />
+          {prompt.reviewPrompt && (
+            <ReviewRow label="리뷰" value={`${prompt.reviewPrompt.length}자`} />
+          )}
+          {prompt.postPrompt && (
+            <ReviewRow label="포스트" value={`${prompt.postPrompt.length}자`} />
+          )}
+          {prompt.commentPrompt && (
+            <ReviewRow label="댓글" value={`${prompt.commentPrompt.length}자`} />
+          )}
+          {prompt.interactionPrompt && (
+            <ReviewRow label="대화" value={`${prompt.interactionPrompt.length}자`} />
+          )}
           <pre className="bg-muted mt-2 max-h-40 overflow-auto rounded-md p-3 font-mono text-[10px]">
             {prompt.basePrompt.slice(0, 500)}
             {prompt.basePrompt.length > 500 && "..."}
