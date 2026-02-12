@@ -2,14 +2,14 @@
 
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
-import type { Vector6D, PersonaDetail } from "./types"
+import type { ThreeLayerVector } from "./types"
 
 // 사용자 프로필 타입
 export interface UserProfile {
   id: string
   nickname: string
-  vector: Vector6D | null
-  vectorConfidence: Record<keyof Vector6D, number> | null
+  vector: ThreeLayerVector | null
+  vectorConfidence: number | null
   completedOnboarding: boolean
   createdAt: string
 }
@@ -37,7 +37,7 @@ interface UserState {
   // 프로필
   profile: UserProfile | null
   setProfile: (profile: UserProfile) => void
-  updateVector: (vector: Vector6D, confidence: Record<keyof Vector6D, number>) => void
+  updateVector: (vector: ThreeLayerVector, confidence: number) => void
   completeOnboarding: () => void
 
   // 팔로우

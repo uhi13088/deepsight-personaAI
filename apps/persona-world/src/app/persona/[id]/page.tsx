@@ -18,12 +18,10 @@ import {
 import { toast } from "sonner"
 import { clientApi } from "@/lib/api"
 import { useUserStore } from "@/lib/user-store"
-import { TRAIT_DIMENSIONS } from "@/lib/trait-colors"
-import { TraitColorBar } from "@/components/trait-color-bar"
-import { PingerPrint2D } from "@/components/p-inger-print-2d"
+import { L1_DIMENSIONS, L2_DIMENSIONS, L3_DIMENSIONS, LAYER_COLORS } from "@/lib/trait-colors"
 import { ROLE_NAMES, POST_TYPE_LABELS } from "@/lib/role-config"
 import { formatTimeAgo } from "@/lib/format"
-import type { PersonaFullDetail, Vector6D } from "@/lib/types"
+import type { PersonaFullDetail } from "@/lib/types"
 
 // 포스트 카드 컴포넌트
 function PostCard({ post }: { post: PersonaFullDetail["recentPosts"][number] }) {
@@ -248,42 +246,64 @@ export default function PersonaDetailPage() {
           </div>
         </div>
 
-        {/* 성향 프로필 - 컬러 지문 + 게이지 바 */}
+        {/* 성향 프로필 — 3-Layer 벡터 요약 */}
         {persona.vector && (
           <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <h3 className="mb-5 flex items-center gap-2 font-semibold text-gray-900">
               <div className="flex h-6 w-6 items-center justify-center rounded bg-gradient-to-br from-violet-500 to-purple-600">
                 <FileText className="h-3 w-3 text-white" />
               </div>
-              성향 프로필
+              3-Layer 성향 프로필
             </h3>
 
-            {/* P-inger Print 2D (종합 인상) */}
-            <div className="mb-6 flex justify-center">
-              <div className="w-64">
-                <PingerPrint2D
-                  data={persona.vector as unknown as Record<string, number>}
-                  size={260}
-                />
-              </div>
-            </div>
-
-            {/* 구분선 */}
-            <div className="mb-5 flex items-center gap-3">
-              <div className="h-px flex-1 bg-gray-100" />
-              <span className="text-xs text-gray-400">차원별 상세</span>
-              <div className="h-px flex-1 bg-gray-100" />
-            </div>
-
-            {/* 게이지 바 (차원별 상세) */}
-            <div className="space-y-5">
-              {TRAIT_DIMENSIONS.filter((dim) => dim.key in persona.vector!).map((dim) => (
-                <TraitColorBar
-                  key={dim.key}
-                  dimension={dim}
-                  value={persona.vector![dim.key as keyof Vector6D]}
-                  size="md"
-                />
+            {/* 레이어별 요약 */}
+            <div className="space-y-4">
+              {(
+                [
+                  { layer: "L1" as const, dims: L1_DIMENSIONS, data: persona.vector.social },
+                  { layer: "L2" as const, dims: L2_DIMENSIONS, data: persona.vector.temperament },
+                  { layer: "L3" as const, dims: L3_DIMENSIONS, data: persona.vector.narrative },
+                ] as const
+              ).map(({ layer, dims, data }) => (
+                <div
+                  key={layer}
+                  className="rounded-xl border p-4"
+                  style={{
+                    borderColor: LAYER_COLORS[layer].border,
+                    backgroundColor: LAYER_COLORS[layer].bg,
+                  }}
+                >
+                  <div className="mb-3 flex items-center gap-2">
+                    <span
+                      className="rounded-full px-2 py-0.5 text-xs font-bold text-white"
+                      style={{ backgroundColor: LAYER_COLORS[layer].primary }}
+                    >
+                      {layer}
+                    </span>
+                    <span className="text-sm font-medium text-gray-700">
+                      {LAYER_COLORS[layer].label}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {dims.map((dim) => {
+                      const value = data[dim.key as keyof typeof data]
+                      return (
+                        <div key={dim.key} className="flex items-center gap-2">
+                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-200">
+                            <div
+                              className="h-full rounded-full transition-all"
+                              style={{
+                                width: `${(value ?? 0) * 100}%`,
+                                backgroundColor: dim.color.primary,
+                              }}
+                            />
+                          </div>
+                          <span className="w-16 text-right text-xs text-gray-500">{dim.label}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
               ))}
             </div>
           </div>

@@ -39,13 +39,23 @@ export const ROLE_COLORS_BOLD: Record<string, string> = {
   ANALYST: "from-cyan-400 to-blue-400",
 }
 
-/** 포스트 타입 라벨 */
+/** 포스트 타입 라벨 (v3: 17종) */
 export const POST_TYPE_LABELS: Record<string, string> = {
   REVIEW: "리뷰",
-  OPINION: "의견",
+  THOUGHT: "생각",
   RECOMMENDATION: "추천",
+  REACTION: "리액션",
+  QUESTION: "질문",
+  LIST: "리스트",
+  THREAD: "스레드",
   VS_BATTLE: "VS 배틀",
   QNA: "Q&A",
-  NEWS_REACTION: "뉴스 반응",
+  CURATION: "큐레이션",
   DEBATE: "토론",
+  MEME: "밈",
+  COLLAB: "콜라보",
+  TRIVIA: "트리비아",
+  PREDICTION: "예측",
+  ANNIVERSARY: "기념일",
+  BEHIND_STORY: "비하인드",
 }

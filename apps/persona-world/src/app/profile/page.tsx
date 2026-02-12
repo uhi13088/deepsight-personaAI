@@ -22,9 +22,8 @@ import Link from "next/link"
 import { toast } from "sonner"
 import { useUserStore } from "@/lib/user-store"
 import { clientApi } from "@/lib/api"
-import { TRAIT_DIMENSIONS } from "@/lib/trait-colors"
-import { TraitColorBar } from "@/components/trait-color-bar"
-import type { PersonaDetail, Vector6D } from "@/lib/types"
+import { L1_DIMENSIONS, L2_DIMENSIONS, L3_DIMENSIONS, LAYER_COLORS } from "@/lib/trait-colors"
+import type { PersonaDetail } from "@/lib/types"
 
 export default function ProfilePage() {
   const { profile, followedPersonas, likedPosts, bookmarkedPosts, reset, notifications } =
@@ -118,21 +117,55 @@ export default function ProfilePage() {
           </PWCard>
         )}
 
-        {/* 6D 벡터 프로필 (온보딩 완료 시) */}
+        {/* 3-Layer 벡터 프로필 (온보딩 완료 시) */}
         {profile?.vector && (
           <PWCard className="mb-6">
             <h3 className="mb-4 flex items-center gap-2 font-semibold text-gray-900">
               <PWIcon icon={BarChart3} size="sm" gradient />
-              나의 취향 벡터
+              나의 3-Layer 취향 벡터
             </h3>
-            <div className="space-y-4">
-              {TRAIT_DIMENSIONS.filter((dim) => dim.key in profile.vector!).map((dim) => (
-                <TraitColorBar
-                  key={dim.key}
-                  dimension={dim}
-                  value={profile.vector![dim.key as keyof Vector6D]}
-                  size="sm"
-                />
+            <div className="space-y-3">
+              {(
+                [
+                  { layer: "L1" as const, dims: L1_DIMENSIONS, data: profile.vector.social },
+                  { layer: "L2" as const, dims: L2_DIMENSIONS, data: profile.vector.temperament },
+                  { layer: "L3" as const, dims: L3_DIMENSIONS, data: profile.vector.narrative },
+                ] as const
+              ).map(({ layer, dims, data }) => (
+                <div
+                  key={layer}
+                  className="rounded-lg border p-3"
+                  style={{
+                    borderColor: LAYER_COLORS[layer].border,
+                    backgroundColor: LAYER_COLORS[layer].bg,
+                  }}
+                >
+                  <span
+                    className="mb-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
+                    style={{ backgroundColor: LAYER_COLORS[layer].primary }}
+                  >
+                    {layer} {LAYER_COLORS[layer].label}
+                  </span>
+                  <div className="space-y-1.5">
+                    {dims.map((dim) => {
+                      const value = data[dim.key as keyof typeof data]
+                      return (
+                        <div key={dim.key} className="flex items-center gap-2">
+                          <span className="w-14 text-[11px] text-gray-500">{dim.label}</span>
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-200">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${(value ?? 0) * 100}%`,
+                                backgroundColor: dim.color.primary,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
               ))}
             </div>
           </PWCard>
@@ -214,7 +247,7 @@ export default function ProfilePage() {
                 <div>
                   <div className="font-medium text-gray-900">취향 분석</div>
                   <div className="text-sm text-gray-500">
-                    {profile?.vector ? "다시 분석하기" : "나의 6D 벡터 프로필"}
+                    {profile?.vector ? "다시 분석하기" : "나의 3-Layer 벡터 프로필"}
                   </div>
                 </div>
               </div>

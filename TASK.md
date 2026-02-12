@@ -277,13 +277,13 @@
 > 엔진 완료 전 선행 가능한 순수 UI 작업. 목업 데이터 금지, shared-types import 기반.
 > 랜딩페이지는 통합 랜딩 하나로 사용 (별도 PW 랜딩 없음).
 
-- [ ] **T74: PW 디자인 시스템 완성 — shared-types + 신규 컴포넌트 + 6D 잔재 삭제**
-  - 배경: PW v3 재구축 전제조건. 타입은 shared-types에서 import, 로컬 재정의 금지
-  - AC1: shared-types v3 타입 import 설정 (PersonaV3, LayerVector, PostType 등 — 로컬 types.ts에서 re-export만)
-  - AC2: `lib/trait-colors.ts` 3-Layer 16D 색상 매핑 (engine-studio 상수 참조, 동기화)
-  - AC3: 디자인 시스템 신규 4종 — PWProfileRing, PWLikeButton, PWBadge, PWSpinner (UI 스펙 §4 준수, props 타이핑)
-  - AC4: 기존 6D 시각화 3파일 삭제 (trait-color-bar, trait-color-fingerprint, p-inger-print-2d)
-  - AC5: Build PASS + 테스트 + 커밋 + 푸시
+- [x] **T74: PW 디자인 시스템 완성 — shared-types + 신규 컴포넌트 + 6D 잔재 삭제** ✅ 2026-02-12
+  - AC1: ✅ shared-types v3 타입 import (ThreeLayerVector, ParadoxProfile 등 14종 re-export, Vector6D 삭제)
+  - AC2: ✅ trait-colors.ts 3-Layer 16D 색상 매핑 (L1 7D Blue + L2 5D Warm + L3 4D Purple, engine-studio 동기화)
+  - AC3: ✅ 디자인 시스템 신규 4종 — PWProfileRing (size 4종+animated), PWLikeButton (하트 팝), PWBadge (3 variant), PWSpinner (size 3종)
+  - AC4: ✅ 기존 6D 시각화 3파일 삭제 (trait-color-bar, trait-color-fingerprint, p-inger-print-2d) + 페이지 v3 전환
+  - AC5: ✅ 테스트 2파일 23개 PASS + Build PASS
+  - 변경: types.ts, user-store.ts, trait-colors.ts, role-config.ts, globals.css, page.tsx, persona/[id]/page.tsx, profile/page.tsx, pw-profile-ring.tsx, pw-like-button.tsx, pw-badge.tsx, pw-spinner.tsx, index.ts, vitest.config.ts
 
 ### Phase PW-B: PersonaWorld 페이지 구축 (T75~T79)
 
@@ -386,7 +386,7 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-(없음)
+(없음 — T74 완료)
 
 ---
 

@@ -198,6 +198,37 @@ body {
   );
 }
 
+/* 프로필 링 — 회전 애니메이션 */
+.pw-profile-ring-animated {
+  padding: 3px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, #833ab4, #fd1d1d, #fcb045, #833ab4);
+  animation: pw-ring-rotate 3s linear infinite;
+}
+
+@keyframes pw-ring-rotate {
+  to {
+    background: conic-gradient(from 360deg, #833ab4, #fd1d1d, #fcb045, #833ab4);
+  }
+}
+
+/* 뱃지 펄스 */
+.pw-badge-pulse {
+  animation: pw-badge-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pw-badge-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.05);
+  }
+}
+
 /* 카드 호버 효과 */
 .pw-card-hover {
   transition:

@@ -1,17 +1,23 @@
-// 6D 벡터
-export interface Vector6D {
-  depth: number
-  lens: number
-  stance: number
-  scope: number
-  taste: number
-  purpose: number
-}
+// ── v3 타입: shared-types에서 re-export ────────────────────
+export type {
+  SocialPersonaVector,
+  CoreTemperamentVector,
+  NarrativeDriveVector,
+  ThreeLayerVector,
+  SocialDimension,
+  TemperamentDimension,
+  NarrativeDimension,
+  AnyDimension,
+  ParadoxProfile,
+  CrossAxisType,
+  CrossAxisRelationship,
+  PersonaStatus,
+} from "@deepsight/shared-types"
 
-// 페르소나 역할
+// ── 페르소나 역할 ────────────────────────────────────────
 export type PersonaRole = "REVIEWER" | "CURATOR" | "EDUCATOR" | "COMPANION" | "ANALYST"
 
-// 페르소나 (피드용)
+// ── 페르소나 (피드용) ────────────────────────────────────
 export interface Persona {
   id: string
   name: string
@@ -22,24 +28,36 @@ export interface Persona {
   warmth: number
 }
 
-// 페르소나 상세 (탐색용)
+// ── 페르소나 상세 (탐색용) ───────────────────────────────
+import type { ThreeLayerVector } from "@deepsight/shared-types"
+
 export interface PersonaDetail extends Persona {
   expertise: string[]
-  vector: Vector6D | null
+  vector: ThreeLayerVector | null
   postCount: number
 }
 
-// 포스트 타입
+// ── 포스트 타입 (v3: 17종) ───────────────────────────────
 export type PostType =
   | "REVIEW"
-  | "OPINION"
+  | "THOUGHT"
   | "RECOMMENDATION"
+  | "REACTION"
+  | "QUESTION"
+  | "LIST"
+  | "THREAD"
   | "VS_BATTLE"
   | "QNA"
-  | "NEWS_REACTION"
+  | "CURATION"
   | "DEBATE"
+  | "MEME"
+  | "COLLAB"
+  | "TRIVIA"
+  | "PREDICTION"
+  | "ANNIVERSARY"
+  | "BEHIND_STORY"
 
-// 피드 포스트
+// ── 피드 포스트 ──────────────────────────────────────────
 export interface FeedPost {
   id: string
   type: PostType
@@ -53,7 +71,7 @@ export interface FeedPost {
   createdAt: string
 }
 
-// API 응답
+// ── API 응답 ─────────────────────────────────────────────
 export interface ApiResponse<T> {
   success: boolean
   data?: T
@@ -63,7 +81,7 @@ export interface ApiResponse<T> {
   }
 }
 
-// 페르소나 목록 응답
+// ── 페르소나 목록 응답 ───────────────────────────────────
 export interface PersonasResponse {
   personas: PersonaDetail[]
   total: number
@@ -72,20 +90,20 @@ export interface PersonasResponse {
   hasMore: boolean
 }
 
-// 피드 응답
+// ── 피드 응답 ────────────────────────────────────────────
 export interface FeedResponse {
   posts: FeedPost[]
   nextCursor: string | null
   hasMore: boolean
 }
 
-// 트렌딩 토픽
+// ── 트렌딩 토픽 ─────────────────────────────────────────
 export interface TrendingTopic {
   tag: string
   count: number
 }
 
-// 페르소나 상세 페이지용 (포스트 포함)
+// ── 페르소나 상세 페이지용 (포스트 포함) ─────────────────
 export interface PersonaFullDetail extends PersonaDetail {
   description: string | null
   recentPosts: Omit<FeedPost, "persona">[]
