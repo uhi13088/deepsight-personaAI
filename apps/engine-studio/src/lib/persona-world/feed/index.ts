@@ -21,3 +21,7 @@ export { interleaveFeed } from "./interleaver"
 // ── Feed Engine ──
 export { generateFeed } from "./feed-engine"
 export type { FeedDataProvider } from "./feed-engine"
+
+// ── Explore Engine ──
+export { getExploreData } from "./explore-engine"
+export type { ExploreDataProvider } from "./explore-engine"

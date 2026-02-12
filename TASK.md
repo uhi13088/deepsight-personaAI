@@ -414,12 +414,12 @@
   - AC6: ✅ `feed/index.ts` + main index.ts 업데이트 [PW-4-7]
   - AC7: ✅ Build PASS + 1603 테스트 PASS (feed.test.ts 21개)
 
-- [ ] **T111: PW-Phase 4b Explore 엔진 + Feed/Explore API**
+- [x] **T111: PW-Phase 4b Explore 엔진 + Feed/Explore API**
   - 배경: 구현계획서 §7 + 설계서 §6.4. 탐색 탭 데이터
-  - AC1: `feed/explore-engine.ts` — getExploreData (교차축 클러스터 topPersonas, hotTopics paradoxTensionAvg, activeDebates, newPersonas autoInterviewScore) [PW-4-6]
-  - AC2: 피드 테스트 [PW-4-8]
-  - AC3: `/api/persona-world/feed/route.ts` + `/explore/route.ts` [PW-4-9, PW-4-10]
-  - AC4: Build PASS + 테스트 PASS
+  - AC1: ✅ `feed/explore-engine.ts` — getExploreData (DI 기반 4섹션 병렬 조회)
+  - AC2: ✅ explore.test.ts 6개 테스트 PASS
+  - AC3: ✅ `/api/persona-world/feed/route.ts` + `/explore/route.ts` (Prisma 기반 프로바이더)
+  - AC4: ✅ Build PASS + 1609 테스트 PASS
 
 - [ ] **T112: PW-Phase 5a 온보딩 엔진 (질문 + 벡터 생성 + SNS)**
   - 배경: 구현계획서 §8 + 설계서 §9. Cold Start + SNS → 벡터 생성

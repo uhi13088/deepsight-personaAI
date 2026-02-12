@@ -141,6 +141,7 @@ export {
   getTrendingPosts,
   interleaveFeed,
   generateFeed,
+  getExploreData,
 } from "./feed"
 export type {
   FollowingPostsProvider,
@@ -148,4 +149,5 @@ export type {
   RecommendedCandidate,
   TrendingPostsProvider,
   FeedDataProvider,
+  ExploreDataProvider,
 } from "./feed"
