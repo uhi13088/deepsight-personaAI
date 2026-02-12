@@ -437,6 +437,19 @@
   - AC4: localStorage 기반 테마 유지 + system preference 감지 (prefers-color-scheme)
   - AC5: 테스트 + Build PASS
 
+### Phase E: 노드 에디터 통합 (T128~)
+
+> T59~T61에서 구축한 DAG 엔진 + 캔버스 UI를 실제 사용 가능한 페이지로 통합.
+
+- [ ] **T128: 노드 에디터 페이지 통합 — ComfyUI 스타일 페르소나 생성**
+  - 배경: T59~T61에서 DAG 엔진(25노드) + ReactFlow 캔버스 + 실행 엔진 완성. 하지만 handleExecute/handleSave가 placeholder 상태이고, 노드 에디터 접근 가능한 페이지 라우트가 없음. 4-step 위자드와 별도로 ComfyUI 스타일 생성 경로 필요
+  - AC1: 실행 엔진 연결 — `handleExecute` placeholder를 `executeGraph()` 실제 호출로 교체. 실행 전 `validateGraph()` 검증. 실행 결과를 Zustand store에 반영 (executionResults, activeEdges). 노드별 상태 배지(성공/에러/스킵) 표시, 활성 엣지 녹색 애니메이션
+  - AC2: 저장/로드 연결 — `handleSave` placeholder를 `serializeGraph()` + localStorage 저장으로 교체. 프리셋/저장된 그래프 로드 (deserializeGraph). 키: `node-graph-${personaId}`
+  - AC3: 실행 결과 패널 — 하단 접이식 패널. 실행 요약(성공/스킵/에러 카운트, 총 소요시간), 실행 경로 리스트(순번/상태/노드명/소요시간), 노드 클릭 시 캔버스 선택 연동
+  - AC4: 전용 페이지 라우트 — `/persona-studio/node-editor` 페이지. `?preset=standard` 프리셋 로드, `?personaId=xxx` 저장 그래프 로드 지원. 전체 높이 캔버스 레이아웃
+  - AC5: 네비게이션 추가 — LNB Persona Studio 하위에 "Node Editor" 항목 추가
+  - AC6: 테스트 + Build PASS — 프리셋 직렬화 라운드트립, 프리셋 실행, 실행 요약, 저장/로드 라운드트립 테스트
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
