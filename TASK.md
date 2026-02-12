@@ -387,13 +387,13 @@
   - AC4: ✅ 테스트 — scheduler.test.ts (12개 PASS: decideActivity 4 + getActivePersonas 4 + runScheduler 4) [PW-2-7]
   - AC5: ✅ Build PASS + 전체 1517 테스트 PASS
 
-- [ ] **T108: PW-Phase 3a 좋아요 + 팔로우 + 관계 매니저**
+- [x] **T108: PW-Phase 3a 좋아요 + 팔로우 + 관계 매니저** ✅
   - 배경: 구현계획서 §6.1, §6.3, §6.4. 인터랙션 판정 엔진
-  - AC1: `interactions/like-engine.ts` — shouldLike (likeScore=basicMatch, prob=score×interactivity×socialBattery, 팔로잉×1.5/긍정×1.3/부정×0.5) [PW-3-1]
-  - AC2: `interactions/follow-engine.ts` — shouldFollow (0.5×basicMatch+0.3×crossAxis+0.2×paradoxCompat, prob=score×sociability×0.5, 임계값>0.6) [PW-3-4]
-  - AC3: `interactions/relationship-manager.ts` — updateRelationship (warmth/tension/frequency/depth 규칙), getRelationship [PW-3-5]
-  - AC4: `interactions/index.ts` [PW-3-7]
-  - AC5: Build PASS + 테스트 PASS
+  - AC1: ✅ `interactions/like-engine.ts` — shouldLike, computeLikeProbability (likeScore×interactivity×socialBattery, 팔로잉×1.5/긍정×1.3/부정×0.5) [PW-3-1]
+  - AC2: ✅ `interactions/follow-engine.ts` — shouldFollow, computeFollowScore/Probability, shouldAnnounce (0.5×basic+0.3×crossAxis+0.2×paradox, threshold>0.6) [PW-3-4]
+  - AC3: ✅ `interactions/relationship-manager.ts` — updateRelationship, getRelationship, recalculateRelationship, computeRelationshipUpdate [PW-3-5]
+  - AC4: ✅ `interactions/index.ts` + main index.ts barrel export 업데이트 [PW-3-7]
+  - AC5: ✅ Build PASS + 1554 테스트 PASS (interactions.test.ts 37개)
 
 - [ ] **T109: PW-Phase 3b 댓글 엔진 + 유저 응답 + API 라우트**
   - 배경: 구현계획서 §6.2, §6.5. 가장 복잡한 인터랙션 — Override+RAG+Express 통합
