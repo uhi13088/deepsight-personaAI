@@ -66,6 +66,46 @@ export interface UsageData {
 }
 
 // ============================================================================
+// 엔드포인트 상세 분석 (§6.2)
+// ============================================================================
+
+export interface EndpointDetail {
+  endpoint: string
+  totalCalls: number
+  successRate: number
+  latency: {
+    p50: number
+    p90: number
+    p95: number
+    p99: number
+    avg: number
+  }
+  hourlyPattern: { hour: string; calls: number }[]
+  errorTypes: { code: number; count: number; message: string }[]
+}
+
+// ============================================================================
+// 비용 분석 (§6.2.4)
+// ============================================================================
+
+export interface CostAnalysis {
+  byEndpoint: { endpoint: string; calls: number; cost: number }[]
+  dailyCost: { date: string; cost: number }[]
+  projectedMonthly: number
+  currentMonthly: number
+}
+
+export interface CostSimulationResult {
+  planName: string
+  monthlyCost: number
+  perCallRate: number
+  included: number
+  overageRate: number
+  overageCost: number
+  totalCost: number
+}
+
+// ============================================================================
 // 서비스 클래스
 // ============================================================================
 
@@ -77,6 +117,56 @@ class UsageService {
       throw new ApiError({
         code: "USAGE_FETCH_FAILED",
         message: "사용량 데이터를 불러오는데 실패했습니다.",
+        status: 500,
+        timestamp: new Date().toISOString(),
+      })
+    }
+
+    return response.data
+  }
+
+  async getEndpointDetail(endpoint: string, period: string = "7d"): Promise<EndpointDetail> {
+    const response = await apiClient.get<EndpointDetail>("/usage/endpoint-detail", {
+      endpoint,
+      period,
+    })
+
+    if (!response.success || !response.data) {
+      throw new ApiError({
+        code: "ENDPOINT_DETAIL_FETCH_FAILED",
+        message: "엔드포인트 상세 데이터를 불러오는데 실패했습니다.",
+        status: 500,
+        timestamp: new Date().toISOString(),
+      })
+    }
+
+    return response.data
+  }
+
+  async getCostAnalysis(period: string = "30d"): Promise<CostAnalysis> {
+    const response = await apiClient.get<CostAnalysis>("/usage/cost-analysis", { period })
+
+    if (!response.success || !response.data) {
+      throw new ApiError({
+        code: "COST_ANALYSIS_FETCH_FAILED",
+        message: "비용 분석 데이터를 불러오는데 실패했습니다.",
+        status: 500,
+        timestamp: new Date().toISOString(),
+      })
+    }
+
+    return response.data
+  }
+
+  async simulateCost(dailyCalls: number): Promise<CostSimulationResult[]> {
+    const response = await apiClient.post<CostSimulationResult[]>("/usage/simulate-cost", {
+      dailyCalls,
+    })
+
+    if (!response.success || !response.data) {
+      throw new ApiError({
+        code: "COST_SIMULATION_FAILED",
+        message: "비용 시뮬레이션에 실패했습니다.",
         status: 500,
         timestamp: new Date().toISOString(),
       })
