@@ -404,15 +404,15 @@
   - AC5: ✅ API Routes — `/posts/[id]/likes/route.ts` (좋아요 토글), `/follows/route.ts` (팔로우 토글) + 기존 comments route 활용 [PW-3-9~3-11]
   - AC6: ✅ Build PASS + 1582 테스트 PASS
 
-- [ ] **T110: PW-Phase 4a 피드 엔진 (Following + Recommended + Trending + Interleaver)**
+- [x] **T110: PW-Phase 4a 피드 엔진 (Following + Recommended + Trending + Interleaver)** ✅
   - 배경: 구현계획서 §7 + 설계서 §6. 3-Tier 매칭 기반 피드
-  - AC1: `feed/following-posts.ts` — getFollowingPosts (시간순) [PW-4-1]
-  - AC2: `feed/recommended-posts.ts` — getRecommendedPosts (Basic 60%: V_Final 70%+crossAxis 30% / Exploration 30%: paradoxDiv 40%+crossAxisDiv 40%+freshness 20% / Advanced 10%: V_Final 50%+crossAxis 30%+paradoxCompat 20%) [PW-4-2]
-  - AC3: `feed/trending-posts.ts` — getTrendingPosts (engagement 기반, timeWindow) [PW-4-3]
-  - AC4: `feed/interleaver.ts` — interleaveFeed (F F B F F E F F ... 패턴, 같은 Tier 연속 방지) [PW-4-4]
-  - AC5: `feed/feed-engine.ts` — generateFeed (Following 60% + Recommended 30% + Trending 10%, qualitativeBonus ±0.10) [PW-4-5]
-  - AC6: `feed/index.ts` [PW-4-7]
-  - AC7: Build PASS + 테스트 PASS
+  - AC1: ✅ `feed/following-posts.ts` — getFollowingPosts (시간순, DI provider) [PW-4-1]
+  - AC2: ✅ `feed/recommended-posts.ts` — getRecommendedPosts, distributeTiers (Basic 60%/Exploration 30%/Advanced 10% 배분, 중복 방지), applyQualitativeBonus [PW-4-2]
+  - AC3: ✅ `feed/trending-posts.ts` — getTrendingPosts (engagement, timeWindow 48h) [PW-4-3]
+  - AC4: ✅ `feed/interleaver.ts` — interleaveFeed (Following 2개 + non-following 1개 패턴, interleaveQueues 라운드 로빈) [PW-4-4]
+  - AC5: ✅ `feed/feed-engine.ts` — generateFeed (60/30/10 비율, 병렬 조회, 인터리빙) [PW-4-5]
+  - AC6: ✅ `feed/index.ts` + main index.ts 업데이트 [PW-4-7]
+  - AC7: ✅ Build PASS + 1603 테스트 PASS (feed.test.ts 21개)
 
 - [ ] **T111: PW-Phase 4b Explore 엔진 + Feed/Explore API**
   - 배경: 구현계획서 §7 + 설계서 §6.4. 탐색 탭 데이터

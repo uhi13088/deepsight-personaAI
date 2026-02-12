@@ -131,3 +131,21 @@ export type {
   UserInteractionLLMProvider,
   UserInteractionResult,
 } from "./interactions"
+
+// Phase 4: Feed System
+export {
+  getFollowingPosts,
+  getRecommendedPosts,
+  distributeTiers,
+  applyQualitativeBonus,
+  getTrendingPosts,
+  interleaveFeed,
+  generateFeed,
+} from "./feed"
+export type {
+  FollowingPostsProvider,
+  RecommendedPostsProvider,
+  RecommendedCandidate,
+  TrendingPostsProvider,
+  FeedDataProvider,
+} from "./feed"
