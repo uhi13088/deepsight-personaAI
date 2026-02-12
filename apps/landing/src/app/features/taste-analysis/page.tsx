@@ -23,7 +23,7 @@ import {
 export const metadata: Metadata = {
   title: "소비자 취향 분석 — Features",
   description:
-    "6D 벡터 프로파일링, SNS 행동 데이터 분석, 콜드스타트 해결, 프로필 누적 학습으로 매칭 정확도를 지속 향상합니다.",
+    "3-Layer 16D 벡터 프로파일링, SNS 행동 데이터 분석, 3-Phase 24문항 온보딩으로 매칭 정확도를 지속 향상합니다.",
 }
 
 const VECTOR_DIMENSIONS = [
@@ -93,6 +93,17 @@ const VECTOR_DIMENSIONS = [
     icon: Brain,
     color: "from-pink-500 to-pink-600",
   },
+  {
+    id: "sociability",
+    name: "Sociability",
+    label: "사회적 성향",
+    low: "독립적",
+    high: "사교적",
+    description: "콘텐츠를 혼자 소비하는지, 함께 나누고 공유하는 것을 선호하는지 측정합니다.",
+    example: "혼자 조용히 책을 읽는지, SNS에 감상평을 나누는지",
+    icon: Share2,
+    color: "from-indigo-500 to-indigo-600",
+  },
 ]
 
 const COLD_START_METHODS = [
@@ -102,11 +113,11 @@ const COLD_START_METHODS = [
     badge: "Quick Profile",
     badgeColor: "bg-purple-100 text-purple-600",
     description:
-      "A vs B 선택형 질문으로 6D 벡터를 생성합니다. 각 질문이 2개 차원을 동시에 측정하도록 설계되어 전체 프로필을 구성합니다. 충분한 질문 수가 필요하여 시간이 걸리지만, 별도 외부 연동이 필요 없습니다.",
+      "3-Phase 24문항 하이브리드 시나리오 질문으로 L1+L2 벡터를 동시 측정합니다. Phase별로 L1 주력, L2 주력, 교차 검증 구조로 약 4분 소요. 이탈 시 Phase 단위로 저장됩니다.",
     features: [
-      "질문당 2개 차원 동시 측정",
-      "확신도(Confidence) 함께 계산",
-      "외부 연동 없이 독립적 프로필 생성",
+      "3-Phase 8+8+8 문항 (L1→L2→교차검증)",
+      "하이브리드 시나리오: 4지선다 delta 적용",
+      "이탈 시 Phase 단위 저장, 미완료만 리셋",
     ],
     accuracy: 2,
     speed: null,
@@ -117,11 +128,11 @@ const COLD_START_METHODS = [
     badge: "Social Analysis",
     badgeColor: "bg-green-100 text-green-600",
     description:
-      "소셜 미디어 데이터(팔로우, 관심사, 소비 패턴)를 분석하여 6D 벡터를 추론합니다. 실제 행동 데이터 기반이라 정확도가 높고, 질문 없이 즉시 프로필을 생성합니다.",
+      "8개 SNS 플랫폼의 행동 데이터를 2-Stage 최적화로 분석하여 3-Layer 벡터를 추론합니다. 실제 행동 데이터 기반이라 정확도가 높고, 질문 없이 즉시 프로필을 생성합니다.",
     features: [
       "실제 행동 데이터 기반 높은 정확도",
       "원시 데이터 저장 없이 벡터만 산출",
-      "Netflix, YouTube, Instagram 등 지원",
+      "8개 플랫폼 지원 (Netflix, YouTube 등)",
     ],
     accuracy: 3,
     speed: "즉시",
@@ -143,22 +154,22 @@ const SNS_PLATFORMS = [
   {
     name: "Netflix",
     data: "시청 이력, 장르 선호, 시청 패턴",
-    dimensions: "depth, taste, purpose에 높은 기여도",
+    dimensions: "L1 depth · taste · purpose, L2 openness에 기여",
   },
   {
     name: "YouTube",
     data: "구독 채널, 시청 시간, 카테고리 분포",
-    dimensions: "lens, scope에 높은 기여도",
+    dimensions: "L1 lens · scope, L2 conscientiousness에 기여",
   },
   {
     name: "Instagram",
     data: "팔로우 계정, 관심사 태그, 인터랙션 패턴",
-    dimensions: "stance, taste에 높은 기여도",
+    dimensions: "L1 sociability · taste, L2 extraversion에 기여",
   },
   {
     name: "Spotify",
     data: "음악 취향, 플레이리스트, 장르 다양성",
-    dimensions: "taste, purpose에 높은 기여도",
+    dimensions: "L1 taste · purpose, L2 openness에 기여",
   },
 ]
 
@@ -167,7 +178,7 @@ const ACCURACY_IMPROVEMENTS = [
     icon: Activity,
     title: "행동 데이터 피드백 루프",
     description:
-      "사용자가 추천 콘텐츠에 반응(좋아요, 스킵, 저장)할 때마다 6D 벡터가 미세 보정됩니다. 사용할수록 프로필이 정교해집니다.",
+      "사용자가 추천 콘텐츠에 반응(좋아요, 스킵, 저장)할 때마다 3-Layer 벡터가 미세 보정됩니다. 사용할수록 프로필이 정교해집니다.",
   },
   {
     icon: RefreshCw,
@@ -185,7 +196,7 @@ const ACCURACY_IMPROVEMENTS = [
     icon: Fingerprint,
     title: "프로필 품질 레벨",
     description:
-      "BASIC → STANDARD → ADVANCED → PREMIUM 4단계로 프로필 품질을 관리합니다. 데이터가 누적될수록 자동으로 레벨업되며 매칭 정확도가 향상됩니다.",
+      "STARTER → STANDARD → ADVANCED → EXPERT 4단계로 프로필 품질을 관리합니다. 데이터가 누적될수록 자동으로 레벨업되며 매칭 정확도가 향상됩니다.",
   },
 ]
 
@@ -209,9 +220,9 @@ export default function TasteAnalysisPage() {
             소비자 <span className="ds-text-gradient">취향 분석</span>
           </h1>
           <p className="max-w-2xl text-lg text-gray-600">
-            6D 벡터 시스템으로 사용자의 콘텐츠 소비 성향을 6개 독립 차원으로 정밀 분석합니다. SNS
-            행동 데이터, 콜드스타트 문답, 누적 피드백을 결합하여 사용할수록 정확해지는 프로필을
-            만듭니다.
+            3-Layer 벡터 시스템으로 사용자의 콘텐츠 소비 성향을 L1(7D) · L2(5D) · L3(4D) 총
+            16차원으로 심층 분석합니다. 3-Phase 24문항 온보딩, SNS 행동 데이터, 누적 피드백을
+            결합하여 사용할수록 정확해지는 프로필을 만듭니다.
           </p>
         </div>
       </section>
@@ -221,11 +232,11 @@ export default function TasteAnalysisPage() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="mb-16 text-center">
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
-              6D VECTOR SYSTEM
+              L1 SOCIAL PERSONA — 7D VECTOR
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">6개 차원으로 취향을 정량화</h2>
+            <h2 className="text-3xl font-bold text-gray-900">7개 차원으로 소비 성향을 정량화</h2>
             <p className="mt-4 text-gray-600">
-              사용자의 콘텐츠 소비 성향을 6개의 독립적인 차원으로 분석합니다.
+              사용자의 콘텐츠 소비 성향을 L1 Social Persona 7개 독립 차원으로 분석합니다.
               <br />각 차원은 0.0~1.0 범위의 벡터값으로, 확신도와 함께 관리됩니다.
             </p>
           </div>
@@ -269,7 +280,7 @@ export default function TasteAnalysisPage() {
             <p className="mt-4 text-gray-600">
               사용자가 이미 사용 중인 서비스의 행동 데이터를 분석하여
               <br />
-              질문 없이도 정확한 6D 벡터 프로필을 즉시 생성합니다.
+              질문 없이도 정확한 3-Layer 벡터 프로필을 즉시 생성합니다.
             </p>
           </div>
 
@@ -413,10 +424,10 @@ export default function TasteAnalysisPage() {
             <div className="grid gap-4 md:grid-cols-4">
               {[
                 {
-                  stage: "BASIC",
+                  stage: "STARTER",
                   time: "가입 직후",
                   accuracy: "60%",
-                  source: "콜드스타트 문답",
+                  source: "3-Phase 온보딩 (Phase 1)",
                 },
                 {
                   stage: "STANDARD",
@@ -428,13 +439,13 @@ export default function TasteAnalysisPage() {
                   stage: "ADVANCED",
                   time: "1개월 후",
                   accuracy: "88%",
-                  source: "+누적 피드백 보정",
+                  source: "+누적 피드백 + 데일리 마이크로 질문",
                 },
                 {
-                  stage: "PREMIUM",
+                  stage: "EXPERT",
                   time: "3개월 후",
                   accuracy: "95%+",
-                  source: "+다중 소스 교차 검증",
+                  source: "+다중 소스 교차 검증 완료",
                 },
               ].map((item, idx) => (
                 <div key={idx} className="relative text-center">
