@@ -73,15 +73,15 @@
   - AC6: ✅ 아키타입 12종 카드 선택 UI (벡터 자동 적용)
   - AC7: ✅ 테스트 143개 PASS + Build PASS
 
-- [ ] **T52: 생성 파이프라인 v3 — 아키타입 + 벡터 생성 + 캐릭터**
+- [x] **T52: 생성 파이프라인 v3 — 아키타입 + 벡터 생성 + 캐릭터** ✅
   - 배경: 구현계획서 Phase 2. 페르소나 자동 생성의 핵심 엔진
-  - AC1: 아키타입 12종 템플릿 (벡터 프리셋, 캐릭터 시드, Paradox 범위)
-  - AC2: 3-Layer 벡터 생성기 (다양성 분석, 빈 영역 우선, L1+L2+L3 동시 생성)
-  - AC3: Paradox 디자이너 (역설 패턴 매핑, 긴장도 조절)
-  - AC4: 캐릭터 생성기 (이름, 배경, 말버릇, 습관, 관계 설정)
-  - AC5: 활동성/콘텐츠 설정 추론 (벡터→활동 패턴 매핑)
-  - AC6: 6-Category 일관성 검증기 (구조/L1↔L2/L2↔L3/정성↔정량/교차축/동적)
-  - AC7: 테스트 + 커밋 + 푸시
+  - AC1: ✅ 아키타입 12종 템플릿 (벡터 범위, 캐릭터 시드, Paradox 범위, dynamics 기본값)
+  - AC2: ✅ 3-Layer 벡터 생성기 (다양성 분석, 빈 영역 우선, L1+L2+L3 동시 생성)
+  - AC3: ✅ Paradox 디자이너 (tension map, 긴장도 자동 조절, 범위 검증)
+  - AC4: ✅ 캐릭터 생성기 (이름, 역할, 전문분야, 배경, 말버릇, 퀴크, 습관, 관계)
+  - AC5: ✅ 활동성/콘텐츠 설정 추론 (PostFrequency, activeHours, reviewStyle, interactionStyle)
+  - AC6: ✅ 6-Category 일관성 검증기 (STRUCTURE/L1_L2/L2_L3/QUAL_QUANT/CROSS_AXIS/DYNAMIC)
+  - AC7: ✅ 테스트 37개 PASS (전체 180개) + Build PASS
 
 - [ ] **T72: 정성적 차원 생성기 — Backstory + Voice + Pressure + Zeitgeist**
   - 배경: 구현계획서 Phase 3. 벡터 너머의 정성적 페르소나 깊이
