@@ -2,7 +2,8 @@
 
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
-import type { ThreeLayerVector } from "./types"
+import type { ThreeLayerVector, OnboardingAnswer } from "./types"
+import type { ProfileLevel } from "./profile-level"
 
 // 사용자 프로필 타입
 export interface UserProfile {
@@ -32,6 +33,15 @@ export interface Notification {
   createdAt: string
 }
 
+// 온보딩 상태
+export interface OnboardingState {
+  currentPhase: 0 | 1 | 2 | 3
+  phaseAnswers: Record<number, OnboardingAnswer[]>
+  completedPhases: number[]
+  profileLevel: ProfileLevel
+  creditsBalance: number
+}
+
 // 스토어 상태
 interface UserState {
   // 프로필
@@ -39,6 +49,13 @@ interface UserState {
   setProfile: (profile: UserProfile) => void
   updateVector: (vector: ThreeLayerVector, confidence: number) => void
   completeOnboarding: () => void
+
+  // 온보딩
+  onboarding: OnboardingState
+  startPhase: (phase: 1 | 2 | 3) => void
+  savePhaseAnswers: (phase: number, answers: OnboardingAnswer[]) => void
+  completePhase: (phase: number, credits: number, level: ProfileLevel) => void
+  resetCurrentPhase: () => void
 
   // 팔로우
   followedPersonas: FollowedPersona[]
@@ -68,9 +85,19 @@ interface UserState {
   reset: () => void
 }
 
+// 온보딩 초기 상태
+const initialOnboarding: OnboardingState = {
+  currentPhase: 0,
+  phaseAnswers: {},
+  completedPhases: [],
+  profileLevel: "BASIC",
+  creditsBalance: 0,
+}
+
 // 초기 상태
 const initialState = {
   profile: null,
+  onboarding: initialOnboarding,
   followedPersonas: [],
   likedPosts: [],
   bookmarkedPosts: [],
@@ -106,6 +133,47 @@ export const useUserStore = create<UserState>()(
                 createdAt: new Date().toISOString(),
               },
         })),
+
+      // 온보딩 관리
+      startPhase: (phase) =>
+        set((state) => ({
+          onboarding: { ...state.onboarding, currentPhase: phase },
+        })),
+
+      savePhaseAnswers: (phase, answers) =>
+        set((state) => ({
+          onboarding: {
+            ...state.onboarding,
+            phaseAnswers: { ...state.onboarding.phaseAnswers, [phase]: answers },
+          },
+        })),
+
+      completePhase: (phase, credits, level) =>
+        set((state) => ({
+          onboarding: {
+            ...state.onboarding,
+            currentPhase: 0 as const,
+            completedPhases: state.onboarding.completedPhases.includes(phase)
+              ? state.onboarding.completedPhases
+              : [...state.onboarding.completedPhases, phase],
+            profileLevel: level,
+            creditsBalance: state.onboarding.creditsBalance + credits,
+          },
+        })),
+
+      resetCurrentPhase: () =>
+        set((state) => {
+          const phase = state.onboarding.currentPhase
+          const newAnswers = { ...state.onboarding.phaseAnswers }
+          delete newAnswers[phase]
+          return {
+            onboarding: {
+              ...state.onboarding,
+              currentPhase: 0 as const,
+              phaseAnswers: newAnswers,
+            },
+          }
+        }),
 
       // 팔로우 관리
       followPersona: (personaId, personaName) =>

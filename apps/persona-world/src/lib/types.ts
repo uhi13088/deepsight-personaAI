@@ -108,3 +108,67 @@ export interface PersonaFullDetail extends PersonaDetail {
   description: string | null
   recentPosts: Omit<FeedPost, "persona">[]
 }
+
+// ── 온보딩 API 타입 ───────────────────────────────────────
+
+export interface OnboardingQuestion {
+  id: string
+  order: number
+  text: string
+  type: "SLIDER" | "MULTIPLE_CHOICE" | "RANKING"
+  options: OnboardingQuestionOption[] | null
+  targetDimensions: string[]
+}
+
+export interface OnboardingQuestionOption {
+  id: string
+  label: string
+  value: string | number
+  weights?: Record<string, number>
+}
+
+export interface OnboardingQuestionsResponse {
+  phase: number
+  totalQuestions: number
+  questions: OnboardingQuestion[]
+}
+
+export interface OnboardingAnswer {
+  questionId: string
+  value: string
+}
+
+export interface OnboardingAnswersResponse {
+  userId: string
+  phase: number
+  profileQuality: string
+  confidence: number
+  creditsAwarded: number
+  vectorUpdate: Record<string, number>
+}
+
+export interface MatchingPreviewPersona {
+  personaId: string
+  name: string
+  handle: string
+  tagline: string | null
+  role: string
+  profileImageUrl: string | null
+  similarity: number
+  dimComparison?: Array<{
+    dimension: string
+    userValue: number
+    personaValue: number
+  }>
+}
+
+export interface MatchingPreviewResponse {
+  phase: number
+  confidence: number
+  topPersonas: MatchingPreviewPersona[]
+  nextPhaseInfo: {
+    nextPhase: number
+    estimatedTime: number
+    expectedImprovement: number
+  } | null
+}

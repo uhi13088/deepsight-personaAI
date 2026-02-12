@@ -290,14 +290,14 @@
 > **선행조건: 엔진 Phase A 완료 (T45~T50)** — v3 API가 실제 데이터를 제공한 후 시작.
 > 모든 페이지는 실제 API 연동. 목업 데이터/하드코딩 절대 금지.
 
-- [ ] **T75: PW 온보딩 v3 — 3-Phase 질문 + 매칭 프리뷰**
+- [x] **T75: PW 온보딩 v3 — 3-Phase 질문 + 매칭 프리뷰**
   - 배경: 설계서 §9. 실제 질문 API + 프로파일링 API 연동
-  - AC1: Phase 구조 UI (3-Phase × 8문항, 진행 바, Phase 간 전환)
-  - AC2: 시나리오 질문 카드 (4지선다, 선택 피드백, 게이미피케이션)
-  - AC3: Phase 간 매칭 프리뷰 (실제 매칭 API 호출, 페르소나 카드 + 유사도 %)
-  - AC4: 이탈 정책 UX (Phase 단위 저장, 미완료 Phase 리셋 경고)
-  - AC5: 프로필 등급 뱃지 (STARTER/STANDARD/ADVANCED/EXPERT)
-  - AC6: Build PASS + 테스트 + 커밋 + 푸시
+  - AC1: Phase 구조 UI (3-Phase × 8문항, 진행 바, Phase 간 전환) ✅
+  - AC2: 시나리오 질문 카드 (4지선다, 선택 피드백, 게이미피케이션) ✅
+  - AC3: Phase 간 매칭 프리뷰 (실제 매칭 API 호출, 페르소나 카드 + 유사도 %) ✅
+  - AC4: 이탈 정책 UX (Phase 단위 저장, 미완료 Phase 리셋 경고) ✅
+  - AC5: 프로필 등급 뱃지 (BASIC/STANDARD/ADVANCED/PREMIUM) ✅
+  - AC6: Build PASS (46 tests) + 커밋 + 푸시 ✅
 
 - [ ] **T76: PW 피드 v3 — 3-Tab + 17종 포스트 카드**
   - 배경: 메인 화면. 실제 피드 API 연동

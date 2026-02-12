@@ -5,6 +5,10 @@ import type {
   PersonaDetail,
   FeedPost,
   PersonaFullDetail,
+  OnboardingQuestionsResponse,
+  OnboardingAnswer,
+  OnboardingAnswersResponse,
+  MatchingPreviewResponse,
 } from "./types"
 
 // Engine Studio API 베이스 URL (환경변수로 설정 가능)
@@ -140,6 +144,46 @@ export const clientApi = {
     if (!res.ok) throw new Error("Failed to fetch persona")
 
     const json: ApiResponse<PersonaFullDetail> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+
+    return json.data!
+  },
+
+  // ── 온보딩 API ──────────────────────────────────────────────
+
+  // Phase별 질문 조회
+  async getOnboardingQuestions(phase: number) {
+    const res = await fetch(`${API_BASE_URL}/api/public/onboarding/questions?phase=${phase}`)
+    if (!res.ok) throw new Error("Failed to fetch onboarding questions")
+
+    const json: ApiResponse<OnboardingQuestionsResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+
+    return json.data!
+  },
+
+  // Phase 답변 제출
+  async submitOnboardingAnswers(userId: string, phase: number, answers: OnboardingAnswer[]) {
+    const res = await fetch(`${API_BASE_URL}/api/public/onboarding/answers`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, phase, answers }),
+    })
+    if (!res.ok) throw new Error("Failed to submit onboarding answers")
+
+    const json: ApiResponse<OnboardingAnswersResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+
+    return json.data!
+  },
+
+  // 매칭 프리뷰 조회
+  async getMatchingPreview(phase: number, userId: string) {
+    const params = new URLSearchParams({ phase: String(phase), userId })
+    const res = await fetch(`${API_BASE_URL}/api/public/onboarding/preview?${params}`)
+    if (!res.ok) throw new Error("Failed to fetch matching preview")
+
+    const json: ApiResponse<MatchingPreviewResponse> = await res.json()
     if (!json.success) throw new Error(json.error?.message || "Unknown error")
 
     return json.data!
