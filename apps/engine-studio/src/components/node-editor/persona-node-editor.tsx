@@ -8,15 +8,17 @@
 // T128-AC3: 실행 결과 패널 통합
 // ═══════════════════════════════════════════════════════════════
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   ReactFlow,
   Background,
   Controls,
   MiniMap,
+  applyNodeChanges,
   type Connection,
   type Node,
   type Edge,
+  type NodeChange,
   BackgroundVariant,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
@@ -46,18 +48,25 @@ export function PersonaNodeEditor() {
   const [executionResult, setExecutionResult] = useState<ExecutionEngineResult | null>(null)
   const [executeError, setExecuteError] = useState<string | null>(null)
 
-  // ReactFlow 노드/엣지 변환
-  const rfNodes: Node[] = useMemo(
-    () =>
+  // ReactFlow 노드 — useState로 관리 (드래그 중 실시간 위치 반영)
+  const [rfNodes, setRfNodes] = useState<Node[]>([])
+
+  useEffect(() => {
+    setRfNodes(
       store.nodes.map((n) => ({
         id: n.id,
         type: n.type,
         position: n.position,
         data: n.data,
         selected: n.id === store.selectedNodeId,
-      })),
-    [store.nodes, store.selectedNodeId]
-  )
+      }))
+    )
+  }, [store.nodes, store.selectedNodeId])
+
+  // 드래그 중 실시간 위치 업데이트
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+    setRfNodes((prev) => applyNodeChanges(changes, prev))
+  }, [])
 
   const rfEdges: Edge[] = useMemo(
     () =>
@@ -256,9 +265,9 @@ export function PersonaNodeEditor() {
 
       {/* 실행 에러 표시 */}
       {executeError && (
-        <div className="flex items-center justify-between border-b bg-red-50 px-4 py-1.5 text-xs text-red-700">
+        <div className="flex items-center justify-between border-b bg-red-500/10 px-4 py-1.5 text-xs text-red-400">
           <span>{executeError}</span>
-          <button onClick={() => setExecuteError(null)} className="text-red-400 hover:text-red-600">
+          <button onClick={() => setExecuteError(null)} className="text-red-400 hover:text-red-300">
             닫기
           </button>
         </div>
@@ -272,6 +281,7 @@ export function PersonaNodeEditor() {
             nodes={rfNodes}
             edges={rfEdges}
             nodeTypes={NODE_TYPE_MAP}
+            onNodesChange={onNodesChange}
             onConnect={onConnect}
             onNodeClick={onNodeClick}
             onNodeDragStop={onNodeDragStop}

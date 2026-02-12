@@ -40,9 +40,9 @@ export function NodePalette({ onAddNode }: NodePaletteProps) {
   )
 
   return (
-    <div className="w-56 overflow-y-auto border-r bg-gray-50">
+    <div className="bg-card w-56 overflow-y-auto border-r">
       <div className="border-b p-3">
-        <h3 className="text-sm font-semibold text-gray-700">노드 팔레트</h3>
+        <h3 className="text-sm font-semibold">노드 팔레트</h3>
       </div>
 
       {categories.map((category) => {
@@ -54,12 +54,12 @@ export function NodePalette({ onAddNode }: NodePaletteProps) {
           <div key={category} className="border-b">
             <button
               onClick={() => setExpandedCategory(isExpanded ? null : category)}
-              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium hover:bg-gray-100"
+              className="hover:bg-accent flex w-full items-center gap-2 px-3 py-2 text-xs font-medium"
             >
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
               <span>{CATEGORY_LABELS[category]}</span>
-              <span className="ml-auto text-gray-400">{nodes.length}</span>
-              <span className="text-gray-400">{isExpanded ? "▲" : "▼"}</span>
+              <span className="text-muted-foreground ml-auto">{nodes.length}</span>
+              <span className="text-muted-foreground">{isExpanded ? "▲" : "▼"}</span>
             </button>
 
             {isExpanded && (
@@ -97,7 +97,7 @@ function PaletteItem({ definition, color, onDragStart, onClick }: PaletteItemPro
       draggable
       onDragStart={(e) => onDragStart(e, definition.type)}
       onClick={() => onClick(definition.type)}
-      className="flex cursor-grab items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-gray-200 active:cursor-grabbing"
+      className="hover:bg-accent flex cursor-grab items-center gap-2 rounded px-2 py-1.5 text-xs active:cursor-grabbing"
       title={definition.description}
     >
       <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ backgroundColor: color }} />

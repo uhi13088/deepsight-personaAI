@@ -21,9 +21,9 @@ interface ExecutionResultsPanelProps {
 // ── 상태 스타일 ──────────────────────────────────────────────
 
 const STATUS_STYLES: Record<string, { label: string; color: string }> = {
-  executed: { label: "성공", color: "text-green-600" },
-  skipped: { label: "스킵", color: "text-gray-400" },
-  error: { label: "에러", color: "text-red-600" },
+  executed: { label: "성공", color: "text-emerald-400" },
+  skipped: { label: "스킵", color: "text-muted-foreground" },
+  error: { label: "에러", color: "text-red-400" },
 }
 
 // ── 메인 패널 ─────────────────────────────────────────────────
@@ -36,19 +36,23 @@ export function ExecutionResultsPanel({
   const summary = summarizeExecution(result)
 
   return (
-    <div className="border-t bg-white">
+    <div className="bg-card border-t">
       {/* 요약 헤더 */}
       <div className="flex items-center justify-between border-b px-4 py-2">
         <div className="flex items-center gap-4 text-xs">
           <span className="font-medium">실행 결과</span>
-          {summary.executed > 0 && <span className="text-green-600">{summary.executed} 성공</span>}
-          {summary.skipped > 0 && <span className="text-gray-500">{summary.skipped} 스킵</span>}
-          {summary.errors > 0 && <span className="text-red-600">{summary.errors} 에러</span>}
-          <span className="text-gray-400">{result.totalDurationMs}ms</span>
+          {summary.executed > 0 && (
+            <span className="text-emerald-400">{summary.executed} 성공</span>
+          )}
+          {summary.skipped > 0 && (
+            <span className="text-muted-foreground">{summary.skipped} 스킵</span>
+          )}
+          {summary.errors > 0 && <span className="text-red-400">{summary.errors} 에러</span>}
+          <span className="text-muted-foreground">{result.totalDurationMs}ms</span>
         </div>
         <button
           onClick={onClose}
-          className="rounded px-2 py-0.5 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          className="text-muted-foreground hover:bg-accent rounded px-2 py-0.5 text-xs"
         >
           닫기
         </button>
@@ -66,7 +70,9 @@ export function ExecutionResultsPanel({
           />
         ))}
         {result.executionPath.length === 0 && (
-          <div className="px-4 py-3 text-center text-xs text-gray-400">실행된 노드 없음</div>
+          <div className="text-muted-foreground px-4 py-3 text-center text-xs">
+            실행된 노드 없음
+          </div>
         )}
       </div>
     </div>
@@ -92,12 +98,12 @@ function ExecutionPathRow({
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-3 px-4 py-1.5 text-xs hover:bg-gray-50"
+      className="hover:bg-accent flex w-full items-center gap-3 px-4 py-1.5 text-xs"
     >
-      <span className="w-5 shrink-0 text-right text-gray-300">{index + 1}</span>
+      <span className="text-muted-foreground w-5 shrink-0 text-right">{index + 1}</span>
       <span className={`w-8 shrink-0 ${style.color}`}>{style.label}</span>
       <span className="flex-1 truncate text-left font-medium">{def?.label ?? entry.nodeType}</span>
-      <span className="shrink-0 text-gray-400">{entry.durationMs}ms</span>
+      <span className="text-muted-foreground shrink-0">{entry.durationMs}ms</span>
       {entry.reason && (
         <span className="max-w-40 shrink-0 truncate text-red-400" title={entry.reason}>
           {entry.reason}
