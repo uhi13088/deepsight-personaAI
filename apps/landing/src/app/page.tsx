@@ -5,15 +5,10 @@ import Link from "next/link"
 import {
   ArrowRight,
   Sparkles,
-  BarChart3,
   Users,
-  Zap,
   Check,
   Brain,
-  Target,
-  Eye,
   Compass,
-  Palette,
   Search,
   MousePointer,
   Clock,
@@ -21,6 +16,9 @@ import {
   MessageSquare,
   TrendingUp,
   Code,
+  Heart,
+  Flame,
+  Sprout,
 } from "lucide-react"
 import { HeroOrbital } from "@/components/home/hero-orbital"
 
@@ -29,7 +27,8 @@ const PERSONA_WORLD_URL =
 const DEVELOPER_CONSOLE_URL =
   process.env.NEXT_PUBLIC_DEVELOPER_CONSOLE_URL || "https://developer-console.vercel.app"
 
-const VECTOR_DIMENSIONS = [
+// v3 3-Layer 대표 차원 (HeroOrbital용: inner 3 + middle 3)
+const HERO_DIMENSIONS = [
   {
     id: "depth",
     name: "Depth",
@@ -40,56 +39,84 @@ const VECTOR_DIMENSIONS = [
     color: "from-blue-500 to-blue-600",
   },
   {
-    id: "lens",
-    name: "Lens",
-    label: "판단 렌즈",
-    low: "감성적",
-    high: "논리적",
-    icon: Eye,
-    color: "from-purple-500 to-purple-600",
-  },
-  {
-    id: "stance",
-    name: "Stance",
-    label: "평가 태도",
-    low: "수용적",
-    high: "비판적",
+    id: "openness",
+    name: "Openness",
+    label: "개방성",
+    low: "보수적",
+    high: "개방적",
     icon: Compass,
     color: "from-orange-500 to-orange-600",
   },
   {
-    id: "scope",
-    name: "Scope",
-    label: "관심 범위",
-    low: "핵심만",
-    high: "디테일",
-    icon: Target,
-    color: "from-green-500 to-green-600",
+    id: "lack",
+    name: "Lack",
+    label: "결핍",
+    low: "충족",
+    high: "결핍",
+    icon: Heart,
+    color: "from-violet-500 to-violet-600",
   },
   {
-    id: "taste",
-    name: "Taste",
-    label: "취향 성향",
-    low: "클래식",
-    high: "실험적",
-    icon: Palette,
-    color: "from-pink-500 to-pink-600",
-  },
-  {
-    id: "purpose",
-    name: "Purpose",
-    label: "소비 목적",
-    low: "오락",
-    high: "의미추구",
-    icon: Brain,
+    id: "sociability",
+    name: "Sociability",
+    label: "사회적 성향",
+    low: "독립적",
+    high: "사교적",
+    icon: Users,
     color: "from-indigo-500 to-indigo-600",
+  },
+  {
+    id: "neuroticism",
+    name: "Neuroticism",
+    label: "신경성",
+    low: "안정적",
+    high: "민감한",
+    icon: Flame,
+    color: "from-amber-500 to-amber-600",
+  },
+  {
+    id: "growthArc",
+    name: "Growth Arc",
+    label: "성장 곡선",
+    low: "정체",
+    high: "변화",
+    icon: Sprout,
+    color: "from-purple-500 to-purple-600",
+  },
+]
+
+// 3-Layer 구조 카드
+const LAYERS = [
+  {
+    id: "L1",
+    name: "L1: Social Persona",
+    subtitle: "가면 — 외부에 보이는 소비 성향",
+    dimensions: "7D",
+    items: ["Depth", "Lens", "Stance", "Scope", "Taste", "Purpose", "Sociability"],
+    color: "from-blue-500 to-blue-600",
+  },
+  {
+    id: "L2",
+    name: "L2: Core Temperament",
+    subtitle: "본성 — OCEAN Big Five 심리 모델",
+    dimensions: "5D",
+    items: ["Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"],
+    color: "from-amber-500 to-amber-600",
+  },
+  {
+    id: "L3",
+    name: "L3: Narrative Drive",
+    subtitle: "욕망 — 캐릭터 아크 기반 내면 동력",
+    dimensions: "4D",
+    items: ["Lack", "Moral Compass", "Volatility", "Growth Arc"],
+    color: "from-violet-500 to-violet-600",
   },
 ]
 
 const ENGINE_STUDIO_URL = process.env.NEXT_PUBLIC_ENGINE_STUDIO_URL || "http://localhost:3000"
 
 const METRICS = [
-  { label: "추천 정확도 향상", value: "6D", icon: MousePointer },
+  { label: "벡터 차원 수", value: "3-Layer 16D", icon: MousePointer },
   { label: "활동 페르소나", value: "—", icon: Users, dynamic: true },
   { label: "추천 이유 설명", value: "투명", icon: Clock },
   { label: "필터버블 탈출", value: "다관점", icon: Star },
@@ -99,17 +126,19 @@ const USE_CASES = [
   {
     industry: "OTT 플랫폼",
     icon: "🎬",
-    description: "취향 맞는 페르소나가 추천 이유와 함께 콘텐츠 큐레이션",
+    description:
+      "3-Layer 벡터로 분석된 취향 프로필과 Paradox Score 기반으로 페르소나가 추천 이유와 함께 콘텐츠 큐레이션",
   },
   {
     industry: "이커머스",
     icon: "🛍️",
-    description: "성향 맞는 리뷰어의 리뷰로 구매 결정 시간 단축",
+    description: "교차축 83축 분석으로 성향이 일치하는 리뷰어의 리뷰를 노출, 구매 결정 시간 단축",
   },
   {
     industry: "뉴스/미디어",
     icon: "📰",
-    description: "필터버블 탈출, 다양한 관점의 기사 노출",
+    description:
+      "Extended Paradox Score로 필터버블 탈출, 3-Tier 매칭이 다양한 관점의 기사를 자동 노출",
   },
 ]
 
@@ -140,13 +169,13 @@ export default function HomePage() {
                 AI 페르소나 기반 추천 시스템
               </div>
               <h1 className="text-5xl font-bold leading-tight tracking-tight text-gray-900 lg:text-6xl">
-                <span className="ds-text-gradient">6D 벡터</span>로
+                <span className="ds-text-gradient">3-Layer 벡터</span>로
                 <br />
-                사용자를 이해하다
+                사용자를 심층 이해하다
               </h1>
               <p className="max-w-lg text-lg text-gray-600">
-                기존 추천 시스템의 블랙박스를 열어, 사용자가 &ldquo;왜 이 콘텐츠가 추천됐는지&rdquo;
-                명확히 알 수 있는 설명 가능한 AI 추천 엔진
+                가면(L1) · 본성(L2) · 욕망(L3), 세 겹의 레이어로 사용자의 16차원 성향을 분석하고 AI
+                페르소나가 &ldquo;왜 이 콘텐츠가 추천됐는지&rdquo; 명확히 설명하는 투명한 추천 엔진
               </p>
               <div className="flex flex-col gap-4 sm:flex-row">
                 <Link
@@ -167,7 +196,7 @@ export default function HomePage() {
             </div>
 
             {/* Right: Orbital Animation */}
-            <HeroOrbital dimensions={VECTOR_DIMENSIONS} />
+            <HeroOrbital dimensions={HERO_DIMENSIONS} />
           </div>
         </div>
       </section>
@@ -260,46 +289,59 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 6D Vector Section */}
+      {/* 3-Layer Vector Section */}
       <section className="ds-dark-section relative overflow-hidden py-24">
-        <div className="relative z-10 mx-auto max-w-4xl px-6 text-center">
+        <div className="relative z-10 mx-auto max-w-5xl px-6 text-center">
           <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-400">
-            6D VECTOR SYSTEM
+            3-LAYER VECTOR SYSTEM
           </div>
           <h2 className="mb-6 text-4xl font-bold text-white md:text-5xl">
-            6개 차원으로
+            세 겹의 레이어로
             <br />
             <span className="bg-gradient-to-r from-[#667eea] via-[#f093fb] to-[#f5576c] bg-clip-text text-transparent">
-              취향을 정량화
+              취향을 심층 정량화
             </span>
           </h2>
           <p className="mx-auto mb-16 max-w-2xl text-lg text-gray-400">
-            단순한 좋아요/싫어요를 넘어, 사용자의 콘텐츠 소비 성향을 6개의 독립적인 차원으로
-            분석합니다.
+            단순한 좋아요/싫어요를 넘어, 사용자의 콘텐츠 소비 성향을 가면(L1) · 본성(L2) · 욕망(L3)
+            세 겹 16차원으로 분석합니다.
           </p>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {VECTOR_DIMENSIONS.map((dim) => (
+          <div className="grid gap-6 md:grid-cols-3">
+            {LAYERS.map((layer) => (
               <div
-                key={dim.id}
+                key={layer.id}
                 className="ds-glass-card group rounded-2xl p-6 text-left transition-all hover:bg-white/10"
               >
-                <div
-                  className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${dim.color}`}
-                >
-                  <dim.icon className="h-6 w-6 text-white" />
-                </div>
-                <h3 className="mb-1 text-lg font-semibold text-white">{dim.name}</h3>
-                <p className="mb-3 text-sm text-gray-400">{dim.label}</p>
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span>{dim.low}</span>
-                  <div className="mx-2 h-1 flex-1 rounded-full bg-gray-700">
-                    <div className={`h-full w-1/2 rounded-full bg-gradient-to-r ${dim.color}`} />
+                <div className="mb-3 flex items-center gap-3">
+                  <div
+                    className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${layer.color}`}
+                  >
+                    <span className="text-sm font-bold text-white">{layer.dimensions}</span>
                   </div>
-                  <span>{dim.high}</span>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">{layer.name}</h3>
+                    <p className="text-xs text-gray-400">{layer.subtitle}</p>
+                  </div>
                 </div>
+                <ul className="mt-4 space-y-1.5">
+                  {layer.items.map((item) => (
+                    <li key={item} className="flex items-center gap-2 text-sm text-gray-300">
+                      <Check className="h-3.5 w-3.5 text-gray-500" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))}
+          </div>
+
+          <div className="mt-8 rounded-xl border border-gray-700 bg-white/5 p-4">
+            <p className="text-sm text-gray-400">
+              <span className="font-semibold text-purple-400">Extended Paradox Score</span> — L1↔L2,
+              L1↔L3, L2↔L3 간 모순을 가중 합산하여 사용자의 &quot;복잡한 인간다움&quot;을
+              정량화합니다. 83개 교차축이 레이어 간 역설·강화·조절 패턴을 분석합니다.
+            </p>
           </div>
 
           <div className="mt-12">
