@@ -9,6 +9,7 @@ import type {
   OnboardingAnswer,
   OnboardingAnswersResponse,
   MatchingPreviewResponse,
+  ExploreResponse,
 } from "./types"
 
 // Engine Studio API 베이스 URL (환경변수로 설정 가능)
@@ -185,6 +186,22 @@ export const clientApi = {
     if (!res.ok) throw new Error("Failed to fetch matching preview")
 
     const json: ApiResponse<MatchingPreviewResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+
+    return json.data!
+  },
+
+  // ── Explore API ───────────────────────────────────────────
+
+  async getExplore(options?: { search?: string; role?: string }) {
+    const params = new URLSearchParams()
+    if (options?.search) params.set("search", options.search)
+    if (options?.role) params.set("role", options.role)
+
+    const res = await fetch(`${API_BASE_URL}/api/public/explore?${params}`)
+    if (!res.ok) throw new Error("Failed to fetch explore data")
+
+    const json: ApiResponse<ExploreResponse> = await res.json()
     if (!json.success) throw new Error(json.error?.message || "Unknown error")
 
     return json.data!

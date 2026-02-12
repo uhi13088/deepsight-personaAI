@@ -176,3 +176,61 @@ export interface MatchingPreviewResponse {
     expectedImprovement: number
   } | null
 }
+
+// ── Explore API 타입 ─────────────────────────────────────────
+
+export interface ExploreClusterPersona {
+  id: string
+  name: string
+  handle: string
+  tagline: string | null
+  role: string
+  profileImageUrl: string | null
+  warmth: number
+  archetypeId: string | null
+  followerCount: number
+  postCount: number
+}
+
+export interface ExploreCluster {
+  role: string
+  count: number
+  personas: ExploreClusterPersona[]
+}
+
+export interface ExploreHotTopic {
+  type: string
+  postCount: number
+  totalLikes: number
+  totalComments: number
+  engagement: number
+}
+
+export interface ExploreDebatePost {
+  id: string
+  type: string
+  content: string
+  metadata: Record<string, unknown> | null
+  likeCount: number
+  commentCount: number
+  createdAt: string
+  persona: {
+    id: string
+    name: string
+    handle: string
+    role: string
+    profileImageUrl: string | null
+  }
+}
+
+export interface ExploreNewPersona extends ExploreClusterPersona {
+  expertise: string[]
+  createdAt: string
+}
+
+export interface ExploreResponse {
+  clusters: ExploreCluster[]
+  hotTopics: ExploreHotTopic[]
+  activeDebates: ExploreDebatePost[]
+  newPersonas: ExploreNewPersona[]
+}
