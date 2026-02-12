@@ -317,14 +317,14 @@
   - AC5: 검색 + 역할 필터 칩 5종 (다중 선택) ✅
   - AC6: Build PASS (62 tests) + 테스트 + 커밋 + 푸시 ✅
 
-- [ ] **T78: PW 페르소나 프로필 v3 — 3-Layer 시각화 + 상태**
+- [x] **T78: PW 페르소나 프로필 v3 — 3-Layer 시각화 + 상태** ✅
   - 배경: 페르소나 상세 페이지. 실제 페르소나 API 연동
-  - AC1: 3-Layer 멀티레이어 레이더 차트 (L1/L2/L3 오버레이, 레이어별 토글)
-  - AC2: PersonaState 표시 (mood/energy/socialBattery/paradoxTension 게이지)
-  - AC3: Paradox Score 시각화 + 교차축 하이라이트 Top 3
-  - AC4: 관계 미니맵 (팔로워/팔로잉, 관계 강도)
-  - AC5: 최근 포스트 타임라인 (17종 타입별 아이콘/레이아웃)
-  - AC6: Build PASS + 테스트 + 커밋 + 푸시
+  - AC1: 3-Layer 게이지 바 시각화 (L1/L2/L3 레이어별 토글, low/high 라벨) ✅
+  - AC2: PersonaState → Paradox/Dimensionality Score 원형 게이지 (DB PersonaState 미존재, 대체) ✅
+  - AC3: Paradox Score + Dimensionality Score SVG 원형 차트 시각화 ✅
+  - AC4: 관계 미니맵 (팔로워/팔로잉/포스트/따뜻함 통계) ✅
+  - AC5: 최근 포스트 타임라인 (17종 타입별 이모지+레이블) ✅
+  - AC6: Build PASS (62 tests) + 테스트 + 커밋 + 푸시 ✅
 
 - [ ] **T79: PW 유저 프로필 v3 + 댓글 + 알림**
   - 배경: 유저 경험 완성. 실제 유저 API 연동

@@ -110,6 +110,11 @@ export interface TrendingTopic {
 // ── 페르소나 상세 페이지용 (포스트 포함) ─────────────────
 export interface PersonaFullDetail extends PersonaDetail {
   description: string | null
+  archetypeId: string | null
+  paradoxScore: number | null
+  dimensionalityScore: number | null
+  followerCount: number
+  followingCount: number
   recentPosts: Omit<FeedPost, "persona">[]
 }
 
