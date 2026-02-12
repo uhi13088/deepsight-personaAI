@@ -8,19 +8,22 @@ import type { RecommendedCandidate } from "@/lib/persona-world/feed/recommended-
  * POST /api/persona-world/feed
  *
  * 3-Tier 매칭 기반 피드 생성 API.
+ * postId 목록 → 실제 포스트 데이터로 풍성화하여 반환.
  *
  * Body:
  * - userId: string (필수)
- * - limit?: number (기본 60)
+ * - limit?: number (기본 20)
  * - cursor?: string
+ * - tab?: string ("for-you" | "following" | "explore")
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { userId, limit, cursor } = body as {
+    const { userId, limit, cursor, tab } = body as {
       userId: string
       limit?: number
       cursor?: string
+      tab?: string
     }
 
     if (!userId) {
@@ -29,6 +32,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const feedLimit = Math.min(limit ?? 20, 50)
 
     const provider: FeedDataProvider = {
       async getFollowingPersonaIds(uid: string): Promise<string[]> {
@@ -62,8 +67,6 @@ export async function POST(request: NextRequest) {
         lim: number,
         excludePostIds: string[]
       ): Promise<RecommendedCandidate[]> {
-        // 추천 후보: 매칭 점수는 향후 3-Tier 매칭 엔진 연동 시 계산
-        // 현재는 최신+인기 포스트를 후보로 사용
         const posts = await prisma.personaPost.findMany({
           where: {
             isHidden: false,
@@ -111,9 +114,80 @@ export async function POST(request: NextRequest) {
       },
     }
 
-    const result = await generateFeed({ userId, limit: limit ?? 60, cursor }, provider)
+    const feedResult = await generateFeed({ userId, limit: feedLimit, cursor }, provider)
 
-    return NextResponse.json({ success: true, data: result })
+    // postId → 실제 포스트 데이터로 풍성화
+    const postIds = feedResult.posts.map((p) => p.postId)
+    const sourceMap = new Map(feedResult.posts.map((p) => [p.postId, p.source]))
+
+    const dbPosts =
+      postIds.length > 0
+        ? await prisma.personaPost.findMany({
+            where: { id: { in: postIds } },
+            select: {
+              id: true,
+              type: true,
+              content: true,
+              contentId: true,
+              metadata: true,
+              likeCount: true,
+              commentCount: true,
+              repostCount: true,
+              createdAt: true,
+              persona: {
+                select: {
+                  id: true,
+                  name: true,
+                  handle: true,
+                  tagline: true,
+                  role: true,
+                  profileImageUrl: true,
+                  warmth: true,
+                },
+              },
+            },
+          })
+        : []
+
+    // 원래 순서 유지
+    const postMap = new Map(dbPosts.map((p) => [p.id, p]))
+    const enrichedPosts = postIds
+      .map((id) => {
+        const p = postMap.get(id)
+        if (!p) return null
+        const tabSource = tab === "following" ? "FOLLOWING" : tab === "explore" ? "TRENDING" : null
+        return {
+          id: p.id,
+          type: p.type,
+          content: p.content,
+          contentId: p.contentId,
+          metadata: p.metadata,
+          likeCount: p.likeCount,
+          commentCount: p.commentCount,
+          repostCount: p.repostCount,
+          createdAt: p.createdAt.toISOString(),
+          source: tabSource ?? sourceMap.get(id) ?? "RECOMMENDED",
+          persona: {
+            id: p.persona.id,
+            name: p.persona.name,
+            handle: p.persona.handle ?? "",
+            tagline: p.persona.tagline,
+            role: p.persona.role,
+            profileImageUrl: p.persona.profileImageUrl,
+            warmth: p.persona.warmth ? Number(p.persona.warmth) : 0.5,
+          },
+        }
+      })
+      .filter(Boolean)
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        posts: enrichedPosts,
+        nextCursor: feedResult.nextCursor,
+        hasMore: enrichedPosts.length >= feedLimit,
+      },
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error"
     return NextResponse.json(

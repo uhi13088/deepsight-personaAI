@@ -437,11 +437,12 @@
   - AC4: ✅ `/api/persona-world/onboarding/cold-start` + `/sns/connect`
   - AC5: ✅ Build PASS + 1660 테스트 PASS
 
-- [ ] **T114: PW 프론트엔드 API 클라이언트 재작성**
+- [x] **T114: PW 프론트엔드 API 클라이언트 재작성** ✅ 2026-02-12
   - 배경: persona-world/src/lib/api.ts + user-store.ts를 실제 백엔드 API로 전환
-  - AC1: api.ts — `/api/persona-world/*` 엔드포인트로 전환
-  - AC2: user-store.ts — 서버 영속화 (localStorage → API 동기화)
-  - AC3: Build PASS + 테스트 PASS
+  - AC1: ✅ api.ts — 피드→`POST /api/persona-world/feed` (userId 개인화), Explore→`GET /api/persona-world/explore` (search/role), 온보딩→`POST /api/persona-world/onboarding/cold-start` (level 매핑), SNS→`POST /api/persona-world/onboarding/sns/connect`, 좋아요/팔로우 API 추가
+  - AC2: ✅ user-store.ts — followPersona/unfollowPersona→`/api/public/follows` 동기화, toggleLike→`/api/public/posts/[id]/likes` 동기화, connectSns→`/api/persona-world/onboarding/sns/connect` 동기화 (Optimistic + fire-and-forget)
+  - AC3: ✅ Build PASS (persona-world + engine-studio) + 1733 테스트 PASS (ES 1660 + PW 73)
+  - 변경: api.ts, user-store.ts, feed/route.ts(persona-world), explore/route.ts(persona-world), feed/page.tsx
 
 - [ ] **T115: E2E 통합 + 품질 게이트**
   - 배경: 전 페이지 실제 API 연동 확인
