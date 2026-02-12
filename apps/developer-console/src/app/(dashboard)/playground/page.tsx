@@ -5,16 +5,14 @@ import {
   Play,
   Copy,
   Check,
-  Code,
-  FileJson,
   Clock,
   Zap,
   RotateCcw,
   ChevronDown,
   Settings2,
   Braces,
-  FileText,
-  AlertCircle,
+  Trash2,
+  History,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -32,100 +30,179 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Separator } from "@/components/ui/separator"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
-import { PingerPrint2D } from "@/components/p-inger-print-2d"
 
-// API Endpoints configuration
-const endpoints = [
+// ============================================================================
+// v3 Endpoint Definitions
+// ============================================================================
+
+interface EndpointDef {
+  id: string
+  method: "GET" | "POST"
+  path: string
+  name: string
+  description: string
+  defaultBody: object | null
+}
+
+const V3_ENDPOINTS: EndpointDef[] = [
   {
-    id: "catalog-list",
-    method: "GET",
-    path: "/v1/personas",
-    name: "Catalog — 페르소나 목록",
-    description: "등록된 페르소나를 검색하고 목록을 조회합니다",
-    defaultBody: null,
-  },
-  {
-    id: "catalog-detail",
-    method: "GET",
-    path: "/v1/personas/:id",
-    name: "Catalog — 페르소나 상세",
-    description: "페르소나 상세 정보 (6D 벡터, 전문분야 등) 조회",
-    defaultBody: null,
-  },
-  {
-    id: "profiling",
-    method: "POST",
-    path: "/v1/profiles",
-    name: "Profiling — 프로필 생성",
-    description: "유저의 6D 벡터 프로필을 생성합니다",
-    defaultBody: {
-      method: "cold_start",
-      answers: [
-        { question_id: "q1", answer: "깊이 있는 분석을 선호합니다" },
-        { question_id: "q2", answer: "새로운 관점을 탐색하는 편입니다" },
-        { question_id: "q3", answer: "객관적인 시각을 중시합니다" },
-      ],
-    },
-  },
-  {
-    id: "matching",
+    id: "match",
     method: "POST",
     path: "/v1/match",
-    name: "Matching — 유저-페르소나 매칭",
-    description: "유저 프로필에 최적화된 페르소나를 매칭합니다",
+    name: "매칭 — 유저-페르소나 매칭",
+    description: "유저에게 최적화된 페르소나를 3-Tier 매칭으로 추천합니다",
     defaultBody: {
-      profileId: "prof_abc123",
+      user_id: "user_abc123",
+      context: {
+        category: "movie",
+        time_of_day: "evening",
+        device: "mobile",
+      },
       options: {
-        limit: 5,
-        diversityFactor: 0.3,
+        top_n: 5,
+        matching_tier: "advanced",
+        include_score: true,
       },
     },
   },
   {
-    id: "recommendation",
-    method: "POST",
-    path: "/v1/recommend",
-    name: "Recommendation — 콘텐츠 추천",
-    description: "매칭된 페르소나가 유저에게 콘텐츠를 추천하고 이유를 설명합니다",
-    defaultBody: {
-      personaId: "persona_movie_reviewer",
-      profileId: "prof_abc123",
-      contentType: "movie",
-      limit: 5,
-    },
+    id: "personas-list",
+    method: "GET",
+    path: "/v1/personas",
+    name: "페르소나 목록",
+    description: "등록된 페르소나 목록을 조회합니다 (role/expertise 필터 지원)",
+    defaultBody: null,
   },
   {
-    id: "evaluation",
+    id: "personas-detail",
+    method: "GET",
+    path: "/v1/personas/:id",
+    name: "페르소나 상세",
+    description: "페르소나 상세 정보 (3-Layer 벡터, paradox, 교차축) 조회",
+    defaultBody: null,
+  },
+  {
+    id: "personas-filter",
     method: "POST",
-    path: "/v1/evaluate",
-    name: "Evaluation — 콘텐츠 평가",
-    description: "페르소나 관점에서 특정 콘텐츠를 리뷰하고 분석합니다",
+    path: "/v1/personas/filter",
+    name: "페르소나 필터 (Enterprise)",
+    description: "106D+ 다차원 정밀 검색으로 페르소나를 필터링합니다",
     defaultBody: {
-      personaId: "persona_movie_reviewer",
-      content: {
-        title: "기생충",
-        type: "movie",
-        description: "봉준호 감독의 블랙코미디 스릴러",
+      filters: {
+        archetype: {
+          include: ["ironic-philosopher", "wounded-critic"],
+        },
+        vectors: {
+          l1: {
+            depth: { min: 0.6, max: 1.0 },
+          },
+        },
       },
+      sort: { field: "paradox.extendedScore", order: "desc" },
+      page: 1,
+      per_page: 20,
     },
   },
   {
     id: "feedback",
     method: "POST",
     path: "/v1/feedback",
-    name: "Feedback — 결과 피드백",
-    description: "추천/평가 결과에 대한 피드백을 제출합니다",
+    name: "피드백 제출",
+    description: "매칭 결과에 대한 피드백을 제출합니다",
     defaultBody: {
-      referenceId: "rec_xyz789",
-      type: "recommendation",
-      feedback: "positive",
-      comment: "추천 결과가 정확합니다.",
+      user_id: "user_abc123",
+      persona_id: "persona_movie_reviewer",
+      feedback_type: "LIKE",
     },
   },
+  {
+    id: "batch-match",
+    method: "POST",
+    path: "/v1/batch-match",
+    name: "배치 매칭",
+    description: "여러 유저에 대한 매칭을 한 번에 요청합니다 (최대 100건)",
+    defaultBody: {
+      items: [
+        {
+          user_id: "user_abc123",
+          context: { category: "movie" },
+          options: { top_n: 3, matching_tier: "basic" },
+        },
+        {
+          user_id: "user_def456",
+          context: { category: "book" },
+          options: { top_n: 5, matching_tier: "advanced" },
+        },
+      ],
+    },
+  },
+  {
+    id: "onboarding",
+    method: "POST",
+    path: "/v1/users/:id/onboarding",
+    name: "온보딩",
+    description: "유저 온보딩을 실행하여 성향 벡터를 생성합니다",
+    defaultBody: {
+      level: "QUICK",
+      responses: [
+        { question_id: "q1", answer: "A", target_dimensions: ["depth"] },
+        { question_id: "q2", answer: "B", target_dimensions: ["lens"] },
+        { question_id: "q3", answer: 0.7, target_dimensions: ["stance"] },
+        { question_id: "q4", answer: "A", target_dimensions: ["scope"] },
+        { question_id: "q5", answer: "B", target_dimensions: ["taste"] },
+        { question_id: "q6", answer: 0.4, target_dimensions: ["purpose"] },
+        { question_id: "q7", answer: "A", target_dimensions: ["sociability"] },
+        { question_id: "q8", answer: "B", target_dimensions: ["depth"] },
+        { question_id: "q9", answer: 0.6, target_dimensions: ["lens"] },
+        { question_id: "q10", answer: "A", target_dimensions: ["stance"] },
+        { question_id: "q11", answer: "B", target_dimensions: ["scope"] },
+        { question_id: "q12", answer: 0.5, target_dimensions: ["taste"] },
+      ],
+      consent: {
+        data_collection: true,
+        sns_analysis: false,
+        third_party_sharing: false,
+        marketing: false,
+      },
+    },
+  },
+  {
+    id: "consent-get",
+    method: "GET",
+    path: "/v1/users/:id/consent",
+    name: "동의 조회",
+    description: "유저의 데이터 동의 상태를 조회합니다",
+    defaultBody: null,
+  },
+  {
+    id: "consent-post",
+    method: "POST",
+    path: "/v1/users/:id/consent",
+    name: "동의 변경",
+    description: "유저의 데이터 동의 상태를 변경합니다",
+    defaultBody: {
+      consents: [
+        { type: "sns_analysis", granted: true },
+        { type: "third_party_sharing", granted: true },
+      ],
+      consent_version: "v2.0",
+    },
+  },
+  {
+    id: "profile",
+    method: "GET",
+    path: "/v1/users/:id/profile",
+    name: "유저 프로필",
+    description: "유저의 성향 벡터 프로필 (3-Layer + 교차축) 조회",
+    defaultBody: null,
+  },
 ]
+
+// ============================================================================
+// Types
+// ============================================================================
 
 type ApiKeyItem = {
   id: string
@@ -135,121 +212,97 @@ type ApiKeyItem = {
   environment: string
 }
 
-// Sample response data
-const sampleResponses: Record<string, object> = {
-  "catalog-list": {
-    success: true,
-    data: {
-      personas: [
-        { id: "persona_movie_reviewer", name: "감성 시네필", expertise: "영화", role: "REVIEWER" },
-        { id: "persona_book_critic", name: "날카로운 독서가", expertise: "도서", role: "CRITIC" },
-        { id: "persona_music_curator", name: "멜로디 탐험가", expertise: "음악", role: "CURATOR" },
-      ],
-      total: 24,
-      page: 1,
-      perPage: 10,
-    },
-  },
-  "catalog-detail": {
-    success: true,
-    data: {
-      id: "persona_movie_reviewer",
-      name: "감성 시네필",
-      expertise: "영화",
-      role: "REVIEWER",
-      traits: { depth: 0.85, lens: 0.72, stance: 0.68, scope: 0.55, taste: 0.91, purpose: 0.78 },
-      description: "서사와 감정의 깊이를 중시하는 영화 리뷰어",
-    },
-  },
-  profiling: {
-    success: true,
-    data: {
-      id: "prof_abc123",
-      traits: { depth: 0.82, lens: 0.75, stance: 0.6, scope: 0.7, taste: 0.88, purpose: 0.65 },
-      schemaVersion: "1.0",
-      method: "coldStart",
-      createdAt: "2025-01-15T09:30:00Z",
-    },
-  },
-  matching: {
-    success: true,
-    data: {
-      matches: [
-        { personaId: "persona_movie_reviewer", name: "감성 시네필", score: 0.94 },
-        { personaId: "persona_book_critic", name: "날카로운 독서가", score: 0.87 },
-      ],
-      profileId: "prof_abc123",
-      processingTimeMs: 120,
-    },
-  },
-  recommendation: {
-    success: true,
-    data: {
-      items: [
-        {
-          title: "기생충",
-          type: "movie",
-          reason: "서사 구조가 탄탄하고 계층 간 긴장감이 뛰어납니다",
-        },
-        { title: "인터스텔라", type: "movie", reason: "감정선과 SF 요소가 균형 잡혀 있습니다" },
-      ],
-      personaId: "persona_movie_reviewer",
-      profileId: "prof_abc123",
-    },
-  },
-  evaluation: {
-    success: true,
-    data: {
-      content: { title: "기생충", type: "movie" },
-      review: {
-        score: 9.2,
-        summary: "계층 구조를 블랙코미디로 풀어낸 수작",
-        strengths: ["촘촘한 서사 구조", "상징적 미장센", "배우들의 호연"],
-        considerations: ["장르 혼합에 대한 호불호"],
-      },
-      personaId: "persona_movie_reviewer",
-    },
-  },
-  feedback: {
-    success: true,
-    data: {
-      feedbackId: "fb_xyz789",
-      message: "Feedback submitted successfully",
-    },
-  },
+interface RequestHistoryItem {
+  id: string
+  timestamp: string
+  method: string
+  path: string
+  status: number
+  latency: number
 }
 
+// ============================================================================
+// Code Generation
+// ============================================================================
+
+function generateCurl(endpoint: EndpointDef, apiKey: string, body: string): string {
+  const baseUrl = "https://api.deepsight.ai"
+  let curl = `curl -X ${endpoint.method} "${baseUrl}${endpoint.path}"`
+  curl += ` \\\n  -H "Authorization: Bearer ${apiKey}"`
+  curl += ` \\\n  -H "Content-Type: application/json"`
+  if (body && endpoint.method !== "GET") {
+    curl += ` \\\n  -d '${body.replace(/\n\s*/g, " ")}'`
+  }
+  return curl
+}
+
+function generateNodejs(endpoint: EndpointDef, apiKey: string, body: string): string {
+  const hasBody = endpoint.method !== "GET" && body
+  return `const response = await fetch('https://api.deepsight.ai${endpoint.path}', {
+  method: '${endpoint.method}',
+  headers: {
+    'Authorization': 'Bearer ${apiKey}',
+    'Content-Type': 'application/json'
+  },${hasBody ? `\n  body: JSON.stringify(${body})` : ""}
+});
+
+const data = await response.json();
+console.log(data);`
+}
+
+function generatePython(endpoint: EndpointDef, apiKey: string, body: string): string {
+  const hasBody = endpoint.method !== "GET" && body
+  return `import requests
+
+response = requests.${endpoint.method.toLowerCase()}(
+    'https://api.deepsight.ai${endpoint.path}',
+    headers={
+        'Authorization': 'Bearer ${apiKey}',
+        'Content-Type': 'application/json'
+    },${hasBody ? `\n    json=${body}` : ""}
+)
+
+print(response.json())`
+}
+
+function generateJava(endpoint: EndpointDef, apiKey: string, body: string): string {
+  const hasBody = endpoint.method !== "GET" && body
+  return `HttpClient client = HttpClient.newHttpClient();
+${hasBody ? `String jsonBody = ${JSON.stringify(body.replace(/\n\s*/g, " "))};\n` : ""}HttpRequest request = HttpRequest.newBuilder()
+    .uri(URI.create("https://api.deepsight.ai${endpoint.path}"))
+    .header("Authorization", "Bearer ${apiKey}")
+    .header("Content-Type", "application/json")
+    .${endpoint.method === "GET" ? "GET()" : `POST(HttpRequest.BodyPublishers.ofString(jsonBody))`}
+    .build();
+
+HttpResponse<String> response = client.send(
+    request, HttpResponse.BodyHandlers.ofString());
+System.out.println(response.body());`
+}
+
+// ============================================================================
+// Component
+// ============================================================================
+
 export default function PlaygroundPage() {
-  const [selectedEndpoint, setSelectedEndpoint] = React.useState(endpoints[0])
+  const [selectedEndpoint, setSelectedEndpoint] = React.useState(V3_ENDPOINTS[0])
   const [apiKeys, setApiKeys] = React.useState<ApiKeyItem[]>([])
   const [selectedApiKey, setSelectedApiKey] = React.useState("")
   const [requestBody, setRequestBody] = React.useState(
-    JSON.stringify(endpoints[0].defaultBody, null, 2)
+    JSON.stringify(V3_ENDPOINTS[0].defaultBody, null, 2)
   )
   const [pathParams, setPathParams] = React.useState<Record<string, string>>({})
-  const [queryParams, setQueryParams] = React.useState<Record<string, string>>({})
   const [response, setResponse] = React.useState<string | null>(null)
+  const [responseHeaders, setResponseHeaders] = React.useState<Record<string, string> | null>(null)
   const [responseStatus, setResponseStatus] = React.useState<number | null>(null)
   const [responseTime, setResponseTime] = React.useState<number | null>(null)
   const [isLoading, setIsLoading] = React.useState(false)
   const [isLoadingKeys, setIsLoadingKeys] = React.useState(true)
   const [copied, setCopied] = React.useState(false)
-
-  // 응답에서 6D 벡터 추출 → P-inger Print 시각화
-  const responseTraits = React.useMemo(() => {
-    if (!response) return null
-    try {
-      const parsed = JSON.parse(response)
-      const traits = parsed?.data?.traits
-      if (traits && typeof traits === "object" && "depth" in traits) {
-        return traits as Record<string, number>
-      }
-      return null
-    } catch {
-      return null
-    }
-  }, [response])
   const [showAdvanced, setShowAdvanced] = React.useState(false)
+  const [showHeaders, setShowHeaders] = React.useState(false)
+  const [history, setHistory] = React.useState<RequestHistoryItem[]>([])
+  const [showHistory, setShowHistory] = React.useState(false)
 
   // Fetch API keys on mount
   React.useEffect(() => {
@@ -271,19 +324,22 @@ export default function PlaygroundPage() {
   }, [])
 
   const handleEndpointChange = (endpointId: string) => {
-    const endpoint = endpoints.find((e) => e.id === endpointId)
+    const endpoint = V3_ENDPOINTS.find((e) => e.id === endpointId)
     if (endpoint) {
       setSelectedEndpoint(endpoint)
       setRequestBody(endpoint.defaultBody ? JSON.stringify(endpoint.defaultBody, null, 2) : "")
       setResponse(null)
+      setResponseHeaders(null)
       setResponseStatus(null)
       setResponseTime(null)
+      setPathParams({})
     }
   }
 
   const handleSendRequest = async () => {
     setIsLoading(true)
     setResponse(null)
+    setResponseHeaders(null)
 
     const startTime = Date.now()
 
@@ -296,7 +352,6 @@ export default function PlaygroundPage() {
         }
       }
 
-      // Build request options
       const options: RequestInit = {
         method: selectedEndpoint.method,
         headers: {
@@ -305,44 +360,41 @@ export default function PlaygroundPage() {
         },
       }
 
-      // Add body for non-GET requests
       if (selectedEndpoint.method !== "GET" && requestBody) {
-        try {
-          options.body = requestBody
-        } catch {
-          setResponse(
-            JSON.stringify(
-              { error: { code: "INVALID_JSON", message: "Invalid JSON in request body" } },
-              null,
-              2
-            )
-          )
-          setResponseStatus(400)
-          setResponseTime(Date.now() - startTime)
-          setIsLoading(false)
-          return
-        }
+        options.body = requestBody
       }
 
       const res = await fetch(url, options)
       const data = await res.json()
+      const latency = Date.now() - startTime
+
+      // Capture response headers
+      const headers: Record<string, string> = {}
+      res.headers.forEach((value, key) => {
+        headers[key] = value
+      })
 
       setResponse(JSON.stringify(data, null, 2))
+      setResponseHeaders(headers)
       setResponseStatus(res.status)
-      setResponseTime(Date.now() - startTime)
+      setResponseTime(latency)
+
+      // Add to history (keep last 10)
+      setHistory((prev) => {
+        const newItem: RequestHistoryItem = {
+          id: `hist_${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          method: selectedEndpoint.method,
+          path: selectedEndpoint.path,
+          status: res.status,
+          latency,
+        }
+        return [newItem, ...prev].slice(0, 10)
+      })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
       setResponse(
-        JSON.stringify(
-          {
-            error: {
-              code: "REQUEST_FAILED",
-              message: errorMessage,
-            },
-          },
-          null,
-          2
-        )
+        JSON.stringify({ error: { code: "REQUEST_FAILED", message: errorMessage } }, null, 2)
       )
       setResponseStatus(500)
       setResponseTime(Date.now() - startTime)
@@ -356,10 +408,10 @@ export default function PlaygroundPage() {
       selectedEndpoint.defaultBody ? JSON.stringify(selectedEndpoint.defaultBody, null, 2) : ""
     )
     setResponse(null)
+    setResponseHeaders(null)
     setResponseStatus(null)
     setResponseTime(null)
     setPathParams({})
-    setQueryParams({})
   }
 
   const copyToClipboard = async (text: string) => {
@@ -368,24 +420,13 @@ export default function PlaygroundPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const generateCurl = () => {
-    const baseUrl = "https://api.deepsight.ai"
-    let curl = `curl -X ${selectedEndpoint.method} "${baseUrl}${selectedEndpoint.path}"`
-    curl += ` \\\n  -H "Authorization: Bearer ${selectedApiKey}"`
-    curl += ` \\\n  -H "Content-Type: application/json"`
-    if (requestBody && selectedEndpoint.method !== "GET") {
-      curl += ` \\\n  -d '${requestBody.replace(/\n\s*/g, " ")}'`
-    }
-    return curl
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">API Playground</h1>
-          <p className="text-muted-foreground">API를 테스트하고 응답을 확인하세요</p>
+          <p className="text-muted-foreground">v3 API를 테스트하고 응답을 확인하세요</p>
         </div>
         <div className="flex gap-2">
           {isLoadingKeys ? (
@@ -419,8 +460,63 @@ export default function PlaygroundPage() {
               </SelectContent>
             </Select>
           )}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setShowHistory(!showHistory)}
+            className="relative"
+          >
+            <History className="h-4 w-4" />
+            {history.length > 0 && (
+              <span className="bg-primary text-primary-foreground absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full text-[10px]">
+                {history.length}
+              </span>
+            )}
+          </Button>
         </div>
       </div>
+
+      {/* Request History Panel */}
+      {showHistory && history.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-base">Request History</CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => setHistory([])}>
+              <Trash2 className="mr-1 h-3 w-3" />
+              Clear
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {history.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between rounded-lg border p-2 text-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="font-mono text-xs">
+                      {item.method}
+                    </Badge>
+                    <span className="font-mono text-xs">{item.path}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge
+                      variant={item.status >= 200 && item.status < 300 ? "success" : "destructive"}
+                      className="text-xs"
+                    >
+                      {item.status}
+                    </Badge>
+                    <span className="text-muted-foreground text-xs">{item.latency}ms</span>
+                    <span className="text-muted-foreground text-xs">
+                      {new Date(item.timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Request Panel */}
@@ -439,14 +535,14 @@ export default function PlaygroundPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {endpoints.map((endpoint) => (
+                    {V3_ENDPOINTS.map((endpoint) => (
                       <SelectItem key={endpoint.id} value={endpoint.id}>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="font-mono text-xs">
                             {endpoint.method}
                           </Badge>
                           <span>{endpoint.path}</span>
-                          <span className="text-muted-foreground text-sm">- {endpoint.name}</span>
+                          <span className="text-muted-foreground text-sm">— {endpoint.name}</span>
                         </div>
                       </SelectItem>
                     ))}
@@ -532,17 +628,12 @@ export default function PlaygroundPage() {
                 <CollapsibleContent className="space-y-4 pt-4">
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label>Include Headers</Label>
-                      <p className="text-muted-foreground text-xs">Show response headers</p>
+                      <Label>Show Response Headers</Label>
+                      <p className="text-muted-foreground text-xs">
+                        Rate limit, request ID headers
+                      </p>
                     </div>
-                    <Switch />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Pretty Print</Label>
-                      <p className="text-muted-foreground text-xs">Format JSON response</p>
-                    </div>
-                    <Switch defaultChecked />
+                    <Switch checked={showHeaders} onCheckedChange={setShowHeaders} />
                   </div>
                 </CollapsibleContent>
               </Collapsible>
@@ -551,15 +642,15 @@ export default function PlaygroundPage() {
               <div className="flex gap-2">
                 <Button onClick={handleSendRequest} disabled={isLoading} className="flex-1">
                   {isLoading ? (
-                    <>
-                      <span className="mr-2 animate-spin">⏳</span>
+                    <span className="flex items-center gap-2">
+                      <span className="animate-spin">&#9203;</span>
                       Sending...
-                    </>
+                    </span>
                   ) : (
-                    <>
-                      <Play className="mr-2 h-4 w-4" />
+                    <span className="flex items-center gap-2">
+                      <Play className="h-4 w-4" />
                       Send Request
-                    </>
+                    </span>
                   )}
                 </Button>
                 <Button variant="outline" onClick={handleReset}>
@@ -578,76 +669,37 @@ export default function PlaygroundPage() {
               <Tabs defaultValue="curl">
                 <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="curl">cURL</TabsTrigger>
-                  <TabsTrigger value="javascript">JS</TabsTrigger>
+                  <TabsTrigger value="nodejs">Node.js</TabsTrigger>
                   <TabsTrigger value="python">Python</TabsTrigger>
-                  <TabsTrigger value="go">Go</TabsTrigger>
+                  <TabsTrigger value="java">Java</TabsTrigger>
                 </TabsList>
                 <TabsContent value="curl" className="mt-4">
-                  <div className="relative">
-                    <pre className="bg-muted max-h-[200px] overflow-auto rounded-lg p-4 font-mono text-xs">
-                      {generateCurl()}
-                    </pre>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-2 top-2"
-                      onClick={() => copyToClipboard(generateCurl())}
-                    >
-                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    </Button>
-                  </div>
+                  <CodeBlock
+                    code={generateCurl(selectedEndpoint, selectedApiKey, requestBody)}
+                    onCopy={copyToClipboard}
+                    copied={copied}
+                  />
                 </TabsContent>
-                <TabsContent value="javascript" className="mt-4">
-                  <pre className="bg-muted max-h-[200px] overflow-auto rounded-lg p-4 font-mono text-xs">
-                    {`const response = await fetch('https://api.deepsight.ai${selectedEndpoint.path}', {
-  method: '${selectedEndpoint.method}',
-  headers: {
-    'Authorization': 'Bearer ${selectedApiKey}',
-    'Content-Type': 'application/json'
-  },${
-    selectedEndpoint.method !== "GET"
-      ? `
-  body: JSON.stringify(${requestBody || "{}"})`
-      : ""
-  }
-});
-
-const data = await response.json();
-console.log(data);`}
-                  </pre>
+                <TabsContent value="nodejs" className="mt-4">
+                  <CodeBlock
+                    code={generateNodejs(selectedEndpoint, selectedApiKey, requestBody)}
+                    onCopy={copyToClipboard}
+                    copied={copied}
+                  />
                 </TabsContent>
                 <TabsContent value="python" className="mt-4">
-                  <pre className="bg-muted max-h-[200px] overflow-auto rounded-lg p-4 font-mono text-xs">
-                    {`import requests
-
-response = requests.${selectedEndpoint.method.toLowerCase()}(
-    'https://api.deepsight.ai${selectedEndpoint.path}',
-    headers={
-        'Authorization': 'Bearer ${selectedApiKey}',
-        'Content-Type': 'application/json'
-    },${
-      selectedEndpoint.method !== "GET"
-        ? `
-    json=${requestBody || "{}"}`
-        : ""
-    }
-)
-
-print(response.json())`}
-                  </pre>
+                  <CodeBlock
+                    code={generatePython(selectedEndpoint, selectedApiKey, requestBody)}
+                    onCopy={copyToClipboard}
+                    copied={copied}
+                  />
                 </TabsContent>
-                <TabsContent value="go" className="mt-4">
-                  <pre className="bg-muted max-h-[200px] overflow-auto rounded-lg p-4 font-mono text-xs">
-                    {`req, _ := http.NewRequest("${selectedEndpoint.method}",
-    "https://api.deepsight.ai${selectedEndpoint.path}",
-    ${selectedEndpoint.method !== "GET" ? "bytes.NewBuffer(jsonData)" : "nil"})
-
-req.Header.Set("Authorization", "Bearer ${selectedApiKey}")
-req.Header.Set("Content-Type", "application/json")
-
-client := &http.Client{}
-resp, _ := client.Do(req)`}
-                  </pre>
+                <TabsContent value="java" className="mt-4">
+                  <CodeBlock
+                    code={generateJava(selectedEndpoint, selectedApiKey, requestBody)}
+                    onCopy={copyToClipboard}
+                    copied={copied}
+                  />
                 </TabsContent>
               </Tabs>
             </CardContent>
@@ -672,7 +724,7 @@ resp, _ := client.Do(req)`}
                     >
                       {responseStatus}
                     </Badge>
-                    {responseTime && (
+                    {responseTime !== null && (
                       <div className="text-muted-foreground flex items-center gap-1 text-sm">
                         <Clock className="h-4 w-4" />
                         {responseTime}ms
@@ -685,6 +737,19 @@ resp, _ := client.Do(req)`}
             <CardContent>
               {response ? (
                 <div className="space-y-4">
+                  {/* Response Headers */}
+                  {showHeaders && responseHeaders && (
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium uppercase">Response Headers</Label>
+                      <pre className="bg-muted max-h-[150px] overflow-auto rounded-lg p-3 font-mono text-xs">
+                        {Object.entries(responseHeaders)
+                          .map(([k, v]) => `${k}: ${v}`)
+                          .join("\n")}
+                      </pre>
+                    </div>
+                  )}
+
+                  {/* Response Body */}
                   <div className="relative">
                     <pre className="bg-muted max-h-[500px] overflow-auto rounded-lg p-4 font-mono text-xs">
                       {response}
@@ -698,19 +763,11 @@ resp, _ := client.Do(req)`}
                       {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                   </div>
-                  {responseTraits && (
-                    <div className="bg-muted/50 flex flex-col items-center gap-2 rounded-lg border p-4">
-                      <span className="text-muted-foreground text-xs font-medium">
-                        P-inger Print Preview
-                      </span>
-                      <PingerPrint2D data={responseTraits} size={180} showLabel={false} />
-                    </div>
-                  )}
                 </div>
               ) : isLoading ? (
                 <div className="flex h-[300px] items-center justify-center">
                   <div className="space-y-4 text-center">
-                    <div className="animate-spin text-4xl">⏳</div>
+                    <div className="animate-spin text-4xl">&#9203;</div>
                     <p className="text-muted-foreground">Sending request...</p>
                   </div>
                 </div>
@@ -741,11 +798,42 @@ resp, _ := client.Do(req)`}
         <AlertDescription>
           <ul className="mt-2 list-inside list-disc space-y-1">
             <li>Test API 키를 사용하면 실제 과금 없이 테스트할 수 있습니다</li>
-            <li>응답 데이터는 복사하여 개발에 활용할 수 있습니다</li>
-            <li>코드 스니펫을 복사하여 바로 사용하세요</li>
+            <li>matching_tier: basic (L1만), advanced (L1+L2+EPS), exploration (L1+L2+L3+EPS)</li>
+            <li>코드 스니펫을 복사하여 바로 프로젝트에 통합하세요</li>
+            <li>요청 히스토리에서 최근 10개 요청을 확인할 수 있습니다</li>
           </ul>
         </AlertDescription>
       </Alert>
+    </div>
+  )
+}
+
+// ============================================================================
+// Subcomponents
+// ============================================================================
+
+function CodeBlock({
+  code,
+  onCopy,
+  copied,
+}: {
+  code: string
+  onCopy: (text: string) => void
+  copied: boolean
+}) {
+  return (
+    <div className="relative">
+      <pre className="bg-muted max-h-[200px] overflow-auto rounded-lg p-4 font-mono text-xs">
+        {code}
+      </pre>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute right-2 top-2"
+        onClick={() => onCopy(code)}
+      >
+        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+      </Button>
     </div>
   )
 }
