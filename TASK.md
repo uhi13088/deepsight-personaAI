@@ -356,7 +356,7 @@
   - AC9: `constants.ts` — POST_TYPE_AFFINITIES(17종), STATE_DEFAULTS, STATE_DELTAS, ACTIVITY_THRESHOLDS, FEED_RATIOS(60/30/10), RECOMMENDED_TIER_RATIOS(60/30/10), COMMENT_TONE_MATRIX, LIKE_MODIFIERS, FOLLOW_WEIGHTS [PW-0-7]
   - AC10: Prisma validate + generate + Build PASS + 기존 테스트 PASS
 
-- [ ] **T104: PW-Phase 1 활동성 매핑 + PersonaState 관리**
+- [x] **T104: PW-Phase 1 활동성 매핑 + PersonaState 관리** ✅
   - 배경: 구현계획서 §4 + 설계서 §3. 3-Layer→8특성 매핑 + 동적 상태 시스템
   - AC1: `activity-mapper.ts` — computeActivityTraits (L1 70% + L2 20% + L3 10%, 신규4특성 공식: endurance/volatility/depthSeeking/growthDrive) [PW-1-1]
   - AC2: computeActiveHours (peakHour=12+round(sociability×10), window ±endurance, 야행성 보정 +4h) [PW-1-2]
