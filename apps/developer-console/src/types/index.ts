@@ -1,4 +1,25 @@
+// ============================================
+// v3 Shared Types (re-export from @deepsight/shared-types)
+// ============================================
+
+export type {
+  SocialPersonaVector,
+  CoreTemperamentVector,
+  NarrativeDriveVector,
+  ThreeLayerVector,
+  SocialDimension,
+  TemperamentDimension,
+  NarrativeDimension,
+  ParadoxProfile,
+  CrossAxisType,
+  CrossAxisRelationship,
+  DynamicsConfig,
+} from "@deepsight/shared-types"
+
+// ============================================
 // Organization Types
+// ============================================
+
 export interface Organization {
   id: string
   name: string
@@ -14,20 +35,39 @@ export interface Organization {
   updatedAt: string
 }
 
-export type Plan = "FREE" | "STARTER" | "PRO" | "ENTERPRISE"
+export type Plan =
+  | "FREE"
+  | "STARTER"
+  | "PRO"
+  | "MAX"
+  | "ENTERPRISE"
+  | "ENT_STARTER"
+  | "ENT_GROWTH"
+  | "ENT_SCALE"
 
 export interface PlanDetails {
   name: Plan
   displayName: string
-  price: number
-  apiCallLimit: number
-  rateLimit: number
+  price: number // monthly USD, -1 = custom
+  annualPrice?: number // annual USD (20% discount)
+  apiCallLimit: number // monthly API calls, -1 = unlimited
+  activePersonas: number // active PW personas, -1 = unlimited
+  rateLimit: number // requests per minute
   apiKeysLimit: number
   teamMembersLimit: number
+  sla?: string
   features: string[]
+  matchingFeatures: string[]
+  overage?: {
+    matchApiPerCall: number
+    personaPerUnit: number
+  }
 }
 
+// ============================================
 // User Types
+// ============================================
+
 export interface User {
   id: string
   email: string
@@ -55,7 +95,10 @@ export interface OrganizationMember {
 
 export type MemberRole = "OWNER" | "ADMIN" | "DEVELOPER" | "VIEWER" | "BILLING"
 
+// ============================================
 // API Key Types
+// ============================================
+
 export interface ApiKey {
   id: string
   organizationId: string
@@ -82,10 +125,16 @@ export interface ApiKeyPermissions {
     personas?: boolean
     feedback?: boolean
     users?: boolean
+    filter?: boolean
+    onboarding?: boolean
+    consent?: boolean
   }
 }
 
+// ============================================
 // Usage Types
+// ============================================
+
 export interface UsageStats {
   totalCalls: number
   successCalls: number
@@ -114,7 +163,10 @@ export interface UsageTimeSeries {
   failedCalls: number
 }
 
+// ============================================
 // API Log Types
+// ============================================
+
 export interface ApiLog {
   id: string
   organizationId: string
@@ -136,7 +188,10 @@ export interface ApiLog {
   responseBody?: object
 }
 
+// ============================================
 // Billing Types
+// ============================================
+
 export interface Invoice {
   id: string
   organizationId: string
@@ -171,7 +226,10 @@ export interface PaymentMethod {
   isDefault: boolean
 }
 
+// ============================================
 // Webhook Types
+// ============================================
+
 export interface Webhook {
   id: string
   organizationId: string
@@ -221,7 +279,10 @@ export interface WebhookDelivery {
   completedAt?: string
 }
 
+// ============================================
 // Notification Types
+// ============================================
+
 export interface Notification {
   id: string
   type: "usage" | "error" | "security" | "billing" | "system"
@@ -232,7 +293,10 @@ export interface Notification {
   createdAt: string
 }
 
+// ============================================
 // Alert Settings
+// ============================================
+
 export interface AlertSettings {
   usageThresholds: number[]
   errorRateThreshold: number
@@ -244,7 +308,10 @@ export interface AlertSettings {
   quietHoursEnd?: string
 }
 
+// ============================================
 // Dashboard Metrics
+// ============================================
+
 export interface DashboardMetrics {
   apiCalls: {
     today: number
@@ -264,34 +331,134 @@ export interface DashboardMetrics {
   }
 }
 
-// Persona Types (for API reference)
+// ============================================
+// Persona Types (v3 3-Layer)
+// ============================================
+
+export type PersonaStatus =
+  | "DRAFT"
+  | "REVIEW"
+  | "ACTIVE"
+  | "STANDARD"
+  | "LEGACY"
+  | "DEPRECATED"
+  | "PAUSED"
+  | "ARCHIVED"
+
+export type MatchingTier = "BASIC" | "ADVANCED" | "EXPLORATION"
+
+export interface PersonaVectors {
+  social: {
+    depth: number
+    lens: number
+    stance: number
+    scope: number
+    taste: number
+    purpose: number
+    sociability: number
+  }
+  temperament?: {
+    openness: number
+    conscientiousness: number
+    extraversion: number
+    agreeableness: number
+    neuroticism: number
+  }
+  narrative?: {
+    lack: number
+    moralCompass: number
+    volatility: number
+    growthArc: number
+  }
+}
+
+export interface PersonaParadox {
+  extendedScore: number
+  l1l2Score: number
+  l1l3Score: number
+  l2l3Score: number
+  archetype?: string
+  description?: string
+}
+
 export interface Persona {
   id: string
   name: string
   role: string
+  expertise: string[]
   tagline?: string
   description?: string
   avatarUrl?: string
-  status: "DRAFT" | "ACTIVE" | "LEGACY" | "DEPRECATED" | "ARCHIVED"
-  visibility: "PUBLIC" | "PRIVATE"
-  specialty: string[]
-  tags: string[]
-  vector: PersonaVector
+  status: PersonaStatus
+  category?: string
+  vectors: PersonaVectors
+  paradox?: PersonaParadox
+  createdAt: string
+  updatedAt: string
 }
 
-export interface PersonaVector {
-  depth: number
-  lens: number
-  stance: number
-  scope: number
-  taste: number
-  purpose: number
+// ============================================
+// Match Result Types (v3)
+// ============================================
+
+export interface MatchScores {
+  similarity: number
+  paradoxCompatibility?: number
+  contextRelevance?: number
 }
 
-// Match Result
 export interface MatchResult {
   personaId: string
   personaName: string
-  score: number
-  explanation?: string
+  overallScore: number
+  matchingTier: MatchingTier
+  scores: MatchScores
+  persona?: Persona
 }
+
+// ============================================
+// User Profile & Consent Types (v3)
+// ============================================
+
+export type OnboardingLevel = "QUICK" | "STANDARD" | "DEEP"
+export type ProfileQualityLevel = "BASIC" | "STANDARD" | "ADVANCED" | "PREMIUM"
+export type ConsentType = "DATA_COLLECTION" | "SNS_ANALYSIS" | "THIRD_PARTY_SHARING" | "MARKETING"
+
+export interface UserProfile {
+  userId: string
+  vectors: PersonaVectors
+  crossAxes?: CrossAxisInfo[]
+  consent: UserConsentStatus
+  profileQuality: {
+    level: ProfileQualityLevel
+    completeness: number
+    lastUpdated: string
+  }
+}
+
+export interface CrossAxisInfo {
+  axisId: string
+  type: "L1xL2" | "L1xL3" | "L2xL3" | "L1xL2xL3"
+  relationship: "paradox" | "reinforcing" | "modulating" | "neutral"
+  score: number
+}
+
+export interface UserConsentItem {
+  type: ConsentType
+  granted: boolean
+  grantedAt?: string
+  revokedAt?: string
+  version: string
+}
+
+export interface UserConsentStatus {
+  consents: UserConsentItem[]
+  allRequired: boolean
+  lastUpdated: string
+}
+
+// ============================================
+// Legacy 6D Vector (backward compat — shared-types re-export)
+// ============================================
+
+export type { PersonaVector } from "@deepsight/shared-types"

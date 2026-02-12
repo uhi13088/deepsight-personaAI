@@ -9,16 +9,20 @@ import {
   X,
   AlertCircle,
   ArrowRight,
-  Zap,
-  Shield,
-  Infinity,
   Clock,
-  DollarSign,
   FileText,
   Building2,
   Star,
   ChevronRight,
   Loader2,
+  ToggleLeft,
+  ToggleRight,
+  Zap,
+  Shield,
+  Users,
+  Key,
+  Activity,
+  Gauge,
 } from "lucide-react"
 import {
   Card,
@@ -53,8 +57,12 @@ import { cn, formatNumber, formatCurrency } from "@/lib/utils"
 import { toast } from "sonner"
 import {
   billingService,
+  PLAN_DATA,
+  GENERAL_PLANS,
+  ENTERPRISE_PLANS,
   type BillingData,
   type Plan,
+  type PlanId,
   type Invoice as ServiceInvoice,
   type PaymentMethod as ServicePaymentMethod,
   type TossPaymentInfo,
@@ -80,97 +88,63 @@ declare global {
   }
 }
 
-// Plan data based on documentation (static content)
-const plans = [
+// Helper: format large numbers
+function formatLargeNumber(n: number): string {
+  if (n === -1) return "무제한"
+  if (n >= 10_000_000) return `${(n / 10_000_000).toFixed(0)}천만`
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(0)}백만`
+  if (n >= 10_000) return `${(n / 10_000).toFixed(0)}만`
+  return formatNumber(n)
+}
+
+// Plan comparison rows for the table
+const COMPARISON_ROWS = [
   {
-    id: "free",
-    name: "Free",
-    description: "개인 프로젝트와 테스트용",
-    price: 0,
-    pricePerCall: null,
-    calls: 3000,
-    rateLimit: 10,
-    features: [
-      { name: "월 3,000 API 호출", included: true },
-      { name: "기본 Match API 접근", included: true },
-      { name: "테스트 환경 전용", included: true },
-      { name: "커뮤니티 지원", included: true },
-      { name: "이메일 지원", included: false },
-      { name: "Webhook 연동", included: false },
-      { name: "우선 처리", included: false },
-    ],
-    recommended: false,
-    current: false,
+    label: "활성 PW 페르소나",
+    icon: Users,
+    getValue: (p: Plan) => {
+      if (p.id === "ent_scale") return `${formatNumber(p.limits.activePersonas)}개 + 추가`
+      return p.limits.activePersonas === -1
+        ? "무제한"
+        : `${formatNumber(p.limits.activePersonas)}개`
+    },
   },
   {
-    id: "starter",
-    name: "Starter",
-    description: "스타트업과 소규모 팀용",
-    price: 49,
-    pricePerCall: 0.00098,
-    calls: 50000,
-    rateLimit: 100,
-    features: [
-      { name: "월 50,000 API 호출", included: true },
-      { name: "모든 API 접근", included: true },
-      { name: "Live + Test 환경", included: true },
-      { name: "이메일 지원", included: true },
-      { name: "Webhook 연동", included: true },
-      { name: "기본 분석 대시보드", included: true },
-      { name: "우선 처리", included: false },
-    ],
-    recommended: true,
-    current: false,
+    label: "매칭 API 호출",
+    icon: Activity,
+    getValue: (p: Plan) =>
+      p.limits.matchingApiCalls === -1
+        ? "무제한"
+        : `${formatLargeNumber(p.limits.matchingApiCalls)}/월`,
   },
   {
-    id: "pro",
-    name: "Pro",
-    description: "성장하는 비즈니스용",
-    price: 199,
-    pricePerCall: 0.000398,
-    calls: 500000,
-    rateLimit: 500,
-    features: [
-      { name: "월 500,000 API 호출", included: true },
-      { name: "모든 API 접근", included: true },
-      { name: "Live + Test 환경", included: true },
-      { name: "우선 이메일 지원", included: true },
-      { name: "Webhook 연동", included: true },
-      { name: "고급 분석 대시보드", included: true },
-      { name: "우선 처리 큐", included: true },
-    ],
-    recommended: false,
-    current: false,
+    label: "Rate Limit",
+    icon: Gauge,
+    getValue: (p: Plan) =>
+      p.limits.rateLimit === -1 ? "협의" : `${formatNumber(p.limits.rateLimit)}/분`,
   },
   {
-    id: "enterprise",
-    name: "Enterprise",
-    description: "대규모 기업용 맞춤 솔루션",
-    price: null,
-    pricePerCall: null,
-    calls: null,
-    rateLimit: null,
-    features: [
-      { name: "무제한 API 호출", included: true },
-      { name: "전용 인프라", included: true },
-      { name: "SLA 보장 (99.9%)", included: true },
-      { name: "전담 기술 지원", included: true },
-      { name: "맞춤 통합 지원", included: true },
-      { name: "온프레미스 옵션", included: true },
-      { name: "커스텀 계약", included: true },
-    ],
-    recommended: false,
-    current: false,
+    label: "API Keys",
+    icon: Key,
+    getValue: (p: Plan) => (p.limits.apiKeys === -1 ? "무제한" : `${p.limits.apiKeys}개`),
   },
+  {
+    label: "팀원",
+    icon: Users,
+    getValue: (p: Plan) => (p.limits.teamMembers === -1 ? "무제한" : `${p.limits.teamMembers}명`),
+  },
+  { label: "SLA", icon: Shield, getValue: (p: Plan) => p.limits.sla },
+  { label: "지원", icon: Zap, getValue: (p: Plan) => p.support },
 ]
 
 export default function BillingPage() {
   const [upgradeDialogOpen, setUpgradeDialogOpen] = React.useState(false)
-  const [selectedPlan, setSelectedPlan] = React.useState<(typeof plans)[0] | null>(null)
+  const [selectedPlan, setSelectedPlan] = React.useState<Plan | null>(null)
   const [isLoading, setIsLoading] = React.useState(true)
   const [isProcessingPayment, setIsProcessingPayment] = React.useState(false)
   const [billingData, setBillingData] = React.useState<BillingData | null>(null)
   const [tossReady, setTossReady] = React.useState(false)
+  const [isAnnual, setIsAnnual] = React.useState(false)
 
   // URL 쿼리 파라미터로 결제 결과 처리
   React.useEffect(() => {
@@ -181,7 +155,6 @@ export default function BillingPage() {
 
     if (success === "true" && plan) {
       toast.success(`${plan} 플랜으로 업그레이드되었습니다!`)
-      // URL에서 쿼리 파라미터 제거
       window.history.replaceState({}, "", "/billing")
     } else if (error) {
       toast.error("결제 처리 중 오류가 발생했습니다.")
@@ -206,11 +179,13 @@ export default function BillingPage() {
 
   const currentUsage = billingData?.usage ?? {
     used: 0,
-    limit: 3000,
+    limit: 500_000,
     percentUsed: 0,
     estimatedCost: 0,
     billingCycle: "",
     daysRemaining: 0,
+    activePersonas: 0,
+    activePersonasLimit: 50,
   }
   const invoices = billingData?.invoices ?? []
   const paymentMethods = billingData?.paymentMethods ?? []
@@ -234,12 +209,7 @@ export default function BillingPage() {
     }
   }
 
-  const displayPlans = plans.map((plan) => ({
-    ...plan,
-    current: currentPlan?.id === plan.id,
-  }))
-
-  const handleUpgrade = async (plan: (typeof plans)[0]) => {
+  const handleUpgrade = (plan: Plan) => {
     setSelectedPlan(plan)
     setUpgradeDialogOpen(true)
   }
@@ -249,11 +219,8 @@ export default function BillingPage() {
 
     setIsProcessingPayment(true)
     try {
-      const paymentInfo = await billingService.upgradePlan(
-        selectedPlan.id as "free" | "starter" | "pro" | "enterprise"
-      )
+      const paymentInfo = await billingService.upgradePlan(selectedPlan.id)
 
-      // Free 플랜은 결제 없이 바로 적용
       if (!paymentInfo) {
         toast.success("플랜이 변경되었습니다.")
         const data = await billingService.getBillingInfo()
@@ -262,13 +229,11 @@ export default function BillingPage() {
         return
       }
 
-      // Toss Payments SDK 로드 확인
       if (!window.TossPayments) {
         toast.error("결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해주세요.")
         return
       }
 
-      // Toss Payments 결제 요청
       const tossPayments = window.TossPayments(paymentInfo.clientKey)
       await tossPayments.requestPayment("카드", {
         amount: paymentInfo.amount,
@@ -280,7 +245,6 @@ export default function BillingPage() {
       })
     } catch (error) {
       console.error("Failed to upgrade plan:", error)
-      // Toss 결제창 취소 시에도 에러가 발생하므로 구분 처리
       if (error instanceof Error && error.message.includes("PAY_PROCESS_CANCELED")) {
         toast.info("결제가 취소되었습니다.")
       } else {
@@ -291,6 +255,11 @@ export default function BillingPage() {
     }
   }
 
+  const getDisplayPrice = (plan: Plan) => {
+    if (isAnnual && !plan.isEnterprise) return plan.annualPrice
+    return plan.price
+  }
+
   if (isLoading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -298,6 +267,16 @@ export default function BillingPage() {
       </div>
     )
   }
+
+  const generalPlans = GENERAL_PLANS.map((id) => ({
+    ...PLAN_DATA[id],
+    current: currentPlan?.id === id,
+  }))
+
+  const enterprisePlans = ENTERPRISE_PLANS.map((id) => ({
+    ...PLAN_DATA[id],
+    current: currentPlan?.id === id,
+  }))
 
   return (
     <div className="space-y-6">
@@ -323,31 +302,43 @@ export default function BillingPage() {
                 <CardDescription>현재 구독 중인 플랜</CardDescription>
               </div>
               <Badge variant="default" className="px-3 py-1 text-lg">
-                {currentPlan?.name ?? "Free"}
+                {currentPlan?.name ?? "Starter"}
               </Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-4">
               <div className="rounded-lg border p-4">
                 <p className="text-muted-foreground text-sm">월 요금</p>
-                <p className="text-2xl font-bold">{formatCurrency(currentPlan?.price ?? 0)}</p>
+                <p className="text-2xl font-bold">{formatCurrency(currentPlan?.price ?? 199)}</p>
               </div>
               <div className="rounded-lg border p-4">
-                <p className="text-muted-foreground text-sm">API 호출 한도</p>
-                <p className="text-2xl font-bold">{formatNumber(currentPlan?.calls ?? 3000)}</p>
+                <p className="text-muted-foreground text-sm">매칭 API 한도</p>
+                <p className="text-2xl font-bold">
+                  {formatLargeNumber(currentPlan?.limits.matchingApiCalls ?? 500_000)}
+                </p>
               </div>
               <div className="rounded-lg border p-4">
                 <p className="text-muted-foreground text-sm">Rate Limit</p>
-                <p className="text-2xl font-bold">{currentPlan?.rateLimit ?? 10}/min</p>
+                <p className="text-2xl font-bold">
+                  {currentPlan?.limits.rateLimit === -1
+                    ? "협의"
+                    : `${currentPlan?.limits.rateLimit ?? 100}/분`}
+                </p>
+              </div>
+              <div className="rounded-lg border p-4">
+                <p className="text-muted-foreground text-sm">활성 페르소나</p>
+                <p className="text-2xl font-bold">
+                  {currentUsage.activePersonas} / {formatNumber(currentUsage.activePersonasLimit)}
+                </p>
               </div>
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span>이번 달 사용량</span>
+                <span>이번 달 API 사용량</span>
                 <span className="font-medium">
-                  {formatNumber(currentUsage.used)} / {formatNumber(currentUsage.limit)} calls
+                  {formatNumber(currentUsage.used)} / {formatLargeNumber(currentUsage.limit)} calls
                 </span>
               </div>
               <Progress value={currentUsage.percentUsed} className="h-3" />
@@ -367,19 +358,6 @@ export default function BillingPage() {
               </Alert>
             )}
           </CardContent>
-          <CardFooter className="flex justify-between border-t pt-6">
-            <div>
-              <p className="text-muted-foreground text-sm">현재 플랜</p>
-              <p className="font-medium">
-                {currentPlan?.name ?? "Free"} (
-                {currentPlan?.price === 0 ? "무료" : `$${currentPlan?.price}/월`})
-              </p>
-            </div>
-            <Button onClick={() => handleUpgrade(plans[1])}>
-              Upgrade to Starter
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </CardFooter>
         </Card>
 
         {/* Payment Method */}
@@ -422,99 +400,388 @@ export default function BillingPage() {
         </Card>
       </div>
 
-      {/* Plans Comparison */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Available Plans</CardTitle>
-          <CardDescription>프로젝트에 맞는 플랜을 선택하세요</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {displayPlans.map((plan) => (
-              <div
-                key={plan.id}
-                className={cn(
-                  "relative rounded-lg border-2 p-6 transition-all",
-                  plan.current
-                    ? "border-primary bg-primary/5"
-                    : "border-muted hover:border-muted-foreground/30",
-                  plan.recommended && !plan.current && "border-primary/50"
-                )}
-              >
-                {plan.recommended && !plan.current && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <Badge className="gap-1">
-                      <Star className="h-3 w-3" />
-                      Recommended
-                    </Badge>
-                  </div>
-                )}
-                {plan.current && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <Badge variant="secondary">Current Plan</Badge>
-                  </div>
-                )}
+      {/* Plans Section */}
+      <Tabs defaultValue="general">
+        <div className="flex items-center justify-between">
+          <TabsList>
+            <TabsTrigger value="general">일반 플랜</TabsTrigger>
+            <TabsTrigger value="enterprise">Enterprise</TabsTrigger>
+            <TabsTrigger value="compare">상세 비교</TabsTrigger>
+          </TabsList>
 
-                <div className="mb-4 text-center">
-                  <h3 className="text-lg font-bold">{plan.name}</h3>
-                  <p className="text-muted-foreground text-sm">{plan.description}</p>
-                </div>
+          {/* Annual Toggle */}
+          <button
+            onClick={() => setIsAnnual(!isAnnual)}
+            className="flex items-center gap-2 text-sm"
+          >
+            {isAnnual ? (
+              <ToggleRight className="text-primary h-5 w-5" />
+            ) : (
+              <ToggleLeft className="text-muted-foreground h-5 w-5" />
+            )}
+            <span className={cn(isAnnual ? "text-primary font-medium" : "text-muted-foreground")}>
+              연간 결제
+            </span>
+            {isAnnual && (
+              <Badge variant="secondary" className="text-xs">
+                20% 할인
+              </Badge>
+            )}
+          </button>
+        </div>
 
-                <div className="mb-6 text-center">
-                  {plan.price !== null ? (
-                    <>
-                      <span className="text-3xl font-bold">${plan.price}</span>
-                      <span className="text-muted-foreground">/month</span>
-                    </>
-                  ) : (
-                    <span className="text-2xl font-bold">Contact Us</span>
-                  )}
-                </div>
-
-                <ul className="mb-6 space-y-2">
-                  {plan.features.slice(0, 5).map((feature) => (
-                    <li
-                      key={feature.name}
-                      className={cn(
-                        "flex items-center gap-2 text-sm",
-                        !feature.included && "text-muted-foreground"
-                      )}
-                    >
-                      {feature.included ? (
-                        <Check className="h-4 w-4 shrink-0 text-green-500" />
-                      ) : (
-                        <X className="text-muted-foreground h-4 w-4 shrink-0" />
-                      )}
-                      {feature.name}
-                    </li>
-                  ))}
-                </ul>
-
-                {plan.current ? (
-                  <Button variant="outline" className="w-full" disabled>
-                    Current Plan
-                  </Button>
-                ) : plan.id === "enterprise" ? (
-                  <Button variant="outline" className="w-full" asChild>
-                    <Link href="/support">
-                      <Building2 className="mr-2 h-4 w-4" />
-                      Contact Sales
-                    </Link>
-                  </Button>
-                ) : (
-                  <Button
-                    className="w-full"
-                    variant={plan.recommended ? "default" : "outline"}
-                    onClick={() => handleUpgrade(plan)}
+        {/* General Plans Tab */}
+        <TabsContent value="general">
+          <Card>
+            <CardHeader>
+              <CardTitle>Available Plans</CardTitle>
+              <CardDescription>
+                프로젝트에 맞는 플랜을 선택하세요
+                {isAnnual && " — 연간 결제 시 20% 할인"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-6 md:grid-cols-3">
+                {generalPlans.map((plan) => (
+                  <div
+                    key={plan.id}
+                    className={cn(
+                      "relative rounded-lg border-2 p-6 transition-all",
+                      plan.current
+                        ? "border-primary bg-primary/5"
+                        : "border-muted hover:border-muted-foreground/30",
+                      plan.recommended && !plan.current && "border-primary/50"
+                    )}
                   >
-                    {plan.price === 0 ? "Downgrade" : "Upgrade"}
-                  </Button>
-                )}
+                    {plan.recommended && !plan.current && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                        <Badge className="gap-1">
+                          <Star className="h-3 w-3" />
+                          Recommended
+                        </Badge>
+                      </div>
+                    )}
+                    {plan.current && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                        <Badge variant="secondary">Current Plan</Badge>
+                      </div>
+                    )}
+
+                    <div className="mb-4 text-center">
+                      <h3 className="text-lg font-bold">{plan.name}</h3>
+                      <p className="text-muted-foreground text-sm">{plan.description}</p>
+                    </div>
+
+                    <div className="mb-6 text-center">
+                      <span className="text-3xl font-bold">${getDisplayPrice(plan as Plan)}</span>
+                      <span className="text-muted-foreground">/month</span>
+                      {isAnnual && (
+                        <p className="text-muted-foreground mt-1 text-xs line-through">
+                          ${plan.price}/month
+                        </p>
+                      )}
+                    </div>
+
+                    <ul className="mb-6 space-y-2">
+                      {plan.features.slice(0, 7).map((feature) => (
+                        <li key={feature} className="flex items-center gap-2 text-sm">
+                          <Check className="h-4 w-4 shrink-0 text-green-500" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+
+                    {plan.current ? (
+                      <Button variant="outline" className="w-full" disabled>
+                        Current Plan
+                      </Button>
+                    ) : (
+                      <Button
+                        className="w-full"
+                        variant={plan.recommended ? "default" : "outline"}
+                        onClick={() => handleUpgrade(plan as Plan)}
+                      >
+                        Upgrade
+                      </Button>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+
+              {/* Enterprise CTA */}
+              <div className="mt-6 rounded-lg border border-dashed p-6 text-center">
+                <Building2 className="text-muted-foreground mx-auto mb-2 h-8 w-8" />
+                <h4 className="mb-1 font-medium">더 큰 규모가 필요하신가요?</h4>
+                <p className="text-muted-foreground mb-4 text-sm">
+                  Enterprise 플랜으로 800~5,000+ 페르소나, SSO, 전담 매니저를 이용하세요.
+                </p>
+                <Button variant="outline" asChild>
+                  <Link href="/support">
+                    <Building2 className="mr-2 h-4 w-4" />
+                    Enterprise 문의
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Enterprise Plans Tab */}
+        <TabsContent value="enterprise">
+          <Card>
+            <CardHeader>
+              <CardTitle>Enterprise Plans</CardTitle>
+              <CardDescription>대규모 기업을 위한 맞춤형 플랜 — 별도 계약 기준</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-6 md:grid-cols-3">
+                {enterprisePlans.map((plan) => (
+                  <div
+                    key={plan.id}
+                    className={cn(
+                      "relative rounded-lg border-2 p-6 transition-all",
+                      plan.current
+                        ? "border-primary bg-primary/5"
+                        : "border-muted hover:border-muted-foreground/30"
+                    )}
+                  >
+                    {plan.current && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                        <Badge variant="secondary">Current Plan</Badge>
+                      </div>
+                    )}
+
+                    <div className="mb-4 text-center">
+                      <h3 className="text-lg font-bold">{plan.name}</h3>
+                      <p className="text-muted-foreground text-sm">{plan.description}</p>
+                    </div>
+
+                    <div className="mb-6 text-center">
+                      <span className="text-3xl font-bold">${formatNumber(plan.price)}</span>
+                      <span className="text-muted-foreground">/month</span>
+                    </div>
+
+                    <ul className="mb-6 space-y-2">
+                      {plan.features.map((feature) => (
+                        <li key={feature} className="flex items-center gap-2 text-sm">
+                          <Check className="h-4 w-4 shrink-0 text-green-500" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <Button variant="outline" className="w-full" asChild>
+                      <Link href="/support">문의하기</Link>
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Plan Comparison Tab */}
+        <TabsContent value="compare">
+          <Card>
+            <CardHeader>
+              <CardTitle>플랜 상세 비교</CardTitle>
+              <CardDescription>모든 플랜의 한도 및 기능을 비교하세요</CardDescription>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[180px]">항목</TableHead>
+                    {GENERAL_PLANS.map((id) => (
+                      <TableHead key={id} className="text-center">
+                        {PLAN_DATA[id].name}
+                        <div className="text-muted-foreground text-xs font-normal">
+                          ${isAnnual ? PLAN_DATA[id].annualPrice : PLAN_DATA[id].price}/월
+                        </div>
+                      </TableHead>
+                    ))}
+                    {ENTERPRISE_PLANS.map((id) => (
+                      <TableHead key={id} className="text-center">
+                        {PLAN_DATA[id].name.replace("Enterprise ", "Ent. ")}
+                        <div className="text-muted-foreground text-xs font-normal">
+                          ${formatNumber(PLAN_DATA[id].price)}/월
+                        </div>
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {COMPARISON_ROWS.map((row) => (
+                    <TableRow key={row.label}>
+                      <TableCell className="font-medium">{row.label}</TableCell>
+                      {[...GENERAL_PLANS, ...ENTERPRISE_PLANS].map((id) => (
+                        <TableCell key={id} className="text-center">
+                          {row.getValue({ ...PLAN_DATA[id], current: false })}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+
+                  {/* Enterprise-only features */}
+                  <TableRow>
+                    <TableCell className="font-medium">SSO</TableCell>
+                    {GENERAL_PLANS.map((id) => (
+                      <TableCell key={id} className="text-center">
+                        <X className="text-muted-foreground mx-auto h-4 w-4" />
+                      </TableCell>
+                    ))}
+                    {ENTERPRISE_PLANS.map((id) => (
+                      <TableCell key={id} className="text-center">
+                        <Check className="mx-auto h-4 w-4 text-green-500" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">IP 화이트리스트</TableCell>
+                    {GENERAL_PLANS.map((id) => (
+                      <TableCell key={id} className="text-center">
+                        <X className="text-muted-foreground mx-auto h-4 w-4" />
+                      </TableCell>
+                    ))}
+                    {ENTERPRISE_PLANS.map((id) => (
+                      <TableCell key={id} className="text-center">
+                        <Check className="mx-auto h-4 w-4 text-green-500" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">페르소나 필터 API</TableCell>
+                    {GENERAL_PLANS.map((id) => (
+                      <TableCell key={id} className="text-center">
+                        <X className="text-muted-foreground mx-auto h-4 w-4" />
+                      </TableCell>
+                    ))}
+                    {ENTERPRISE_PLANS.map((id) => (
+                      <TableCell key={id} className="text-center">
+                        <Check className="mx-auto h-4 w-4 text-green-500" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Overage Pricing */}
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>초과 요금 (Overage)</CardTitle>
+              <CardDescription>한도 초과 시 적용되는 요금</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-6 md:grid-cols-2">
+                <div>
+                  <h4 className="mb-3 font-medium">매칭 API 초과 요금</h4>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>플랜</TableHead>
+                        <TableHead className="text-right">초과 요금</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[...GENERAL_PLANS, ...ENTERPRISE_PLANS].map((id) => (
+                        <TableRow key={id}>
+                          <TableCell>{PLAN_DATA[id].name}</TableCell>
+                          <TableCell className="text-right">
+                            {PLAN_DATA[id].overage.matchApiPerCall === 0
+                              ? "포함량 내 운영"
+                              : `$${PLAN_DATA[id].overage.matchApiPerCall} / call`}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div>
+                  <h4 className="mb-3 font-medium">PW 페르소나 추가 요금</h4>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>플랜</TableHead>
+                        <TableHead className="text-right">추가 요금</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[...GENERAL_PLANS, ...ENTERPRISE_PLANS].map((id) => (
+                        <TableRow key={id}>
+                          <TableCell>{PLAN_DATA[id].name}</TableCell>
+                          <TableCell className="text-right">
+                            ${PLAN_DATA[id].overage.personaPerUnit} / 개 / 월
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Matching Features */}
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>매칭 기능 비교</CardTitle>
+              <CardDescription>모든 플랜에서 동일한 106D+ 매칭 품질을 제공합니다</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>매칭 기능</TableHead>
+                    <TableHead>설명</TableHead>
+                    <TableHead className="text-center">모든 플랜</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell className="font-medium">Tier 1: Basic</TableCell>
+                    <TableCell>106D+ 벡터 공간 유사도 기반 매칭</TableCell>
+                    <TableCell className="text-center">
+                      <Check className="mx-auto h-4 w-4 text-green-500" />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Tier 2: Advanced</TableCell>
+                    <TableCell>106D+ 벡터 + Extended Paradox Score 호환성 매칭</TableCell>
+                    <TableCell className="text-center">
+                      <Check className="mx-auto h-4 w-4 text-green-500" />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Tier 3: Exploration</TableCell>
+                    <TableCell>
+                      106D+ 다양성 극대화 + Init/Override/Adapt/Express + Voice 보정
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="secondary">기본값</Badge>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">스마트 캐싱</TableCell>
+                    <TableCell>동일 콘텐츠 매칭 결과 7일간 캐싱 (히트율 70%+)</TableCell>
+                    <TableCell className="text-center">
+                      <Check className="mx-auto h-4 w-4 text-green-500" />
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Prompt Caching</TableCell>
+                    <TableCell>페르소나 시스템 프롬프트 캐싱 (LLM 호출 비용 90% 절감)</TableCell>
+                    <TableCell className="text-center">
+                      <Check className="mx-auto h-4 w-4 text-green-500" />
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Recent Invoices */}
       <Card>
@@ -591,21 +858,39 @@ export default function BillingPage() {
                 <div className="mb-2 flex items-center justify-between">
                   <span className="font-medium">{selectedPlan.name} Plan</span>
                   <span className="text-xl font-bold">
-                    {selectedPlan.price !== null ? formatCurrency(selectedPlan.price) : "Custom"}
-                    /month
+                    {formatCurrency(getDisplayPrice(selectedPlan))}/month
                   </span>
                 </div>
                 <ul className="text-muted-foreground space-y-1 text-sm">
                   <li>
-                    • {selectedPlan.calls ? formatNumber(selectedPlan.calls) : "Unlimited"} API
-                    calls/month
+                    • {formatLargeNumber(selectedPlan.limits.matchingApiCalls)} API calls/month
                   </li>
                   <li>
-                    • {selectedPlan.rateLimit ? `${selectedPlan.rateLimit} req/min` : "Custom"} rate
-                    limit
+                    •{" "}
+                    {selectedPlan.limits.rateLimit === -1
+                      ? "협의"
+                      : `${selectedPlan.limits.rateLimit} req/min`}{" "}
+                    rate limit
+                  </li>
+                  <li>
+                    • 활성 PW 페르소나{" "}
+                    {selectedPlan.limits.activePersonas === -1
+                      ? "무제한"
+                      : `${formatNumber(selectedPlan.limits.activePersonas)}개`}
                   </li>
                 </ul>
               </div>
+
+              {isAnnual && !selectedPlan.isEnterprise && (
+                <Alert>
+                  <Zap className="h-4 w-4" />
+                  <AlertTitle>연간 결제 할인 적용</AlertTitle>
+                  <AlertDescription>
+                    연간 결제 시 월 ${selectedPlan.annualPrice} (20% 할인, 연 $
+                    {formatNumber(selectedPlan.annualPrice * 12)})
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <Alert>
                 <Clock className="h-4 w-4" />
@@ -631,8 +916,6 @@ export default function BillingPage() {
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Processing...
                 </>
-              ) : selectedPlan?.price === 0 ? (
-                "Confirm Downgrade"
               ) : (
                 "결제하기"
               )}

@@ -1,44 +1,58 @@
 import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
 import prisma from "@/lib/prisma"
-import { validateApiKey } from "@/lib/api-key-validator"
+import { validateApiKey, type ValidatedApiKey } from "@/lib/api-key-validator"
 import { trackApiUsage } from "@/lib/usage-tracker"
-import type { PersonaVector } from "@deepsight/shared-types"
-import type { Persona } from "@prisma/client"
 
-type MatchResult = {
-  personaId: string
-  name: string
-  category: string
-  score: number
-  dimensions?: {
-    depth: number
-    lens: number
-    stance: number
-    scope: number
-    taste: number
-    purpose: number
+// ============================================================================
+// Types
+// ============================================================================
+
+type MatchingTier = "basic" | "advanced" | "exploration"
+
+interface MatchRequestBody {
+  user_id: string
+  context?: {
+    category?: string
+    time_of_day?: string
+    device?: string
+    custom?: Record<string, unknown>
+  }
+  options?: {
+    top_n?: number
+    matching_tier?: MatchingTier
+    include_score?: boolean
+    include_explanation?: boolean
   }
 }
 
 // ============================================================================
-// Vector Utilities
+// Rate Limit Helpers
 // ============================================================================
 
-/**
- * Calculate cosine similarity between two 6D vectors
- */
-function cosineSimilarity(v1: PersonaVector, v2: PersonaVector): number {
-  const dimensions = ["depth", "lens", "stance", "scope", "taste", "purpose"] as const
+function getRateLimitHeaders(apiKey: ValidatedApiKey) {
+  const limit = apiKey.rateLimit
+  const resetTime = Math.floor(Date.now() / 60000) * 60 + 60
+  return {
+    "X-RateLimit-Limit": String(limit),
+    "X-RateLimit-Remaining": String(Math.max(0, limit - 1)),
+    "X-RateLimit-Reset": String(resetTime),
+  }
+}
 
+// ============================================================================
+// Vector Utilities (v3 3-Layer)
+// ============================================================================
+
+function cosineSimilarity(v1: number[], v2: number[]): number {
   let dotProduct = 0
   let magnitude1 = 0
   let magnitude2 = 0
 
-  for (const dim of dimensions) {
-    dotProduct += v1[dim] * v2[dim]
-    magnitude1 += v1[dim] ** 2
-    magnitude2 += v2[dim] ** 2
+  for (let i = 0; i < v1.length; i++) {
+    dotProduct += v1[i] * v2[i]
+    magnitude1 += v1[i] ** 2
+    magnitude2 += v2[i] ** 2
   }
 
   magnitude1 = Math.sqrt(magnitude1)
@@ -50,59 +64,72 @@ function cosineSimilarity(v1: PersonaVector, v2: PersonaVector): number {
 }
 
 /**
- * Simple content analysis to extract a 6D vector
- * This is a heuristic-based approach - in production, you might use ML models
+ * Compute overall match score based on matching tier
+ * - basic: L1 similarity only (7D)
+ * - advanced: L1 70% + L2 20% + EPS 10%
+ * - exploration: L1 50% + L2 20% + L3 20% + EPS 10%
  */
-function analyzeContent(content: string): PersonaVector {
-  const lowerContent = content.toLowerCase()
-  const wordCount = content.split(/\s+/).length
-  const sentenceCount = content.split(/[.!?]+/).filter(Boolean).length
+function computeMatchScore(
+  persona: {
+    l1: number[]
+    l2: number[] | null
+    l3: number[] | null
+    eps: number | null
+  },
+  tier: MatchingTier
+): {
+  overallScore: number
+  similarityScore: number
+  paradoxCompatibility: number | null
+} {
+  // Default user vector (neutral 0.5 — in production, fetched from UserVector)
+  const defaultUserL1 = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+  const l1Score = cosineSimilarity(persona.l1, defaultUserL1)
 
-  // Depth: Longer, more detailed content = higher depth
-  const avgWordsPerSentence = wordCount / Math.max(sentenceCount, 1)
-  const depth = Math.min(1, Math.max(0, (avgWordsPerSentence - 5) / 25))
+  if (tier === "basic") {
+    return {
+      overallScore: Math.round(l1Score * 1000) / 10,
+      similarityScore: Math.round(l1Score * 1000) / 10,
+      paradoxCompatibility: null,
+    }
+  }
 
-  // Lens: Presence of subjective language
-  const subjectiveWords = ["i think", "i feel", "personally", "opinion", "believe", "seems"]
-  const subjectiveCount = subjectiveWords.filter((w) => lowerContent.includes(w)).length
-  const lens = Math.min(1, subjectiveCount / 3)
+  let l2Score = 0
+  if (persona.l2) {
+    const defaultUserL2 = [0.5, 0.5, 0.5, 0.5, 0.5]
+    l2Score = cosineSimilarity(persona.l2, defaultUserL2)
+  }
 
-  // Stance: Forward-looking vs traditional language
-  const progressiveWords = ["innovation", "future", "new", "change", "disrupt", "modern"]
-  const conservativeWords = ["traditional", "proven", "stable", "established", "classic"]
-  const progressiveCount = progressiveWords.filter((w) => lowerContent.includes(w)).length
-  const conservativeCount = conservativeWords.filter((w) => lowerContent.includes(w)).length
-  const stance =
-    progressiveCount + conservativeCount > 0
-      ? progressiveCount / (progressiveCount + conservativeCount)
-      : 0.5
+  const epsScore = persona.eps ?? 0
 
-  // Scope: Social vs individual focus
-  const socialWords = ["community", "society", "everyone", "people", "world", "global"]
-  const individualWords = ["personal", "individual", "myself", "my own", "private"]
-  const socialCount = socialWords.filter((w) => lowerContent.includes(w)).length
-  const individualCount = individualWords.filter((w) => lowerContent.includes(w)).length
-  const scope =
-    socialCount + individualCount > 0 ? socialCount / (socialCount + individualCount) : 0.5
+  if (tier === "advanced") {
+    const overall = l1Score * 0.7 + l2Score * 0.2 + epsScore * 0.1
+    return {
+      overallScore: Math.round(overall * 1000) / 10,
+      similarityScore: Math.round(l1Score * 1000) / 10,
+      paradoxCompatibility: Math.round(epsScore * 1000) / 10,
+    }
+  }
 
-  // Taste: Niche vs mainstream indicators
-  const nicheWords = ["exclusive", "artisan", "boutique", "niche", "specialized", "unique"]
-  const mainstreamWords = ["popular", "mainstream", "common", "standard", "typical"]
-  const nicheCount = nicheWords.filter((w) => lowerContent.includes(w)).length
-  const mainstreamCount = mainstreamWords.filter((w) => lowerContent.includes(w)).length
-  const taste = nicheCount + mainstreamCount > 0 ? nicheCount / (nicheCount + mainstreamCount) : 0.5
+  // Exploration
+  let l3Score = 0
+  if (persona.l3) {
+    const defaultUserL3 = [0.5, 0.5, 0.5, 0.5]
+    l3Score = cosineSimilarity(persona.l3, defaultUserL3)
+  }
 
-  // Purpose: Information vs emotion
-  const infoWords = ["data", "facts", "statistics", "research", "study", "analysis"]
-  const emotionWords = ["feel", "love", "hate", "amazing", "terrible", "excited", "beautiful"]
-  const infoCount = infoWords.filter((w) => lowerContent.includes(w)).length
-  const emotionCount = emotionWords.filter((w) => lowerContent.includes(w)).length
-  const purpose = infoCount + emotionCount > 0 ? emotionCount / (infoCount + emotionCount) : 0.5
-
-  return { depth, lens, stance, scope, taste, purpose }
+  const overall = l1Score * 0.5 + l2Score * 0.2 + l3Score * 0.2 + epsScore * 0.1
+  return {
+    overallScore: Math.round(overall * 1000) / 10,
+    similarityScore: Math.round(l1Score * 1000) / 10,
+    paradoxCompatibility: Math.round(epsScore * 1000) / 10,
+  }
 }
 
-// POST /api/v1/match - Match content to personas
+// ============================================================================
+// POST /api/v1/match — v3 3-Layer Matching (스펙 §9.3.1)
+// ============================================================================
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
   const requestId = "req_" + crypto.randomBytes(12).toString("hex")
@@ -118,132 +145,135 @@ export async function POST(request: NextRequest) {
             code: validation.error?.code || "UNAUTHORIZED",
             message: validation.error?.message || "Invalid API key",
           },
-          requestId,
+          meta: { request_id: requestId },
         },
         { status: 401 }
       )
     }
 
     // Parse request body
-    const body = await request.json()
-    const { content, options = {} } = body
+    const body: MatchRequestBody = await request.json()
+    const { user_id, context, options = {} } = body
 
-    // Validate content
-    if (!content || typeof content !== "string") {
+    // Validate user_id
+    if (!user_id || typeof user_id !== "string") {
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: "INVALID_CONTENT",
-            message: "Content is required and must be a string",
+            code: "INVALID_USER_ID",
+            message: "user_id is required and must be a string",
           },
-          requestId,
+          meta: { request_id: requestId },
         },
-        { status: 400 }
+        {
+          status: 400,
+          headers: getRateLimitHeaders(validation.apiKey),
+        }
       )
     }
 
-    if (content.length < 10) {
+    const topN = Math.min(Math.max(options.top_n || 5, 1), 20)
+    const matchingTier: MatchingTier = options.matching_tier || "basic"
+    const includeScore = options.include_score !== false
+    const includeExplanation = options.include_explanation === true
+
+    if (!["basic", "advanced", "exploration"].includes(matchingTier)) {
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: "CONTENT_TOO_SHORT",
-            message: "Content must be at least 10 characters",
+            code: "INVALID_MATCHING_TIER",
+            message: "matching_tier must be one of: basic, advanced, exploration",
           },
-          requestId,
+          meta: { request_id: requestId },
         },
-        { status: 400 }
-      )
-    }
-
-    if (content.length > 10000) {
-      return NextResponse.json(
         {
-          success: false,
-          error: {
-            code: "CONTENT_TOO_LONG",
-            message: "Content must not exceed 10,000 characters",
-          },
-          requestId,
-        },
-        { status: 400 }
+          status: 400,
+          headers: getRateLimitHeaders(validation.apiKey),
+        }
       )
     }
 
-    const limit = Math.min(Math.max(options.limit || 5, 1), 20)
-    const threshold = Math.max(Math.min(options.threshold || 0.0, 1.0), 0.0)
-    const includeScores = options.includeScores !== false
-
-    // Analyze content to get a content vector
-    const contentVector = analyzeContent(content)
-
-    // Fetch all active personas
+    // Fetch active personas
     const personas = await prisma.persona.findMany({
-      where: { active: true },
+      where: {
+        active: true,
+        ...(context?.category ? { category: context.category } : {}),
+      },
     })
 
-    // Calculate similarity scores
+    // Compute match scores
     const matches = personas
-      .map((persona: Persona) => {
-        const personaVector: PersonaVector = {
-          depth: Number(persona.depth),
-          lens: Number(persona.lens),
-          stance: Number(persona.stance),
-          scope: Number(persona.scope),
-          taste: Number(persona.taste),
-          purpose: Number(persona.purpose),
-        }
+      .map((persona) => {
+        const l1 = [
+          Number(persona.depth),
+          Number(persona.lens),
+          Number(persona.stance),
+          Number(persona.scope),
+          Number(persona.taste),
+          Number(persona.purpose),
+          Number(persona.sociability),
+        ]
 
-        const score = cosineSimilarity(contentVector, personaVector)
+        const l2 =
+          persona.openness !== null
+            ? [
+                Number(persona.openness),
+                Number(persona.conscientiousness),
+                Number(persona.extraversion),
+                Number(persona.agreeableness),
+                Number(persona.neuroticism),
+              ]
+            : null
+
+        const l3 =
+          persona.lack !== null
+            ? [
+                Number(persona.lack),
+                Number(persona.moralCompass),
+                Number(persona.volatility),
+                Number(persona.growthArc),
+              ]
+            : null
+
+        const eps = persona.extendedParadoxScore ? Number(persona.extendedParadoxScore) : null
+
+        const scores = computeMatchScore({ l1, l2, l3, eps }, matchingTier)
 
         return {
-          personaId: persona.id,
-          name: persona.name,
-          category: persona.category || "General",
-          score: Math.round(score * 1000) / 1000,
-          dimensions: includeScores
-            ? {
-                depth:
-                  Math.round(Math.abs(contentVector.depth - personaVector.depth) * 1000) / 1000,
-                lens: Math.round(Math.abs(contentVector.lens - personaVector.lens) * 1000) / 1000,
-                stance:
-                  Math.round(Math.abs(contentVector.stance - personaVector.stance) * 1000) / 1000,
-                scope:
-                  Math.round(Math.abs(contentVector.scope - personaVector.scope) * 1000) / 1000,
-                taste:
-                  Math.round(Math.abs(contentVector.taste - personaVector.taste) * 1000) / 1000,
-                purpose:
-                  Math.round(Math.abs(contentVector.purpose - personaVector.purpose) * 1000) / 1000,
-              }
+          persona_id: persona.id,
+          persona_name: persona.name,
+          score: includeScore ? scores.overallScore : undefined,
+          explanation: includeExplanation
+            ? `${matchingTier} tier matching — similarity ${scores.similarityScore}%`
             : undefined,
+          ...(matchingTier !== "basic" && includeScore
+            ? {
+                details: {
+                  similarity_score: scores.similarityScore,
+                  paradox_compatibility: scores.paradoxCompatibility,
+                },
+              }
+            : {}),
         }
       })
-      .filter((m: MatchResult) => m.score >= threshold)
-      .sort((a: MatchResult, b: MatchResult) => b.score - a.score)
-      .slice(0, limit)
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+      .slice(0, topN)
 
     const processingTime = Date.now() - startTime
 
-    // Store match results in database
-    const contentHash = crypto.createHash("sha256").update(content).digest("hex").slice(0, 32)
-
-    // Store top match in database (async, don't await)
+    // Store top match in database (async)
     if (matches.length > 0) {
       prisma.matchResult
         .create({
           data: {
             requestId,
-            content: content.slice(0, 5000), // Truncate for storage
-            contentHash,
-            personaId: matches[0].personaId,
-            score: matches[0].score,
-            depthScore: matches[0].dimensions?.depth,
-            lensScore: matches[0].dimensions?.lens,
-            stanceScore: matches[0].dimensions?.stance,
-            scopeScore: matches[0].dimensions?.scope,
-            tasteScore: matches[0].dimensions?.taste,
-            purposeScore: matches[0].dimensions?.purpose,
+            userId: user_id,
+            personaId: matches[0].persona_id,
+            matchingTier: matchingTier.toUpperCase() as "BASIC" | "ADVANCED" | "EXPLORATION",
+            overallScore: matches[0].score,
+            context: context as object | undefined,
             processingTimeMs: processingTime,
           },
         })
@@ -258,24 +288,27 @@ export async function POST(request: NextRequest) {
       "/api/v1/match",
       200,
       processingTime,
-      { content_length: content.length, limit, threshold },
+      { user_id, matching_tier: matchingTier, top_n: topN },
       { matches_found: matches.length }
     )
 
-    return NextResponse.json({
-      success: true,
-      requestId,
-      data: {
-        matches,
-        contentVector: includeScores ? contentVector : undefined,
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          matches,
+          user_archetype: null, // Populated when UserVector exists
+        },
+        meta: {
+          request_id: requestId,
+          processing_time_ms: processingTime,
+          matching_tier: matchingTier,
+        },
       },
-      meta: {
-        contentLength: content.length,
-        matchesFound: matches.length,
-        thresholdApplied: threshold,
-        processingTimeMs: processingTime,
-      },
-    })
+      {
+        headers: getRateLimitHeaders(validation.apiKey),
+      }
+    )
   } catch (error) {
     console.error("Match API error:", error)
 
@@ -288,8 +321,10 @@ export async function POST(request: NextRequest) {
           code: "INTERNAL_ERROR",
           message: "An error occurred while processing the match request",
         },
-        requestId,
-        processingTimeMs: processingTime,
+        meta: {
+          request_id: requestId,
+          processing_time_ms: processingTime,
+        },
       },
       { status: 500 }
     )

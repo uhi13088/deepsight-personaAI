@@ -5,24 +5,29 @@ import Link from "next/link"
 import {
   Activity,
   TrendingUp,
-  TrendingDown,
   Clock,
   DollarSign,
   Download,
   Calendar,
   BarChart3,
   PieChart,
-  ArrowUpRight,
-  ArrowDownRight,
   Zap,
   CheckCircle,
   XCircle,
   Globe,
   Loader2,
   ChevronDown,
+  Calculator,
+  FileBarChart,
 } from "lucide-react"
 import { toast } from "sonner"
-import { usageService, type UsageData } from "@/services/usage-service"
+import {
+  usageService,
+  type UsageData,
+  type EndpointDetail,
+  type CostAnalysis,
+  type CostSimulationResult,
+} from "@/services/usage-service"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -49,6 +54,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Input } from "@/components/ui/input"
 import { cn, formatNumber, formatCurrency } from "@/lib/utils"
 import { downloadCSV, downloadJSON, generateFilename } from "@/lib/export"
 
@@ -74,9 +80,22 @@ export default function UsagePage() {
   const [isLoading, setIsLoading] = React.useState(true)
   const [usageData, setUsageData] = React.useState<UsageData | null>(null)
 
+  // Endpoint detail (§6.2)
+  const [selectedEndpoint, setSelectedEndpoint] = React.useState<string | null>(null)
+  const [endpointDetail, setEndpointDetail] = React.useState<EndpointDetail | null>(null)
+  const [endpointDetailLoading, setEndpointDetailLoading] = React.useState(false)
+
+  // Cost analysis (§6.2.4)
+  const [costAnalysis, setCostAnalysis] = React.useState<CostAnalysis | null>(null)
+  const [costLoading, setCostLoading] = React.useState(false)
+  const [simDailyCalls, setSimDailyCalls] = React.useState("")
+  const [simResults, setSimResults] = React.useState<CostSimulationResult[]>([])
+  const [simLoading, setSimLoading] = React.useState(false)
+
   React.useEffect(() => {
     const fetchData = async () => {
       try {
+        setIsLoading(true)
         const data = await usageService.getUsage(dateRange)
         setUsageData(data)
       } catch (error) {
@@ -88,6 +107,56 @@ export default function UsagePage() {
     }
     fetchData()
   }, [dateRange])
+
+  // Fetch endpoint detail when selected
+  React.useEffect(() => {
+    if (!selectedEndpoint) {
+      setEndpointDetail(null)
+      return
+    }
+    const fetchDetail = async () => {
+      try {
+        setEndpointDetailLoading(true)
+        const data = await usageService.getEndpointDetail(selectedEndpoint, dateRange)
+        setEndpointDetail(data)
+      } catch {
+        toast.error("엔드포인트 상세 데이터를 불러오는데 실패했습니다.")
+      } finally {
+        setEndpointDetailLoading(false)
+      }
+    }
+    fetchDetail()
+  }, [selectedEndpoint, dateRange])
+
+  // Fetch cost analysis
+  const fetchCostAnalysis = React.useCallback(async () => {
+    try {
+      setCostLoading(true)
+      const data = await usageService.getCostAnalysis(dateRange)
+      setCostAnalysis(data)
+    } catch {
+      toast.error("비용 분석 데이터를 불러오는데 실패했습니다.")
+    } finally {
+      setCostLoading(false)
+    }
+  }, [dateRange])
+
+  const handleSimulate = async () => {
+    const calls = parseInt(simDailyCalls)
+    if (!calls || calls <= 0) {
+      toast.error("유효한 일일 호출 수를 입력하세요.")
+      return
+    }
+    try {
+      setSimLoading(true)
+      const results = await usageService.simulateCost(calls)
+      setSimResults(results)
+    } catch {
+      toast.error("비용 시뮬레이션에 실패했습니다.")
+    } finally {
+      setSimLoading(false)
+    }
+  }
 
   const usageOverview = usageData?.overview ?? {
     totalCalls: 0,
@@ -190,11 +259,7 @@ export default function UsagePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatNumber(usageOverview.totalCalls)}</div>
-            <div className="text-muted-foreground mt-1 flex items-center text-xs">
-              <ArrowUpRight className="h-4 w-4 text-green-500" />
-              <span className="text-green-500">+12.5%</span>
-              <span className="ml-1">vs previous period</span>
-            </div>
+            <p className="text-muted-foreground mt-1 text-xs">선택 기간 총 호출 수</p>
           </CardContent>
         </Card>
 
@@ -257,6 +322,10 @@ export default function UsagePage() {
           <TabsTrigger value="endpoints">Endpoints</TabsTrigger>
           <TabsTrigger value="errors">Errors</TabsTrigger>
           <TabsTrigger value="distribution">Distribution</TabsTrigger>
+          <TabsTrigger value="performance">Performance</TabsTrigger>
+          <TabsTrigger value="cost" onClick={fetchCostAnalysis}>
+            Cost
+          </TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -787,6 +856,350 @@ export default function UsagePage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Performance Tab (§6.2) */}
+        <TabsContent value="performance" className="space-y-6">
+          {/* Endpoint Selector */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Endpoint Performance Analysis</CardTitle>
+              <CardDescription>엔드포인트별 상세 성능 분석 (§6.2.1~§6.2.2)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4">
+                <Select
+                  value={selectedEndpoint ?? ""}
+                  onValueChange={(v) => setSelectedEndpoint(v || null)}
+                >
+                  <SelectTrigger className="w-[300px]">
+                    <SelectValue placeholder="엔드포인트를 선택하세요" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {endpointUsage.map((ep) => (
+                      <SelectItem key={ep.endpoint} value={ep.endpoint}>
+                        {ep.endpoint}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {endpointDetailLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+                </div>
+              ) : endpointDetail ? (
+                <div className="space-y-6">
+                  {/* Latency Percentiles (§6.2.2) */}
+                  <div>
+                    <h4 className="mb-3 text-sm font-medium">Response Time Percentiles</h4>
+                    <div className="grid gap-4 md:grid-cols-5">
+                      {(
+                        [
+                          { label: "Average", value: endpointDetail.latency.avg },
+                          { label: "P50", value: endpointDetail.latency.p50 },
+                          { label: "P90", value: endpointDetail.latency.p90 },
+                          { label: "P95", value: endpointDetail.latency.p95 },
+                          { label: "P99", value: endpointDetail.latency.p99 },
+                        ] as const
+                      ).map((metric) => (
+                        <div key={metric.label} className="rounded-lg border p-3 text-center">
+                          <p className="text-muted-foreground text-xs">{metric.label}</p>
+                          <p
+                            className={cn(
+                              "text-xl font-bold",
+                              metric.value < 200
+                                ? "text-green-600"
+                                : metric.value < 500
+                                  ? "text-yellow-600"
+                                  : "text-red-600"
+                            )}
+                          >
+                            {metric.value}ms
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Summary */}
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="rounded-lg border p-3">
+                      <p className="text-muted-foreground text-xs">Total Calls</p>
+                      <p className="text-lg font-bold">{formatNumber(endpointDetail.totalCalls)}</p>
+                    </div>
+                    <div className="rounded-lg border p-3">
+                      <p className="text-muted-foreground text-xs">Success Rate</p>
+                      <p className="text-lg font-bold">{endpointDetail.successRate}%</p>
+                    </div>
+                    <div className="rounded-lg border p-3">
+                      <p className="text-muted-foreground text-xs">Endpoint</p>
+                      <code className="text-sm font-medium">{endpointDetail.endpoint}</code>
+                    </div>
+                  </div>
+
+                  {/* Hourly Pattern (§6.2.1) */}
+                  {endpointDetail.hourlyPattern.length > 0 && (
+                    <div>
+                      <h4 className="mb-3 text-sm font-medium">Hourly Call Pattern</h4>
+                      <div className="flex h-[150px] items-end gap-1">
+                        {endpointDetail.hourlyPattern.map((h, i) => {
+                          const maxCalls = Math.max(
+                            ...endpointDetail.hourlyPattern.map((p) => p.calls)
+                          )
+                          const heightPercent = maxCalls > 0 ? (h.calls / maxCalls) * 100 : 0
+                          return (
+                            <div key={i} className="flex flex-1 flex-col items-center gap-1">
+                              <div
+                                className="bg-primary hover:bg-primary/80 w-full rounded-t transition-all"
+                                style={{ height: `${heightPercent}%`, minHeight: "2px" }}
+                              />
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <div className="text-muted-foreground mt-1 flex justify-between text-xs">
+                        <span>00:00</span>
+                        <span>06:00</span>
+                        <span>12:00</span>
+                        <span>18:00</span>
+                        <span>23:00</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Error Types (§6.2.3) */}
+                  {endpointDetail.errorTypes.length > 0 && (
+                    <div>
+                      <h4 className="mb-3 text-sm font-medium">Error Types</h4>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Status Code</TableHead>
+                            <TableHead>Message</TableHead>
+                            <TableHead className="text-right">Count</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {endpointDetail.errorTypes.map((err) => (
+                            <TableRow key={err.code}>
+                              <TableCell>
+                                <Badge variant="destructive">{err.code}</Badge>
+                              </TableCell>
+                              <TableCell>{err.message}</TableCell>
+                              <TableCell className="text-right">
+                                {formatNumber(err.count)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="py-12 text-center">
+                  <FileBarChart className="text-muted-foreground/30 mx-auto mb-2 h-12 w-12" />
+                  <p className="text-muted-foreground">
+                    엔드포인트를 선택하면 상세 성능 분석을 확인할 수 있습니다
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Cost Tab (§6.2.4) */}
+        <TabsContent value="cost" className="space-y-6">
+          {costLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+            </div>
+          ) : (
+            <>
+              {/* Cost Overview */}
+              {costAnalysis && (
+                <>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm font-medium">Current Monthly Cost</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-3xl font-bold">
+                          {formatCurrency(costAnalysis.currentMonthly)}
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-sm font-medium">
+                          Projected Monthly Cost
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-3xl font-bold text-blue-600">
+                          {formatCurrency(costAnalysis.projectedMonthly)}
+                        </p>
+                        <p className="text-muted-foreground mt-1 text-xs">예상 월말 비용</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Cost by Endpoint */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Cost by Endpoint</CardTitle>
+                      <CardDescription>엔드포인트별 비용 분석</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {costAnalysis.byEndpoint.length > 0 ? (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Endpoint</TableHead>
+                              <TableHead className="text-right">Calls</TableHead>
+                              <TableHead className="text-right">Cost</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {costAnalysis.byEndpoint.map((ep) => (
+                              <TableRow key={ep.endpoint}>
+                                <TableCell>
+                                  <code className="bg-muted rounded px-2 py-1 font-mono text-sm">
+                                    {ep.endpoint}
+                                  </code>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {formatNumber(ep.calls)}
+                                </TableCell>
+                                <TableCell className="text-right font-medium">
+                                  {formatCurrency(ep.cost)}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      ) : (
+                        <div className="py-8 text-center">
+                          <DollarSign className="text-muted-foreground/30 mx-auto mb-2 h-8 w-8" />
+                          <p className="text-muted-foreground text-sm">비용 데이터가 없습니다</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Daily Cost Trend */}
+                  {costAnalysis.dailyCost.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Daily Cost Trend</CardTitle>
+                        <CardDescription>일별 비용 추이</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex h-[200px] items-end gap-2">
+                          {costAnalysis.dailyCost.map((day, i) => {
+                            const maxCost = Math.max(...costAnalysis.dailyCost.map((d) => d.cost))
+                            const heightPercent = maxCost > 0 ? (day.cost / maxCost) * 100 : 0
+                            return (
+                              <div key={i} className="flex flex-1 flex-col items-center gap-1">
+                                <div
+                                  className="w-full rounded-t bg-emerald-500 transition-all hover:bg-emerald-400"
+                                  style={{ height: `${heightPercent}%`, minHeight: "2px" }}
+                                />
+                                <span className="text-muted-foreground text-xs">
+                                  {day.date.slice(-5)}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
+              )}
+
+              {!costAnalysis && !costLoading && (
+                <div className="py-12 text-center">
+                  <DollarSign className="text-muted-foreground/30 mx-auto mb-2 h-12 w-12" />
+                  <p className="text-muted-foreground">
+                    비용 분석 탭을 클릭하면 데이터를 불러옵니다
+                  </p>
+                </div>
+              )}
+
+              {/* Cost Simulator (§6.2.4) */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Calculator className="h-5 w-5" />
+                    <CardTitle>Cost Simulator</CardTitle>
+                  </div>
+                  <CardDescription>
+                    예상 일일 호출 수를 입력하여 플랜별 비용을 비교하세요
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4 flex gap-2">
+                    <Input
+                      type="number"
+                      placeholder="예상 일일 API 호출 수"
+                      value={simDailyCalls}
+                      onChange={(e) => setSimDailyCalls(e.target.value)}
+                      className="w-[250px]"
+                    />
+                    <Button onClick={handleSimulate} disabled={simLoading}>
+                      {simLoading ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Calculator className="mr-2 h-4 w-4" />
+                      )}
+                      시뮬레이션
+                    </Button>
+                  </div>
+
+                  {simResults.length > 0 && (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Plan</TableHead>
+                          <TableHead className="text-right">Monthly Fee</TableHead>
+                          <TableHead className="text-right">Included Calls</TableHead>
+                          <TableHead className="text-right">Overage Rate</TableHead>
+                          <TableHead className="text-right">Overage Cost</TableHead>
+                          <TableHead className="text-right">Total Cost</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {simResults.map((plan) => (
+                          <TableRow key={plan.planName}>
+                            <TableCell className="font-medium">{plan.planName}</TableCell>
+                            <TableCell className="text-right">
+                              {formatCurrency(plan.monthlyCost)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatNumber(plan.included)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatCurrency(plan.overageRate)}/call
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatCurrency(plan.overageCost)}
+                            </TableCell>
+                            <TableCell className="text-right font-bold">
+                              {formatCurrency(plan.totalCost)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
         </TabsContent>
       </Tabs>
     </div>

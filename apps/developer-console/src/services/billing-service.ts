@@ -1,5 +1,6 @@
 /**
  * Billing Service - 결제/구독 관리 서비스
+ * v3.1 6-Tier 플랜 체계 (스펙 §8.1.1)
  */
 
 import { apiClient, ApiError } from "./api-client"
@@ -8,18 +9,36 @@ import { apiClient, ApiError } from "./api-client"
 // 타입 정의
 // ============================================================================
 
-export type PlanId = "free" | "starter" | "pro" | "enterprise"
+export type PlanId = "starter" | "pro" | "max" | "ent_starter" | "ent_growth" | "ent_scale"
+
 export type InvoiceStatus = "pending" | "paid" | "failed" | "refunded"
+export type BillingCycle = "monthly" | "annual"
+
+export interface PlanLimits {
+  activePersonas: number // -1 = unlimited
+  matchingApiCalls: number // monthly, -1 = unlimited
+  rateLimit: number // per minute, -1 = negotiable
+  apiKeys: number // -1 = unlimited
+  teamMembers: number // -1 = unlimited
+  sla: string
+}
+
+export interface PlanOverage {
+  matchApiPerCall: number // $ per call
+  personaPerUnit: number // $ per persona per month
+}
 
 export interface Plan {
   id: PlanId
   name: string
   description: string
-  price: number | null
-  pricePerCall: number | null
-  calls: number | null
-  rateLimit: number | null
-  features: { name: string; included: boolean }[]
+  price: number // monthly USD
+  annualPrice: number // annual monthly USD (20% off)
+  limits: PlanLimits
+  overage: PlanOverage
+  support: string
+  features: string[]
+  isEnterprise: boolean
   recommended: boolean
   current: boolean
 }
@@ -31,6 +50,8 @@ export interface CurrentUsage {
   estimatedCost: number
   billingCycle: string
   daysRemaining: number
+  activePersonas: number
+  activePersonasLimit: number
 }
 
 export interface Invoice {
@@ -53,6 +74,7 @@ export interface PaymentMethod {
 
 export interface BillingData {
   currentPlan: Plan
+  billingCycle: BillingCycle
   usage: CurrentUsage
   invoices: Invoice[]
   paymentMethods: PaymentMethod[]
@@ -74,6 +96,195 @@ export interface TossPaymentInfo {
 }
 
 // ============================================================================
+// 6-Tier 플랜 상수 (스펙 §8.1.1~§8.1.5 정확히 반영)
+// ============================================================================
+
+export const PLAN_DATA: Record<PlanId, Omit<Plan, "current">> = {
+  starter: {
+    id: "starter",
+    name: "Starter",
+    description: "스타트업과 소규모 팀용",
+    price: 199,
+    annualPrice: 159,
+    limits: {
+      activePersonas: 50,
+      matchingApiCalls: 500_000,
+      rateLimit: 100,
+      apiKeys: 5,
+      teamMembers: 3,
+      sla: "99.5%",
+    },
+    overage: { matchApiPerCall: 0.001, personaPerUnit: 2.5 },
+    support: "셀프서비스",
+    features: [
+      "활성 PW 페르소나 50개",
+      "매칭 API 50만/월",
+      "Rate Limit 100/분",
+      "API Keys 5개",
+      "팀원 3명",
+      "Webhook 연동",
+      "셀프서비스 지원",
+    ],
+    isEnterprise: false,
+    recommended: true,
+  },
+  pro: {
+    id: "pro",
+    name: "Pro",
+    description: "성장하는 비즈니스용",
+    price: 499,
+    annualPrice: 399,
+    limits: {
+      activePersonas: 100,
+      matchingApiCalls: 1_000_000,
+      rateLimit: 500,
+      apiKeys: 10,
+      teamMembers: 5,
+      sla: "99.5%",
+    },
+    overage: { matchApiPerCall: 0.001, personaPerUnit: 2.5 },
+    support: "셀프서비스",
+    features: [
+      "활성 PW 페르소나 100개",
+      "매칭 API 100만/월",
+      "Rate Limit 500/분",
+      "API Keys 10개",
+      "팀원 5명",
+      "Webhook 연동",
+      "셀프서비스 지원",
+    ],
+    isEnterprise: false,
+    recommended: false,
+  },
+  max: {
+    id: "max",
+    name: "Max",
+    description: "대규모 프로젝트용",
+    price: 1499,
+    annualPrice: 1199,
+    limits: {
+      activePersonas: 350,
+      matchingApiCalls: 3_000_000,
+      rateLimit: 1000,
+      apiKeys: 20,
+      teamMembers: 10,
+      sla: "99.9%",
+    },
+    overage: { matchApiPerCall: 0.0008, personaPerUnit: 2.0 },
+    support: "우선 이메일",
+    features: [
+      "활성 PW 페르소나 350개",
+      "매칭 API 300만/월",
+      "Rate Limit 1,000/분",
+      "API Keys 20개",
+      "팀원 10명",
+      "Webhook 연동",
+      "우선 이메일 지원",
+      "SLA 99.9%",
+    ],
+    isEnterprise: false,
+    recommended: false,
+  },
+  ent_starter: {
+    id: "ent_starter",
+    name: "Enterprise Starter",
+    description: "Enterprise 진입용",
+    price: 3500,
+    annualPrice: 3500,
+    limits: {
+      activePersonas: 800,
+      matchingApiCalls: 5_000_000,
+      rateLimit: 1000,
+      apiKeys: 50,
+      teamMembers: 30,
+      sla: "99.9%",
+    },
+    overage: { matchApiPerCall: 0.0006, personaPerUnit: 2.0 },
+    support: "프리미엄 이메일 + 온보딩",
+    features: [
+      "활성 PW 페르소나 800개",
+      "매칭 API 500만/월",
+      "Rate Limit 1,000/분",
+      "API Keys 50개",
+      "팀원 30명",
+      "SSO (SAML 2.0, OIDC)",
+      "IP 화이트리스트",
+      "페르소나 필터 API",
+      "프리미엄 이메일 + 온보딩",
+      "SLA 99.9%",
+    ],
+    isEnterprise: true,
+    recommended: false,
+  },
+  ent_growth: {
+    id: "ent_growth",
+    name: "Enterprise Growth",
+    description: "Enterprise 성장기",
+    price: 5000,
+    annualPrice: 5000,
+    limits: {
+      activePersonas: 1500,
+      matchingApiCalls: 10_000_000,
+      rateLimit: 5000,
+      apiKeys: -1,
+      teamMembers: -1,
+      sla: "99.95%",
+    },
+    overage: { matchApiPerCall: 0.0004, personaPerUnit: 1.5 },
+    support: "전담 매니저 (1:5)",
+    features: [
+      "활성 PW 페르소나 1,500개",
+      "매칭 API 1,000만/월",
+      "Rate Limit 5,000/분",
+      "API Keys 무제한",
+      "팀원 무제한",
+      "SSO (SAML 2.0, OIDC)",
+      "IP 화이트리스트",
+      "페르소나 필터 API",
+      "전담 매니저 (1:5)",
+      "SLA 99.95%",
+    ],
+    isEnterprise: true,
+    recommended: false,
+  },
+  ent_scale: {
+    id: "ent_scale",
+    name: "Enterprise Scale",
+    description: "최대 규모 Enterprise",
+    price: 15000,
+    annualPrice: 15000,
+    limits: {
+      activePersonas: 5000,
+      matchingApiCalls: 15_000_000,
+      rateLimit: -1,
+      apiKeys: -1,
+      teamMembers: -1,
+      sla: "99.99%",
+    },
+    overage: { matchApiPerCall: 0, personaPerUnit: 1.5 },
+    support: "전담 매니저 (1:2)",
+    features: [
+      "활성 PW 페르소나 5,000개 + 추가과금",
+      "매칭 API 1,500만/월",
+      "Rate Limit 협의",
+      "API Keys 무제한",
+      "팀원 무제한",
+      "SSO (SAML 2.0, OIDC)",
+      "IP 화이트리스트",
+      "페르소나 필터 API",
+      "전담 매니저 (1:2)",
+      "SLA 99.99%",
+      "온프레미스 협의",
+    ],
+    isEnterprise: true,
+    recommended: false,
+  },
+}
+
+export const GENERAL_PLANS: PlanId[] = ["starter", "pro", "max"]
+export const ENTERPRISE_PLANS: PlanId[] = ["ent_starter", "ent_growth", "ent_scale"]
+
+// ============================================================================
 // 서비스 클래스
 // ============================================================================
 
@@ -82,27 +293,18 @@ class BillingService {
     const response = await apiClient.get<BillingData>("/billing")
 
     if (!response.success || !response.data) {
-      // Return default data if API not implemented
       return {
-        currentPlan: {
-          id: "free",
-          name: "Free",
-          description: "개인 프로젝트와 테스트용",
-          price: 0,
-          pricePerCall: null,
-          calls: 3000,
-          rateLimit: 10,
-          features: [],
-          recommended: false,
-          current: true,
-        },
+        currentPlan: { ...PLAN_DATA.starter, current: true },
+        billingCycle: "monthly",
         usage: {
           used: 0,
-          limit: 3000,
+          limit: 500_000,
           percentUsed: 0,
           estimatedCost: 0,
           billingCycle: "",
           daysRemaining: 0,
+          activePersonas: 0,
+          activePersonasLimit: 50,
         },
         invoices: [],
         paymentMethods: [],
@@ -137,7 +339,6 @@ class BillingService {
       })
     }
 
-    // Free 플랜은 결제 정보 없이 바로 변경
     if (!response.data?.paymentInfo) {
       return null
     }

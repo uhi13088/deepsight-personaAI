@@ -335,16 +335,118 @@
   - AC5: 알림 (페르소나 활동, 매칭 추천, 읽음 처리) ✅
   - AC6: Build PASS (73 tests) + 테스트 + 커밋 + 푸시 ✅
 
-### 보류: PW 백엔드 통합 (엔진 스튜디오 충돌 가능)
+### Phase PW-C: PersonaWorld 백엔드 구축 (T103~T115)
 
-> **엔진 스튜디오 작업 완료 후 상황 봐서 진행. Prisma 스키마 + API 라우트 변경 포함.**
+> 구현계획서: `docs/design/persona-world-v3-impl.md` (v1.0-draft.2)
+> 설계서: `docs/design/persona-world-v3.md` (v1.0-draft.3)
+> 백엔드 모듈: `apps/engine-studio/src/lib/persona-world/` (공유 DB + 엔진 모듈 직접 import)
+> API 라우트: `apps/engine-studio/src/app/api/persona-world/`
+> 원칙: No Mock Data, No Hardcoding, Real Data Only, Feedback Loop
 
-- 보류-1: Prisma 스키마 추가 (PersonaState, PersonaRelationship, ConsumptionLog 등)
-- 보류-2: API 라우트 재작성 (`/api/persona-world/*` 전체)
-- 보류-3: `user-store.ts` + `api.ts` 실제 API 연동 전환
-- 보류-4: 피드 알고리즘 3-Tier 매칭 엔진 연동
-- 보류-5: 자율 활동 엔진 (스케줄러, 콘텐츠 생성, RAG)
-- 보류-6: 품질 모니터링 (Auto-Interview, Integrity Score, Voice drift)
+- [x] **T103: PW-Phase 0 기반 인프라 — DB 스키마 + 타입 + 상수** ✅
+  - 배경: 구현계획서 §2~3. PW 전체 데이터 모델과 타입 시스템의 기반
+  - AC1: PersonaState 모델 (mood/energy/socialBattery/paradoxTension, Decimal(3,2), Persona 1:1) [PW-0-2]
+  - AC2: PersonaRelationship 모델 (warmth/tension/frequency/depth, unique(A,B), Persona 양방향) [PW-0-3]
+  - AC3: ConsumptionLog 모델 + ConsumptionContentType/ConsumptionSource 2 enum [PW-0-8]
+  - AC4: PersonaWorldUser 확장 — L2 OCEAN 5필드 + hasOceanProfile + profileLevel String [PW-0-4]
+  - AC5: PersonaActivityLog 확장 — postTypeReason Json, stateSnapshot Json, matchingScore Decimal(4,3) [PW-0-5]
+  - AC6: Persona 릴레이션 추가 (personaState, relationshipsAsA/B, consumptionLogs) [PW-0-2~0-4]
+  - AC7: SQL 마이그레이션 파일 `007_persona_world_v3.sql` [PW-0-6]
+  - AC8: `types.ts` — ActivityTraitsV3, PersonaStateData, StateUpdateEvent, RelationshipScore, ConsumptionRecord, ActivityDecision, SchedulerContext, PostGenerationInput/Result, CommentGenerationInput, CommentTone(7종), CommentToneDecision, FeedRequest/Response, FeedPost, ExploreData [PW-0-1]
+  - AC9: `constants.ts` — POST_TYPE_AFFINITIES(17종), STATE_DEFAULTS, STATE_DELTAS, ACTIVITY_THRESHOLDS, FEED_RATIOS(60/30/10), RECOMMENDED_TIER_RATIOS(60/30/10), COMMENT_TONE_MATRIX, LIKE_MODIFIERS, FOLLOW_WEIGHTS [PW-0-7]
+  - AC10: Prisma validate + generate + Build PASS + 기존 테스트 PASS
+
+- [x] **T104: PW-Phase 1 활동성 매핑 + PersonaState 관리** ✅
+  - 배경: 구현계획서 §4 + 설계서 §3. 3-Layer→8특성 매핑 + 동적 상태 시스템
+  - AC1: `activity-mapper.ts` — computeActivityTraits (L1 70% + L2 20% + L3 10%, 신규4특성 공식: endurance/volatility/depthSeeking/growthDrive) [PW-1-1]
+  - AC2: computeActiveHours (peakHour=12+round(sociability×10), window ±endurance, 야행성 보정 +4h) [PW-1-2]
+  - AC3: computeActivityProbabilities (adjustedPost=base×energy×(0.5+mood×0.5), adjustedInteraction=base×socialBattery×energy) [PW-1-3]
+  - AC4: `state-manager.ts` — initializeState, updatePersonaState (7종 StateUpdateEvent), getPersonaState [PW-1-4]
+  - AC5: 테스트 — activity-mapper.test.ts + state-manager.test.ts [PW-1-5, PW-1-6]
+  - AC6: Build PASS + 테스트 PASS
+
+- [x] **T105: PW-Phase 2a 포스트 타입 선택 + 주제 선택 + Paradox 발현** ✅
+  - 배경: 구현계획서 §5.2 + 설계서 §4.5. 17종 포스트 타입 친화도 기반 선택
+  - AC1: ✅ `post-type-selector.ts` — selectPostType (친화도 점수 계산, 상태 보정: mood<0.4→THOUGHT×2, paradoxTension>0.7→BEHIND_STORY×3, energy<0.3→REACTION×2, 가중 랜덤) [PW-2-1]
+  - AC2: ✅ `topic-selector.ts` — selectTopic (우선순위: 트리거→관심사연속→벡터매칭→자유주제) [PW-2-2]
+  - AC3: ✅ `paradox-activity.ts` — paradoxActivityChance = sigmoid(paradoxScore×3 - 1.5), 4종 Paradox 패턴 발현 [PW-2-5]
+  - AC4: ✅ Build PASS + 테스트 56개 PASS (1472 total)
+
+- [x] **T106: PW-Phase 2b 콘텐츠 생성기 + 소비 기록 관리** ✅
+  - 배경: 구현계획서 §5.3 + §5.5. LLM 콘텐츠 생성 + ConsumptionMemory
+  - AC1: ✅ `content-generator.ts` — buildSystemPrompt + buildUserPrompt + generatePostContent (LLMProvider DI, 17종 타입별 길이/스타일 가이드) [PW-2-3]
+  - AC2: ✅ `consumption-manager.ts` — recordConsumption + getConsumptionContext (90일 이내 top5, 태그 매칭) + getConsumptionStats + autoTag + generateImpression [PW-2-9]
+  - AC3: ✅ 테스트 — content-generator.test.ts(18) + consumption-manager.test.ts(15) = 33개 PASS [PW-2-10]
+  - AC4: ✅ Build PASS + 전체 1505 테스트 PASS
+
+- [x] **T107: PW-Phase 2c 자율 활동 스케줄러 + API** ✅
+  - 배경: 구현계획서 §5.1. 매시간 크론 파이프라인
+  - AC1: ✅ `scheduler.ts` — runScheduler (7단계 파이프라인), getActivePersonas (currentHour ∈ activeHours AND energy>0.2), decideActivity [PW-2-4]
+  - AC2: ✅ `index.ts` — Phase 1-2 전체 모듈 barrel export (activity-mapper, state-manager, post-type-selector, topic-selector, paradox-activity, content-generator, consumption-manager, scheduler) [PW-2-6]
+  - AC3: ✅ `/api/persona-world/scheduler/route.ts` — POST (cron trigger, DB provider, layerType→ThreeLayerVector 변환) [PW-2-8]
+  - AC4: ✅ 테스트 — scheduler.test.ts (12개 PASS: decideActivity 4 + getActivePersonas 4 + runScheduler 4) [PW-2-7]
+  - AC5: ✅ Build PASS + 전체 1517 테스트 PASS
+
+- [x] **T108: PW-Phase 3a 좋아요 + 팔로우 + 관계 매니저** ✅
+  - 배경: 구현계획서 §6.1, §6.3, §6.4. 인터랙션 판정 엔진
+  - AC1: ✅ `interactions/like-engine.ts` — shouldLike, computeLikeProbability (likeScore×interactivity×socialBattery, 팔로잉×1.5/긍정×1.3/부정×0.5) [PW-3-1]
+  - AC2: ✅ `interactions/follow-engine.ts` — shouldFollow, computeFollowScore/Probability, shouldAnnounce (0.5×basic+0.3×crossAxis+0.2×paradox, threshold>0.6) [PW-3-4]
+  - AC3: ✅ `interactions/relationship-manager.ts` — updateRelationship, getRelationship, recalculateRelationship, computeRelationshipUpdate [PW-3-5]
+  - AC4: ✅ `interactions/index.ts` + main index.ts barrel export 업데이트 [PW-3-7]
+  - AC5: ✅ Build PASS + 1554 테스트 PASS (interactions.test.ts 37개)
+
+- [x] **T109: PW-Phase 3b 댓글 엔진 + 유저 응답 + API 라우트** ✅
+  - 배경: 구현계획서 §6.2, §6.5. 가장 복잡한 인터랙션 — Override+RAG+Express 통합
+  - AC1: ✅ `interactions/comment-tone.ts` — decideCommentTone (COMMENT_TONE_MATRIX 기반 7종 톤, getDimensionValue로 L1/L2/L3/state/relationship 차원 추출, Paradox 영향) [PW-3-2]
+  - AC2: ✅ `interactions/comment-engine.ts` — generateComment (6단계 파이프라인), applyExpress (에너지/paradox 기반), placeholder+LLM DI [PW-3-3]
+  - AC3: ✅ `interactions/user-interaction.ts` — respondToUser (UIV 분석→Adapt delta→톤결정→LLM/placeholder), analyzeUserAttitudeSimple, computeAdaptDelta [PW-3-6]
+  - AC4: ✅ comment-interaction.test.ts — 28개 테스트 (tone 8 + express 3 + comment 4 + uiv 4 + adapt 4 + respond 5) [PW-3-8]
+  - AC5: ✅ API Routes — `/posts/[id]/likes/route.ts` (좋아요 토글), `/follows/route.ts` (팔로우 토글) + 기존 comments route 활용 [PW-3-9~3-11]
+  - AC6: ✅ Build PASS + 1582 테스트 PASS
+
+- [x] **T110: PW-Phase 4a 피드 엔진 (Following + Recommended + Trending + Interleaver)** ✅
+  - 배경: 구현계획서 §7 + 설계서 §6. 3-Tier 매칭 기반 피드
+  - AC1: ✅ `feed/following-posts.ts` — getFollowingPosts (시간순, DI provider) [PW-4-1]
+  - AC2: ✅ `feed/recommended-posts.ts` — getRecommendedPosts, distributeTiers (Basic 60%/Exploration 30%/Advanced 10% 배분, 중복 방지), applyQualitativeBonus [PW-4-2]
+  - AC3: ✅ `feed/trending-posts.ts` — getTrendingPosts (engagement, timeWindow 48h) [PW-4-3]
+  - AC4: ✅ `feed/interleaver.ts` — interleaveFeed (Following 2개 + non-following 1개 패턴, interleaveQueues 라운드 로빈) [PW-4-4]
+  - AC5: ✅ `feed/feed-engine.ts` — generateFeed (60/30/10 비율, 병렬 조회, 인터리빙) [PW-4-5]
+  - AC6: ✅ `feed/index.ts` + main index.ts 업데이트 [PW-4-7]
+  - AC7: ✅ Build PASS + 1603 테스트 PASS (feed.test.ts 21개)
+
+- [x] **T111: PW-Phase 4b Explore 엔진 + Feed/Explore API**
+  - 배경: 구현계획서 §7 + 설계서 §6.4. 탐색 탭 데이터
+  - AC1: ✅ `feed/explore-engine.ts` — getExploreData (DI 기반 4섹션 병렬 조회)
+  - AC2: ✅ explore.test.ts 6개 테스트 PASS
+  - AC3: ✅ `/api/persona-world/feed/route.ts` + `/explore/route.ts` (Prisma 기반 프로바이더)
+  - AC4: ✅ Build PASS + 1609 테스트 PASS
+
+- [ ] **T112: PW-Phase 5a 온보딩 엔진 (질문 + 벡터 생성 + SNS)**
+  - 배경: 구현계획서 §8 + 설계서 §9. Cold Start + SNS → 벡터 생성
+  - AC1: `onboarding/questions.ts` — v3 질문 셋 (L1 7D + L2 5D OCEAN) [PW-5-1]
+  - AC2: `onboarding/onboarding-engine.ts` — processOnboardingAnswers (LIGHT→L1, MEDIUM→L1+L2, DEEP→L1+L2+메타) [PW-5-2]
+  - AC3: `onboarding/sns-processor.ts` — processSnsData (Init 알고리즘 연동, 8개 플랫폼) [PW-5-3]
+  - AC4: `onboarding/index.ts` [PW-5-5]
+  - AC5: Build PASS + 테스트 PASS
+
+- [ ] **T113: PW-Phase 5b 활동 학습 + 품질 모니터 + API**
+  - 배경: 구현계획서 §5.4, §8. Adapt 연동 + Voice/Integrity 통합
+  - AC1: `onboarding/activity-learner.ts` — learnFromActivity (UIV→Adapt→벡터 보정 ±0.3 클램프) [PW-5-4]
+  - AC2: `quality-monitor.ts` — Voice 일관성 모니터링 (similarity<0.6 경고, <0.4 보류+재생성) + Integrity Score 자동 실행 [PW-5-7, PW-5-8]
+  - AC3: 온보딩 테스트 [PW-5-6]
+  - AC4: `/api/persona-world/onboarding/` API Routes [PW-5-9]
+  - AC5: Build PASS + 테스트 PASS
+
+- [ ] **T114: PW 프론트엔드 API 클라이언트 재작성**
+  - 배경: persona-world/src/lib/api.ts + user-store.ts를 실제 백엔드 API로 전환
+  - AC1: api.ts — `/api/persona-world/*` 엔드포인트로 전환
+  - AC2: user-store.ts — 서버 영속화 (localStorage → API 동기화)
+  - AC3: Build PASS + 테스트 PASS
+
+- [ ] **T115: E2E 통합 + 품질 게이트**
+  - 배경: 전 페이지 실제 API 연동 확인
+  - AC1: 7 페이지 (feed/explore/onboarding/profile/persona/[id]/notifications) 실제 데이터 동작 확인
+  - AC2: `pnpm validate` 전체 PASS
 
 ---
 
@@ -463,6 +565,139 @@
   - AC5: Matching Lab 3페이지 (Simulator, Tuning, Analytics) — 인라인 목업 제거, useEffect + fetch로 전환, 뮤테이션 API 호출
   - AC6: User Insight 3페이지 + Dashboard (Cold Start, Psychometric, Archetype, Dashboard) — 인라인 목업 제거, useEffect + fetch로 전환
   - AC7: 테스트 + Build PASS
+
+### Phase DC-A: 개발자콘솔 v3 기반 인프라 (T116~T117)
+
+> 선택적 리빌드: 핵심(Schema/Types/API) 재작성 + 벡터 무관 페이지(API Keys/Usage/Logs/Settings/Team) 보존.
+> 현재 v1 6D 아키텍처 → v3 3-Layer 106D+ 전환. 설계서: `docs/specs/developer-console.md`
+
+- [x] **T116: Prisma Schema v3 + 타입 시스템 재구축** ✅
+  - 배경: 현재 6D 스키마/타입 → v3 3-Layer 106D+ 전환. 모든 후속 작업의 기반
+  - AC1: Prisma Schema v3 — Persona 모델 (L1 7D + L2 5D + L3 4D + paradox + archetype), MatchResult v3
+  - AC2: PlanType enum 확장 (6-Tier: Starter/Pro/Max/EntStarter/EntGrowth/EntScale)
+  - AC3: UserVector 모델 (L1 7D + L2 5D + 교차축 + 프로필 품질)
+  - AC4: Consent 모델 (data_collection/sns_analysis/third_party_sharing/marketing)
+  - AC5: 공유 타입 정의 (v3 PersonaVector, ThreeLayerVector, ParadoxProfile 등 — shared-types import)
+  - AC6: 서비스 타입 업데이트 (DashboardMetrics, UsageStats 등 v3 호환)
+  - AC7: Build PASS
+
+- [ ] **T117: Billing 6-Tier 플랜 체계 업데이트**
+  - 배경: 스펙 §8.1.1 v3.1. 현재 4-Tier → 6-Tier 전환
+  - AC1: 플랜 데이터 상수 6-Tier (Starter $199 / Pro $499 / Max $1,499 / Ent.S $3,500 / Ent.G $5,000 / Ent.Sc $15,000)
+  - AC2: 플랜 비교 테이블 UI — 활성 PW 페르소나, 매칭 API, Rate Limit, API Keys, 팀원, SLA
+  - AC3: 초과 요금(Overage) — 매칭 API 초과 + PW 페르소나 초과 단가
+  - AC4: 연간 결제 20% 할인 토글 + Enterprise 문의 분기
+  - AC5: 매칭 기능 비교 섹션 (3-Tier 매칭 + 스마트 캐싱 + Prompt Caching)
+  - AC6: billing-service 타입 업데이트
+  - AC7: 테스트 + Build PASS
+
+### Phase DC-B: v1 Public API v3 재구축 (T118~T120)
+
+> 기존 6D v1 API 전체 삭제 후 v3 3-Layer 106D+ 기반 재구축.
+
+- [ ] **T118: v1 매칭/페르소나/피드백 API v3 전환**
+  - 배경: 현재 6D → v3 3-Layer 전환. 스펙 §9.3.1~§9.3.4
+  - AC1: `POST /v1/match` — user_id + context + options.matching_tier(basic/advanced/exploration)
+  - AC2: `GET /v1/personas` — role/expertise 필터 + v3 벡터 응답 (L1/L2/L3 + paradox)
+  - AC3: `GET /v1/personas/{id}` — v3 상세 (3-Layer 벡터 + paradox + 교차축)
+  - AC4: `POST /v1/feedback` — user_id + persona_id + feedback_type(LIKE/DISLIKE)
+  - AC5: `POST /v1/batch-match` — 배치 매칭 v3
+  - AC6: Rate Limit 헤더 (X-RateLimit-Limit/Remaining/Reset) + 플랜별 Rate Limit
+  - AC7: 테스트 + Build PASS
+
+- [ ] **T119: 페르소나 필터 API (§9.3.9)**
+  - 배경: Enterprise 고객용 106D+ 다차원 정밀 검색
+  - AC1: `POST /v1/personas/filter` — 아키타입 include/exclude 필터 (12종)
+  - AC2: 벡터 범위 필터 (L1 7D + L2 5D + L3 4D 각 차원 min/max)
+  - AC3: Paradox 범위 필터 (extendedScore, l1l2Score, l1l3Score, l2l3Score)
+  - AC4: 교차축 패턴 필터 (axisId + relationship + scoreRange)
+  - AC5: 정렬 7종 (paradox.extendedScore, vectors.l1.\*, createdAt, name 등)
+  - AC6: 응답: personas + appliedFilters + filterStats (아키타입 분포)
+  - AC7: 플랜별 Rate Limit (Starter 50/분 ~ Ent.Scale 무제한)
+  - AC8: 테스트 + Build PASS
+
+- [ ] **T120: v3.3 사용자 프로필/온보딩/동의 API**
+  - 배경: 스펙 §9.3.5~§9.3.11. 외부 플랫폼 유저 프로파일링 연동
+  - AC1: `GET /v1/users/{id}/profile` — 3-Layer 벡터 + 교차축 + 동의 + 프로필 품질
+  - AC2: `POST /v1/users/{id}/onboarding` — QUICK(12)/STANDARD(30)/DEEP(60) 온보딩
+  - AC3: `GET /v1/users/{id}/consent` — 동의 항목 4종 조회
+  - AC4: `POST /v1/users/{id}/consent` — 동의 생성/변경 + side_effects
+  - AC5: 동의 미취득 시 403 CONSENT_REQUIRED 처리
+  - AC6: 테스트 + Build PASS
+
+### Phase DC-C: UI 페이지 재구축/적응 (T121~T124)
+
+> Dashboard/Playground/Docs는 v1 하드코딩이므로 재구축. Support 신규. Webhooks 적응.
+
+- [ ] **T121: Dashboard v3 리팩토링**
+  - 배경: 현재 v1 메트릭 구조 → v3 호환 대시보드. 스펙 §4.1
+  - AC1: 핵심 지표 4카드 (API Calls, Success Rate, P95 Latency, Cost)
+  - AC2: 최근 7일 API 호출 추이 차트 + 최근 활동 로그
+  - AC3: 퀵 액션 (새 API Key 생성, 문서 보기, Playground 열기)
+  - AC4: 환영 메시지 + 오늘/이번달 사용량 요약
+  - AC5: dashboard-service v3 호환 업데이트
+  - AC6: 테스트 + Build PASS
+
+- [ ] **T122: API Playground v3 재구축**
+  - 배경: 현재 v1 엔드포인트 하드코딩 → v3 API 구조. 스펙 §12.1.3
+  - AC1: 엔드포인트 선택 (match, personas, personas/filter, feedback, onboarding, consent)
+  - AC2: 요청 파라미터 UI (JSON 에디터 + 필드별 폼)
+  - AC3: 인증 설정 (API Key 선택 / 직접 입력)
+  - AC4: 실행 + 응답 표시 (상태코드, 헤더, Body, 소요시간)
+  - AC5: cURL / Python / Node.js / Java 코드 자동 생성
+  - AC6: 요청 히스토리 (최근 10개)
+  - AC7: 테스트 + Build PASS
+
+- [ ] **T123: API Documentation v3 재구축**
+  - 배경: 현재 v1 문서 → v3 API 레퍼런스 + SDK 가이드. 스펙 §9 + §11 + §12.1
+  - AC1: Quick Start (5분 가이드 — Key 발급 → SDK 설치 → 첫 호출)
+  - AC2: API Reference — v3 전 엔드포인트 명세 (match, personas, filter, onboarding, consent)
+  - AC3: 인증 가이드 (API Key + 멀티테넌시 + 에러 코드)
+  - AC4: SDK 가이드 — Python / Node.js / Java / Go 코드 예제
+  - AC5: 통합 가이드 — 온보딩, 데일리 체크, 매칭, 피드백 루프
+  - AC6: 사이드바 네비게이션 + 코드 블록 복사 버튼
+  - AC7: 테스트 + Build PASS
+
+- [ ] **T124: Support 페이지 + Webhooks v3 적응**
+  - 배경: Support 재구축(§12) + Webhooks 이벤트명 v3 업데이트
+  - AC1: FAQ 아코디언 (스펙 §12.2.3 기준 4+ QA)
+  - AC2: 문의하기 폼 (유형 4종, 제목, 내용, 첨부, 우선순위)
+  - AC3: 플랜별 지원 채널 안내 (6-Tier 응답시간 테이블)
+  - AC4: 커뮤니티 링크 (Discord, 포럼, 뉴스레터, Status Page)
+  - AC5: Webhooks 이벤트 v3 업데이트 (persona.activated/deprecated/updated 등 §10.2)
+  - AC6: 테스트 + Build PASS
+
+### Phase DC-D: 대시보드/분석 고도화 (T125~T126)
+
+> 기존 보존 페이지(Usage/Logs) 고도화 + 실시간 모니터링/알림 추가.
+
+- [ ] **T125: 실시간 모니터링 + 알림 센터 + Usage 고도화**
+  - 배경: 스펙 §4.2 + §4.3 + §6.2~§6.3
+  - AC1: 실시간 지표 패널 — RPS, 성공률, 응답시간, 활성 연결 (5초 자동 갱신)
+  - AC2: 알림 센터 드롭다운 — 5종 알림 + 채널 설정 + 히스토리
+  - AC3: 엔드포인트별 상세 분석 — 시간대 패턴, 응답시간 P50/P90/P95/P99
+  - AC4: 비용 분석 + 시뮬레이터 — 예상 월말 비용, 플랜별 비용 비교
+  - AC5: 리포트 빌더 — PDF/CSV/JSON 내보내기
+  - AC6: 테스트 + Build PASS
+
+- [ ] **T126: Logs 고도화 (고급 검색 + 에러 분석)**
+  - 배경: 스펙 §7.2 + §7.3
+  - AC1: 고급 검색 쿼리 (status:400 AND endpoint:/v1/match AND duration:>500)
+  - AC2: 로그 상세 모달 (Request/Response 헤더+바디)
+  - AC3: 에러 대시보드 — 에러율 추이, 유형별 그룹화
+  - AC4: 에러 알림 설정 — 임계값 + 연속 에러 트리거
+  - AC5: 로그 내보내기 — JSONL/CSV (10,000건, 30일)
+  - AC6: 테스트 + Build PASS
+
+### Phase DC-E: 테스트 (T127)
+
+- [ ] **T127: 개발자콘솔 테스트 스위트**
+  - 배경: 현재 테스트 0개. CLAUDE.md "테스트 없이 완료 처리 금지"
+  - AC1: Vitest 설정 + vitest.config.ts
+  - AC2: v1 API 라우트 테스트 (match, personas, filter, feedback, onboarding, consent)
+  - AC3: 서비스 테스트 (billing, api-keys, dashboard, usage, logs, webhooks, team, settings)
+  - AC4: 유틸리티 테스트 (api-key-validator, usage-tracker, utils)
+  - AC5: 최소 150개 테스트 PASS + Build PASS
 
 ---
 
