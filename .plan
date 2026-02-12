@@ -1,0 +1,51 @@
+# T96 Plan: User Insight 3페이지 UI
+
+## 개요
+lib/user-insight/ 6파일의 순수 함수들을 UI로 연결.
+3개 stub 페이지 → 실제 관리 대시보드로 전환.
+
+## 아키텍처 결정
+
+- **데이터 소스**: lib 함수가 순수 함수 (DB 미사용) → 페이지에서 직접 호출
+- **상태 관리**: useState + useCallback (기존 페이지 패턴)
+- **API 라우트**: 현 단계에서는 클라이언트 사이드 순수 함수 호출로 충분 (DB 연동은 추후 티켓)
+- **UI 패턴**: Header + div.space-y-6.p-6 + 탭/카드/테이블 레이아웃
+
+## AC1: Cold Start Strategy 페이지
+
+**파일**: `app/(dashboard)/user-insight/cold-start/page.tsx`
+**lib**: `cold-start.ts` — MODE_CONFIG, createQuestionSet, addQuestion, removeQuestion, reorderQuestions, validateQuestionSet, inferVectorsFromAnswers
+
+**UI 구성**:
+1. 3모드 탭 (Quick 12문항 / Standard 30문항 / Deep 60문항) — MODE_CONFIG 기반
+2. 질문 목록 테이블 (순서, 질문텍스트, 타입, 대상차원, 액션)
+3. 질문 추가 폼 (모달 또는 인라인)
+4. 검증 상태 패널 (validateQuestionSet → 차원별 커버리지)
+5. 벡터 미리보기 (샘플 답변 → inferVectorsFromAnswers)
+
+## AC2: Psychometric Model 페이지
+
+**파일**: `app/(dashboard)/user-insight/psychometric/page.tsx`
+**lib**: `psychometric.ts` — OCEAN_L1_MAPPINGS, predictL1FromL2, detectReversals, extractLatentTraits, REVERSAL_THRESHOLD
+
+**UI 구성**:
+1. OCEAN→L1 매핑 테이블 (5행 × 7열 상관 계수, 컬러 인코딩)
+2. 인터랙티브 예측기 (L2 5D 슬라이더 입력 → predictL1FromL2 → L1 7D 바 출력)
+3. 반전 탐지 섹션 (explicit/implicit 점수 입력 → detectReversals → Δ≥0.25 하이라이트)
+4. 잠재 특성 카드 3유형 (strong_explicit / hidden_implicit / confirmed_mixed)
+
+## AC3: Archetype Manager 페이지
+
+**파일**: `app/(dashboard)/user-insight/archetype/page.tsx`
+**lib**: `user-archetype.ts` — BASE_ARCHETYPES, classifyUser, createCustomArchetype, addArchetype, updateArchetype, removeArchetype, computeArchetypeStats
+
+**UI 구성**:
+1. 10종 기본 아키타입 카드 그리드 (이름, 설명, 참조벡터 7D 바, 임계값 규칙)
+2. 커스텀 아키타입 CRUD (추가/편집/삭제, isCustom 구분)
+3. 분류 테스터 (7D 벡터 입력 → classifyUser → 1차/2차 아키타입 + 신뢰도)
+4. 통계 개요 (computeArchetypeStats → 아키타입별 유저 수 + 평균 신뢰도)
+
+## 검증 단계
+1. 각 페이지 구현 후 Build 확인
+2. 전체 완료 후 테스트 파일 작성 (컴포넌트 렌더링 + lib 연동)
+3. pnpm --filter engine-studio build PASS 확인
