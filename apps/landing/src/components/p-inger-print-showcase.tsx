@@ -126,7 +126,7 @@ export function PingerPrintShowcase() {
         </div>
       </div>
 
-      {/* 6D Values for selected persona */}
+      {/* L1 Values for selected persona */}
       <div className="mx-auto mt-10 max-w-xl">
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-6">
           <div className="mb-4 text-center text-sm font-medium text-gray-700">

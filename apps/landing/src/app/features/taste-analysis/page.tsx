@@ -227,7 +227,7 @@ export default function TasteAnalysisPage() {
         </div>
       </section>
 
-      {/* 6D Vector System */}
+      {/* L1 Social Persona — 7D Vector System */}
       <section className="py-24">
         <div className="mx-auto max-w-7xl px-6">
           <div className="mb-16 text-center">
