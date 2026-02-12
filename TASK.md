@@ -372,12 +372,12 @@
   - AC3: ✅ `paradox-activity.ts` — paradoxActivityChance = sigmoid(paradoxScore×3 - 1.5), 4종 Paradox 패턴 발현 [PW-2-5]
   - AC4: ✅ Build PASS + 테스트 56개 PASS (1472 total)
 
-- [ ] **T106: PW-Phase 2b 콘텐츠 생성기 + 소비 기록 관리**
+- [x] **T106: PW-Phase 2b 콘텐츠 생성기 + 소비 기록 관리** ✅
   - 배경: 구현계획서 §5.3 + §5.5. LLM 콘텐츠 생성 + ConsumptionMemory
-  - AC1: `content-generator.ts` — generatePostContent (System ~3000tok + RAG Voice ~500tok + 관심사 ~100tok + 감정 ~100tok + User ~300tok), selectTopic 연동 [PW-2-3]
-  - AC2: `consumption-manager.ts` — recordConsumption (impression LLM ~50자 + 자동태깅 + emotionalImpact), getConsumptionContext (90일 이내 top5, ~200tok), getConsumptionStats [PW-2-9]
-  - AC3: 테스트 — consumption-manager.test.ts [PW-2-10]
-  - AC4: Build PASS + 테스트 PASS
+  - AC1: ✅ `content-generator.ts` — buildSystemPrompt + buildUserPrompt + generatePostContent (LLMProvider DI, 17종 타입별 길이/스타일 가이드) [PW-2-3]
+  - AC2: ✅ `consumption-manager.ts` — recordConsumption + getConsumptionContext (90일 이내 top5, 태그 매칭) + getConsumptionStats + autoTag + generateImpression [PW-2-9]
+  - AC3: ✅ 테스트 — content-generator.test.ts(18) + consumption-manager.test.ts(15) = 33개 PASS [PW-2-10]
+  - AC4: ✅ Build PASS + 전체 1505 테스트 PASS
 
 - [ ] **T107: PW-Phase 2c 자율 활동 스케줄러 + API**
   - 배경: 구현계획서 §5.1. 매시간 크론 파이프라인
