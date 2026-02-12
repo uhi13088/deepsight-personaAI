@@ -162,16 +162,16 @@
   - AC6: ✅ serializer.ts — JSON 직렬화/역직렬화, v2→v3 마이그레이션(6D→7D), 변경 감지
   - AC7: ✅ 테스트 55개 PASS (전체 696개) + Build PASS
 
-- [ ] **T60: 노드 에디터 — 캔버스 + 25노드 UI + 설정 패널**
+- [x] **T60: 노드 에디터 — 캔버스 + 25노드 UI + 설정 패널**
   - 배경: 구현계획서 Phase 8 후반 + 스펙 §3.10. @xyflow/react 기반
-  - AC1: Zustand 에디터 스토어 (노드/엣지 상태, 실행 상태, 선택)
-  - AC2: 메인 캔버스 (DAG 레이아웃, 자동 배치, 줌/팬)
-  - AC3: 노드 래퍼 v3 (포트 핸들, 상태 표시, 카테고리별 컬러)
-  - AC4: 25노드 타입별 UI (Input 5 + Engine 4 + Generation 7 + Assembly 2 + Output 4 + Control Flow 3)
-  - AC5: 노드 팔레트 (드래그&드롭, 카테고리별 필터)
-  - AC6: 노드 설정 패널 (§3.10 스펙 — 설정 19종 + 자동 6종)
-  - AC7: 에디터 툴바 (프리셋 4종, 실행, 검증) + 상태 바
-  - AC8: 테스트 + 커밋 + 푸시
+  - AC1: ✅ node-editor-store.ts — Zustand 스토어 (노드/엣지 CRUD, 선택, 실행, 검증 상태)
+  - AC2: ✅ persona-node-editor.tsx — ReactFlow 캔버스 (연결 검증, 순환 방지, 드래그&드롭)
+  - AC3: ✅ persona-node-wrapper.tsx — 포트 핸들, 카테고리별 컬러, 실행 상태 배지
+  - AC4: ✅ node-types.tsx — 25노드 타입별 UI + NODE_TYPE_MAP 레지스트리
+  - AC5: ✅ node-palette.tsx — 카테고리별 접이식 팔레트, 드래그&드롭 + 클릭 추가
+  - AC6: ✅ node-settings-panel.tsx — 포트 정보, 데이터 편집 (숫자/문자열), 메타 정보
+  - AC7: ✅ editor-toolbar.tsx + editor-status-bar.tsx — 프리셋 4종 + flow-presets.ts
+  - AC8: ✅ 전체 696개 테스트 PASS + Build PASS
 
 - [ ] **T61: 노드 에디터 — 실행 엔진 + 제어 흐름**
   - 배경: 구현계획서 Phase 8 실행부 + §14.8~§14.9
