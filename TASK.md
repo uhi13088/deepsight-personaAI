@@ -51,13 +51,13 @@
   - AC5: ✅ POST /api/internal/personas/create (트랜잭션, Paradox Score 자동 계산, 벡터 3레이어 저장)
   - AC6: ✅ 테스트 9파일 119개 PASS + Build PASS (b1bcaf9)
 
-- [ ] **T50: 페르소나 수정/복제/보관 + 라이프사이클**
+- [x] **T50: 페르소나 수정/복제/보관 + 라이프사이클** ✅
   - 배경: 스펙 §3.1.3~3.1.5 + §3.8
-  - AC1: 페르소나 수정 (PUT API + 편집 UI + 벡터 버전 관리)
-  - AC2: 페르소나 복제 (DRAFT로 생성)
-  - AC3: 페르소나 보관/복원 (Archive/Restore)
-  - AC4: 라이프사이클 상태 전이 8종 (Draft→Review→Active→Standard→Legacy→Deprecated→Paused→Archived)
-  - AC5: 테스트 + 커밋 + 푸시
+  - AC1: ✅ 페르소나 수정 (GET/PUT /personas/[id] + 편집 UI 3탭 + 벡터 표시)
+  - AC2: ✅ 페르소나 복제 (POST /personas/[id]/duplicate, DRAFT+MUTATION 소스, parentPersonaId 추적)
+  - AC3: ✅ 페르소나 보관/복원 (라이프사이클 ARCHIVE/RESTORE 액션, archivedAt 타임스탬프)
+  - AC4: ✅ 라이프사이클 상태 전이 8종 (POST /personas/[id]/lifecycle, 전이 매트릭스, 위험 액션 확인)
+  - AC5: ✅ 테스트 10파일 143개 PASS + Build PASS (29 routes)
 
 ### Phase B: 엔진 핵심 기능 (T51~T61)
 
