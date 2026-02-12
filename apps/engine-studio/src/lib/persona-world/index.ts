@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 // PersonaWorld v3 — Module Index
-// Phase 0~3: 타입 + 상수 + 활동 + 인터랙션
+// Phase 0~5: 타입 + 상수 + 활동 + 인터랙션 + 피드 + 온보딩
 // ═══════════════════════════════════════════════════════════════
 
 // Types
@@ -151,3 +151,23 @@ export type {
   FeedDataProvider,
   ExploreDataProvider,
 } from "./feed"
+
+// Phase 5: Onboarding
+export {
+  computeL1Vector,
+  computeL2Vector,
+  crossValidate,
+  ONBOARDING_CONFIDENCE,
+  processOnboardingAnswers,
+  getRequiredPhases,
+  computeCompleteness,
+  processSnsData,
+  extractCombinedText,
+} from "./onboarding"
+export type {
+  OnboardingQuestion,
+  OnboardingQuestionOption,
+  OnboardingQuestionsProvider,
+  OnboardingDataProvider,
+  SnsDataProvider,
+} from "./onboarding"

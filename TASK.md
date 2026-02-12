@@ -421,13 +421,13 @@
   - AC3: ✅ `/api/persona-world/feed/route.ts` + `/explore/route.ts` (Prisma 기반 프로바이더)
   - AC4: ✅ Build PASS + 1609 테스트 PASS
 
-- [ ] **T112: PW-Phase 5a 온보딩 엔진 (질문 + 벡터 생성 + SNS)**
+- [x] **T112: PW-Phase 5a 온보딩 엔진 (질문 + 벡터 생성 + SNS)**
   - 배경: 구현계획서 §8 + 설계서 §9. Cold Start + SNS → 벡터 생성
-  - AC1: `onboarding/questions.ts` — v3 질문 셋 (L1 7D + L2 5D OCEAN) [PW-5-1]
-  - AC2: `onboarding/onboarding-engine.ts` — processOnboardingAnswers (LIGHT→L1, MEDIUM→L1+L2, DEEP→L1+L2+메타) [PW-5-2]
-  - AC3: `onboarding/sns-processor.ts` — processSnsData (Init 알고리즘 연동, 8개 플랫폼) [PW-5-3]
-  - AC4: `onboarding/index.ts` [PW-5-5]
-  - AC5: Build PASS + 테스트 PASS
+  - AC1: ✅ `onboarding/questions.ts` — 질문 구조 타입 + DI 프로바이더 + L1/L2 벡터 산출 + 교차검증
+  - AC2: ✅ `onboarding/onboarding-engine.ts` — processOnboardingAnswers (LIGHT→L1 BASIC, MEDIUM→L1+L2 STANDARD, DEEP→ADVANCED)
+  - AC3: ✅ `onboarding/sns-processor.ts` — processSnsData (Init 알고리즘 연동, 카테고리→L2 매핑)
+  - AC4: ✅ `onboarding/index.ts` + 메인 index 업데이트
+  - AC5: ✅ Build PASS + 1635 테스트 PASS (onboarding.test.ts 26개)
 
 - [ ] **T113: PW-Phase 5b 활동 학습 + 품질 모니터 + API**
   - 배경: 구현계획서 §5.4, §8. Adapt 연동 + Voice/Integrity 통합
