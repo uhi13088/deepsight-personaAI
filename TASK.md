@@ -207,13 +207,13 @@
   - AC6: 정규 SVG 렌더러 ✅ `svg-renderer.ts`
   - AC7: 단위 테스트 (69 tests PASS) + 빌드 PASS + 커밋
 
-- [ ] **T64: 컬러지문 UI — TraitColor/PingerPrint v3**
+- [x] **T64: 컬러지문 UI — TraitColor/PingerPrint v3** ✅
   - 배경: 구현계획서 Phase 7. 멀티레이어 시각화
-  - AC1: TraitColorFingerprint v3 (멀티레이어 레이더 차트)
-  - AC2: PingerPrint2D v3 (멀티레이어 패턴)
-  - AC3: PingerPrint3D v3 (멀티레이어 3D Jacks)
-  - AC4: 지문 호환성 래퍼 (v2→v3 전환)
-  - AC5: 테스트 + 커밋 + 푸시
+  - AC1: TraitColorFingerprint v3 (멀티레이어 레이더 차트) ✅ `trait-color-fingerprint.tsx`
+  - AC2: PingerPrint2D v3 (멀티레이어 패턴) ✅ `p-inger-print-2d.tsx`
+  - AC3: PingerPrint3D v3 (멀티레이어 3D Jacks) ✅ `p-inger-print-3d.tsx`
+  - AC4: 지문 호환성 래퍼 (v2→v3 전환) ✅ `fingerprint-compat.tsx`
+  - AC5: 단위 테스트 (34 tests PASS) + 빌드 PASS + 커밋
 
 - [ ] **T65: 소비자 여정 시뮬레이터**
   - 배경: 스펙 §5.7. B2B 고객 체험용 미리보기
