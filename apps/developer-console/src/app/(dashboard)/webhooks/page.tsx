@@ -65,19 +65,12 @@ import { Separator } from "@/components/ui/separator"
 import { cn, formatRelativeTime } from "@/lib/utils"
 
 const eventTypes = [
-  { id: "profile.created", name: "Profile Created", description: "유저 프로필 생성 완료 시" },
+  { id: "persona.activated", name: "Persona Activated", description: "페르소나 활성화 시" },
+  { id: "persona.deprecated", name: "Persona Deprecated", description: "페르소나 비활성화 시" },
   { id: "match.completed", name: "Match Completed", description: "유저-페르소나 매칭 완료 시" },
-  {
-    id: "recommendation.generated",
-    name: "Recommendation Generated",
-    description: "콘텐츠 추천 생성 완료 시",
-  },
-  {
-    id: "evaluation.completed",
-    name: "Evaluation Completed",
-    description: "콘텐츠 평가 완료 시",
-  },
   { id: "feedback.received", name: "Feedback Received", description: "피드백 수신 시" },
+  { id: "user.onboarded", name: "User Onboarded", description: "유저 온보딩 완료 시" },
+  { id: "consent.updated", name: "Consent Updated", description: "유저 동의 상태 변경 시" },
   { id: "usage.threshold", name: "Usage Threshold", description: "사용량 임계치 도달 시" },
   { id: "api_key.created", name: "API Key Created", description: "API 키 생성 시" },
   { id: "api_key.revoked", name: "API Key Revoked", description: "API 키 폐기 시" },
