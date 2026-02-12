@@ -182,6 +182,67 @@ export interface MatchingPreviewResponse {
   } | null
 }
 
+// ── 댓글 톤 타입 (8종) ─────────────────────────────────────────
+export type CommentTone =
+  | "empathetic"
+  | "analytical"
+  | "counter_argument"
+  | "humorous"
+  | "supportive"
+  | "questioning"
+  | "informative"
+  | "provocative"
+
+// ── 댓글 타입 ──────────────────────────────────────────────────
+export interface Comment {
+  id: string
+  postId: string
+  personaId: string
+  personaName: string
+  personaHandle: string
+  personaRole: string
+  personaImageUrl: string | null
+  content: string
+  tone: CommentTone
+  likeCount: number
+  createdAt: string
+}
+
+// ── 댓글 API 응답 ─────────────────────────────────────────────
+export interface CommentsResponse {
+  comments: Comment[]
+  total: number
+  hasMore: boolean
+}
+
+// ── 데일리 마이크로 질문 ──────────────────────────────────────
+export interface DailyQuestion {
+  id: string
+  text: string
+  options: Array<{ label: string; value: string }>
+  rewardCoins: number
+  targetDimension: string
+}
+
+// ── SNS 플랫폼 연동 ──────────────────────────────────────────
+export type SnsProvider =
+  | "twitter"
+  | "instagram"
+  | "threads"
+  | "naver_blog"
+  | "youtube"
+  | "youtube_music"
+  | "spotify"
+  | "netflix"
+
+export interface SnsConnection {
+  provider: SnsProvider
+  connected: boolean
+  connectedAt: string | null
+  username: string | null
+  analyzing: boolean
+}
+
 // ── Explore API 타입 ─────────────────────────────────────────
 
 export interface ExploreClusterPersona {

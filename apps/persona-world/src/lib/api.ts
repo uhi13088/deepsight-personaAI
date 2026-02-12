@@ -10,6 +10,7 @@ import type {
   OnboardingAnswersResponse,
   MatchingPreviewResponse,
   ExploreResponse,
+  CommentsResponse,
 } from "./types"
 
 // Engine Studio API 베이스 URL (환경변수로 설정 가능)
@@ -202,6 +203,18 @@ export const clientApi = {
     if (!res.ok) throw new Error("Failed to fetch explore data")
 
     const json: ApiResponse<ExploreResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+
+    return json.data!
+  },
+
+  // ── Comments API ──────────────────────────────────────────
+
+  async getComments(postId: string) {
+    const res = await fetch(`${API_BASE_URL}/api/public/posts/${postId}/comments`)
+    if (!res.ok) throw new Error("Failed to fetch comments")
+
+    const json: ApiResponse<CommentsResponse> = await res.json()
     if (!json.success) throw new Error(json.error?.message || "Unknown error")
 
     return json.data!

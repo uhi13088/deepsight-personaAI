@@ -2,7 +2,7 @@
 
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
-import type { ThreeLayerVector, OnboardingAnswer } from "./types"
+import type { ThreeLayerVector, OnboardingAnswer, SnsProvider, SnsConnection } from "./types"
 import type { ProfileLevel } from "./profile-level"
 
 // 사용자 프로필 타입
@@ -31,6 +31,13 @@ export interface Notification {
   personaName?: string
   read: boolean
   createdAt: string
+}
+
+// 데일리 질문 상태
+export interface DailyQuestionState {
+  lastAnsweredDate: string | null
+  streak: number
+  totalAnswered: number
 }
 
 // 온보딩 상태
@@ -81,6 +88,16 @@ interface UserState {
   clearNotifications: () => void
   unreadCount: () => number
 
+  // 데일리 질문
+  dailyQuestion: DailyQuestionState
+  answerDailyQuestion: (coins: number) => void
+
+  // SNS 연동
+  snsConnections: SnsConnection[]
+  connectSns: (provider: SnsProvider, username: string) => void
+  disconnectSns: (provider: SnsProvider) => void
+  setSnsAnalyzing: (provider: SnsProvider, analyzing: boolean) => void
+
   // 초기화
   reset: () => void
 }
@@ -94,14 +111,23 @@ const initialOnboarding: OnboardingState = {
   creditsBalance: 0,
 }
 
+// 데일리 질문 초기 상태
+const initialDailyQuestion: DailyQuestionState = {
+  lastAnsweredDate: null,
+  streak: 0,
+  totalAnswered: 0,
+}
+
 // 초기 상태
 const initialState = {
   profile: null,
   onboarding: initialOnboarding,
-  followedPersonas: [],
-  likedPosts: [],
-  bookmarkedPosts: [],
-  notifications: [],
+  dailyQuestion: initialDailyQuestion,
+  snsConnections: [] as SnsConnection[],
+  followedPersonas: [] as FollowedPersona[],
+  likedPosts: [] as string[],
+  bookmarkedPosts: [] as string[],
+  notifications: [] as Notification[],
 }
 
 // Zustand 스토어 생성
@@ -240,6 +266,55 @@ export const useUserStore = create<UserState>()(
       clearNotifications: () => set({ notifications: [] }),
 
       unreadCount: () => get().notifications.filter((n) => !n.read).length,
+
+      // 데일리 질문 관리
+      answerDailyQuestion: (coins) =>
+        set((state) => {
+          const today = new Date().toISOString().slice(0, 10)
+          const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+          const isConsecutive = state.dailyQuestion.lastAnsweredDate === yesterday
+          return {
+            dailyQuestion: {
+              lastAnsweredDate: today,
+              streak: isConsecutive ? state.dailyQuestion.streak + 1 : 1,
+              totalAnswered: state.dailyQuestion.totalAnswered + 1,
+            },
+            onboarding: {
+              ...state.onboarding,
+              creditsBalance: state.onboarding.creditsBalance + coins,
+            },
+          }
+        }),
+
+      // SNS 연동 관리
+      connectSns: (provider, username) =>
+        set((state) => {
+          const existing = state.snsConnections.filter((c) => c.provider !== provider)
+          return {
+            snsConnections: [
+              ...existing,
+              {
+                provider,
+                connected: true,
+                connectedAt: new Date().toISOString(),
+                username,
+                analyzing: false,
+              },
+            ],
+          }
+        }),
+
+      disconnectSns: (provider) =>
+        set((state) => ({
+          snsConnections: state.snsConnections.filter((c) => c.provider !== provider),
+        })),
+
+      setSnsAnalyzing: (provider, analyzing) =>
+        set((state) => ({
+          snsConnections: state.snsConnections.map((c) =>
+            c.provider === provider ? { ...c, analyzing } : c
+          ),
+        })),
 
       // 초기화
       reset: () => set(initialState),

@@ -1,6 +1,7 @@
 "use client"
 
-import { PWLogoWithText, PWCard, PWButton } from "@/components/persona-world"
+import { useState } from "react"
+import { PWLogoWithText, PWCard } from "@/components/persona-world"
 import {
   Home,
   Search,
@@ -14,40 +15,70 @@ import {
   Trash2,
   Users,
   Star,
+  Filter,
 } from "lucide-react"
 import Link from "next/link"
 import { useUserStore } from "@/lib/user-store"
 import type { Notification } from "@/lib/user-store"
+import { formatTimeAgo } from "@/lib/format"
 
-// 시간 포맷
-function getTimeAgo(dateString: string): string {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 1) return "방금"
-  if (diffMins < 60) return `${diffMins}분 전`
-  if (diffHours < 24) return `${diffHours}시간 전`
-  if (diffDays < 7) return `${diffDays}일 전`
-  return date.toLocaleDateString("ko-KR")
-}
+type NotificationFilter = "all" | "unread" | "persona_activity" | "matching"
 
 // 알림 타입별 아이콘 및 스타일
 const NOTIFICATION_STYLES: Record<
   Notification["type"],
-  { icon: typeof Heart; bgColor: string; iconColor: string }
+  { icon: typeof Heart; bgColor: string; iconColor: string; category: string }
 > = {
-  like: { icon: Heart, bgColor: "bg-pink-100", iconColor: "text-pink-500" },
-  comment: { icon: MessageCircle, bgColor: "bg-blue-100", iconColor: "text-blue-500" },
-  follow: { icon: UserPlus, bgColor: "bg-purple-100", iconColor: "text-purple-500" },
-  mention: { icon: Users, bgColor: "bg-green-100", iconColor: "text-green-500" },
-  recommendation: { icon: Star, bgColor: "bg-amber-100", iconColor: "text-amber-500" },
-  new_post: { icon: Sparkles, bgColor: "bg-violet-100", iconColor: "text-violet-500" },
-  system: { icon: Bell, bgColor: "bg-gray-100", iconColor: "text-gray-500" },
+  like: {
+    icon: Heart,
+    bgColor: "bg-pink-100",
+    iconColor: "text-pink-500",
+    category: "persona_activity",
+  },
+  comment: {
+    icon: MessageCircle,
+    bgColor: "bg-blue-100",
+    iconColor: "text-blue-500",
+    category: "persona_activity",
+  },
+  follow: {
+    icon: UserPlus,
+    bgColor: "bg-purple-100",
+    iconColor: "text-purple-500",
+    category: "persona_activity",
+  },
+  mention: {
+    icon: Users,
+    bgColor: "bg-green-100",
+    iconColor: "text-green-500",
+    category: "persona_activity",
+  },
+  recommendation: {
+    icon: Star,
+    bgColor: "bg-amber-100",
+    iconColor: "text-amber-500",
+    category: "matching",
+  },
+  new_post: {
+    icon: Sparkles,
+    bgColor: "bg-violet-100",
+    iconColor: "text-violet-500",
+    category: "persona_activity",
+  },
+  system: {
+    icon: Bell,
+    bgColor: "bg-gray-100",
+    iconColor: "text-gray-500",
+    category: "all",
+  },
 }
+
+const FILTER_OPTIONS: Array<{ key: NotificationFilter; label: string }> = [
+  { key: "all", label: "전체" },
+  { key: "unread", label: "읽지 않음" },
+  { key: "persona_activity", label: "페르소나 활동" },
+  { key: "matching", label: "매칭 추천" },
+]
 
 // 알림 아이템 컴포넌트
 function NotificationItem({
@@ -74,27 +105,48 @@ function NotificationItem({
         <Icon className={`h-5 w-5 ${style.iconColor}`} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm text-gray-800">{notification.message}</p>
-        <p className="mt-1 text-xs text-gray-400">{getTimeAgo(notification.createdAt)}</p>
+        <div className="flex items-start gap-2">
+          <div className="flex-1">
+            {notification.personaName && (
+              <Link
+                href={notification.personaId ? `/persona/${notification.personaId}` : "#"}
+                className="text-sm font-medium text-purple-600 hover:underline"
+              >
+                {notification.personaName}
+              </Link>
+            )}
+            <p className="text-sm text-gray-800">{notification.message}</p>
+          </div>
+          {!notification.read && (
+            <button
+              onClick={() => onMarkAsRead(notification.id)}
+              className="flex-shrink-0 rounded-full p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-purple-500"
+              title="읽음 처리"
+            >
+              <Check className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <p className="mt-1 text-xs text-gray-400">{formatTimeAgo(notification.createdAt)}</p>
       </div>
-      {!notification.read && (
-        <button
-          onClick={() => onMarkAsRead(notification.id)}
-          className="flex-shrink-0 rounded-full p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-purple-500"
-          title="읽음 처리"
-        >
-          <Check className="h-4 w-4" />
-        </button>
-      )}
     </div>
   )
 }
 
 export default function NotificationsPage() {
   const { notifications, markAsRead, markAllAsRead, clearNotifications } = useUserStore()
+  const [filter, setFilter] = useState<NotificationFilter>("all")
 
   const unreadCount = notifications.filter((n) => !n.read).length
   const hasNotifications = notifications.length > 0
+
+  // 필터 적용
+  const filteredNotifications = notifications.filter((n) => {
+    if (filter === "all") return true
+    if (filter === "unread") return !n.read
+    const style = NOTIFICATION_STYLES[n.type]
+    return style.category === filter
+  })
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -128,7 +180,7 @@ export default function NotificationsPage() {
       {/* Main Content */}
       <main className="mx-auto max-w-2xl px-4 pb-20 pt-16">
         {/* Section Header */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Bell className="h-5 w-5 text-purple-500" />
             <h2 className="font-semibold text-gray-900">알림</h2>
@@ -140,15 +192,68 @@ export default function NotificationsPage() {
           </div>
         </div>
 
-        {hasNotifications ? (
+        {/* 필터 탭 */}
+        {hasNotifications && (
+          <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+            {FILTER_OPTIONS.map((opt) => {
+              const isActive = filter === opt.key
+              const count =
+                opt.key === "unread"
+                  ? unreadCount
+                  : opt.key === "all"
+                    ? notifications.length
+                    : notifications.filter((n) => NOTIFICATION_STYLES[n.type].category === opt.key)
+                        .length
+
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => setFilter(opt.key)}
+                  className={`flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                    isActive
+                      ? "bg-purple-500 text-white"
+                      : "bg-white text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  {opt.label}
+                  {count > 0 && (
+                    <span
+                      className={`rounded-full px-1 text-[10px] ${
+                        isActive ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {filteredNotifications.length > 0 ? (
           <div className="space-y-3">
-            {notifications.map((notification) => (
+            {filteredNotifications.map((notification) => (
               <NotificationItem
                 key={notification.id}
                 notification={notification}
                 onMarkAsRead={markAsRead}
               />
             ))}
+          </div>
+        ) : hasNotifications && filter !== "all" ? (
+          /* 필터 적용 시 빈 상태 */
+          <div className="py-12 text-center">
+            <Filter className="mx-auto mb-3 h-8 w-8 text-gray-300" />
+            <p className="text-sm text-gray-500">
+              {FILTER_OPTIONS.find((o) => o.key === filter)?.label} 알림이 없습니다
+            </p>
+            <button
+              onClick={() => setFilter("all")}
+              className="mt-2 text-sm text-purple-500 hover:underline"
+            >
+              전체 알림 보기
+            </button>
           </div>
         ) : (
           /* Empty State */
@@ -171,20 +276,20 @@ export default function NotificationsPage() {
                     <Heart className="h-5 w-5 text-pink-500" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-700">좋아요 알림</p>
-                    <p className="text-xs text-gray-500">페르소나가 내 활동에 반응할 때</p>
+                    <p className="text-sm font-medium text-gray-700">페르소나 활동</p>
+                    <p className="text-xs text-gray-500">좋아요, 댓글, 새 포스트 알림</p>
                   </div>
                 </div>
               </PWCard>
 
               <PWCard className="!p-4 text-left opacity-50">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
-                    <MessageCircle className="h-5 w-5 text-blue-500" />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100">
+                    <Star className="h-5 w-5 text-amber-500" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-700">댓글 알림</p>
-                    <p className="text-xs text-gray-500">페르소나가 답글을 달 때</p>
+                    <p className="text-sm font-medium text-gray-700">매칭 추천</p>
+                    <p className="text-xs text-gray-500">새로운 페르소나가 매칭될 때</p>
                   </div>
                 </div>
               </PWCard>
@@ -195,8 +300,8 @@ export default function NotificationsPage() {
                     <UserPlus className="h-5 w-5 text-purple-500" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-700">매칭 알림</p>
-                    <p className="text-xs text-gray-500">새로운 페르소나가 매칭될 때</p>
+                    <p className="text-sm font-medium text-gray-700">팔로우 알림</p>
+                    <p className="text-xs text-gray-500">팔로우한 페르소나의 새 소식</p>
                   </div>
                 </div>
               </PWCard>
