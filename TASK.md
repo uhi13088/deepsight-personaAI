@@ -441,7 +441,7 @@
 
 > T59~T61에서 구축한 DAG 엔진 + 캔버스 UI를 실제 사용 가능한 페이지로 통합.
 
-- [ ] **T128: 노드 에디터 페이지 통합 — ComfyUI 스타일 페르소나 생성**
+- [x] **T128: 노드 에디터 페이지 통합 — ComfyUI 스타일 페르소나 생성**
   - 배경: T59~T61에서 DAG 엔진(25노드) + ReactFlow 캔버스 + 실행 엔진 완성. 하지만 handleExecute/handleSave가 placeholder 상태이고, 노드 에디터 접근 가능한 페이지 라우트가 없음. 4-step 위자드와 별도로 ComfyUI 스타일 생성 경로 필요
   - AC1: 실행 엔진 연결 — `handleExecute` placeholder를 `executeGraph()` 실제 호출로 교체. 실행 전 `validateGraph()` 검증. 실행 결과를 Zustand store에 반영 (executionResults, activeEdges). 노드별 상태 배지(성공/에러/스킵) 표시, 활성 엣지 녹색 애니메이션
   - AC2: 저장/로드 연결 — `handleSave` placeholder를 `serializeGraph()` + localStorage 저장으로 교체. 프리셋/저장된 그래프 로드 (deserializeGraph). 키: `node-graph-${personaId}`
