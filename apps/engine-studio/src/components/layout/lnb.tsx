@@ -37,6 +37,7 @@ const navSections: NavSection[] = [
     children: [
       { label: "Persona List", href: "/persona-studio/list" },
       { label: "Create New Persona", href: "/persona-studio/create" },
+      { label: "Node Editor", href: "/persona-studio/node-editor" },
       { label: "Incubator Dashboard", href: "/persona-studio/incubator" },
     ],
   },
