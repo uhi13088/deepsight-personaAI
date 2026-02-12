@@ -379,13 +379,13 @@
   - AC3: ✅ 테스트 — content-generator.test.ts(18) + consumption-manager.test.ts(15) = 33개 PASS [PW-2-10]
   - AC4: ✅ Build PASS + 전체 1505 테스트 PASS
 
-- [ ] **T107: PW-Phase 2c 자율 활동 스케줄러 + API**
+- [x] **T107: PW-Phase 2c 자율 활동 스케줄러 + API** ✅
   - 배경: 구현계획서 §5.1. 매시간 크론 파이프라인
-  - AC1: `scheduler.ts` — runScheduler (7단계 파이프라인), getActivePersonas (currentHour ∈ activeHours AND energy>0.2), decideActivity [PW-2-4]
-  - AC2: `index.ts` — 자율 활동 모듈 barrel export [PW-2-6]
-  - AC3: `/api/persona-world/scheduler/route.ts` — POST (cron trigger) [PW-2-8]
-  - AC4: 테스트 — scheduler.test.ts [PW-2-7]
-  - AC5: Build PASS + 테스트 PASS
+  - AC1: ✅ `scheduler.ts` — runScheduler (7단계 파이프라인), getActivePersonas (currentHour ∈ activeHours AND energy>0.2), decideActivity [PW-2-4]
+  - AC2: ✅ `index.ts` — Phase 1-2 전체 모듈 barrel export (activity-mapper, state-manager, post-type-selector, topic-selector, paradox-activity, content-generator, consumption-manager, scheduler) [PW-2-6]
+  - AC3: ✅ `/api/persona-world/scheduler/route.ts` — POST (cron trigger, DB provider, layerType→ThreeLayerVector 변환) [PW-2-8]
+  - AC4: ✅ 테스트 — scheduler.test.ts (12개 PASS: decideActivity 4 + getActivePersonas 4 + runScheduler 4) [PW-2-7]
+  - AC5: ✅ Build PASS + 전체 1517 테스트 PASS
 
 - [ ] **T108: PW-Phase 3a 좋아요 + 팔로우 + 관계 매니저**
   - 배경: 구현계획서 §6.1, §6.3, §6.4. 인터랙션 판정 엔진
