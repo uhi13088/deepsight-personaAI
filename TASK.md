@@ -335,16 +335,118 @@
   - AC5: 알림 (페르소나 활동, 매칭 추천, 읽음 처리) ✅
   - AC6: Build PASS (73 tests) + 테스트 + 커밋 + 푸시 ✅
 
-### 보류: PW 백엔드 통합 (엔진 스튜디오 충돌 가능)
+### Phase PW-C: PersonaWorld 백엔드 구축 (T103~T115)
 
-> **엔진 스튜디오 작업 완료 후 상황 봐서 진행. Prisma 스키마 + API 라우트 변경 포함.**
+> 구현계획서: `docs/design/persona-world-v3-impl.md` (v1.0-draft.2)
+> 설계서: `docs/design/persona-world-v3.md` (v1.0-draft.3)
+> 백엔드 모듈: `apps/engine-studio/src/lib/persona-world/` (공유 DB + 엔진 모듈 직접 import)
+> API 라우트: `apps/engine-studio/src/app/api/persona-world/`
+> 원칙: No Mock Data, No Hardcoding, Real Data Only, Feedback Loop
 
-- 보류-1: Prisma 스키마 추가 (PersonaState, PersonaRelationship, ConsumptionLog 등)
-- 보류-2: API 라우트 재작성 (`/api/persona-world/*` 전체)
-- 보류-3: `user-store.ts` + `api.ts` 실제 API 연동 전환
-- 보류-4: 피드 알고리즘 3-Tier 매칭 엔진 연동
-- 보류-5: 자율 활동 엔진 (스케줄러, 콘텐츠 생성, RAG)
-- 보류-6: 품질 모니터링 (Auto-Interview, Integrity Score, Voice drift)
+- [x] **T103: PW-Phase 0 기반 인프라 — DB 스키마 + 타입 + 상수** ✅
+  - 배경: 구현계획서 §2~3. PW 전체 데이터 모델과 타입 시스템의 기반
+  - AC1: PersonaState 모델 (mood/energy/socialBattery/paradoxTension, Decimal(3,2), Persona 1:1) [PW-0-2]
+  - AC2: PersonaRelationship 모델 (warmth/tension/frequency/depth, unique(A,B), Persona 양방향) [PW-0-3]
+  - AC3: ConsumptionLog 모델 + ConsumptionContentType/ConsumptionSource 2 enum [PW-0-8]
+  - AC4: PersonaWorldUser 확장 — L2 OCEAN 5필드 + hasOceanProfile + profileLevel String [PW-0-4]
+  - AC5: PersonaActivityLog 확장 — postTypeReason Json, stateSnapshot Json, matchingScore Decimal(4,3) [PW-0-5]
+  - AC6: Persona 릴레이션 추가 (personaState, relationshipsAsA/B, consumptionLogs) [PW-0-2~0-4]
+  - AC7: SQL 마이그레이션 파일 `007_persona_world_v3.sql` [PW-0-6]
+  - AC8: `types.ts` — ActivityTraitsV3, PersonaStateData, StateUpdateEvent, RelationshipScore, ConsumptionRecord, ActivityDecision, SchedulerContext, PostGenerationInput/Result, CommentGenerationInput, CommentTone(7종), CommentToneDecision, FeedRequest/Response, FeedPost, ExploreData [PW-0-1]
+  - AC9: `constants.ts` — POST_TYPE_AFFINITIES(17종), STATE_DEFAULTS, STATE_DELTAS, ACTIVITY_THRESHOLDS, FEED_RATIOS(60/30/10), RECOMMENDED_TIER_RATIOS(60/30/10), COMMENT_TONE_MATRIX, LIKE_MODIFIERS, FOLLOW_WEIGHTS [PW-0-7]
+  - AC10: Prisma validate + generate + Build PASS + 기존 테스트 PASS
+
+- [ ] **T104: PW-Phase 1 활동성 매핑 + PersonaState 관리**
+  - 배경: 구현계획서 §4 + 설계서 §3. 3-Layer→8특성 매핑 + 동적 상태 시스템
+  - AC1: `activity-mapper.ts` — computeActivityTraits (L1 70% + L2 20% + L3 10%, 신규4특성 공식: endurance/volatility/depthSeeking/growthDrive) [PW-1-1]
+  - AC2: computeActiveHours (peakHour=12+round(sociability×10), window ±endurance, 야행성 보정 +4h) [PW-1-2]
+  - AC3: computeActivityProbabilities (adjustedPost=base×energy×(0.5+mood×0.5), adjustedInteraction=base×socialBattery×energy) [PW-1-3]
+  - AC4: `state-manager.ts` — initializeState, updatePersonaState (7종 StateUpdateEvent), getPersonaState [PW-1-4]
+  - AC5: 테스트 — activity-mapper.test.ts + state-manager.test.ts [PW-1-5, PW-1-6]
+  - AC6: Build PASS + 테스트 PASS
+
+- [ ] **T105: PW-Phase 2a 포스트 타입 선택 + 주제 선택 + Paradox 발현**
+  - 배경: 구현계획서 §5.2 + 설계서 §4.5. 17종 포스트 타입 친화도 기반 선택
+  - AC1: `post-type-selector.ts` — selectPostType (친화도 점수 계산, 상태 보정: mood<0.4→THOUGHT×2, paradoxTension>0.7→BEHIND_STORY×3, energy<0.3→REACTION×2, 가중 랜덤) [PW-2-1]
+  - AC2: `topic-selector.ts` — selectTopic (우선순위: 트리거→관심사연속→벡터매칭→자유주제) [PW-2-2]
+  - AC3: `paradox-activity.ts` — paradoxActivityChance = sigmoid(paradoxScore×3 - 1.5), 4종 Paradox 패턴 발현 [PW-2-5]
+  - AC4: Build PASS + 테스트 PASS
+
+- [ ] **T106: PW-Phase 2b 콘텐츠 생성기 + 소비 기록 관리**
+  - 배경: 구현계획서 §5.3 + §5.5. LLM 콘텐츠 생성 + ConsumptionMemory
+  - AC1: `content-generator.ts` — generatePostContent (System ~3000tok + RAG Voice ~500tok + 관심사 ~100tok + 감정 ~100tok + User ~300tok), selectTopic 연동 [PW-2-3]
+  - AC2: `consumption-manager.ts` — recordConsumption (impression LLM ~50자 + 자동태깅 + emotionalImpact), getConsumptionContext (90일 이내 top5, ~200tok), getConsumptionStats [PW-2-9]
+  - AC3: 테스트 — consumption-manager.test.ts [PW-2-10]
+  - AC4: Build PASS + 테스트 PASS
+
+- [ ] **T107: PW-Phase 2c 자율 활동 스케줄러 + API**
+  - 배경: 구현계획서 §5.1. 매시간 크론 파이프라인
+  - AC1: `scheduler.ts` — runScheduler (7단계 파이프라인), getActivePersonas (currentHour ∈ activeHours AND energy>0.2), decideActivity [PW-2-4]
+  - AC2: `index.ts` — 자율 활동 모듈 barrel export [PW-2-6]
+  - AC3: `/api/persona-world/scheduler/route.ts` — POST (cron trigger) [PW-2-8]
+  - AC4: 테스트 — scheduler.test.ts [PW-2-7]
+  - AC5: Build PASS + 테스트 PASS
+
+- [ ] **T108: PW-Phase 3a 좋아요 + 팔로우 + 관계 매니저**
+  - 배경: 구현계획서 §6.1, §6.3, §6.4. 인터랙션 판정 엔진
+  - AC1: `interactions/like-engine.ts` — shouldLike (likeScore=basicMatch, prob=score×interactivity×socialBattery, 팔로잉×1.5/긍정×1.3/부정×0.5) [PW-3-1]
+  - AC2: `interactions/follow-engine.ts` — shouldFollow (0.5×basicMatch+0.3×crossAxis+0.2×paradoxCompat, prob=score×sociability×0.5, 임계값>0.6) [PW-3-4]
+  - AC3: `interactions/relationship-manager.ts` — updateRelationship (warmth/tension/frequency/depth 규칙), getRelationship [PW-3-5]
+  - AC4: `interactions/index.ts` [PW-3-7]
+  - AC5: Build PASS + 테스트 PASS
+
+- [ ] **T109: PW-Phase 3b 댓글 엔진 + 유저 응답 + API 라우트**
+  - 배경: 구현계획서 §6.2, §6.5. 가장 복잡한 인터랙션 — Override+RAG+Express 통합
+  - AC1: `interactions/comment-tone.ts` — decideCommentTone (벡터+관계+상태→7종 톤, Paradox 영향 판정) [PW-3-2]
+  - AC2: `interactions/comment-engine.ts` — generateComment (6단계: 관계로드→Override→톤결정→LLM생성→Express→로깅) [PW-3-3]
+  - AC3: `interactions/user-interaction.ts` — respondToUser (UIV 분석→Adapt→Override→RAG→LLM→Express→Integrity 수집) [PW-3-6]
+  - AC4: 인터랙션 테스트 [PW-3-8]
+  - AC5: API Routes — `/posts/[id]/comments/route.ts`, `/posts/[id]/likes/route.ts`, `/follows/route.ts` [PW-3-9~3-11]
+  - AC6: Build PASS + 테스트 PASS
+
+- [ ] **T110: PW-Phase 4a 피드 엔진 (Following + Recommended + Trending + Interleaver)**
+  - 배경: 구현계획서 §7 + 설계서 §6. 3-Tier 매칭 기반 피드
+  - AC1: `feed/following-posts.ts` — getFollowingPosts (시간순) [PW-4-1]
+  - AC2: `feed/recommended-posts.ts` — getRecommendedPosts (Basic 60%: V_Final 70%+crossAxis 30% / Exploration 30%: paradoxDiv 40%+crossAxisDiv 40%+freshness 20% / Advanced 10%: V_Final 50%+crossAxis 30%+paradoxCompat 20%) [PW-4-2]
+  - AC3: `feed/trending-posts.ts` — getTrendingPosts (engagement 기반, timeWindow) [PW-4-3]
+  - AC4: `feed/interleaver.ts` — interleaveFeed (F F B F F E F F ... 패턴, 같은 Tier 연속 방지) [PW-4-4]
+  - AC5: `feed/feed-engine.ts` — generateFeed (Following 60% + Recommended 30% + Trending 10%, qualitativeBonus ±0.10) [PW-4-5]
+  - AC6: `feed/index.ts` [PW-4-7]
+  - AC7: Build PASS + 테스트 PASS
+
+- [ ] **T111: PW-Phase 4b Explore 엔진 + Feed/Explore API**
+  - 배경: 구현계획서 §7 + 설계서 §6.4. 탐색 탭 데이터
+  - AC1: `feed/explore-engine.ts` — getExploreData (교차축 클러스터 topPersonas, hotTopics paradoxTensionAvg, activeDebates, newPersonas autoInterviewScore) [PW-4-6]
+  - AC2: 피드 테스트 [PW-4-8]
+  - AC3: `/api/persona-world/feed/route.ts` + `/explore/route.ts` [PW-4-9, PW-4-10]
+  - AC4: Build PASS + 테스트 PASS
+
+- [ ] **T112: PW-Phase 5a 온보딩 엔진 (질문 + 벡터 생성 + SNS)**
+  - 배경: 구현계획서 §8 + 설계서 §9. Cold Start + SNS → 벡터 생성
+  - AC1: `onboarding/questions.ts` — v3 질문 셋 (L1 7D + L2 5D OCEAN) [PW-5-1]
+  - AC2: `onboarding/onboarding-engine.ts` — processOnboardingAnswers (LIGHT→L1, MEDIUM→L1+L2, DEEP→L1+L2+메타) [PW-5-2]
+  - AC3: `onboarding/sns-processor.ts` — processSnsData (Init 알고리즘 연동, 8개 플랫폼) [PW-5-3]
+  - AC4: `onboarding/index.ts` [PW-5-5]
+  - AC5: Build PASS + 테스트 PASS
+
+- [ ] **T113: PW-Phase 5b 활동 학습 + 품질 모니터 + API**
+  - 배경: 구현계획서 §5.4, §8. Adapt 연동 + Voice/Integrity 통합
+  - AC1: `onboarding/activity-learner.ts` — learnFromActivity (UIV→Adapt→벡터 보정 ±0.3 클램프) [PW-5-4]
+  - AC2: `quality-monitor.ts` — Voice 일관성 모니터링 (similarity<0.6 경고, <0.4 보류+재생성) + Integrity Score 자동 실행 [PW-5-7, PW-5-8]
+  - AC3: 온보딩 테스트 [PW-5-6]
+  - AC4: `/api/persona-world/onboarding/` API Routes [PW-5-9]
+  - AC5: Build PASS + 테스트 PASS
+
+- [ ] **T114: PW 프론트엔드 API 클라이언트 재작성**
+  - 배경: persona-world/src/lib/api.ts + user-store.ts를 실제 백엔드 API로 전환
+  - AC1: api.ts — `/api/persona-world/*` 엔드포인트로 전환
+  - AC2: user-store.ts — 서버 영속화 (localStorage → API 동기화)
+  - AC3: Build PASS + 테스트 PASS
+
+- [ ] **T115: E2E 통합 + 품질 게이트**
+  - 배경: 전 페이지 실제 API 연동 확인
+  - AC1: 7 페이지 (feed/explore/onboarding/profile/persona/[id]/notifications) 실제 데이터 동작 확인
+  - AC2: `pnpm validate` 전체 PASS
 
 ---
 
