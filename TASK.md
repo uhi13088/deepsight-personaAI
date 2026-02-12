@@ -429,19 +429,20 @@
   - AC4: ✅ `onboarding/index.ts` + 메인 index 업데이트
   - AC5: ✅ Build PASS + 1635 테스트 PASS (onboarding.test.ts 26개)
 
-- [ ] **T113: PW-Phase 5b 활동 학습 + 품질 모니터 + API**
+- [x] **T113: PW-Phase 5b 활동 학습 + 품질 모니터 + API**
   - 배경: 구현계획서 §5.4, §8. Adapt 연동 + Voice/Integrity 통합
-  - AC1: `onboarding/activity-learner.ts` — learnFromActivity (UIV→Adapt→벡터 보정 ±0.3 클램프) [PW-5-4]
-  - AC2: `quality-monitor.ts` — Voice 일관성 모니터링 (similarity<0.6 경고, <0.4 보류+재생성) + Integrity Score 자동 실행 [PW-5-7, PW-5-8]
-  - AC3: 온보딩 테스트 [PW-5-6]
-  - AC4: `/api/persona-world/onboarding/` API Routes [PW-5-9]
-  - AC5: Build PASS + 테스트 PASS
+  - AC1: ✅ `onboarding/activity-learner.ts` — learnFromActivity (Adapt 연동, ±0.3 클램프)
+  - AC2: ✅ `quality-monitor.ts` — Voice 일관성 (0.6/0.4 임계값) + Integrity Gate
+  - AC3: ✅ quality-monitor.test.ts 25개 테스트 PASS
+  - AC4: ✅ `/api/persona-world/onboarding/cold-start` + `/sns/connect`
+  - AC5: ✅ Build PASS + 1660 테스트 PASS
 
-- [ ] **T114: PW 프론트엔드 API 클라이언트 재작성**
+- [x] **T114: PW 프론트엔드 API 클라이언트 재작성** ✅ 2026-02-12
   - 배경: persona-world/src/lib/api.ts + user-store.ts를 실제 백엔드 API로 전환
-  - AC1: api.ts — `/api/persona-world/*` 엔드포인트로 전환
-  - AC2: user-store.ts — 서버 영속화 (localStorage → API 동기화)
-  - AC3: Build PASS + 테스트 PASS
+  - AC1: ✅ api.ts — 피드→`POST /api/persona-world/feed` (userId 개인화), Explore→`GET /api/persona-world/explore` (search/role), 온보딩→`POST /api/persona-world/onboarding/cold-start` (level 매핑), SNS→`POST /api/persona-world/onboarding/sns/connect`, 좋아요/팔로우 API 추가
+  - AC2: ✅ user-store.ts — followPersona/unfollowPersona→`/api/public/follows` 동기화, toggleLike→`/api/public/posts/[id]/likes` 동기화, connectSns→`/api/persona-world/onboarding/sns/connect` 동기화 (Optimistic + fire-and-forget)
+  - AC3: ✅ Build PASS (persona-world + engine-studio) + 1733 테스트 PASS (ES 1660 + PW 73)
+  - 변경: api.ts, user-store.ts, feed/route.ts(persona-world), explore/route.ts(persona-world), feed/page.tsx
 
 - [ ] **T115: E2E 통합 + 품질 게이트**
   - 배경: 전 페이지 실제 API 연동 확인
