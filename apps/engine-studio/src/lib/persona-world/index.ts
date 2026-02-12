@@ -57,3 +57,41 @@ export {
 } from "./constants"
 
 export type { CommentToneRule } from "./constants"
+
+// Phase 1: Activity Mapping + State
+export {
+  computeActivityTraits,
+  computeActiveHours,
+  computeActivityProbabilities,
+} from "./activity-mapper"
+export {
+  initializeState,
+  applyStateEvent,
+  getPersonaState,
+  updatePersonaState,
+} from "./state-manager"
+
+// Phase 2: Autonomous Activity Engine
+export { selectPostType, computeAffinityScore, applyStateModifiers } from "./post-type-selector"
+export { selectTopic, isTriggerBasedTopic } from "./topic-selector"
+export type { TopicSelectionResult, TopicDataProvider } from "./topic-selector"
+export {
+  computeParadoxActivityChance,
+  detectParadoxPatterns,
+  decideParadoxActivity,
+  sigmoid,
+  PARADOX_PATTERNS,
+} from "./paradox-activity"
+export type { ParadoxPattern, ParadoxActivityResult } from "./paradox-activity"
+export { buildSystemPrompt, buildUserPrompt, generatePostContent } from "./content-generator"
+export type { LLMProvider } from "./content-generator"
+export {
+  recordConsumption,
+  getConsumptionContext,
+  getConsumptionStats,
+  generateImpression,
+  autoTag,
+} from "./consumption-manager"
+export type { ConsumptionLLMProvider } from "./consumption-manager"
+export { runScheduler, getActivePersonas, decideActivity } from "./scheduler"
+export type { SchedulerPersona, SchedulerDataProvider, SchedulerResult } from "./scheduler"
