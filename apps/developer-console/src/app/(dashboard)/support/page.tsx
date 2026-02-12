@@ -18,7 +18,6 @@ import {
   Zap,
   CheckCircle,
   AlertCircle,
-  ArrowRight,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -43,7 +42,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { cn } from "@/lib/utils"
 
-// FAQ Data
+// FAQ Data (v3)
 const faqCategories = [
   {
     id: "getting-started",
@@ -53,22 +52,22 @@ const faqCategories = [
       {
         question: "API Key는 어떻게 생성하나요?",
         answer:
-          "Dashboard에서 'API Keys' 메뉴로 이동한 후 '새 API Key 생성' 버튼을 클릭하세요. 키 이름, 환경(Test/Live), 권한(Catalog/Profiling/Matching/Recommendation/Evaluation 등)을 설정한 후 생성할 수 있습니다.",
-      },
-      {
-        question: "Test 환경과 Live 환경의 차이는 무엇인가요?",
-        answer:
-          "Test 환경은 개발 및 테스트용으로 과금되지 않습니다. Live 환경은 실제 프로덕션용이며 API 호출에 따라 과금됩니다. 먼저 Test 환경에서 충분히 테스트 후 Live로 전환하시기 바랍니다.",
+          "Dashboard에서 'API Keys' 메뉴로 이동한 후 '새 API Key 생성' 버튼을 클릭하세요. 키 이름, 환경(Test/Live)을 설정한 후 생성할 수 있습니다. Test 키는 과금 없이 테스트할 수 있습니다.",
       },
       {
         question: "첫 API 호출은 어떻게 하나요?",
         answer:
-          "API Key를 생성한 후, Playground에서 바로 테스트하거나 문서의 Quick Start 가이드를 따라 진행하세요. 기본 흐름은 Catalog API로 페르소나 검색 → Profiling API로 유저 프로필 생성 → Matching API로 매칭 → Recommendation API로 추천 받기입니다.",
+          "API Key 생성 후 Playground에서 바로 테스트하거나 Quick Start를 따라 진행하세요. 기본 흐름: 1) Onboarding API로 유저 성향 벡터 생성 → 2) Match API로 3-Tier 매칭 실행 → 3) Feedback API로 결과 피드백 제출.",
       },
       {
-        question: "DeepSight API로 무엇을 할 수 있나요?",
+        question: "DeepSight v3 API로 무엇을 할 수 있나요?",
         answer:
-          "DeepSight에 등록된 AI 페르소나를 활용하여 5가지 핵심 기능을 사용할 수 있습니다: 페르소나 카탈로그 검색(Catalog), 유저 프로파일링(Profiling), 유저-페르소나 매칭(Matching), 콘텐츠 추천(Recommendation), 콘텐츠 평가(Evaluation).",
+          "3-Layer 106D+ 벡터 시스템 기반으로 유저-페르소나 매칭을 제공합니다. 주요 기능: 페르소나 카탈로그(검색/필터), 유저 온보딩(성향 벡터 생성), 3-Tier 매칭(basic/advanced/exploration), 피드백 루프, 배치 매칭, 동의 관리.",
+      },
+      {
+        question: "3-Layer 벡터 시스템이란 무엇인가요?",
+        answer:
+          "L1 Social Persona(7D: depth/lens/stance/scope/taste/purpose/sociability), L2 Core Temperament/OCEAN(5D), L3 Narrative Drive(4D: lack/moralCompass/volatility/growthArc)로 구성된 다차원 성향 분석 시스템입니다. 각 레이어의 교차 분석으로 Extended Paradox Score(EPS)를 산출합니다.",
       },
     ],
   },
@@ -80,27 +79,27 @@ const faqCategories = [
       {
         question: "Rate Limit에 걸리면 어떻게 되나요?",
         answer:
-          "Rate Limit 초과 시 HTTP 429 에러가 반환됩니다. 잠시 후 다시 시도하거나, 플랜을 업그레이드하여 Rate Limit을 높일 수 있습니다. Retry-After 헤더를 확인하여 대기 시간을 파악하세요.",
+          "Rate Limit 초과 시 HTTP 429 에러가 반환됩니다. X-RateLimit-Remaining 헤더로 남은 호출 수를, X-RateLimit-Reset 헤더로 리셋 시간을 확인하세요. 플랜 업그레이드로 Rate Limit을 높일 수 있습니다 (Starter 200/분 ~ Ent.Scale 무제한).",
       },
       {
-        question: "Profiling API에서 지원하는 프로필 생성 방식은?",
+        question: "3-Tier 매칭은 어떻게 다른가요?",
         answer:
-          "콜드스타트 질문셋 기반과 SNS 연동 분석 두 가지 방식을 지원합니다. SNS 연동이 실제 행동 데이터 기반이라 정확도가 높으며, 콜드스타트는 별도 연동 없이 질문 응답만으로 프로필을 생성합니다.",
+          "Basic: L1(7D)만 사용하여 빠른 매칭. Advanced: L1 70% + L2 20% + EPS 10%로 성격 특성 반영. Exploration: L1 50% + L2 20% + L3 20% + EPS 10%로 서사적 성향까지 탐색. 플랜에 따라 사용 가능한 티어가 다릅니다.",
       },
       {
-        question: "Recommendation API 응답에 추천 이유가 포함되나요?",
+        question: "유저 온보딩 레벨은 어떻게 선택하나요?",
         answer:
-          "네. Recommendation API 응답에는 각 추천 항목마다 reason 필드가 포함됩니다. 매칭된 페르소나가 유저의 성향을 고려하여 왜 이 콘텐츠를 추천하는지 설명합니다.",
+          "QUICK(12문항): 빠른 시작, 정밀도 ~45%. STANDARD(30문항): 일반 권장, 정밀도 ~62%. DEEP(60문항): 최고 정밀도 ~75%. SNS 연동 시 L2 벡터가 자동 생성되어 정밀도가 더 높아집니다.",
       },
       {
-        question: "6D Vector는 무엇인가요?",
+        question: "동의(Consent) 관리는 어떻게 하나요?",
         answer:
-          "6D Vector는 DeepSight의 핵심 분석 기술입니다. Depth(깊이), Lens(관점), Stance(태도), Scope(범위), Taste(취향), Purpose(목적) 6가지 차원으로 유저와 페르소나의 성향을 분석합니다. Profiling API를 통해 유저의 6D 프로필을 생성하고, Matching API에서 페르소나와의 유사도를 계산합니다.",
+          "4가지 동의 항목이 있습니다: data_collection(필수), sns_analysis, third_party_sharing, marketing. data_collection은 서비스 이용에 필수이며, third_party_sharing 미동의 시 프로필 조회 API가 403 CONSENT_REQUIRED를 반환합니다.",
       },
       {
         question: "Webhook은 어떻게 설정하나요?",
         answer:
-          "Webhook은 Pro 플랜 이상에서 사용 가능합니다. Webhooks 메뉴에서 엔드포인트 URL을 등록하고 수신할 이벤트(profile.created, match.completed, recommendation.generated 등)를 선택하세요.",
+          "Webhooks 메뉴에서 HTTPS 엔드포인트 URL을 등록하고 수신할 이벤트(persona.activated, match.completed, user.onboarded, consent.updated 등)를 선택하세요. X-DeepSight-Signature 헤더로 요청 무결성을 검증할 수 있습니다.",
       },
     ],
   },
@@ -110,6 +109,11 @@ const faqCategories = [
     icon: AlertCircle,
     faqs: [
       {
+        question: "어떤 플랜이 있나요?",
+        answer:
+          "6개 플랜: Starter($199/월), Pro($499/월), Max($1,499/월), Enterprise Starter($3,500/월), Enterprise Growth($5,000/월), Enterprise Scale($15,000/월). 연간 결제 시 일반 플랜 20% 할인. Enterprise는 별도 문의.",
+      },
+      {
         question: "플랜 변경은 어떻게 하나요?",
         answer:
           "Billing 페이지에서 원하는 플랜을 선택하여 업그레이드하거나 다운그레이드할 수 있습니다. 업그레이드는 즉시 적용되며, 다운그레이드는 현재 결제 주기 종료 후 적용됩니다.",
@@ -117,12 +121,7 @@ const faqCategories = [
       {
         question: "API 호출 한도를 초과하면 어떻게 되나요?",
         answer:
-          "한도 초과 시 추가 요청은 거부됩니다. 즉시 플랜을 업그레이드하거나 다음 결제 주기까지 기다려야 합니다. 사용량 알림을 설정하여 미리 대비하세요.",
-      },
-      {
-        question: "환불 정책은 어떻게 되나요?",
-        answer:
-          "서비스 특성상 사용한 API 호출에 대해서는 환불이 불가합니다. 단, 서비스 장애로 인한 미사용의 경우 개별 검토 후 크레딧으로 보상해 드립니다.",
+          "매칭 API 초과분에 대해 건당 초과 요금이 부과됩니다 (플랜별 상이). PW 페르소나 초과 시에도 개당 초과 요금이 적용됩니다. Usage 페이지에서 실시간 사용량을 확인하고 알림을 설정하세요.",
       },
     ],
   },
@@ -134,7 +133,7 @@ const supportChannels = [
     description: "이메일로 문의하세요",
     icon: Mail,
     contact: "support@deepsight.ai",
-    responseTime: "24시간 이내",
+    responseTime: "플랜별 상이",
     available: true,
   },
   {
@@ -161,6 +160,42 @@ const supportChannels = [
     responseTime: "즉시 응답",
     available: false,
   },
+]
+
+// 6-Tier Support Response Times
+const supportTiers = [
+  { plan: "Starter", price: "$199", email: "48h", chat: "-", phone: "-", sla: "-" },
+  { plan: "Pro", price: "$499", email: "24h", chat: "영업시간", phone: "-", sla: "99.5%" },
+  { plan: "Max", price: "$1,499", email: "12h", chat: "24/7", phone: "-", sla: "99.9%" },
+  {
+    plan: "Ent. Starter",
+    price: "$3,500",
+    email: "4h",
+    chat: "24/7",
+    phone: "영업시간",
+    sla: "99.9%",
+  },
+  { plan: "Ent. Growth", price: "$5,000", email: "2h", chat: "24/7", phone: "24/7", sla: "99.95%" },
+  {
+    plan: "Ent. Scale",
+    price: "$15,000",
+    email: "1h",
+    chat: "24/7",
+    phone: "24/7 전담",
+    sla: "99.99%",
+  },
+]
+
+// Community Links
+const communityLinks = [
+  { name: "Discord", description: "실시간 커뮤니티 채팅", href: "https://discord.gg/deepsight" },
+  { name: "Forum", description: "기술 토론 및 Q&A", href: "https://community.deepsight.ai" },
+  {
+    name: "Newsletter",
+    description: "업데이트 소식 구독",
+    href: "https://deepsight.ai/newsletter",
+  },
+  { name: "Status Page", description: "서비스 상태 확인", href: "https://status.deepsight.ai" },
 ]
 
 const resources = [
@@ -195,6 +230,7 @@ export default function SupportPage() {
   const [ticketSubject, setTicketSubject] = React.useState("")
   const [ticketMessage, setTicketMessage] = React.useState("")
   const [ticketCategory, setTicketCategory] = React.useState("")
+  const [ticketPriority, setTicketPriority] = React.useState("")
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [submitted, setSubmitted] = React.useState(false)
 
@@ -206,6 +242,7 @@ export default function SupportPage() {
     setTicketSubject("")
     setTicketMessage("")
     setTicketCategory("")
+    setTicketPriority("")
   }
 
   const filteredFaqs = faqCategories
@@ -386,18 +423,31 @@ export default function SupportPage() {
                           <SelectItem value="billing">Billing Question</SelectItem>
                           <SelectItem value="account">Account Issue</SelectItem>
                           <SelectItem value="feature">Feature Request</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Subject</Label>
-                      <Input
-                        placeholder="Brief description of your issue"
-                        value={ticketSubject}
-                        onChange={(e) => setTicketSubject(e.target.value)}
-                      />
+                      <Label>Priority</Label>
+                      <Select value={ticketPriority} onValueChange={setTicketPriority}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select priority" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="urgent">Urgent</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Subject</Label>
+                    <Input
+                      placeholder="Brief description of your issue"
+                      value={ticketSubject}
+                      onChange={(e) => setTicketSubject(e.target.value)}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Message</Label>
@@ -426,6 +476,87 @@ export default function SupportPage() {
                   </Button>
                 </>
               )}
+            </CardContent>
+          </Card>
+
+          {/* 6-Tier Support Response Time Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Plan-based Support</CardTitle>
+              <CardDescription>플랜별 지원 채널 및 응답 시간</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="px-4 py-3 text-left font-medium">Plan</th>
+                      <th className="px-4 py-3 text-left font-medium">Price</th>
+                      <th className="px-4 py-3 text-left font-medium">Email</th>
+                      <th className="px-4 py-3 text-left font-medium">Chat</th>
+                      <th className="px-4 py-3 text-left font-medium">Phone</th>
+                      <th className="px-4 py-3 text-left font-medium">SLA</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {supportTiers.map((tier) => (
+                      <tr key={tier.plan} className="border-b last:border-0">
+                        <td className="px-4 py-3 font-medium">{tier.plan}</td>
+                        <td className="text-muted-foreground px-4 py-3">{tier.price}</td>
+                        <td className="px-4 py-3">{tier.email}</td>
+                        <td className="px-4 py-3">
+                          {tier.chat === "-" ? (
+                            <span className="text-muted-foreground">-</span>
+                          ) : (
+                            tier.chat
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {tier.phone === "-" ? (
+                            <span className="text-muted-foreground">-</span>
+                          ) : (
+                            tier.phone
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {tier.sla === "-" ? (
+                            <span className="text-muted-foreground">-</span>
+                          ) : (
+                            <Badge variant="outline">{tier.sla}</Badge>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Community Links */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Community</CardTitle>
+              <CardDescription>커뮤니티 채널에서 도움을 받으세요</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                {communityLinks.map((link) => (
+                  <a
+                    key={link.name}
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:border-primary/50 flex items-center gap-3 rounded-lg border p-4 transition-colors"
+                  >
+                    <div>
+                      <p className="font-medium">{link.name}</p>
+                      <p className="text-muted-foreground text-sm">{link.description}</p>
+                    </div>
+                    <ExternalLink className="text-muted-foreground ml-auto h-4 w-4" />
+                  </a>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
