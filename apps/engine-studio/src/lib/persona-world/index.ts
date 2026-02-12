@@ -109,6 +109,12 @@ export {
   recalculateRelationship,
   computeRelationshipUpdate,
   DEFAULT_RELATIONSHIP,
+  decideCommentTone,
+  generateComment,
+  applyExpress,
+  respondToUser,
+  computeAdaptDelta,
+  analyzeUserAttitudeSimple,
 } from "./interactions"
 export type {
   LikeDataProvider,
@@ -117,4 +123,11 @@ export type {
   FollowDecision,
   InteractionEvent,
   RelationshipDataProvider,
+  CommentLLMProvider,
+  CommentDataProvider,
+  CommentResult,
+  UserInteractionVector,
+  UserInteractionDataProvider,
+  UserInteractionLLMProvider,
+  UserInteractionResult,
 } from "./interactions"

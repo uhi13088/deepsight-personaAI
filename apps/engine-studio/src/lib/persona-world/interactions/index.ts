@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 // PersonaWorld v3 — Interactions Module
-// 좋아요 + 팔로우 + 관계 매니저 barrel export
+// 좋아요 + 팔로우 + 관계 + 댓글 + 유저 인터랙션
 // ═══════════════════════════════════════════════════════════════
 
 // ── Like Engine ──
@@ -25,3 +25,19 @@ export {
   DEFAULT_RELATIONSHIP,
 } from "./relationship-manager"
 export type { InteractionEvent, RelationshipDataProvider } from "./relationship-manager"
+
+// ── Comment Tone ──
+export { decideCommentTone } from "./comment-tone"
+
+// ── Comment Engine ──
+export { generateComment, applyExpress } from "./comment-engine"
+export type { CommentLLMProvider, CommentDataProvider, CommentResult } from "./comment-engine"
+
+// ── User Interaction ──
+export { respondToUser, computeAdaptDelta, analyzeUserAttitudeSimple } from "./user-interaction"
+export type {
+  UserInteractionVector,
+  UserInteractionDataProvider,
+  UserInteractionLLMProvider,
+  UserInteractionResult,
+} from "./user-interaction"
