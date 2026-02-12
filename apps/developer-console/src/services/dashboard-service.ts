@@ -1,5 +1,5 @@
 /**
- * Dashboard Service - 대시보드 통계 서비스
+ * Dashboard Service - 대시보드 통계 서비스 (v3)
  */
 
 import { apiClient, ApiError } from "./api-client"
@@ -7,6 +7,8 @@ import { apiClient, ApiError } from "./api-client"
 // ============================================================================
 // 타입 정의
 // ============================================================================
+
+export type DashboardPeriod = "today" | "yesterday" | "7d" | "30d"
 
 export interface DashboardStats {
   apiCalls: {
@@ -37,12 +39,21 @@ export interface DashboardStats {
     live: number
     test: number
   }
+  errorTop5: ErrorSummary[]
+}
+
+export interface ErrorSummary {
+  code: string
+  count: number
+  lastOccurred: string
+  endpoint: string
 }
 
 export interface RecentActivity {
   id: string
   timestamp: string
   endpoint: string
+  method: string
   status: number
   latency: number
   requestId: string
@@ -51,12 +62,14 @@ export interface RecentActivity {
 export interface UsageByDay {
   date: string
   calls: number
+  errors: number
 }
 
 export interface UsageByEndpoint {
   endpoint: string
   calls: number
   percentage: number
+  avgLatency: number
 }
 
 export interface DashboardData {
@@ -71,8 +84,8 @@ export interface DashboardData {
 // ============================================================================
 
 class DashboardService {
-  async getStats(): Promise<DashboardData> {
-    const response = await apiClient.get<DashboardData>("/dashboard/stats")
+  async getStats(period: DashboardPeriod = "7d"): Promise<DashboardData> {
+    const response = await apiClient.get<DashboardData>("/dashboard/stats", { period })
 
     if (!response.success || !response.data) {
       throw new ApiError({

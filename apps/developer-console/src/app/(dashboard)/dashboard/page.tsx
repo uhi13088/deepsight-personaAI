@@ -16,19 +16,13 @@ import {
   AlertCircle,
   ExternalLink,
   Loader2,
+  AlertTriangle,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn, formatNumber, formatCurrency, formatRelativeTime } from "@/lib/utils"
 import { toast } from "sonner"
 import {
@@ -37,38 +31,53 @@ import {
   type RecentActivity,
   type UsageByDay,
   type UsageByEndpoint,
+  type DashboardPeriod,
 } from "@/services/dashboard-service"
 
-const quickActions = [
+const QUICK_ACTIONS = [
   { title: "새 API Key 생성", href: "/api-keys/new", icon: Key },
   { title: "문서 보기", href: "/docs", icon: FileText },
   { title: "Playground 열기", href: "/playground", icon: Play },
 ]
 
+const PERIOD_OPTIONS: { value: DashboardPeriod; label: string }[] = [
+  { value: "today", label: "오늘" },
+  { value: "yesterday", label: "어제" },
+  { value: "7d", label: "최근 7일" },
+  { value: "30d", label: "최근 30일" },
+]
+
 export default function DashboardPage() {
   const [isLoading, setIsLoading] = React.useState(true)
+  const [period, setPeriod] = React.useState<DashboardPeriod>("7d")
   const [stats, setStats] = React.useState<DashboardStats | null>(null)
   const [recentLogs, setRecentLogs] = React.useState<RecentActivity[]>([])
   const [usageData, setUsageData] = React.useState<UsageByDay[]>([])
   const [usageByEndpoint, setUsageByEndpoint] = React.useState<UsageByEndpoint[]>([])
 
-  React.useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const data = await dashboardService.getStats()
-        setStats(data.stats)
-        setRecentLogs(data.recentActivity)
-        setUsageData(data.usageByDay)
-        setUsageByEndpoint(data.usageByEndpoint)
-      } catch (error) {
-        console.error("Failed to fetch dashboard data:", error)
-        toast.error("대시보드 데이터를 불러오는데 실패했습니다.")
-      } finally {
-        setIsLoading(false)
-      }
+  const fetchData = React.useCallback(async (selectedPeriod: DashboardPeriod) => {
+    try {
+      setIsLoading(true)
+      const data = await dashboardService.getStats(selectedPeriod)
+      setStats(data.stats)
+      setRecentLogs(data.recentActivity)
+      setUsageData(data.usageByDay)
+      setUsageByEndpoint(data.usageByEndpoint)
+    } catch (error) {
+      console.error("Failed to fetch dashboard data:", error)
+      toast.error("대시보드 데이터를 불러오는데 실패했습니다.")
+    } finally {
+      setIsLoading(false)
     }
-    fetchData()
   }, [])
+
+  React.useEffect(() => {
+    fetchData(period)
+  }, [period, fetchData])
+
+  const handlePeriodChange = (value: string) => {
+    setPeriod(value as DashboardPeriod)
+  }
 
   const userName = "Developer" // Replace with actual user name
 
@@ -84,7 +93,7 @@ export default function DashboardPage() {
     },
   }
 
-  if (isLoading) {
+  if (isLoading && !stats) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
@@ -94,7 +103,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Welcome Section */}
+      {/* Welcome Section + Period Filter */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">안녕하세요, {userName}님!</h1>
@@ -103,8 +112,8 @@ export default function DashboardPage() {
             {formatNumber(stats?.apiCalls.thisMonth ?? 0)} calls
           </p>
         </div>
-        <div className="flex gap-2">
-          {quickActions.map((action) => (
+        <div className="flex flex-wrap items-center gap-2">
+          {QUICK_ACTIONS.map((action) => (
             <Button key={action.href} variant="outline" asChild>
               <Link href={action.href} className="gap-2">
                 <action.icon className="h-4 w-4" />
@@ -114,6 +123,17 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
+
+      {/* Period Filter */}
+      <Tabs value={period} onValueChange={handlePeriodChange}>
+        <TabsList>
+          {PERIOD_OPTIONS.map((opt) => (
+            <TabsTrigger key={opt.value} value={opt.value}>
+              {opt.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
       {/* Metrics Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -127,20 +147,7 @@ export default function DashboardPage() {
             <div className="text-2xl font-bold">
               {formatNumber(dashboardMetrics.apiCalls.today)}
             </div>
-            <div className="text-muted-foreground flex items-center text-xs">
-              {dashboardMetrics.apiCalls.change > 0 ? (
-                <>
-                  <ArrowUpRight className="h-4 w-4 text-green-500" />
-                  <span className="text-green-500">+{dashboardMetrics.apiCalls.change}%</span>
-                </>
-              ) : (
-                <>
-                  <ArrowDownRight className="h-4 w-4 text-red-500" />
-                  <span className="text-red-500">{dashboardMetrics.apiCalls.change}%</span>
-                </>
-              )}
-              <span className="ml-1">from yesterday</span>
-            </div>
+            <ChangeIndicator value={dashboardMetrics.apiCalls.change} label="from yesterday" />
           </CardContent>
         </Card>
 
@@ -152,11 +159,11 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{dashboardMetrics.successRate.value}%</div>
-            <div className="text-muted-foreground flex items-center text-xs">
-              <ArrowUpRight className="h-4 w-4 text-green-500" />
-              <span className="text-green-500">+{dashboardMetrics.successRate.change}%</span>
-              <span className="ml-1">from last week</span>
-            </div>
+            <ChangeIndicator
+              value={dashboardMetrics.successRate.change}
+              label="from last week"
+              inverted={false}
+            />
           </CardContent>
         </Card>
 
@@ -168,11 +175,12 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{dashboardMetrics.latency.p95}ms</div>
-            <div className="text-muted-foreground flex items-center text-xs">
-              <ArrowDownRight className="h-4 w-4 text-green-500" />
-              <span className="text-green-500">{dashboardMetrics.latency.change}ms</span>
-              <span className="ml-1">improvement</span>
-            </div>
+            <ChangeIndicator
+              value={dashboardMetrics.latency.change}
+              label="improvement"
+              inverted
+              suffix="ms"
+            />
           </CardContent>
         </Card>
 
@@ -199,7 +207,9 @@ export default function DashboardPage() {
         {/* Usage Chart */}
         <Card className="lg:col-span-4">
           <CardHeader>
-            <CardTitle>API Usage (Last 7 Days)</CardTitle>
+            <CardTitle>
+              API Usage ({PERIOD_OPTIONS.find((o) => o.value === period)?.label})
+            </CardTitle>
             <CardDescription>Daily API call volume</CardDescription>
           </CardHeader>
           <CardContent>
@@ -207,15 +217,25 @@ export default function DashboardPage() {
               <div className="flex h-[200px] items-end gap-2">
                 {usageData.map((day, i) => {
                   const maxCalls = Math.max(...usageData.map((d) => d.calls))
-                  const heightPercent = (day.calls / maxCalls) * 100
+                  const heightPercent = maxCalls > 0 ? (day.calls / maxCalls) * 100 : 0
+                  const errorPercent =
+                    day.errors > 0 && day.calls > 0 ? (day.errors / day.calls) * 100 : 0
                   return (
                     <div key={i} className="flex flex-1 flex-col items-center gap-1">
                       <div
-                        className="bg-primary hover:bg-primary/80 w-full rounded-t transition-all"
+                        className="relative w-full"
                         style={{ height: `${heightPercent}%`, minHeight: "4px" }}
-                      />
+                      >
+                        <div className="bg-primary hover:bg-primary/80 h-full w-full rounded-t transition-all" />
+                        {errorPercent > 0 && (
+                          <div
+                            className="absolute bottom-0 left-0 w-full rounded-t bg-red-400/60"
+                            style={{ height: `${errorPercent}%` }}
+                          />
+                        )}
+                      </div>
                       <span className="text-muted-foreground text-xs">
-                        {day.date.split(" ")[1]}
+                        {day.date.includes(" ") ? day.date.split(" ")[1] : day.date.slice(-5)}
                       </span>
                     </div>
                   )
@@ -264,6 +284,9 @@ export default function DashboardPage() {
                       >
                         {log.status}
                       </Badge>
+                      <span className="text-muted-foreground font-mono text-xs uppercase">
+                        {log.method}
+                      </span>
                       <span className="text-muted-foreground max-w-[120px] truncate font-mono text-xs">
                         {log.endpoint.includes(" ") ? log.endpoint.split(" ")[1] : log.endpoint}
                       </span>
@@ -285,8 +308,39 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* API Keys and Usage Summary */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* Error Top 5 + API Keys + Usage by Endpoint */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Error Top 5 */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Error Top 5</CardTitle>
+            <CardDescription>Most frequent errors</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {stats?.errorTop5 && stats.errorTop5.length > 0 ? (
+              <div className="space-y-3">
+                {stats.errorTop5.map((err) => (
+                  <div key={err.code} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+                      <span className="font-mono text-xs">{err.code}</span>
+                    </div>
+                    <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                      <span>{err.count}회</span>
+                      <span className="max-w-[80px] truncate">{err.endpoint}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <CheckCircle className="text-muted-foreground/30 mx-auto mb-2 h-8 w-8" />
+                <p className="text-muted-foreground text-sm">에러가 없습니다</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Active API Keys */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -343,8 +397,8 @@ export default function DashboardPage() {
                 {usageByEndpoint.map((ep) => (
                   <div key={ep.endpoint} className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <code className="font-mono">{ep.endpoint}</code>
-                      <span className="text-muted-foreground">
+                      <code className="font-mono text-xs">{ep.endpoint}</code>
+                      <span className="text-muted-foreground text-xs">
                         {formatNumber(ep.calls)} ({ep.percentage}%)
                       </span>
                     </div>
@@ -374,7 +428,7 @@ export default function DashboardPage() {
           <CardContent>
             <p className="text-sm text-yellow-700 dark:text-yellow-300">
               You&apos;ve used {dashboardMetrics.cost.percentUsed}% of your monthly API call quota.
-              Consider upgrading to Pro for more calls.
+              Consider upgrading your plan for more calls.
             </p>
             <Button variant="outline" size="sm" className="mt-3" asChild>
               <Link href="/billing">View Plans</Link>
@@ -382,6 +436,38 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       )}
+    </div>
+  )
+}
+
+// ============================================================================
+// Subcomponent: ChangeIndicator
+// ============================================================================
+
+function ChangeIndicator({
+  value,
+  label,
+  inverted = false,
+  suffix = "%",
+}: {
+  value: number
+  label: string
+  inverted?: boolean
+  suffix?: string
+}) {
+  const isPositive = inverted ? value < 0 : value > 0
+  const Icon = value >= 0 ? ArrowUpRight : ArrowDownRight
+  const colorClass = isPositive ? "text-green-500" : "text-red-500"
+
+  return (
+    <div className="text-muted-foreground flex items-center text-xs">
+      <Icon className={cn("h-4 w-4", colorClass)} />
+      <span className={colorClass}>
+        {value > 0 ? "+" : ""}
+        {value}
+        {suffix}
+      </span>
+      <span className="ml-1">{label}</span>
     </div>
   )
 }
