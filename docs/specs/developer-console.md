@@ -68,6 +68,8 @@
 - 9.1 API 개요
 - 9.2 인증 방식
 - 9.3 엔드포인트 명세
+  - 9.3.10 GET /v1/users/{id}/consent ← **v3.3 신규**
+  - 9.3.11 POST /v1/users/{id}/consent ← **v3.3 신규**
 - 9.4 에러 코드
 
 ### 10\. Webhook 연동 (Webhook Integration) ← **v2.0 신규**
@@ -1963,123 +1965,198 @@ Authorization: Bearer sk_live_xxxxxxxxxxxxx
 
 ---
 
-### 9.3.5 GET /v1/users/{id}/profile
+### 9.3.5 GET /v1/users/{id}/profile ← **v3.3 전면 개편**
 
-사용자 프로필 및 벡터를 조회합니다.
-
-**Response:** ← **v3.0 벡터 필드 변경**
-
-{
-
-"success": true,
-
-"data": {
-
-"user\\\_id": "user\\\_12345",
-
-"archetype": "Balanced Explorer",
-
-"onboarding\\\_level": "STANDARD",
-
-"vector": {
-
-"depth": 0.6,
-
-"lens": 0.4,
-
-"stance": 0.4,
-
-"scope": 0.5,
-
-"taste": 0.6,
-
-"purpose": 0.5
-
-},
-
-"confidence\\\_scores": {
-
-"depth": 0.85,
-
-"lens": 0.72,
-
-"stance": 0.68,
-
-"scope": 0.90,
-
-"taste": 0.75,
-
-"purpose": 0.60
-
-},
-
-"feedback\\\_count": 45,
-
-"created\\\_at": "2026-01-01T00:00:00Z",
-
-"last\\\_active\\\_at": "2026-01-10T14:30:00Z"
-
-}
-
-}
-
----
-
-### 9.3.6 POST /v1/users/{id}/onboarding
-
-사용자 온보딩 응답을 제출합니다.
-
-**Request:**
-
-{
-
-"level": "QUICK | STANDARD | DEEP",
-
-"responses": \[
-
-{
-
-"question\\\_id": "q\\\_001",
-
-"answer": "A"
-
-},
-
-{
-
-"question\\\_id": "q\\\_002",
-
-"answer": 0.7
-
-}
-
-\]
-
-}
+사용자 프로필, 3-Layer 벡터, 교차축 패턴, 동의 상태, 프로필 품질을 조회합니다.
 
 **Response:**
 
+```json
 {
+  "success": true,
+  "data": {
+    "user_id": "user_12345",
+    "archetype": "Balanced Explorer",
+    "onboarding_level": "STANDARD",
+    "profile_quality": "ADVANCED",
 
-"success": true,
+    "vector": {
+      "l1_social": {
+        "depth": 0.6,
+        "lens": 0.4,
+        "stance": 0.4,
+        "scope": 0.5,
+        "taste": 0.6,
+        "purpose": 0.5,
+        "sociability": 0.65
+      },
+      "l2_temperament": {
+        "openness": 0.72,
+        "conscientiousness": 0.58,
+        "extraversion": 0.45,
+        "agreeableness": 0.63,
+        "neuroticism": 0.3
+      },
+      "has_l2": true
+    },
 
-"data": {
+    "confidence_scores": {
+      "l1": {
+        "depth": 0.85,
+        "lens": 0.72,
+        "stance": 0.68,
+        "scope": 0.9,
+        "taste": 0.75,
+        "purpose": 0.6,
+        "sociability": 0.55
+      },
+      "l2": {
+        "openness": 0.6,
+        "conscientiousness": 0.55,
+        "extraversion": 0.5,
+        "agreeableness": 0.58,
+        "neuroticism": 0.52
+      },
+      "overall": 0.67
+    },
 
-"user\\\_id": "user\\\_12345",
+    "cross_axes": {
+      "l1_l2": [
+        { "axis": "depth↔openness", "score": 0.15, "type": "reinforcing" },
+        { "axis": "stance↔agreeableness", "score": 0.72, "type": "paradox" },
+        { "axis": "sociability↔extraversion", "score": 0.35, "type": "modulating" }
+      ],
+      "extended_paradox_score": 0.45
+    },
 
-"archetype": "Analyst",
+    "consent": {
+      "data_collection": true,
+      "sns_analysis": true,
+      "third_party_sharing": false,
+      "marketing": false,
+      "last_updated": "2026-02-01T10:00:00Z"
+    },
 
-"vector\\\_updated": true,
-
-"recommended\\\_personas": \\\[
-
-{"persona\\\_id": "persona\\\_12345", "score": 95.0}
-
-\\\]
-
+    "data_sources": ["cold_start", "sns_instagram", "daily_check"],
+    "feedback_count": 45,
+    "daily_check_count": 32,
+    "precision_estimate": 0.78,
+    "created_at": "2026-01-01T00:00:00Z",
+    "last_active_at": "2026-01-10T14:30:00Z"
+  }
 }
+```
 
+**필드 설명:**
+
+| 필드                    | 타입    | 설명                                          |
+| :---------------------- | :------ | :-------------------------------------------- |
+| `profile_quality`       | enum    | `BASIC` / `STANDARD` / `ADVANCED` / `PREMIUM` |
+| `vector.l1_social`      | object  | L1 사회적 페르소나 7D 벡터 (0.0~1.0)          |
+| `vector.l2_temperament` | object  | L2 핵심 기질 5D (OCEAN). SNS 연동 시 채워짐   |
+| `vector.has_l2`         | boolean | L2 벡터 존재 여부                             |
+| `confidence_scores`     | object  | 축별 확신도 (0.0~1.0). `overall`은 가중 평균  |
+| `cross_axes`            | object  | 교차축 패턴 (L1↔L2 상위 3개) + 확장 역설 점수 |
+| `consent`               | object  | 동의 항목별 상태                              |
+| `precision_estimate`    | number  | 현재 추정 정밀도 (0.0~1.0)                    |
+
+**에러 응답:**
+
+| 조건                         | 코드 | 에러                                                                   |
+| :--------------------------- | :--- | :--------------------------------------------------------------------- |
+| 존재하지 않는 유저           | 404  | `NOT_FOUND: User not found`                                            |
+| 인증 실패                    | 401  | `UNAUTHORIZED`                                                         |
+| 동의 미취득 (제3자 공유 off) | 403  | `CONSENT_REQUIRED: User has not consented to third-party data sharing` |
+
+---
+
+### 9.3.6 POST /v1/users/{id}/onboarding ← **v3.3 개편**
+
+사용자 온보딩 응답을 제출합니다. v3.3부터 L1 7D + L2 5D 벡터 동시 측정을 지원합니다.
+
+**Request:**
+
+```json
+{
+  "level": "QUICK | STANDARD | DEEP",
+  "responses": [
+    {
+      "question_id": "q_001",
+      "answer": "A",
+      "target_dimensions": ["depth"]
+    },
+    {
+      "question_id": "q_002",
+      "answer": "B",
+      "target_dimensions": ["lens", "openness"]
+    },
+    {
+      "question_id": "q_030",
+      "answer": 0.7,
+      "target_dimensions": ["agreeableness"]
+    }
+  ],
+  "consent": {
+    "data_collection": true,
+    "sns_analysis": false
+  }
 }
+```
+
+**필드 설명:**
+
+| 필드                            | 타입             | 필수 | 설명                                                     |
+| :------------------------------ | :--------------- | :--- | :------------------------------------------------------- |
+| `level`                         | enum             | ✅   | `QUICK` (12문항) / `STANDARD` (30문항) / `DEEP` (60문항) |
+| `responses[].question_id`       | string           | ✅   | 질문 ID                                                  |
+| `responses[].answer`            | string \| number | ✅   | 강제 선택: `"A"` / `"B"`, 슬라이더: `0.0~1.0`            |
+| `responses[].target_dimensions` | string[]         | -    | 측정 대상 차원 (서버에서 자동 매핑하므로 선택 사항)      |
+| `consent`                       | object           | ✅   | 최소 `data_collection: true` 필수                        |
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "user_id": "user_12345",
+    "archetype": "Analyst",
+    "vector_updated": true,
+    "profile_quality": "STANDARD",
+    "vector": {
+      "l1_social": {
+        "depth": 0.72,
+        "lens": 0.35,
+        "stance": 0.55,
+        "scope": 0.6,
+        "taste": 0.48,
+        "purpose": 0.65,
+        "sociability": 0.5
+      },
+      "l2_temperament": null
+    },
+    "precision_estimate": 0.62,
+    "recommended_personas": [
+      { "persona_id": "persona_12345", "score": 95.0, "tier": "basic" },
+      { "persona_id": "persona_67890", "score": 87.5, "tier": "exploration" }
+    ],
+    "next_steps": {
+      "daily_check_available": true,
+      "sns_connection_suggested": true,
+      "suggested_sns": ["instagram", "spotify"]
+    }
+  }
+}
+```
+
+**에러 응답:**
+
+| 조건                      | 코드 | 에러                                                                   |
+| :------------------------ | :--- | :--------------------------------------------------------------------- |
+| 응답 수 부족 (level 대비) | 400  | `INVALID_FIELD: QUICK requires minimum 12 responses`                   |
+| 동의 미제출               | 400  | `MISSING_FIELD: consent.data_collection is required`                   |
+| 잘못된 question_id        | 400  | `INVALID_FIELD: question_id "q_999" not found`                         |
+| 중복 온보딩               | 409  | `CONFLICT: User already completed onboarding. Use daily check instead` |
 
 ---
 
@@ -2503,6 +2580,143 @@ curl -X POST https://api.deepsight.ai/v1/personas/filter \
 | 존재하지 않는 교차축 ID         | 400  | `INVALID_FIELD: crossAxis "invalid_axis" not found`         |
 | 인증 실패                       | 401  | `UNAUTHORIZED`                                              |
 | Rate Limit 초과                 | 429  | `RATE_LIMITED`                                              |
+
+---
+
+### 9.3.10 GET /v1/users/{id}/consent ← **v3.3 신규**
+
+사용자의 데이터 수집/활용 동의 상태를 조회합니다. GDPR/PIPA 준수를 위해 외부 플랫폼은 반드시 동의 상태를 확인한 후 유저 데이터에 접근해야 합니다.
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "user_id": "user_12345",
+    "consents": [
+      {
+        "type": "data_collection",
+        "label": "프로필 데이터 수집 및 분석",
+        "description": "콘텐츠 추천을 위한 성향 데이터 수집·분석에 동의합니다.",
+        "required": true,
+        "granted": true,
+        "granted_at": "2026-01-01T10:00:00Z",
+        "expires_at": null
+      },
+      {
+        "type": "sns_analysis",
+        "label": "SNS 연동 데이터 분석",
+        "description": "연동된 SNS 활동 데이터를 성향 분석에 활용하는 것에 동의합니다.",
+        "required": false,
+        "granted": true,
+        "granted_at": "2026-01-15T14:00:00Z",
+        "expires_at": "2027-01-15T14:00:00Z"
+      },
+      {
+        "type": "third_party_sharing",
+        "label": "제3자 데이터 제공",
+        "description": "파트너 플랫폼에 익명화된 성향 데이터를 제공하는 것에 동의합니다.",
+        "required": false,
+        "granted": false,
+        "granted_at": null,
+        "expires_at": null
+      },
+      {
+        "type": "marketing",
+        "label": "마케팅 활용",
+        "description": "맞춤형 콘텐츠 추천 및 프로모션 알림 수신에 동의합니다.",
+        "required": false,
+        "granted": false,
+        "granted_at": null,
+        "expires_at": null
+      }
+    ],
+    "consent_version": "v2.0",
+    "last_updated": "2026-01-15T14:00:00Z"
+  }
+}
+```
+
+**동의 항목 타입:**
+
+| type                  | 필수    | 설명                    | 미동의 시 영향                   |
+| :-------------------- | :------ | :---------------------- | :------------------------------- |
+| `data_collection`     | ✅ 필수 | 기본 성향 데이터 수집   | 서비스 이용 불가                 |
+| `sns_analysis`        | 선택    | SNS 연동 분석           | L2 벡터 미생성, 프로필 품질 제한 |
+| `third_party_sharing` | 선택    | 외부 플랫폼 데이터 제공 | 외부 API 프로필 조회 시 403      |
+| `marketing`           | 선택    | 마케팅 알림             | 프로모션 알림 미수신             |
+
+---
+
+### 9.3.11 POST /v1/users/{id}/consent ← **v3.3 신규**
+
+사용자의 동의 항목을 생성/변경합니다. 부분 업데이트를 지원하며, 전달된 항목만 변경됩니다.
+
+**Request:**
+
+```json
+{
+  "consents": [
+    {
+      "type": "sns_analysis",
+      "granted": true
+    },
+    {
+      "type": "third_party_sharing",
+      "granted": true
+    }
+  ],
+  "consent_version": "v2.0"
+}
+```
+
+**필드 설명:**
+
+| 필드                 | 타입    | 필수 | 설명                                     |
+| :------------------- | :------ | :--- | :--------------------------------------- |
+| `consents[].type`    | enum    | ✅   | 동의 항목 타입 (위 표 참조)              |
+| `consents[].granted` | boolean | ✅   | `true`: 동의, `false`: 철회              |
+| `consent_version`    | string  | ✅   | 동의 약관 버전 (최신 버전과 일치해야 함) |
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "user_id": "user_12345",
+    "updated": [
+      { "type": "sns_analysis", "granted": true, "granted_at": "2026-02-12T09:30:00Z" },
+      { "type": "third_party_sharing", "granted": true, "granted_at": "2026-02-12T09:30:00Z" }
+    ],
+    "consent_version": "v2.0",
+    "side_effects": {
+      "sns_analysis_enabled": true,
+      "l2_vector_generation_queued": true,
+      "profile_quality_upgrade": "STANDARD → ADVANCED"
+    }
+  }
+}
+```
+
+**동의 철회 시 처리:**
+
+| 항목 철회             | 즉시 조치                       | 유예 기간           |
+| :-------------------- | :------------------------------ | :------------------ |
+| `data_collection`     | 서비스 이용 중단, 매칭 비활성화 | 30일 후 데이터 삭제 |
+| `sns_analysis`        | SNS 연동 해제, L2 벡터 삭제     | 즉시                |
+| `third_party_sharing` | 외부 API 접근 차단              | 즉시                |
+| `marketing`           | 알림 수신 중단                  | 즉시                |
+
+**에러 응답:**
+
+| 조건                | 코드 | 에러                                                                                         |
+| :------------------ | :--- | :------------------------------------------------------------------------------------------- |
+| 잘못된 consent type | 400  | `INVALID_FIELD: consent type "unknown" is not valid`                                         |
+| 약관 버전 불일치    | 400  | `INVALID_FIELD: consent_version "v1.0" is outdated. Current: "v2.0"`                         |
+| 필수 동의 철회 시도 | 400  | `INVALID_REQUEST: data_collection cannot be revoked while active. Use DELETE /v1/users/{id}` |
+| 존재하지 않는 유저  | 404  | `NOT_FOUND: User not found`                                                                  |
 
 ---
 
