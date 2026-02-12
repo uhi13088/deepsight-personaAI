@@ -161,7 +161,7 @@ export function calculateStats(results: SingleContentTestResult[]): BatchTestSta
   // 감성 분포: dominant tone 기준
   let positive = 0
   let neutral = 0
-  let negative = 0
+  const negative = 0
 
   for (const r of results) {
     const tone = r.evaluation.toneAnalysis

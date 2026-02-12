@@ -67,7 +67,7 @@ export function designParadox(
   // 아키타입이 있으면 기대 역설 범위로 조정
   let adjustedL1 = { ...l1 }
   let adjustedL2 = { ...l2 }
-  let adjustedL3 = { ...l3 }
+  const adjustedL3 = { ...l3 }
 
   if (archetype) {
     const result = adjustForTension(adjustedL1, adjustedL2, archetype)

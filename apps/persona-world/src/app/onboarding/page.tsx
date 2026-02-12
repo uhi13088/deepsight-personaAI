@@ -63,6 +63,7 @@ export default function OnboardingPage() {
     completeOnboarding,
     resetCurrentPhase,
     profile,
+    setProfile,
   } = useUserStore()
 
   // 플로우 상태
@@ -151,7 +152,19 @@ export default function OnboardingPage() {
   const handlePhaseComplete = async () => {
     setLoading(true)
     try {
-      const userId = profile?.id ?? "anonymous"
+      // 프로필이 없으면 자동 생성 (온보딩이 프로필 생성 과정)
+      let userId = profile?.id
+      if (!userId) {
+        userId = crypto.randomUUID()
+        setProfile({
+          id: userId,
+          nickname: "관찰자",
+          vector: null,
+          vectorConfidence: null,
+          completedOnboarding: false,
+          createdAt: new Date().toISOString(),
+        })
+      }
       const answerPayload: OnboardingAnswer[] = Object.entries(answers).map(
         ([questionId, value]) => ({
           questionId,

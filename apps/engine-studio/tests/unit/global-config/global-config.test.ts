@@ -772,7 +772,7 @@ describe("AC3: API Endpoint Management", () => {
 
   describe("getHealthSummary", () => {
     it("counts endpoints by health status", () => {
-      let manager = createAPIEndpointManager()
+      const manager = createAPIEndpointManager()
       const { manager: m1, id: id1 } = registerAndGetId(manager, makeEndpoint({ path: "/a" }))
       const { manager: m2, id: id2 } = registerAndGetId(m1, makeEndpoint({ path: "/b" }))
       const { manager: m3, id: id3 } = registerAndGetId(m2, makeEndpoint({ path: "/c" }))
