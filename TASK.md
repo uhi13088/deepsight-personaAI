@@ -350,7 +350,7 @@
 
 ### 별도 작업 (설계 문서 + 데이터)
 
-- [ ] **T42: 매칭 설명 + 유저↔페르소나 일치도 시스템** (설계 문서)
+- [x] **T42: 매칭 설명 + 유저↔페르소나 일치도 시스템** (설계 문서) ✅ T57+T58에서 구현 완료
   - 배경: 유저가 "왜 이 페르소나가 나와 맞는지" 이해할 수 있어야 함. 숫자가 아닌 자연어 설명 필수
   - AC1: `docs/design/persona-engine-v3.md` — 매칭 설명 시스템 섹션 신설
     - 유저↔페르소나 일치도 계산 공식 (차원별 %, 종합 %)
@@ -362,7 +362,7 @@
     - "왜 추천했는지" 상세 뷰 (교차축 하이라이트, 역설 호환성)
   - AC3: 커밋 + 푸시
 
-- [ ] **T43: 개발자 콘솔 유저 프로필 API v3 + 동의 관리** (설계 문서)
+- [x] **T43: 개발자 콘솔 유저 프로필 API v3 + 동의 관리** (설계 문서) ✅
   - 배경: 유저 프로파일 데이터를 외부 플랫폼에 안전하게 공유. GDPR/개인정보 동의 필수
   - AC1: `docs/specs/developer-console.md` §9 — 유저 프로필 API v3 확장
     - GET /v1/users/{id}/profile v3 (L1+L2 벡터, 교차축, 동의 상태, 프로필 품질)
@@ -382,15 +382,76 @@
     - 역설 심화 18문항 (역설 패턴 6종 × 3문항)
   - AC2: 커밋 + 푸시
 
+### Phase D: 엔진 스튜디오 대시보드 UI 구축 (T96~T99)
+
+> lib/ 비즈니스 로직(T56~T67)은 완료. 12개 placeholder 페이지에 실제 UI 연결.
+> 패턴: Header + 탭/카드 레이아웃 + lib 함수 호출 + shadcn/ui 컴포넌트.
+
+- [x] **T96** → DONE ✅ 2026-02-12
+
+- [ ] **T97: Matching Lab 3페이지 UI — Simulator + Tuning + Analytics**
+  - 배경: lib/matching/ 10파일 완성 (T57, T58). stub 페이지 3개를 실제 연구소 UI로 전환
+  - AC1: Matching Simulator — 유저 벡터 입력 (수동/랜덤), 3-Tier 매칭 실행, 결과 카드 (점수+순위+XAI 설명), 배치 시뮬레이션 통계
+  - AC2: Algorithm Tuning — 6종 하이퍼파라미터 슬라이더, 6장르 가중치 테이블, Grid Search/Bayesian 자동 튜닝 실행, A/B 테스트 관리
+  - AC3: Performance Analytics — KPI 대시보드 (CTR/만족도/다양성), Shannon entropy 다양성 지수, 트렌드 차트, 이상 탐지 알림, 리포트 생성/CSV 내보내기
+  - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/matching-lab/\*)
+  - AC5: 테스트 + Build PASS
+
+- [ ] **T98: System Integration 3페이지 UI — Deployment + Versions + Event Bus**
+  - 배경: lib/system-integration/ 완성 (T66, ~2400줄). stub 페이지 3개를 실제 관리 UI로 전환
+  - AC1: Deployment Pipeline — 환경 3종 (DEV/STG/PROD) 상태 카드, 배포 워크플로우 타임라인 (build→test→deploy→verify), Canary Release 진행 게이지 (10%→50%→100%), 롤백 트리거 설정
+  - AC2: Version Control — 알고리즘 버전 목록 테이블 (상태 뱃지), 시맨틱 버전 범프 (Major/Minor/Patch), 버전 Diff 비교 뷰, 롤백 영향도 분석 + 실행
+  - AC3: Event Bus Monitor — 실시간 이벤트 로그 테이블 (타입/소스/상태 필터), 이벤트 통계 (delivered/failed/pending), 구독 관리, Sync Delay 리포트
+  - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/system-integration/\*)
+  - AC5: 테스트 + Build PASS
+
+- [ ] **T99: Operations 3페이지 UI — Monitoring + Incidents + Backup**
+  - 배경: lib/operations/ 완성 (T67, ~1600줄). stub 페이지 3개를 실제 운영 UI로 전환
+  - AC1: System Monitoring — 실시간 메트릭 카드 6종 (CPU/Memory/Disk/Network/API Latency/Error Rate), 임계값 알림 목록 (severity 컬러), 로그 검색 (레벨/소스/시간 필터), 대시보드 패널 레이아웃
+  - AC2: Incident Management — 장애 목록 테이블 (P0~P3 severity 뱃지), 장애 생성/삼분류, 타임라인 워크플로우 (Declared→In Progress→Resolved→Closed), Post-mortem 작성 폼, MTTR 통계
+  - AC3: Backup & Recovery — 백업 정책 3종 카드 (Full/Incremental/Differential), 백업 이력 테이블 (상태/크기/소요시간), DR 계획 관리, DR Drill 스케줄/결과, 용량 예측 차트 + 비용 최적화 권고
+  - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/operations/\*)
+  - AC5: 테스트 + Build PASS
+
+- [ ] **T100: Global Config 3페이지 UI — Model Settings + Safety Filters + API Endpoints**
+  - 배경: lib/global-config/ 완성 (T68, ~1800줄). stub 페이지 3개를 실제 설정 UI로 전환
+  - AC1: Model Settings — LLM 모델 선택 카드 (GPT-4/Claude/Gemini 등), 모델별 비용 테이블, 일/월 예산 설정 슬라이더, 사용량 대시보드 (소비/잔여), 모델 라우팅 규칙 설정
+  - AC2: Safety Filters — 필터 규칙 CRUD 테이블 (카테고리/심각도/활성 토글), 금지어 관리 (추가/삭제/일괄 업로드), 필터 로그 목록 (차단 이력+통계), 필터 테스트 시뮬레이터
+  - AC3: API Endpoints — 엔드포인트 등록/수정 테이블 (URL/메서드/Rate Limit), 헬스체크 상태 카드 (UP/DOWN/DEGRADED), Rate Limit 설정 (RPM/일일 상한), 헬스 요약 대시보드
+  - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/global-config/\*)
+  - AC5: 테스트 + Build PASS
+
+- [ ] **T101: Team & Access 3페이지 UI — Users + Roles + Audit Logs**
+  - 배경: lib/team/ 완성 (T69, ~1200줄). stub 페이지 3개를 실제 팀 관리 UI로 전환
+  - AC1: Users — 팀 멤버 목록 테이블 (이름/이메일/역할/상태 뱃지), 멤버 초대 모달 (이메일+역할 선택), 멤버 비활성화/재활성화 토글, 멤버 역할 변경 드롭다운
+  - AC2: Roles — 역할 4종 카드 (Admin/AI Engineer/Content Manager/Analyst), 권한 매트릭스 테이블 (리소스×액션 체크박스), 커스텀 역할 생성/수정, 역할별 멤버 수 표시
+  - AC3: Audit Logs — 감사 로그 테이블 (시간/사용자/액션/리소스/결과), 필터 (사용자/액션 타입/날짜 범위), 로그 상세 보기 모달 (before/after diff), CSV 내보내기
+  - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/team/\*)
+  - AC5: 테스트 + Build PASS
+
+- [ ] **T102: 테마 토글 (Light/Dark) — LNB 하단 테마 전환 버튼**
+  - 배경: 엔진 스튜디오 전역 테마 지원. 다크 테마는 순수 블랙(#000) 아닌 다크 그레이 톤 (Claude 스타일)
+  - AC1: ThemeProvider (next-themes) + globals.css CSS 변수 — light/dark 두 세트 정의, dark 배경 #1a1a2e~#2d2d3f 계열 (Claude 참고)
+  - AC2: LNB 좌측 하단 테마 토글 버튼 (Sun/Moon 아이콘, 툴팁, 부드러운 전환 애니메이션)
+  - AC3: 모든 기존 컴포넌트 다크 모드 호환 확인 (shadcn/ui 기본 지원 + 커스텀 컴포넌트 CSS 변수 적용)
+  - AC4: localStorage 기반 테마 유지 + system preference 감지 (prefers-color-scheme)
+  - AC5: 테스트 + Build PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
 
-(없음 — T74 완료)
+(없음)
 
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T96: User Insight 3페이지 UI — Cold Start + Psychometric + Archetype** ✅ 2026-02-12
+  - AC1: ✅ Cold Start Strategy — 3모드 탭 (Quick/Standard/Deep), 질문 CRUD 테이블, 차원별 커버리지, 검증 상태
+  - AC2: ✅ Psychometric Model — OCEAN→L1 매핑 테이블 (5×7 컬러 인코딩), L2→L1 예측기, 반전 탐지 (Δ≥0.25), 잠재 특성 3유형 카드
+  - AC3: ✅ Archetype Manager — 10종 아키타입 카드 (7D 벡터 바+임계값), 커스텀 CRUD, 분류 테스터 (1차/2차+순위), 통계
+  - AC5: ✅ Build PASS + 1388 테스트 PASS
 
 - [x] **T95: 전체 페이지 SEO 메타데이터 v3 통일** ✅ 2026-02-12
   - AC1~AC8: ✅ 전 페이지 metadata 6D 잔재 0건 확인 (layout/features/products/about/blog)
