@@ -173,14 +173,14 @@
   - AC7: ✅ editor-toolbar.tsx + editor-status-bar.tsx — 프리셋 4종 + flow-presets.ts
   - AC8: ✅ 전체 696개 테스트 PASS + Build PASS
 
-- [ ] **T61: 노드 에디터 — 실행 엔진 + 제어 흐름**
+- [x] **T61: 노드 에디터 — 실행 엔진 + 제어 흐름** ✅
   - 배경: 구현계획서 Phase 8 실행부 + §14.8~§14.9
-  - AC1: 22노드 execute() 디스패처 + 실행 함수
-  - AC2: LLM 호출 어댑터 (프롬프트 템플릿, 모델 라우팅)
-  - AC3: Control Flow 3종 (Conditional/Switch/Merge)
-  - AC4: 분기 실행 엔진 (활성 엣지 추적, ExecutionPath, 비활성 경로 스킵)
-  - AC5: 플로우 프리셋 4종 (기본/고급/탐색/커스텀)
-  - AC6: 단위 테스트 + 커밋 + 푸시
+  - AC1: ✅ node-executor.ts — 25노드 execute() 디스패처 (Input 5 + Engine 4 + CF 3 + Gen 7 + Assembly 2 + Output 4)
+  - AC2: ✅ llm-adapter.ts — LLM 인터페이스, 7노드 프롬프트 템플릿, 모델 라우팅 (sonnet/haiku)
+  - AC3: ✅ control-flow.ts — Conditional (threshold/range/enum/exists), Switch (band/enum-match), Merge (first-active/combine)
+  - AC4: ✅ execution-engine.ts — executeGraph/executeFromNode, ExecutionPath 로깅, 활성 엣지 추적, 비활성 경로 스킵
+  - AC5: ✅ 플로우 프리셋 4종 (T60에서 구현 완료)
+  - AC6: ✅ 전체 766개 테스트 PASS (T61: 70개 추가) + Build PASS
 
 ### Phase C: 이후 확장 (T62~T71)
 
