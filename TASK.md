@@ -343,7 +343,7 @@
 > API 라우트: `apps/engine-studio/src/app/api/persona-world/`
 > 원칙: No Mock Data, No Hardcoding, Real Data Only, Feedback Loop
 
-- [ ] **T103: PW-Phase 0 기반 인프라 — DB 스키마 + 타입 + 상수**
+- [x] **T103: PW-Phase 0 기반 인프라 — DB 스키마 + 타입 + 상수** ✅
   - 배경: 구현계획서 §2~3. PW 전체 데이터 모델과 타입 시스템의 기반
   - AC1: PersonaState 모델 (mood/energy/socialBattery/paradoxTension, Decimal(3,2), Persona 1:1) [PW-0-2]
   - AC2: PersonaRelationship 모델 (warmth/tension/frequency/depth, unique(A,B), Persona 양방향) [PW-0-3]
