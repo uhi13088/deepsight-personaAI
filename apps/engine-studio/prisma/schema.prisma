@@ -202,6 +202,12 @@ model Persona {
   following       PersonaFollow[] @relation("PersonaFollowing")
   followers       PersonaFollow[] @relation("PersonaFollowers")
 
+  // PersonaWorld v3
+  personaState        PersonaState?
+  relationshipsAsA    PersonaRelationship[] @relation("RelationshipA")
+  relationshipsAsB    PersonaRelationship[] @relation("RelationshipB")
+  consumptionLogs     ConsumptionLog[]
+
   @@map("personas")
 }
 
@@ -1247,6 +1253,17 @@ model PersonaWorldUser {
   taste           Decimal?        @db.Decimal(3, 2)
   purpose         Decimal?        @db.Decimal(3, 2)
 
+  // === v3: L2 OCEAN (선택 수집) ===
+  openness          Decimal?        @db.Decimal(3, 2)
+  conscientiousness Decimal?        @db.Decimal(3, 2)
+  extraversion      Decimal?        @db.Decimal(3, 2)
+  agreeableness     Decimal?        @db.Decimal(3, 2)
+  neuroticism       Decimal?        @db.Decimal(3, 2)
+  hasOceanProfile   Boolean         @default(false)
+
+  // === v3: 프로필 품질 레벨 ===
+  profileLevel    String          @default("BASIC") @map("profile_level") // BASIC | STANDARD | ADVANCED | PREMIUM
+
   // === 프로필 품질 ===
   profileQuality  ProfileQuality  @default(BASIC)
   confidenceScore Decimal?        @db.Decimal(3, 2)
@@ -1391,6 +1408,11 @@ model PersonaActivityLog {
   metadata        Json?            // 활동 상세 데이터
   trigger         ActivityTrigger
 
+  // v3 신규 필드
+  postTypeReason  Json?            // 포스트 타입 선택 경위 (벡터값, 친화도 점수, 상태 보정)
+  stateSnapshot   Json?            // PersonaState 스냅샷 (mood, energy, socialBattery, paradoxTension)
+  matchingScore   Decimal?         @db.Decimal(4, 3) @map("matching_score") // 매칭 기반 활동인 경우 점수
+
   createdAt       DateTime         @default(now())
 
   @@index([personaId, createdAt])
@@ -1407,6 +1429,86 @@ enum PersonaActivityType {
   PERSONA_UNFOLLOWED
   DEBATE_STARTED
   COLLAB_STARTED
+}
+
+// ============================================
+// PersonaWorld v3 — 동적 상태 + 관계 + 소비 기록
+// ============================================
+
+model PersonaState {
+  id              String   @id @default(cuid())
+  personaId       String   @unique
+  persona         Persona  @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  mood            Decimal  @db.Decimal(3, 2) @default(0.50)  // 0.00~1.00
+  energy          Decimal  @db.Decimal(3, 2) @default(1.00)  // 0.00~1.00
+  socialBattery   Decimal  @db.Decimal(3, 2) @default(1.00)  // 0.00~1.00
+  paradoxTension  Decimal  @db.Decimal(3, 2) @default(0.00)  // 0.00~1.00
+
+  updatedAt       DateTime @updatedAt
+
+  @@map("persona_states")
+}
+
+model PersonaRelationship {
+  id              String   @id @default(cuid())
+  personaAId      String
+  personaBId      String
+  personaA        Persona  @relation("RelationshipA", fields: [personaAId], references: [id], onDelete: Cascade)
+  personaB        Persona  @relation("RelationshipB", fields: [personaBId], references: [id], onDelete: Cascade)
+
+  warmth          Decimal  @db.Decimal(3, 2) @default(0.50)  // 0.00~1.00
+  tension         Decimal  @db.Decimal(3, 2) @default(0.00)  // 0.00~1.00
+  frequency       Decimal  @db.Decimal(3, 2) @default(0.00)  // 주간 인터랙션 정규화
+  depth           Decimal  @db.Decimal(3, 2) @default(0.00)  // 답글 체인 길이 평균
+
+  lastInteractionAt DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([personaAId, personaBId])
+  @@index([personaAId])
+  @@index([personaBId])
+  @@map("persona_relationships")
+}
+
+model ConsumptionLog {
+  id              String                 @id @default(cuid())
+  personaId       String
+  contentType     ConsumptionContentType
+  contentId       String?                // 외부 컨텐츠 ID (있으면)
+  title           String                 // "기묘한 이야기 시즌 3"
+  impression      String                 // LLM 생성 한줄 감상 (~50자)
+  rating          Decimal?               @db.Decimal(3, 2)  // 0.00~1.00 내부 평가
+  emotionalImpact Decimal                @db.Decimal(3, 2)  // PersonaState 변화량
+  tags            String[]               // 자동 태깅 ["SF", "호러", "Netflix"]
+  source          ConsumptionSource
+  consumedAt      DateTime               @default(now())
+  createdAt       DateTime               @default(now())
+
+  persona         Persona                @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  @@index([personaId, consumedAt])
+  @@index([personaId, tags])
+  @@map("consumption_logs")
+}
+
+enum ConsumptionContentType {
+  MOVIE
+  DRAMA
+  MUSIC
+  BOOK
+  ARTICLE
+  GAME
+  OTHER
+}
+
+enum ConsumptionSource {
+  AUTONOMOUS     // 스케줄러가 결정한 자율 소비
+  FEED           // 피드에서 다른 페르소나의 리뷰를 보고 소비
+  RECOMMENDATION // 매칭 추천으로 소비
+  ONBOARDING     // 온보딩 시 "좋아하는 컨텐츠" 입력
 }
 
 // ============================================
