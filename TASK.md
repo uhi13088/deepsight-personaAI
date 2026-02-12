@@ -109,13 +109,13 @@
   - AC4: ✅ 프롬프트 빌더 v3 (5종 프롬프트 생성, 벡터 기반 가이드, 프리셋 4종)
   - AC5: ✅ 테스트 49개 PASS (전체 296개) + Build PASS
 
-- [ ] **T54: 페르소나 검증 + 품질 측정**
+- [x] **T54: 페르소나 검증 + 품질 측정** ✅
   - 배경: 스펙 §3.4 + 구현계획서 Phase 2/9. 품질 게이트
-  - AC1: Auto-Interview 프로토콜 (20문항, L1 7+L2 5+L3 4+역설 4)
-  - AC2: Persona Integrity Score (CR 0.35 + SC 0.35 + CS 0.30)
-  - AC3: Quality Score 대시보드 (Pass/Warning/Fail 상태, 차원별 점수)
-  - AC4: 수동 검증 워크플로우 (리뷰어 지정, 승인/반려)
-  - AC5: 테스트 + 커밋 + 푸시
+  - AC1: ✅ Auto-Interview 프로토콜 (20문항, L1 7+L2 5+L3 4+역설 4, 규칙기반 스코어링)
+  - AC2: ✅ Persona Integrity Score (CR 0.35 + SC 0.35 + CS 0.30, A~F 등급, 레이어별 분석)
+  - AC3: ✅ Quality Score (vectorBalance 30% + promptCompleteness 30% + interviewResult 30% + coherence 10%, 추천 사항)
+  - AC4: ✅ 수동 검증 워크플로우 (리뷰어 지정, 11개 체크리스트 4카테고리, 승인/반려/수정요청)
+  - AC5: ✅ 테스트 70개 PASS (전체 366개) + Build PASS
 
 - [ ] **T55: 페르소나 테스트 + A/B 테스트 + 성과 모니터링**
   - 배경: 스펙 §3.5 + §3.7. 실제 콘텐츠 테스트 및 성과 추적
