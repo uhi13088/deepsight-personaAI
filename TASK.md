@@ -197,15 +197,15 @@
   - AC7: 인큐베이터 대시보드 + 모니터링 ✅ `dashboard.ts`
   - AC8: 테스트 (40 tests PASS) + 빌드 PASS + 커밋
 
-- [ ] **T63: 컬러지문 데이터 엔진 — CIELAB+OKLCH 인코딩**
+- [x] **T63: 컬러지문 데이터 엔진 — CIELAB+OKLCH 인코딩** ✅
   - 배경: 구현계획서 Phase 6. 페르소나 고유 시각 식별자
-  - AC1: 색상 공간 변환 (CIELAB↔OKLCH↔sRGB)
-  - AC2: 색상 인코더 (릿지별 할당, ΔE00 차이)
-  - AC3: 릿지 생성기 (패턴/코어/델타/곡률)
-  - AC4: 유일성 엔진 (결정적 PRNG)
-  - AC5: 충돌 검사기 (pHash/SSIM/커브/히스토그램)
-  - AC6: 정규 SVG 렌더러
-  - AC7: 단위 테스트 + 커밋 + 푸시
+  - AC1: 색상 공간 변환 (CIELAB↔OKLCH↔sRGB) ✅ `color-space.ts`
+  - AC2: 색상 인코더 (릿지별 할당, ΔE00 차이) ✅ `color-encoder.ts`
+  - AC3: 릿지 생성기 (패턴/코어/델타/곡률) ✅ `ridge-generator.ts`
+  - AC4: 유일성 엔진 (결정적 PRNG) ✅ `uniqueness-engine.ts`
+  - AC5: 충돌 검사기 (pHash/SSIM/커브/히스토그램) ✅ `collision-checker.ts`
+  - AC6: 정규 SVG 렌더러 ✅ `svg-renderer.ts`
+  - AC7: 단위 테스트 (69 tests PASS) + 빌드 PASS + 커밋
 
 - [ ] **T64: 컬러지문 UI — TraitColor/PingerPrint v3**
   - 배경: 구현계획서 Phase 7. 멀티레이어 시각화
