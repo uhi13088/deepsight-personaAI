@@ -18,12 +18,13 @@ import {
   BarChart3,
   Fingerprint,
   Activity,
+  Combine,
 } from "lucide-react"
 
 export const metadata: Metadata = {
   title: "소비자 취향 분석 — Features",
   description:
-    "3-Layer 16D 벡터 프로파일링, SNS 행동 데이터 분석, 3-Phase 24문항 온보딩으로 매칭 정확도를 지속 향상합니다.",
+    "3-Layer 벡터 프로파일링, SNS 행동 데이터 분석, 3-Phase 24문항 온보딩으로 매칭 정확도를 지속 향상합니다.",
 }
 
 const VECTOR_DIMENSIONS = [
@@ -220,9 +221,9 @@ export default function TasteAnalysisPage() {
             소비자 <span className="ds-text-gradient">취향 분석</span>
           </h1>
           <p className="max-w-2xl text-lg text-gray-600">
-            3-Layer 벡터 시스템으로 사용자의 콘텐츠 소비 성향을 L1(7D) · L2(5D) · L3(4D) 총
-            16차원으로 심층 분석합니다. 3-Phase 24문항 온보딩, SNS 행동 데이터, 누적 피드백을
-            결합하여 사용할수록 정확해지는 프로필을 만듭니다.
+            3-Layer 벡터 시스템으로 사용자의 콘텐츠 소비 성향을 가면(L1) · 본성(L2) · 욕망(L3) 세
+            겹으로 심층 분석합니다. 3-Phase 24문항 온보딩, SNS 행동 데이터, 누적 피드백을 결합하여
+            사용할수록 정확해지는 프로필을 만듭니다.
           </p>
         </div>
       </section>
@@ -457,6 +458,102 @@ export default function TasteAnalysisPage() {
                   <p className="text-xs text-gray-400">{item.source}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Quantitative × Qualitative Fusion */}
+      <section className="py-24">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="mb-16 text-center">
+            <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
+              QUANTITATIVE &times; QUALITATIVE
+            </div>
+            <h2 className="text-3xl font-bold text-gray-900">
+              숫자 너머의 페르소나 — 정량 &times; 정성 융합
+            </h2>
+            <p className="mt-4 text-gray-600">
+              3-Layer 벡터는 시작점일 뿐입니다. DeepSight는 정량 데이터를 정성적 페르소나
+              <br />
+              요소와 연결하여 숫자로는 담을 수 없는 &lsquo;사람다움&rsquo;까지 프로파일링합니다.
+            </p>
+          </div>
+
+          <div className="grid gap-8 md:grid-cols-2">
+            {/* Onboarding → Qualitative Inference */}
+            <div className="rounded-2xl border border-gray-200 bg-white p-8 transition-all hover:shadow-lg">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#667eea] to-[#f093fb]">
+                  <Combine className="h-6 w-6 text-white" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">온보딩에서 정성 신호 포착</h3>
+              </div>
+              <p className="mb-4 text-sm text-gray-600">
+                3-Phase 24문항은 벡터값만 측정하는 것이 아닙니다. 응답 패턴과 선택의 맥락에서 Voice
+                Profile(표현 스타일)과 Backstory(서사적 기원) 추론을 위한 행동 신호를 함께
+                수집합니다.
+              </p>
+              <ul className="space-y-2">
+                {[
+                  "선택 패턴에서 감정 레지스터와 문체 경향 추론",
+                  "시나리오 반응으로 Hidden Desire, Trauma Trigger 단서 포착",
+                  "Phase별 태도 변화로 압박 역학(Pressure Dynamics) 기초 데이터 확보",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2 text-sm text-gray-600">
+                    <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* SNS → Qualitative Signals */}
+            <div className="rounded-2xl border border-gray-200 bg-white p-8 transition-all hover:shadow-lg">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[#667eea] to-[#f093fb]">
+                  <Share2 className="h-6 w-6 text-white" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">SNS 데이터의 이중 역할</h3>
+              </div>
+              <p className="mb-4 text-sm text-gray-600">
+                SNS 행동 데이터는 3-Layer 벡터 산출과 동시에 정성적 신호원으로도 활용됩니다.
+                게시글의 표현 방식, 문화적 소비 패턴, 세대적 코드에서 페르소나의 고유한 목소리와
+                시대정신(Zeitgeist)을 읽어냅니다.
+              </p>
+              <ul className="space-y-2">
+                {[
+                  "게시글 문체 분석 → Voice Profile의 few-shot anchor 생성",
+                  "문화적 취향 패턴 → Zeitgeist(세대 코드, 문화자본) 매핑",
+                  "인터랙션 스타일 → 감정 레지스터 및 표현 강도 추론",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2 text-sm text-gray-600">
+                    <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-500" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Init Algorithm Callout */}
+          <div className="mt-8 rounded-2xl border border-purple-100 bg-purple-50/50 p-8">
+            <div className="flex items-start gap-4">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-purple-100">
+                <Layers className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <h4 className="mb-2 font-bold text-gray-900">
+                  Init 알고리즘 — 프로파일링에서 페르소나로
+                </h4>
+                <p className="text-sm text-gray-600">
+                  수집된 정량 벡터와 정성 신호는{" "}
+                  <span className="font-semibold text-purple-700">Init 알고리즘</span>을 통해
+                  페르소나의 초기 상태로 변환됩니다. Backstory 키워드가 벡터 매핑 테이블을 거쳐
+                  init_delta(최대 &plusmn;0.4)를 생성하고, 이를 통해 동일한 벡터값이라도 서로 다른
+                  서사를 가진 고유한 페르소나가 탄생합니다.
+                </p>
+              </div>
             </div>
           </div>
         </div>

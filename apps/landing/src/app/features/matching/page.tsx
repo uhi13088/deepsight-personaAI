@@ -13,6 +13,10 @@ import {
   Zap,
   Shield,
   Eye,
+  AudioWaveform,
+  BookOpen,
+  Gauge,
+  Ratio,
 } from "lucide-react"
 
 export const metadata: Metadata = {
@@ -49,10 +53,10 @@ const PIPELINE_STEPS = [
   {
     step: "04",
     icon: GitBranch,
-    title: "추천 생성",
+    title: "정성적 보정 + 추천 생성",
     description:
-      "매칭된 페르소나가 자신의 관점에서 콘텐츠를 평가하고, 3-Tier 매칭 근거와 함께 추천 이유를 설명하는 추천을 생성합니다.",
-    output: "추천 + 3-Tier 설명",
+      "3-Tier 매칭 점수에 정성적 보정(voice_match, narrative_match)을 적용한 최종 점수로 피드를 구성하고, 매칭 근거와 함께 추천 이유를 설명합니다.",
+    output: "추천 + 매칭 근거 (정량+정성)",
   },
 ]
 
@@ -80,6 +84,54 @@ const BONUS_FACTORS = [
     description: "따뜻한/냉철한 표현 스타일 선호도 반영",
     weight: "+0.02",
     type: "선택적",
+  },
+]
+
+const QUALITATIVE_FACTORS = [
+  {
+    icon: AudioWaveform,
+    title: "Voice Similarity",
+    description:
+      "벡터 유사도를 넘어, 페르소나가 자신을 표현하는 방식(톤, 어휘, 문체)과 사용자 선호 표현 스타일을 임베딩 기반으로 비교합니다.",
+    detail: "voice_match 기여: ×0.05",
+    color: "from-indigo-500 to-blue-500",
+  },
+  {
+    icon: BookOpen,
+    title: "Narrative Compatibility",
+    description:
+      "L3 Narrative Drive의 서사 아크(story arc)가 사용자의 내러티브 욕구와 얼마나 공명하는지 측정합니다. 단순 벡터 거리가 아닌 서사적 호환성을 평가합니다.",
+    detail: "narrative_match 기여: ×0.05",
+    color: "from-purple-500 to-pink-500",
+  },
+  {
+    icon: Gauge,
+    title: "Pressure Response Compatibility",
+    description:
+      "페르소나의 압력 역학(pressure dynamics)이 사용자의 인터랙션 스타일과 어떻게 보완되는지 분석합니다. 높은 Volatility 페르소나와 안정적 사용자의 보완적 매칭 등을 감지합니다.",
+    detail: "Exploration Tier에 반영",
+    color: "from-amber-500 to-orange-500",
+  },
+]
+
+const FEED_MIX_SEGMENTS = [
+  {
+    label: "팔로우 기반",
+    percentage: 60,
+    color: "bg-purple-500",
+    description: "사용자가 직접 팔로우한 페르소나의 추천",
+  },
+  {
+    label: "유사도 기반",
+    percentage: 30,
+    color: "bg-blue-500",
+    description: "3-Tier 매칭 + 정성적 보정 점수 기반 추천",
+  },
+  {
+    label: "트렌딩",
+    percentage: 10,
+    color: "bg-pink-500",
+    description: "전체 플랫폼에서 주목받는 콘텐츠/페르소나",
   },
 ]
 
@@ -260,6 +312,105 @@ export default function MatchingPage() {
         </div>
       </section>
 
+      {/* Qualitative Matching */}
+      <section className="py-24">
+        <div className="mx-auto max-w-5xl px-6">
+          <div className="mb-16 text-center">
+            <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
+              QUALITATIVE MATCHING
+            </div>
+            <h2 className="text-3xl font-bold text-gray-900">벡터를 넘어선 정성적 매칭</h2>
+            <p className="mt-4 text-gray-600">
+              벡터 유사도만으로는 포착할 수 없는 표현 스타일, 서사 공명, 압력 역학까지 반영하여
+              <br />
+              최종 매칭 점수에 정성적 보정(qualitative bonus ±0.1)을 적용합니다.
+            </p>
+          </div>
+
+          {/* Qualitative Factors */}
+          <div className="mb-12 grid gap-6 md:grid-cols-3">
+            {QUALITATIVE_FACTORS.map((factor) => (
+              <div
+                key={factor.title}
+                className="rounded-2xl border border-gray-200 bg-white p-8 transition-all hover:shadow-lg"
+              >
+                <div
+                  className={`mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${factor.color}`}
+                >
+                  <factor.icon className="h-7 w-7 text-white" />
+                </div>
+                <h3 className="mb-2 text-lg font-bold text-gray-900">{factor.title}</h3>
+                <p className="mb-4 text-sm text-gray-600">{factor.description}</p>
+                <span className="inline-block rounded-lg bg-gray-50 px-3 py-1.5 font-mono text-xs text-gray-500">
+                  {factor.detail}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Qualitative Bonus Formula */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-teal-600">
+              Qualitative Bonus
+            </div>
+            <div className="mb-2 font-mono text-lg text-gray-900">
+              qualitative_bonus = voice_match × 0.05 + narrative_match × 0.05
+            </div>
+            <p className="mb-4 text-sm text-gray-500">
+              범위: ±0.1 | 최종 매칭 점수에 가산/감산되어 정성적 호환성을 반영
+            </p>
+            <div className="inline-flex items-center gap-3 rounded-lg bg-gray-50 px-4 py-2 text-sm text-gray-600">
+              <Ratio className="h-4 w-4 text-purple-500" />
+              <span>S_final = S_tier + qualitative_bonus</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Feed Mixing */}
+      <section className="bg-gray-50 py-24">
+        <div className="mx-auto max-w-5xl px-6">
+          <div className="mb-16 text-center">
+            <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
+              FEED MIXING
+            </div>
+            <h2 className="text-3xl font-bold text-gray-900">피드 구성 알고리즘</h2>
+            <p className="mt-4 text-gray-600">
+              매칭 점수만으로 피드를 구성하지 않습니다. 팔로우, 유사도, 트렌딩을 혼합하여 균형 잡힌
+              피드를 제공합니다.
+            </p>
+          </div>
+
+          {/* Bar Visualization */}
+          <div className="mb-8 overflow-hidden rounded-2xl border border-gray-200 bg-white p-8">
+            <div className="mb-6 flex h-10 overflow-hidden rounded-full">
+              {FEED_MIX_SEGMENTS.map((seg) => (
+                <div
+                  key={seg.label}
+                  className={`${seg.color} flex items-center justify-center text-xs font-bold text-white`}
+                  style={{ width: `${seg.percentage}%` }}
+                >
+                  {seg.percentage}%
+                </div>
+              ))}
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              {FEED_MIX_SEGMENTS.map((seg) => (
+                <div key={seg.label} className="flex items-start gap-3">
+                  <div className={`mt-1 h-3 w-3 flex-shrink-0 rounded-full ${seg.color}`} />
+                  <div>
+                    <div className="text-sm font-bold text-gray-900">
+                      {seg.label} ({seg.percentage}%)
+                    </div>
+                    <p className="text-xs text-gray-500">{seg.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Explainable Recommendations */}
       <section className="py-24">
         <div className="mx-auto max-w-5xl px-6">
@@ -369,6 +520,16 @@ export default function MatchingPage() {
                   <td className="px-6 py-4 text-gray-600">협업 필터링 (비슷한 유저가 본 것)</td>
                   <td className="px-6 py-4 text-gray-900">
                     3-Tier 매칭 (Basic/Advanced/Exploration)
+                  </td>
+                </tr>
+                <tr>
+                  <td className="px-6 py-4 font-medium text-gray-900">정성적 매칭</td>
+                  <td className="px-6 py-4 text-gray-600">없음 (수치 유사도만 사용)</td>
+                  <td className="px-6 py-4 text-gray-900">
+                    <span className="flex items-center gap-1">
+                      <Check className="h-4 w-4 text-green-500" />
+                      Voice + Narrative 보정 (±0.1)
+                    </span>
                   </td>
                 </tr>
                 <tr>

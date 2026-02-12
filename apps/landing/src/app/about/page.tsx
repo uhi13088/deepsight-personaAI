@@ -49,7 +49,7 @@ const MILESTONES = [
   {
     phase: "Phase 1",
     title: "v3 3-Layer 벡터 시스템 설계",
-    description: "콘텐츠 소비 성향을 3-Layer 16D로 분석하는 프레임워크 구축",
+    description: "콘텐츠 소비 성향을 3-Layer 벡터 + 서사·음성 프로파일로 분석하는 프레임워크 구축",
     status: "완료",
   },
   {
@@ -162,9 +162,9 @@ export default function AboutPage() {
               </span>
             </p>
             <p className="mt-4 text-gray-600">
-              그래서 우리는 AI 페르소나를 만들기 시작했습니다. 사용자의 취향을 3-Layer 16D로
-              정량화하고, 그 취향을 가진 도플갱어 AI가 수백 개의 콘텐츠를 미리 소비한 뒤, 검증된
-              추천만 전달하는 시스템. 그것이 DeepSight입니다.
+              그래서 우리는 AI 페르소나를 만들기 시작했습니다. 사용자의 취향을 3-Layer 벡터로
+              정량화하고, 서사와 음성까지 입혀 살아 숨 쉬는 도플갱어 AI가 수백 개의 콘텐츠를 미리
+              소비한 뒤, 검증된 추천만 전달하는 시스템. 그것이 DeepSight입니다.
             </p>
           </div>
         </div>
