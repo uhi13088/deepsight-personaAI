@@ -164,11 +164,11 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="relative overflow-hidden pb-20 pt-16">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="grid items-center gap-12 lg:grid-cols-2">
+      <section className="relative overflow-hidden pb-20 pt-20">
+        <div className="mx-auto max-w-7xl px-6 lg:px-12">
+          <div className="grid items-center gap-12 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
             {/* Left: Text */}
-            <div className="space-y-8">
+            <div className="space-y-8 lg:py-8">
               <div className="inline-flex items-center gap-2 rounded-full border border-purple-200 bg-purple-50 px-4 py-2 text-sm text-purple-700">
                 <Sparkles className="h-4 w-4" />
                 AI 페르소나 기반 추천 시스템
