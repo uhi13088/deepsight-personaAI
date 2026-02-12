@@ -88,7 +88,7 @@ export function HeroOrbital({ dimensions }: HeroOrbitalProps) {
 
       {/* Center card */}
       <div className="absolute z-10 rounded-2xl border border-gray-200 bg-white/95 p-5 shadow-2xl backdrop-blur-sm">
-        <div className="mb-3 text-sm font-medium text-gray-500">Your Vector Profile</div>
+        <div className="mb-3 text-sm font-medium text-gray-500">Your 3-Layer Profile</div>
         <div className="space-y-2">
           {dimensions.slice(0, 3).map((dim, idx) => (
             <div key={dim.id} className="flex items-center gap-2">
@@ -108,7 +108,7 @@ export function HeroOrbital({ dimensions }: HeroOrbitalProps) {
         </div>
         <div className="mt-3 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-1.5 text-xs text-green-700">
           <Check className="h-3 w-3" />
-          도플갱어: 유나 (92%)
+          3-Tier 매칭: 유나 (92%)
         </div>
       </div>
 
