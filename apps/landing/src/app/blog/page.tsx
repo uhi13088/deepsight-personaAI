@@ -46,7 +46,7 @@ export default async function BlogPage() {
           </div>
           <h1 className="mb-6 text-5xl font-bold text-gray-900">DeepSight Blog</h1>
           <p className="mx-auto max-w-2xl text-lg text-gray-600">
-            AI 페르소나, 추천 시스템, 6D 벡터 기술에 대한 이야기를 나눕니다.
+            AI 페르소나, 추천 시스템, 3-Layer 벡터 기술에 대한 이야기를 나눕니다.
           </p>
         </div>
       </section>
