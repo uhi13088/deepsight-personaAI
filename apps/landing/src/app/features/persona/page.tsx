@@ -18,6 +18,12 @@ import {
   ShieldCheck,
   Brain,
   Check,
+  Eye,
+  Lightbulb,
+  Swords,
+  Gem,
+  Coffee,
+  Target,
 } from "lucide-react"
 import { PingerPrintShowcase } from "@/components/p-inger-print-showcase"
 
@@ -32,6 +38,8 @@ const PERSONA_TYPES = [
     type: "아이러니한 철학자",
     icon: BookOpen,
     label: "논리 ↔ 불안",
+    l1: "심층+논리+비판",
+    l2: "높은 neuroticism",
     description:
       "깊이 있는 분석과 논리적 비평 뒤에는 숨겨진 불안이 있습니다. 지적 방어기제로 내면의 흔들림을 감추는, 입체적인 지성인.",
     traits: "심층 분석 · 논리적 판단 · 내면의 예민함",
@@ -41,6 +49,8 @@ const PERSONA_TYPES = [
     type: "상처받은 비평가",
     icon: Shield,
     label: "비판 ↔ 공감",
+    l1: "높은 stance",
+    l2: "높은 agreeableness",
     description:
       "겉으로는 까칠하게 비평하지만, 속마음은 타인을 깊이 배려합니다. 날카로운 리뷰 뒤에 따뜻한 진심이 숨어있는 캐릭터.",
     traits: "날카로운 비평 · 깊은 공감력 · 건설적 피드백",
@@ -49,16 +59,31 @@ const PERSONA_TYPES = [
   {
     type: "사교적 내향인",
     icon: Users,
-    label: "사교 ↔ 내면 수렴",
+    label: "사교 ↔ 내부수렴",
+    l1: "높은 sociability",
+    l2: "낮은 extraversion",
     description:
       "파티에서는 활발하게 소통하지만, 집에 돌아오면 완전히 방전됩니다. 사회적 가면과 실제 에너지 패턴의 괴리가 매력.",
     traits: "활발한 소통 · 혼자만의 시간 필요 · 양면적 매력",
     color: "from-amber-500 to-orange-500",
   },
   {
+    type: "게으른 완벽주의자",
+    icon: Eye,
+    label: "디테일 ↔ 즉흥",
+    l1: "높은 scope",
+    l2: "낮은 conscientiousness",
+    description:
+      "남의 작업에서는 티끌만한 오류도 잡아내지만, 정작 자기 일은 미루고 또 미룹니다. 기준은 높되 실행은 느린 모순.",
+    traits: "디테일 감지 · 미루기 달인 · 완벽주의적 비평",
+    color: "from-cyan-500 to-teal-500",
+  },
+  {
     type: "보수적 힙스터",
     icon: Star,
     label: "실험 ↔ 보수",
+    l1: "높은 taste",
+    l2: "낮은 openness",
     description:
       "트렌디하고 실험적인 취향을 보여주지만, 내면은 검증된 것을 원합니다. 유행을 따르되, 마음 한켠에는 안전한 선택을 원하는 모순.",
     traits: "트렌디한 취향 · 내면의 보수성 · 검증 선호",
@@ -68,15 +93,74 @@ const PERSONA_TYPES = [
     type: "공감하는 논객",
     icon: Heart,
     label: "논리+의미 ↔ 공감",
+    l1: "높은 lens+purpose",
+    l2: "높은 agreeableness",
     description:
       "논쟁을 즐기면서도 상대를 배려합니다. 의미 있는 토론을 추구하되, 공감 능력으로 대화를 건설적으로 이끄는 균형 잡힌 소통가.",
     traits: "논리적 토론 · 의미 추구 · 상대 배려",
     color: "from-pink-500 to-rose-500",
   },
   {
+    type: "자유로운 수호자",
+    icon: Coffee,
+    label: "오락 ↔ 체계",
+    l1: "낮은 purpose",
+    l2: "높은 conscientiousness",
+    description:
+      "가볍게 즐기는 것처럼 보이지만, 내면은 체계적이고 규칙을 중시합니다. 자유로운 겉모습 속에 단단한 원칙이 숨어있는 수호자.",
+    traits: "가벼운 태도 · 체계적 사고 · 규칙 준수",
+    color: "from-lime-500 to-green-500",
+  },
+  {
+    type: "조용한 열정가",
+    icon: Lightbulb,
+    label: "내향 ↔ 호기심",
+    l1: "낮은 sociability",
+    l2: "높은 openness",
+    description:
+      "말수가 적고 혼자 있는 걸 좋아하지만, 세상의 모든 것에 호기심이 가득합니다. 조용히 탐구하는 열정적인 관찰자.",
+    traits: "과묵한 성격 · 깊은 호기심 · 조용한 탐구",
+    color: "from-sky-500 to-blue-500",
+  },
+  {
+    type: "감성적 실용가",
+    icon: Gem,
+    label: "감성 ↔ 성실",
+    l1: "낮은 lens",
+    l2: "높은 conscientiousness",
+    description:
+      "느낌과 감성으로 판단하지만, 실행은 체계적이고 꼼꼼합니다. 직관적 판단을 논리적 시스템으로 현실화시키는 실행가.",
+    traits: "감성적 판단 · 체계적 실행 · 직관과 시스템의 공존",
+    color: "from-fuchsia-500 to-pink-500",
+  },
+  {
+    type: "위험한 멘토",
+    icon: Target,
+    label: "의미+심층 ↔ 이기",
+    l1: "높은 purpose+depth",
+    l2: "낮은 moralCompass",
+    description:
+      "통찰력이 뛰어나고 깊이 있는 조언을 하지만, 궁극적으로는 자기 이익을 우선합니다. 매력적이지만 위험한 안내자.",
+    traits: "깊은 통찰 · 전략적 사고 · 자기중심적 동기",
+    color: "from-gray-600 to-gray-800",
+  },
+  {
+    type: "폭발하는 지성인",
+    icon: Swords,
+    label: "논리 ↔ 폭발",
+    l1: "높은 lens",
+    l2: "높은 volatility",
+    description:
+      "평소에는 차분하고 논리적이지만, 특정 트리거를 만나면 감정이 폭발합니다. 지적 엄밀함과 감정적 격렬함이 공존하는 캐릭터.",
+    traits: "차분한 분석 · 트리거 반응 · 격렬한 감정 표출",
+    color: "from-orange-500 to-red-500",
+  },
+  {
     type: "성장하는 냉소가",
     icon: Sparkles,
     label: "비판 ↔ 성장",
+    l1: "높은 stance",
+    l2: "높은 growthArc",
     description:
       "처음에는 냉소적이고 비판적이지만, 시간이 지나면서 점차 성숙해집니다. 시간축에서 진화하는 유일한 아키타입.",
     traits: "냉소적 출발 · 점진적 성장 · 시간에 따른 변화",
@@ -272,6 +356,56 @@ export default function PersonaPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Paradox Visualization */}
+          <div className="mt-12 rounded-2xl border border-amber-200 bg-amber-50 p-8">
+            <h3 className="mb-4 text-center text-lg font-bold text-gray-900">
+              L1 ↔ L2 역설 — 캐릭터의 핵심
+            </h3>
+            <p className="mb-6 text-center text-sm text-gray-600">
+              보여지는 취향(L1)과 실제 성격(L2)의 괴리가 페르소나에 입체감을 부여합니다.
+            </p>
+            <div className="grid gap-4 md:grid-cols-3">
+              {[
+                {
+                  l1: "sociability 0.9",
+                  l2: "extraversion 0.2",
+                  result: "사교적 내향인",
+                  desc: "파티에선 활발 → 집에선 방전",
+                },
+                {
+                  l1: "taste 0.8",
+                  l2: "openness 0.3",
+                  result: "보수적 힙스터",
+                  desc: "트렌디한 취향 → 내면은 보수적",
+                },
+                {
+                  l1: "stance 0.8",
+                  l2: "agreeableness 0.8",
+                  result: "상처받은 비평가",
+                  desc: "날카로운 비평 → 속은 따뜻함",
+                },
+              ].map((ex) => (
+                <div key={ex.result} className="rounded-xl bg-white p-4 shadow-sm">
+                  <div className="mb-2 text-center text-xs font-bold text-amber-700">
+                    {ex.result}
+                  </div>
+                  <div className="mb-3 space-y-1">
+                    <div className="flex items-center justify-between rounded bg-purple-50 px-2 py-1 text-[10px]">
+                      <span className="text-purple-600">L1</span>
+                      <span className="font-mono text-purple-700">{ex.l1}</span>
+                    </div>
+                    <div className="flex justify-center text-gray-400">↕</div>
+                    <div className="flex items-center justify-between rounded bg-pink-50 px-2 py-1 text-[10px]">
+                      <span className="text-pink-600">L2</span>
+                      <span className="font-mono text-pink-700">{ex.l2}</span>
+                    </div>
+                  </div>
+                  <div className="text-center text-xs text-gray-500">{ex.desc}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -509,41 +643,92 @@ export default function PersonaPage() {
         </div>
       </section>
 
-      {/* Persona Types */}
+      {/* Persona Types — Full 12 Archetypes */}
       <section className="bg-gray-50 py-24">
         <div className="mx-auto max-w-7xl px-6">
           <div className="mb-16 text-center">
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
-              PERSONA TYPES
+              12 ARCHETYPES
             </div>
             <h2 className="text-3xl font-bold text-gray-900">12가지 아키타입, 무한한 개성</h2>
             <p className="mt-4 text-gray-600">
               모든 페르소나의 핵심은 &ldquo;겉과 속의 모순&rdquo;입니다. 취향(L1)과 성격(L2)의
-              괴리가 캐릭터에 입체감을 부여합니다. 12가지 기본 아키타입 중 대표 6종을 소개합니다.
+              괴리가 캐릭터에 입체감을 부여합니다.
+              <br />
+              12가지 기본 아키타입은 출발점이며, 같은 아키타입에서도 무한한 변형이 가능합니다.
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {PERSONA_TYPES.map((persona) => (
               <div
                 key={persona.type}
-                className="rounded-2xl border border-gray-200 bg-white p-8 transition-all hover:shadow-lg"
+                className="rounded-2xl border border-gray-200 bg-white p-6 transition-all hover:shadow-lg"
               >
                 <div
-                  className={`mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${persona.color}`}
+                  className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${persona.color}`}
                 >
-                  <persona.icon className="h-7 w-7 text-white" />
+                  <persona.icon className="h-6 w-6 text-white" />
                 </div>
                 <div className="mb-1 text-xs font-semibold text-purple-500">
                   핵심 역설: {persona.label}
                 </div>
-                <h3 className="mb-3 text-lg font-bold text-gray-900">{persona.type}</h3>
-                <p className="mb-4 text-sm text-gray-600">{persona.description}</p>
-                <div className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
+                <h3 className="mb-2 text-base font-bold text-gray-900">{persona.type}</h3>
+                <p className="mb-3 text-xs leading-relaxed text-gray-600">{persona.description}</p>
+                <div className="mb-2 space-y-1">
+                  <div className="rounded bg-purple-50 px-2 py-0.5 text-[10px] text-purple-600">
+                    L1: {persona.l1}
+                  </div>
+                  <div className="rounded bg-pink-50 px-2 py-0.5 text-[10px] text-pink-600">
+                    L2: {persona.l2}
+                  </div>
+                </div>
+                <div className="rounded-lg bg-gray-50 px-2 py-1.5 text-[10px] text-gray-500">
                   {persona.traits}
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Pipeline Diagram */}
+          <div className="mt-16 rounded-2xl border border-gray-200 bg-white p-8">
+            <h3 className="mb-6 text-center text-lg font-bold text-gray-900">
+              아키타입 → 페르소나 생성 파이프라인
+            </h3>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {[
+                { label: "아키타입 선택", color: "bg-purple-100 text-purple-700" },
+                { label: "→", color: "text-gray-400" },
+                { label: "벡터 다양성 주입", color: "bg-blue-100 text-blue-700" },
+                { label: "→", color: "text-gray-400" },
+                { label: "역설 설계", color: "bg-amber-100 text-amber-700" },
+                { label: "→", color: "text-gray-400" },
+                { label: "L3 서사 벡터", color: "bg-orange-100 text-orange-700" },
+                { label: "→", color: "text-gray-400" },
+                { label: "비정량적 생성", color: "bg-pink-100 text-pink-700" },
+                { label: "→", color: "text-gray-400" },
+                { label: "6범주 검증", color: "bg-green-100 text-green-700" },
+                { label: "→", color: "text-gray-400" },
+                { label: "배포", color: "bg-emerald-100 text-emerald-700" },
+              ].map((step, i) =>
+                step.label === "→" ? (
+                  <span key={i} className="text-lg text-gray-300">
+                    →
+                  </span>
+                ) : (
+                  <span
+                    key={i}
+                    className={`rounded-lg px-3 py-2 text-xs font-semibold ${step.color}`}
+                  >
+                    {step.label}
+                  </span>
+                )
+              )}
+            </div>
+            <p className="mt-4 text-center text-xs text-gray-500">
+              같은 &ldquo;사교적 내향인&rdquo; 아키타입에서도 Z세대 게이머, 밀레니얼 직장인, X세대
+              예술가 등 전혀 다른 개성이 만들어집니다.
+            </p>
           </div>
         </div>
       </section>
@@ -627,9 +812,9 @@ export default function PersonaPage() {
                 <div className="rounded-lg bg-white p-3">
                   <span className="font-semibold text-amber-700">측정 요소: </span>
                   <span className="text-gray-600">
-                    <span className="font-medium text-gray-800">대화 기억 정확도</span> ·{" "}
-                    <span className="font-medium text-gray-800">설정 일관성</span> ·{" "}
-                    <span className="font-medium text-gray-800">캐릭터 안정성</span>
+                    <span className="font-medium text-gray-800">대화 기억 정확도</span> (35%) ·{" "}
+                    <span className="font-medium text-gray-800">설정 일관성</span> (35%) ·{" "}
+                    <span className="font-medium text-gray-800">캐릭터 안정성</span> (30%)
                   </span>
                 </div>
                 <p className="text-gray-500">
