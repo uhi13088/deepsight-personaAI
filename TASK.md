@@ -101,13 +101,13 @@
   - AC5: ✅ attitude→delta 매핑 8종 + InteractionEngine (Init→Override→Adapt→Attitude→Express 파이프라인, drift 계산, reset)
   - AC6: ✅ 테스트 49개 PASS (전체 247개) + Build PASS
 
-- [ ] **T53: 프롬프트 엔지니어링 — 버전 관리 + 테스트 + 빌더**
+- [x] **T53: 프롬프트 엔지니어링 — 버전 관리 + 테스트 + 빌더** ✅
   - 배경: 스펙 §3.3. 프롬프트 작성, 버전 관리, 테스트
-  - AC1: 프롬프트 에디터 UI (basePrompt, reviewPrompt, postPrompt 등)
-  - AC2: 프롬프트 버전 관리 (생성/비교/롤백)
-  - AC3: 프롬프트 테스트 (단일 콘텐츠 테스트, LLM 응답 미리보기)
-  - AC4: 프롬프트 빌더 v3 (RAG 컨텍스트 구조, 프리셋 기반)
-  - AC5: 테스트 + 커밋 + 푸시
+  - AC1: ✅ 프롬프트 에디터 UI (5탭: base/review/post/comment/interaction, 프리셋 4종, 품질 테스트)
+  - AC2: ✅ 프롬프트 버전 관리 (시맨틱 버전 Major/Minor/Patch 자동 감지, diff 비교, 롤백)
+  - AC3: ✅ 프롬프트 테스트 (구조 분석, 톤 분석, 금지어 검사, 벡터 일관성, 종합 점수)
+  - AC4: ✅ 프롬프트 빌더 v3 (5종 프롬프트 생성, 벡터 기반 가이드, 프리셋 4종)
+  - AC5: ✅ 테스트 49개 PASS (전체 296개) + Build PASS
 
 - [ ] **T54: 페르소나 검증 + 품질 측정**
   - 배경: 스펙 §3.4 + 구현계획서 Phase 2/9. 품질 게이트
