@@ -38,6 +38,7 @@ interface PersonaPublic {
   expertise: string[]
   profileImageUrl: string | null
   warmth: number
+  archetypeId: string | null
   vector: Record<string, number> | null
   postCount: number
   followerCount: number
