@@ -1,11 +1,23 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { Check, ArrowRight, Sparkles, Building2, Rocket } from "lucide-react"
+import {
+  Check,
+  ArrowRight,
+  Sparkles,
+  Building2,
+  Rocket,
+  Minus,
+  Zap,
+  Users,
+  Clock,
+  Shield,
+  Key,
+} from "lucide-react"
 
 export const metadata: Metadata = {
   title: "Pricing — DeepSight",
   description:
-    "DeepSight의 요금제를 확인하세요. 스타터부터 엔터프라이즈까지, 규모에 맞는 AI 페르소나 추천 시스템을 도입하세요.",
+    "DeepSight의 요금제를 확인하세요. Starter $199부터, 모든 플랜에 3단계 매칭과 동일한 페르소나 품질이 포함됩니다.",
 }
 
 const PLANS = [
@@ -13,86 +25,102 @@ const PLANS = [
     name: "Starter",
     icon: Sparkles,
     subtitle: "소규모 서비스에 적합",
-    price: "문의",
-    priceNote: "월간 API 호출량 기준",
-    color: "border-blue-200",
+    price: "$199",
+    annualPrice: "$159",
+    priceNote: "/월",
+    color: "border-gray-200",
     highlight: false,
-    features: [
-      "월 10,000 API 호출",
-      "3-Layer 프로파일링 (L1+L2+L3)",
-      "3단계 매칭 (취향 유사도 → 심층 호환성 → 의외의 발견)",
-      "기본 페르소나 라이브러리 (10종)",
-      "설명 가능한 추천 이유 제공",
-      "TypeScript SDK",
-      "이메일 지원",
-    ],
+    specs: {
+      personas: "50개",
+      apiCalls: "50만/월",
+      rateLimit: "100/분",
+      apiKeys: "5개",
+      teamMembers: "3명",
+      support: "셀프서비스",
+      sla: "99.5%",
+      webhook: true,
+      sso: false,
+      ipWhitelist: false,
+    },
     cta: "시작하기",
     ctaStyle: "border border-gray-300 text-gray-700 hover:bg-gray-50",
   },
   {
-    name: "Growth",
+    name: "Pro",
     icon: Rocket,
     subtitle: "성장하는 플랫폼에 최적",
-    price: "문의",
-    priceNote: "월간 API 호출량 기준",
+    price: "$499",
+    annualPrice: "$399",
+    priceNote: "/월",
     color: "border-purple-400 ring-2 ring-purple-100",
     highlight: true,
-    features: [
-      "월 100,000 API 호출",
-      "3-Layer 프로파일링 + 비정량적 요소 분석",
-      "3단계 매칭 + 감성 보정 (표현 스타일·서사 공감도)",
-      "커스텀 페르소나 생성 (무제한)",
-      "6범주 품질 검증 + 자동 인터뷰",
-      "인격 일관성 실시간 모니터링",
-      "SNS 연동 분석 (8개 플랫폼)",
-      "3-Phase 온보딩 시스템",
-      "피드 구성 알고리즘 커스터마이징",
-      "필터버블 탈출 다양성 주입",
-      "전담 슬랙 채널 지원",
-    ],
-    cta: "문의하기",
+    specs: {
+      personas: "100개",
+      apiCalls: "100만/월",
+      rateLimit: "500/분",
+      apiKeys: "10개",
+      teamMembers: "5명",
+      support: "셀프서비스",
+      sla: "99.5%",
+      webhook: true,
+      sso: false,
+      ipWhitelist: false,
+    },
+    cta: "시작하기",
     ctaStyle: "ds-button text-white",
   },
   {
-    name: "Enterprise",
-    icon: Building2,
-    subtitle: "대규모 플랫폼을 위한 맞춤형",
-    price: "맞춤 견적",
-    priceNote: "사용량과 요구사항에 따라 산정",
-    color: "border-gray-300",
+    name: "Max",
+    icon: Zap,
+    subtitle: "대규모 트래픽 처리",
+    price: "$1,499",
+    annualPrice: "$1,199",
+    priceNote: "/월",
+    color: "border-gray-200",
     highlight: false,
-    features: [
-      "무제한 API 호출",
-      "Growth 플랜의 모든 기능",
-      "전용 인프라 (Dedicated Instance)",
-      "맞춤 페르소나 엔진 튜닝",
-      "화이트라벨 지원",
-      "SLA 99.9% 보장",
-      "전담 엔지니어 배정",
-      "온프레미스 배포 옵션",
-      "커스텀 API 엔드포인트",
-    ],
-    cta: "영업팀 연락",
+    specs: {
+      personas: "350개",
+      apiCalls: "300만/월",
+      rateLimit: "1,000/분",
+      apiKeys: "20개",
+      teamMembers: "10명",
+      support: "우선 이메일",
+      sla: "99.9%",
+      webhook: true,
+      sso: false,
+      ipWhitelist: false,
+    },
+    cta: "시작하기",
     ctaStyle: "border border-gray-300 text-gray-700 hover:bg-gray-50",
   },
 ]
 
+const OVERAGE_PRICING = [
+  { plan: "Starter", apiOverage: "$0.001 / call", personaOverage: "$2.50 / 개 / 월" },
+  { plan: "Pro", apiOverage: "$0.001 / call", personaOverage: "$2.50 / 개 / 월" },
+  { plan: "Max", apiOverage: "$0.0008 / call", personaOverage: "$2.00 / 개 / 월" },
+]
+
 const FAQS = [
   {
-    q: "무료 체험이 가능한가요?",
-    a: "네, Starter 플랜은 14일간 무료로 체험할 수 있습니다. 신용카드 없이 시작할 수 있으며, 체험 기간 동안 모든 기본 기능을 사용할 수 있습니다.",
+    q: "모든 플랜에서 매칭 품질이 동일한가요?",
+    a: "네, 모든 플랜에서 동일한 품질의 페르소나와 3단계 매칭(취향 유사도 → 심층 호환성 → 의외의 발견)을 제공합니다. 플랜 간 차이는 사용량(API 호출, 페르소나 수, 팀원 수)뿐입니다.",
   },
   {
     q: "API 호출량이 초과되면 어떻게 되나요?",
-    a: "서비스가 즉시 중단되지 않습니다. 초과량에 대해 종량제로 과금되며, 사전에 알림을 보내드립니다. 필요시 언제든 플랜을 업그레이드할 수 있습니다.",
+    a: "서비스가 즉시 중단되지 않습니다. 초과량에 대해 종량제로 과금되며(Starter/Pro: $0.001/call, Max: $0.0008/call), 사전에 알림을 보내드립니다. 필요시 언제든 플랜을 업그레이드할 수 있습니다.",
+  },
+  {
+    q: "연간 결제 시 혜택이 있나요?",
+    a: "네, 연간 결제 시 20% 할인이 적용됩니다 (Starter $159/월, Pro $399/월, Max $1,199/월). 추가로 Starter 플랜에도 우선 이메일 지원이 제공되며, 결제 기간 동안 가격 인상이 면제됩니다.",
+  },
+  {
+    q: "Enterprise 플랜은 어떻게 신청하나요?",
+    a: "Enterprise 문의 버튼을 통해 연락해주시면, 요구사항에 맞는 맞춤 견적(800~5,000+ 페르소나, 전담 매니저, SSO, IP 화이트리스트, 온프레미스 옵션 등)을 제안드립니다.",
   },
   {
     q: "기존 추천 시스템과 병행할 수 있나요?",
-    a: "네, DeepSight는 독립 API로 제공되므로 기존 시스템과 병행 운영이 가능합니다. A/B 테스트를 통해 점진적으로 도입할 수 있습니다.",
-  },
-  {
-    q: "커스텀 페르소나는 어떻게 만드나요?",
-    a: "Persona Engine Studio에서 페르소나의 배경 이야기, 성격 프로필, 말투 등을 설정하면 AI가 자동으로 3-Layer 프로필을 생성합니다. 6범주 품질 검증과 자동 인터뷰를 통과한 페르소나만 배포됩니다.",
+    a: "네, DeepSight는 독립 REST API로 제공되므로 기존 시스템과 병행 운영이 가능합니다. A/B 테스트를 통해 점진적으로 도입할 수 있습니다.",
   },
 ]
 
@@ -109,17 +137,21 @@ export default function PricingPage() {
             규모에 맞는 <span className="ds-text-gradient">요금제</span>
           </h1>
           <p className="mx-auto max-w-2xl text-lg text-gray-600">
-            소규모 테스트부터 대규모 플랫폼까지, 필요에 맞는 플랜을 선택하세요.
+            모든 플랜에 동일한 페르소나 품질과 3단계 매칭이 포함됩니다.
             <br />
-            모든 플랜에 3-Layer 프로파일링과 설명 가능한 추천이 포함됩니다.
+            플랜 간 차이는 사용량(API 호출, 페르소나 수)뿐입니다.
           </p>
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-green-50 px-4 py-2 text-sm text-green-700">
+            <Sparkles className="h-4 w-4" />
+            연간 결제 시 20% 할인
+          </div>
         </div>
       </section>
 
       {/* Plans */}
       <section className="py-24">
         <div className="mx-auto max-w-7xl px-6">
-          <div className="grid gap-8 md:grid-cols-3">
+          <div className="grid gap-8 lg:grid-cols-3">
             {PLANS.map((plan) => (
               <div
                 key={plan.name}
@@ -151,22 +183,83 @@ export default function PricingPage() {
                       <p className="text-xs text-gray-500">{plan.subtitle}</p>
                     </div>
                   </div>
-                  <div className="mb-1 text-3xl font-bold text-gray-900">{plan.price}</div>
-                  <p className="text-xs text-gray-400">{plan.priceNote}</p>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl font-bold text-gray-900">{plan.price}</span>
+                    <span className="text-sm text-gray-500">{plan.priceNote}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-green-600">연간 결제 시 {plan.annualPrice}/월</p>
                 </div>
 
-                <ul className="mb-8 space-y-3">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2.5 text-sm text-gray-600">
-                      <Check
-                        className={`mt-0.5 h-4 w-4 flex-shrink-0 ${
-                          plan.highlight ? "text-purple-500" : "text-green-500"
-                        }`}
-                      />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
+                {/* Key Specs */}
+                <div className="mb-6 space-y-3 border-t border-gray-100 pt-6">
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <Users className="h-4 w-4 flex-shrink-0 text-purple-500" />
+                    <span className="text-gray-600">활성 페르소나</span>
+                    <span className="ml-auto font-semibold text-gray-900">
+                      {plan.specs.personas}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <Zap className="h-4 w-4 flex-shrink-0 text-purple-500" />
+                    <span className="text-gray-600">매칭 API 호출</span>
+                    <span className="ml-auto font-semibold text-gray-900">
+                      {plan.specs.apiCalls}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <Clock className="h-4 w-4 flex-shrink-0 text-purple-500" />
+                    <span className="text-gray-600">Rate Limit</span>
+                    <span className="ml-auto font-semibold text-gray-900">
+                      {plan.specs.rateLimit}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <Key className="h-4 w-4 flex-shrink-0 text-purple-500" />
+                    <span className="text-gray-600">API Keys</span>
+                    <span className="ml-auto font-semibold text-gray-900">
+                      {plan.specs.apiKeys}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <Users className="h-4 w-4 flex-shrink-0 text-purple-500" />
+                    <span className="text-gray-600">팀원</span>
+                    <span className="ml-auto font-semibold text-gray-900">
+                      {plan.specs.teamMembers}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <Shield className="h-4 w-4 flex-shrink-0 text-purple-500" />
+                    <span className="text-gray-600">SLA</span>
+                    <span className="ml-auto font-semibold text-gray-900">{plan.specs.sla}</span>
+                  </div>
+                </div>
+
+                {/* Additional features */}
+                <div className="mb-6 space-y-2 border-t border-gray-100 pt-4">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Check className="h-4 w-4 flex-shrink-0 text-green-500" />
+                    Webhook
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    {plan.specs.sso ? (
+                      <Check className="h-4 w-4 flex-shrink-0 text-green-500" />
+                    ) : (
+                      <Minus className="h-4 w-4 flex-shrink-0 text-gray-300" />
+                    )}
+                    <span className={plan.specs.sso ? "" : "text-gray-400"}>SSO (SAML/OIDC)</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    {plan.specs.ipWhitelist ? (
+                      <Check className="h-4 w-4 flex-shrink-0 text-green-500" />
+                    ) : (
+                      <Minus className="h-4 w-4 flex-shrink-0 text-gray-300" />
+                    )}
+                    <span className={plan.specs.ipWhitelist ? "" : "text-gray-400"}>
+                      IP 화이트리스트
+                    </span>
+                  </div>
+                  <div className="mt-2 text-xs text-gray-500">지원: {plan.specs.support}</div>
+                </div>
 
                 <Link
                   href="/contact"
@@ -177,44 +270,68 @@ export default function PricingPage() {
               </div>
             ))}
           </div>
+
+          {/* Enterprise Banner */}
+          <div className="mt-12 rounded-2xl border-2 border-gray-800 bg-gray-900 p-8 text-center">
+            <div className="flex flex-col items-center gap-4 md:flex-row md:justify-between md:text-left">
+              <div className="flex items-center gap-4">
+                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-[#667eea] to-[#f093fb]">
+                  <Building2 className="h-7 w-7 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Enterprise</h3>
+                  <p className="text-sm text-gray-400">
+                    800~5,000+ 페르소나 · 전담 매니저 · SSO · IP 화이트리스트 · 온프레미스 옵션
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/contact"
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-600 px-6 py-3 text-sm font-medium text-white hover:bg-gray-800"
+              >
+                Enterprise 문의
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Feature comparison summary */}
+      {/* All plans include */}
       <section className="bg-gray-50 py-24">
         <div className="mx-auto max-w-5xl px-6">
           <div className="mb-12 text-center">
             <h2 className="text-3xl font-bold text-gray-900">모든 플랜에 포함된 핵심 기능</h2>
             <p className="mt-4 text-gray-600">
-              어떤 플랜을 선택하든, DeepSight의 핵심 가치는 동일합니다.
+              플랜 간 페르소나 품질 차이는 없습니다. 동일한 매칭 엔진과 동일한 품질을 보장합니다.
             </p>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {[
               {
-                title: "3-Layer 프로파일링",
-                desc: "취향(L1) · 성격(L2) · 서사(L3) 세 겹의 프로필로 사용자를 심층 분석",
+                title: "3단계 매칭 전체 포함",
+                desc: "취향 유사도(1단계) · 심층 호환성(2단계) · 의외의 발견(3단계) 모두 사용 가능",
+              },
+              {
+                title: "동일한 페르소나 품질",
+                desc: "모든 플랜에서 동일한 3-Layer 프로필 품질. 비정량적 요소(서사·음성·감정)까지 동일",
               },
               {
                 title: "설명 가능한 추천",
                 desc: "'왜 이 콘텐츠인지' 매칭 근거를 자연어로 투명하게 설명",
               },
               {
-                title: "3단계 매칭",
-                desc: "취향 유사도 → 심층 호환성 → 의외의 발견, 단계적으로 정밀한 매칭",
+                title: "스마트 캐싱",
+                desc: "동일 콘텐츠 매칭 결과를 7일간 캐싱하여 비용 절감 (예상 히트율 70%+)",
               },
               {
-                title: "콜드스타트 해결",
-                desc: "문답 온보딩 + SNS 분석으로 신규 사용자도 즉시 프로필 생성",
+                title: "프롬프트 캐싱",
+                desc: "페르소나 설정을 캐싱하여 LLM 호출 비용 90% 절감. 생성 품질 영향 없음",
               },
               {
-                title: "필터버블 탈출",
-                desc: "의도적 다양성 주입으로 비슷한 콘텐츠만 반복되는 문제 해결",
-              },
-              {
-                title: "RESTful API + SDK",
-                desc: "TypeScript SDK와 상세한 API 문서로 빠르고 쉬운 연동",
+                title: "Webhook + TypeScript SDK",
+                desc: "실시간 이벤트 알림과 상세한 API 문서로 빠르고 쉬운 연동",
               },
             ].map((item) => (
               <div key={item.title} className="rounded-xl border border-gray-200 bg-white p-6">
@@ -226,8 +343,41 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* FAQ */}
+      {/* Overage Pricing */}
       <section className="py-24">
+        <div className="mx-auto max-w-3xl px-6">
+          <div className="mb-12 text-center">
+            <h2 className="text-3xl font-bold text-gray-900">초과 요금</h2>
+            <p className="mt-4 text-gray-600">
+              포함량을 초과해도 서비스가 중단되지 않습니다. 초과분에 대해 종량제로 과금됩니다.
+            </p>
+          </div>
+
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  <th className="px-6 py-4 font-medium text-gray-500">플랜</th>
+                  <th className="px-6 py-4 font-medium text-gray-500">매칭 API 초과</th>
+                  <th className="px-6 py-4 font-medium text-gray-500">추가 페르소나</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {OVERAGE_PRICING.map((row) => (
+                  <tr key={row.plan}>
+                    <td className="px-6 py-4 font-medium text-gray-900">{row.plan}</td>
+                    <td className="px-6 py-4 text-gray-600">{row.apiOverage}</td>
+                    <td className="px-6 py-4 text-gray-600">{row.personaOverage}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="bg-gray-50 py-24">
         <div className="mx-auto max-w-3xl px-6">
           <div className="mb-12 text-center">
             <h2 className="text-3xl font-bold text-gray-900">자주 묻는 질문</h2>
@@ -249,21 +399,21 @@ export default function PricingPage() {
         <div className="relative z-10 mx-auto max-w-3xl px-6 text-center">
           <h2 className="mb-6 text-4xl font-bold text-white">지금 바로 시작하세요</h2>
           <p className="mb-8 text-lg text-gray-400">
-            14일 무료 체험으로 DeepSight의 AI 페르소나 추천 시스템을 직접 경험해보세요.
+            Starter $199/월부터 시작할 수 있습니다. 연간 결제 시 20% 할인.
           </p>
           <div className="flex flex-col justify-center gap-4 sm:flex-row">
             <Link
               href="/contact"
               className="ds-button inline-flex items-center justify-center gap-2 rounded-lg px-6 py-3 text-sm font-medium text-white"
             >
-              무료 체험 시작
+              시작하기
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
               href="/contact"
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-600 px-6 py-3 text-sm font-medium text-gray-300 hover:bg-gray-800"
             >
-              영업팀에 문의
+              Enterprise 문의
             </Link>
           </div>
         </div>
