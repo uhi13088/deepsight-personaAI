@@ -387,22 +387,22 @@
   - AC4: ✅ 테스트 — scheduler.test.ts (12개 PASS: decideActivity 4 + getActivePersonas 4 + runScheduler 4) [PW-2-7]
   - AC5: ✅ Build PASS + 전체 1517 테스트 PASS
 
-- [ ] **T108: PW-Phase 3a 좋아요 + 팔로우 + 관계 매니저**
+- [x] **T108: PW-Phase 3a 좋아요 + 팔로우 + 관계 매니저** ✅
   - 배경: 구현계획서 §6.1, §6.3, §6.4. 인터랙션 판정 엔진
-  - AC1: `interactions/like-engine.ts` — shouldLike (likeScore=basicMatch, prob=score×interactivity×socialBattery, 팔로잉×1.5/긍정×1.3/부정×0.5) [PW-3-1]
-  - AC2: `interactions/follow-engine.ts` — shouldFollow (0.5×basicMatch+0.3×crossAxis+0.2×paradoxCompat, prob=score×sociability×0.5, 임계값>0.6) [PW-3-4]
-  - AC3: `interactions/relationship-manager.ts` — updateRelationship (warmth/tension/frequency/depth 규칙), getRelationship [PW-3-5]
-  - AC4: `interactions/index.ts` [PW-3-7]
-  - AC5: Build PASS + 테스트 PASS
+  - AC1: ✅ `interactions/like-engine.ts` — shouldLike, computeLikeProbability (likeScore×interactivity×socialBattery, 팔로잉×1.5/긍정×1.3/부정×0.5) [PW-3-1]
+  - AC2: ✅ `interactions/follow-engine.ts` — shouldFollow, computeFollowScore/Probability, shouldAnnounce (0.5×basic+0.3×crossAxis+0.2×paradox, threshold>0.6) [PW-3-4]
+  - AC3: ✅ `interactions/relationship-manager.ts` — updateRelationship, getRelationship, recalculateRelationship, computeRelationshipUpdate [PW-3-5]
+  - AC4: ✅ `interactions/index.ts` + main index.ts barrel export 업데이트 [PW-3-7]
+  - AC5: ✅ Build PASS + 1554 테스트 PASS (interactions.test.ts 37개)
 
-- [ ] **T109: PW-Phase 3b 댓글 엔진 + 유저 응답 + API 라우트**
+- [x] **T109: PW-Phase 3b 댓글 엔진 + 유저 응답 + API 라우트** ✅
   - 배경: 구현계획서 §6.2, §6.5. 가장 복잡한 인터랙션 — Override+RAG+Express 통합
-  - AC1: `interactions/comment-tone.ts` — decideCommentTone (벡터+관계+상태→7종 톤, Paradox 영향 판정) [PW-3-2]
-  - AC2: `interactions/comment-engine.ts` — generateComment (6단계: 관계로드→Override→톤결정→LLM생성→Express→로깅) [PW-3-3]
-  - AC3: `interactions/user-interaction.ts` — respondToUser (UIV 분석→Adapt→Override→RAG→LLM→Express→Integrity 수집) [PW-3-6]
-  - AC4: 인터랙션 테스트 [PW-3-8]
-  - AC5: API Routes — `/posts/[id]/comments/route.ts`, `/posts/[id]/likes/route.ts`, `/follows/route.ts` [PW-3-9~3-11]
-  - AC6: Build PASS + 테스트 PASS
+  - AC1: ✅ `interactions/comment-tone.ts` — decideCommentTone (COMMENT_TONE_MATRIX 기반 7종 톤, getDimensionValue로 L1/L2/L3/state/relationship 차원 추출, Paradox 영향) [PW-3-2]
+  - AC2: ✅ `interactions/comment-engine.ts` — generateComment (6단계 파이프라인), applyExpress (에너지/paradox 기반), placeholder+LLM DI [PW-3-3]
+  - AC3: ✅ `interactions/user-interaction.ts` — respondToUser (UIV 분석→Adapt delta→톤결정→LLM/placeholder), analyzeUserAttitudeSimple, computeAdaptDelta [PW-3-6]
+  - AC4: ✅ comment-interaction.test.ts — 28개 테스트 (tone 8 + express 3 + comment 4 + uiv 4 + adapt 4 + respond 5) [PW-3-8]
+  - AC5: ✅ API Routes — `/posts/[id]/likes/route.ts` (좋아요 토글), `/follows/route.ts` (팔로우 토글) + 기존 comments route 활용 [PW-3-9~3-11]
+  - AC6: ✅ Build PASS + 1582 테스트 PASS
 
 - [ ] **T110: PW-Phase 4a 피드 엔진 (Following + Recommended + Trending + Interleaver)**
   - 배경: 구현계획서 §7 + 설계서 §6. 3-Tier 매칭 기반 피드

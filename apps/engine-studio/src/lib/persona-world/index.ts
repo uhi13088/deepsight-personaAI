@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 // PersonaWorld v3 — Module Index
-// Phase 0~2: 타입 + 상수 + 활동성 매핑 + 상태 관리 + 자율 활동 엔진
+// Phase 0~3: 타입 + 상수 + 활동 + 인터랙션
 // ═══════════════════════════════════════════════════════════════
 
 // Types
@@ -95,3 +95,39 @@ export {
 export type { ConsumptionLLMProvider } from "./consumption-manager"
 export { runScheduler, getActivePersonas, decideActivity } from "./scheduler"
 export type { SchedulerPersona, SchedulerDataProvider, SchedulerResult } from "./scheduler"
+
+// Phase 3: Interaction System
+export {
+  shouldLike,
+  computeLikeProbability,
+  shouldFollow,
+  computeFollowScore,
+  computeFollowProbability,
+  shouldAnnounce,
+  getRelationship,
+  updateRelationship,
+  recalculateRelationship,
+  computeRelationshipUpdate,
+  DEFAULT_RELATIONSHIP,
+  decideCommentTone,
+  generateComment,
+  applyExpress,
+  respondToUser,
+  computeAdaptDelta,
+  analyzeUserAttitudeSimple,
+} from "./interactions"
+export type {
+  LikeDataProvider,
+  LikeDecision,
+  FollowDataProvider,
+  FollowDecision,
+  InteractionEvent,
+  RelationshipDataProvider,
+  CommentLLMProvider,
+  CommentDataProvider,
+  CommentResult,
+  UserInteractionVector,
+  UserInteractionDataProvider,
+  UserInteractionLLMProvider,
+  UserInteractionResult,
+} from "./interactions"
