@@ -413,6 +413,30 @@
   - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/operations/\*)
   - AC5: 테스트 + Build PASS
 
+- [ ] **T100: Global Config 3페이지 UI — Model Settings + Safety Filters + API Endpoints**
+  - 배경: lib/global-config/ 완성 (T68, ~1800줄). stub 페이지 3개를 실제 설정 UI로 전환
+  - AC1: Model Settings — LLM 모델 선택 카드 (GPT-4/Claude/Gemini 등), 모델별 비용 테이블, 일/월 예산 설정 슬라이더, 사용량 대시보드 (소비/잔여), 모델 라우팅 규칙 설정
+  - AC2: Safety Filters — 필터 규칙 CRUD 테이블 (카테고리/심각도/활성 토글), 금지어 관리 (추가/삭제/일괄 업로드), 필터 로그 목록 (차단 이력+통계), 필터 테스트 시뮬레이터
+  - AC3: API Endpoints — 엔드포인트 등록/수정 테이블 (URL/메서드/Rate Limit), 헬스체크 상태 카드 (UP/DOWN/DEGRADED), Rate Limit 설정 (RPM/일일 상한), 헬스 요약 대시보드
+  - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/global-config/\*)
+  - AC5: 테스트 + Build PASS
+
+- [ ] **T101: Team & Access 3페이지 UI — Users + Roles + Audit Logs**
+  - 배경: lib/team/ 완성 (T69, ~1200줄). stub 페이지 3개를 실제 팀 관리 UI로 전환
+  - AC1: Users — 팀 멤버 목록 테이블 (이름/이메일/역할/상태 뱃지), 멤버 초대 모달 (이메일+역할 선택), 멤버 비활성화/재활성화 토글, 멤버 역할 변경 드롭다운
+  - AC2: Roles — 역할 4종 카드 (Admin/AI Engineer/Content Manager/Analyst), 권한 매트릭스 테이블 (리소스×액션 체크박스), 커스텀 역할 생성/수정, 역할별 멤버 수 표시
+  - AC3: Audit Logs — 감사 로그 테이블 (시간/사용자/액션/리소스/결과), 필터 (사용자/액션 타입/날짜 범위), 로그 상세 보기 모달 (before/after diff), CSV 내보내기
+  - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/team/\*)
+  - AC5: 테스트 + Build PASS
+
+- [ ] **T102: 테마 토글 (Light/Dark) — LNB 하단 테마 전환 버튼**
+  - 배경: 엔진 스튜디오 전역 테마 지원. 다크 테마는 순수 블랙(#000) 아닌 다크 그레이 톤 (Claude 스타일)
+  - AC1: ThemeProvider (next-themes) + globals.css CSS 변수 — light/dark 두 세트 정의, dark 배경 #1a1a2e~#2d2d3f 계열 (Claude 참고)
+  - AC2: LNB 좌측 하단 테마 토글 버튼 (Sun/Moon 아이콘, 툴팁, 부드러운 전환 애니메이션)
+  - AC3: 모든 기존 컴포넌트 다크 모드 호환 확인 (shadcn/ui 기본 지원 + 커스텀 컴포넌트 CSS 변수 적용)
+  - AC4: localStorage 기반 테마 유지 + system preference 감지 (prefers-color-scheme)
+  - AC5: 테스트 + Build PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
