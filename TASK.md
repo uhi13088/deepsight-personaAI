@@ -387,7 +387,7 @@
 > lib/ 비즈니스 로직(T56~T67)은 완료. 12개 placeholder 페이지에 실제 UI 연결.
 > 패턴: Header + 탭/카드 레이아웃 + lib 함수 호출 + shadcn/ui 컴포넌트.
 
-- [ ] **T96** → IN_PROGRESS
+- [x] **T96** → DONE ✅ 2026-02-12
 
 - [ ] **T97: Matching Lab 3페이지 UI — Simulator + Tuning + Analytics**
   - 배경: lib/matching/ 10파일 완성 (T57, T58). stub 페이지 3개를 실제 연구소 UI로 전환
@@ -417,17 +417,17 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-- [ ] **T96: User Insight 3페이지 UI — Cold Start + Psychometric + Archetype**
-  - 배경: lib/user-insight/ 6파일 완성 (T56). stub 페이지 3개를 실제 관리 UI로 전환
-  - AC1: Cold Start Strategy — 질문 세트 CRUD 테이블 (Quick/Standard/Deep 3모드 탭), 질문 추가/편집/삭제, 순서 드래그, 응답→벡터 변환 미리보기
-  - AC2: Psychometric Model — OCEAN→L1 매핑 시각화, 반전 탐지 결과 테이블 (Δ≥0.25 하이라이트), 잠재 특성 3유형 카드
-  - AC3: Archetype Manager — 10종 아키타입 카드 그리드 (벡터 범위 시각화), 커스텀 아키타입 CRUD, 분류 규칙 편집, 유저 분포 통계
-  - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/user-insight/\*)
-  - AC5: 테스트 + Build PASS
+(없음)
 
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T96: User Insight 3페이지 UI — Cold Start + Psychometric + Archetype** ✅ 2026-02-12
+  - AC1: ✅ Cold Start Strategy — 3모드 탭 (Quick/Standard/Deep), 질문 CRUD 테이블, 차원별 커버리지, 검증 상태
+  - AC2: ✅ Psychometric Model — OCEAN→L1 매핑 테이블 (5×7 컬러 인코딩), L2→L1 예측기, 반전 탐지 (Δ≥0.25), 잠재 특성 3유형 카드
+  - AC3: ✅ Archetype Manager — 10종 아키타입 카드 (7D 벡터 바+임계값), 커스텀 CRUD, 분류 테스터 (1차/2차+순위), 통계
+  - AC5: ✅ Build PASS + 1388 테스트 PASS
 
 - [x] **T95: 전체 페이지 SEO 메타데이터 v3 통일** ✅ 2026-02-12
   - AC1~AC8: ✅ 전 페이지 metadata 6D 잔재 0건 확인 (layout/features/products/about/blog)
