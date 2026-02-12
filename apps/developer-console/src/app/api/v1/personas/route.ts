@@ -1,12 +1,117 @@
 import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
 import prisma from "@/lib/prisma"
-import { validateApiKey } from "@/lib/api-key-validator"
+import { validateApiKey, type ValidatedApiKey } from "@/lib/api-key-validator"
 import { trackApiUsage } from "@/lib/usage-tracker"
-import type { PersonaVector } from "@deepsight/shared-types"
-import type { Persona } from "@prisma/client"
 
-// GET /api/v1/personas - List all available personas
+// ============================================================================
+// Rate Limit Helpers
+// ============================================================================
+
+function getRateLimitHeaders(apiKey: ValidatedApiKey) {
+  const limit = apiKey.rateLimit
+  const resetTime = Math.floor(Date.now() / 60000) * 60 + 60
+  return {
+    "X-RateLimit-Limit": String(limit),
+    "X-RateLimit-Remaining": String(Math.max(0, limit - 1)),
+    "X-RateLimit-Reset": String(resetTime),
+  }
+}
+
+// ============================================================================
+// Persona v3 Response Transformer
+// ============================================================================
+
+function transformPersonaToV3(persona: {
+  id: string
+  name: string
+  description: string | null
+  role: string
+  expertise: string[]
+  depth: unknown
+  lens: unknown
+  stance: unknown
+  scope: unknown
+  taste: unknown
+  purpose: unknown
+  sociability: unknown
+  openness: unknown
+  conscientiousness: unknown
+  extraversion: unknown
+  agreeableness: unknown
+  neuroticism: unknown
+  lack: unknown
+  moralCompass: unknown
+  volatility: unknown
+  growthArc: unknown
+  archetypeId: string | null
+  extendedParadoxScore: unknown
+  l1l2Score: unknown
+  l1l3Score: unknown
+  l2l3Score: unknown
+  createdAt: Date
+  updatedAt: Date
+}) {
+  const result: Record<string, unknown> = {
+    id: persona.id,
+    name: persona.name,
+    role: persona.role,
+    expertise: persona.expertise,
+    description: persona.description || "",
+  }
+
+  // Vectors: L1 always, L2/L3 optional
+  const vectors: Record<string, unknown> = {
+    l1: {
+      depth: Number(persona.depth),
+      lens: Number(persona.lens),
+      stance: Number(persona.stance),
+      scope: Number(persona.scope),
+      taste: Number(persona.taste),
+      purpose: Number(persona.purpose),
+      sociability: Number(persona.sociability),
+    },
+  }
+
+  if (persona.openness !== null) {
+    vectors.l2 = {
+      openness: Number(persona.openness),
+      conscientiousness: Number(persona.conscientiousness),
+      extraversion: Number(persona.extraversion),
+      agreeableness: Number(persona.agreeableness),
+      neuroticism: Number(persona.neuroticism),
+    }
+  }
+
+  if (persona.lack !== null) {
+    vectors.l3 = {
+      lack: Number(persona.lack),
+      moralCompass: Number(persona.moralCompass),
+      volatility: Number(persona.volatility),
+      growthArc: Number(persona.growthArc),
+    }
+  }
+
+  result.vectors = vectors
+
+  // Paradox profile — optional
+  if (persona.extendedParadoxScore !== null) {
+    result.paradox = {
+      archetype_id: persona.archetypeId,
+      extended_score: Number(persona.extendedParadoxScore),
+      l1_l2_score: persona.l1l2Score ? Number(persona.l1l2Score) : null,
+      l1_l3_score: persona.l1l3Score ? Number(persona.l1l3Score) : null,
+      l2_l3_score: persona.l2l3Score ? Number(persona.l2l3Score) : null,
+    }
+  }
+
+  return result
+}
+
+// ============================================================================
+// GET /api/v1/personas — v3 페르소나 목록 (스펙 §9.3.2)
+// ============================================================================
+
 export async function GET(request: NextRequest) {
   const requestId = "req_" + crypto.randomBytes(12).toString("hex")
   const startTime = Date.now()
@@ -22,7 +127,7 @@ export async function GET(request: NextRequest) {
             code: validation.error?.code || "UNAUTHORIZED",
             message: validation.error?.message || "Invalid API key",
           },
-          requestId,
+          meta: { request_id: requestId },
         },
         { status: 401 }
       )
@@ -30,62 +135,32 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"))
-    const perPage = Math.min(Math.max(1, parseInt(searchParams.get("per_page") || "10")), 100)
-    const category = searchParams.get("category")
-    const active = searchParams.get("active") !== "false" // Default to active only
+    const limit = Math.min(Math.max(1, parseInt(searchParams.get("limit") || "20")), 100)
+    const role = searchParams.get("role")
+    const expertise = searchParams.get("expertise")
 
     // Build query filters
-    const where: { category?: string; active?: boolean } = {}
-    if (category) {
-      where.category = category
+    const where: Record<string, unknown> = { active: true }
+    if (role) {
+      where.role = role.toUpperCase()
     }
-    if (active) {
-      where.active = true
+    if (expertise) {
+      where.expertise = { has: expertise }
     }
 
     // Fetch personas from database
     const [personas, total] = await Promise.all([
       prisma.persona.findMany({
         where,
-        skip: (page - 1) * perPage,
-        take: perPage,
+        skip: (page - 1) * limit,
+        take: limit,
         orderBy: { createdAt: "desc" },
       }),
       prisma.persona.count({ where }),
     ])
 
-    // Transform to API response format
-    const transformedPersonas = personas.map((p: Persona) => ({
-      id: p.id,
-      name: p.name,
-      category: p.category || "General",
-      description: p.description || "",
-      dimensions: {
-        depth: Number(p.depth),
-        lens: Number(p.lens),
-        stance: Number(p.stance),
-        scope: Number(p.scope),
-        taste: Number(p.taste),
-        purpose: Number(p.purpose),
-      } satisfies PersonaVector,
-      createdAt: p.createdAt.toISOString(),
-      updatedAt: p.updatedAt.toISOString(),
-    }))
-
-    const response = {
-      success: true,
-      requestId,
-      data: {
-        personas: transformedPersonas,
-      },
-      meta: {
-        page,
-        perPage,
-        total,
-        totalPages: Math.ceil(total / perPage),
-        hasMore: page * perPage < total,
-      },
-    }
+    // Transform to v3 API response format
+    const transformedPersonas = personas.map(transformPersonaToV3)
 
     const latencyMs = Date.now() - startTime
 
@@ -97,11 +172,30 @@ export async function GET(request: NextRequest) {
       "/api/v1/personas",
       200,
       latencyMs,
-      { page, per_page: perPage, category },
+      { page, limit, role, expertise },
       { personas_count: transformedPersonas.length }
     )
 
-    return NextResponse.json(response)
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          personas: transformedPersonas,
+        },
+        meta: {
+          request_id: requestId,
+          pagination: {
+            current_page: page,
+            total_pages: Math.ceil(total / limit),
+            total_count: total,
+          },
+          processing_time_ms: latencyMs,
+        },
+      },
+      {
+        headers: getRateLimitHeaders(validation.apiKey),
+      }
+    )
   } catch (error) {
     console.error("Personas API error:", error)
 
@@ -112,7 +206,7 @@ export async function GET(request: NextRequest) {
           code: "INTERNAL_ERROR",
           message: "An error occurred while fetching personas",
         },
-        requestId,
+        meta: { request_id: requestId },
       },
       { status: 500 }
     )
