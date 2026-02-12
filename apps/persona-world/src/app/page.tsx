@@ -11,75 +11,42 @@ import {
   Zap,
   ChevronRight,
   BarChart3,
-  Target,
-  Eye,
   Search,
   Star,
   ThumbsUp,
   MessageSquare,
-  Compass,
   Palette,
   Brain,
 } from "lucide-react"
 import Link from "next/link"
 
 // ============================================
-// 6D 벡터 차원
+// 3-Layer 벡터 소개
 // ============================================
-const VECTOR_DIMENSIONS = [
+const LAYER_SECTIONS = [
   {
-    id: "depth",
-    name: "Depth",
-    label: "분석 깊이",
-    low: "직관적",
-    high: "심층적",
+    id: "L1",
+    name: "Layer 1: Social Persona",
+    label: "사회적 가면 (7D)",
+    desc: "분석 깊이, 판단 렌즈, 평가 태도, 관심 범위, 취향, 소비 목적, 사교성",
     icon: Search,
     color: "from-blue-500 to-blue-600",
   },
   {
-    id: "lens",
-    name: "Lens",
-    label: "판단 렌즈",
-    low: "감성적",
-    high: "논리적",
-    icon: Eye,
-    color: "from-purple-500 to-purple-600",
-  },
-  {
-    id: "stance",
-    name: "Stance",
-    label: "평가 태도",
-    low: "수용적",
-    high: "비판적",
-    icon: Compass,
-    color: "from-orange-500 to-orange-600",
-  },
-  {
-    id: "scope",
-    name: "Scope",
-    label: "관심 범위",
-    low: "핵심만",
-    high: "디테일",
-    icon: Target,
-    color: "from-green-500 to-green-600",
-  },
-  {
-    id: "taste",
-    name: "Taste",
-    label: "취향 성향",
-    low: "클래식",
-    high: "실험적",
-    icon: Palette,
-    color: "from-pink-500 to-pink-600",
-  },
-  {
-    id: "purpose",
-    name: "Purpose",
-    label: "소비 목적",
-    low: "오락",
-    high: "의미추구",
+    id: "L2",
+    name: "Layer 2: Core Temperament",
+    label: "본원적 기질 OCEAN (5D)",
+    desc: "개방성, 성실성, 외향성, 친화성, 신경성",
     icon: Brain,
-    color: "from-indigo-500 to-indigo-600",
+    color: "from-amber-500 to-orange-600",
+  },
+  {
+    id: "L3",
+    name: "Layer 3: Narrative Drive",
+    label: "서사적 욕망 (4D)",
+    desc: "결핍감, 도덕 기준, 변동성, 성장 곡선",
+    icon: Palette,
+    color: "from-purple-500 to-violet-600",
   },
 ]
 
@@ -378,8 +345,8 @@ export default function PersonaWorldLanding() {
                   {
                     icon: BarChart3,
                     step: "2",
-                    title: "6D 벡터 분석",
-                    desc: "당신의 콘텐츠 소비 성향을 6차원으로 분석해요",
+                    title: "3-Layer 벡터 분석",
+                    desc: "당신의 콘텐츠 소비 성향을 3레이어 16차원으로 분석해요",
                   },
                   {
                     icon: Users,
@@ -410,7 +377,7 @@ export default function PersonaWorldLanding() {
         </div>
       </section>
 
-      {/* 6D Vector Section - Dark with Floating Icons */}
+      {/* 3-Layer Vector Section - Dark with Floating Icons */}
       <section id="features" className="pw-dark-section relative overflow-hidden py-24">
         {/* Floating Icons */}
         {FLOATING_ICONS.map(({ Icon, pos, anim, size }, idx) => (
@@ -424,39 +391,33 @@ export default function PersonaWorldLanding() {
 
         <div className="relative z-10 mx-auto max-w-4xl px-6 text-center">
           <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-400">
-            6D VECTOR SYSTEM
+            3-LAYER 16D VECTOR SYSTEM
           </div>
           <h2 className="mb-6 text-4xl font-bold text-white md:text-5xl">
             단순한 좋아요를 넘어,
             <br />
-            <span className="pw-text-gradient">6가지 차원으로 분석</span>
+            <span className="pw-text-gradient">3개 레이어, 16차원으로 분석</span>
           </h2>
           <p className="mx-auto mb-16 max-w-2xl text-lg text-gray-400">
-            좋아요/싫어요로는 알 수 없는 당신의 진짜 취향. 6개의 독립적인 차원으로 콘텐츠 소비
-            성향을 정밀하게 분석합니다.
+            좋아요/싫어요로는 알 수 없는 당신의 진짜 취향. 사회적 가면, 본원적 기질, 서사적 욕망까지
+            3개 레이어 16차원으로 정밀하게 분석합니다.
           </p>
 
-          {/* 6D Cards */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {VECTOR_DIMENSIONS.map((dim) => (
+          {/* 3-Layer Cards */}
+          <div className="grid gap-6 lg:grid-cols-3">
+            {LAYER_SECTIONS.map((layer) => (
               <div
-                key={dim.id}
+                key={layer.id}
                 className="pw-glass-card group rounded-2xl p-6 text-left transition-all hover:bg-white/10"
               >
                 <div
-                  className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${dim.color}`}
+                  className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${layer.color}`}
                 >
-                  <dim.icon className="h-6 w-6 text-white" />
+                  <layer.icon className="h-6 w-6 text-white" />
                 </div>
-                <h3 className="mb-1 text-lg font-semibold text-white">{dim.name}</h3>
-                <p className="mb-3 text-sm text-gray-400">{dim.label}</p>
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span>{dim.low}</span>
-                  <div className="mx-2 h-1 flex-1 rounded-full bg-gray-700">
-                    <div className={`h-full w-1/2 rounded-full bg-gradient-to-r ${dim.color}`} />
-                  </div>
-                  <span>{dim.high}</span>
-                </div>
+                <h3 className="mb-1 text-lg font-semibold text-white">{layer.name}</h3>
+                <p className="mb-3 text-sm text-gray-300">{layer.label}</p>
+                <p className="text-xs text-gray-500">{layer.desc}</p>
               </div>
             ))}
           </div>
@@ -472,7 +433,7 @@ export default function PersonaWorldLanding() {
             </div>
             <h2 className="text-4xl font-bold text-gray-900">24개의 AI 페르소나</h2>
             <p className="mx-auto mt-4 max-w-2xl text-gray-600">
-              각각 고유한 6D 벡터 프로필을 가진 AI 페르소나들이 당신의 취향에 맞는 콘텐츠를
+              각각 고유한 3-Layer 벡터 프로필을 가진 AI 페르소나들이 당신의 취향에 맞는 콘텐츠를
               추천합니다.
             </p>
           </div>

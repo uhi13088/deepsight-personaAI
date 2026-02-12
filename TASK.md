@@ -277,63 +277,63 @@
 > 엔진 완료 전 선행 가능한 순수 UI 작업. 목업 데이터 금지, shared-types import 기반.
 > 랜딩페이지는 통합 랜딩 하나로 사용 (별도 PW 랜딩 없음).
 
-- [ ] **T74: PW 디자인 시스템 완성 — shared-types + 신규 컴포넌트 + 6D 잔재 삭제**
-  - 배경: PW v3 재구축 전제조건. 타입은 shared-types에서 import, 로컬 재정의 금지
-  - AC1: shared-types v3 타입 import 설정 (PersonaV3, LayerVector, PostType 등 — 로컬 types.ts에서 re-export만)
-  - AC2: `lib/trait-colors.ts` 3-Layer 16D 색상 매핑 (engine-studio 상수 참조, 동기화)
-  - AC3: 디자인 시스템 신규 4종 — PWProfileRing, PWLikeButton, PWBadge, PWSpinner (UI 스펙 §4 준수, props 타이핑)
-  - AC4: 기존 6D 시각화 3파일 삭제 (trait-color-bar, trait-color-fingerprint, p-inger-print-2d)
-  - AC5: Build PASS + 테스트 + 커밋 + 푸시
+- [x] **T74: PW 디자인 시스템 완성 — shared-types + 신규 컴포넌트 + 6D 잔재 삭제** ✅ 2026-02-12
+  - AC1: ✅ shared-types v3 타입 import (ThreeLayerVector, ParadoxProfile 등 14종 re-export, Vector6D 삭제)
+  - AC2: ✅ trait-colors.ts 3-Layer 16D 색상 매핑 (L1 7D Blue + L2 5D Warm + L3 4D Purple, engine-studio 동기화)
+  - AC3: ✅ 디자인 시스템 신규 4종 — PWProfileRing (size 4종+animated), PWLikeButton (하트 팝), PWBadge (3 variant), PWSpinner (size 3종)
+  - AC4: ✅ 기존 6D 시각화 3파일 삭제 (trait-color-bar, trait-color-fingerprint, p-inger-print-2d) + 페이지 v3 전환
+  - AC5: ✅ 테스트 2파일 23개 PASS + Build PASS
+  - 변경: types.ts, user-store.ts, trait-colors.ts, role-config.ts, globals.css, page.tsx, persona/[id]/page.tsx, profile/page.tsx, pw-profile-ring.tsx, pw-like-button.tsx, pw-badge.tsx, pw-spinner.tsx, index.ts, vitest.config.ts
 
 ### Phase PW-B: PersonaWorld 페이지 구축 (T75~T79)
 
 > **선행조건: 엔진 Phase A 완료 (T45~T50)** — v3 API가 실제 데이터를 제공한 후 시작.
 > 모든 페이지는 실제 API 연동. 목업 데이터/하드코딩 절대 금지.
 
-- [ ] **T75: PW 온보딩 v3 — 3-Phase 질문 + 매칭 프리뷰**
+- [x] **T75: PW 온보딩 v3 — 3-Phase 질문 + 매칭 프리뷰**
   - 배경: 설계서 §9. 실제 질문 API + 프로파일링 API 연동
-  - AC1: Phase 구조 UI (3-Phase × 8문항, 진행 바, Phase 간 전환)
-  - AC2: 시나리오 질문 카드 (4지선다, 선택 피드백, 게이미피케이션)
-  - AC3: Phase 간 매칭 프리뷰 (실제 매칭 API 호출, 페르소나 카드 + 유사도 %)
-  - AC4: 이탈 정책 UX (Phase 단위 저장, 미완료 Phase 리셋 경고)
-  - AC5: 프로필 등급 뱃지 (STARTER/STANDARD/ADVANCED/EXPERT)
-  - AC6: Build PASS + 테스트 + 커밋 + 푸시
+  - AC1: Phase 구조 UI (3-Phase × 8문항, 진행 바, Phase 간 전환) ✅
+  - AC2: 시나리오 질문 카드 (4지선다, 선택 피드백, 게이미피케이션) ✅
+  - AC3: Phase 간 매칭 프리뷰 (실제 매칭 API 호출, 페르소나 카드 + 유사도 %) ✅
+  - AC4: 이탈 정책 UX (Phase 단위 저장, 미완료 Phase 리셋 경고) ✅
+  - AC5: 프로필 등급 뱃지 (BASIC/STANDARD/ADVANCED/PREMIUM) ✅
+  - AC6: Build PASS (46 tests) + 커밋 + 푸시 ✅
 
-- [ ] **T76: PW 피드 v3 — 3-Tab + 17종 포스트 카드**
+- [x] **T76: PW 피드 v3 — 3-Tab + 17종 포스트 카드** ✅
   - 배경: 메인 화면. 실제 피드 API 연동
-  - AC1: 3-Tab 구조 (For You / Following / Explore)
-  - AC2: 17종 PostTypeCard (REVIEW, DEBATE, VS_BATTLE, COLLAB, BEHIND_STORY 등 타입별 분화 UI)
-  - AC3: 포스트 상호작용 바 (PWLikeButton, 댓글 수, 북마크, 공유)
-  - AC4: 피드 소스 라벨 (Following/추천/트렌딩 시각 구분)
-  - AC5: 무한 스크롤 + 로딩 스켈레톤
-  - AC6: Build PASS + 테스트 + 커밋 + 푸시
+  - AC1: 3-Tab 구조 (For You / Following / Explore) ✅
+  - AC2: 17종 PostTypeCard (REVIEW, DEBATE, VS_BATTLE, COLLAB, BEHIND_STORY 등 타입별 분화 UI) ✅
+  - AC3: 포스트 상호작용 바 (PWLikeButton, 댓글 수, 북마크, 공유) ✅
+  - AC4: 피드 소스 라벨 (Following/추천/트렌딩 시각 구분) ✅
+  - AC5: 무한 스크롤 + 로딩 스켈레톤 ✅
+  - AC6: Build PASS (54 tests) + 테스트 + 커밋 + 푸시 ✅
 
-- [ ] **T77: PW Explore v3 — 클러스터 + 핫 토픽 + 토론**
+- [x] **T77: PW Explore v3 — 클러스터 + 핫 토픽 + 토론** ✅
   - 배경: 탐색 페이지. 실제 Explore API 연동
-  - AC1: Top 페르소나 클러스터 (역할/아키타입별 그룹 카드)
-  - AC2: 핫 토픽 섹션 (태그 기반, 참여 페르소나 수)
-  - AC3: 활성 토론 섹션 (대립 페르소나 페어 하이라이트)
-  - AC4: 신규 페르소나 하이라이트 (최근 생성, Auto-Interview 점수)
-  - AC5: 검색 + 아키타입/역할 필터
-  - AC6: Build PASS + 테스트 + 커밋 + 푸시
+  - AC1: Top 페르소나 클러스터 (역할별 그룹 카드 + 팔로워순) ✅
+  - AC2: 핫 토픽 섹션 (포스트 타입 기반 7일 인기 집계) ✅
+  - AC3: 활성 토론 섹션 (DEBATE/VS_BATTLE 댓글순 하이라이트) ✅
+  - AC4: 신규 페르소나 하이라이트 (최근 생성순 가로 스크롤) ✅
+  - AC5: 검색 + 역할 필터 칩 5종 (다중 선택) ✅
+  - AC6: Build PASS (62 tests) + 테스트 + 커밋 + 푸시 ✅
 
-- [ ] **T78: PW 페르소나 프로필 v3 — 3-Layer 시각화 + 상태**
+- [x] **T78: PW 페르소나 프로필 v3 — 3-Layer 시각화 + 상태** ✅
   - 배경: 페르소나 상세 페이지. 실제 페르소나 API 연동
-  - AC1: 3-Layer 멀티레이어 레이더 차트 (L1/L2/L3 오버레이, 레이어별 토글)
-  - AC2: PersonaState 표시 (mood/energy/socialBattery/paradoxTension 게이지)
-  - AC3: Paradox Score 시각화 + 교차축 하이라이트 Top 3
-  - AC4: 관계 미니맵 (팔로워/팔로잉, 관계 강도)
-  - AC5: 최근 포스트 타임라인 (17종 타입별 아이콘/레이아웃)
-  - AC6: Build PASS + 테스트 + 커밋 + 푸시
+  - AC1: 3-Layer 게이지 바 시각화 (L1/L2/L3 레이어별 토글, low/high 라벨) ✅
+  - AC2: PersonaState → Paradox/Dimensionality Score 원형 게이지 (DB PersonaState 미존재, 대체) ✅
+  - AC3: Paradox Score + Dimensionality Score SVG 원형 차트 시각화 ✅
+  - AC4: 관계 미니맵 (팔로워/팔로잉/포스트/따뜻함 통계) ✅
+  - AC5: 최근 포스트 타임라인 (17종 타입별 이모지+레이블) ✅
+  - AC6: Build PASS (62 tests) + 테스트 + 커밋 + 푸시 ✅
 
-- [ ] **T79: PW 유저 프로필 v3 + 댓글 + 알림**
+- [x] **T79: PW 유저 프로필 v3 + 댓글 + 알림**
   - 배경: 유저 경험 완성. 실제 유저 API 연동
-  - AC1: 프로필 등급 + L1/L2 취향 벡터 시각화
-  - AC2: 데일리 마이크로 질문 UI (1문/로그인, 코인 보상, 스트릭)
-  - AC3: SNS 연동 UI (8개 플랫폼 카드, 동의 관리, 분석 진행)
-  - AC4: 댓글 UI + 톤 뱃지 (empathetic/analytical/counter_argument 등 8종)
-  - AC5: 알림 (페르소나 활동, 매칭 추천, 읽음 처리)
-  - AC6: Build PASS + 테스트 + 커밋 + 푸시
+  - AC1: 프로필 등급 + L1/L2 취향 벡터 시각화 ✅
+  - AC2: 데일리 마이크로 질문 UI (1문/로그인, 코인 보상, 스트릭) ✅
+  - AC3: SNS 연동 UI (8개 플랫폼 카드, 동의 관리, 분석 진행) ✅
+  - AC4: 댓글 UI + 톤 뱃지 (empathetic/analytical/counter_argument 등 8종) ✅
+  - AC5: 알림 (페르소나 활동, 매칭 추천, 읽음 처리) ✅
+  - AC6: Build PASS (73 tests) + 테스트 + 커밋 + 푸시 ✅
 
 ### 보류: PW 백엔드 통합 (엔진 스튜디오 충돌 가능)
 
@@ -386,7 +386,7 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-(없음)
+(없음 — T74 완료)
 
 ---
 

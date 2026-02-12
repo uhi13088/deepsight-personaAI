@@ -5,6 +5,12 @@ import type {
   PersonaDetail,
   FeedPost,
   PersonaFullDetail,
+  OnboardingQuestionsResponse,
+  OnboardingAnswer,
+  OnboardingAnswersResponse,
+  MatchingPreviewResponse,
+  ExploreResponse,
+  CommentsResponse,
 } from "./types"
 
 // Engine Studio API 베이스 URL (환경변수로 설정 가능)
@@ -104,11 +110,12 @@ export async function getPersonaById(id: string): Promise<PersonaFullDetail | nu
 // 클라이언트 사이드 API 함수들 (fetch 사용)
 export const clientApi = {
   // 피드 조회 (클라이언트)
-  async getFeed(options?: { limit?: number; cursor?: string; personaId?: string }) {
+  async getFeed(options?: { limit?: number; cursor?: string; personaId?: string; tab?: string }) {
     const params = new URLSearchParams()
     if (options?.limit) params.set("limit", String(options.limit))
     if (options?.cursor) params.set("cursor", options.cursor)
     if (options?.personaId) params.set("personaId", options.personaId)
+    if (options?.tab) params.set("tab", options.tab)
 
     const res = await fetch(`${API_BASE_URL}/api/public/feed?${params}`)
     if (!res.ok) throw new Error("Failed to fetch feed")
@@ -140,6 +147,74 @@ export const clientApi = {
     if (!res.ok) throw new Error("Failed to fetch persona")
 
     const json: ApiResponse<PersonaFullDetail> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+
+    return json.data!
+  },
+
+  // ── 온보딩 API ──────────────────────────────────────────────
+
+  // Phase별 질문 조회
+  async getOnboardingQuestions(phase: number) {
+    const res = await fetch(`${API_BASE_URL}/api/public/onboarding/questions?phase=${phase}`)
+    if (!res.ok) throw new Error("Failed to fetch onboarding questions")
+
+    const json: ApiResponse<OnboardingQuestionsResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+
+    return json.data!
+  },
+
+  // Phase 답변 제출
+  async submitOnboardingAnswers(userId: string, phase: number, answers: OnboardingAnswer[]) {
+    const res = await fetch(`${API_BASE_URL}/api/public/onboarding/answers`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, phase, answers }),
+    })
+    if (!res.ok) throw new Error("Failed to submit onboarding answers")
+
+    const json: ApiResponse<OnboardingAnswersResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+
+    return json.data!
+  },
+
+  // 매칭 프리뷰 조회
+  async getMatchingPreview(phase: number, userId: string) {
+    const params = new URLSearchParams({ phase: String(phase), userId })
+    const res = await fetch(`${API_BASE_URL}/api/public/onboarding/preview?${params}`)
+    if (!res.ok) throw new Error("Failed to fetch matching preview")
+
+    const json: ApiResponse<MatchingPreviewResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+
+    return json.data!
+  },
+
+  // ── Explore API ───────────────────────────────────────────
+
+  async getExplore(options?: { search?: string; role?: string }) {
+    const params = new URLSearchParams()
+    if (options?.search) params.set("search", options.search)
+    if (options?.role) params.set("role", options.role)
+
+    const res = await fetch(`${API_BASE_URL}/api/public/explore?${params}`)
+    if (!res.ok) throw new Error("Failed to fetch explore data")
+
+    const json: ApiResponse<ExploreResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+
+    return json.data!
+  },
+
+  // ── Comments API ──────────────────────────────────────────
+
+  async getComments(postId: string) {
+    const res = await fetch(`${API_BASE_URL}/api/public/posts/${postId}/comments`)
+    if (!res.ok) throw new Error("Failed to fetch comments")
+
+    const json: ApiResponse<CommentsResponse> = await res.json()
     if (!json.success) throw new Error(json.error?.message || "Unknown error")
 
     return json.data!

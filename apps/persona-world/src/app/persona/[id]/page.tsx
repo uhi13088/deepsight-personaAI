@@ -14,50 +14,194 @@ import {
   Loader2,
   UserPlus,
   UserMinus,
+  Zap,
+  Layers,
 } from "lucide-react"
 import { toast } from "sonner"
 import { clientApi } from "@/lib/api"
 import { useUserStore } from "@/lib/user-store"
-import { TRAIT_DIMENSIONS } from "@/lib/trait-colors"
-import { TraitColorBar } from "@/components/trait-color-bar"
-import { PingerPrint2D } from "@/components/p-inger-print-2d"
-import { ROLE_NAMES, POST_TYPE_LABELS } from "@/lib/role-config"
+import {
+  L1_DIMENSIONS,
+  L2_DIMENSIONS,
+  L3_DIMENSIONS,
+  LAYER_COLORS,
+  type TraitDimensionConfig,
+} from "@/lib/trait-colors"
+import {
+  ROLE_NAMES,
+  ROLE_EMOJI,
+  ROLE_COLORS_BOLD,
+  POST_TYPE_LABELS,
+  POST_TYPE_EMOJI,
+} from "@/lib/role-config"
 import { formatTimeAgo } from "@/lib/format"
-import type { PersonaFullDetail, Vector6D } from "@/lib/types"
+import { PWCard, PWProfileRing } from "@/components/persona-world"
+import type { PersonaFullDetail } from "@/lib/types"
 
-// 포스트 카드 컴포넌트
+// ── 레이어 토글 상태 ─────────────────────────────────────
+
+type LayerKey = "L1" | "L2" | "L3"
+
+const LAYER_CONFIG: {
+  key: LayerKey
+  dims: TraitDimensionConfig[]
+  vectorKey: "social" | "temperament" | "narrative"
+}[] = [
+  { key: "L1", dims: L1_DIMENSIONS, vectorKey: "social" },
+  { key: "L2", dims: L2_DIMENSIONS, vectorKey: "temperament" },
+  { key: "L3", dims: L3_DIMENSIONS, vectorKey: "narrative" },
+]
+
+// ── 게이지 바 ──────────────────────────────────────────────
+
+function GaugeBar({
+  value,
+  color,
+  label,
+  lowLabel,
+  highLabel,
+}: {
+  value: number
+  color: string
+  label: string
+  lowLabel: string
+  highLabel: string
+}) {
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-xs font-medium text-gray-600">{label}</span>
+        <span className="text-xs text-gray-400">{Math.round(value * 100)}%</span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${value * 100}%`, backgroundColor: color }}
+        />
+      </div>
+      <div className="mt-0.5 flex justify-between text-[10px] text-gray-400">
+        <span>{lowLabel}</span>
+        <span>{highLabel}</span>
+      </div>
+    </div>
+  )
+}
+
+// ── Paradox Score 시각화 ──────────────────────────────────
+
+function ParadoxScoreCard({
+  paradoxScore,
+  dimensionalityScore,
+}: {
+  paradoxScore: number | null
+  dimensionalityScore: number | null
+}) {
+  if (paradoxScore == null && dimensionalityScore == null) return null
+
+  return (
+    <PWCard className="!p-4">
+      <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-800">
+        <Zap className="h-4 w-4 text-amber-500" />
+        역설 프로필
+      </h3>
+      <div className="grid grid-cols-2 gap-4">
+        {paradoxScore != null && (
+          <div className="text-center">
+            <div className="relative mx-auto mb-2 h-16 w-16">
+              <svg viewBox="0 0 36 36" className="h-16 w-16">
+                <path
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke="#E5E7EB"
+                  strokeWidth="3"
+                />
+                <path
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke="#F59E0B"
+                  strokeWidth="3"
+                  strokeDasharray={`${paradoxScore * 100}, 100`}
+                  strokeLinecap="round"
+                />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-amber-600">
+                {Math.round(paradoxScore * 100)}
+              </span>
+            </div>
+            <div className="text-xs font-medium text-gray-600">Paradox Score</div>
+            <div className="text-[10px] text-gray-400">내면 모순 수치</div>
+          </div>
+        )}
+        {dimensionalityScore != null && (
+          <div className="text-center">
+            <div className="relative mx-auto mb-2 h-16 w-16">
+              <svg viewBox="0 0 36 36" className="h-16 w-16">
+                <path
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke="#E5E7EB"
+                  strokeWidth="3"
+                />
+                <path
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke="#8B5CF6"
+                  strokeWidth="3"
+                  strokeDasharray={`${dimensionalityScore * 100}, 100`}
+                  strokeLinecap="round"
+                />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-violet-600">
+                {Math.round(dimensionalityScore * 100)}
+              </span>
+            </div>
+            <div className="text-xs font-medium text-gray-600">Dimensionality</div>
+            <div className="text-[10px] text-gray-400">입체성 지수</div>
+          </div>
+        )}
+      </div>
+    </PWCard>
+  )
+}
+
+// ── 포스트 카드 ───────────────────────────────────────────
+
 function PostCard({ post }: { post: PersonaFullDetail["recentPosts"][number] }) {
-  const timeAgo = formatTimeAgo(post.createdAt)
+  const emoji = POST_TYPE_EMOJI[post.type] || ""
+  const typeLabel = POST_TYPE_LABELS[post.type] || post.type
 
   return (
     <div className="rounded-xl border border-gray-100 bg-white p-4 transition-all hover:border-violet-200 hover:shadow-sm">
       <div className="mb-2 flex items-center justify-between">
-        <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-600">
-          {POST_TYPE_LABELS[post.type]}
+        <span className="flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-600">
+          <span>{emoji}</span>
+          {typeLabel}
         </span>
-        <span className="text-xs text-gray-400">{timeAgo}</span>
+        <span className="text-xs text-gray-400">{formatTimeAgo(post.createdAt)}</span>
       </div>
       <p className="mb-3 line-clamp-3 text-sm text-gray-700">{post.content}</p>
       <div className="flex items-center gap-4 text-gray-400">
-        <button className="flex items-center gap-1 transition-colors hover:text-rose-500">
-          <Heart className="h-4 w-4" />
-          <span className="text-xs">{post.likeCount}</span>
-        </button>
-        <button className="flex items-center gap-1 transition-colors hover:text-violet-500">
-          <MessageCircle className="h-4 w-4" />
-          <span className="text-xs">{post.commentCount}</span>
-        </button>
-        <button className="flex items-center gap-1 transition-colors hover:text-green-500">
-          <Repeat2 className="h-4 w-4" />
-          <span className="text-xs">{post.repostCount}</span>
-        </button>
-        <button className="ml-auto transition-colors hover:text-gray-600">
-          <Share className="h-4 w-4" />
+        <span className="flex items-center gap-1 text-xs">
+          <Heart className="h-3.5 w-3.5" />
+          {post.likeCount}
+        </span>
+        <span className="flex items-center gap-1 text-xs">
+          <MessageCircle className="h-3.5 w-3.5" />
+          {post.commentCount}
+        </span>
+        <span className="flex items-center gap-1 text-xs">
+          <Repeat2 className="h-3.5 w-3.5" />
+          {post.repostCount}
+        </span>
+        <button className="ml-auto text-gray-300 hover:text-gray-500">
+          <Share className="h-3.5 w-3.5" />
         </button>
       </div>
     </div>
   )
 }
+
+// ── 메인 페이지 ───────────────────────────────────────────
 
 export default function PersonaDetailPage() {
   const params = useParams()
@@ -67,8 +211,8 @@ export default function PersonaDetailPage() {
   const [persona, setPersona] = useState<PersonaFullDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [activeLayers, setActiveLayers] = useState<Set<LayerKey>>(new Set(["L1", "L2", "L3"]))
 
-  // 현재 페르소나 팔로우 여부 확인
   const isFollowing = followedPersonas.some((f) => f.personaId === personaId)
 
   useEffect(() => {
@@ -93,14 +237,12 @@ export default function PersonaDetailPage() {
 
   const handleFollowToggle = () => {
     if (!persona) return
-
     if (isFollowing) {
       unfollowPersona(personaId)
       toast.success(`${persona.name}님을 언팔로우했습니다`)
     } else {
       followPersona(personaId, persona.name)
       toast.success(`${persona.name}님을 팔로우했습니다`)
-      // 팔로우 시 알림 추가 (데모용)
       addNotification({
         type: "recommendation",
         message: `${persona.name}님의 새로운 콘텐츠를 받아보세요!`,
@@ -108,6 +250,18 @@ export default function PersonaDetailPage() {
         personaName: persona.name,
       })
     }
+  }
+
+  const toggleLayer = (layer: LayerKey) => {
+    setActiveLayers((prev) => {
+      const next = new Set(prev)
+      if (next.has(layer)) {
+        if (next.size > 1) next.delete(layer) // 최소 1개 유지
+      } else {
+        next.add(layer)
+      }
+      return next
+    })
   }
 
   // 로딩 상태
@@ -146,6 +300,9 @@ export default function PersonaDetailPage() {
     )
   }
 
+  const roleEmoji = ROLE_EMOJI[persona.role] || "\uD83E\uDD16"
+  const colorBold = ROLE_COLORS_BOLD[persona.role] || "from-gray-400 to-gray-500"
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
@@ -161,25 +318,18 @@ export default function PersonaDetailPage() {
         </div>
       </header>
 
-      {/* 메인 콘텐츠 */}
-      <main className="mx-auto max-w-2xl px-4 py-6">
+      <main className="mx-auto max-w-2xl space-y-4 px-4 py-6">
         {/* 프로필 카드 */}
-        <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          {/* 프로필 상단 */}
+        <PWCard className="!p-5">
           <div className="mb-4 flex items-start justify-between">
             <div className="flex items-center gap-4">
-              {/* 아바타 */}
-              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-violet-400 to-purple-500 text-3xl shadow-lg">
-                {persona.profileImageUrl ? (
-                  <img
-                    src={persona.profileImageUrl}
-                    alt={persona.name}
-                    className="h-full w-full rounded-full object-cover"
-                  />
-                ) : (
-                  <span className="text-white">{persona.name.charAt(0)}</span>
-                )}
-              </div>
+              <PWProfileRing size="xl" animated>
+                <div
+                  className={`flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br ${colorBold} text-3xl text-white`}
+                >
+                  {roleEmoji}
+                </div>
+              </PWProfileRing>
               <div>
                 <h2 className="text-xl font-bold text-gray-900">{persona.name}</h2>
                 <p className="text-sm text-gray-500">{persona.handle}</p>
@@ -188,7 +338,6 @@ export default function PersonaDetailPage() {
                 </span>
               </div>
             </div>
-            {/* 팔로우 버튼 */}
             <button
               onClick={handleFollowToggle}
               className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${
@@ -211,13 +360,11 @@ export default function PersonaDetailPage() {
             </button>
           </div>
 
-          {/* 소개 */}
-          {persona.tagline && <p className="mb-3 text-gray-700">{persona.tagline}</p>}
+          {persona.tagline && <p className="mb-2 text-gray-700">{persona.tagline}</p>}
           {persona.description && (
-            <p className="mb-4 text-sm text-gray-600">{persona.description}</p>
+            <p className="mb-3 text-sm text-gray-600">{persona.description}</p>
           )}
 
-          {/* 전문 분야 */}
           {persona.expertise && persona.expertise.length > 0 && (
             <div className="mb-4 flex flex-wrap gap-2">
               {persona.expertise.map((exp) => (
@@ -231,70 +378,116 @@ export default function PersonaDetailPage() {
             </div>
           )}
 
-          {/* 통계 */}
+          {/* 통계 (AC4: 관계 미니맵) */}
           <div className="flex gap-6 border-t border-gray-100 pt-4">
             <div className="text-center">
               <p className="text-lg font-bold text-gray-900">{persona.postCount}</p>
               <p className="text-xs text-gray-500">포스트</p>
             </div>
             <div className="text-center">
-              <p className="text-lg font-bold text-gray-900">--</p>
+              <p className="text-lg font-bold text-gray-900">{persona.followerCount}</p>
               <p className="text-xs text-gray-500">팔로워</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-bold text-gray-900">{persona.followingCount}</p>
+              <p className="text-xs text-gray-500">팔로잉</p>
             </div>
             <div className="text-center">
               <p className="text-lg font-bold text-gray-900">{Math.round(persona.warmth * 100)}%</p>
               <p className="text-xs text-gray-500">따뜻함</p>
             </div>
           </div>
-        </div>
+        </PWCard>
 
-        {/* 성향 프로필 - 컬러 지문 + 게이지 바 */}
+        {/* Paradox Score (AC3) */}
+        <ParadoxScoreCard
+          paradoxScore={persona.paradoxScore}
+          dimensionalityScore={persona.dimensionalityScore}
+        />
+
+        {/* 3-Layer 성향 프로필 (AC1) */}
         {persona.vector && (
-          <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h3 className="mb-5 flex items-center gap-2 font-semibold text-gray-900">
-              <div className="flex h-6 w-6 items-center justify-center rounded bg-gradient-to-br from-violet-500 to-purple-600">
-                <FileText className="h-3 w-3 text-white" />
+          <PWCard className="!p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                <Layers className="h-4 w-4 text-violet-500" />
+                3-Layer 성향 프로필
+              </h3>
+              {/* 레이어 토글 버튼 */}
+              <div className="flex gap-1">
+                {(["L1", "L2", "L3"] as const).map((layer) => (
+                  <button
+                    key={layer}
+                    onClick={() => toggleLayer(layer)}
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition-all ${
+                      activeLayers.has(layer) ? "text-white" : "bg-gray-100 text-gray-400"
+                    }`}
+                    style={
+                      activeLayers.has(layer)
+                        ? { backgroundColor: LAYER_COLORS[layer].primary }
+                        : undefined
+                    }
+                  >
+                    {layer}
+                  </button>
+                ))}
               </div>
-              성향 프로필
-            </h3>
-
-            {/* P-inger Print 2D (종합 인상) */}
-            <div className="mb-6 flex justify-center">
-              <div className="w-64">
-                <PingerPrint2D
-                  data={persona.vector as unknown as Record<string, number>}
-                  size={260}
-                />
-              </div>
             </div>
 
-            {/* 구분선 */}
-            <div className="mb-5 flex items-center gap-3">
-              <div className="h-px flex-1 bg-gray-100" />
-              <span className="text-xs text-gray-400">차원별 상세</span>
-              <div className="h-px flex-1 bg-gray-100" />
-            </div>
+            <div className="space-y-4">
+              {LAYER_CONFIG.filter(({ key }) => activeLayers.has(key)).map(
+                ({ key, dims, vectorKey }) => {
+                  const data = persona.vector![vectorKey]
+                  if (!data || Object.keys(data).length === 0) return null
 
-            {/* 게이지 바 (차원별 상세) */}
-            <div className="space-y-5">
-              {TRAIT_DIMENSIONS.filter((dim) => dim.key in persona.vector!).map((dim) => (
-                <TraitColorBar
-                  key={dim.key}
-                  dimension={dim}
-                  value={persona.vector![dim.key as keyof Vector6D]}
-                  size="md"
-                />
-              ))}
+                  return (
+                    <div
+                      key={key}
+                      className="rounded-xl border p-4"
+                      style={{
+                        borderColor: LAYER_COLORS[key].border,
+                        backgroundColor: LAYER_COLORS[key].bg,
+                      }}
+                    >
+                      <div className="mb-3 flex items-center gap-2">
+                        <span
+                          className="rounded-full px-2 py-0.5 text-xs font-bold text-white"
+                          style={{ backgroundColor: LAYER_COLORS[key].primary }}
+                        >
+                          {key}
+                        </span>
+                        <span className="text-sm font-medium text-gray-700">
+                          {LAYER_COLORS[key].label}
+                        </span>
+                      </div>
+                      <div className="space-y-3">
+                        {dims.map((dim) => {
+                          const value = data[dim.key as keyof typeof data]
+                          if (value == null) return null
+                          return (
+                            <GaugeBar
+                              key={dim.key}
+                              value={value}
+                              color={dim.color.primary}
+                              label={dim.label}
+                              lowLabel={dim.low}
+                              highLabel={dim.high}
+                            />
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                }
+              )}
             </div>
-          </div>
+          </PWCard>
         )}
 
-        {/* 최근 포스트 */}
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h3 className="mb-4 flex items-center gap-2 font-semibold text-gray-900">
-            <div className="flex h-6 w-6 items-center justify-center rounded bg-gradient-to-br from-violet-500 to-purple-600">
-              <MessageCircle className="h-3 w-3 text-white" />
-            </div>
+        {/* 최근 포스트 (AC5) */}
+        <PWCard className="!p-5">
+          <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-800">
+            <FileText className="h-4 w-4 text-violet-500" />
             최근 포스트
           </h3>
           {persona.recentPosts && persona.recentPosts.length > 0 ? (
@@ -309,7 +502,7 @@ export default function PersonaDetailPage() {
               <p className="text-sm text-gray-500">아직 작성한 포스트가 없습니다</p>
             </div>
           )}
-        </div>
+        </PWCard>
       </main>
     </div>
   )
