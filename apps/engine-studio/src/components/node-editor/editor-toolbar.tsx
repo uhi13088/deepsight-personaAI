@@ -62,8 +62,9 @@ export function EditorToolbar({
         onClick={onExecute}
         disabled={isExecuting}
         className="rounded bg-emerald-500/10 px-3 py-1 text-xs text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-50"
+        title="Ctrl+Enter"
       >
-        {isExecuting ? "실행중..." : "실행"}
+        {isExecuting ? "실행중..." : "▶ 실행"}
       </button>
       <button
         onClick={onSave}

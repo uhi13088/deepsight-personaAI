@@ -61,6 +61,7 @@ function PersonaNodeEditorInner() {
   const store = useNodeEditorStore()
   const { screenToFlowPosition } = useReactFlow()
   const canvasRef = useRef<HTMLDivElement>(null)
+  const handleExecuteRef = useRef<() => void>(() => {})
   const [executionResult, setExecutionResult] = useState<ExecutionEngineResult | null>(null)
   const [executeError, setExecuteError] = useState<string | null>(null)
 
@@ -278,6 +279,32 @@ function PersonaNodeEditorInner() {
     store.setValidationResult(result)
   }, [store])
 
+  // ── 자동 검증: 그래프 변경 시 300ms 디바운스 ──────────────
+
+  useEffect(() => {
+    if (store.nodes.length === 0) return
+    const timer = setTimeout(() => {
+      const result = validateGraph({ nodes: store.nodes, edges: store.edges })
+      store.setValidationResult(result)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [store.nodes, store.edges, store])
+
+  // ── 키보드 단축키: Ctrl+Enter → 실행 ─────────────────────
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault()
+        if (!store.isExecuting && store.nodes.length > 0) {
+          handleExecuteRef.current()
+        }
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [store.isExecuting, store.nodes.length])
+
   // ── T128-AC1: 실제 실행 엔진 연결 ────────────────────────
 
   const handleExecute = useCallback(async () => {
@@ -303,6 +330,9 @@ function PersonaNodeEditorInner() {
       setExecuteError(err instanceof Error ? err.message : "실행 중 오류 발생")
     }
   }, [store])
+
+  // ref를 최신 handleExecute로 갱신 (키보드 단축키에서 사용)
+  handleExecuteRef.current = handleExecute
 
   // ── T128-AC2: 저장/로드 ───────────────────────────────────
 
