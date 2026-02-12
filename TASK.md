@@ -429,13 +429,13 @@
   - AC4: ✅ `onboarding/index.ts` + 메인 index 업데이트
   - AC5: ✅ Build PASS + 1635 테스트 PASS (onboarding.test.ts 26개)
 
-- [ ] **T113: PW-Phase 5b 활동 학습 + 품질 모니터 + API**
+- [x] **T113: PW-Phase 5b 활동 학습 + 품질 모니터 + API**
   - 배경: 구현계획서 §5.4, §8. Adapt 연동 + Voice/Integrity 통합
-  - AC1: `onboarding/activity-learner.ts` — learnFromActivity (UIV→Adapt→벡터 보정 ±0.3 클램프) [PW-5-4]
-  - AC2: `quality-monitor.ts` — Voice 일관성 모니터링 (similarity<0.6 경고, <0.4 보류+재생성) + Integrity Score 자동 실행 [PW-5-7, PW-5-8]
-  - AC3: 온보딩 테스트 [PW-5-6]
-  - AC4: `/api/persona-world/onboarding/` API Routes [PW-5-9]
-  - AC5: Build PASS + 테스트 PASS
+  - AC1: ✅ `onboarding/activity-learner.ts` — learnFromActivity (Adapt 연동, ±0.3 클램프)
+  - AC2: ✅ `quality-monitor.ts` — Voice 일관성 (0.6/0.4 임계값) + Integrity Gate
+  - AC3: ✅ quality-monitor.test.ts 25개 테스트 PASS
+  - AC4: ✅ `/api/persona-world/onboarding/cold-start` + `/sns/connect`
+  - AC5: ✅ Build PASS + 1660 테스트 PASS
 
 - [ ] **T114: PW 프론트엔드 API 클라이언트 재작성**
   - 배경: persona-world/src/lib/api.ts + user-store.ts를 실제 백엔드 API로 전환

@@ -163,6 +163,8 @@ export {
   computeCompleteness,
   processSnsData,
   extractCombinedText,
+  learnFromActivity,
+  activityToUIV,
 } from "./onboarding"
 export type {
   OnboardingQuestion,
@@ -170,4 +172,25 @@ export type {
   OnboardingQuestionsProvider,
   OnboardingDataProvider,
   SnsDataProvider,
+  ActivityLearnerProvider,
+  ActivityLearnResult,
 } from "./onboarding"
+
+// Phase 5: Quality Monitor
+export {
+  checkVoiceConsistency,
+  extractVoiceFeatures,
+  runQualityGate,
+  cosineSimilarity,
+  VOICE_THRESHOLDS,
+  QUALITY_THRESHOLDS,
+} from "./quality-monitor"
+export type {
+  VoiceFeatures,
+  VoiceStatus,
+  VoiceCheckResult,
+  VoiceMonitorProvider,
+  QualityStatus,
+  QualityGateResult,
+  QualityGateProvider,
+} from "./quality-monitor"

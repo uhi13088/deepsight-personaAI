@@ -22,3 +22,7 @@ export type { OnboardingDataProvider } from "./onboarding-engine"
 // ── SNS Processor ──
 export { processSnsData, extractCombinedText } from "./sns-processor"
 export type { SnsDataProvider } from "./sns-processor"
+
+// ── Activity Learner ──
+export { learnFromActivity, activityToUIV } from "./activity-learner"
+export type { ActivityLearnerProvider, ActivityLearnResult } from "./activity-learner"
