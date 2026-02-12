@@ -51,6 +51,24 @@ export interface LogsResponse {
 }
 
 // ============================================================================
+// 에러 대시보드 (§7.2 + §7.3)
+// ============================================================================
+
+export interface ErrorDashboardData {
+  errorRateTrend: { date: string; errorRate: number; totalCalls: number; errors: number }[]
+  errorsByType: { code: number; description: string; count: number; percentage: number }[]
+  errorsByEndpoint: { endpoint: string; errorCount: number; errorRate: number }[]
+  topErrorMessages: { message: string; count: number; lastOccurred: string }[]
+}
+
+export interface ErrorAlertConfig {
+  enabled: boolean
+  errorRateThreshold: number
+  consecutiveErrorCount: number
+  notifyChannels: { email: boolean; slack: boolean; webhook: boolean }
+}
+
+// ============================================================================
 // 서비스 클래스
 // ============================================================================
 
@@ -95,12 +113,47 @@ class LogsService {
     return response.data.log
   }
 
-  async exportLogs(filters?: LogsFilters): Promise<Blob> {
+  async getErrorDashboard(period: string = "7d"): Promise<ErrorDashboardData> {
+    const response = await apiClient.get<ErrorDashboardData>("/logs/error-dashboard", { period })
+
+    if (!response.success || !response.data) {
+      throw new ApiError({
+        code: "ERROR_DASHBOARD_FETCH_FAILED",
+        message: "에러 대시보드 데이터를 불러오는데 실패했습니다.",
+        status: 500,
+        timestamp: new Date().toISOString(),
+      })
+    }
+
+    return response.data
+  }
+
+  async getErrorAlertConfig(): Promise<ErrorAlertConfig> {
+    const response = await apiClient.get<ErrorAlertConfig>("/logs/error-alert-config")
+
+    if (!response.success || !response.data) {
+      throw new ApiError({
+        code: "ERROR_ALERT_CONFIG_FETCH_FAILED",
+        message: "에러 알림 설정을 불러오는데 실패했습니다.",
+        status: 500,
+        timestamp: new Date().toISOString(),
+      })
+    }
+
+    return response.data
+  }
+
+  async updateErrorAlertConfig(config: ErrorAlertConfig): Promise<void> {
+    await apiClient.put("/logs/error-alert-config", config)
+  }
+
+  async exportLogs(filters?: LogsFilters, format: "csv" | "jsonl" = "csv"): Promise<Blob> {
     const params = new URLSearchParams()
     if (filters?.status) params.set("status", filters.status)
     if (filters?.endpoint) params.set("endpoint", filters.endpoint)
     if (filters?.startDate) params.set("startDate", filters.startDate)
     if (filters?.endDate) params.set("endDate", filters.endDate)
+    params.set("format", format)
 
     const response = await fetch(`/api/logs/export?${params.toString()}`, {
       credentials: "include",
