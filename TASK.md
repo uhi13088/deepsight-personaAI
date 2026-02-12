@@ -83,14 +83,14 @@
   - AC6: ✅ 6-Category 일관성 검증기 (STRUCTURE/L1_L2/L2_L3/QUAL_QUANT/CROSS_AXIS/DYNAMIC)
   - AC7: ✅ 테스트 37개 PASS (전체 180개) + Build PASS
 
-- [ ] **T72: 정성적 차원 생성기 — Backstory + Voice + Pressure + Zeitgeist**
+- [x] **T72: 정성적 차원 생성기 — Backstory + Voice + Pressure + Zeitgeist** ✅
   - 배경: 구현계획서 Phase 3. 벡터 너머의 정성적 페르소나 깊이
-  - AC1: Backstory 생성기 (배경 서사, 경험, 동기)
-  - AC2: Voice Profile 생성기 (말투, 어휘 수준, 커뮤니케이션 스타일)
-  - AC3: Pressure Context 생성기 (스트레스 반응, 압박 상황 행동 패턴)
-  - AC4: Zeitgeist Profile 생성기 (시대적 감수성, 트렌드 반응)
-  - AC5: 정성적 차원 에디터 UI (텍스트 에디터 + LLM 제안)
-  - AC6: 테스트 + 커밋 + 푸시
+  - AC1: ✅ Backstory 생성기 (origin, formativeExperience, innerConflict, selfNarrative, nlpKeywords)
+  - AC2: ✅ Voice Profile 생성기 (speechStyle, habitualExpressions, mannerisms, activationThresholds)
+  - AC3: ✅ Pressure Context 생성기 (triggers, stressResponse, comfortZone)
+  - AC4: ✅ Zeitgeist Profile 생성기 (culturalReferences, generationalMarkers, socialAwareness, trendSensitivity)
+  - AC5: ✅ 정성적 차원 에디터 UI (4탭: 배경/보이스/압박/시대, 텍스트 에디터 + 자동 생성)
+  - AC6: ✅ 테스트 18개 PASS (전체 198개) + Build PASS
 
 - [ ] **T73: 하이브리드 연결 메커니즘 — Init/Override/Adapt/Express**
   - 배경: 구현계획서 Phase 4. 정성↔정량 4대 알고리즘
