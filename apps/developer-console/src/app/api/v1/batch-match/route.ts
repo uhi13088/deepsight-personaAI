@@ -1,33 +1,57 @@
 import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
 import prisma from "@/lib/prisma"
-import { validateApiKey } from "@/lib/api-key-validator"
+import { validateApiKey, type ValidatedApiKey } from "@/lib/api-key-validator"
 import { trackApiUsage } from "@/lib/usage-tracker"
-import type { PersonaVector } from "@deepsight/shared-types"
-import type { Persona } from "@prisma/client"
 
-type MatchResult = {
-  personaId: string
-  name: string
-  category: string
-  score: number
+// ============================================================================
+// Types
+// ============================================================================
+
+type MatchingTier = "basic" | "advanced" | "exploration"
+
+interface BatchMatchItem {
+  user_id: string
+  context?: {
+    category?: string
+    time_of_day?: string
+    device?: string
+    custom?: Record<string, unknown>
+  }
+  options?: {
+    top_n?: number
+    matching_tier?: MatchingTier
+    include_score?: boolean
+  }
 }
 
 // ============================================================================
-// Vector Utilities (same as match API)
+// Rate Limit Helpers
 // ============================================================================
 
-function cosineSimilarity(v1: PersonaVector, v2: PersonaVector): number {
-  const dimensions = ["depth", "lens", "stance", "scope", "taste", "purpose"] as const
+function getRateLimitHeaders(apiKey: ValidatedApiKey) {
+  const limit = apiKey.rateLimit
+  const resetTime = Math.floor(Date.now() / 60000) * 60 + 60
+  return {
+    "X-RateLimit-Limit": String(limit),
+    "X-RateLimit-Remaining": String(Math.max(0, limit - 1)),
+    "X-RateLimit-Reset": String(resetTime),
+  }
+}
 
+// ============================================================================
+// Vector Utilities
+// ============================================================================
+
+function cosineSimilarity(v1: number[], v2: number[]): number {
   let dotProduct = 0
   let magnitude1 = 0
   let magnitude2 = 0
 
-  for (const dim of dimensions) {
-    dotProduct += v1[dim] * v2[dim]
-    magnitude1 += v1[dim] ** 2
-    magnitude2 += v2[dim] ** 2
+  for (let i = 0; i < v1.length; i++) {
+    dotProduct += v1[i] * v2[i]
+    magnitude1 += v1[i] ** 2
+    magnitude2 += v2[i] ** 2
   }
 
   magnitude1 = Math.sqrt(magnitude1)
@@ -38,51 +62,34 @@ function cosineSimilarity(v1: PersonaVector, v2: PersonaVector): number {
   return dotProduct / (magnitude1 * magnitude2)
 }
 
-function analyzeContent(content: string): PersonaVector {
-  const lowerContent = content.toLowerCase()
-  const wordCount = content.split(/\s+/).length
-  const sentenceCount = content.split(/[.!?]+/).filter(Boolean).length
+function computeScore(
+  persona: {
+    l1: number[]
+    l2: number[] | null
+    eps: number | null
+  },
+  tier: MatchingTier
+): number {
+  const defaultL1 = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+  const l1Score = cosineSimilarity(persona.l1, defaultL1)
 
-  const avgWordsPerSentence = wordCount / Math.max(sentenceCount, 1)
-  const depth = Math.min(1, Math.max(0, (avgWordsPerSentence - 5) / 25))
+  if (tier === "basic") {
+    return Math.round(l1Score * 1000) / 10
+  }
 
-  const subjectiveWords = ["i think", "i feel", "personally", "opinion", "believe", "seems"]
-  const subjectiveCount = subjectiveWords.filter((w) => lowerContent.includes(w)).length
-  const lens = Math.min(1, subjectiveCount / 3)
+  let l2Score = 0
+  if (persona.l2) {
+    l2Score = cosineSimilarity(persona.l2, [0.5, 0.5, 0.5, 0.5, 0.5])
+  }
 
-  const progressiveWords = ["innovation", "future", "new", "change", "disrupt", "modern"]
-  const conservativeWords = ["traditional", "proven", "stable", "established", "classic"]
-  const progressiveCount = progressiveWords.filter((w) => lowerContent.includes(w)).length
-  const conservativeCount = conservativeWords.filter((w) => lowerContent.includes(w)).length
-  const stance =
-    progressiveCount + conservativeCount > 0
-      ? progressiveCount / (progressiveCount + conservativeCount)
-      : 0.5
+  const eps = persona.eps ?? 0
+  const overall = l1Score * 0.7 + l2Score * 0.2 + eps * 0.1
 
-  const socialWords = ["community", "society", "everyone", "people", "world", "global"]
-  const individualWords = ["personal", "individual", "myself", "my own", "private"]
-  const socialCount = socialWords.filter((w) => lowerContent.includes(w)).length
-  const individualCount = individualWords.filter((w) => lowerContent.includes(w)).length
-  const scope =
-    socialCount + individualCount > 0 ? socialCount / (socialCount + individualCount) : 0.5
-
-  const nicheWords = ["exclusive", "artisan", "boutique", "niche", "specialized", "unique"]
-  const mainstreamWords = ["popular", "mainstream", "common", "standard", "typical"]
-  const nicheCount = nicheWords.filter((w) => lowerContent.includes(w)).length
-  const mainstreamCount = mainstreamWords.filter((w) => lowerContent.includes(w)).length
-  const taste = nicheCount + mainstreamCount > 0 ? nicheCount / (nicheCount + mainstreamCount) : 0.5
-
-  const infoWords = ["data", "facts", "statistics", "research", "study", "analysis"]
-  const emotionWords = ["feel", "love", "hate", "amazing", "terrible", "excited", "beautiful"]
-  const infoCount = infoWords.filter((w) => lowerContent.includes(w)).length
-  const emotionCount = emotionWords.filter((w) => lowerContent.includes(w)).length
-  const purpose = infoCount + emotionCount > 0 ? emotionCount / (infoCount + emotionCount) : 0.5
-
-  return { depth, lens, stance, scope, taste, purpose }
+  return Math.round(overall * 1000) / 10
 }
 
 // ============================================================================
-// POST /api/v1/batch-match - Batch match multiple contents to personas
+// POST /api/v1/batch-match — v3 배치 매칭
 // ============================================================================
 
 export async function POST(request: NextRequest) {
@@ -100,7 +107,7 @@ export async function POST(request: NextRequest) {
             code: validation.error?.code || "UNAUTHORIZED",
             message: validation.error?.message || "Invalid API key",
           },
-          requestId,
+          meta: { request_id: requestId },
         },
         { status: 401 }
       )
@@ -108,133 +115,136 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json()
-    const { contents, options = {} } = body
+    const { items } = body
 
-    // Validate contents
-    if (!contents || !Array.isArray(contents)) {
+    // Validate items array
+    if (!items || !Array.isArray(items)) {
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: "INVALID_CONTENTS",
-            message: "contents is required and must be an array",
+            code: "INVALID_ITEMS",
+            message: "items is required and must be an array of match requests",
           },
-          requestId,
+          meta: { request_id: requestId },
         },
-        { status: 400 }
+        {
+          status: 400,
+          headers: getRateLimitHeaders(validation.apiKey),
+        }
       )
     }
 
-    if (contents.length === 0) {
+    if (items.length === 0) {
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: "EMPTY_CONTENTS",
-            message: "contents array must not be empty",
+            code: "EMPTY_ITEMS",
+            message: "items array must not be empty",
           },
-          requestId,
+          meta: { request_id: requestId },
         },
-        { status: 400 }
+        {
+          status: 400,
+          headers: getRateLimitHeaders(validation.apiKey),
+        }
       )
     }
 
-    if (contents.length > 100) {
+    if (items.length > 100) {
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: "TOO_MANY_CONTENTS",
-            message: "contents array must not exceed 100 items",
+            code: "TOO_MANY_ITEMS",
+            message: "items array must not exceed 100 items",
           },
-          requestId,
+          meta: { request_id: requestId },
         },
-        { status: 400 }
+        {
+          status: 400,
+          headers: getRateLimitHeaders(validation.apiKey),
+        }
       )
     }
 
-    // Validate each content
-    for (let i = 0; i < contents.length; i++) {
-      const content = contents[i]
-      if (typeof content !== "string") {
+    // Validate each item
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i] as BatchMatchItem
+      if (!item.user_id || typeof item.user_id !== "string") {
         return NextResponse.json(
           {
             success: false,
             error: {
-              code: "INVALID_CONTENT",
-              message: `content at index ${i} must be a string`,
+              code: "INVALID_USER_ID",
+              message: `item at index ${i} must have a valid user_id`,
             },
-            requestId,
+            meta: { request_id: requestId },
           },
-          { status: 400 }
-        )
-      }
-      if (content.length < 10) {
-        return NextResponse.json(
           {
-            success: false,
-            error: {
-              code: "CONTENT_TOO_SHORT",
-              message: `content at index ${i} must be at least 10 characters`,
-            },
-            requestId,
-          },
-          { status: 400 }
-        )
-      }
-      if (content.length > 10000) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: "CONTENT_TOO_LONG",
-              message: `content at index ${i} must not exceed 10,000 characters`,
-            },
-            requestId,
-          },
-          { status: 400 }
+            status: 400,
+            headers: getRateLimitHeaders(validation.apiKey),
+          }
         )
       }
     }
 
-    const limit = Math.min(Math.max(options.limit || 5, 1), 20)
-    const threshold = Math.max(Math.min(options.threshold || 0.0, 1.0), 0.0)
-
-    // Fetch all active personas once
+    // Fetch all active personas once (optimization)
     const personas = await prisma.persona.findMany({
       where: { active: true },
     })
 
-    // Process each content
-    const results = contents.map((content: string) => {
-      const contentVector = analyzeContent(content)
+    // Process each item
+    const results = (items as BatchMatchItem[]).map((item) => {
+      const topN = Math.min(Math.max(item.options?.top_n || 5, 1), 20)
+      const tier = item.options?.matching_tier || "basic"
+      const includeScore = item.options?.include_score !== false
 
-      const matches = personas
-        .map((persona: Persona) => {
-          const personaVector: PersonaVector = {
-            depth: Number(persona.depth),
-            lens: Number(persona.lens),
-            stance: Number(persona.stance),
-            scope: Number(persona.scope),
-            taste: Number(persona.taste),
-            purpose: Number(persona.purpose),
-          }
+      // Filter personas by category if specified
+      const filteredPersonas = item.context?.category
+        ? personas.filter((p) => p.category === item.context!.category)
+        : personas
 
-          const score = cosineSimilarity(contentVector, personaVector)
+      const matches = filteredPersonas
+        .map((persona) => {
+          const l1 = [
+            Number(persona.depth),
+            Number(persona.lens),
+            Number(persona.stance),
+            Number(persona.scope),
+            Number(persona.taste),
+            Number(persona.purpose),
+            Number(persona.sociability),
+          ]
+
+          const l2 =
+            persona.openness !== null
+              ? [
+                  Number(persona.openness),
+                  Number(persona.conscientiousness),
+                  Number(persona.extraversion),
+                  Number(persona.agreeableness),
+                  Number(persona.neuroticism),
+                ]
+              : null
+
+          const eps = persona.extendedParadoxScore ? Number(persona.extendedParadoxScore) : null
+
+          const score = computeScore({ l1, l2, eps }, tier)
 
           return {
-            personaId: persona.id,
-            name: persona.name,
-            category: persona.category || "General",
-            score: Math.round(score * 1000) / 1000,
+            persona_id: persona.id,
+            persona_name: persona.name,
+            score: includeScore ? score : undefined,
           }
         })
-        .filter((m: MatchResult) => m.score >= threshold)
-        .sort((a: MatchResult, b: MatchResult) => b.score - a.score)
-        .slice(0, limit)
+        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+        .slice(0, topN)
 
       return {
-        content: content.slice(0, 100) + (content.length > 100 ? "..." : ""),
+        user_id: item.user_id,
+        matching_tier: tier,
         matches,
       }
     })
@@ -249,23 +259,26 @@ export async function POST(request: NextRequest) {
       "/api/v1/batch-match",
       200,
       processingTime,
-      { contents_count: contents.length, limit, threshold },
+      { items_count: items.length },
       { results_count: results.length }
     )
 
-    return NextResponse.json({
-      success: true,
-      requestId,
-      data: {
-        results,
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          results,
+        },
+        meta: {
+          request_id: requestId,
+          total_items: items.length,
+          processing_time_ms: processingTime,
+        },
       },
-      meta: {
-        totalContents: contents.length,
-        limit,
-        thresholdApplied: threshold,
-        processingTimeMs: processingTime,
-      },
-    })
+      {
+        headers: getRateLimitHeaders(validation.apiKey),
+      }
+    )
   } catch (error) {
     console.error("Batch Match API error:", error)
 
@@ -278,8 +291,10 @@ export async function POST(request: NextRequest) {
           code: "INTERNAL_ERROR",
           message: "An error occurred while processing the batch match request",
         },
-        requestId,
-        processingTimeMs: processingTime,
+        meta: {
+          request_id: requestId,
+          processing_time_ms: processingTime,
+        },
       },
       { status: 500 }
     )

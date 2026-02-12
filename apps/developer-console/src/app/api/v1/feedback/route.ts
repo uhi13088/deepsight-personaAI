@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
 import prisma from "@/lib/prisma"
-import { validateApiKey } from "@/lib/api-key-validator"
+import { validateApiKey, type ValidatedApiKey } from "@/lib/api-key-validator"
 import { trackApiUsage } from "@/lib/usage-tracker"
 import type { FeedbackType } from "@prisma/client"
 
@@ -9,20 +9,29 @@ import type { FeedbackType } from "@prisma/client"
 // Types
 // ============================================================================
 
-const VALID_FEEDBACK_TYPES = ["positive", "negative", "neutral"] as const
+const VALID_FEEDBACK_TYPES = ["LIKE", "DISLIKE"] as const
 type FeedbackInput = (typeof VALID_FEEDBACK_TYPES)[number]
 
 function mapFeedbackToEnum(feedback: FeedbackInput): FeedbackType {
-  const mapping: Record<FeedbackInput, FeedbackType> = {
-    positive: "POSITIVE",
-    negative: "NEGATIVE",
-    neutral: "NEUTRAL",
-  }
-  return mapping[feedback]
+  return feedback as FeedbackType
 }
 
 // ============================================================================
-// POST /api/v1/feedback - Submit feedback for a match result
+// Rate Limit Helpers
+// ============================================================================
+
+function getRateLimitHeaders(apiKey: ValidatedApiKey) {
+  const limit = apiKey.rateLimit
+  const resetTime = Math.floor(Date.now() / 60000) * 60 + 60
+  return {
+    "X-RateLimit-Limit": String(limit),
+    "X-RateLimit-Remaining": String(Math.max(0, limit - 1)),
+    "X-RateLimit-Reset": String(resetTime),
+  }
+}
+
+// ============================================================================
+// POST /api/v1/feedback — v3 피드백 전송 (스펙 §9.3.4)
 // ============================================================================
 
 export async function POST(request: NextRequest) {
@@ -40,7 +49,7 @@ export async function POST(request: NextRequest) {
             code: validation.error?.code || "UNAUTHORIZED",
             message: validation.error?.message || "Invalid API key",
           },
-          requestId,
+          meta: { request_id: requestId },
         },
         { status: 401 }
       )
@@ -48,35 +57,59 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json()
-    const { matchId, feedback, comment } = body
+    const { user_id, persona_id, feedback_type, content_id, comment } = body
 
-    // Validate matchId
-    if (!matchId || typeof matchId !== "string") {
+    // Validate user_id
+    if (!user_id || typeof user_id !== "string") {
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: "INVALID_MATCH_ID",
-            message: "matchId is required and must be a string",
+            code: "INVALID_USER_ID",
+            message: "user_id is required and must be a string",
           },
-          requestId,
+          meta: { request_id: requestId },
         },
-        { status: 400 }
+        {
+          status: 400,
+          headers: getRateLimitHeaders(validation.apiKey),
+        }
       )
     }
 
-    // Validate feedback
-    if (!feedback || !VALID_FEEDBACK_TYPES.includes(feedback)) {
+    // Validate persona_id
+    if (!persona_id || typeof persona_id !== "string") {
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: "INVALID_FEEDBACK",
-            message: `feedback must be one of: ${VALID_FEEDBACK_TYPES.join(", ")}`,
+            code: "INVALID_PERSONA_ID",
+            message: "persona_id is required and must be a string",
           },
-          requestId,
+          meta: { request_id: requestId },
         },
-        { status: 400 }
+        {
+          status: 400,
+          headers: getRateLimitHeaders(validation.apiKey),
+        }
+      )
+    }
+
+    // Validate feedback_type
+    if (!feedback_type || !VALID_FEEDBACK_TYPES.includes(feedback_type)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "INVALID_FEEDBACK_TYPE",
+            message: `feedback_type must be one of: ${VALID_FEEDBACK_TYPES.join(", ")}`,
+          },
+          meta: { request_id: requestId },
+        },
+        {
+          status: 400,
+          headers: getRateLimitHeaders(validation.apiKey),
+        }
       )
     }
 
@@ -90,9 +123,12 @@ export async function POST(request: NextRequest) {
               code: "INVALID_COMMENT",
               message: "comment must be a string",
             },
-            requestId,
+            meta: { request_id: requestId },
           },
-          { status: 400 }
+          {
+            status: 400,
+            headers: getRateLimitHeaders(validation.apiKey),
+          }
         )
       }
       if (comment.length > 1000) {
@@ -103,90 +139,57 @@ export async function POST(request: NextRequest) {
               code: "COMMENT_TOO_LONG",
               message: "comment must not exceed 1000 characters",
             },
-            requestId,
+            meta: { request_id: requestId },
           },
-          { status: 400 }
+          {
+            status: 400,
+            headers: getRateLimitHeaders(validation.apiKey),
+          }
         )
       }
     }
 
-    // Find the match result by requestId
-    const matchResult = await prisma.matchResult.findFirst({
-      where: { requestId: matchId },
-      include: {
-        feedback: true,
-        persona: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
+    // Verify persona exists
+    const persona = await prisma.persona.findUnique({
+      where: { id: persona_id },
+      select: { id: true, name: true },
     })
 
-    if (!matchResult) {
+    if (!persona) {
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: "MATCH_NOT_FOUND",
-            message: "Match result not found with the given matchId",
+            code: "PERSONA_NOT_FOUND",
+            message: `Persona with id '${persona_id}' not found`,
           },
-          requestId,
+          meta: { request_id: requestId },
         },
-        { status: 404 }
+        {
+          status: 404,
+          headers: getRateLimitHeaders(validation.apiKey),
+        }
       )
     }
 
-    // Check if feedback already exists for this match
-    if (matchResult.feedback) {
-      // Update existing feedback
-      const updatedFeedback = await prisma.matchFeedback.update({
-        where: { id: matchResult.feedback.id },
-        data: {
-          feedback: mapFeedbackToEnum(feedback),
-          comment: comment || null,
-        },
-      })
+    // Create a match result entry to associate feedback with
+    const matchResult = await prisma.matchResult.create({
+      data: {
+        requestId: `feedback_${requestId}`,
+        userId: user_id,
+        personaId: persona_id,
+        matchingTier: "BASIC",
+        overallScore: null,
+        context: content_id ? { content_id } : undefined,
+        processingTimeMs: 0,
+      },
+    })
 
-      const processingTime = Date.now() - startTime
-
-      // Track usage
-      await trackApiUsage(
-        request,
-        validation.apiKey,
-        requestId,
-        "/api/v1/feedback",
-        200,
-        processingTime,
-        { matchId, feedback, comment: comment ? "[provided]" : null },
-        { feedbackId: updatedFeedback.id, action: "updated" }
-      )
-
-      return NextResponse.json({
-        success: true,
-        requestId,
-        data: {
-          feedbackId: updatedFeedback.id,
-          matchId,
-          personaId: matchResult.persona.id,
-          personaName: matchResult.persona.name,
-          feedback,
-          comment: comment || null,
-          updatedAt: updatedFeedback.createdAt.toISOString(),
-        },
-        meta: {
-          action: "updated",
-          processingTimeMs: processingTime,
-        },
-      })
-    }
-
-    // Create new feedback
+    // Create feedback
     const newFeedback = await prisma.matchFeedback.create({
       data: {
         matchResultId: matchResult.id,
-        feedback: mapFeedbackToEnum(feedback),
+        feedback: mapFeedbackToEnum(feedback_type),
         comment: comment || null,
       },
     })
@@ -199,31 +202,27 @@ export async function POST(request: NextRequest) {
       validation.apiKey,
       requestId,
       "/api/v1/feedback",
-      201,
+      200,
       processingTime,
-      { matchId, feedback, comment: comment ? "[provided]" : null },
-      { feedbackId: newFeedback.id, action: "created" }
+      { user_id, persona_id, feedback_type },
+      { feedback_id: newFeedback.id }
     )
 
     return NextResponse.json(
       {
         success: true,
-        requestId,
         data: {
-          feedbackId: newFeedback.id,
-          matchId,
-          personaId: matchResult.persona.id,
-          personaName: matchResult.persona.name,
-          feedback,
-          comment: comment || null,
-          createdAt: newFeedback.createdAt.toISOString(),
+          feedback_id: newFeedback.id,
+          processed: true,
         },
         meta: {
-          action: "created",
-          processingTimeMs: processingTime,
+          request_id: requestId,
+          processing_time_ms: processingTime,
         },
       },
-      { status: 201 }
+      {
+        headers: getRateLimitHeaders(validation.apiKey),
+      }
     )
   } catch (error) {
     console.error("Feedback API error:", error)
@@ -237,143 +236,10 @@ export async function POST(request: NextRequest) {
           code: "INTERNAL_ERROR",
           message: "An error occurred while submitting feedback",
         },
-        requestId,
-        processingTimeMs: processingTime,
-      },
-      { status: 500 }
-    )
-  }
-}
-
-// ============================================================================
-// GET /api/v1/feedback - Get feedback for a match result
-// ============================================================================
-
-export async function GET(request: NextRequest) {
-  const startTime = Date.now()
-  const requestId = "req_" + crypto.randomBytes(12).toString("hex")
-
-  try {
-    // Validate API key
-    const validation = await validateApiKey(request)
-    if (!validation.valid || !validation.apiKey) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: validation.error?.code || "UNAUTHORIZED",
-            message: validation.error?.message || "Invalid API key",
-          },
-          requestId,
-        },
-        { status: 401 }
-      )
-    }
-
-    const { searchParams } = new URL(request.url)
-    const matchId = searchParams.get("matchId")
-
-    // Validate matchId
-    if (!matchId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "MISSING_MATCH_ID",
-            message: "matchId query parameter is required",
-          },
-          requestId,
-        },
-        { status: 400 }
-      )
-    }
-
-    // Find the match result with feedback
-    const matchResult = await prisma.matchResult.findFirst({
-      where: { requestId: matchId },
-      include: {
-        feedback: true,
-        persona: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    })
-
-    if (!matchResult) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: {
-            code: "MATCH_NOT_FOUND",
-            message: "Match result not found with the given matchId",
-          },
-          requestId,
-        },
-        { status: 404 }
-      )
-    }
-
-    const processingTime = Date.now() - startTime
-
-    // Track usage
-    await trackApiUsage(
-      request,
-      validation.apiKey,
-      requestId,
-      "/api/v1/feedback",
-      200,
-      processingTime,
-      { matchId },
-      { hasFeedback: !!matchResult.feedback }
-    )
-
-    if (!matchResult.feedback) {
-      return NextResponse.json({
-        success: true,
-        requestId,
-        data: null,
         meta: {
-          matchId,
-          hasFeedback: false,
-          processingTimeMs: processingTime,
+          request_id: requestId,
+          processing_time_ms: processingTime,
         },
-      })
-    }
-
-    return NextResponse.json({
-      success: true,
-      requestId,
-      data: {
-        feedbackId: matchResult.feedback.id,
-        matchId,
-        personaId: matchResult.persona.id,
-        personaName: matchResult.persona.name,
-        feedback: matchResult.feedback.feedback.toLowerCase(),
-        comment: matchResult.feedback.comment,
-        createdAt: matchResult.feedback.createdAt.toISOString(),
-      },
-      meta: {
-        hasFeedback: true,
-        processingTimeMs: processingTime,
-      },
-    })
-  } catch (error) {
-    console.error("Feedback GET API error:", error)
-
-    const processingTime = Date.now() - startTime
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: "INTERNAL_ERROR",
-          message: "An error occurred while fetching feedback",
-        },
-        requestId,
-        processingTimeMs: processingTime,
       },
       { status: 500 }
     )
