@@ -382,6 +382,43 @@
     - 역설 심화 18문항 (역설 패턴 6종 × 3문항)
   - AC2: 커밋 + 푸시
 
+### Phase D: 엔진 스튜디오 대시보드 UI 구축 (T96~T99)
+
+> lib/ 비즈니스 로직(T56~T67)은 완료. 12개 placeholder 페이지에 실제 UI 연결.
+> 패턴: Header + 탭/카드 레이아웃 + lib 함수 호출 + shadcn/ui 컴포넌트.
+
+- [ ] **T96: User Insight 3페이지 UI — Cold Start + Psychometric + Archetype**
+  - 배경: lib/user-insight/ 6파일 완성 (T56). stub 페이지 3개를 실제 관리 UI로 전환
+  - AC1: Cold Start Strategy — 질문 세트 CRUD 테이블 (Quick/Standard/Deep 3모드 탭), 질문 추가/편집/삭제, 순서 드래그, 응답→벡터 변환 미리보기
+  - AC2: Psychometric Model — OCEAN→L1 매핑 시각화, 반전 탐지 결과 테이블 (Δ≥0.25 하이라이트), 잠재 특성 3유형 카드
+  - AC3: Archetype Manager — 10종 아키타입 카드 그리드 (벡터 범위 시각화), 커스텀 아키타입 CRUD, 분류 규칙 편집, 유저 분포 통계
+  - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/user-insight/\*)
+  - AC5: 테스트 + Build PASS
+
+- [ ] **T97: Matching Lab 3페이지 UI — Simulator + Tuning + Analytics**
+  - 배경: lib/matching/ 10파일 완성 (T57, T58). stub 페이지 3개를 실제 연구소 UI로 전환
+  - AC1: Matching Simulator — 유저 벡터 입력 (수동/랜덤), 3-Tier 매칭 실행, 결과 카드 (점수+순위+XAI 설명), 배치 시뮬레이션 통계
+  - AC2: Algorithm Tuning — 6종 하이퍼파라미터 슬라이더, 6장르 가중치 테이블, Grid Search/Bayesian 자동 튜닝 실행, A/B 테스트 관리
+  - AC3: Performance Analytics — KPI 대시보드 (CTR/만족도/다양성), Shannon entropy 다양성 지수, 트렌드 차트, 이상 탐지 알림, 리포트 생성/CSV 내보내기
+  - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/matching-lab/\*)
+  - AC5: 테스트 + Build PASS
+
+- [ ] **T98: System Integration 3페이지 UI — Deployment + Versions + Event Bus**
+  - 배경: lib/system-integration/ 완성 (T66, ~2400줄). stub 페이지 3개를 실제 관리 UI로 전환
+  - AC1: Deployment Pipeline — 환경 3종 (DEV/STG/PROD) 상태 카드, 배포 워크플로우 타임라인 (build→test→deploy→verify), Canary Release 진행 게이지 (10%→50%→100%), 롤백 트리거 설정
+  - AC2: Version Control — 알고리즘 버전 목록 테이블 (상태 뱃지), 시맨틱 버전 범프 (Major/Minor/Patch), 버전 Diff 비교 뷰, 롤백 영향도 분석 + 실행
+  - AC3: Event Bus Monitor — 실시간 이벤트 로그 테이블 (타입/소스/상태 필터), 이벤트 통계 (delivered/failed/pending), 구독 관리, Sync Delay 리포트
+  - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/system-integration/\*)
+  - AC5: 테스트 + Build PASS
+
+- [ ] **T99: Operations 3페이지 UI — Monitoring + Incidents + Backup**
+  - 배경: lib/operations/ 완성 (T67, ~1600줄). stub 페이지 3개를 실제 운영 UI로 전환
+  - AC1: System Monitoring — 실시간 메트릭 카드 6종 (CPU/Memory/Disk/Network/API Latency/Error Rate), 임계값 알림 목록 (severity 컬러), 로그 검색 (레벨/소스/시간 필터), 대시보드 패널 레이아웃
+  - AC2: Incident Management — 장애 목록 테이블 (P0~P3 severity 뱃지), 장애 생성/삼분류, 타임라인 워크플로우 (Declared→In Progress→Resolved→Closed), Post-mortem 작성 폼, MTTR 통계
+  - AC3: Backup & Recovery — 백업 정책 3종 카드 (Full/Incremental/Differential), 백업 이력 테이블 (상태/크기/소요시간), DR 계획 관리, DR Drill 스케줄/결과, 용량 예측 차트 + 비용 최적화 권고
+  - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/operations/\*)
+  - AC5: 테스트 + Build PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
