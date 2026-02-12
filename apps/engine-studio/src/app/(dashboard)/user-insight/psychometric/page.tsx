@@ -1,16 +1,15 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
 import {
-  OCEAN_L1_MAPPINGS,
-  REVERSAL_THRESHOLD,
   predictL1FromL2,
   detectReversals,
   extractLatentTraits,
 } from "@/lib/user-insight/psychometric"
+import type { PsychometricMapping, LatentTrait } from "@/lib/user-insight/psychometric"
 import { L1_DIMENSIONS, L2_DIMENSIONS } from "@/constants/v3/dimensions"
 import type { CoreTemperamentVector } from "@/types"
 import { AlertTriangle, Eye, EyeOff, Sparkles } from "lucide-react"
@@ -31,7 +30,16 @@ const TRAIT_SOURCE_CONFIG = {
   },
 }
 
+interface PsychometricConfig {
+  mappings: PsychometricMapping[]
+  reversalThreshold: number
+}
+
 export default function PsychometricPage() {
+  const [config, setConfig] = useState<PsychometricConfig | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   // L2 OCEAN 슬라이더 입력
   const [l2, setL2] = useState<CoreTemperamentVector>({
     openness: 0.5,
@@ -53,7 +61,32 @@ export default function PsychometricPage() {
     return init
   })
 
-  // L2→L1 예측
+  // Fetch config from API
+  const fetchConfig = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/user-insight/psychometric")
+      const json = (await res.json()) as {
+        success: boolean
+        data?: PsychometricConfig
+        error?: { code: string; message: string }
+      }
+      if (json.success && json.data) {
+        setConfig(json.data)
+      } else {
+        setError(json.error?.message ?? "데이터를 불러오지 못했습니다")
+      }
+    } catch {
+      setError("서버와 통신 중 오류가 발생했습니다")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchConfig()
+  }, [fetchConfig])
+
+  // L2→L1 예측 (client-side for responsiveness)
   const predictedL1 = useMemo(() => predictL1FromL2(l2), [l2])
 
   // 반전 탐지
@@ -62,6 +95,32 @@ export default function PsychometricPage() {
 
   // 잠재 특성
   const latentTraits = useMemo(() => extractLatentTraits(explicit, implicit), [explicit, implicit])
+
+  if (loading) {
+    return (
+      <>
+        <Header title="Psychometric Model" description="OCEAN→L1 매핑, 반전 탐지, 잠재 특성 분석" />
+        <div className="flex items-center justify-center p-8">
+          <div className="text-muted-foreground text-sm">데이터를 불러오는 중...</div>
+        </div>
+      </>
+    )
+  }
+
+  if (error) {
+    return (
+      <>
+        <Header title="Psychometric Model" description="OCEAN→L1 매핑, 반전 탐지, 잠재 특성 분석" />
+        <div className="flex items-center justify-center p-8">
+          <div className="text-sm text-red-400">{error}</div>
+        </div>
+      </>
+    )
+  }
+
+  if (!config) return null
+
+  const { mappings, reversalThreshold } = config
 
   return (
     <>
@@ -84,7 +143,7 @@ export default function PsychometricPage() {
                 </tr>
               </thead>
               <tbody>
-                {OCEAN_L1_MAPPINGS.map((mapping) => {
+                {mappings.map((mapping) => {
                   const l2Def = L2_DIMENSIONS.find((d) => d.key === mapping.l2Dimension)
                   return (
                     <tr key={mapping.l2Dimension} className="border-border border-b last:border-0">
@@ -118,7 +177,7 @@ export default function PsychometricPage() {
                                     : "bg-red-500/10 text-red-400/70"
                               }`}
                             >
-                              {isPositive ? "+" : "−"}
+                              {isPositive ? "+" : "\u2212"}
                               {intensity}%
                             </span>
                           </td>
@@ -173,7 +232,7 @@ export default function PsychometricPage() {
                     <div className="flex items-center justify-between">
                       <span className="text-xs">{dim.label}</span>
                       <span className="text-xs font-medium">
-                        {value !== null ? value.toFixed(2) : "—"}
+                        {value !== null ? value.toFixed(2) : "\u2014"}
                       </span>
                     </div>
                     <div className="bg-muted h-2 rounded-full">
@@ -198,7 +257,7 @@ export default function PsychometricPage() {
         {/* 반전 탐지 */}
         <div className="bg-card rounded-lg border p-4">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-medium">반전 탐지 (Δ ≥ {REVERSAL_THRESHOLD})</h3>
+            <h3 className="text-sm font-medium">반전 탐지 (Δ ≥ {reversalThreshold})</h3>
             {reversalCount > 0 && (
               <Badge variant="warning">
                 <AlertTriangle className="mr-1 h-3 w-3" />
@@ -267,7 +326,7 @@ export default function PsychometricPage() {
             </p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {latentTraits.map((trait, i) => {
+              {latentTraits.map((trait: LatentTrait, i: number) => {
                 const cfg = TRAIT_SOURCE_CONFIG[trait.source]
                 const Icon = cfg.icon
                 return (

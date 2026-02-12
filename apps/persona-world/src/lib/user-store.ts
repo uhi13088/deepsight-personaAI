@@ -4,6 +4,7 @@ import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type { ThreeLayerVector, OnboardingAnswer, SnsProvider, SnsConnection } from "./types"
 import type { ProfileLevel } from "./profile-level"
+import { clientApi } from "./api"
 
 // 사용자 프로필 타입
 export interface UserProfile {
@@ -130,6 +131,13 @@ const initialState = {
   notifications: [] as Notification[],
 }
 
+// Fire-and-forget 서버 동기화 (실패 시 로컬 상태 유지)
+function syncToServer(fn: () => Promise<unknown>): void {
+  fn().catch((err) => {
+    console.warn("[user-store] Server sync failed:", err)
+  })
+}
+
 // Zustand 스토어 생성
 export const useUserStore = create<UserState>()(
   persist(
@@ -201,33 +209,48 @@ export const useUserStore = create<UserState>()(
           }
         }),
 
-      // 팔로우 관리
-      followPersona: (personaId, personaName) =>
+      // 팔로우 관리 — Optimistic + Server Sync
+      followPersona: (personaId, personaName) => {
         set((state) => ({
           followedPersonas: [
             ...state.followedPersonas,
             { personaId, personaName, followedAt: new Date().toISOString() },
           ],
-        })),
+        }))
+        const userId = get().profile?.id
+        if (userId) {
+          syncToServer(() => clientApi.toggleFollow(personaId, userId))
+        }
+      },
 
-      unfollowPersona: (personaId) =>
+      unfollowPersona: (personaId) => {
         set((state) => ({
           followedPersonas: state.followedPersonas.filter((f) => f.personaId !== personaId),
-        })),
+        }))
+        const userId = get().profile?.id
+        if (userId) {
+          syncToServer(() => clientApi.toggleFollow(personaId, userId))
+        }
+      },
 
       isFollowing: (personaId) => get().followedPersonas.some((f) => f.personaId === personaId),
 
-      // 좋아요 관리
-      toggleLike: (postId) =>
+      // 좋아요 관리 — Optimistic + Server Sync
+      toggleLike: (postId) => {
         set((state) => ({
           likedPosts: state.likedPosts.includes(postId)
             ? state.likedPosts.filter((id) => id !== postId)
             : [...state.likedPosts, postId],
-        })),
+        }))
+        const userId = get().profile?.id
+        if (userId) {
+          syncToServer(() => clientApi.toggleLike(postId, userId))
+        }
+      },
 
       isLiked: (postId) => get().likedPosts.includes(postId),
 
-      // 북마크 관리
+      // 북마크 관리 (로컬 전용 — 서버 API 미존재)
       toggleBookmark: (postId) =>
         set((state) => ({
           bookmarkedPosts: state.bookmarkedPosts.includes(postId)
@@ -237,7 +260,7 @@ export const useUserStore = create<UserState>()(
 
       isBookmarked: (postId) => get().bookmarkedPosts.includes(postId),
 
-      // 알림 관리
+      // 알림 관리 (로컬 전용)
       addNotification: (notification) =>
         set((state) => ({
           notifications: [
@@ -267,7 +290,7 @@ export const useUserStore = create<UserState>()(
 
       unreadCount: () => get().notifications.filter((n) => !n.read).length,
 
-      // 데일리 질문 관리
+      // 데일리 질문 관리 (로컬 전용)
       answerDailyQuestion: (coins) =>
         set((state) => {
           const today = new Date().toISOString().slice(0, 10)
@@ -286,8 +309,8 @@ export const useUserStore = create<UserState>()(
           }
         }),
 
-      // SNS 연동 관리
-      connectSns: (provider, username) =>
+      // SNS 연동 관리 — Optimistic + Server Sync
+      connectSns: (provider, username) => {
         set((state) => {
           const existing = state.snsConnections.filter((c) => c.provider !== provider)
           return {
@@ -302,7 +325,21 @@ export const useUserStore = create<UserState>()(
               },
             ],
           }
-        }),
+        })
+        // SNS 연동 시 서버에 데이터 전송 → Init 알고리즘으로 벡터 보정
+        const userId = get().profile?.id
+        if (userId) {
+          syncToServer(() =>
+            clientApi.connectSns(userId, [
+              {
+                platform: provider.toUpperCase(),
+                profileData: { username },
+                extractedData: {},
+              },
+            ])
+          )
+        }
+      },
 
       disconnectSns: (provider) =>
         set((state) => ({

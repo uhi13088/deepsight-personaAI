@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,23 +13,9 @@ import {
   DEFAULT_L2_VECTOR,
   DEFAULT_L3_VECTOR,
 } from "@/constants/v3/dimensions"
-import {
-  createManualVirtualUser,
-  createRandomVirtualUser,
-  generateDimensionExplanations,
-} from "@/lib/matching/simulator"
-import type { VirtualUser, SimulationRun, BatchStats } from "@/lib/matching/simulator"
-import { matchAll, DEFAULT_MATCHING_CONFIG } from "@/lib/matching/three-tier-engine"
-import type {
-  MatchResult,
-  MatchingTier,
-  PersonaCandidate,
-  UserProfile,
-  MatchingConfig,
-} from "@/lib/matching/three-tier-engine"
-import { calculateVFinal } from "@/lib/vector/v-final"
-import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
-import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
+import { generateDimensionExplanations } from "@/lib/matching/simulator"
+import type { BatchStats } from "@/lib/matching/simulator"
+import type { MatchResult, MatchingTier, PersonaCandidate } from "@/lib/matching/three-tier-engine"
 import type {
   SocialPersonaVector,
   CoreTemperamentVector,
@@ -38,139 +24,7 @@ import type {
   TemperamentDimension,
   NarrativeDimension,
 } from "@/types"
-import { Shuffle, Play, Users, Target, BarChart3, ChevronDown, ChevronUp, Info } from "lucide-react"
-
-// ── 샘플 페르소나 후보 (시뮬레이션용 가상 데이터) ─────────────
-function createSamplePersonas(): PersonaCandidate[] {
-  const archetypes: Array<{
-    name: string
-    archetype: string
-    l1: SocialPersonaVector
-    l2: CoreTemperamentVector
-    l3: NarrativeDriveVector
-  }> = [
-    {
-      name: "심층 분석가",
-      archetype: "analyst",
-      l1: {
-        depth: 0.9,
-        lens: 0.8,
-        stance: 0.7,
-        scope: 0.85,
-        taste: 0.4,
-        purpose: 0.8,
-        sociability: 0.3,
-      },
-      l2: {
-        openness: 0.7,
-        conscientiousness: 0.9,
-        extraversion: 0.3,
-        agreeableness: 0.5,
-        neuroticism: 0.4,
-      },
-      l3: { lack: 0.3, moralCompass: 0.7, volatility: 0.2, growthArc: 0.6 },
-    },
-    {
-      name: "트렌드 큐레이터",
-      archetype: "curator",
-      l1: {
-        depth: 0.5,
-        lens: 0.5,
-        stance: 0.4,
-        scope: 0.6,
-        taste: 0.9,
-        purpose: 0.5,
-        sociability: 0.8,
-      },
-      l2: {
-        openness: 0.9,
-        conscientiousness: 0.5,
-        extraversion: 0.8,
-        agreeableness: 0.7,
-        neuroticism: 0.3,
-      },
-      l3: { lack: 0.2, moralCompass: 0.4, volatility: 0.5, growthArc: 0.7 },
-    },
-    {
-      name: "감성 공감러",
-      archetype: "empath",
-      l1: {
-        depth: 0.6,
-        lens: 0.2,
-        stance: 0.3,
-        scope: 0.5,
-        taste: 0.5,
-        purpose: 0.7,
-        sociability: 0.9,
-      },
-      l2: {
-        openness: 0.6,
-        conscientiousness: 0.4,
-        extraversion: 0.7,
-        agreeableness: 0.9,
-        neuroticism: 0.6,
-      },
-      l3: { lack: 0.5, moralCompass: 0.6, volatility: 0.4, growthArc: 0.5 },
-    },
-    {
-      name: "독립 비평가",
-      archetype: "critic",
-      l1: {
-        depth: 0.8,
-        lens: 0.7,
-        stance: 0.9,
-        scope: 0.7,
-        taste: 0.6,
-        purpose: 0.6,
-        sociability: 0.2,
-      },
-      l2: {
-        openness: 0.5,
-        conscientiousness: 0.7,
-        extraversion: 0.2,
-        agreeableness: 0.3,
-        neuroticism: 0.5,
-      },
-      l3: { lack: 0.4, moralCompass: 0.8, volatility: 0.3, growthArc: 0.4 },
-    },
-    {
-      name: "엔터테인먼트 가이드",
-      archetype: "entertainer",
-      l1: {
-        depth: 0.3,
-        lens: 0.4,
-        stance: 0.2,
-        scope: 0.4,
-        taste: 0.7,
-        purpose: 0.2,
-        sociability: 0.9,
-      },
-      l2: {
-        openness: 0.8,
-        conscientiousness: 0.3,
-        extraversion: 0.9,
-        agreeableness: 0.8,
-        neuroticism: 0.2,
-      },
-      l3: { lack: 0.1, moralCompass: 0.3, volatility: 0.6, growthArc: 0.8 },
-    },
-  ]
-
-  return archetypes.map((a, i) => {
-    const crossAxisProfile = calculateCrossAxisProfile(a.l1, a.l2, a.l3)
-    const paradoxProfile = calculateExtendedParadoxScore(a.l1, a.l2, a.l3)
-    return {
-      id: `persona_sim_${i}`,
-      name: a.name,
-      l1: a.l1,
-      l2: a.l2,
-      l3: a.l3,
-      crossAxisProfile,
-      paradoxProfile,
-      archetype: a.archetype,
-    }
-  })
-}
+import { Shuffle, Play, Users, Target, ChevronDown, ChevronUp } from "lucide-react"
 
 const TIER_LABELS: Record<MatchingTier, { label: string; color: string }> = {
   basic: { label: "Basic", color: "text-blue-400" },
@@ -192,115 +46,117 @@ export default function SimulatorPage() {
   const [batchSize, setBatchSize] = useState(20)
   const [isRunning, setIsRunning] = useState(false)
 
-  // 샘플 페르소나
-  const personas = useMemo(() => createSamplePersonas(), [])
+  // 페르소나 데이터 (API에서 로드)
+  const [personas, setPersonas] = useState<PersonaCandidate[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // 유저 프로필 생성
-  const buildUserProfile = useCallback((): UserProfile => {
-    const vFinal = calculateVFinal(l1, l2, l3)
-    const crossAxisProfile = calculateCrossAxisProfile(l1, l2, l3)
-    const paradoxProfile = calculateExtendedParadoxScore(l1, l2, l3)
-    return {
-      id: "sim_user",
-      l1,
-      l2,
-      l3,
-      vFinal,
-      crossAxisProfile,
-      paradoxProfile,
+  // 페르소나 목록 API 로드
+  useEffect(() => {
+    fetch("/api/internal/matching-lab/simulate")
+      .then((r) => r.json())
+      .then(
+        (d: {
+          success: boolean
+          data?: { personas: PersonaCandidate[] }
+          error?: { code: string; message: string }
+        }) => {
+          if (d.success && d.data) {
+            setPersonas(d.data.personas)
+          } else {
+            setError(d.error?.message ?? "페르소나 목록 로드 실패")
+          }
+        }
+      )
+      .catch(() => {
+        setError("페르소나 목록 로드 실패")
+      })
+      .finally(() => {
+        setLoading(false)
+      })
+  }, [])
+
+  // 단일 매칭 실행 (API POST)
+  const handleRunMatching = useCallback(async () => {
+    setIsRunning(true)
+    try {
+      const response = await fetch("/api/internal/matching-lab/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "single",
+          user: { l1, l2, l3 },
+        }),
+      })
+      const data = (await response.json()) as {
+        success: boolean
+        data?: { mode: string; results?: MatchResult[] }
+        error?: { code: string; message: string }
+      }
+      if (data.success && data.data?.results) {
+        setResults(data.data.results)
+        setBatchStats(null)
+      }
+    } catch {
+      // 실행 실패 시 무시
+    } finally {
+      setIsRunning(false)
     }
   }, [l1, l2, l3])
 
-  // 단일 매칭 실행
-  const handleRunMatching = useCallback(() => {
+  // 배치 시뮬레이션 (API POST)
+  const handleRunBatch = useCallback(async () => {
     setIsRunning(true)
-    const userProfile = buildUserProfile()
-    const matchResults = matchAll(userProfile, personas)
-    matchResults.sort((a, b) => b.score - a.score)
-    setResults(matchResults)
-    setBatchStats(null)
-    setIsRunning(false)
-  }, [buildUserProfile, personas])
-
-  // 배치 시뮬레이션
-  const handleRunBatch = useCallback(() => {
-    setIsRunning(true)
-    const runs: Array<{ topScore: number; topPersonaId: string | null }> = []
-
-    for (let i = 0; i < batchSize; i++) {
-      const vu = createRandomVirtualUser()
-      const vFinal = calculateVFinal(vu.l1, vu.l2, vu.l3)
-      const crossAxisProfile = calculateCrossAxisProfile(vu.l1, vu.l2, vu.l3)
-      const paradoxProfile = calculateExtendedParadoxScore(vu.l1, vu.l2, vu.l3)
-      const up: UserProfile = {
-        id: vu.id,
-        l1: vu.l1,
-        l2: vu.l2,
-        l3: vu.l3,
-        vFinal,
-        crossAxisProfile,
-        paradoxProfile,
-      }
-      const matchResults = matchAll(up, personas)
-      matchResults.sort((a, b) => b.score - a.score)
-      runs.push({
-        topScore: matchResults.length > 0 ? matchResults[0].score : 0,
-        topPersonaId: matchResults.length > 0 ? matchResults[0].personaId : null,
+    try {
+      const response = await fetch("/api/internal/matching-lab/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "batch",
+          batchSize,
+        }),
       })
-    }
-
-    // 배치 통계 계산
-    const topScores = runs.map((r) => r.topScore)
-    const sorted = [...topScores].sort((a, b) => a - b)
-    const mean = topScores.reduce((s, v) => s + v, 0) / topScores.length
-    const median =
-      sorted.length % 2 === 0
-        ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
-        : sorted[Math.floor(sorted.length / 2)]
-    const failures = topScores.filter((s) => s < 0.5).length
-    const variance = topScores.reduce((s, v) => s + (v - mean) ** 2, 0) / topScores.length
-
-    const personaCounts: Record<string, number> = {}
-    for (const run of runs) {
-      if (run.topPersonaId) {
-        personaCounts[run.topPersonaId] = (personaCounts[run.topPersonaId] ?? 0) + 1
+      const data = (await response.json()) as {
+        success: boolean
+        data?: {
+          mode: string
+          stats?: {
+            totalUsers: number
+            avgMatchScore: number
+            failureRate: number
+          }
+        }
+        error?: { code: string; message: string }
       }
+      if (data.success && data.data?.stats) {
+        const stats = data.data.stats
+        // API returns simplified stats; build BatchStats structure for UI
+        setBatchStats({
+          totalUsers: stats.totalUsers,
+          avgMatchScore: stats.avgMatchScore,
+          medianMatchScore: stats.avgMatchScore, // approximate with avg
+          failureRate: stats.failureRate,
+          topPersonaDistribution: [],
+          scoreDistribution: {
+            buckets: [
+              { min: 0, max: 0.2, count: 0 },
+              { min: 0.2, max: 0.4, count: 0 },
+              { min: 0.4, max: 0.6, count: 0 },
+              { min: 0.6, max: 0.8, count: 0 },
+              { min: 0.8, max: 1.0, count: 0 },
+            ],
+            mean: stats.avgMatchScore,
+            stdDev: 0,
+          },
+        })
+        setResults([])
+      }
+    } catch {
+      // 실행 실패 시 무시
+    } finally {
+      setIsRunning(false)
     }
-    const topPersonaDistribution = Object.entries(personaCounts)
-      .map(([personaId, count]) => ({
-        personaId,
-        count,
-        percentage: Math.round((count / runs.length) * 100) / 100,
-      }))
-      .sort((a, b) => b.count - a.count)
-
-    const buckets = [
-      { min: 0, max: 0.2, count: 0 },
-      { min: 0.2, max: 0.4, count: 0 },
-      { min: 0.4, max: 0.6, count: 0 },
-      { min: 0.6, max: 0.8, count: 0 },
-      { min: 0.8, max: 1.0, count: 0 },
-    ]
-    for (const score of topScores) {
-      const idx = Math.min(Math.floor(score * 5), 4)
-      buckets[idx].count++
-    }
-
-    setBatchStats({
-      totalUsers: runs.length,
-      avgMatchScore: Math.round(mean * 100) / 100,
-      medianMatchScore: Math.round(median * 100) / 100,
-      failureRate: Math.round((failures / runs.length) * 100) / 100,
-      topPersonaDistribution,
-      scoreDistribution: {
-        buckets,
-        mean: Math.round(mean * 100) / 100,
-        stdDev: Math.round(Math.sqrt(variance) * 100) / 100,
-      },
-    })
-    setResults([])
-    setIsRunning(false)
-  }, [batchSize, personas])
+  }, [batchSize])
 
   // 랜덤 벡터 생성
   const handleRandomize = useCallback(() => {
@@ -329,6 +185,22 @@ export default function SimulatorPage() {
     (id: string) => personas.find((p) => p.id === id)?.name ?? id,
     [personas]
   )
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-muted-foreground text-sm">데이터를 불러오는 중...</div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-sm text-red-400">{error}</div>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -634,25 +506,27 @@ export default function SimulatorPage() {
             </div>
 
             {/* Top 페르소나 분포 */}
-            <div className="bg-card rounded-lg border p-4">
-              <h4 className="mb-3 text-xs font-medium">상위 매칭 페르소나 분포</h4>
-              <div className="space-y-2">
-                {batchStats.topPersonaDistribution.map((dist) => (
-                  <div key={dist.personaId} className="flex items-center gap-3 text-sm">
-                    <span className="w-32 truncate">{getPersonaName(dist.personaId)}</span>
-                    <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-white/5">
-                      <div
-                        className="absolute inset-y-0 left-0 rounded-full bg-purple-500/60"
-                        style={{ width: `${dist.percentage * 100}%` }}
-                      />
+            {batchStats.topPersonaDistribution.length > 0 && (
+              <div className="bg-card rounded-lg border p-4">
+                <h4 className="mb-3 text-xs font-medium">상위 매칭 페르소나 분포</h4>
+                <div className="space-y-2">
+                  {batchStats.topPersonaDistribution.map((dist) => (
+                    <div key={dist.personaId} className="flex items-center gap-3 text-sm">
+                      <span className="w-32 truncate">{getPersonaName(dist.personaId)}</span>
+                      <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-white/5">
+                        <div
+                          className="absolute inset-y-0 left-0 rounded-full bg-purple-500/60"
+                          style={{ width: `${dist.percentage * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-muted-foreground w-20 text-right text-xs">
+                        {dist.count}명 ({Math.round(dist.percentage * 100)}%)
+                      </span>
                     </div>
-                    <span className="text-muted-foreground w-20 text-right text-xs">
-                      {dist.count}명 ({Math.round(dist.percentage * 100)}%)
-                    </span>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 

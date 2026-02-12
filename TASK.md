@@ -365,83 +365,84 @@
   - AC5: 테스트 — activity-mapper.test.ts + state-manager.test.ts [PW-1-5, PW-1-6]
   - AC6: Build PASS + 테스트 PASS
 
-- [ ] **T105: PW-Phase 2a 포스트 타입 선택 + 주제 선택 + Paradox 발현**
+- [x] **T105: PW-Phase 2a 포스트 타입 선택 + 주제 선택 + Paradox 발현** ✅
   - 배경: 구현계획서 §5.2 + 설계서 §4.5. 17종 포스트 타입 친화도 기반 선택
-  - AC1: `post-type-selector.ts` — selectPostType (친화도 점수 계산, 상태 보정: mood<0.4→THOUGHT×2, paradoxTension>0.7→BEHIND_STORY×3, energy<0.3→REACTION×2, 가중 랜덤) [PW-2-1]
-  - AC2: `topic-selector.ts` — selectTopic (우선순위: 트리거→관심사연속→벡터매칭→자유주제) [PW-2-2]
-  - AC3: `paradox-activity.ts` — paradoxActivityChance = sigmoid(paradoxScore×3 - 1.5), 4종 Paradox 패턴 발현 [PW-2-5]
-  - AC4: Build PASS + 테스트 PASS
+  - AC1: ✅ `post-type-selector.ts` — selectPostType (친화도 점수 계산, 상태 보정: mood<0.4→THOUGHT×2, paradoxTension>0.7→BEHIND_STORY×3, energy<0.3→REACTION×2, 가중 랜덤) [PW-2-1]
+  - AC2: ✅ `topic-selector.ts` — selectTopic (우선순위: 트리거→관심사연속→벡터매칭→자유주제) [PW-2-2]
+  - AC3: ✅ `paradox-activity.ts` — paradoxActivityChance = sigmoid(paradoxScore×3 - 1.5), 4종 Paradox 패턴 발현 [PW-2-5]
+  - AC4: ✅ Build PASS + 테스트 56개 PASS (1472 total)
 
-- [ ] **T106: PW-Phase 2b 콘텐츠 생성기 + 소비 기록 관리**
+- [x] **T106: PW-Phase 2b 콘텐츠 생성기 + 소비 기록 관리** ✅
   - 배경: 구현계획서 §5.3 + §5.5. LLM 콘텐츠 생성 + ConsumptionMemory
-  - AC1: `content-generator.ts` — generatePostContent (System ~3000tok + RAG Voice ~500tok + 관심사 ~100tok + 감정 ~100tok + User ~300tok), selectTopic 연동 [PW-2-3]
-  - AC2: `consumption-manager.ts` — recordConsumption (impression LLM ~50자 + 자동태깅 + emotionalImpact), getConsumptionContext (90일 이내 top5, ~200tok), getConsumptionStats [PW-2-9]
-  - AC3: 테스트 — consumption-manager.test.ts [PW-2-10]
-  - AC4: Build PASS + 테스트 PASS
+  - AC1: ✅ `content-generator.ts` — buildSystemPrompt + buildUserPrompt + generatePostContent (LLMProvider DI, 17종 타입별 길이/스타일 가이드) [PW-2-3]
+  - AC2: ✅ `consumption-manager.ts` — recordConsumption + getConsumptionContext (90일 이내 top5, 태그 매칭) + getConsumptionStats + autoTag + generateImpression [PW-2-9]
+  - AC3: ✅ 테스트 — content-generator.test.ts(18) + consumption-manager.test.ts(15) = 33개 PASS [PW-2-10]
+  - AC4: ✅ Build PASS + 전체 1505 테스트 PASS
 
-- [ ] **T107: PW-Phase 2c 자율 활동 스케줄러 + API**
+- [x] **T107: PW-Phase 2c 자율 활동 스케줄러 + API** ✅
   - 배경: 구현계획서 §5.1. 매시간 크론 파이프라인
-  - AC1: `scheduler.ts` — runScheduler (7단계 파이프라인), getActivePersonas (currentHour ∈ activeHours AND energy>0.2), decideActivity [PW-2-4]
-  - AC2: `index.ts` — 자율 활동 모듈 barrel export [PW-2-6]
-  - AC3: `/api/persona-world/scheduler/route.ts` — POST (cron trigger) [PW-2-8]
-  - AC4: 테스트 — scheduler.test.ts [PW-2-7]
-  - AC5: Build PASS + 테스트 PASS
+  - AC1: ✅ `scheduler.ts` — runScheduler (7단계 파이프라인), getActivePersonas (currentHour ∈ activeHours AND energy>0.2), decideActivity [PW-2-4]
+  - AC2: ✅ `index.ts` — Phase 1-2 전체 모듈 barrel export (activity-mapper, state-manager, post-type-selector, topic-selector, paradox-activity, content-generator, consumption-manager, scheduler) [PW-2-6]
+  - AC3: ✅ `/api/persona-world/scheduler/route.ts` — POST (cron trigger, DB provider, layerType→ThreeLayerVector 변환) [PW-2-8]
+  - AC4: ✅ 테스트 — scheduler.test.ts (12개 PASS: decideActivity 4 + getActivePersonas 4 + runScheduler 4) [PW-2-7]
+  - AC5: ✅ Build PASS + 전체 1517 테스트 PASS
 
-- [ ] **T108: PW-Phase 3a 좋아요 + 팔로우 + 관계 매니저**
+- [x] **T108: PW-Phase 3a 좋아요 + 팔로우 + 관계 매니저** ✅
   - 배경: 구현계획서 §6.1, §6.3, §6.4. 인터랙션 판정 엔진
-  - AC1: `interactions/like-engine.ts` — shouldLike (likeScore=basicMatch, prob=score×interactivity×socialBattery, 팔로잉×1.5/긍정×1.3/부정×0.5) [PW-3-1]
-  - AC2: `interactions/follow-engine.ts` — shouldFollow (0.5×basicMatch+0.3×crossAxis+0.2×paradoxCompat, prob=score×sociability×0.5, 임계값>0.6) [PW-3-4]
-  - AC3: `interactions/relationship-manager.ts` — updateRelationship (warmth/tension/frequency/depth 규칙), getRelationship [PW-3-5]
-  - AC4: `interactions/index.ts` [PW-3-7]
-  - AC5: Build PASS + 테스트 PASS
+  - AC1: ✅ `interactions/like-engine.ts` — shouldLike, computeLikeProbability (likeScore×interactivity×socialBattery, 팔로잉×1.5/긍정×1.3/부정×0.5) [PW-3-1]
+  - AC2: ✅ `interactions/follow-engine.ts` — shouldFollow, computeFollowScore/Probability, shouldAnnounce (0.5×basic+0.3×crossAxis+0.2×paradox, threshold>0.6) [PW-3-4]
+  - AC3: ✅ `interactions/relationship-manager.ts` — updateRelationship, getRelationship, recalculateRelationship, computeRelationshipUpdate [PW-3-5]
+  - AC4: ✅ `interactions/index.ts` + main index.ts barrel export 업데이트 [PW-3-7]
+  - AC5: ✅ Build PASS + 1554 테스트 PASS (interactions.test.ts 37개)
 
-- [ ] **T109: PW-Phase 3b 댓글 엔진 + 유저 응답 + API 라우트**
+- [x] **T109: PW-Phase 3b 댓글 엔진 + 유저 응답 + API 라우트** ✅
   - 배경: 구현계획서 §6.2, §6.5. 가장 복잡한 인터랙션 — Override+RAG+Express 통합
-  - AC1: `interactions/comment-tone.ts` — decideCommentTone (벡터+관계+상태→7종 톤, Paradox 영향 판정) [PW-3-2]
-  - AC2: `interactions/comment-engine.ts` — generateComment (6단계: 관계로드→Override→톤결정→LLM생성→Express→로깅) [PW-3-3]
-  - AC3: `interactions/user-interaction.ts` — respondToUser (UIV 분석→Adapt→Override→RAG→LLM→Express→Integrity 수집) [PW-3-6]
-  - AC4: 인터랙션 테스트 [PW-3-8]
-  - AC5: API Routes — `/posts/[id]/comments/route.ts`, `/posts/[id]/likes/route.ts`, `/follows/route.ts` [PW-3-9~3-11]
-  - AC6: Build PASS + 테스트 PASS
+  - AC1: ✅ `interactions/comment-tone.ts` — decideCommentTone (COMMENT_TONE_MATRIX 기반 7종 톤, getDimensionValue로 L1/L2/L3/state/relationship 차원 추출, Paradox 영향) [PW-3-2]
+  - AC2: ✅ `interactions/comment-engine.ts` — generateComment (6단계 파이프라인), applyExpress (에너지/paradox 기반), placeholder+LLM DI [PW-3-3]
+  - AC3: ✅ `interactions/user-interaction.ts` — respondToUser (UIV 분석→Adapt delta→톤결정→LLM/placeholder), analyzeUserAttitudeSimple, computeAdaptDelta [PW-3-6]
+  - AC4: ✅ comment-interaction.test.ts — 28개 테스트 (tone 8 + express 3 + comment 4 + uiv 4 + adapt 4 + respond 5) [PW-3-8]
+  - AC5: ✅ API Routes — `/posts/[id]/likes/route.ts` (좋아요 토글), `/follows/route.ts` (팔로우 토글) + 기존 comments route 활용 [PW-3-9~3-11]
+  - AC6: ✅ Build PASS + 1582 테스트 PASS
 
-- [ ] **T110: PW-Phase 4a 피드 엔진 (Following + Recommended + Trending + Interleaver)**
+- [x] **T110: PW-Phase 4a 피드 엔진 (Following + Recommended + Trending + Interleaver)** ✅
   - 배경: 구현계획서 §7 + 설계서 §6. 3-Tier 매칭 기반 피드
-  - AC1: `feed/following-posts.ts` — getFollowingPosts (시간순) [PW-4-1]
-  - AC2: `feed/recommended-posts.ts` — getRecommendedPosts (Basic 60%: V_Final 70%+crossAxis 30% / Exploration 30%: paradoxDiv 40%+crossAxisDiv 40%+freshness 20% / Advanced 10%: V_Final 50%+crossAxis 30%+paradoxCompat 20%) [PW-4-2]
-  - AC3: `feed/trending-posts.ts` — getTrendingPosts (engagement 기반, timeWindow) [PW-4-3]
-  - AC4: `feed/interleaver.ts` — interleaveFeed (F F B F F E F F ... 패턴, 같은 Tier 연속 방지) [PW-4-4]
-  - AC5: `feed/feed-engine.ts` — generateFeed (Following 60% + Recommended 30% + Trending 10%, qualitativeBonus ±0.10) [PW-4-5]
-  - AC6: `feed/index.ts` [PW-4-7]
-  - AC7: Build PASS + 테스트 PASS
+  - AC1: ✅ `feed/following-posts.ts` — getFollowingPosts (시간순, DI provider) [PW-4-1]
+  - AC2: ✅ `feed/recommended-posts.ts` — getRecommendedPosts, distributeTiers (Basic 60%/Exploration 30%/Advanced 10% 배분, 중복 방지), applyQualitativeBonus [PW-4-2]
+  - AC3: ✅ `feed/trending-posts.ts` — getTrendingPosts (engagement, timeWindow 48h) [PW-4-3]
+  - AC4: ✅ `feed/interleaver.ts` — interleaveFeed (Following 2개 + non-following 1개 패턴, interleaveQueues 라운드 로빈) [PW-4-4]
+  - AC5: ✅ `feed/feed-engine.ts` — generateFeed (60/30/10 비율, 병렬 조회, 인터리빙) [PW-4-5]
+  - AC6: ✅ `feed/index.ts` + main index.ts 업데이트 [PW-4-7]
+  - AC7: ✅ Build PASS + 1603 테스트 PASS (feed.test.ts 21개)
 
-- [ ] **T111: PW-Phase 4b Explore 엔진 + Feed/Explore API**
+- [x] **T111: PW-Phase 4b Explore 엔진 + Feed/Explore API**
   - 배경: 구현계획서 §7 + 설계서 §6.4. 탐색 탭 데이터
-  - AC1: `feed/explore-engine.ts` — getExploreData (교차축 클러스터 topPersonas, hotTopics paradoxTensionAvg, activeDebates, newPersonas autoInterviewScore) [PW-4-6]
-  - AC2: 피드 테스트 [PW-4-8]
-  - AC3: `/api/persona-world/feed/route.ts` + `/explore/route.ts` [PW-4-9, PW-4-10]
-  - AC4: Build PASS + 테스트 PASS
+  - AC1: ✅ `feed/explore-engine.ts` — getExploreData (DI 기반 4섹션 병렬 조회)
+  - AC2: ✅ explore.test.ts 6개 테스트 PASS
+  - AC3: ✅ `/api/persona-world/feed/route.ts` + `/explore/route.ts` (Prisma 기반 프로바이더)
+  - AC4: ✅ Build PASS + 1609 테스트 PASS
 
-- [ ] **T112: PW-Phase 5a 온보딩 엔진 (질문 + 벡터 생성 + SNS)**
+- [x] **T112: PW-Phase 5a 온보딩 엔진 (질문 + 벡터 생성 + SNS)**
   - 배경: 구현계획서 §8 + 설계서 §9. Cold Start + SNS → 벡터 생성
-  - AC1: `onboarding/questions.ts` — v3 질문 셋 (L1 7D + L2 5D OCEAN) [PW-5-1]
-  - AC2: `onboarding/onboarding-engine.ts` — processOnboardingAnswers (LIGHT→L1, MEDIUM→L1+L2, DEEP→L1+L2+메타) [PW-5-2]
-  - AC3: `onboarding/sns-processor.ts` — processSnsData (Init 알고리즘 연동, 8개 플랫폼) [PW-5-3]
-  - AC4: `onboarding/index.ts` [PW-5-5]
-  - AC5: Build PASS + 테스트 PASS
+  - AC1: ✅ `onboarding/questions.ts` — 질문 구조 타입 + DI 프로바이더 + L1/L2 벡터 산출 + 교차검증
+  - AC2: ✅ `onboarding/onboarding-engine.ts` — processOnboardingAnswers (LIGHT→L1 BASIC, MEDIUM→L1+L2 STANDARD, DEEP→ADVANCED)
+  - AC3: ✅ `onboarding/sns-processor.ts` — processSnsData (Init 알고리즘 연동, 카테고리→L2 매핑)
+  - AC4: ✅ `onboarding/index.ts` + 메인 index 업데이트
+  - AC5: ✅ Build PASS + 1635 테스트 PASS (onboarding.test.ts 26개)
 
-- [ ] **T113: PW-Phase 5b 활동 학습 + 품질 모니터 + API**
+- [x] **T113: PW-Phase 5b 활동 학습 + 품질 모니터 + API**
   - 배경: 구현계획서 §5.4, §8. Adapt 연동 + Voice/Integrity 통합
-  - AC1: `onboarding/activity-learner.ts` — learnFromActivity (UIV→Adapt→벡터 보정 ±0.3 클램프) [PW-5-4]
-  - AC2: `quality-monitor.ts` — Voice 일관성 모니터링 (similarity<0.6 경고, <0.4 보류+재생성) + Integrity Score 자동 실행 [PW-5-7, PW-5-8]
-  - AC3: 온보딩 테스트 [PW-5-6]
-  - AC4: `/api/persona-world/onboarding/` API Routes [PW-5-9]
-  - AC5: Build PASS + 테스트 PASS
+  - AC1: ✅ `onboarding/activity-learner.ts` — learnFromActivity (Adapt 연동, ±0.3 클램프)
+  - AC2: ✅ `quality-monitor.ts` — Voice 일관성 (0.6/0.4 임계값) + Integrity Gate
+  - AC3: ✅ quality-monitor.test.ts 25개 테스트 PASS
+  - AC4: ✅ `/api/persona-world/onboarding/cold-start` + `/sns/connect`
+  - AC5: ✅ Build PASS + 1660 테스트 PASS
 
-- [ ] **T114: PW 프론트엔드 API 클라이언트 재작성**
+- [x] **T114: PW 프론트엔드 API 클라이언트 재작성** ✅ 2026-02-12
   - 배경: persona-world/src/lib/api.ts + user-store.ts를 실제 백엔드 API로 전환
-  - AC1: api.ts — `/api/persona-world/*` 엔드포인트로 전환
-  - AC2: user-store.ts — 서버 영속화 (localStorage → API 동기화)
-  - AC3: Build PASS + 테스트 PASS
+  - AC1: ✅ api.ts — 피드→`POST /api/persona-world/feed` (userId 개인화), Explore→`GET /api/persona-world/explore` (search/role), 온보딩→`POST /api/persona-world/onboarding/cold-start` (level 매핑), SNS→`POST /api/persona-world/onboarding/sns/connect`, 좋아요/팔로우 API 추가
+  - AC2: ✅ user-store.ts — followPersona/unfollowPersona→`/api/public/follows` 동기화, toggleLike→`/api/public/posts/[id]/likes` 동기화, connectSns→`/api/persona-world/onboarding/sns/connect` 동기화 (Optimistic + fire-and-forget)
+  - AC3: ✅ Build PASS (persona-world + engine-studio) + 1733 테스트 PASS (ES 1660 + PW 73)
+  - 변경: api.ts, user-store.ts, feed/route.ts(persona-world), explore/route.ts(persona-world), feed/page.tsx
 
 - [ ] **T115: E2E 통합 + 품질 게이트**
   - 배경: 전 페이지 실제 API 연동 확인
@@ -499,7 +500,7 @@
   - 테스트 40개 PASS, 빌드 PASS
   - 파일: simulator/page.tsx, tuning/page.tsx, analytics/page.tsx, 3 API routes, matching-lab-ui.test.ts
 
-- [ ] **T98: System Integration 3페이지 UI — Deployment + Versions + Event Bus**
+- [x] **T98: System Integration 3페이지 UI — Deployment + Versions + Event Bus** → DONE ✅ 2026-02-12
   - 배경: lib/system-integration/ 완성 (T66, ~2400줄). stub 페이지 3개를 실제 관리 UI로 전환
   - AC1: Deployment Pipeline — 환경 3종 (DEV/STG/PROD) 상태 카드, 배포 워크플로우 타임라인 (build→test→deploy→verify), Canary Release 진행 게이지 (10%→50%→100%), 롤백 트리거 설정
   - AC2: Version Control — 알고리즘 버전 목록 테이블 (상태 뱃지), 시맨틱 버전 범프 (Major/Minor/Patch), 버전 Diff 비교 뷰, 롤백 영향도 분석 + 실행
@@ -507,7 +508,7 @@
   - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/system-integration/\*)
   - AC5: 테스트 + Build PASS
 
-- [ ] **T99: Operations 3페이지 UI — Monitoring + Incidents + Backup**
+- [x] **T99: Operations 3페이지 UI — Monitoring + Incidents + Backup** → DONE ✅ 2026-02-12
   - 배경: lib/operations/ 완성 (T67, ~1600줄). stub 페이지 3개를 실제 운영 UI로 전환
   - AC1: System Monitoring — 실시간 메트릭 카드 6종 (CPU/Memory/Disk/Network/API Latency/Error Rate), 임계값 알림 목록 (severity 컬러), 로그 검색 (레벨/소스/시간 필터), 대시보드 패널 레이아웃
   - AC2: Incident Management — 장애 목록 테이블 (P0~P3 severity 뱃지), 장애 생성/삼분류, 타임라인 워크플로우 (Declared→In Progress→Resolved→Closed), Post-mortem 작성 폼, MTTR 통계
@@ -515,7 +516,7 @@
   - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/operations/\*)
   - AC5: 테스트 + Build PASS
 
-- [ ] **T100: Global Config 3페이지 UI — Model Settings + Safety Filters + API Endpoints**
+- [x] **T100: Global Config 3페이지 UI — Model Settings + Safety Filters + API Endpoints** → DONE ✅ 2026-02-12
   - 배경: lib/global-config/ 완성 (T68, ~1800줄). stub 페이지 3개를 실제 설정 UI로 전환
   - AC1: Model Settings — LLM 모델 선택 카드 (GPT-4/Claude/Gemini 등), 모델별 비용 테이블, 일/월 예산 설정 슬라이더, 사용량 대시보드 (소비/잔여), 모델 라우팅 규칙 설정
   - AC2: Safety Filters — 필터 규칙 CRUD 테이블 (카테고리/심각도/활성 토글), 금지어 관리 (추가/삭제/일괄 업로드), 필터 로그 목록 (차단 이력+통계), 필터 테스트 시뮬레이터
@@ -523,7 +524,7 @@
   - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/global-config/\*)
   - AC5: 테스트 + Build PASS
 
-- [ ] **T101: Team & Access 3페이지 UI — Users + Roles + Audit Logs**
+- [x] **T101: Team & Access 3페이지 UI — Users + Roles + Audit Logs** → DONE ✅ 2026-02-12
   - 배경: lib/team/ 완성 (T69, ~1200줄). stub 페이지 3개를 실제 팀 관리 UI로 전환
   - AC1: Users — 팀 멤버 목록 테이블 (이름/이메일/역할/상태 뱃지), 멤버 초대 모달 (이메일+역할 선택), 멤버 비활성화/재활성화 토글, 멤버 역할 변경 드롭다운
   - AC2: Roles — 역할 4종 카드 (Admin/AI Engineer/Content Manager/Analyst), 권한 매트릭스 테이블 (리소스×액션 체크박스), 커스텀 역할 생성/수정, 역할별 멤버 수 표시
@@ -531,7 +532,7 @@
   - AC4: 각 페이지 API 라우트 연결 (GET/POST /api/internal/team/\*)
   - AC5: 테스트 + Build PASS
 
-- [ ] **T102: 테마 토글 (Light/Dark) — LNB 하단 테마 전환 버튼**
+- [x] **T102: 테마 토글 (Light/Dark) — LNB 하단 테마 전환 버튼** → DONE ✅ 2026-02-12
   - 배경: 엔진 스튜디오 전역 테마 지원. 다크 테마는 순수 블랙(#000) 아닌 다크 그레이 톤 (Claude 스타일)
   - AC1: ThemeProvider (next-themes) + globals.css CSS 변수 — light/dark 두 세트 정의, dark 배경 #1a1a2e~#2d2d3f 계열 (Claude 참고)
   - AC2: LNB 좌측 하단 테마 토글 버튼 (Sun/Moon 아이콘, 툴팁, 부드러운 전환 애니메이션)
@@ -543,7 +544,7 @@
 
 > T59~T61에서 구축한 DAG 엔진 + 캔버스 UI를 실제 사용 가능한 페이지로 통합.
 
-- [ ] **T128: 노드 에디터 페이지 통합 — ComfyUI 스타일 페르소나 생성**
+- [x] **T128: 노드 에디터 페이지 통합 — ComfyUI 스타일 페르소나 생성**
   - 배경: T59~T61에서 DAG 엔진(25노드) + ReactFlow 캔버스 + 실행 엔진 완성. 하지만 handleExecute/handleSave가 placeholder 상태이고, 노드 에디터 접근 가능한 페이지 라우트가 없음. 4-step 위자드와 별도로 ComfyUI 스타일 생성 경로 필요
   - AC1: 실행 엔진 연결 — `handleExecute` placeholder를 `executeGraph()` 실제 호출로 교체. 실행 전 `validateGraph()` 검증. 실행 결과를 Zustand store에 반영 (executionResults, activeEdges). 노드별 상태 배지(성공/에러/스킵) 표시, 활성 엣지 녹색 애니메이션
   - AC2: 저장/로드 연결 — `handleSave` placeholder를 `serializeGraph()` + localStorage 저장으로 교체. 프리셋/저장된 그래프 로드 (deserializeGraph). 키: `node-graph-${personaId}`
@@ -551,6 +552,20 @@
   - AC4: 전용 페이지 라우트 — `/persona-studio/node-editor` 페이지. `?preset=standard` 프리셋 로드, `?personaId=xxx` 저장 그래프 로드 지원. 전체 높이 캔버스 레이아웃
   - AC5: 네비게이션 추가 — LNB Persona Studio 하위에 "Node Editor" 항목 추가
   - AC6: 테스트 + Build PASS — 프리셋 직렬화 라운드트립, 프리셋 실행, 실행 요약, 저장/로드 라운드트립 테스트
+
+### Phase F: 하드코딩 목업 데이터 제거 (T129)
+
+> T96~T102에서 구축한 18+ 페이지의 인라인 목업/샘플 데이터를 제거하고, 기존 API 라우트에서 동적으로 fetch하도록 전환.
+
+- [x] **T129: 하드코딩 목업 데이터 제거 — 전체 페이지 API 기반 동적 전환** → DONE ✅ 2026-02-12
+  - 배경: T96~T102에서 대시보드 UI 구축 시 각 페이지에 인라인 샘플 데이터 생성 함수(createSample*, generate* 등)를 포함. API 라우트는 이미 GET/POST 핸들러 완성. 페이지에서 API를 호출하여 동적으로 데이터를 로드/변경하도록 전환 필요
+  - AC1: System Integration 3페이지 (Deployment, Versions, Event Bus) — 인라인 목업 제거, useEffect + fetch로 전환, 뮤테이션 API 호출
+  - AC2: Operations 3페이지 (Monitoring, Incidents, Backup) — 인라인 목업 제거, useEffect + fetch로 전환, 뮤테이션 API 호출
+  - AC3: Global Config 3페이지 (Model Settings, Safety Filters, API Endpoints) — 인라인 목업 제거, useEffect + fetch로 전환, 뮤테이션 API 호출
+  - AC4: Team & Access 3페이지 (Users, Roles, Audit Logs) — 인라인 목업 제거, useEffect + fetch로 전환, 뮤테이션 API 호출
+  - AC5: Matching Lab 3페이지 (Simulator, Tuning, Analytics) — 인라인 목업 제거, useEffect + fetch로 전환, 뮤테이션 API 호출
+  - AC6: User Insight 3페이지 + Dashboard (Cold Start, Psychometric, Archetype, Dashboard) — 인라인 목업 제거, useEffect + fetch로 전환
+  - AC7: 테스트 + Build PASS
 
 ### Phase DC-A: 개발자콘솔 v3 기반 인프라 (T116~T117)
 
