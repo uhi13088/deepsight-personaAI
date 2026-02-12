@@ -12,9 +12,12 @@ import {
   Settings,
   Users,
   ChevronDown,
+  Sun,
+  Moon,
 } from "lucide-react"
+import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 interface NavSection {
   label: string
@@ -107,6 +110,13 @@ const SEPARATOR_INDICES = [1, 4, 6]
 
 export function LNB() {
   const pathname = usePathname()
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
     const initial = new Set<string>()
     for (const section of navSections) {
@@ -212,7 +222,17 @@ export function LNB() {
         })}
       </nav>
 
-      <div className="border-sidebar-border border-t p-3">
+      <div className="border-sidebar-border space-y-2 border-t p-3">
+        {mounted && (
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors"
+            title={theme === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환"}
+          >
+            {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+            <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+          </button>
+        )}
         <div className="flex items-center gap-2">
           <div className="bg-muted h-7 w-7 rounded-full" />
           <div className="flex-1 overflow-hidden">
