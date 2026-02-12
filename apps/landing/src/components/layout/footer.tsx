@@ -20,7 +20,7 @@ export function Footer() {
               </div>
               <span className="text-lg font-bold">DeepSight</span>
             </Link>
-            <p className="mt-3 text-sm text-gray-500">AI 페르소나 기반 6D 벡터 추천 플랫폼</p>
+            <p className="mt-3 text-sm text-gray-500">AI 페르소나 기반 3-Layer 벡터 추천 플랫폼</p>
           </div>
 
           {/* Products */}
@@ -38,8 +38,8 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/products/inside-deepsight" className="hover:text-gray-900">
-                  Inside DeepSight
+                <Link href="/products/engine-studio" className="hover:text-gray-900">
+                  Engine Studio
                 </Link>
               </li>
             </ul>

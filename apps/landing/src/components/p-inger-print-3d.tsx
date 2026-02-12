@@ -79,7 +79,7 @@ function useStudioEnvMap() {
 }
 
 /**
- * 잭스(Jacks) 오브젝트 — 6D 벡터에 따라 팔 길이/굵기/컬러 결정
+ * 잭스(Jacks) 오브젝트 — v3 L1 벡터(7D)에 따라 팔 길이/굵기/컬러 결정
  * 컬러 크롬: meshPhysicalMaterial + 프로그래매틱 envMap
  */
 function JacksObject({ data }: { data: Record<string, number> }) {
@@ -88,7 +88,7 @@ function JacksObject({ data }: { data: Record<string, number> }) {
   const envMap = useStudioEnvMap()
 
   const arms = useMemo(() => {
-    const keys = ["depth", "lens", "stance", "scope", "taste", "purpose"]
+    const keys = ["depth", "lens", "stance", "scope", "taste", "purpose", "sociability"]
     const directions: [number, number, number][] = [
       [0, 1, 0.15],
       [0, -1, -0.15],
@@ -96,6 +96,7 @@ function JacksObject({ data }: { data: Record<string, number> }) {
       [-1, -0.15, 0],
       [0.15, 0, 1],
       [-0.15, 0, -1],
+      [0.7, 0.7, 0],
     ]
 
     return keys.map((key, i) => {
@@ -154,7 +155,7 @@ function JacksObject({ data }: { data: Record<string, number> }) {
         />
       </mesh>
 
-      {/* 6개 팔 */}
+      {/* 7개 팔 (L1 7D) */}
       {arms.map((arm) => {
         const midPoint = arm.dir.clone().multiplyScalar(arm.length / 2)
         const tipPoint = arm.dir.clone().multiplyScalar(arm.length)

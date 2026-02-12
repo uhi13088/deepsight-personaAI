@@ -5,15 +5,10 @@ import Link from "next/link"
 import {
   ArrowRight,
   Sparkles,
-  BarChart3,
   Users,
-  Zap,
   Check,
   Brain,
-  Target,
-  Eye,
   Compass,
-  Palette,
   Search,
   MousePointer,
   Clock,
@@ -21,6 +16,14 @@ import {
   MessageSquare,
   TrendingUp,
   Code,
+  Heart,
+  Flame,
+  Sprout,
+  BookOpen,
+  Mic,
+  Zap,
+  RefreshCw,
+  ShieldCheck,
 } from "lucide-react"
 import { HeroOrbital } from "@/components/home/hero-orbital"
 
@@ -29,7 +32,8 @@ const PERSONA_WORLD_URL =
 const DEVELOPER_CONSOLE_URL =
   process.env.NEXT_PUBLIC_DEVELOPER_CONSOLE_URL || "https://developer-console.vercel.app"
 
-const VECTOR_DIMENSIONS = [
+// v3 3-Layer 대표 차원 (HeroOrbital용: inner 3 + middle 3)
+const HERO_DIMENSIONS = [
   {
     id: "depth",
     name: "Depth",
@@ -40,56 +44,84 @@ const VECTOR_DIMENSIONS = [
     color: "from-blue-500 to-blue-600",
   },
   {
-    id: "lens",
-    name: "Lens",
-    label: "판단 렌즈",
-    low: "감성적",
-    high: "논리적",
-    icon: Eye,
-    color: "from-purple-500 to-purple-600",
-  },
-  {
-    id: "stance",
-    name: "Stance",
-    label: "평가 태도",
-    low: "수용적",
-    high: "비판적",
+    id: "openness",
+    name: "Openness",
+    label: "개방성",
+    low: "보수적",
+    high: "개방적",
     icon: Compass,
     color: "from-orange-500 to-orange-600",
   },
   {
-    id: "scope",
-    name: "Scope",
-    label: "관심 범위",
-    low: "핵심만",
-    high: "디테일",
-    icon: Target,
-    color: "from-green-500 to-green-600",
+    id: "lack",
+    name: "Lack",
+    label: "결핍",
+    low: "충족",
+    high: "결핍",
+    icon: Heart,
+    color: "from-violet-500 to-violet-600",
   },
   {
-    id: "taste",
-    name: "Taste",
-    label: "취향 성향",
-    low: "클래식",
-    high: "실험적",
-    icon: Palette,
-    color: "from-pink-500 to-pink-600",
-  },
-  {
-    id: "purpose",
-    name: "Purpose",
-    label: "소비 목적",
-    low: "오락",
-    high: "의미추구",
-    icon: Brain,
+    id: "sociability",
+    name: "Sociability",
+    label: "사회적 성향",
+    low: "독립적",
+    high: "사교적",
+    icon: Users,
     color: "from-indigo-500 to-indigo-600",
+  },
+  {
+    id: "neuroticism",
+    name: "Neuroticism",
+    label: "신경성",
+    low: "안정적",
+    high: "민감한",
+    icon: Flame,
+    color: "from-amber-500 to-amber-600",
+  },
+  {
+    id: "growthArc",
+    name: "Growth Arc",
+    label: "성장 곡선",
+    low: "정체",
+    high: "변화",
+    icon: Sprout,
+    color: "from-purple-500 to-purple-600",
+  },
+]
+
+// 3-Layer 구조 카드
+const LAYERS = [
+  {
+    id: "L1",
+    name: "L1: Social Persona",
+    subtitle: "가면 — 외부에 보이는 소비 성향",
+    dimensions: "7D",
+    items: ["Depth", "Lens", "Stance", "Scope", "Taste", "Purpose", "Sociability"],
+    color: "from-blue-500 to-blue-600",
+  },
+  {
+    id: "L2",
+    name: "L2: Core Temperament",
+    subtitle: "본성 — OCEAN Big Five 심리 모델",
+    dimensions: "5D",
+    items: ["Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"],
+    color: "from-amber-500 to-amber-600",
+  },
+  {
+    id: "L3",
+    name: "L3: Narrative Drive",
+    subtitle: "욕망 — 캐릭터 아크 기반 내면 동력",
+    dimensions: "4D",
+    items: ["Lack", "Moral Compass", "Volatility", "Growth Arc"],
+    color: "from-violet-500 to-violet-600",
   },
 ]
 
 const ENGINE_STUDIO_URL = process.env.NEXT_PUBLIC_ENGINE_STUDIO_URL || "http://localhost:3000"
 
 const METRICS = [
-  { label: "추천 정확도 향상", value: "6D", icon: MousePointer },
+  { label: "페르소나 엔진", value: "3-Layer", icon: MousePointer },
   { label: "활동 페르소나", value: "—", icon: Users, dynamic: true },
   { label: "추천 이유 설명", value: "투명", icon: Clock },
   { label: "필터버블 탈출", value: "다관점", icon: Star },
@@ -99,17 +131,20 @@ const USE_CASES = [
   {
     industry: "OTT 플랫폼",
     icon: "🎬",
-    description: "취향 맞는 페르소나가 추천 이유와 함께 콘텐츠 큐레이션",
+    description:
+      "취향·성격·서사 3겹 프로필로 분석하고, 겉과 속의 모순까지 반영하여 페르소나가 추천 이유와 함께 콘텐츠 큐레이션",
   },
   {
     industry: "이커머스",
     icon: "🛍️",
-    description: "성향 맞는 리뷰어의 리뷰로 구매 결정 시간 단축",
+    description:
+      "취향과 성격의 심층 연결 패턴 분석으로 성향이 일치하는 리뷰어의 리뷰를 노출, 구매 결정 시간 단축",
   },
   {
     industry: "뉴스/미디어",
     icon: "📰",
-    description: "필터버블 탈출, 다양한 관점의 기사 노출",
+    description:
+      "겉과 속의 모순 분석으로 필터버블 탈출, 3단계 매칭이 다양한 관점의 기사를 자동 노출",
   },
 ]
 
@@ -130,23 +165,23 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="relative overflow-hidden pb-20 pt-16">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="grid items-center gap-12 lg:grid-cols-2">
+      <section className="relative overflow-hidden pb-20 pt-20">
+        <div className="mx-auto max-w-7xl px-6 lg:px-12">
+          <div className="grid items-center gap-12 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
             {/* Left: Text */}
-            <div className="space-y-8">
+            <div className="space-y-8 lg:py-8">
               <div className="inline-flex items-center gap-2 rounded-full border border-purple-200 bg-purple-50 px-4 py-2 text-sm text-purple-700">
                 <Sparkles className="h-4 w-4" />
                 AI 페르소나 기반 추천 시스템
               </div>
               <h1 className="text-5xl font-bold leading-tight tracking-tight text-gray-900 lg:text-6xl">
-                <span className="ds-text-gradient">6D 벡터</span>로
+                <span className="ds-text-gradient">3-Layer 벡터</span>로
                 <br />
-                사용자를 이해하다
+                사용자를 심층 이해하다
               </h1>
               <p className="max-w-lg text-lg text-gray-600">
-                기존 추천 시스템의 블랙박스를 열어, 사용자가 &ldquo;왜 이 콘텐츠가 추천됐는지&rdquo;
-                명확히 알 수 있는 설명 가능한 AI 추천 엔진
+                가면(L1) · 본성(L2) · 욕망(L3), 세 겹의 벡터로 사용자의 성향을 심층 분석하고 AI
+                페르소나가 &ldquo;왜 이 콘텐츠가 추천됐는지&rdquo; 명확히 설명하는 투명한 추천 엔진
               </p>
               <div className="flex flex-col gap-4 sm:flex-row">
                 <Link
@@ -167,7 +202,7 @@ export default function HomePage() {
             </div>
 
             {/* Right: Orbital Animation */}
-            <HeroOrbital dimensions={VECTOR_DIMENSIONS} />
+            <HeroOrbital dimensions={HERO_DIMENSIONS} />
           </div>
         </div>
       </section>
@@ -260,46 +295,60 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 6D Vector Section */}
+      {/* 3-Layer Vector Section */}
       <section className="ds-dark-section relative overflow-hidden py-24">
-        <div className="relative z-10 mx-auto max-w-4xl px-6 text-center">
+        <div className="relative z-10 mx-auto max-w-5xl px-6 text-center">
           <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-400">
-            6D VECTOR SYSTEM
+            3-LAYER VECTOR SYSTEM
           </div>
           <h2 className="mb-6 text-4xl font-bold text-white md:text-5xl">
-            6개 차원으로
+            세 겹의 레이어로
             <br />
             <span className="bg-gradient-to-r from-[#667eea] via-[#f093fb] to-[#f5576c] bg-clip-text text-transparent">
-              취향을 정량화
+              취향을 심층 정량화
             </span>
           </h2>
           <p className="mx-auto mb-16 max-w-2xl text-lg text-gray-400">
-            단순한 좋아요/싫어요를 넘어, 사용자의 콘텐츠 소비 성향을 6개의 독립적인 차원으로
-            분석합니다.
+            단순한 좋아요/싫어요를 넘어, 사용자의 콘텐츠 소비 성향을 가면(L1) · 본성(L2) · 욕망(L3)
+            세 겹의 벡터로 정량화하고, 서사·음성·압박 역학을 융합합니다.
           </p>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {VECTOR_DIMENSIONS.map((dim) => (
+          <div className="grid gap-6 md:grid-cols-3">
+            {LAYERS.map((layer) => (
               <div
-                key={dim.id}
+                key={layer.id}
                 className="ds-glass-card group rounded-2xl p-6 text-left transition-all hover:bg-white/10"
               >
-                <div
-                  className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${dim.color}`}
-                >
-                  <dim.icon className="h-6 w-6 text-white" />
-                </div>
-                <h3 className="mb-1 text-lg font-semibold text-white">{dim.name}</h3>
-                <p className="mb-3 text-sm text-gray-400">{dim.label}</p>
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span>{dim.low}</span>
-                  <div className="mx-2 h-1 flex-1 rounded-full bg-gray-700">
-                    <div className={`h-full w-1/2 rounded-full bg-gradient-to-r ${dim.color}`} />
+                <div className="mb-3 flex items-center gap-3">
+                  <div
+                    className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${layer.color}`}
+                  >
+                    <span className="text-sm font-bold text-white">{layer.dimensions}</span>
                   </div>
-                  <span>{dim.high}</span>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">{layer.name}</h3>
+                    <p className="text-xs text-gray-400">{layer.subtitle}</p>
+                  </div>
                 </div>
+                <ul className="mt-4 space-y-1.5">
+                  {layer.items.map((item) => (
+                    <li key={item} className="flex items-center gap-2 text-sm text-gray-300">
+                      <Check className="h-3.5 w-3.5 text-gray-500" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))}
+          </div>
+
+          <div className="mt-8 rounded-xl border border-gray-700 bg-white/5 p-4">
+            <p className="text-sm text-gray-400">
+              <span className="font-semibold text-purple-400">겉과 속의 모순 점수</span> —
+              취향↔성격, 취향↔서사, 성격↔서사 간 모순을 종합하여 사용자의 &quot;복잡한
+              인간다움&quot;을 정량화합니다. 계층 간 연결 패턴이 역설·강화·조절 관계를 자동
+              분석합니다.
+            </p>
           </div>
 
           <div className="mt-12">
@@ -308,6 +357,144 @@ export default function HomePage() {
               className="inline-flex items-center gap-2 text-purple-400 hover:text-purple-300"
             >
               자세히 알아보기
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Qualitative Architecture — 비정량적 요소 + 런타임 알고리즘 */}
+      <section className="py-24">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="mb-4 text-center text-sm font-semibold uppercase tracking-wider text-purple-600">
+            BEYOND VECTORS
+          </div>
+          <h2 className="mb-4 text-center text-4xl font-bold text-gray-900">숫자 너머의 인격</h2>
+          <p className="mx-auto mb-16 max-w-2xl text-center text-gray-600">
+            벡터만으로는 페르소나가 아닙니다. DeepSight는 서사적 기원, 고유한 목소리, 압박 역학,
+            시대정신까지 비정량적 요소를 융합해 &quot;살아 있는&quot; AI 인격을 만듭니다.
+          </p>
+
+          <div className="grid gap-8 md:grid-cols-2">
+            {/* 비정량적 4요소 */}
+            <div className="space-y-4">
+              <h3 className="mb-6 text-lg font-semibold text-gray-900">
+                페르소나를 구성하는 4가지 비정량적 축
+              </h3>
+              {[
+                {
+                  icon: BookOpen,
+                  title: "서사적 기원 (Backstory)",
+                  desc: "과거의 상처, 무의식적 욕망, 내면의 트리거 — 성격의 '이유'를 서사로 정의합니다.",
+                  color: "text-violet-600 bg-violet-50",
+                },
+                {
+                  icon: Mic,
+                  title: "고유한 목소리 (Voice Profile)",
+                  desc: "말버릇, 문장 구조, 감정 표현 범위, 대표 화법 — 수백 턴이 지나도 같은 사람처럼 말합니다.",
+                  color: "text-blue-600 bg-blue-50",
+                },
+                {
+                  icon: Zap,
+                  title: "압박 역학 (Pressure Dynamics)",
+                  desc: "특정 주제나 상황에서 성격이 일시적으로 변하고, 점차 원래 모습으로 돌아옵니다. 숨겨진 본성이 표면에 드러나는 순간.",
+                  color: "text-amber-600 bg-amber-50",
+                },
+                {
+                  icon: Compass,
+                  title: "시대정신 (Zeitgeist)",
+                  desc: "세대 코드, 가치관, 문화 자본 — 같은 성향이라도 밀레니얼과 Z세대는 다르게 표현합니다.",
+                  color: "text-emerald-600 bg-emerald-50",
+                },
+              ].map((item) => (
+                <div
+                  key={item.title}
+                  className="flex gap-4 rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
+                >
+                  <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${item.color}`}
+                  >
+                    <item.icon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900">{item.title}</h4>
+                    <p className="mt-1 text-sm text-gray-500">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 4대 런타임 알고리즘 */}
+            <div className="space-y-4">
+              <h3 className="mb-6 text-lg font-semibold text-gray-900">
+                실시간으로 작동하는 4대 알고리즘
+              </h3>
+              {[
+                {
+                  icon: Sparkles,
+                  step: "01",
+                  title: "Init — 서사 → 벡터 초기화",
+                  desc: "배경 이야기에서 핵심 키워드를 추출하고, 의미 분류표를 참조하여 초기 성격 프로필을 자동 산출합니다.",
+                  color: "text-purple-600 border-purple-200 bg-purple-50",
+                },
+                {
+                  icon: Flame,
+                  step: "02",
+                  title: "Override — 압박 → 벡터 변위",
+                  desc: "민감한 주제 감지 시 성격이 일시적으로 변하고, 감정 변동성에 비례하여 점차 원래 모습으로 돌아옵니다.",
+                  color: "text-red-600 border-red-200 bg-red-50",
+                },
+                {
+                  icon: RefreshCw,
+                  step: "03",
+                  title: "Adapt — 사용자 태도 → 실시간 조정",
+                  desc: "매 대화마다 사용자의 태도(공격성·친밀도·정중함)를 분석하여, 페르소나가 자연스럽게 미세 조정됩니다.",
+                  color: "text-blue-600 border-blue-200 bg-blue-50",
+                },
+                {
+                  icon: Heart,
+                  step: "04",
+                  title: "Express — 벡터 상태 → 행동 발현",
+                  desc: "갈등, 불안, 결핍 등 복합 감정 상태에서 고유한 말버릇·행동 패턴이 자연스럽게 발현됩니다.",
+                  color: "text-pink-600 border-pink-200 bg-pink-50",
+                },
+              ].map((item) => (
+                <div key={item.step} className={`flex gap-4 rounded-xl border p-4 ${item.color}`}>
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white font-bold text-gray-400 shadow-sm">
+                    {item.step}
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900">{item.title}</h4>
+                    <p className="mt-1 text-sm text-gray-500">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-12 rounded-xl border border-gray-200 bg-gray-50 p-6">
+            <div className="flex items-start gap-3">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
+              <div>
+                <p className="font-semibold text-gray-900">품질 보증 3중 검증</p>
+                <p className="mt-1 text-sm text-gray-500">
+                  <span className="font-medium text-gray-700">자동 인터뷰</span> 20문항으로
+                  성격↔응답 일관성 검증 ·{" "}
+                  <span className="font-medium text-gray-700">6범주 검증</span>{" "}
+                  구조·취향↔성격·성격↔서사·이야기↔수치·계층 간 연결·감정 반응 6범주 검증 ·{" "}
+                  <span className="font-medium text-gray-700">인격 일관성 점수</span> 실시간 대화 중
+                  인격 붕괴 감지 (대화 기억 정확도 · 설정 일관성 · 캐릭터 안정성)
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 text-center">
+            <Link
+              href="/features/persona"
+              className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-500"
+            >
+              페르소나 아키텍처 자세히 보기
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

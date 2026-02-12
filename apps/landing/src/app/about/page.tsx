@@ -4,7 +4,7 @@ import { ArrowRight, Layers, Quote } from "lucide-react"
 
 export const metadata: Metadata = {
   title: "About",
-  description: "DeepSight는 AI 페르소나 기반 6D 벡터 추천 시스템을 만드는 팀입니다.",
+  description: "DeepSight는 AI 페르소나 기반 3-Layer 벡터 추천 시스템을 만드는 팀입니다.",
 }
 
 const PERSONA_WORLD_URL =
@@ -48,8 +48,8 @@ const TEAM_STORIES = [
 const MILESTONES = [
   {
     phase: "Phase 1",
-    title: "6D 벡터 시스템 설계",
-    description: "콘텐츠 소비 성향을 6개의 독립적 차원으로 분석하는 프레임워크 구축",
+    title: "v3 3-Layer 벡터 시스템 설계",
+    description: "콘텐츠 소비 성향을 3-Layer 벡터 + 서사·음성 프로파일로 분석하는 프레임워크 구축",
     status: "완료",
   },
   {
@@ -81,7 +81,7 @@ const VALUES = [
   {
     title: "사용자 주권",
     description:
-      "데이터는 사용자의 것입니다. 6D 벡터를 통해 자신의 콘텐츠 소비 성향을 직접 확인하고 이해할 수 있습니다.",
+      "데이터는 사용자의 것입니다. 3-Layer 벡터를 통해 자신의 콘텐츠 소비 성향을 직접 확인하고 이해할 수 있습니다.",
   },
   {
     title: "다양성 존중",
@@ -105,8 +105,8 @@ export default function AboutPage() {
             추천의 <span className="ds-text-gradient">블랙박스</span>를 엽니다
           </h1>
           <p className="mx-auto max-w-2xl text-lg text-gray-600">
-            DeepSight는 AI 페르소나 기반 6D 벡터 추천 시스템을 개발하는 팀입니다. 기존 추천 시스템의
-            한계를 넘어, 사용자가 &ldquo;왜&rdquo;를 이해할 수 있는 설명 가능한 추천 기술을
+            DeepSight는 AI 페르소나 기반 3-Layer 벡터 추천 시스템을 개발하는 팀입니다. 기존 추천
+            시스템의 한계를 넘어, 사용자가 &ldquo;왜&rdquo;를 이해할 수 있는 설명 가능한 추천 기술을
             만듭니다.
           </p>
         </div>
@@ -162,9 +162,9 @@ export default function AboutPage() {
               </span>
             </p>
             <p className="mt-4 text-gray-600">
-              그래서 우리는 AI 페르소나를 만들기 시작했습니다. 사용자의 취향을 6개 차원으로
-              정량화하고, 그 취향을 가진 도플갱어 AI가 수백 개의 콘텐츠를 미리 소비한 뒤, 검증된
-              추천만 전달하는 시스템. 그것이 DeepSight입니다.
+              그래서 우리는 AI 페르소나를 만들기 시작했습니다. 사용자의 취향을 3-Layer 벡터로
+              정량화하고, 서사와 음성까지 입혀 살아 숨 쉬는 도플갱어 AI가 수백 개의 콘텐츠를 미리
+              소비한 뒤, 검증된 추천만 전달하는 시스템. 그것이 DeepSight입니다.
             </p>
           </div>
         </div>
@@ -188,7 +188,7 @@ export default function AboutPage() {
                 알 수 없고, 알고리즘은 비슷한 콘텐츠만 반복 추천합니다.
               </p>
               <p className="text-gray-600">
-                DeepSight는 이 문제를 해결합니다. 6D 벡터로 사용자의 취향을 정량화하고, AI
+                DeepSight는 이 문제를 해결합니다. 3-Layer 벡터로 사용자의 취향을 정량화하고, AI
                 페르소나가 자신의 관점에서 추천 이유를 설명합니다. 사용자는 자신의 성향을 이해하고,
                 새로운 콘텐츠를 발견할 수 있습니다.
               </p>

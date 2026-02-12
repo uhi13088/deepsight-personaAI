@@ -392,6 +392,93 @@
 
 ## ✅ DONE (완료)
 
+- [x] **T95: 전체 페이지 SEO 메타데이터 v3 통일** ✅ 2026-02-12
+  - AC1~AC8: ✅ 전 페이지 metadata 6D 잔재 0건 확인 (layout/features/products/about/blog)
+  - AC9: ✅ 잔여 6D 코멘트 2건 수정 + Build PASS + 커밋 (e25a382)
+
+- [x] **T89-T94: Products + About + FAQ + Contact v3 전환** ✅ 2026-02-12
+  - T89: ✅ PersonaWorld — "6D 벡터" → "3-Layer 벡터", "Cold-Start" → "3-Phase 24문항 온보딩"
+  - T90: ✅ Developer Console — API 코드 예시 phase1/2/3 구조, matchingTier 옵션
+  - T91: ✅ Engine Studio — "3-Layer 벡터 분포 + 아키타입 12종 균형"
+  - T92: ✅ About — 전체 6D→3-Layer 전환 (미션/로드맵/스토리)
+  - T93: ✅ FAQ — 17개 항목 6D→v3 전환 (cold-start/매칭/페르소나/PersonaWorld)
+  - T94: ✅ Contact — 주소 "서울특별시 (상세 주소 추후 공개)" 명시
+  - Build PASS + 커밋 (5d896f8)
+
+- [x] **T86-T88: Features 허브 + 서브페이지 3종 v3 전면 개편** ✅ 2026-02-12
+  - T86: ✅ Features 허브 — "6D 벡터 시스템" → "3-Layer 16D 벡터 시스템", highlights 전환
+  - T86: ✅ 취향 분석 — L1 7D + 3-Phase 24문항 + STARTER/EXPERT 품질 레벨 + SNS v3 차원
+  - T87: ✅ AI 페르소나 — 3-LAYER SYSTEM, 6종 아키타입, L1 7D P-inger Print 매핑
+  - T88: ✅ 매칭 시스템 — 3-Tier 파이프라인, V_Final/교차축/Paradox 공식, 비교 테이블
+  - Build PASS + 커밋 (abf9c39)
+
+- [x] **T84-T85: HeroOrbital + P-inger Print v3 전환** ✅ 2026-02-12
+  - T84: ✅ "Your Vector Profile" → "Your 3-Layer Profile", "도플갱어" → "3-Tier 매칭"
+  - T85: ✅ 2D — sociability 시드 계수 추가, 3D — 7번째 팔 [0.7,0.7,0], Showcase — L1 7D 데이터
+  - Build PASS + 커밋 (197e663)
+
+- [x] **T83: 메인 페이지 v3 전면 개편** ✅ 2026-02-12
+  - AC1~AC8: ✅ HERO_DIMENSIONS 6종 (3-Layer 대표), LAYERS L1/L2/L3 카드, Extended Paradox Score 배너
+  - AC9: ✅ Build PASS + 커밋 (fe40468)
+
+- [x] **T82: layout + Header + Footer v3 전환** ✅ 2026-02-12
+  - AC1~AC4: ✅ metadata 6D→3-Layer, header "3-Layer 벡터 기반", footer "Engine Studio" 링크
+  - AC5: ✅ Build PASS + 커밋 (fdff970)
+
+- [x] **T81: lib/ 공통 모듈 v3 전환** ✅ 2026-02-12
+  - AC1: ✅ trait-colors.ts — 6D→3-Layer 16D (L1 7+L2 5+L3 4, layer 필드, LAYER_COLORS)
+  - AC2~AC4: ✅ utils.ts — Vector6D/cosine/presets/DB transforms 전량 삭제
+  - AC5~AC7: ✅ api.ts — archetypeId 추가
+  - AC8: ✅ Build PASS + 커밋 (abc317b)
+
+- [x] **T80: 블로그 DB 스키마 + API + 동적 페이지** ✅ 2026-02-12
+  - AC1: ✅ Prisma BlogPost 모델 (기존 스키마에 이미 존재 확인)
+  - AC2: ✅ SQL 마이그레이션 `006_blog_posts.sql` 작성 (BlogCategory enum, 인덱스 3개, FK)
+  - AC3: ✅ GET /api/public/blog API (페이지네이션, 카테고리 필터, publishedAt 정렬)
+  - AC4: ✅ GET /api/public/blog/[slug] API (단일 조회 + 비동기 viewCount 증가)
+  - AC5: ✅ GET /api/public/personas API (활성 페르소나 수 + 팔로워 Top 3, \_count 활용)
+  - AC6: ✅ Landing lib/api.ts — 기존 함수 구조 적합 확인 (수정 불필요)
+  - AC7: ✅ Landing blog 페이지 빈 상태 UI 확인 + "6D 벡터" → "3-Layer 벡터" 텍스트 수정
+  - AC8: ✅ Engine-studio Build PASS + Landing Build PASS + 커밋 + 푸시 (699e67c)
+
+- [x] **T49: 페르소나 생성 플로우 (4-Step)** ✅ 2026-02-11
+  - AC1: ✅ Step 1 — 기본 정보 (이름 2~30자, 역할 5종, 전문분야 16종, 설명 100자)
+  - AC2: ✅ Step 2 — 3-Layer 벡터 에디터 (L1 7D + L2 5D + L3 4D + 아키타입 12종 프리셋, EPS 실시간)
+  - AC3: ✅ Step 3 — 프롬프트 엔지니어링 (벡터 기반 자동 생성 + 수동 편집, 6개 섹션)
+  - AC4: ✅ Step 4 — 리뷰 + Draft/Activate 저장
+  - AC5: ✅ POST /api/internal/personas/create (트랜잭션, Paradox Score 자동 계산, 벡터 3레이어 저장)
+  - AC6: ✅ 테스트 9파일 119개 PASS + Build PASS (b1bcaf9)
+
+- [x] **T48: 페르소나 목록 페이지 + API** ✅ 2026-02-11
+  - AC1: ✅ GET /api/internal/personas (상태/소스/아키타입/검색/벡터범위/Paradox범위/교차축 필터, 5종 정렬, 페이지네이션)
+  - AC2: ✅ PersonaCard 카드 그리드 (프로필, 이름, 상태 뱃지 8종, 아키타입 라벨, 주요 성향 Top3, Paradox %)
+  - AC3: ✅ PersonaFilters (상태 칩, 아키타입 12종 멀티셀렉, L1/L2/L3 16D 범위 슬라이더, EPS Range)
+  - AC4: ✅ 검색(이름+설명), 정렬 5종+오름/내림, PersonaPagination 페이지 크기 선택
+  - AC5: ✅ shadcn/ui 6종 + usePersonas hook + 테스트 7파일 73개 PASS + Build PASS (a52840a)
+
+- [x] **T47: Phase 1 벡터 엔진 — 교차축 + Paradox + V_Final** ✅ 2026-02-11
+  - AC1: ✅ 벡터 유틸리티 (clamp, validateVector, euclideanDistance, cosineSimilarity)
+  - AC2: ✅ L2→L1 투영 (5D→7D, invert 포함), L3→L1 투영 (4D→7D, 0.5 baseline + coefficients)
+  - AC3: ✅ 교차축 계산 엔진 (83축, paradox/reinforcing/modulating/neutral 4종 score formula)
+  - AC4: ✅ Extended Paradox Score (w1=0.50×L1↔L2 + w2=0.30×L1↔L3 + w3=0.20×L2↔L3) + Dimensionality bell curve
+  - AC5: ✅ V_Final = clamp((1-P)×L1 + P×(α×L2proj + β×L3proj)), vFinalToVector 변환
+  - AC6: ✅ 단위 테스트 5파일 41개 전부 PASS + Build PASS + 커밋 (38679ab)
+
+- [x] **T46: Phase 0 기반 인프라 — v3 타입 + DB 스키마 + 상수** ✅ 2026-02-11
+  - AC1: ✅ v3 공유 타입 (shared-types + engine-studio) — 106D+ 전체
+  - AC2: ✅ Prisma v3 확장 (PersonaLayerVector 3-Layer, Persona 12필드, UserVector OCEAN, InteractionLog/Session 2모델, 3 enum)
+  - AC3: ✅ 상수 모듈 7개 (dimensions 16D, paradox-mappings 7쌍, projection-coefficients, cross-layer-axes 83축, dynamics-defaults, interpretation-tables, index)
+  - AC4: ✅ 색상 모듈 6개 (CIELAB+OKLCH 16D, layer 3, cross-axis, engine-meta, archetype 12, resolveColor)
+  - AC5: ✅ Build PASS + 커밋 + 푸시 (7d07d91, fa21144)
+
+- [x] **T45: 프로젝트 초기화 + 기본 레이아웃** ✅ 2026-02-11
+  - AC1: ✅ 기존 src/ (233 files) + tests/ (4 files) 삭제, prisma/config 보존
+  - AC2: ✅ App Router 구조 (app/, components/, lib/, types/, constants/, stores/, hooks/)
+  - AC3: ✅ LNB 8섹션 (§2.4 기준, 접이식 하위 메뉴, 구분선, 활성 표시)
+  - AC4: ✅ 21개 하위 라우트 + Dashboard = 24 pages (Build PASS)
+  - AC5: ✅ globals.css (Tailwind v4 dark 테마) + cn() + prisma singleton
+  - AC6: ✅ Build PASS (Next.js 16.1.6 Turbopack) + 커밋 + 푸시
+
 - [x] **T41: 콜드스타트 질문 v3 전면 재설계 — 유저 프로파일링 시스템 v3** ✅ 2026-02-11
   - AC1: `docs/design/persona-engine-v3.md` §19 신설 (v3.0-draft.13) — 유저 프로파일링 시스템 v3
     - 하이브리드 시나리오 질문 (L1+L2 동시 측정, 4지선다, delta 적용 공식)
