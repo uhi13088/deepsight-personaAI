@@ -8,17 +8,21 @@
 // T128-AC3: 실행 결과 패널 통합
 // ═══════════════════════════════════════════════════════════════
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   ReactFlow,
+  ReactFlowProvider,
+  useReactFlow,
   Background,
   Controls,
   MiniMap,
   applyNodeChanges,
+  applyEdgeChanges,
   type Connection,
   type Node,
   type Edge,
   type NodeChange,
+  type EdgeChange,
   BackgroundVariant,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
@@ -41,14 +45,28 @@ import { EditorToolbar } from "./editor-toolbar"
 import { EditorStatusBar } from "./editor-status-bar"
 import { ExecutionResultsPanel } from "./execution-results-panel"
 
-// ── 메인 컴포넌트 ────────────────────────────────────────────
+// ── 외부 래퍼 (ReactFlowProvider 필수) ──────────────────────
 
 export function PersonaNodeEditor() {
+  return (
+    <ReactFlowProvider>
+      <PersonaNodeEditorInner />
+    </ReactFlowProvider>
+  )
+}
+
+// ── 메인 컴포넌트 ────────────────────────────────────────────
+
+function PersonaNodeEditorInner() {
   const store = useNodeEditorStore()
+  const { screenToFlowPosition } = useReactFlow()
+  const canvasRef = useRef<HTMLDivElement>(null)
+  const handleExecuteRef = useRef<() => void>(() => {})
   const [executionResult, setExecutionResult] = useState<ExecutionEngineResult | null>(null)
   const [executeError, setExecuteError] = useState<string | null>(null)
 
-  // ReactFlow 노드 — useState로 관리 (드래그 중 실시간 위치 반영)
+  // ── ReactFlow 노드 — useState로 관리 (드래그 중 실시간 위치 반영) ──
+
   const [rfNodes, setRfNodes] = useState<Node[]>([])
 
   useEffect(() => {
@@ -63,13 +81,24 @@ export function PersonaNodeEditor() {
     )
   }, [store.nodes, store.selectedNodeId])
 
-  // 드래그 중 실시간 위치 업데이트
-  const onNodesChange = useCallback((changes: NodeChange[]) => {
-    setRfNodes((prev) => applyNodeChanges(changes, prev))
-  }, [])
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      for (const change of changes) {
+        if (change.type === "remove") {
+          store.removeNode(change.id)
+        }
+      }
+      setRfNodes((prev) => applyNodeChanges(changes, prev))
+    },
+    [store]
+  )
 
-  const rfEdges: Edge[] = useMemo(
-    () =>
+  // ── ReactFlow 엣지 — useState로 관리 (선택/삭제 지원) ──
+
+  const [rfEdges, setRfEdges] = useState<Edge[]>([])
+
+  useEffect(() => {
+    setRfEdges(
       store.edges.map((e) => ({
         id: e.id,
         source: e.sourceNodeId,
@@ -81,40 +110,58 @@ export function PersonaNodeEditor() {
           stroke: store.activeEdges.has(e.id) ? "#10b981" : "#94a3b8",
           strokeWidth: store.activeEdges.has(e.id) ? 2 : 1,
         },
-      })),
-    [store.edges, store.activeEdges]
+      }))
+    )
+  }, [store.edges, store.activeEdges])
+
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      for (const change of changes) {
+        if (change.type === "remove") {
+          store.removeEdge(change.id)
+        }
+      }
+      setRfEdges((prev) => applyEdgeChanges(changes, prev))
+    },
+    [store]
   )
 
-  // 연결 검증 + 추가
-  const onConnect = useCallback(
-    (connection: Connection) => {
-      if (!connection.source || !connection.target) return
-      if (!connection.sourceHandle || !connection.targetHandle) return
+  // ── 연결 검증 (시각 피드백용) ──────────────────────────────
 
-      // 포트 타입 호환성 검사
+  const isValidConnection = useCallback(
+    (connection: Edge | Connection) => {
+      if (!connection.source || !connection.target) return false
+      if (!connection.sourceHandle || !connection.targetHandle) return false
+      if (connection.source === connection.target) return false
+
       const sourceDef = getNodeDefinition(
         store.nodes.find((n) => n.id === connection.source)?.type ?? ""
       )
       const targetDef = getNodeDefinition(
         store.nodes.find((n) => n.id === connection.target)?.type ?? ""
       )
+      if (!sourceDef || !targetDef) return false
 
-      if (sourceDef && targetDef) {
-        const sourcePort = sourceDef.outputs.find((p) => p.id === connection.sourceHandle)
-        const targetPort = targetDef.inputs.find((p) => p.id === connection.targetHandle)
+      const sourcePort = sourceDef.outputs.find((p) => p.id === connection.sourceHandle)
+      const targetPort = targetDef.inputs.find((p) => p.id === connection.targetHandle)
+      if (!sourcePort || !targetPort) return false
 
-        if (sourcePort && targetPort) {
-          if (!isPortCompatible(sourcePort.type as PortType, targetPort.type as PortType)) {
-            return // 비호환 포트
-          }
-        }
-      }
+      if (!isPortCompatible(sourcePort.type as PortType, targetPort.type as PortType)) return false
 
-      // 순환 검사
       const graphState = store.getGraphState()
-      if (wouldCreateCycle(graphState, connection.source, connection.target)) {
-        return // 순환 방지
-      }
+      if (wouldCreateCycle(graphState, connection.source, connection.target)) return false
+
+      return true
+    },
+    [store]
+  )
+
+  // ── 연결 확정 ─────────────────────────────────────────────
+
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      if (!connection.source || !connection.target) return
+      if (!connection.sourceHandle || !connection.targetHandle) return
 
       const edgeId = `e_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
       store.addEdge({
@@ -128,7 +175,8 @@ export function PersonaNodeEditor() {
     [store]
   )
 
-  // 노드 선택
+  // ── 노드/엣지 선택 ────────────────────────────────────────
+
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       store.selectNode(node.id)
@@ -136,7 +184,15 @@ export function PersonaNodeEditor() {
     [store]
   )
 
-  // 노드 위치 변경
+  const onEdgeClick = useCallback(
+    (_: React.MouseEvent, edge: Edge) => {
+      store.selectEdge(edge.id)
+    },
+    [store]
+  )
+
+  // ── 노드 위치 변경 ────────────────────────────────────────
+
   const onNodeDragStop = useCallback(
     (_: React.MouseEvent, node: Node) => {
       store.updateNodePosition(node.id, node.position)
@@ -144,8 +200,9 @@ export function PersonaNodeEditor() {
     [store]
   )
 
-  // 팔레트에서 노드 추가
-  const handleAddNode = useCallback(
+  // ── 노드 추가 (공통) ──────────────────────────────────────
+
+  const addNode = useCallback(
     (nodeType: string, position: { x: number; y: number }) => {
       const def = getNodeDefinition(nodeType)
       if (!def) return
@@ -161,7 +218,25 @@ export function PersonaNodeEditor() {
     [store]
   )
 
-  // 드래그&드롭
+  // ── 팔레트 클릭 → 뷰포트 중앙에 추가 ─────────────────────
+
+  const handleAddNodeFromPalette = useCallback(
+    (nodeType: string) => {
+      let position = { x: 400, y: 300 }
+      if (canvasRef.current) {
+        const rect = canvasRef.current.getBoundingClientRect()
+        position = screenToFlowPosition({
+          x: rect.left + rect.width / 2 + Math.random() * 60 - 30,
+          y: rect.top + rect.height / 2 + Math.random() * 60 - 30,
+        })
+      }
+      addNode(nodeType, position)
+    },
+    [addNode, screenToFlowPosition]
+  )
+
+  // ── 드래그&드롭 → 드롭 지점에 추가 ───────────────────────
+
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault()
     event.dataTransfer.dropEffect = "move"
@@ -173,16 +248,17 @@ export function PersonaNodeEditor() {
       const nodeType = event.dataTransfer.getData("application/persona-node")
       if (!nodeType) return
 
-      const position = {
-        x: event.clientX - 300,
-        y: event.clientY - 100,
-      }
-      handleAddNode(nodeType, position)
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      })
+      addNode(nodeType, position)
     },
-    [handleAddNode]
+    [addNode, screenToFlowPosition]
   )
 
-  // 프리셋 로드
+  // ── 프리셋 로드 ───────────────────────────────────────────
+
   const handleLoadPreset = useCallback(
     (presetId: string) => {
       const preset = getPreset(presetId)
@@ -196,16 +272,42 @@ export function PersonaNodeEditor() {
     [store]
   )
 
-  // 검증
+  // ── 검증 ──────────────────────────────────────────────────
+
   const handleValidate = useCallback(() => {
     const result = validateGraph(store.getGraphState())
     store.setValidationResult(result)
   }, [store])
 
-  // ── T128-AC1: 실제 실행 엔진 연결 ──────────────────────────
+  // ── 자동 검증: 그래프 변경 시 300ms 디바운스 ──────────────
+
+  useEffect(() => {
+    if (store.nodes.length === 0) return
+    const timer = setTimeout(() => {
+      const result = validateGraph({ nodes: store.nodes, edges: store.edges })
+      store.setValidationResult(result)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [store.nodes, store.edges, store])
+
+  // ── 키보드 단축키: Ctrl+Enter → 실행 ─────────────────────
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault()
+        if (!store.isExecuting && store.nodes.length > 0) {
+          handleExecuteRef.current()
+        }
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [store.isExecuting, store.nodes.length])
+
+  // ── T128-AC1: 실제 실행 엔진 연결 ────────────────────────
 
   const handleExecute = useCallback(async () => {
-    // 1. 실행 전 검증
     const validation = validateGraph(store.getGraphState())
     store.setValidationResult(validation)
 
@@ -214,17 +316,13 @@ export function PersonaNodeEditor() {
       return
     }
 
-    // 2. 실행 상태 초기화
     store.clearExecutionResults()
     store.setExecuting(true)
     setExecutionResult(null)
     setExecuteError(null)
 
     try {
-      // 3. DAG 실행
       const result = await executeGraph(store.getGraphState())
-
-      // 4. 결과 반영 (isExecuting=false 자동 설정)
       store.setExecutionResults(result.state)
       setExecutionResult(result)
     } catch (err) {
@@ -233,7 +331,10 @@ export function PersonaNodeEditor() {
     }
   }, [store])
 
-  // ── T128-AC2: 저장/로드 ─────────────────────────────────────
+  // ref를 최신 handleExecute로 갱신 (키보드 단축키에서 사용)
+  handleExecuteRef.current = handleExecute
+
+  // ── T128-AC2: 저장/로드 ───────────────────────────────────
 
   const handleSave = useCallback(() => {
     const graphState = store.getGraphState()
@@ -247,7 +348,8 @@ export function PersonaNodeEditor() {
     store.markClean()
   }, [store])
 
-  // 선택된 노드
+  // ── 선택된 노드 ──────────────────────────────────────────
+
   const selectedNode = store.nodes.find((n) => n.id === store.selectedNodeId)
 
   return (
@@ -274,21 +376,25 @@ export function PersonaNodeEditor() {
       )}
 
       <div className="flex flex-1 overflow-hidden">
-        <NodePalette onAddNode={handleAddNode} />
+        <NodePalette onAddNode={handleAddNodeFromPalette} />
 
-        <div className="flex-1" onDragOver={onDragOver} onDrop={onDrop}>
+        <div ref={canvasRef} className="flex-1" onDragOver={onDragOver} onDrop={onDrop}>
           <ReactFlow
             nodes={rfNodes}
             edges={rfEdges}
             nodeTypes={NODE_TYPE_MAP}
             onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            isValidConnection={isValidConnection}
             onNodeClick={onNodeClick}
+            onEdgeClick={onEdgeClick}
             onNodeDragStop={onNodeDragStop}
             onPaneClick={() => store.clearSelection()}
             fitView
             snapToGrid
             snapGrid={[20, 20]}
+            deleteKeyCode={["Backspace", "Delete"]}
           >
             <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
             <Controls />
