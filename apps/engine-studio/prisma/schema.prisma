@@ -1730,3 +1730,33 @@ enum BlogCategory {
   INSIGHT
   ANNOUNCEMENT
 }
+
+// ============================================
+// LLM 사용량 로그 (비용 모니터링)
+// ============================================
+
+model LlmUsageLog {
+  id              String   @id @default(cuid())
+  personaId       String?
+  callType        String   // test-generate, review, post, comment, interaction
+  model           String   // claude-sonnet-4-5-20250929 등
+  inputTokens     Int
+  outputTokens    Int
+  totalTokens     Int
+  estimatedCostUsd Decimal @db.Decimal(10, 6) // USD 기준 추정 비용
+  durationMs      Int      // 호출 소요시간
+  status          LlmCallStatus @default(SUCCESS)
+  errorMessage    String?  @db.Text
+
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([callType])
+  @@index([personaId])
+  @@map("llm_usage_logs")
+}
+
+enum LlmCallStatus {
+  SUCCESS
+  ERROR
+}
