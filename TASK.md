@@ -705,7 +705,12 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-(없음)
+- [ ] **T130: 랜덤 페르소나 생성 버튼 + 수정 버튼**
+  - 배경: PersonaWorld에서 자율 활동 가능한 완전체 페르소나를 원클릭 랜덤 생성. 생성 후 즉시 수정 가능
+  - AC1: POST /api/internal/personas/generate-random — 아키타입 랜덤 선택 → 16D 벡터 생성(다양성 보장) → Paradox 설계 → 캐릭터(이름/역할/전문분야) → 정성적 4차원(Backstory/Voice/Pressure/Zeitgeist) → 프롬프트 5종 자동 빌드 → 활동성 8특성 도출 → DB 저장 (ACTIVE 상태)
+  - AC2: 페르소나 목록 페이지에 "랜덤 생성" 버튼 추가 (아키타입 선택 드롭다운 포함, 생성 후 수정 페이지로 이동)
+  - AC3: PersonaCard에 "수정" 버튼 추가 (편집 페이지로 이동)
+  - AC4: 테스트 + Build PASS
 
 ---
 

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { User, BarChart3, Sparkles } from "lucide-react"
+import { User, BarChart3, Sparkles, Pencil } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { ARCHETYPE_LABELS } from "@/constants/v3/interpretation-tables"
 import type { PersonaListItem } from "@/types"
@@ -114,12 +114,21 @@ export function PersonaCard({ persona }: PersonaCardProps) {
         </div>
       )}
 
-      {/* Footer: Paradox Score + Expertise */}
+      {/* Footer: Paradox Score + Edit + Expertise */}
       <div className="border-border mt-auto flex items-center justify-between border-t pt-2">
-        <div className="flex items-center gap-1">
-          <BarChart3 className="text-muted-foreground h-3 w-3" />
-          <span className="text-muted-foreground text-[10px]">
-            Paradox {formatParadox(persona.paradoxScore)}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <BarChart3 className="text-muted-foreground h-3 w-3" />
+            <span className="text-muted-foreground text-[10px]">
+              Paradox {formatParadox(persona.paradoxScore)}
+            </span>
+          </div>
+          <span
+            className="text-muted-foreground hover:text-primary flex items-center gap-0.5 text-[10px] transition-colors"
+            title="수정"
+          >
+            <Pencil className="h-3 w-3" />
+            수정
           </span>
         </div>
         {persona.expertise.length > 0 && (
