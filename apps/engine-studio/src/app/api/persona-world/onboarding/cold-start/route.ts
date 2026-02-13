@@ -35,13 +35,50 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Phase → DB onboardingLevel/questionOrder 매핑 (질문 API route와 동일)
+    type PhaseRange = { level: "LIGHT" | "MEDIUM"; from: number; to: number }
+    const PHASE_RANGES: Record<number, PhaseRange[]> = {
+      1: [{ level: "LIGHT", from: 1, to: 8 }],
+      2: [
+        { level: "LIGHT", from: 9, to: 12 },
+        { level: "MEDIUM", from: 13, to: 16 },
+      ],
+      3: [{ level: "MEDIUM", from: 17, to: 24 }],
+    }
+
     const provider: OnboardingDataProvider = {
       async getQuestionsByPhase(phase: 1 | 2 | 3): Promise<OnboardingQuestion[]> {
-        // 설문 질문은 PWUserSurveyResponse의 answers JSON에서 질문 구조 재구성
-        // 실제로는 별도 question_pool 테이블에서 조회하거나 설정 파일에서 로드
-        // 현재는 빈 배열 반환 → 추후 질문 풀 구현 시 연동
-        const _phase = phase
-        return []
+        const ranges = PHASE_RANGES[phase]
+        const rows: Array<{ id: string; options: Prisma.JsonValue }> = []
+
+        for (const range of ranges) {
+          const batch = await prisma.psychProfileTemplate.findMany({
+            where: {
+              onboardingLevel: range.level,
+              questionOrder: { gte: range.from, lte: range.to },
+            },
+            orderBy: { questionOrder: "asc" },
+            select: { id: true, options: true },
+          })
+          rows.push(...batch)
+        }
+
+        return rows.map((row) => {
+          const rawOptions = (row.options ?? []) as Array<{
+            key: string
+            l1Weights?: Record<string, number>
+            l2Weights?: Record<string, number>
+          }>
+          return {
+            id: row.id,
+            phase,
+            options: rawOptions.map((opt) => ({
+              key: opt.key,
+              l1Weights: opt.l1Weights,
+              l2Weights: opt.l2Weights,
+            })),
+          }
+        })
       },
 
       async saveOnboardingResult(

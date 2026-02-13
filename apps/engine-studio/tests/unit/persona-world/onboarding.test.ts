@@ -500,3 +500,363 @@ describe("ONBOARDING_CONFIDENCE", () => {
     expect(ONBOARDING_CONFIDENCE.MEDIUM).toBeLessThan(ONBOARDING_CONFIDENCE.DEEP)
   })
 })
+
+// ═══ v3 24문항 구조 통합 테스트 ═══
+// 설계서 §19.3~§19.4 기준 — 실제 SQL(009_cold_start_v3.sql)과 동일 구조
+
+describe("v3 24문항 구조 통합", () => {
+  // Phase 1 실제 질문 구조 (SQL과 동일)
+  const V3_PHASE1: OnboardingQuestion[] = [
+    {
+      id: "v3-q01-depth-openness",
+      phase: 1,
+      options: [
+        { key: "A", l1Weights: { depth: -0.2 }, l2Weights: { openness: 0.1 } },
+        { key: "B", l1Weights: { depth: 0.1 }, l2Weights: { openness: 0.15 } },
+        { key: "C", l1Weights: { depth: 0.3 }, l2Weights: { openness: 0.25 } },
+        { key: "D", l1Weights: { depth: 0.4 }, l2Weights: { openness: 0.3 } },
+      ],
+    },
+    {
+      id: "v3-q02-lens-conscientiousness",
+      phase: 1,
+      options: [
+        { key: "A", l1Weights: { lens: -0.3 }, l2Weights: { conscientiousness: -0.2 } },
+        { key: "B", l1Weights: { lens: -0.1 }, l2Weights: { conscientiousness: 0.0 } },
+        { key: "C", l1Weights: { lens: 0.2 }, l2Weights: { conscientiousness: 0.25 } },
+        { key: "D", l1Weights: { lens: 0.35 }, l2Weights: { conscientiousness: 0.35 } },
+      ],
+    },
+    {
+      id: "v3-q03-stance-agreeableness",
+      phase: 1,
+      options: [
+        { key: "A", l1Weights: { stance: -0.3 }, l2Weights: { agreeableness: 0.3 } },
+        { key: "B", l1Weights: { stance: -0.1 }, l2Weights: { agreeableness: 0.2 } },
+        { key: "C", l1Weights: { stance: 0.25 }, l2Weights: { agreeableness: -0.1 } },
+        { key: "D", l1Weights: { stance: 0.4 }, l2Weights: { agreeableness: -0.3 } },
+      ],
+    },
+    {
+      id: "v3-q04-scope-openness",
+      phase: 1,
+      options: [
+        { key: "A", l1Weights: { scope: -0.3 }, l2Weights: { openness: -0.2 } },
+        { key: "B", l1Weights: { scope: -0.05 }, l2Weights: { openness: 0.05 } },
+        { key: "C", l1Weights: { scope: 0.2 }, l2Weights: { openness: 0.2 } },
+        { key: "D", l1Weights: { scope: 0.35 }, l2Weights: { openness: 0.35 } },
+      ],
+    },
+    {
+      id: "v3-q05-taste-openness",
+      phase: 1,
+      options: [
+        { key: "A", l1Weights: { taste: -0.3 }, l2Weights: { openness: -0.3 } },
+        { key: "B", l1Weights: { taste: -0.1 }, l2Weights: { openness: -0.05 } },
+        { key: "C", l1Weights: { taste: 0.2 }, l2Weights: { openness: 0.25 } },
+        { key: "D", l1Weights: { taste: 0.4 }, l2Weights: { openness: 0.35 } },
+      ],
+    },
+    {
+      id: "v3-q06-purpose-conscientiousness",
+      phase: 1,
+      options: [
+        { key: "A", l1Weights: { purpose: -0.3 }, l2Weights: { conscientiousness: -0.25 } },
+        { key: "B", l1Weights: { purpose: -0.1 }, l2Weights: { conscientiousness: -0.05 } },
+        { key: "C", l1Weights: { purpose: 0.2 }, l2Weights: { conscientiousness: 0.2 } },
+        { key: "D", l1Weights: { purpose: 0.35 }, l2Weights: { conscientiousness: 0.35 } },
+      ],
+    },
+    {
+      id: "v3-q07-sociability-extraversion",
+      phase: 1,
+      options: [
+        { key: "A", l1Weights: { sociability: -0.3 }, l2Weights: { extraversion: -0.3 } },
+        { key: "B", l1Weights: { sociability: -0.1 }, l2Weights: { extraversion: -0.1 } },
+        { key: "C", l1Weights: { sociability: 0.2 }, l2Weights: { extraversion: 0.2 } },
+        { key: "D", l1Weights: { sociability: 0.4 }, l2Weights: { extraversion: 0.35 } },
+      ],
+    },
+    {
+      id: "v3-q08-depth-lens-neuroticism",
+      phase: 1,
+      options: [
+        { key: "A", l1Weights: { depth: 0.1, lens: -0.2 }, l2Weights: { neuroticism: -0.2 } },
+        { key: "B", l1Weights: { depth: 0.1, lens: 0.15 }, l2Weights: { neuroticism: 0.1 } },
+        { key: "C", l1Weights: { depth: -0.15, lens: 0.0 }, l2Weights: { neuroticism: 0.3 } },
+        { key: "D", l1Weights: { depth: 0.3, lens: 0.2 }, l2Weights: { neuroticism: -0.1 } },
+      ],
+    },
+  ]
+
+  // Phase 2 대표 질문 (Q9, Q11)
+  const V3_PHASE2: OnboardingQuestion[] = [
+    {
+      id: "v3-q09-openness-taste",
+      phase: 2,
+      options: [
+        { key: "A", l2Weights: { openness: -0.3 }, l1Weights: { taste: -0.25 } },
+        { key: "B", l2Weights: { openness: -0.05 }, l1Weights: { taste: -0.05 } },
+        { key: "C", l2Weights: { openness: 0.2 }, l1Weights: { taste: 0.15 } },
+        { key: "D", l2Weights: { openness: 0.35 }, l1Weights: { taste: 0.3 } },
+      ],
+    },
+    {
+      id: "v3-q11-extraversion-sociability",
+      phase: 2,
+      options: [
+        { key: "A", l2Weights: { extraversion: -0.3 }, l1Weights: { sociability: -0.25 } },
+        { key: "B", l2Weights: { extraversion: -0.05 }, l1Weights: { sociability: 0.05 } },
+        { key: "C", l2Weights: { extraversion: 0.25 }, l1Weights: { sociability: 0.2 } },
+        { key: "D", l2Weights: { extraversion: 0.35 }, l1Weights: { sociability: 0.35 } },
+      ],
+    },
+  ]
+
+  // Phase 3 역설 검증 질문 (Q19)
+  const V3_PHASE3: OnboardingQuestion[] = [
+    {
+      id: "v3-q19-paradox-sociability-extraversion",
+      phase: 3,
+      options: [
+        { key: "A", l1Weights: { sociability: 0.15 }, l2Weights: { extraversion: 0.3 } },
+        { key: "B", l1Weights: { sociability: 0.1 }, l2Weights: { extraversion: -0.1 } },
+        { key: "C", l1Weights: { sociability: 0.05 }, l2Weights: { extraversion: -0.2 } },
+        { key: "D", l1Weights: { sociability: 0.2 }, l2Weights: { extraversion: -0.3 } },
+      ],
+    },
+  ]
+
+  it("Phase 1 전체 8문항 응답 → L1 7D 모든 축 측정", () => {
+    const answers: OnboardingAnswer[] = [
+      { questionId: "v3-q01-depth-openness", value: "C" },
+      { questionId: "v3-q02-lens-conscientiousness", value: "D" },
+      { questionId: "v3-q03-stance-agreeableness", value: "C" },
+      { questionId: "v3-q04-scope-openness", value: "C" },
+      { questionId: "v3-q05-taste-openness", value: "C" },
+      { questionId: "v3-q06-purpose-conscientiousness", value: "C" },
+      { questionId: "v3-q07-sociability-extraversion", value: "C" },
+      { questionId: "v3-q08-depth-lens-neuroticism", value: "D" },
+    ]
+    const l1 = computeL1Vector(V3_PHASE1, answers)
+
+    // 모든 L1 차원이 기본값(0.5)에서 변화해야 함
+    expect(l1.depth).not.toBe(0.5) // Q1 +0.3, Q8 +0.3
+    expect(l1.lens).not.toBe(0.5) // Q2 +0.35, Q8 +0.2
+    expect(l1.stance).not.toBe(0.5) // Q3 +0.25
+    expect(l1.scope).not.toBe(0.5) // Q4 +0.2
+    expect(l1.taste).not.toBe(0.5) // Q5 +0.2
+    expect(l1.purpose).not.toBe(0.5) // Q6 +0.2
+    expect(l1.sociability).not.toBe(0.5) // Q7 +0.2
+
+    // 값 범위 검증
+    for (const key of [
+      "depth",
+      "lens",
+      "stance",
+      "scope",
+      "taste",
+      "purpose",
+      "sociability",
+    ] as const) {
+      expect(l1[key]).toBeGreaterThanOrEqual(0)
+      expect(l1[key]).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it("Phase 1 극단적 응답 (전부 A) → 보수적/소극적 벡터", () => {
+    const answers: OnboardingAnswer[] = V3_PHASE1.map((q) => ({
+      questionId: q.id,
+      value: "A",
+    }))
+    const l1 = computeL1Vector(V3_PHASE1, answers)
+
+    // A는 대부분 음수 가중치
+    expect(l1.depth).toBeLessThan(0.5)
+    expect(l1.lens).toBeLessThan(0.5)
+    expect(l1.stance).toBeLessThan(0.5)
+    expect(l1.scope).toBeLessThan(0.5)
+    expect(l1.taste).toBeLessThan(0.5)
+    expect(l1.purpose).toBeLessThan(0.5)
+    expect(l1.sociability).toBeLessThan(0.5)
+  })
+
+  it("Phase 1 극단적 응답 (전부 D) → 적극적/개방적 벡터", () => {
+    const answers: OnboardingAnswer[] = V3_PHASE1.map((q) => ({
+      questionId: q.id,
+      value: "D",
+    }))
+    const l1 = computeL1Vector(V3_PHASE1, answers)
+
+    // D는 대부분 양수 가중치
+    expect(l1.depth).toBeGreaterThan(0.5)
+    expect(l1.lens).toBeGreaterThan(0.5)
+    expect(l1.stance).toBeGreaterThan(0.5)
+    expect(l1.scope).toBeGreaterThan(0.5)
+    expect(l1.taste).toBeGreaterThan(0.5)
+    expect(l1.purpose).toBeGreaterThan(0.5)
+    expect(l1.sociability).toBeGreaterThan(0.5)
+  })
+
+  it("Phase 2 → L2 OCEAN 벡터 변화", () => {
+    const answers: OnboardingAnswer[] = [
+      { questionId: "v3-q09-openness-taste", value: "D" },
+      { questionId: "v3-q11-extraversion-sociability", value: "D" },
+    ]
+    const l2 = computeL2Vector(V3_PHASE2, answers)
+
+    expect(l2.openness).toBe(0.85) // 0.5 + 0.35
+    expect(l2.extraversion).toBe(0.85) // 0.5 + 0.35
+  })
+
+  it("Phase 2 → L1 교차 측정도 반영", () => {
+    const answers: OnboardingAnswer[] = [
+      { questionId: "v3-q09-openness-taste", value: "D" }, // taste +0.3
+      { questionId: "v3-q11-extraversion-sociability", value: "D" }, // sociability +0.35
+    ]
+    // Phase 2 질문은 l1Weights도 포함 → computeL1Vector로도 측정 가능
+    const l1 = computeL1Vector(V3_PHASE2, answers)
+
+    expect(l1.taste).toBe(0.8) // 0.5 + 0.3
+    expect(l1.sociability).toBe(0.85) // 0.5 + 0.35
+  })
+
+  it("Phase 3 역설 검증 — sociability↔extraversion 괴리 감지", () => {
+    // 온라인 활발(sociability 높음) + 오프라인 소극(extraversion 낮음) = 역설
+    const l1 = {
+      depth: 0.5,
+      lens: 0.5,
+      stance: 0.5,
+      scope: 0.5,
+      taste: 0.5,
+      purpose: 0.5,
+      sociability: 0.85,
+    }
+    const l2 = {
+      openness: 0.5,
+      conscientiousness: 0.5,
+      extraversion: 0.3,
+      agreeableness: 0.5,
+      neuroticism: 0.5,
+    }
+    // Q19 D선택: sociability +0.2, extraversion -0.3 → 괴리 심화
+    const answers: OnboardingAnswer[] = [
+      { questionId: "v3-q19-paradox-sociability-extraversion", value: "D" },
+    ]
+
+    const result = crossValidate(l1, l2, V3_PHASE3, answers)
+
+    // sociability=0.85+0.2=1.0(클램프), extraversion=0.3-0.3=0.0 → 갭 1.0 > 0.3
+    expect(result.paradoxDetected).toBe(true)
+  })
+
+  it("Phase 3 일관 응답 → 역설 미감지", () => {
+    const l1 = {
+      depth: 0.5,
+      lens: 0.5,
+      stance: 0.5,
+      scope: 0.5,
+      taste: 0.5,
+      purpose: 0.5,
+      sociability: 0.65,
+    }
+    const l2 = {
+      openness: 0.5,
+      conscientiousness: 0.5,
+      extraversion: 0.6,
+      agreeableness: 0.5,
+      neuroticism: 0.5,
+    }
+    // Q19 A선택: sociability +0.15, extraversion +0.3 → 일관
+    const answers: OnboardingAnswer[] = [
+      { questionId: "v3-q19-paradox-sociability-extraversion", value: "A" },
+    ]
+
+    const result = crossValidate(l1, l2, V3_PHASE3, answers)
+
+    // sociability=0.8, extraversion=0.9 → 갭 0.1 < 0.3
+    expect(result.paradoxDetected).toBe(false)
+  })
+
+  it("전체 파이프라인 DEEP → ADVANCED 프로필", async () => {
+    const provider: OnboardingDataProvider = {
+      getQuestionsByPhase: vi.fn().mockImplementation((phase: number) => {
+        switch (phase) {
+          case 1:
+            return Promise.resolve(V3_PHASE1)
+          case 2:
+            return Promise.resolve(V3_PHASE2)
+          case 3:
+            return Promise.resolve(V3_PHASE3)
+          default:
+            return Promise.resolve([])
+        }
+      }),
+      saveOnboardingResult: vi.fn().mockResolvedValue(undefined),
+    }
+
+    const answers: OnboardingAnswer[] = [
+      // Phase 1
+      { questionId: "v3-q01-depth-openness", value: "C" },
+      { questionId: "v3-q02-lens-conscientiousness", value: "C" },
+      { questionId: "v3-q03-stance-agreeableness", value: "B" },
+      { questionId: "v3-q04-scope-openness", value: "C" },
+      { questionId: "v3-q05-taste-openness", value: "C" },
+      { questionId: "v3-q06-purpose-conscientiousness", value: "C" },
+      { questionId: "v3-q07-sociability-extraversion", value: "B" },
+      { questionId: "v3-q08-depth-lens-neuroticism", value: "B" },
+      // Phase 2
+      { questionId: "v3-q09-openness-taste", value: "C" },
+      { questionId: "v3-q11-extraversion-sociability", value: "B" },
+      // Phase 3
+      { questionId: "v3-q19-paradox-sociability-extraversion", value: "B" },
+    ]
+
+    const result = await processOnboardingAnswers(answers, "DEEP", provider)
+
+    expect(result.profileLevel).toBe("ADVANCED")
+    expect(result.confidence).toBe(ONBOARDING_CONFIDENCE.DEEP)
+    expect(result.l1Vector).toBeDefined()
+    expect(result.l2Vector).toBeDefined()
+    // L1 벡터 범위 검증
+    for (const key of [
+      "depth",
+      "lens",
+      "stance",
+      "scope",
+      "taste",
+      "purpose",
+      "sociability",
+    ] as const) {
+      expect(result.l1Vector[key]).toBeGreaterThanOrEqual(0)
+      expect(result.l1Vector[key]).toBeLessThanOrEqual(1)
+    }
+    // L2 벡터 범위 검증
+    for (const key of [
+      "openness",
+      "conscientiousness",
+      "extraversion",
+      "agreeableness",
+      "neuroticism",
+    ] as const) {
+      expect(result.l2Vector![key]).toBeGreaterThanOrEqual(0)
+      expect(result.l2Vector![key]).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it("v3 질문 구조 검증 — 모든 질문에 key/l1Weights 또는 l2Weights 존재", () => {
+    const allQuestions = [...V3_PHASE1, ...V3_PHASE2, ...V3_PHASE3]
+
+    for (const q of allQuestions) {
+      expect(q.options.length).toBe(4) // 4지선다
+      for (const opt of q.options) {
+        expect(["A", "B", "C", "D"]).toContain(opt.key)
+        // 최소 l1Weights 또는 l2Weights 하나는 존재
+        const hasWeights =
+          (opt.l1Weights && Object.keys(opt.l1Weights).length > 0) ||
+          (opt.l2Weights && Object.keys(opt.l2Weights).length > 0)
+        expect(hasWeights).toBe(true)
+      }
+    }
+  })
+})
