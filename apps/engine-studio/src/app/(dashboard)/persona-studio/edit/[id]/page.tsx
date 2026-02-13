@@ -201,8 +201,8 @@ export default function PersonaEditPage({ params }: { params: Promise<{ id: stri
               복제
             </Button>
 
-            {hasChanges && editable && (
-              <Button size="sm" onClick={handleSave} disabled={saving}>
+            {editable && (
+              <Button size="sm" onClick={handleSave} disabled={saving || !hasChanges}>
                 {saving ? (
                   <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                 ) : (
