@@ -10,7 +10,11 @@
 
 BEGIN;
 
--- ── 0. 시스템 유저 (없으면 생성) ────────────────────────────────
+-- ── 0-a. 기존 시드 데이터 삭제 (재실행 시 중복 방지) ──────────
+DELETE FROM persona_vectors WHERE "personaId" LIKE 'persona_seed_%';
+DELETE FROM personas WHERE id LIKE 'persona_seed_%';
+
+-- ── 0-b. 시스템 유저 (없으면 생성) ────────────────────────────────
 INSERT INTO users (id, email, name, role, "isActive", "createdAt", "updatedAt")
 VALUES ('sys_seed_admin_001', 'admin@deepsight.ai', 'DeepSight Admin', 'ADMIN', true, NOW(), NOW())
 ON CONFLICT (email) DO NOTHING;
