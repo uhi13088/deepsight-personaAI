@@ -3,7 +3,7 @@
  * 초기 데이터 및 관리자 계정 생성
  */
 
-import { Prisma, PrismaClient } from "@prisma/client"
+import { Prisma, PrismaClient } from "../src/generated/prisma"
 import bcrypt from "bcryptjs"
 import { COLD_START_QUESTIONS } from "./seed-data/cold-start-questions"
 import { BLOG_POSTS } from "./seed-data/blog-posts"
