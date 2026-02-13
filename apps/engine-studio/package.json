@@ -23,6 +23,7 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.74.0",
     "@auth/prisma-adapter": "^2.11.1",
     "@deepsight/shared-types": "workspace:^",
     "@hookform/resolvers": "^5.2.2",
