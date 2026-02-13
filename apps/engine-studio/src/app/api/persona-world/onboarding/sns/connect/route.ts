@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { processSnsData } from "@/lib/persona-world/onboarding/sns-processor"
 import type { SNSExtendedData } from "@/lib/persona-world/types"
-import type { Prisma } from "@prisma/client"
+import type { Prisma } from "@/generated/prisma"
 
 /**
  * POST /api/persona-world/onboarding/sns/connect

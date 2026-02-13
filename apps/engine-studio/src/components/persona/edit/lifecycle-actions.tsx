@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getAvailableActions, ACTION_LABELS, DANGEROUS_ACTIONS } from "@/lib/lifecycle"
 import type { LifecycleAction } from "@/lib/lifecycle"
-import type { PersonaStatus } from "@prisma/client"
+import type { PersonaStatus } from "@/generated/prisma"
 import type { ApiResponse, LifecycleTransitionResponse } from "@/types"
 
 interface LifecycleActionsProps {

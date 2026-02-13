@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
-import type { Prisma, ApiLog, ApiKey } from "@prisma/client"
+import type { Prisma, ApiLog, ApiKey } from "@/generated/prisma"
 
 type ApiLogWithApiKey = ApiLog & {
   apiKey: Pick<ApiKey, "id" | "name" | "lastFour" | "keyPrefix"> | null

@@ -8,7 +8,7 @@ import type {
   CoreTemperamentVector,
   NarrativeDriveVector,
 } from "@/types"
-import type { PersonaRole, PersonaStatus } from "@prisma/client"
+import type { PersonaRole, PersonaStatus } from "@/generated/prisma"
 
 interface CreatePersonaBody {
   name: string

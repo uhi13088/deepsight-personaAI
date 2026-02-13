@@ -9,6 +9,9 @@ dist
 build
 .turbo
 
+# Prisma generated clients
+**/src/generated/prisma
+
 # Environment
 .env
 .env.local

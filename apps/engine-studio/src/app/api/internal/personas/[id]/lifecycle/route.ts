@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { executeTransition } from "@/lib/lifecycle"
 import type { ApiResponse, LifecycleTransitionBody, LifecycleTransitionResponse } from "@/types"
 import type { LifecycleAction } from "@/lib/lifecycle"
-import type { PersonaStatus } from "@prisma/client"
+import type { PersonaStatus } from "@/generated/prisma"
 
 // ═══════════════════════════════════════════════════════════════
 // POST /api/internal/personas/[id]/lifecycle
