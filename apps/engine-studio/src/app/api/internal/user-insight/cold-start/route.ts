@@ -14,7 +14,6 @@ import type {
   QuestionType,
   ColdStartQuestion,
 } from "@/lib/user-insight/cold-start"
-import type { SocialDimension, TemperamentDimension } from "@/types"
 
 // ── L1/L2 차원 판별 ────────────────────────────────────────────
 
@@ -74,19 +73,25 @@ function dbToColdStartQuestion(
   },
   mode: OnboardingMode
 ): ColdStartQuestion {
-  const primaryDim = row.targetDimensions[0] ?? "depth"
   const rawOptions = (row.options ?? []) as DbOption[]
+
+  // 대상 차원 → 레이어 판별 (복합질문은 L1+L2 동시)
+  const layers = new Set<"L1" | "L2">()
+  for (const dim of row.targetDimensions) {
+    layers.add(resolveLayer(dim))
+  }
 
   return {
     id: row.id,
     text: row.questionText,
     type: "scenario" as QuestionType,
-    targetDimension: primaryDim as SocialDimension | TemperamentDimension,
-    targetLayer: resolveLayer(primaryDim),
+    targetDimensions: row.targetDimensions,
+    targetLayers: Array.from(layers),
     options: rawOptions.map((opt) => ({
       id: opt.key,
       text: opt.label,
-      vectorDelta: { ...(opt.l1Weights ?? {}), ...(opt.l2Weights ?? {}) },
+      l1Weights: opt.l1Weights ?? {},
+      l2Weights: opt.l2Weights ?? {},
     })),
     mode,
     order: row.questionOrder,
@@ -185,9 +190,14 @@ interface ColdStartPostRequest {
   question?: {
     text: string
     type: QuestionType
-    targetDimension: string
-    targetLayer: "L1" | "L2"
-    options: Array<{ id: string; text: string; vectorDelta: Record<string, number> }>
+    targetDimensions: string[]
+    targetLayers: ("L1" | "L2")[]
+    options: Array<{
+      id: string
+      text: string
+      l1Weights: Record<string, number>
+      l2Weights: Record<string, number>
+    }>
   }
   // For remove_question
   questionId?: string
@@ -240,8 +250,8 @@ export async function POST(request: NextRequest) {
       const updated = addQuestion(currentSet, {
         text: body.question.text.trim(),
         type: body.question.type,
-        targetDimension: body.question.targetDimension as SocialDimension | TemperamentDimension,
-        targetLayer: body.question.targetLayer,
+        targetDimensions: body.question.targetDimensions,
+        targetLayers: body.question.targetLayers,
         options: body.question.options,
       })
 

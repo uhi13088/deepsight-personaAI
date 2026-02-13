@@ -140,16 +140,21 @@ export function calculateExpectedInfoGain(
   question: ColdStartQuestion,
   uncertainties: AxisUncertainty[]
 ): number {
-  const targetUncertainty = uncertainties.find((u) => u.axis === question.targetDimension)
-  if (!targetUncertainty) return 0
+  // 복합질문: 모든 대상 차원의 불확실도를 합산
+  const targetUncertainties = question.targetDimensions
+    .map((dim) => uncertainties.find((u) => u.axis === dim))
+    .filter((u): u is AxisUncertainty => u !== undefined)
+  if (targetUncertainties.length === 0) return 0
 
-  // 기본 이득: 해당 축의 불확실도
-  let gain = targetUncertainty.uncertainty
+  // 기본 이득: 대상 축들의 평균 불확실도
+  let gain =
+    targetUncertainties.reduce((sum, u) => sum + u.uncertainty, 0) / targetUncertainties.length
 
   // 옵션의 벡터 다양성 보너스 (선택지가 다양할수록 정보 이득 높음)
   const deltas = question.options.map((o) => {
-    const vals = Object.values(o.vectorDelta)
-    return vals.length > 0 ? vals.reduce((a, b) => a + Math.abs(b), 0) : 0
+    const l1Vals = Object.values(o.l1Weights)
+    const l2Vals = Object.values(o.l2Weights)
+    return [...l1Vals, ...l2Vals].reduce((a, b) => a + Math.abs(b), 0)
   })
   const avgDelta = deltas.reduce((a, b) => a + b, 0) / Math.max(deltas.length, 1)
   gain *= 1 + avgDelta
@@ -157,7 +162,10 @@ export function calculateExpectedInfoGain(
   // 다축 측정 보너스 (여러 축을 동시에 측정하면 효율적)
   const measuredAxes = new Set<string>()
   for (const option of question.options) {
-    for (const dim of Object.keys(option.vectorDelta)) {
+    for (const dim of Object.keys(option.l1Weights)) {
+      measuredAxes.add(dim)
+    }
+    for (const dim of Object.keys(option.l2Weights)) {
       measuredAxes.add(dim)
     }
   }
@@ -188,12 +196,13 @@ export function selectNextQuestions(
   const candidates: QuestionCandidate[] = unanswered.map((q) => ({
     question: q,
     expectedInfoGain: calculateExpectedInfoGain(q, uncertainties),
-    targetAxis: q.targetDimension,
+    targetAxis: q.targetDimensions[0],
   }))
 
-  // 4. 타겟 축 매칭 보너스 적용
+  // 4. 타겟 축 매칭 보너스 적용 (복합질문의 모든 차원 확인)
   for (const c of candidates) {
-    if (topAxes.has(c.targetAxis)) {
+    const hasTopAxis = c.question.targetDimensions.some((dim) => topAxes.has(dim))
+    if (hasTopAxis) {
       c.expectedInfoGain *= 1.5
       c.expectedInfoGain = round(c.expectedInfoGain)
     }

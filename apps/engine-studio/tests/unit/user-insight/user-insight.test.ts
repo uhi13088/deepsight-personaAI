@@ -118,11 +118,11 @@ describe("Cold Start", () => {
       set = addQuestion(set, {
         text: "다음 중 선호하는 분석 방식은?",
         type: "forced_choice",
-        targetDimension: "depth",
-        targetLayer: "L1",
+        targetDimensions: ["depth", "openness"],
+        targetLayers: ["L1", "L2"],
         options: [
-          { id: "o1", text: "직관적", vectorDelta: { depth: -0.3 } },
-          { id: "o2", text: "심층적", vectorDelta: { depth: 0.3 } },
+          { id: "o1", text: "직관적", l1Weights: { depth: -0.3 }, l2Weights: { openness: 0.1 } },
+          { id: "o2", text: "심층적", l1Weights: { depth: 0.3 }, l2Weights: { openness: 0.2 } },
         ],
       })
 
@@ -139,11 +139,11 @@ describe("Cold Start", () => {
         set = addQuestion(set, {
           text: `질문 ${i}`,
           type: "forced_choice",
-          targetDimension: "depth",
-          targetLayer: "L1",
+          targetDimensions: ["depth", "openness"],
+          targetLayers: ["L1", "L2"],
           options: [
-            { id: `a${i}`, text: "A", vectorDelta: { depth: -0.1 } },
-            { id: `b${i}`, text: "B", vectorDelta: { depth: 0.1 } },
+            { id: `a${i}`, text: "A", l1Weights: { depth: -0.1 }, l2Weights: { openness: 0.05 } },
+            { id: `b${i}`, text: "B", l1Weights: { depth: 0.1 }, l2Weights: { openness: -0.05 } },
           ],
         })
       }
@@ -152,11 +152,11 @@ describe("Cold Start", () => {
         addQuestion(set, {
           text: "추가 질문",
           type: "forced_choice",
-          targetDimension: "depth",
-          targetLayer: "L1",
+          targetDimensions: ["depth", "openness"],
+          targetLayers: ["L1", "L2"],
           options: [
-            { id: "x", text: "A", vectorDelta: { depth: 0 } },
-            { id: "y", text: "B", vectorDelta: { depth: 0 } },
+            { id: "x", text: "A", l1Weights: { depth: 0 }, l2Weights: { openness: 0 } },
+            { id: "y", text: "B", l1Weights: { depth: 0 }, l2Weights: { openness: 0 } },
           ],
         })
       ).toThrow("최대 질문 수")
@@ -169,21 +169,26 @@ describe("Cold Start", () => {
       set = addQuestion(set, {
         text: "Q1",
         type: "forced_choice",
-        targetDimension: "depth",
-        targetLayer: "L1",
+        targetDimensions: ["depth", "openness"],
+        targetLayers: ["L1", "L2"],
         options: [
-          { id: "a", text: "A", vectorDelta: { depth: 0.1 } },
-          { id: "b", text: "B", vectorDelta: { depth: -0.1 } },
+          { id: "a", text: "A", l1Weights: { depth: 0.1 }, l2Weights: { openness: 0.1 } },
+          { id: "b", text: "B", l1Weights: { depth: -0.1 }, l2Weights: { openness: -0.1 } },
         ],
       })
       set = addQuestion(set, {
         text: "Q2",
         type: "scenario",
-        targetDimension: "lens",
-        targetLayer: "L1",
+        targetDimensions: ["lens", "conscientiousness"],
+        targetLayers: ["L1", "L2"],
         options: [
-          { id: "c", text: "C", vectorDelta: { lens: 0.2 } },
-          { id: "d", text: "D", vectorDelta: { lens: -0.2 } },
+          { id: "c", text: "C", l1Weights: { lens: 0.2 }, l2Weights: { conscientiousness: 0.15 } },
+          {
+            id: "d",
+            text: "D",
+            l1Weights: { lens: -0.2 },
+            l2Weights: { conscientiousness: -0.15 },
+          },
         ],
       })
 
@@ -196,17 +201,17 @@ describe("Cold Start", () => {
   })
 
   describe("inferVectorsFromAnswers", () => {
-    it("응답에서 L1 벡터를 추론", () => {
+    it("응답에서 L1+L2 벡터를 동시 추론 (복합질문)", () => {
       const questions: ColdStartQuestion[] = [
         {
           id: "q1",
           text: "Q1",
           type: "forced_choice",
-          targetDimension: "depth",
-          targetLayer: "L1",
+          targetDimensions: ["depth", "openness"],
+          targetLayers: ["L1", "L2"],
           options: [
-            { id: "a", text: "A", vectorDelta: { depth: 0.3 } },
-            { id: "b", text: "B", vectorDelta: { depth: -0.3 } },
+            { id: "a", text: "A", l1Weights: { depth: 0.3 }, l2Weights: { openness: 0.2 } },
+            { id: "b", text: "B", l1Weights: { depth: -0.3 }, l2Weights: { openness: -0.2 } },
           ],
           mode: "quick",
           order: 0,
@@ -217,6 +222,7 @@ describe("Cold Start", () => {
         { questionId: "q1", selectedOptionId: "a" },
       ])
       expect(result.depth).toBeGreaterThan(0.5) // 0.5 + 0.3 = 0.8
+      expect(result.l2?.openness).toBeGreaterThan(0.5) // L2도 동시 측정
     })
 
     it("응답이 없으면 기본값 0.5", () => {
@@ -243,9 +249,11 @@ describe("Cold Start", () => {
             id: "q1",
             text: "Q1",
             type: "forced_choice" as const,
-            targetDimension: "depth" as const,
-            targetLayer: "L1" as const,
-            options: [{ id: "a", text: "A", vectorDelta: { depth: 0.1 } }],
+            targetDimensions: ["depth", "openness"],
+            targetLayers: ["L1", "L2"] as ("L1" | "L2")[],
+            options: [
+              { id: "a", text: "A", l1Weights: { depth: 0.1 }, l2Weights: { openness: 0.05 } },
+            ],
             mode: "quick" as const,
             order: 0,
           },
@@ -887,16 +895,16 @@ describe("Adaptive Profiling", () => {
   })
 
   describe("calculateExpectedInfoGain", () => {
-    it("불확실한 축에 대한 질문이 높은 정보 이득", () => {
+    it("불확실한 축에 대한 복합질문이 높은 정보 이득", () => {
       const question: ColdStartQuestion = {
         id: "q1",
         text: "Q1",
         type: "forced_choice",
-        targetDimension: "depth",
-        targetLayer: "L1",
+        targetDimensions: ["depth", "openness"],
+        targetLayers: ["L1", "L2"],
         options: [
-          { id: "a", text: "A", vectorDelta: { depth: 0.3 } },
-          { id: "b", text: "B", vectorDelta: { depth: -0.3 } },
+          { id: "a", text: "A", l1Weights: { depth: 0.3 }, l2Weights: { openness: 0.2 } },
+          { id: "b", text: "B", l1Weights: { depth: -0.3 }, l2Weights: { openness: -0.2 } },
         ],
         mode: "quick",
         order: 0,
@@ -909,17 +917,17 @@ describe("Adaptive Profiling", () => {
   })
 
   describe("selectNextQuestions", () => {
-    it("미출제 질문 중 정보 이득 높은 것 선택", () => {
+    it("미출제 복합질문 중 정보 이득 높은 것 선택", () => {
       const pool: ColdStartQuestion[] = [
         {
           id: "q1",
           text: "Q1",
           type: "forced_choice",
-          targetDimension: "depth",
-          targetLayer: "L1",
+          targetDimensions: ["depth", "openness"],
+          targetLayers: ["L1", "L2"],
           options: [
-            { id: "a", text: "A", vectorDelta: { depth: 0.3 } },
-            { id: "b", text: "B", vectorDelta: { depth: -0.3 } },
+            { id: "a", text: "A", l1Weights: { depth: 0.3 }, l2Weights: { openness: 0.2 } },
+            { id: "b", text: "B", l1Weights: { depth: -0.3 }, l2Weights: { openness: -0.2 } },
           ],
           mode: "quick",
           order: 0,
@@ -928,11 +936,21 @@ describe("Adaptive Profiling", () => {
           id: "q2",
           text: "Q2",
           type: "scenario",
-          targetDimension: "lens",
-          targetLayer: "L1",
+          targetDimensions: ["lens", "conscientiousness"],
+          targetLayers: ["L1", "L2"],
           options: [
-            { id: "c", text: "C", vectorDelta: { lens: 0.2 } },
-            { id: "d", text: "D", vectorDelta: { lens: -0.2 } },
+            {
+              id: "c",
+              text: "C",
+              l1Weights: { lens: 0.2 },
+              l2Weights: { conscientiousness: 0.15 },
+            },
+            {
+              id: "d",
+              text: "D",
+              l1Weights: { lens: -0.2 },
+              l2Weights: { conscientiousness: -0.15 },
+            },
           ],
           mode: "quick",
           order: 1,
@@ -951,11 +969,11 @@ describe("Adaptive Profiling", () => {
           id: "q1",
           text: "Q1",
           type: "forced_choice",
-          targetDimension: "depth",
-          targetLayer: "L1",
+          targetDimensions: ["depth", "openness"],
+          targetLayers: ["L1", "L2"],
           options: [
-            { id: "a", text: "A", vectorDelta: { depth: 0.3 } },
-            { id: "b", text: "B", vectorDelta: { depth: -0.3 } },
+            { id: "a", text: "A", l1Weights: { depth: 0.3 }, l2Weights: { openness: 0.2 } },
+            { id: "b", text: "B", l1Weights: { depth: -0.3 }, l2Weights: { openness: -0.2 } },
           ],
           mode: "quick",
           order: 0,

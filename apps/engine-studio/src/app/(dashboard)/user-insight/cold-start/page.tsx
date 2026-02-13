@@ -37,8 +37,8 @@ export default function ColdStartPage() {
   // 새 질문 입력 상태
   const [newText, setNewText] = useState("")
   const [newType, setNewType] = useState<QuestionType>("forced_choice")
-  const [newDim, setNewDim] = useState(ALL_DIMENSIONS[0].key)
-  const [newLayer, setNewLayer] = useState<"L1" | "L2">("L1")
+  const [newL1Dim, setNewL1Dim] = useState(L1_DIMENSIONS[0].key)
+  const [newL2Dim, setNewL2Dim] = useState(L2_DIMENSIONS[0].key)
 
   // Fetch data from API
   const fetchData = useCallback(async () => {
@@ -84,11 +84,21 @@ export default function ColdStartPage() {
           question: {
             text: newText.trim(),
             type: newType,
-            targetDimension: newDim,
-            targetLayer: newLayer,
+            targetDimensions: [newL1Dim, newL2Dim],
+            targetLayers: ["L1", "L2"],
             options: [
-              { id: `opt_a_${Date.now()}`, text: "선택지 A", vectorDelta: { [newDim]: 0.3 } },
-              { id: `opt_b_${Date.now()}`, text: "선택지 B", vectorDelta: { [newDim]: -0.3 } },
+              {
+                id: `opt_a_${Date.now()}`,
+                text: "선택지 A",
+                l1Weights: { [newL1Dim]: 0.3 },
+                l2Weights: { [newL2Dim]: 0.2 },
+              },
+              {
+                id: `opt_b_${Date.now()}`,
+                text: "선택지 B",
+                l1Weights: { [newL1Dim]: -0.3 },
+                l2Weights: { [newL2Dim]: -0.2 },
+              },
             ],
           },
         }),
@@ -105,7 +115,7 @@ export default function ColdStartPage() {
     } catch {
       // 질문 추가 실패
     }
-  }, [activeMode, newText, newType, newDim, newLayer])
+  }, [activeMode, newText, newType, newL1Dim, newL2Dim])
 
   const handleRemove = useCallback(
     async (questionId: string) => {
@@ -194,12 +204,14 @@ export default function ColdStartPage() {
     [currentSet, activeMode]
   )
 
-  // 차원별 질문 수 카운트
+  // 차원별 질문 수 카운트 (복합질문: 모든 대상 차원 카운트)
   const dimCoverage = useMemo(() => {
     const counts: Record<string, number> = {}
     if (!currentSet) return counts
     for (const q of currentSet.questions) {
-      counts[q.targetDimension] = (counts[q.targetDimension] ?? 0) + 1
+      for (const dim of q.targetDimensions) {
+        counts[dim] = (counts[dim] ?? 0) + 1
+      }
     }
     return counts
   }, [currentSet])
@@ -343,20 +355,23 @@ export default function ColdStartPage() {
             </select>
             <select
               className="border-border bg-background rounded-md border px-3 py-2 text-sm"
-              value={newLayer}
-              onChange={(e) => setNewLayer(e.target.value as "L1" | "L2")}
+              value={newL1Dim}
+              onChange={(e) => setNewL1Dim(e.target.value)}
             >
-              <option value="L1">L1</option>
-              <option value="L2">L2</option>
+              {L1_DIMENSIONS.map((d) => (
+                <option key={d.key} value={d.key}>
+                  L1:{d.label}
+                </option>
+              ))}
             </select>
             <select
               className="border-border bg-background rounded-md border px-3 py-2 text-sm"
-              value={newDim}
-              onChange={(e) => setNewDim(e.target.value)}
+              value={newL2Dim}
+              onChange={(e) => setNewL2Dim(e.target.value)}
             >
-              {ALL_DIMENSIONS.filter((d) => d.layer === newLayer).map((d) => (
+              {L2_DIMENSIONS.map((d) => (
                 <option key={d.key} value={d.key}>
-                  {d.label}
+                  L2:{d.label}
                 </option>
               ))}
             </select>
@@ -389,8 +404,10 @@ export default function ColdStartPage() {
                 </tr>
               ) : (
                 currentSet.questions.map((q, i) => {
-                  const dimDef = ALL_DIMENSIONS.find((d) => d.key === q.targetDimension)
                   const typeDef = QUESTION_TYPES.find((t) => t.key === q.type)
+                  const dimLabels = q.targetDimensions
+                    .map((dim) => ALL_DIMENSIONS.find((d) => d.key === dim)?.label ?? dim)
+                    .join(" + ")
                   return (
                     <tr key={q.id} className="border-border border-b last:border-0">
                       <td className="text-muted-foreground px-4 py-3">{i + 1}</td>
@@ -398,11 +415,15 @@ export default function ColdStartPage() {
                       <td className="px-4 py-3">
                         <Badge variant="outline">{typeDef?.label ?? q.type}</Badge>
                       </td>
-                      <td className="px-4 py-3">{dimDef?.label ?? q.targetDimension}</td>
+                      <td className="px-4 py-3">{dimLabels}</td>
                       <td className="px-4 py-3">
-                        <Badge variant={q.targetLayer === "L1" ? "info" : "warning"}>
-                          {q.targetLayer}
-                        </Badge>
+                        <div className="flex gap-1">
+                          {q.targetLayers.map((layer) => (
+                            <Badge key={layer} variant={layer === "L1" ? "info" : "warning"}>
+                              {layer}
+                            </Badge>
+                          ))}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
