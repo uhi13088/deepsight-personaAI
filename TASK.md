@@ -452,6 +452,60 @@
 
 ---
 
+### Phase PW-D: PersonaWorld 자율 활동 시스템 + 관리자 대시보드 (T116~T121)
+
+> PW-C까지의 백엔드 모듈을 실제 자율 동작 시스템으로 완성
+> LLM 연동, 실행 파이프라인, 크론 트리거, 품질 러너, 피드 벡터 매칭, 관리자 UI
+
+- [x] **T116: LLM Provider 어댑터 — llm-client.ts → PersonaWorld DI 연결** ✅ 2026-02-13
+  - 배경: 기존 Anthropic SDK llm-client.ts → 4개 PW DI 인터페이스 (Post/Comment/Consumption/UserInteraction) 연결
+  - AC1: ✅ `llm-adapter.ts` — createPostLLMProvider, createCommentLLMProvider, createConsumptionLLMProvider, createUserInteractionLLMProvider
+  - AC2: ✅ callType별 비용 추적 (`pw:post_generation`, `pw:comment`, `pw:impression`, `pw:user_response`)
+  - AC3: ✅ llm-adapter.test.ts — 13개 테스트 PASS (파라미터 매핑, fallback, UIV JSON 파싱/클램핑)
+  - 변경: llm-adapter.ts, llm-adapter.test.ts, index.ts
+
+- [x] **T117: 포스트/인터랙션 실행 파이프라인 — 스케줄러 결정 → 실제 실행** ✅ 2026-02-13
+  - 배경: 스케줄러가 활동 결정만 하고 실행하지 않던 것을 완전한 파이프라인으로 연결
+  - AC1: ✅ `post-pipeline.ts` — executePostCreation (7단계: 주제선택→RAG→LLM생성→Voice체크→DB저장→상태갱신→로그)
+  - AC2: ✅ `interaction-pipeline.ts` — executeInteractions (좋아요확률→저장→댓글생성→관계갱신→상태갱신)
+  - AC3: ✅ scheduler/route.ts — 결정 후 executePostCreation + executeInteractions 호출
+  - 변경: post-pipeline.ts, interaction-pipeline.ts, scheduler/route.ts
+
+- [x] **T118: 크론 트리거 + 스케줄러 제어 API** ✅ 2026-02-13
+  - 배경: 외부 cron(Vercel/GH Actions)이 호출하는 API 엔드포인트 + 관리자 제어
+  - AC1: ✅ `/api/cron/persona-scheduler/route.ts` — GET, CRON_SECRET 인증, 스케줄러 파이프라인 호출
+  - AC2: ✅ `/api/cron/quality-check/route.ts` — GET, quality-runner 연동
+  - AC3: ✅ `/api/internal/persona-world-admin/scheduler/route.ts` — GET(상태) + POST(pause/resume/trigger_now)
+  - 변경: cron/persona-scheduler/route.ts, cron/quality-check/route.ts, persona-world-admin/scheduler/route.ts
+
+- [x] **T119: 품질 모니터링 러너 — 주기적 Voice + Integrity 체크** ✅ 2026-02-13
+  - 배경: 기존 quality-monitor.ts 로직을 전체 페르소나에 주기 실행 + PIS<0.55 자동 정지
+  - AC1: ✅ `quality-runner.ts` — runPeriodicQualityCheck (Voice 일관성 + QualityGate, auto-pause, 요약 생성)
+  - AC2: ✅ `/api/internal/persona-world-admin/quality/route.ts` — GET(현황) + POST(수동 체크)
+  - AC3: ✅ cron/quality-check에 quality-runner 연동 완료
+  - 변경: quality-runner.ts, quality/route.ts, cron/quality-check/route.ts, index.ts
+
+- [x] **T120: 피드 3-Tier 매칭 점수 — 실제 벡터 유사도 기반** ✅ 2026-02-13
+  - 배경: getCandidates()의 랜덤/카운트 기반 점수 → 실제 L1/L2/L3 벡터 코사인 유사도
+  - AC1: ✅ basicScore = L1 코사인 유사도 70% + L2 유사도 30%
+  - AC2: ✅ explorationScore = L1 발산도 40% + L2 발산도 40% + 신선도 20%
+  - AC3: ✅ advancedScore = V_Final 유사도 50% + L2 유사도 30% + 역설 호환 20%
+  - AC4: ✅ 벡터 없는 유저/페르소나 → 인기도 기반 폴백
+  - 변경: feed/route.ts
+
+- [x] **T121: 관리자 대시보드 (Engine Studio) — 4 서브페이지 + API + LNB** ✅ 2026-02-13
+  - 배경: PersonaWorld 자율 시스템 모니터링 + 안전 제어 대시보드
+  - AC1: ✅ LNB — "PW Admin" 섹션 추가 (Globe 아이콘, 4 하위 메뉴)
+  - AC2: ✅ Activity Dashboard — 최근 활동 스트림, 포스트 통계, 활성 페르소나 수
+  - AC3: ✅ Moderation — 신고 대기열, 콘텐츠 검색, 액션 (승인/숨김/삭제/정지)
+  - AC4: ✅ Quality Monitor — 전체 평균 점수, 페르소나별 테이블, Critical 알림
+  - AC5: ✅ Scheduler Control — 상태 표시, 제어 버튼, 개별 페르소나 pause/resume
+  - AC6: ✅ 3개 API (activity, moderation, quality) + 기존 scheduler API 활용
+  - 변경: lnb.tsx, activity/page.tsx, moderation/page.tsx, quality/page.tsx, scheduler/page.tsx, activity/route.ts, moderation/route.ts
+  - 테스트: 1974 테스트 PASS (pre-existing 2 suite fail: Prisma 모듈)
+
+---
+
 ### 별도 작업 (설계 문서 + 데이터)
 
 - [x] **T42: 매칭 설명 + 유저↔페르소나 일치도 시스템** (설계 문서) ✅ T57+T58에서 구현 완료

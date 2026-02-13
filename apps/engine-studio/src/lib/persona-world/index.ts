@@ -176,6 +176,19 @@ export type {
   ActivityLearnResult,
 } from "./onboarding"
 
+// LLM Adapter
+export {
+  createPostLLMProvider,
+  createCommentLLMProvider,
+  createConsumptionLLMProvider,
+  createUserInteractionLLMProvider,
+  isLLMConfigured,
+} from "./llm-adapter"
+
+// Quality Runner
+export { runPeriodicQualityCheck } from "./quality-runner"
+export type { QualityRunnerDataProvider, QualityCheckSummary } from "./quality-runner"
+
 // Phase 5: Quality Monitor
 export {
   checkVoiceConsistency,
