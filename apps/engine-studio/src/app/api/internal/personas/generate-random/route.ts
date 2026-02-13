@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
           expertise: generated.character.expertise,
           description: generated.character.description,
           status: (body.status === "DRAFT" ? "DRAFT" : "ACTIVE") as PersonaStatus,
-          source: "AUTO_GENERATED",
+          source: "MANUAL",
           archetypeId: generated.archetype?.id ?? null,
           paradoxScore: paradoxProfile.overall,
           dimensionalityScore: paradoxProfile.dimensionality,

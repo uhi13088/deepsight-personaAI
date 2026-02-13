@@ -6,9 +6,10 @@ import type { PersonaListItem } from "@/types"
 interface PersonaGridProps {
   personas: PersonaListItem[]
   isLoading?: boolean
+  onDelete?: (id: string, name: string) => void
 }
 
-export function PersonaGrid({ personas, isLoading }: PersonaGridProps) {
+export function PersonaGrid({ personas, isLoading, onDelete }: PersonaGridProps) {
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -30,7 +31,7 @@ export function PersonaGrid({ personas, isLoading }: PersonaGridProps) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {personas.map((persona) => (
-        <PersonaCard key={persona.id} persona={persona} />
+        <PersonaCard key={persona.id} persona={persona} onDelete={onDelete} />
       ))}
     </div>
   )

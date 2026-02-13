@@ -295,3 +295,48 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     )
   }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// DELETE /api/internal/personas/[id]
+// ═══════════════════════════════════════════════════════════════
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+
+    const persona = await prisma.persona.findUnique({
+      where: { id },
+      select: { id: true, status: true },
+    })
+
+    if (!persona) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: "NOT_FOUND", message: "페르소나를 찾을 수 없습니다." },
+        } satisfies ApiResponse<never>,
+        { status: 404 }
+      )
+    }
+
+    // 관련 레코드 삭제 (트랜잭션)
+    await prisma.$transaction(async (tx) => {
+      await tx.personaLayerVector.deleteMany({ where: { personaId: id } })
+      await tx.persona.delete({ where: { id } })
+    })
+
+    return NextResponse.json({ success: true, data: { id } } satisfies ApiResponse<{ id: string }>)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error"
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: "INTERNAL_ERROR", message: `삭제 실패: ${message}` },
+      } satisfies ApiResponse<never>,
+      { status: 500 }
+    )
+  }
+}
