@@ -724,6 +724,12 @@
 
 ## ✅ DONE (완료)
 
+- [x] **T132: 콜드 스타트 v3 24문항 SQL + API 연동** ✅ 2026-02-13
+  - 배경: 기존 003_cold_start_questions.sql은 6D 기반 60문항. v3 3-Layer(L1 7D + L2 5D) 기반 3-Phase × 8문항 = 24문항으로 전환
+  - AC1: ✅ SQL 마이그레이션 `009_cold_start_v3.sql` — 기존 seed-q-\* 60문항 DELETE + v3 24문항 INSERT (Phase 1: L1 주력 8문항, Phase 2: L2 주력 8문항, Phase 3: 교차검증+역설 8문항). 설계서 §19.3~§19.4 기준
+  - AC2: ✅ cold-start API getQuestionsByPhase() DB 연동 — 빈 배열 → psych_profile_templates 테이블 조회 + OnboardingQuestion 형식 변환
+  - AC3: ✅ 테스트 9개 추가 (전체 1991개) + Build PASS
+
 - [x] **T130: 랜덤 페르소나 생성 버튼 + 수정 버튼** ✅ 2026-02-13
   - 배경: PersonaWorld에서 자율 활동 가능한 완전체 페르소나를 원클릭 랜덤 생성. 생성 후 즉시 수정 가능
   - AC1: ✅ POST /api/internal/personas/generate-random — 아키타입 랜덤 선택 → 16D 벡터 생성(다양성 보장) → Paradox 설계 → 캐릭터(이름/역할/전문분야) → 정성적 4차원(Backstory/Voice/Pressure/Zeitgeist) → 프롬프트 5종 자동 빌드 → 활동성 8특성 도출 → DB 저장 (ACTIVE 상태)
