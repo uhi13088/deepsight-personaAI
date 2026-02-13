@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
 import type { ApiResponse } from "@/types"
 import {
   createQuestionSet,
@@ -7,10 +8,121 @@ import {
   reorderQuestions,
   MODE_CONFIG,
 } from "@/lib/user-insight/cold-start"
-import type { OnboardingMode, QuestionSet, QuestionType } from "@/lib/user-insight/cold-start"
+import type {
+  OnboardingMode,
+  QuestionSet,
+  QuestionType,
+  ColdStartQuestion,
+} from "@/lib/user-insight/cold-start"
 import type { SocialDimension, TemperamentDimension } from "@/types"
 
-// ── In-memory store ─────────────────────────────────────────────
+// ── L1/L2 차원 판별 ────────────────────────────────────────────
+
+const L1_DIMS = new Set<string>([
+  "depth",
+  "lens",
+  "stance",
+  "scope",
+  "taste",
+  "purpose",
+  "sociability",
+])
+
+function resolveLayer(dimension: string): "L1" | "L2" {
+  return L1_DIMS.has(dimension) ? "L1" : "L2"
+}
+
+// ── Phase → Mode 매핑 ──────────────────────────────────────────
+// Quick  = Phase 1 (Q1-Q8)
+// Standard = Phase 1+2 (Q1-Q16)
+// Deep   = Phase 1+2+3 (Q1-Q24)
+
+interface PhaseRange {
+  level: "LIGHT" | "MEDIUM"
+  from: number
+  to: number
+}
+
+const MODE_PHASE_RANGES: Record<OnboardingMode, PhaseRange[]> = {
+  quick: [{ level: "LIGHT", from: 1, to: 8 }],
+  standard: [
+    { level: "LIGHT", from: 1, to: 12 },
+    { level: "MEDIUM", from: 13, to: 16 },
+  ],
+  deep: [
+    { level: "LIGHT", from: 1, to: 12 },
+    { level: "MEDIUM", from: 13, to: 24 },
+  ],
+}
+
+// ── DB → ColdStartQuestion 변환 ──────────────────────────────
+
+interface DbOption {
+  key: string
+  label: string
+  l1Weights?: Record<string, number>
+  l2Weights?: Record<string, number>
+}
+
+function dbToColdStartQuestion(
+  row: {
+    id: string
+    questionText: string
+    questionOrder: number
+    targetDimensions: string[]
+    options: unknown
+  },
+  mode: OnboardingMode
+): ColdStartQuestion {
+  const primaryDim = row.targetDimensions[0] ?? "depth"
+  const rawOptions = (row.options ?? []) as DbOption[]
+
+  return {
+    id: row.id,
+    text: row.questionText,
+    type: "scenario" as QuestionType,
+    targetDimension: primaryDim as SocialDimension | TemperamentDimension,
+    targetLayer: resolveLayer(primaryDim),
+    options: rawOptions.map((opt) => ({
+      id: opt.key,
+      text: opt.label,
+      vectorDelta: { ...(opt.l1Weights ?? {}), ...(opt.l2Weights ?? {}) },
+    })),
+    mode,
+    order: row.questionOrder,
+  }
+}
+
+// ── DB에서 질문 로드 ──────────────────────────────────────────
+
+async function loadQuestionsFromDb(mode: OnboardingMode): Promise<ColdStartQuestion[]> {
+  const ranges = MODE_PHASE_RANGES[mode]
+  const questions: ColdStartQuestion[] = []
+
+  for (const range of ranges) {
+    const rows = await prisma.psychProfileTemplate.findMany({
+      where: {
+        onboardingLevel: range.level,
+        questionOrder: { gte: range.from, lte: range.to },
+      },
+      orderBy: { questionOrder: "asc" },
+      select: {
+        id: true,
+        questionText: true,
+        questionOrder: true,
+        targetDimensions: true,
+        options: true,
+      },
+    })
+    for (const row of rows) {
+      questions.push(dbToColdStartQuestion(row, mode))
+    }
+  }
+
+  return questions
+}
+
+// ── In-memory store (DB 로드 후 캐시, CRUD 뮤테이션용) ─────────
 
 interface ColdStartStore {
   sets: Record<OnboardingMode, QuestionSet>
@@ -18,13 +130,19 @@ interface ColdStartStore {
 
 let store: ColdStartStore | null = null
 
-function getStore(): ColdStartStore {
+async function getStore(): Promise<ColdStartStore> {
   if (!store) {
+    const [quickQuestions, standardQuestions, deepQuestions] = await Promise.all([
+      loadQuestionsFromDb("quick"),
+      loadQuestionsFromDb("standard"),
+      loadQuestionsFromDb("deep"),
+    ])
+
     store = {
       sets: {
-        quick: createQuestionSet("Quick Mode 기본", "quick"),
-        standard: createQuestionSet("Standard Mode 기본", "standard"),
-        deep: createQuestionSet("Deep Mode 기본", "deep"),
+        quick: createQuestionSet("Quick Mode (Phase 1)", "quick", quickQuestions),
+        standard: createQuestionSet("Standard Mode (Phase 1+2)", "standard", standardQuestions),
+        deep: createQuestionSet("Deep Mode (Phase 1+2+3)", "deep", deepQuestions),
       },
     }
   }
@@ -41,7 +159,7 @@ interface ColdStartResponse {
 
 export async function GET() {
   try {
-    const s = getStore()
+    const s = await getStore()
 
     return NextResponse.json<ApiResponse<ColdStartResponse>>({
       success: true,
@@ -80,7 +198,7 @@ interface ColdStartPostRequest {
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as ColdStartPostRequest
-    const s = getStore()
+    const s = await getStore()
 
     if (!body.mode || !s.sets[body.mode]) {
       return NextResponse.json<ApiResponse<never>>(

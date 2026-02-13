@@ -84,15 +84,15 @@ import type { UserResponseRecord } from "@/lib/user-insight/adaptive-profiling"
 describe("Cold Start", () => {
   describe("MODE_CONFIG", () => {
     it("3가지 모드별 설정이 정의됨", () => {
-      expect(MODE_CONFIG.quick.questionCount).toBe(12)
-      expect(MODE_CONFIG.standard.questionCount).toBe(30)
-      expect(MODE_CONFIG.deep.questionCount).toBe(60)
+      expect(MODE_CONFIG.quick.questionCount).toBe(8)
+      expect(MODE_CONFIG.standard.questionCount).toBe(16)
+      expect(MODE_CONFIG.deep.questionCount).toBe(24)
     })
 
     it("모드별 예상 소요 시간이 있음", () => {
-      expect(MODE_CONFIG.quick.minutes).toBe(1.5)
-      expect(MODE_CONFIG.standard.minutes).toBe(4)
-      expect(MODE_CONFIG.deep.minutes).toBe(8)
+      expect(MODE_CONFIG.quick.minutes).toBe(1.3)
+      expect(MODE_CONFIG.standard.minutes).toBe(2.7)
+      expect(MODE_CONFIG.deep.minutes).toBe(4)
     })
 
     it("모드별 정밀도 정의", () => {
@@ -108,7 +108,7 @@ describe("Cold Start", () => {
       expect(set.mode).toBe("quick")
       expect(set.questions).toHaveLength(0)
       expect(set.id).toMatch(/^qs_/)
-      expect(set.estimatedMinutes).toBe(1.5)
+      expect(set.estimatedMinutes).toBe(1.3)
     })
   })
 
@@ -135,7 +135,7 @@ describe("Cold Start", () => {
 
     it("최대 질문 수 초과 시 에러", () => {
       let set = createQuestionSet("테스트", "quick")
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 8; i++) {
         set = addQuestion(set, {
           text: `질문 ${i}`,
           type: "forced_choice",

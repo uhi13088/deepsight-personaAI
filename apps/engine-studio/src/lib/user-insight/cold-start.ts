@@ -58,9 +58,9 @@ export const MODE_CONFIG: Record<
   OnboardingMode,
   { questionCount: number; minutes: number; precision: number; questionsPerAxis: number }
 > = {
-  quick: { questionCount: 12, minutes: 1.5, precision: 0.53, questionsPerAxis: 2 },
-  standard: { questionCount: 30, minutes: 4, precision: 0.64, questionsPerAxis: 5 },
-  deep: { questionCount: 60, minutes: 8, precision: 0.74, questionsPerAxis: 8 },
+  quick: { questionCount: 8, minutes: 1.3, precision: 0.65, questionsPerAxis: 1 },
+  standard: { questionCount: 16, minutes: 2.7, precision: 0.8, questionsPerAxis: 2 },
+  deep: { questionCount: 24, minutes: 4, precision: 0.93, questionsPerAxis: 3 },
 }
 
 // ── 질문 세트 생성 ──────────────────────────────────────────────
