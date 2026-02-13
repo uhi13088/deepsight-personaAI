@@ -14,6 +14,8 @@ import {
   ChevronDown,
   Sun,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
@@ -109,14 +111,26 @@ const navSections: NavSection[] = [
 
 const SEPARATOR_INDICES = [1, 4, 6]
 
+const LNB_COLLAPSED_KEY = "lnb-collapsed"
+
 export function LNB() {
   const pathname = usePathname()
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
 
   useEffect(() => {
     setMounted(true)
+    setCollapsed(localStorage.getItem(LNB_COLLAPSED_KEY) === "true")
   }, [])
+
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev
+      localStorage.setItem(LNB_COLLAPSED_KEY, String(next))
+      return next
+    })
+  }
 
   const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
     const initial = new Set<string>()
@@ -145,15 +159,26 @@ export function LNB() {
   }
 
   return (
-    <aside className="border-sidebar-border bg-sidebar flex h-screen w-60 flex-col border-r">
-      <div className="border-sidebar-border flex h-14 items-center gap-2 border-b px-4">
-        <div className="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold">
+    <aside
+      className={cn(
+        "border-sidebar-border bg-sidebar flex h-screen flex-col border-r transition-[width] duration-200",
+        collapsed ? "w-14" : "w-60"
+      )}
+    >
+      {/* Header */}
+      <div className="border-sidebar-border flex h-14 items-center gap-2 border-b px-3">
+        <div className="bg-primary text-primary-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-bold">
           ES
         </div>
-        <span className="text-sidebar-foreground text-sm font-semibold">Engine Studio</span>
+        {!collapsed && (
+          <span className="text-sidebar-foreground truncate text-sm font-semibold">
+            Engine Studio
+          </span>
+        )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-2 py-2">
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2">
         {navSections.map((section, index) => {
           const Icon = section.icon
           const sectionActive = isActive(section.basePath)
@@ -167,40 +192,57 @@ export function LNB() {
               )}
 
               {hasChildren ? (
-                <button
-                  onClick={() => toggleSection(section.basePath)}
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
-                    sectionActive
-                      ? "text-sidebar-accent-foreground"
-                      : "text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span className="flex-1 text-left">{section.label}</span>
-                  <ChevronDown
+                collapsed ? (
+                  <Link
+                    href={section.children[0].href}
                     className={cn(
-                      "h-3.5 w-3.5 shrink-0 transition-transform",
-                      expanded && "rotate-180"
+                      "flex items-center justify-center rounded-md p-1.5 transition-colors",
+                      sectionActive
+                        ? "text-sidebar-accent-foreground"
+                        : "text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     )}
-                  />
-                </button>
+                    title={section.label}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                  </Link>
+                ) : (
+                  <button
+                    onClick={() => toggleSection(section.basePath)}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+                      sectionActive
+                        ? "text-sidebar-accent-foreground"
+                        : "text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    )}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="flex-1 text-left">{section.label}</span>
+                    <ChevronDown
+                      className={cn(
+                        "h-3.5 w-3.5 shrink-0 transition-transform",
+                        expanded && "rotate-180"
+                      )}
+                    />
+                  </button>
+                )
               ) : (
                 <Link
                   href={section.basePath}
                   className={cn(
-                    "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+                    "flex items-center rounded-md transition-colors",
+                    collapsed ? "justify-center p-1.5" : "gap-2 px-2 py-1.5 text-sm",
                     sectionActive
                       ? "bg-sidebar-accent text-sidebar-accent-foreground"
                       : "text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   )}
+                  title={collapsed ? section.label : undefined}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
-                  <span>{section.label}</span>
+                  {!collapsed && <span>{section.label}</span>}
                 </Link>
               )}
 
-              {hasChildren && expanded && (
+              {hasChildren && expanded && !collapsed && (
                 <div className="border-sidebar-border ml-4 mt-0.5 space-y-0.5 border-l pl-2">
                   {section.children.map((child) => (
                     <Link
@@ -223,24 +265,56 @@ export function LNB() {
         })}
       </nav>
 
-      <div className="border-sidebar-border space-y-2 border-t p-3">
+      {/* Footer */}
+      <div className="border-sidebar-border space-y-2 border-t p-2">
         {mounted && (
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors"
+            className={cn(
+              "text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex w-full items-center rounded-md px-2 py-1.5 text-xs transition-colors",
+              collapsed ? "justify-center" : "gap-2"
+            )}
             title={theme === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환"}
           >
-            {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-            <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+            {theme === "dark" ? (
+              <Sun className="h-3.5 w-3.5 shrink-0" />
+            ) : (
+              <Moon className="h-3.5 w-3.5 shrink-0" />
+            )}
+            {!collapsed && <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>}
           </button>
         )}
-        <div className="flex items-center gap-2">
-          <div className="bg-muted h-7 w-7 rounded-full" />
-          <div className="flex-1 overflow-hidden">
-            <p className="text-sidebar-foreground truncate text-xs font-medium">Admin</p>
-            <p className="text-sidebar-muted truncate text-[10px]">DeepSight Internal</p>
+
+        {/* Collapse toggle */}
+        <button
+          onClick={toggleCollapsed}
+          className="text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex w-full items-center justify-center rounded-md px-2 py-1.5 text-xs transition-colors"
+          title={collapsed ? "메뉴 펼치기" : "메뉴 접기"}
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="h-3.5 w-3.5 shrink-0" />
+          ) : (
+            <>
+              <PanelLeftClose className="h-3.5 w-3.5 shrink-0" />
+              <span className="ml-2">접기</span>
+            </>
+          )}
+        </button>
+
+        {!collapsed && (
+          <div className="flex items-center gap-2">
+            <div className="bg-muted h-7 w-7 shrink-0 rounded-full" />
+            <div className="flex-1 overflow-hidden">
+              <p className="text-sidebar-foreground truncate text-xs font-medium">Admin</p>
+              <p className="text-sidebar-muted truncate text-[10px]">DeepSight Internal</p>
+            </div>
           </div>
-        </div>
+        )}
+        {collapsed && (
+          <div className="flex justify-center">
+            <div className="bg-muted h-7 w-7 rounded-full" title="Admin" />
+          </div>
+        )}
       </div>
     </aside>
   )

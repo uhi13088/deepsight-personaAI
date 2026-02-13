@@ -63,7 +63,7 @@ export function PersonaNodeWrapper({
 
   return (
     <div
-      className={`group/node bg-card relative min-w-[180px] max-w-[280px] rounded-lg border-2 shadow-sm ${selected ? "border-blue-500 shadow-md" : "border-border"} `}
+      className={`group/node bg-card relative min-w-[220px] max-w-[320px] rounded-lg border-2 shadow-sm ${selected ? "border-blue-500 shadow-md" : "border-border"} `}
       style={{ borderTopColor: categoryColor, borderTopWidth: "3px" }}
     >
       {/* 헤더 */}
@@ -109,7 +109,9 @@ export function PersonaNodeWrapper({
 
       {/* 편집 가능 힌트 (선택 시) */}
       {selected && hasEditableData && (
-        <div className="border-t px-3 py-1.5 text-[10px] text-blue-400">→ 우측 패널에서 편집</div>
+        <div className="border-t px-3 py-1.5 text-[10px] text-blue-400">
+          ⚙ 우측 패널에서 상세 설정
+        </div>
       )}
 
       {/* 입력 포트 핸들 */}

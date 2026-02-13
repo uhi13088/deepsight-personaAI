@@ -81,26 +81,37 @@ export function NodeSettingsPanel({
         <div>
           <h4 className="text-muted-foreground mb-1 text-xs font-medium">설정</h4>
           {Object.entries(data).map(([key, value]) => (
-            <div key={key} className="flex items-center gap-2 py-1 text-xs">
-              <label className="text-muted-foreground w-24 truncate" title={key}>
+            <div key={key} className="space-y-1 py-1.5">
+              <label className="text-muted-foreground block text-[10px] font-medium" title={key}>
                 {key}
               </label>
               {typeof value === "number" ? (
-                <input
-                  type="number"
-                  value={value}
-                  step={0.1}
-                  min={0}
-                  max={1}
-                  onChange={(e) => onUpdateData({ [key]: parseFloat(e.target.value) || 0 })}
-                  className="bg-background flex-1 rounded border px-2 py-0.5 text-xs"
-                />
+                <div className="space-y-1">
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={value}
+                    onChange={(e) => onUpdateData({ [key]: parseFloat(e.target.value) })}
+                    className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-gray-600 accent-blue-500"
+                  />
+                  <input
+                    type="number"
+                    value={value}
+                    step={0.01}
+                    min={0}
+                    max={1}
+                    onChange={(e) => onUpdateData({ [key]: parseFloat(e.target.value) || 0 })}
+                    className="bg-background w-full rounded border px-2 py-0.5 text-xs"
+                  />
+                </div>
               ) : typeof value === "string" ? (
                 <input
                   type="text"
                   value={value}
                   onChange={(e) => onUpdateData({ [key]: e.target.value })}
-                  className="bg-background flex-1 rounded border px-2 py-0.5 text-xs"
+                  className="bg-background w-full rounded border px-2 py-0.5 text-xs"
                 />
               ) : (
                 <span className="text-muted-foreground text-[10px]">{JSON.stringify(value)}</span>
