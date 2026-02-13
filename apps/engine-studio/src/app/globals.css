@@ -76,14 +76,23 @@
 
 /* ── ReactFlow 노드 기본 스타일 리셋 ────────────────── */
 .react-flow__node {
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  width: auto;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  width: auto !important;
   text-align: left;
   font-size: inherit;
   color: inherit;
+}
+
+.react-flow__node.selected,
+.react-flow__node:focus,
+.react-flow__node:focus-visible {
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 /* ── ReactFlow 다크모드 오버라이드 ────────────────── */
