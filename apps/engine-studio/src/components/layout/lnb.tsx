@@ -16,6 +16,7 @@ import {
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
+  Globe,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
@@ -44,6 +45,7 @@ const navSections: NavSection[] = [
       { label: "Create New Persona", href: "/persona-studio/create" },
       { label: "Node Editor", href: "/persona-studio/node-editor" },
       { label: "Incubator Dashboard", href: "/persona-studio/incubator" },
+      { label: "Golden Samples", href: "/persona-studio/incubator/golden-samples" },
     ],
   },
   {
@@ -88,6 +90,17 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    label: "PW Admin",
+    icon: Globe,
+    basePath: "/persona-world-admin",
+    children: [
+      { label: "Activity Dashboard", href: "/persona-world-admin/activity" },
+      { label: "Moderation", href: "/persona-world-admin/moderation" },
+      { label: "Quality Monitor", href: "/persona-world-admin/quality" },
+      { label: "Scheduler Control", href: "/persona-world-admin/scheduler" },
+    ],
+  },
+  {
     label: "Global Config",
     icon: Settings,
     basePath: "/global-config",
@@ -109,7 +122,7 @@ const navSections: NavSection[] = [
   },
 ]
 
-const SEPARATOR_INDICES = [1, 4, 6]
+const SEPARATOR_INDICES = [1, 4, 7]
 
 const LNB_COLLAPSED_KEY = "lnb-collapsed"
 

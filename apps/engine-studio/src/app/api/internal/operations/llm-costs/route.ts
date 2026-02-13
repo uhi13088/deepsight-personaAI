@@ -58,6 +58,25 @@ interface LlmCostsResponse {
 // GET /api/internal/operations/llm-costs
 // ═══════════════════════════════════════════════════════════════
 
+const EMPTY_SUMMARY: LlmCostsSummary = {
+  totalCostUsd: 0,
+  totalCalls: 0,
+  totalInputTokens: 0,
+  totalOutputTokens: 0,
+  totalTokens: 0,
+  avgCostPerCall: 0,
+  avgDurationMs: 0,
+  errorCount: 0,
+  errorRate: 0,
+}
+
+const EMPTY_RESPONSE: LlmCostsResponse = {
+  summary: EMPTY_SUMMARY,
+  dailyCosts: [],
+  callTypeBreakdown: [],
+  recentCalls: [],
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -66,6 +85,28 @@ export async function GET(request: NextRequest) {
 
     const since = new Date()
     since.setDate(since.getDate() - days)
+
+    // 테이블 존재 여부 + 데이터 확인 (raw query 실패 방지)
+    let totalCount: number
+    try {
+      totalCount = await prisma.llmUsageLog.count({
+        where: { createdAt: { gte: since } },
+      })
+    } catch {
+      // 테이블이 없거나 마이그레이션 미적용 — 빈 데이터 반환
+      return NextResponse.json({
+        success: true,
+        data: EMPTY_RESPONSE,
+      } satisfies ApiResponse<LlmCostsResponse>)
+    }
+
+    // 데이터가 없으면 빈 응답 반환 (불필요한 쿼리 방지)
+    if (totalCount === 0) {
+      return NextResponse.json({
+        success: true,
+        data: EMPTY_RESPONSE,
+      } satisfies ApiResponse<LlmCostsResponse>)
+    }
 
     // 전체 요약 통계
     const aggregates = await prisma.llmUsageLog.aggregate({
@@ -105,59 +146,69 @@ export async function GET(request: NextRequest) {
     }
 
     // 일별 비용 (groupBy raw query — Prisma의 날짜 groupBy 한계로 raw 사용)
-    const dailyRaw = await prisma.$queryRaw<
-      { date: Date; total_cost: string; total_calls: bigint; total_tokens: bigint }[]
-    >`
-      SELECT
-        DATE(created_at) as date,
-        SUM(estimated_cost_usd) as total_cost,
-        COUNT(*) as total_calls,
-        SUM(total_tokens) as total_tokens
-      FROM llm_usage_logs
-      WHERE created_at >= ${since}
-      GROUP BY DATE(created_at)
-      ORDER BY date ASC
-    `
+    let dailyCosts: DailyCost[] = []
+    try {
+      const dailyRaw = await prisma.$queryRaw<
+        { date: Date; total_cost: string; total_calls: bigint; total_tokens: bigint }[]
+      >`
+        SELECT
+          DATE(created_at) as date,
+          COALESCE(SUM(estimated_cost_usd), 0) as total_cost,
+          COUNT(*) as total_calls,
+          COALESCE(SUM(total_tokens), 0) as total_tokens
+        FROM llm_usage_logs
+        WHERE created_at >= ${since}
+        GROUP BY DATE(created_at)
+        ORDER BY date ASC
+      `
 
-    const dailyCosts: DailyCost[] = dailyRaw.map((row) => ({
-      date: new Date(row.date).toISOString().split("T")[0],
-      totalCostUsd: Number(row.total_cost),
-      totalCalls: Number(row.total_calls),
-      totalTokens: Number(row.total_tokens),
-    }))
+      dailyCosts = dailyRaw.map((row) => ({
+        date: new Date(row.date).toISOString().split("T")[0],
+        totalCostUsd: Number(row.total_cost),
+        totalCalls: Number(row.total_calls),
+        totalTokens: Number(row.total_tokens),
+      }))
+    } catch {
+      // raw query 실패 시 빈 배열 유지
+    }
 
     // callType별 통계
-    const typeRaw = await prisma.$queryRaw<
-      {
-        call_type: string
-        total_calls: bigint
-        total_cost: string
-        total_input: bigint
-        total_output: bigint
-        avg_duration: string
-      }[]
-    >`
-      SELECT
-        call_type,
-        COUNT(*) as total_calls,
-        SUM(estimated_cost_usd) as total_cost,
-        SUM(input_tokens) as total_input,
-        SUM(output_tokens) as total_output,
-        AVG(duration_ms) as avg_duration
-      FROM llm_usage_logs
-      WHERE created_at >= ${since}
-      GROUP BY call_type
-      ORDER BY total_cost DESC
-    `
+    let callTypeBreakdown: CallTypeBreakdown[] = []
+    try {
+      const typeRaw = await prisma.$queryRaw<
+        {
+          call_type: string
+          total_calls: bigint
+          total_cost: string
+          total_input: bigint
+          total_output: bigint
+          avg_duration: string
+        }[]
+      >`
+        SELECT
+          call_type,
+          COUNT(*) as total_calls,
+          COALESCE(SUM(estimated_cost_usd), 0) as total_cost,
+          COALESCE(SUM(input_tokens), 0) as total_input,
+          COALESCE(SUM(output_tokens), 0) as total_output,
+          COALESCE(AVG(duration_ms), 0) as avg_duration
+        FROM llm_usage_logs
+        WHERE created_at >= ${since}
+        GROUP BY call_type
+        ORDER BY total_cost DESC
+      `
 
-    const callTypeBreakdown: CallTypeBreakdown[] = typeRaw.map((row) => ({
-      callType: row.call_type,
-      totalCalls: Number(row.total_calls),
-      totalCostUsd: Number(row.total_cost),
-      totalInputTokens: Number(row.total_input),
-      totalOutputTokens: Number(row.total_output),
-      avgDurationMs: Math.round(Number(row.avg_duration)),
-    }))
+      callTypeBreakdown = typeRaw.map((row) => ({
+        callType: row.call_type,
+        totalCalls: Number(row.total_calls),
+        totalCostUsd: Number(row.total_cost),
+        totalInputTokens: Number(row.total_input),
+        totalOutputTokens: Number(row.total_output),
+        avgDurationMs: Math.round(Number(row.avg_duration)),
+      }))
+    } catch {
+      // raw query 실패 시 빈 배열 유지
+    }
 
     // 최근 호출 목록
     const recentRaw = await prisma.llmUsageLog.findMany({
