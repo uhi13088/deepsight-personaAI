@@ -4,6 +4,7 @@
 // 25노드 타입별 UI
 // T60-AC4: Input5 / Engine4 / Generation7 / Assembly2 / Output4 / ControlFlow3
 // T128-AC1: 실행 결과 상태 배지 연결
+// 인라인 편집: 벡터 슬라이더, 텍스트 입력, 수치 조정
 // ═══════════════════════════════════════════════════════════════
 
 import type { NodeProps } from "@xyflow/react"
@@ -22,6 +23,97 @@ function useNodeExecution(nodeId: string) {
   return useNodeEditorStore((s) => s.executionResults.get(nodeId))
 }
 
+// ── 인라인 편집 컴포넌트 ────────────────────────────────────
+
+function InlineSlider({
+  nodeId,
+  label,
+  field,
+  value,
+}: {
+  nodeId: string
+  label: string
+  field: string
+  value: number
+}) {
+  const updateNodeData = useNodeEditorStore((s) => s.updateNodeData)
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="w-[52px] shrink-0 truncate text-[10px]">{label}</span>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.01}
+        value={value}
+        onChange={(e) => updateNodeData(nodeId, { [field]: parseFloat(e.target.value) })}
+        className="nodrag h-1 flex-1 cursor-pointer appearance-none rounded-full bg-gray-600 accent-blue-500 [&::-webkit-slider-thumb]:h-2.5 [&::-webkit-slider-thumb]:w-2.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500"
+      />
+      <span className="w-7 shrink-0 text-right font-mono text-[10px]">{value.toFixed(2)}</span>
+    </div>
+  )
+}
+
+function InlineTextInput({
+  nodeId,
+  field,
+  value,
+  placeholder,
+}: {
+  nodeId: string
+  field: string
+  value: string
+  placeholder: string
+}) {
+  const updateNodeData = useNodeEditorStore((s) => s.updateNodeData)
+
+  return (
+    <input
+      type="text"
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => updateNodeData(nodeId, { [field]: e.target.value })}
+      className="nodrag bg-background w-full rounded border px-1.5 py-0.5 text-[11px]"
+    />
+  )
+}
+
+function InlineNumberInput({
+  nodeId,
+  field,
+  value,
+  label,
+  min,
+  max,
+  step,
+}: {
+  nodeId: string
+  field: string
+  value: number
+  label: string
+  min?: number
+  max?: number
+  step?: number
+}) {
+  const updateNodeData = useNodeEditorStore((s) => s.updateNodeData)
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-muted-foreground shrink-0 text-[10px]">{label}</span>
+      <input
+        type="number"
+        value={value}
+        min={min}
+        max={max}
+        step={step ?? 1}
+        onChange={(e) => updateNodeData(nodeId, { [field]: parseFloat(e.target.value) || 0 })}
+        className="nodrag bg-background w-14 rounded border px-1.5 py-0.5 text-right text-[11px]"
+      />
+    </div>
+  )
+}
+
 // ── Input Nodes ──────────────────────────────────────────────
 
 export function BasicInfoNode({ id, data, selected }: NodeProps) {
@@ -35,12 +127,42 @@ export function BasicInfoNode({ id, data, selected }: NodeProps) {
       selected={!!selected}
       executionResult={executionResult}
     >
-      <div className="text-muted-foreground space-y-1">
-        <div>이름: {(d.name as string) || "미설정"}</div>
-        <div>나이: {(d.age as number) ?? 25}</div>
+      <div className="space-y-1.5">
+        <InlineTextInput
+          nodeId={id}
+          field="name"
+          value={(d.name as string) || ""}
+          placeholder="이름"
+        />
+        <div className="flex gap-1.5">
+          <InlineNumberInput
+            nodeId={id}
+            field="age"
+            value={(d.age as number) ?? 25}
+            label="나이"
+            min={1}
+            max={100}
+          />
+        </div>
+        <InlineTextInput
+          nodeId={id}
+          field="occupation"
+          value={(d.occupation as string) || ""}
+          placeholder="직업"
+        />
       </div>
     </PersonaNodeWrapper>
   )
+}
+
+const L1_DIM_LABELS: Record<string, string> = {
+  depth: "분석깊이",
+  lens: "판단렌즈",
+  stance: "평가태도",
+  scope: "관심범위",
+  taste: "취향성향",
+  purpose: "소비목적",
+  sociability: "사회성향",
 }
 
 export function L1VectorNode({ id, data, selected }: NodeProps) {
@@ -54,37 +176,84 @@ export function L1VectorNode({ id, data, selected }: NodeProps) {
       selected={!!selected}
       executionResult={executionResult}
     >
-      <div className="text-muted-foreground">L1 Social (7D)</div>
+      <div className="space-y-0.5">
+        {Object.entries(L1_DIM_LABELS).map(([key, label]) => (
+          <InlineSlider
+            key={key}
+            nodeId={id}
+            label={label}
+            field={key}
+            value={(d[key] as number) ?? 0.5}
+          />
+        ))}
+      </div>
     </PersonaNodeWrapper>
   )
 }
 
+const L2_DIM_LABELS: Record<string, string> = {
+  openness: "개방성",
+  conscientiousness: "성실성",
+  extraversion: "외향성",
+  agreeableness: "우호성",
+  neuroticism: "신경성",
+}
+
 export function L2VectorNode({ id, data, selected }: NodeProps) {
+  const d = data as PersonaNodeData
   const executionResult = useNodeExecution(id)
   return (
     <PersonaNodeWrapper
       nodeType="l2-vector"
       nodeId={id}
-      data={data as PersonaNodeData}
+      data={d}
       selected={!!selected}
       executionResult={executionResult}
     >
-      <div className="text-muted-foreground">L2 OCEAN (5D)</div>
+      <div className="space-y-0.5">
+        {Object.entries(L2_DIM_LABELS).map(([key, label]) => (
+          <InlineSlider
+            key={key}
+            nodeId={id}
+            label={label}
+            field={key}
+            value={(d[key] as number) ?? 0.5}
+          />
+        ))}
+      </div>
     </PersonaNodeWrapper>
   )
 }
 
+const L3_DIM_LABELS: Record<string, string> = {
+  conflictOrientation: "갈등지향",
+  resolutionStyle: "해결방식",
+  narrativePace: "서사속도",
+  emotionalArc: "감정궤적",
+}
+
 export function L3VectorNode({ id, data, selected }: NodeProps) {
+  const d = data as PersonaNodeData
   const executionResult = useNodeExecution(id)
   return (
     <PersonaNodeWrapper
       nodeType="l3-vector"
       nodeId={id}
-      data={data as PersonaNodeData}
+      data={d}
       selected={!!selected}
       executionResult={executionResult}
     >
-      <div className="text-muted-foreground">L3 Narrative (4D)</div>
+      <div className="space-y-0.5">
+        {Object.entries(L3_DIM_LABELS).map(([key, label]) => (
+          <InlineSlider
+            key={key}
+            nodeId={id}
+            label={label}
+            field={key}
+            value={(d[key] as number) ?? 0.5}
+          />
+        ))}
+      </div>
     </PersonaNodeWrapper>
   )
 }
@@ -100,7 +269,12 @@ export function ArchetypeSelectNode({ id, data, selected }: NodeProps) {
       selected={!!selected}
       executionResult={executionResult}
     >
-      <div className="text-muted-foreground">{(d.archetypeId as string) || "선택 필요"}</div>
+      <InlineTextInput
+        nodeId={id}
+        field="archetypeId"
+        value={(d.archetypeId as string) || ""}
+        placeholder="아키타입 ID"
+      />
     </PersonaNodeWrapper>
   )
 }
@@ -133,7 +307,12 @@ export function PressureCtrlNode({ id, data, selected }: NodeProps) {
       selected={!!selected}
       executionResult={executionResult}
     >
-      <div className="text-muted-foreground">압력: {(d.pressureLevel as number) ?? 0.5}</div>
+      <InlineSlider
+        nodeId={id}
+        label="압력"
+        field="pressureLevel"
+        value={(d.pressureLevel as number) ?? 0.5}
+      />
     </PersonaNodeWrapper>
   )
 }
@@ -154,16 +333,22 @@ export function VFinalNode({ id, data, selected }: NodeProps) {
 }
 
 export function ProjectionNode({ id, data, selected }: NodeProps) {
+  const d = data as PersonaNodeData
   const executionResult = useNodeExecution(id)
   return (
     <PersonaNodeWrapper
       nodeType="projection"
       nodeId={id}
-      data={data as PersonaNodeData}
+      data={d}
       selected={!!selected}
       executionResult={executionResult}
     >
-      <div className="text-muted-foreground">프로젝션 계수</div>
+      <InlineSlider
+        nodeId={id}
+        label="계수"
+        field="coefficient"
+        value={(d.coefficient as number) ?? 0.5}
+      />
     </PersonaNodeWrapper>
   )
 }
@@ -181,9 +366,17 @@ export function ConditionalNode({ id, data, selected }: NodeProps) {
       selected={!!selected}
       executionResult={executionResult}
     >
-      <div className="text-muted-foreground">
-        {(d.conditionType as string) ?? "threshold"} {(d.operator as string) ?? ">"}{" "}
-        {(d.threshold as number) ?? 0.5}
+      <div className="space-y-1">
+        <div className="text-muted-foreground text-[10px]">
+          {(d.conditionType as string) ?? "threshold"} {(d.operator as string) ?? ">"}{" "}
+          {(d.threshold as number) ?? 0.5}
+        </div>
+        <InlineSlider
+          nodeId={id}
+          label="임계값"
+          field="threshold"
+          value={(d.threshold as number) ?? 0.5}
+        />
       </div>
     </PersonaNodeWrapper>
   )

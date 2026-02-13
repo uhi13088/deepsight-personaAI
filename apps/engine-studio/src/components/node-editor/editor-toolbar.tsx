@@ -68,10 +68,14 @@ export function EditorToolbar({
       </button>
       <button
         onClick={onSave}
-        disabled={!isDirty}
-        className="border-border bg-muted hover:bg-accent rounded border px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50"
+        disabled={nodeCount === 0}
+        className={`rounded border px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+          isDirty
+            ? "border-amber-500/50 bg-amber-500/10 text-amber-400 hover:border-amber-500 hover:bg-amber-500/20"
+            : "border-border bg-muted hover:bg-accent"
+        }`}
       >
-        💾 저장
+        💾 {isDirty ? "저장 *" : "저장"}
       </button>
 
       {/* 상태 바 */}

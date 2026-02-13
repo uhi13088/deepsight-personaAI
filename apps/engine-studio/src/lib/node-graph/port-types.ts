@@ -96,6 +96,11 @@ export const PORT_CATEGORIES: Record<PortType, PortCategory> = {
 
 const SPECIAL_COMPATIBILITY: Record<string, PortType[]> = {
   ArchetypeConfig: ["SocialPersonaVector", "CoreTemperamentVector", "NarrativeDriveVector"],
+  // VFinalResult는 L1+L2+L3 통합 벡터이므로 개별 벡터 입력에 연결 가능
+  VFinalResult: ["SocialPersonaVector", "CoreTemperamentVector", "NarrativeDriveVector"],
+  // PressureConfig ↔ PressureContext 상호 호환 (엔진 출력 → 생성 입력)
+  PressureConfig: ["PressureContext"],
+  PressureContext: ["PressureConfig"],
 }
 
 export function isPortCompatible(outputType: PortType, inputType: PortType): boolean {
