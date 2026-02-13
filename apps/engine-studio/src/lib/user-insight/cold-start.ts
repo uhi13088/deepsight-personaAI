@@ -19,8 +19,8 @@ export interface ColdStartQuestion {
   id: string
   text: string
   type: QuestionType
-  targetDimension: SocialDimension | TemperamentDimension
-  targetLayer: "L1" | "L2"
+  targetDimensions: string[] // 복합질문: 여러 차원 동시 측정
+  targetLayers: ("L1" | "L2")[] // 복합질문: L1+L2 동시 측정
   options: QuestionOption[]
   mode: OnboardingMode
   order: number
@@ -29,7 +29,8 @@ export interface ColdStartQuestion {
 export interface QuestionOption {
   id: string
   text: string
-  vectorDelta: Record<string, number> // dimension → delta (-0.5 ~ +0.5)
+  l1Weights: Record<string, number> // L1 차원 → delta (-0.5 ~ +0.5)
+  l2Weights: Record<string, number> // L2 차원 → delta (-0.5 ~ +0.5)
 }
 
 export interface QuestionSet {
@@ -168,7 +169,14 @@ export function inferVectorsFromAnswers(
     const option = question.options.find((o) => o.id === answer.selectedOptionId)
     if (!option) continue
 
-    for (const [dim, delta] of Object.entries(option.vectorDelta)) {
+    // L1 + L2 가중치를 각각 적용 (복합질문: 동시 측정)
+    for (const [dim, delta] of Object.entries(option.l1Weights)) {
+      if (sums[dim]) {
+        sums[dim].total += delta
+        sums[dim].count++
+      }
+    }
+    for (const [dim, delta] of Object.entries(option.l2Weights)) {
       if (sums[dim]) {
         sums[dim].total += delta
         sums[dim].count++
@@ -216,7 +224,9 @@ export function validateQuestionSet(set: QuestionSet): { valid: boolean; errors:
   // 차원별 질문 수 체크
   const dimCounts: Record<string, number> = {}
   for (const q of set.questions) {
-    dimCounts[q.targetDimension] = (dimCounts[q.targetDimension] ?? 0) + 1
+    for (const dim of q.targetDimensions) {
+      dimCounts[dim] = (dimCounts[dim] ?? 0) + 1
+    }
   }
 
   // 최소 1문항/차원 체크
