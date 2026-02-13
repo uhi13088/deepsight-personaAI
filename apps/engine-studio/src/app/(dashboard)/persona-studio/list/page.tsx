@@ -28,6 +28,10 @@ export default function PersonaListPage() {
   const [showArchetypeMenu, setShowArchetypeMenu] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
 
+  // 삭제 확인 다이얼로그 상태
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
   const handleFiltersChange = useCallback((next: PersonaFilterState) => {
     setFilters(next)
   }, [])
@@ -71,6 +75,38 @@ export default function PersonaListPage() {
     },
     [refetch, router]
   )
+
+  const handleDeleteRequest = useCallback((id: string, name: string) => {
+    setDeleteTarget({ id, name })
+  }, [])
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteTarget) return
+    setIsDeleting(true)
+
+    try {
+      const res = await fetch(`/api/internal/personas/${deleteTarget.id}`, {
+        method: "DELETE",
+      })
+
+      const json = await res.json()
+
+      if (!json.success) {
+        setGenerateError(json.error?.message ?? "삭제에 실패했습니다.")
+      } else {
+        refetch()
+      }
+    } catch {
+      setGenerateError("네트워크 오류가 발생했습니다.")
+    } finally {
+      setIsDeleting(false)
+      setDeleteTarget(null)
+    }
+  }, [deleteTarget, refetch])
+
+  const handleDeleteCancel = useCallback(() => {
+    setDeleteTarget(null)
+  }, [])
 
   return (
     <>
@@ -146,7 +182,7 @@ export default function PersonaListPage() {
           </div>
         </div>
 
-        {/* 생성 에러 */}
+        {/* 생성/삭제 에러 */}
         {generateError && (
           <div className="bg-destructive/10 text-destructive rounded-lg px-4 py-3 text-sm">
             {generateError}
@@ -168,7 +204,11 @@ export default function PersonaListPage() {
         )}
 
         {/* Grid */}
-        <PersonaGrid personas={data?.personas ?? []} isLoading={isLoading} />
+        <PersonaGrid
+          personas={data?.personas ?? []}
+          isLoading={isLoading}
+          onDelete={handleDeleteRequest}
+        />
 
         {/* Pagination */}
         {data && data.pagination.totalPages > 0 && (
@@ -180,6 +220,45 @@ export default function PersonaListPage() {
           />
         )}
       </div>
+
+      {/* 삭제 확인 다이얼로그 */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-background mx-4 w-full max-w-sm rounded-lg p-6 shadow-xl">
+            <h3 className="text-lg font-semibold">페르소나 삭제</h3>
+            <p className="text-muted-foreground mt-2 text-sm">
+              <strong className="text-foreground">{deleteTarget.name}</strong>을(를)
+              삭제하시겠습니까?
+              <br />이 작업은 되돌릴 수 없습니다.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleDeleteCancel}
+                disabled={isDeleting}
+              >
+                취소
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    삭제 중...
+                  </>
+                ) : (
+                  "삭제"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

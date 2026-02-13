@@ -5,6 +5,7 @@ import "./globals.css"
 export const metadata: Metadata = {
   title: "Engine Studio — DeepSight",
   description: "AI Persona Engine Management Studio",
+  icons: { icon: "/icon.svg" },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
