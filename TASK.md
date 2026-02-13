@@ -566,6 +566,19 @@
   - AC6: User Insight 3페이지 + Dashboard (Cold Start, Psychometric, Archetype, Dashboard) — 인라인 목업 제거, useEffect + fetch로 전환
   - AC7: 테스트 + Build PASS
 
+### Phase G: LLM 비용 모니터링 (T131)
+
+> 실시간 LLM 호출 비용 추적 및 대시보드. 기존 estimateRequestCost/CostPolicy 인프라 활용.
+
+- [ ] **T131: LLM 실시간 비용 모니터링 대시보드**
+  - 배경: estimateRequestCost(), CostPolicy, calculateMonthlyCost() 등 비용 추정 로직은 완성. 하지만 실제 LLM 호출을 기록하고 실시간 집계하는 기능 없음. model-settings 페이지는 데모 데이터만 표시
+  - AC1: DB 스키마 — LLMUsageLog 테이블 (requestId, modelId, provider, taskType, inputTokens, outputTokens, costUSD, personaId, status, timestamp)
+  - AC2: LLM 호출 인터셉터 — LLM 호출 시 자동으로 UsageLog 기록. estimateRequestCost() 연동
+  - AC3: API 엔드포인트 — GET /api/internal/operations/llm-costs (일별/모델별/작업유형별 집계, 예산 사용률)
+  - AC4: 대시보드 UI — /operations/llm-costs 페이지. 월간 총비용, 모델별 분석, 일별 트렌드, 작업유형별 분석, 예산 알림
+  - AC5: LNB 네비게이션 — Operations 하위에 "LLM 비용" 항목 추가
+  - AC6: 테스트 + Build PASS
+
 ### Phase DC-A: 개발자콘솔 v3 기반 인프라 (T116~T117)
 
 > 선택적 리빌드: 핵심(Schema/Types/API) 재작성 + 벡터 무관 페이지(API Keys/Usage/Logs/Settings/Team) 보존.

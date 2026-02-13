@@ -1,0 +1,215 @@
+import { NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
+import {
+  buildReviewPrompt,
+  buildPostPrompt,
+  buildCommentPrompt,
+  buildInteractionPrompt,
+} from "@/lib/prompt-builder"
+import { generateText, isLLMConfigured } from "@/lib/llm-client"
+import type {
+  ApiResponse,
+  SocialPersonaVector,
+  CoreTemperamentVector,
+  NarrativeDriveVector,
+} from "@/types"
+
+// ── Dim Maps ──────────────────────────────────────────────────
+
+const L1_DIM_MAP: Record<string, string> = {
+  depth: "dim1",
+  lens: "dim2",
+  stance: "dim3",
+  scope: "dim4",
+  taste: "dim5",
+  purpose: "dim6",
+  sociability: "dim7",
+}
+
+const L2_DIM_MAP: Record<string, string> = {
+  openness: "dim1",
+  conscientiousness: "dim2",
+  extraversion: "dim3",
+  agreeableness: "dim4",
+  neuroticism: "dim5",
+}
+
+const L3_DIM_MAP: Record<string, string> = {
+  lack: "dim1",
+  moralCompass: "dim2",
+  volatility: "dim3",
+  growthArc: "dim4",
+}
+
+function layerVectorToRecord(
+  layerVector: {
+    dim1: unknown
+    dim2: unknown
+    dim3: unknown
+    dim4: unknown
+    dim5: unknown
+    dim6: unknown
+    dim7: unknown
+  },
+  dimMap: Record<string, string>
+): Record<string, number> {
+  const result: Record<string, number> = {}
+  for (const [dimName, dimCol] of Object.entries(dimMap)) {
+    const value = layerVector[dimCol as keyof typeof layerVector]
+    if (value !== null && value !== undefined) {
+      result[dimName] =
+        typeof value === "object" && "toNumber" in value
+          ? (value as { toNumber(): number }).toNumber()
+          : Number(value)
+    }
+  }
+  return result
+}
+
+// ── 타입 정의 ──────────────────────────────────────────────────
+
+type TestPromptType = "review" | "post" | "comment" | "interaction"
+
+interface TestGenerateBody {
+  type: TestPromptType
+  scenario: string
+  maxTokens?: number
+}
+
+interface TestGenerateResponse {
+  output: string
+  type: TestPromptType
+  inputTokens: number
+  outputTokens: number
+  model: string
+}
+
+// ═══════════════════════════════════════════════════════════════
+// POST /api/internal/personas/[id]/test-generate
+// ═══════════════════════════════════════════════════════════════
+
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    // LLM 설정 확인
+    if (!isLLMConfigured()) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "LLM_NOT_CONFIGURED",
+            message:
+              "ANTHROPIC_API_KEY가 설정되지 않았습니다. .env.local에 ANTHROPIC_API_KEY를 추가해주세요.",
+          },
+        } satisfies ApiResponse<never>,
+        { status: 503 }
+      )
+    }
+
+    const { id } = await params
+    const body: TestGenerateBody = await request.json()
+
+    // 유효성 검증
+    const validTypes: TestPromptType[] = ["review", "post", "comment", "interaction"]
+    if (!validTypes.includes(body.type)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "유효하지 않은 프롬프트 유형입니다." },
+        } satisfies ApiResponse<never>,
+        { status: 400 }
+      )
+    }
+
+    if (!body.scenario || body.scenario.trim().length < 5) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "시나리오는 최소 5자 이상이어야 합니다." },
+        } satisfies ApiResponse<never>,
+        { status: 400 }
+      )
+    }
+
+    // 페르소나 조회
+    const persona = await prisma.persona.findUnique({
+      where: { id },
+      include: { layerVectors: true },
+    })
+
+    if (!persona) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: "NOT_FOUND", message: "페르소나를 찾을 수 없습니다." },
+        } satisfies ApiResponse<never>,
+        { status: 404 }
+      )
+    }
+
+    // 벡터 추출
+    const l1Raw = persona.layerVectors.find((v) => v.layerType === "SOCIAL")
+    const l2Raw = persona.layerVectors.find((v) => v.layerType === "TEMPERAMENT")
+    const l3Raw = persona.layerVectors.find((v) => v.layerType === "NARRATIVE")
+
+    if (!l1Raw || !l2Raw || !l3Raw) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: "VALIDATION_ERROR", message: "페르소나 벡터 데이터가 불완전합니다." },
+        } satisfies ApiResponse<never>,
+        { status: 400 }
+      )
+    }
+
+    const l1 = layerVectorToRecord(l1Raw, L1_DIM_MAP) as unknown as SocialPersonaVector
+    const l2 = layerVectorToRecord(l2Raw, L2_DIM_MAP) as unknown as CoreTemperamentVector
+    const l3 = layerVectorToRecord(l3Raw, L3_DIM_MAP) as unknown as NarrativeDriveVector
+
+    const promptInput = {
+      name: persona.name,
+      role: persona.role,
+      expertise: persona.expertise,
+      l1,
+      l2,
+      l3,
+    }
+
+    // 유형별 시스템 프롬프트 빌드
+    const promptBuilders: Record<TestPromptType, () => string> = {
+      review: () => buildReviewPrompt(promptInput),
+      post: () => buildPostPrompt(promptInput),
+      comment: () => buildCommentPrompt(promptInput),
+      interaction: () => buildInteractionPrompt(promptInput),
+    }
+
+    const systemPrompt = promptBuilders[body.type]()
+
+    // LLM 호출
+    const result = await generateText({
+      systemPrompt,
+      userMessage: body.scenario.trim(),
+      maxTokens: body.maxTokens ?? 1024,
+      temperature: 0.7,
+    })
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        output: result.text,
+        type: body.type,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        model: result.model,
+      },
+    } satisfies ApiResponse<TestGenerateResponse>)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error"
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: "INTERNAL_ERROR", message: `테스트 생성 실패: ${message}` },
+      } satisfies ApiResponse<never>,
+      { status: 500 }
+    )
+  }
+}

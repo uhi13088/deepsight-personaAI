@@ -1,9 +1,18 @@
 "use client"
 
-import { useState, useMemo, use } from "react"
+import { useState, useMemo, useCallback, use } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Copy, Loader2, AlertTriangle, Save } from "lucide-react"
+import {
+  ArrowLeft,
+  Copy,
+  Loader2,
+  AlertTriangle,
+  Save,
+  Send,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -704,7 +713,7 @@ function PromptTab({
   )
 }
 
-// ── Preview Tab (미리보기 테스트) ────────────────────────────
+// ── Preview Tab (인터랙티브 페르소나 플레이그라운드) ─────────
 
 type PreviewPromptType = "review" | "post" | "comment" | "interaction"
 
@@ -727,9 +736,21 @@ const PREVIEW_LABELS: Record<PreviewPromptType, { label: string; scenario: strin
   },
 }
 
+interface GeneratedResult {
+  output: string
+  type: PreviewPromptType
+  inputTokens: number
+  outputTokens: number
+  model: string
+}
+
 function PreviewTab({ data }: { data: PersonaData }) {
   const [activeType, setActiveType] = useState<PreviewPromptType>("review")
   const [customScenario, setCustomScenario] = useState("")
+  const [generating, setGenerating] = useState(false)
+  const [results, setResults] = useState<GeneratedResult[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [showSystemPrompt, setShowSystemPrompt] = useState(false)
 
   const l1 = data.vectors.l1 as SocialPersonaVector | null
   const l2 = data.vectors.l2 as CoreTemperamentVector | null
@@ -758,6 +779,35 @@ function PreviewTab({ data }: { data: PersonaData }) {
 
   const currentScenario = customScenario || PREVIEW_LABELS[activeType].scenario
 
+  const handleGenerate = useCallback(async () => {
+    if (generating || !currentScenario.trim()) return
+    setGenerating(true)
+    setError(null)
+
+    try {
+      const res = await fetch(`/api/internal/personas/${data.id}/test-generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: activeType,
+          scenario: currentScenario.trim(),
+        }),
+      })
+      const json = await res.json()
+
+      if (!json.success) {
+        setError(json.error?.message ?? "생성에 실패했습니다.")
+        return
+      }
+
+      setResults((prev) => [json.data as GeneratedResult, ...prev])
+    } catch {
+      setError("네트워크 오류가 발생했습니다.")
+    } finally {
+      setGenerating(false)
+    }
+  }, [generating, currentScenario, data.id, activeType])
+
   if (!l1 || !l2 || !l3) {
     return (
       <div className="text-muted-foreground py-8 text-center text-sm">
@@ -768,15 +818,16 @@ function PreviewTab({ data }: { data: PersonaData }) {
 
   return (
     <div className="space-y-6">
+      {/* 안내 */}
       <div className="border-border rounded-lg border bg-emerald-500/5 p-4">
-        <p className="mb-1 text-xs font-medium">미리보기 테스트</p>
+        <p className="mb-1 text-xs font-medium">페르소나 플레이그라운드</p>
         <p className="text-muted-foreground text-xs">
-          페르소나의 벡터와 프롬프트를 기반으로 예상 행동 패턴과 시스템 프롬프트를 미리 확인합니다.
-          실제 LLM에 전달될 시스템 프롬프트와 시나리오를 함께 볼 수 있습니다.
+          시나리오를 입력하고 &quot;생성&quot;을 누르면 이 페르소나가 실제로 어떻게 응답하는지
+          확인할 수 있습니다. 리뷰, 포스트, 댓글, 대화 등 다양한 상황을 테스트하세요.
         </p>
       </div>
 
-      {/* Persona Personality Card */}
+      {/* 성격 요약 (접이식) */}
       {behaviorSummary && (
         <div className="border-border rounded-lg border p-4">
           <h4 className="mb-3 text-sm font-semibold">페르소나 성격 요약</h4>
@@ -798,10 +849,9 @@ function PreviewTab({ data }: { data: PersonaData }) {
         </div>
       )}
 
-      {/* Prompt Type Selection */}
-      <div>
-        <h4 className="mb-2 text-sm font-semibold">프롬프트 유형 선택</h4>
-        <div className="flex gap-1">
+      {/* 유형 선택 + 시나리오 입력 + 생성 버튼 */}
+      <div className="border-border rounded-lg border p-4">
+        <div className="mb-3 flex items-center gap-2">
           {(Object.keys(PREVIEW_LABELS) as PreviewPromptType[]).map((type) => (
             <button
               key={type}
@@ -819,73 +869,117 @@ function PreviewTab({ data }: { data: PersonaData }) {
             </button>
           ))}
         </div>
-      </div>
 
-      {/* Scenario */}
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <h4 className="text-sm font-semibold">테스트 시나리오</h4>
-          {customScenario && (
-            <button
-              onClick={() => setCustomScenario("")}
-              className="text-muted-foreground text-xs hover:underline"
-            >
-              기본 시나리오 복원
-            </button>
-          )}
-        </div>
-        <textarea
-          className="border-border bg-background w-full rounded-lg border p-3 text-xs"
-          rows={2}
-          value={currentScenario}
-          onChange={(e) => setCustomScenario(e.target.value)}
-          placeholder="시나리오를 입력하세요..."
-        />
-      </div>
-
-      {/* Preview: System Prompt + Scenario */}
-      <div className="space-y-4">
-        <div>
-          <div className="mb-2 flex items-center gap-2">
-            <h4 className="text-sm font-semibold">시스템 프롬프트</h4>
-            <Badge variant="outline" className="text-[10px]">
-              {activeType}
-            </Badge>
+        <div className="mb-3">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-muted-foreground text-xs">시나리오</span>
+            {customScenario && (
+              <button
+                onClick={() => setCustomScenario("")}
+                className="text-muted-foreground text-xs hover:underline"
+              >
+                기본값 복원
+              </button>
+            )}
           </div>
-          <div className="border-border bg-muted/50 max-h-64 overflow-y-auto rounded-lg border p-3">
+          <textarea
+            className="border-border bg-background w-full rounded-lg border p-3 text-xs"
+            rows={3}
+            value={currentScenario}
+            onChange={(e) => setCustomScenario(e.target.value)}
+            placeholder="시나리오를 입력하세요..."
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault()
+                handleGenerate()
+              }
+            }}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setShowSystemPrompt((v) => !v)}
+            className="text-muted-foreground flex items-center gap-1 text-xs hover:underline"
+          >
+            {showSystemPrompt ? (
+              <ChevronUp className="h-3 w-3" />
+            ) : (
+              <ChevronDown className="h-3 w-3" />
+            )}
+            시스템 프롬프트 보기
+          </button>
+
+          <Button size="sm" onClick={handleGenerate} disabled={generating}>
+            {generating ? (
+              <>
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                생성 중...
+              </>
+            ) : (
+              <>
+                <Send className="mr-1 h-3 w-3" />
+                생성 (Ctrl+Enter)
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* 시스템 프롬프트 (접이식) */}
+        {showSystemPrompt && (
+          <div className="border-border bg-muted/50 mt-3 max-h-48 overflow-y-auto rounded-lg border p-3">
             <pre className="whitespace-pre-wrap text-xs">
               {prompts?.[activeType] || data.basePrompt}
             </pre>
           </div>
-        </div>
-
-        <div>
-          <h4 className="mb-2 text-sm font-semibold">사용자 메시지 (User)</h4>
-          <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-3">
-            <p className="text-xs">{currentScenario}</p>
-          </div>
-        </div>
-
-        {/* Expected Behavior */}
-        <div>
-          <h4 className="mb-2 text-sm font-semibold">예상 응답 특성</h4>
-          <div className="border-border rounded-lg border bg-emerald-500/5 p-4">
-            <div className="space-y-2">
-              {getExpectedBehavior(activeType, l1, l2, l3).map((item, i) => (
-                <div key={i} className="flex items-start gap-2 text-xs">
-                  <span className="text-muted-foreground mt-0.5 shrink-0">
-                    {item.confidence >= 0.7 ? "●" : item.confidence >= 0.4 ? "◐" : "○"}
-                  </span>
-                  <div>
-                    <span className="font-medium">{item.label}:</span>{" "}
-                    <span className="text-muted-foreground">{item.description}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        )}
       </div>
+
+      {/* 에러 */}
+      {error && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
+          <div className="flex items-center gap-2 text-xs text-red-400">
+            <AlertTriangle className="h-3 w-3 shrink-0" />
+            {error}
+          </div>
+        </div>
+      )}
+
+      {/* 생성 결과 목록 */}
+      {results.length > 0 && (
+        <div className="space-y-4">
+          <h4 className="text-sm font-semibold">생성 결과</h4>
+          {results.map((result, idx) => (
+            <div key={idx} className="border-border rounded-lg border">
+              {/* 결과 헤더 */}
+              <div className="flex items-center justify-between border-b px-4 py-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-[10px]">
+                    {PREVIEW_LABELS[result.type].label}
+                  </Badge>
+                  <span className="text-muted-foreground text-[10px]">{result.model}</span>
+                </div>
+                <span className="text-muted-foreground text-[10px]">
+                  {result.inputTokens + result.outputTokens} tokens (in:{result.inputTokens} / out:
+                  {result.outputTokens})
+                </span>
+              </div>
+              {/* 결과 본문 */}
+              <div className="p-4">
+                <div className="whitespace-pre-wrap text-sm leading-relaxed">{result.output}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 결과가 없을 때 안내 */}
+      {results.length === 0 && !generating && (
+        <div className="text-muted-foreground py-8 text-center text-sm">
+          시나리오를 입력하고 &quot;생성&quot; 버튼을 클릭하면
+          <br />이 페르소나의 실제 응답을 확인할 수 있습니다.
+        </div>
+      )}
     </div>
   )
 }
