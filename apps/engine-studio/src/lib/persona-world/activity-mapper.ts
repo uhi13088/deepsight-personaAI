@@ -7,7 +7,7 @@
 import { clamp } from "@/lib/vector/utils"
 import type { ThreeLayerVector } from "@/types/persona-v3"
 import { ACTIVE_HOURS, TRAIT_WEIGHTS } from "./constants"
-import type { ActivityTraitsV3, PersonaStateData } from "./types"
+import type { ActivityTraitsV3, PersonaStateData, VoiceStyleParams } from "./types"
 
 /**
  * 3-Layer 벡터 → 8개 활동 특성 매핑.
@@ -130,6 +130,34 @@ export function computeActiveHours(vectors: ThreeLayerVector, traits: ActivityTr
 
   // 중복 제거 + 정렬
   return [...new Set(hours)].sort((a, b) => a - b)
+}
+
+/**
+ * 3-Layer 벡터 → Voice 스타일 파라미터 도출.
+ *
+ * 6개 스타일 차원을 벡터 조합으로 산출:
+ * - formality: 격식도 (lens×0.4 + conscientiousness×0.3 + purpose×0.3)
+ * - humor: 유머 (taste×0.3 + (1-neuroticism)×0.3 + volatility×0.2 + sociability×0.2)
+ * - sentenceLength: 문장 호흡 (scope×0.4 + depth×0.3 + (1-extraversion)×0.3)
+ * - emotionExpression: 감정 표현 ((1-lens)×0.3 + neuroticism×0.3 + volatility×0.2 + lack×0.2)
+ * - assertiveness: 단정적 어조 (stance×0.4 + moralCompass×0.3 + conscientiousness×0.3)
+ * - vocabularyLevel: 어휘 수준 (depth×0.3 + lens×0.3 + openness×0.2 + purpose×0.2)
+ */
+export function computeVoiceParams(vectors: ThreeLayerVector): VoiceStyleParams {
+  const { social: l1, temperament: l2, narrative: l3 } = vectors
+
+  return {
+    formality: clamp(l1.lens * 0.4 + l2.conscientiousness * 0.3 + l1.purpose * 0.3),
+    humor: clamp(
+      l1.taste * 0.3 + (1 - l2.neuroticism) * 0.3 + l3.volatility * 0.2 + l1.sociability * 0.2
+    ),
+    sentenceLength: clamp(l1.scope * 0.4 + l1.depth * 0.3 + (1 - l2.extraversion) * 0.3),
+    emotionExpression: clamp(
+      (1 - l1.lens) * 0.3 + l2.neuroticism * 0.3 + l3.volatility * 0.2 + l3.lack * 0.2
+    ),
+    assertiveness: clamp(l1.stance * 0.4 + l3.moralCompass * 0.3 + l2.conscientiousness * 0.3),
+    vocabularyLevel: clamp(l1.depth * 0.3 + l1.lens * 0.3 + l2.openness * 0.2 + l1.purpose * 0.2),
+  }
 }
 
 /**

@@ -9,34 +9,45 @@ import type { PostTypeAffinity, PersonaStateData, CommentTone } from "./types"
 // 설계서 §4.5 포스트 타입 ↔ 레이어 친화도
 export const POST_TYPE_AFFINITIES: PostTypeAffinity[] = [
   {
+    // REVIEW: 깊이 있는 분석 + 도덕적 엄격함 → 꼼꼼한 리뷰
     type: "REVIEW",
-    conditions: [{ layer: "L1", dimension: "depth", operator: ">", threshold: 0.6, weight: 1.0 }],
+    conditions: [
+      { layer: "L1", dimension: "depth", operator: ">", threshold: 0.6, weight: 0.8 },
+      { layer: "L3", dimension: "moralCompass", operator: ">", threshold: 0.5, weight: 0.2 },
+    ],
   },
   {
+    // DEBATE: 비판적 + 강한 신념 → 논쟁 주도
     type: "DEBATE",
     conditions: [
-      { layer: "L1", dimension: "stance", operator: ">", threshold: 0.7, weight: 0.6 },
-      { layer: "L1", dimension: "initiative", operator: ">", threshold: 0.7, weight: 0.4 },
+      { layer: "L1", dimension: "stance", operator: ">", threshold: 0.7, weight: 0.5 },
+      { layer: "L1", dimension: "initiative", operator: ">", threshold: 0.7, weight: 0.3 },
+      { layer: "L3", dimension: "moralCompass", operator: ">", threshold: 0.6, weight: 0.2 },
     ],
   },
   {
+    // THOUGHT: 내면 불안 + 성장 추구 → 내성적 사색
     type: "THOUGHT",
     conditions: [
-      { layer: "L2", dimension: "neuroticism", operator: ">", threshold: 0.5, weight: 0.6 },
-      { layer: "paradox", dimension: "paradoxTension", operator: ">", threshold: 0.5, weight: 0.4 },
+      { layer: "L2", dimension: "neuroticism", operator: ">", threshold: 0.5, weight: 0.4 },
+      { layer: "paradox", dimension: "paradoxTension", operator: ">", threshold: 0.5, weight: 0.3 },
+      { layer: "L3", dimension: "growthArc", operator: ">", threshold: 0.4, weight: 0.3 },
     ],
   },
   {
+    // RECOMMENDATION: 사교적 + 충족된 사람이 나누기 좋아함
     type: "RECOMMENDATION",
     conditions: [
-      { layer: "L1", dimension: "sociability", operator: ">", threshold: 0.5, weight: 0.5 },
-      { layer: "L2", dimension: "agreeableness", operator: ">", threshold: 0.6, weight: 0.5 },
+      { layer: "L1", dimension: "sociability", operator: ">", threshold: 0.5, weight: 0.4 },
+      { layer: "L2", dimension: "agreeableness", operator: ">", threshold: 0.6, weight: 0.4 },
+      { layer: "L3", dimension: "lack", operator: "<", threshold: 0.4, weight: 0.2 },
     ],
   },
   {
     type: "REACTION",
     conditions: [
-      { layer: "L1", dimension: "expressiveness", operator: ">", threshold: 0.6, weight: 1.0 },
+      { layer: "L1", dimension: "expressiveness", operator: ">", threshold: 0.6, weight: 0.8 },
+      { layer: "L3", dimension: "volatility", operator: ">", threshold: 0.5, weight: 0.2 },
     ],
   },
   {
@@ -48,18 +59,22 @@ export const POST_TYPE_AFFINITIES: PostTypeAffinity[] = [
     ],
   },
   {
+    // THREAD: 체계적 정리 + 도덕적 사명감 → 연재
     type: "THREAD",
     conditions: [
-      { layer: "L1", dimension: "scope", operator: ">", threshold: 0.7, weight: 0.35 },
-      { layer: "L1", dimension: "expressiveness", operator: ">", threshold: 0.7, weight: 0.35 },
-      { layer: "L2", dimension: "conscientiousness", operator: ">", threshold: 0.5, weight: 0.3 },
+      { layer: "L1", dimension: "scope", operator: ">", threshold: 0.7, weight: 0.3 },
+      { layer: "L1", dimension: "expressiveness", operator: ">", threshold: 0.7, weight: 0.25 },
+      { layer: "L2", dimension: "conscientiousness", operator: ">", threshold: 0.5, weight: 0.25 },
+      { layer: "L3", dimension: "moralCompass", operator: ">", threshold: 0.5, weight: 0.2 },
     ],
   },
   {
+    // VS_BATTLE: 비판적 + 높은 폭발성
     type: "VS_BATTLE",
     conditions: [
-      { layer: "L1", dimension: "stance", operator: ">", threshold: 0.8, weight: 0.6 },
-      { layer: "paradox", dimension: "paradoxScore", operator: ">", threshold: 0.5, weight: 0.4 },
+      { layer: "L1", dimension: "stance", operator: ">", threshold: 0.8, weight: 0.4 },
+      { layer: "paradox", dimension: "paradoxScore", operator: ">", threshold: 0.5, weight: 0.3 },
+      { layer: "L3", dimension: "volatility", operator: ">", threshold: 0.5, weight: 0.3 },
     ],
   },
   {
@@ -70,10 +85,12 @@ export const POST_TYPE_AFFINITIES: PostTypeAffinity[] = [
     ],
   },
   {
+    // CURATION: 취향 + 성장 욕구 → 큐레이션으로 자기 표현
     type: "CURATION",
     conditions: [
-      { layer: "L1", dimension: "scope", operator: ">", threshold: 0.6, weight: 0.5 },
-      { layer: "L1", dimension: "taste", operator: ">", threshold: 0.5, weight: 0.5 },
+      { layer: "L1", dimension: "scope", operator: ">", threshold: 0.6, weight: 0.4 },
+      { layer: "L1", dimension: "taste", operator: ">", threshold: 0.5, weight: 0.4 },
+      { layer: "L3", dimension: "growthArc", operator: ">", threshold: 0.4, weight: 0.2 },
     ],
   },
   {
@@ -99,18 +116,22 @@ export const POST_TYPE_AFFINITIES: PostTypeAffinity[] = [
     ],
   },
   {
+    // MEME: 실험적 취향 + 감정 폭발성 → 유머/밈
     type: "MEME",
     conditions: [
-      { layer: "L1", dimension: "taste", operator: ">", threshold: 0.7, weight: 0.5 },
-      { layer: "L1", dimension: "expressiveness", operator: ">", threshold: 0.5, weight: 0.5 },
+      { layer: "L1", dimension: "taste", operator: ">", threshold: 0.7, weight: 0.4 },
+      { layer: "L1", dimension: "expressiveness", operator: ">", threshold: 0.5, weight: 0.4 },
+      { layer: "L3", dimension: "volatility", operator: ">", threshold: 0.5, weight: 0.2 },
     ],
   },
   {
+    // COLLAB: 사교적 + 결핍(연결 욕구) → 협업
     type: "COLLAB",
     conditions: [
-      { layer: "L1", dimension: "sociability", operator: ">", threshold: 0.7, weight: 0.4 },
-      { layer: "L2", dimension: "agreeableness", operator: ">", threshold: 0.6, weight: 0.3 },
-      { layer: "L1", dimension: "interactivity", operator: ">", threshold: 0.6, weight: 0.3 },
+      { layer: "L1", dimension: "sociability", operator: ">", threshold: 0.7, weight: 0.3 },
+      { layer: "L2", dimension: "agreeableness", operator: ">", threshold: 0.6, weight: 0.25 },
+      { layer: "L1", dimension: "interactivity", operator: ">", threshold: 0.6, weight: 0.25 },
+      { layer: "L3", dimension: "lack", operator: ">", threshold: 0.5, weight: 0.2 },
     ],
   },
   {
@@ -121,10 +142,12 @@ export const POST_TYPE_AFFINITIES: PostTypeAffinity[] = [
     ],
   },
   {
+    // ANNIVERSARY: 의미추구 + 성장서사
     type: "ANNIVERSARY",
     conditions: [
-      { layer: "L1", dimension: "purpose", operator: ">", threshold: 0.6, weight: 0.5 },
-      { layer: "L1", dimension: "sociability", operator: ">", threshold: 0.4, weight: 0.5 },
+      { layer: "L1", dimension: "purpose", operator: ">", threshold: 0.6, weight: 0.4 },
+      { layer: "L1", dimension: "sociability", operator: ">", threshold: 0.4, weight: 0.35 },
+      { layer: "L3", dimension: "growthArc", operator: ">", threshold: 0.5, weight: 0.25 },
     ],
   },
 ]

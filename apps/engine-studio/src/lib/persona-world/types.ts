@@ -31,6 +31,19 @@ export interface PersonaStateData {
   energy: number // 0.0~1.0: 소진 ↔ 충만
   socialBattery: number // 0.0~1.0: 방전 ↔ 충전
   paradoxTension: number // 0.0~1.0: 안정 ↔ 폭발 직전
+  narrativeTension?: number // 0.0~1.0: L3 서사 긴장 (결핍↔충족)
+}
+
+// ── 성격 민감도 (State delta 개인화) ─────────────────────────
+// 벡터 기반으로 상태 변화량을 증폭/감쇠하는 계수 (0.5~1.5 범위)
+// - 1.0 = 기본 반응 (기존 동작과 동일)
+// - >1.0 = 더 민감하게 반응
+// - <1.0 = 둔감하게 반응
+export interface PersonalitySensitivity {
+  moodSensitivity: number // neuroticism 기반: 기분 변화 민감도
+  energyRecoveryRate: number // extraversion+conscientiousness: 에너지 회복 속도
+  socialDrain: number // (1-extraversion): 사회적 에너지 소모 속도
+  tensionSensitivity: number // neuroticism+volatility: 긴장 축적 민감도
 }
 
 // ── 상태 업데이트 이벤트 ──────────────────────────────────────
@@ -131,6 +144,17 @@ export interface PostTypeAffinity {
   conditions: PostTypeAffinityCondition[]
 }
 
+// ── Voice 스타일 파라미터 (벡터 → 말투 개인화) ──────────────
+// 3-Layer 벡터에서 도출되는 명시적 스타일 수치
+export interface VoiceStyleParams {
+  formality: number // 0.0~1.0: 구어체 ↔ 격식체
+  humor: number // 0.0~1.0: 진지 ↔ 유머
+  sentenceLength: number // 0.0~1.0: 간결체 ↔ 만연체
+  emotionExpression: number // 0.0~1.0: 절제 ↔ 감정표현 풍부
+  assertiveness: number // 0.0~1.0: 겸양 ↔ 단정적
+  vocabularyLevel: number // 0.0~1.0: 쉬운 말 ↔ 전문용어
+}
+
 // ── 포스트 생성 입력/결과 ────────────────────────────────────
 export interface PostGenerationInput {
   personaId: string
@@ -144,6 +168,7 @@ export interface PostGenerationInput {
     emotionalState: string
   }
   personaState: PersonaStateData
+  voiceStyle?: VoiceStyleParams // Voice 스타일 (벡터에서 도출)
 }
 
 export interface PostGenerationResult {

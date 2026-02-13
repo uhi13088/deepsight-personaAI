@@ -4,6 +4,7 @@ import {
   computeActivityTraits,
   computeActiveHours,
   computeActivityProbabilities,
+  computeVoiceParams,
 } from "@/lib/persona-world/activity-mapper"
 import type { PersonaStateData } from "@/lib/persona-world/types"
 
@@ -281,5 +282,88 @@ describe("computeActivityProbabilities", () => {
     const low = computeActivityProbabilities(traits, lowMood)
 
     expect(high.postProbability).toBeGreaterThan(low.postProbability)
+  })
+})
+
+// ═══ computeVoiceParams ═══
+
+describe("computeVoiceParams", () => {
+  it("returns 6 voice style params all in [0, 1]", () => {
+    const voice = computeVoiceParams(makeVectors())
+
+    expect(voice.formality).toBeGreaterThanOrEqual(0)
+    expect(voice.formality).toBeLessThanOrEqual(1)
+    expect(voice.humor).toBeGreaterThanOrEqual(0)
+    expect(voice.humor).toBeLessThanOrEqual(1)
+    expect(voice.sentenceLength).toBeGreaterThanOrEqual(0)
+    expect(voice.sentenceLength).toBeLessThanOrEqual(1)
+    expect(voice.emotionExpression).toBeGreaterThanOrEqual(0)
+    expect(voice.emotionExpression).toBeLessThanOrEqual(1)
+    expect(voice.assertiveness).toBeGreaterThanOrEqual(0)
+    expect(voice.assertiveness).toBeLessThanOrEqual(1)
+    expect(voice.vocabularyLevel).toBeGreaterThanOrEqual(0)
+    expect(voice.vocabularyLevel).toBeLessThanOrEqual(1)
+  })
+
+  it("논리적+격식적 페르소나 → formality 높음, humor 낮음", () => {
+    const voice = computeVoiceParams(
+      makeVectors({
+        social: { ...makeVectors().social, lens: 0.9, purpose: 0.9 },
+        temperament: { ...makeVectors().temperament, conscientiousness: 0.9, neuroticism: 0.8 },
+      })
+    )
+    expect(voice.formality).toBeGreaterThan(0.6)
+    expect(voice.humor).toBeLessThan(0.5)
+  })
+
+  it("감성적+사교적 페르소나 → emotionExpression 높음, assertiveness 낮음", () => {
+    const voice = computeVoiceParams(
+      makeVectors({
+        social: { ...makeVectors().social, lens: 0.1, stance: 0.2, sociability: 0.9 },
+        temperament: { ...makeVectors().temperament, neuroticism: 0.8 },
+        narrative: { ...makeVectors().narrative, volatility: 0.8, lack: 0.7 },
+      })
+    )
+    expect(voice.emotionExpression).toBeGreaterThan(0.6)
+    expect(voice.assertiveness).toBeLessThan(0.5)
+  })
+
+  it("비판적+원칙적 페르소나 → assertiveness 높음", () => {
+    const voice = computeVoiceParams(
+      makeVectors({
+        social: { ...makeVectors().social, stance: 0.9 },
+        temperament: { ...makeVectors().temperament, conscientiousness: 0.9 },
+        narrative: { ...makeVectors().narrative, moralCompass: 0.9 },
+      })
+    )
+    expect(voice.assertiveness).toBeGreaterThan(0.7)
+  })
+
+  it("극단적 입력에도 [0, 1] 범위 유지", () => {
+    const voice = computeVoiceParams(
+      makeVectors({
+        social: {
+          depth: 1,
+          lens: 1,
+          stance: 1,
+          scope: 1,
+          taste: 1,
+          purpose: 1,
+          sociability: 1,
+        },
+        temperament: {
+          openness: 1,
+          conscientiousness: 1,
+          extraversion: 1,
+          agreeableness: 1,
+          neuroticism: 1,
+        },
+        narrative: { lack: 1, moralCompass: 1, volatility: 1, growthArc: 1 },
+      })
+    )
+    for (const value of Object.values(voice)) {
+      expect(value).toBeLessThanOrEqual(1)
+      expect(value).toBeGreaterThanOrEqual(0)
+    }
   })
 })

@@ -4,7 +4,12 @@
 // LLM 기반 포스트 콘텐츠 생성 — 프롬프트 빌딩 + 생성 호출
 // ═══════════════════════════════════════════════════════════════
 
-import type { PostGenerationInput, PostGenerationResult, PersonaPostType } from "./types"
+import type {
+  PostGenerationInput,
+  PostGenerationResult,
+  PersonaPostType,
+  VoiceStyleParams,
+} from "./types"
 
 /**
  * LLM 호출 인터페이스.
@@ -60,6 +65,9 @@ export function buildSystemPrompt(input: PostGenerationInput): string {
     `내면 긴장: ${describeValue(personaState.paradoxTension, "안정", "보통", "폭발 직전")}(${personaState.paradoxTension.toFixed(2)})`,
   ].join("\n")
 
+  // Voice 스타일 파라미터가 있으면 구체적 말투 지시 생성
+  const voiceStyleSection = input.voiceStyle ? buildVoiceStyleInstruction(input.voiceStyle) : ""
+
   return `당신은 SNS에서 활동하는 페르소나입니다.
 
 [현재 상태]
@@ -67,6 +75,7 @@ ${stateDesc}
 
 [Voice 참조]
 ${input.ragContext.voiceAnchor}
+${voiceStyleSection}
 
 [감정 상태]
 ${input.ragContext.emotionalState}
@@ -76,6 +85,44 @@ ${input.ragContext.emotionalState}
 - 현재 기분과 에너지 상태를 글의 톤에 반영하세요
 - 지나치게 인위적이거나 봇 같은 말투를 피하세요
 - 자연스러운 SNS 사용자처럼 글을 작성하세요`
+}
+
+/**
+ * VoiceStyleParams → LLM에 주입할 구체적 말투 지시 문자열.
+ *
+ * 연속 벡터 값을 자연어 지시로 변환.
+ * 중간 범위(0.3~0.7)는 언급하지 않아 불필요한 지시를 줄임.
+ */
+export function buildVoiceStyleInstruction(voice: VoiceStyleParams): string {
+  const instructions: string[] = []
+
+  // formality
+  if (voice.formality < 0.3) instructions.push("구어체로, 편하게 말하듯이")
+  else if (voice.formality > 0.7) instructions.push("격식있는 문어체로")
+
+  // humor
+  if (voice.humor < 0.3) instructions.push("진지하고 무거운 톤")
+  else if (voice.humor > 0.7) instructions.push("위트있고 가벼운 유머 섞어")
+
+  // sentenceLength
+  if (voice.sentenceLength < 0.3) instructions.push("짧고 간결한 문장")
+  else if (voice.sentenceLength > 0.7) instructions.push("길고 만연한 문장, 부연 설명 풍부")
+
+  // emotionExpression
+  if (voice.emotionExpression < 0.3) instructions.push("감정을 절제하여 표현")
+  else if (voice.emotionExpression > 0.7) instructions.push("감정을 풍부하게, 감탄사나 느낌표 활용")
+
+  // assertiveness
+  if (voice.assertiveness < 0.3) instructions.push("조심스럽게, ~일 수도 있다 식으로")
+  else if (voice.assertiveness > 0.7) instructions.push("단정적으로, 확신을 가지고")
+
+  // vocabularyLevel
+  if (voice.vocabularyLevel < 0.3) instructions.push("쉬운 일상 용어 위주")
+  else if (voice.vocabularyLevel > 0.7) instructions.push("전문용어나 고급 어휘 활용")
+
+  if (instructions.length === 0) return ""
+
+  return `\n[말투 스타일]\n${instructions.map((i) => `- ${i}`).join("\n")}`
 }
 
 /**
