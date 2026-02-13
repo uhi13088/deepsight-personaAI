@@ -64,6 +64,7 @@ function PersonaNodeEditorInner() {
   const handleExecuteRef = useRef<() => void>(() => {})
   const [executionResult, setExecutionResult] = useState<ExecutionEngineResult | null>(null)
   const [executeError, setExecuteError] = useState<string | null>(null)
+  const [showValidationPanel, setShowValidationPanel] = useState(false)
 
   // ── ReactFlow 노드 — useState로 관리 (드래그 중 실시간 위치 반영) ──
 
@@ -277,6 +278,9 @@ function PersonaNodeEditorInner() {
   const handleValidate = useCallback(() => {
     const result = validateGraph(store.getGraphState())
     store.setValidationResult(result)
+    if (!result.valid) {
+      setShowValidationPanel(true)
+    }
   }, [store])
 
   // ── 자동 검증: 그래프 변경 시 300ms 디바운스 ──────────────
@@ -312,7 +316,8 @@ function PersonaNodeEditorInner() {
     store.setValidationResult(validation)
 
     if (!validation.valid) {
-      setExecuteError("그래프 검증 실패. 에러를 확인하세요.")
+      setExecuteError("그래프 검증 실패. 하단 에러 목록을 확인하세요.")
+      setShowValidationPanel(true)
       return
     }
 
@@ -422,7 +427,12 @@ function PersonaNodeEditorInner() {
         />
       )}
 
-      <EditorStatusBar validationResult={store.validationResult} zoom={store.zoom} />
+      <EditorStatusBar
+        validationResult={store.validationResult}
+        zoom={store.zoom}
+        onNodeClick={(nodeId) => store.selectNode(nodeId)}
+        forceOpen={showValidationPanel}
+      />
     </div>
   )
 }
