@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import type { ThreeLayerVector } from "@/types/persona-v3"
-import type { PersonaPostType } from "@prisma/client"
+import type { PersonaPostType } from "@/generated/prisma"
 import { POST_TYPE_AFFINITIES, POST_TYPE_STATE_MODIFIERS } from "./constants"
 import type { PersonaStateData, PostTypeAffinity } from "./types"
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
-import { MemberRole } from "@prisma/client"
+import { MemberRole } from "@/generated/prisma"
 
 // Role mapping (frontend → DB)
 const frontendToDbRole: Record<string, MemberRole> = {

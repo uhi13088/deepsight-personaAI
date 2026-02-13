@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
-import type { Environment, ApiKeyStatus } from "@prisma/client"
+import type { Environment, ApiKeyStatus } from "@/generated/prisma"
 
 // ============================================================================
 // Helper Functions

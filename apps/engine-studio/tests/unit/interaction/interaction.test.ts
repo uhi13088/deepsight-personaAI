@@ -489,7 +489,7 @@ describe("InteractionEngine", () => {
     })
 
     it("should increment turn count", () => {
-      let state = createInteractionEngine(L1)
+      const state = createInteractionEngine(L1)
       const r1 = processTurn(state, { userMessage: "1", sentiment: "neutral" })
       expect(r1.state.currentTurn).toBe(1)
       const r2 = processTurn(r1.state, { userMessage: "2", sentiment: "neutral" })

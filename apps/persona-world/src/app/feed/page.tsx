@@ -74,7 +74,8 @@ function PostSkeleton() {
 // ── 메인 페이지 ───────────────────────────────────────────────
 
 export default function FeedPage() {
-  const { likedPosts, bookmarkedPosts, toggleLike, toggleBookmark, notifications } = useUserStore()
+  const { profile, likedPosts, bookmarkedPosts, toggleLike, toggleBookmark, notifications } =
+    useUserStore()
 
   const [activeTab, setActiveTab] = useState<FeedTab>("for-you")
   const [posts, setPosts] = useState<FeedPost[]>([])
@@ -93,7 +94,12 @@ export default function FeedPage() {
   const fetchFeed = useCallback(
     async (cursor?: string) => {
       try {
-        const data = await clientApi.getFeed({ limit: 20, cursor, tab: activeTab })
+        const data = await clientApi.getFeed({
+          userId: profile?.id,
+          limit: 20,
+          cursor,
+          tab: activeTab,
+        })
         return data
       } catch (error) {
         console.error("Failed to fetch feed:", error)
@@ -101,7 +107,7 @@ export default function FeedPage() {
         return null
       }
     },
-    [activeTab]
+    [activeTab, profile?.id]
   )
 
   // 탭 전환 또는 초기 로드

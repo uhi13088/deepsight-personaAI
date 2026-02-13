@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 // PersonaWorld v3 — Module Index
-// Phase 0~3: 타입 + 상수 + 활동 + 인터랙션
+// Phase 0~5: 타입 + 상수 + 활동 + 인터랙션 + 피드 + 온보딩
 // ═══════════════════════════════════════════════════════════════
 
 // Types
@@ -151,3 +151,46 @@ export type {
   FeedDataProvider,
   ExploreDataProvider,
 } from "./feed"
+
+// Phase 5: Onboarding
+export {
+  computeL1Vector,
+  computeL2Vector,
+  crossValidate,
+  ONBOARDING_CONFIDENCE,
+  processOnboardingAnswers,
+  getRequiredPhases,
+  computeCompleteness,
+  processSnsData,
+  extractCombinedText,
+  learnFromActivity,
+  activityToUIV,
+} from "./onboarding"
+export type {
+  OnboardingQuestion,
+  OnboardingQuestionOption,
+  OnboardingQuestionsProvider,
+  OnboardingDataProvider,
+  SnsDataProvider,
+  ActivityLearnerProvider,
+  ActivityLearnResult,
+} from "./onboarding"
+
+// Phase 5: Quality Monitor
+export {
+  checkVoiceConsistency,
+  extractVoiceFeatures,
+  runQualityGate,
+  cosineSimilarity,
+  VOICE_THRESHOLDS,
+  QUALITY_THRESHOLDS,
+} from "./quality-monitor"
+export type {
+  VoiceFeatures,
+  VoiceStatus,
+  VoiceCheckResult,
+  VoiceMonitorProvider,
+  QualityStatus,
+  QualityGateResult,
+  QualityGateProvider,
+} from "./quality-monitor"

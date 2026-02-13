@@ -8,7 +8,7 @@ import type {
   SocialPersonaVector,
   CoreTemperamentVector,
 } from "@/types/persona-v3"
-import type { PersonaPostType } from "@prisma/client"
+import type { PersonaPostType } from "@/generated/prisma"
 
 // ── 확장된 8개 활동 특성 ──────────────────────────────────────
 export interface ActivityTraitsV3 {
