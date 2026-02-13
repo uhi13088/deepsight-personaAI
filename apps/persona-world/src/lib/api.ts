@@ -13,17 +13,17 @@ import type {
   CommentsResponse,
 } from "./types"
 
-// Engine Studio API 베이스 URL (환경변수로 설정 가능)
-// Engine Studio는 port 3000에서 실행됨
-function resolveApiBaseUrl(): string {
+// Engine Studio API 베이스 URL
+// Server-side (RSC/SSR): 절대 URL 필수 → 환경변수 or localhost:3000
+// Client-side: 상대 경로 → next.config.ts rewrites가 engine-studio로 프록시
+function resolveServerApiBaseUrl(): string {
   const raw = process.env.NEXT_PUBLIC_ENGINE_API_URL || "http://localhost:3000"
-  // 프로토콜 누락 방어 (상대 경로 방지)
   if (raw && !raw.startsWith("http://") && !raw.startsWith("https://")) {
     return `https://${raw}`
   }
   return raw
 }
-const API_BASE_URL = resolveApiBaseUrl()
+const SERVER_API_BASE_URL = resolveServerApiBaseUrl()
 
 // ── Server-side 함수 (RSC 호환) ─────────────────────────────
 
@@ -37,7 +37,7 @@ export async function getPersonas(options?: {
     if (options?.limit) params.set("limit", String(options.limit))
     if (options?.page) params.set("page", String(options.page))
 
-    const res = await fetch(`${API_BASE_URL}/api/public/personas?${params}`, {
+    const res = await fetch(`${SERVER_API_BASE_URL}/api/public/personas?${params}`, {
       next: { revalidate: 60 },
     })
 
@@ -66,7 +66,7 @@ export async function getFeed(options?: {
     if (options?.cursor) params.set("cursor", options.cursor)
     if (options?.personaId) params.set("personaId", options.personaId)
 
-    const res = await fetch(`${API_BASE_URL}/api/public/feed?${params}`, {
+    const res = await fetch(`${SERVER_API_BASE_URL}/api/public/feed?${params}`, {
       next: { revalidate: 30 },
     })
 
@@ -92,7 +92,7 @@ export async function getFeed(options?: {
 // 페르소나 상세 조회
 export async function getPersonaById(id: string): Promise<PersonaFullDetail | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/public/personas/${id}`, {
+    const res = await fetch(`${SERVER_API_BASE_URL}/api/public/personas/${id}`, {
       next: { revalidate: 60 },
     })
 
@@ -122,7 +122,7 @@ export const clientApi = {
   }) {
     // userId가 있으면 persona-world 개인화 피드, 없으면 public 피드
     if (options?.userId) {
-      const res = await fetch(`${API_BASE_URL}/api/persona-world/feed`, {
+      const res = await fetch(`/api/persona-world/feed`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -146,7 +146,7 @@ export const clientApi = {
     if (options?.personaId) params.set("personaId", options.personaId)
     if (options?.tab) params.set("tab", options.tab)
 
-    const res = await fetch(`${API_BASE_URL}/api/public/feed?${params}`)
+    const res = await fetch(`/api/public/feed?${params}`)
     if (!res.ok) throw new Error("Failed to fetch feed")
 
     const json: ApiResponse<FeedResponse> = await res.json()
@@ -160,7 +160,7 @@ export const clientApi = {
     if (options?.limit) params.set("limit", String(options.limit))
     if (options?.page) params.set("page", String(options.page))
 
-    const res = await fetch(`${API_BASE_URL}/api/public/personas?${params}`)
+    const res = await fetch(`/api/public/personas?${params}`)
     if (!res.ok) throw new Error("Failed to fetch personas")
 
     const json: ApiResponse<PersonasResponse> = await res.json()
@@ -170,7 +170,7 @@ export const clientApi = {
 
   // ── 페르소나 상세 ────────────────────────────────────────
   async getPersonaById(id: string) {
-    const res = await fetch(`${API_BASE_URL}/api/public/personas/${id}`)
+    const res = await fetch(`/api/public/personas/${id}`)
     if (!res.ok) throw new Error("Failed to fetch persona")
 
     const json: ApiResponse<PersonaFullDetail> = await res.json()
@@ -180,7 +180,7 @@ export const clientApi = {
 
   // ── 온보딩: 질문 조회 ────────────────────────────────────
   async getOnboardingQuestions(phase: number) {
-    const res = await fetch(`${API_BASE_URL}/api/public/onboarding/questions?phase=${phase}`)
+    const res = await fetch(`/api/public/onboarding/questions?phase=${phase}`)
     if (!res.ok) throw new Error("Failed to fetch onboarding questions")
 
     const json: ApiResponse<OnboardingQuestionsResponse> = await res.json()
@@ -199,7 +199,7 @@ export const clientApi = {
     const level = levelMap[phase] ?? "LIGHT"
     const creditsMap: Record<number, number> = { 1: 100, 2: 150, 3: 200 }
 
-    const res = await fetch(`${API_BASE_URL}/api/persona-world/onboarding/cold-start`, {
+    const res = await fetch(`/api/persona-world/onboarding/cold-start`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId, level, answers }),
@@ -231,7 +231,7 @@ export const clientApi = {
   // ── 온보딩: 매칭 프리뷰 ──────────────────────────────────
   async getMatchingPreview(phase: number, userId: string) {
     const params = new URLSearchParams({ phase: String(phase), userId })
-    const res = await fetch(`${API_BASE_URL}/api/public/onboarding/preview?${params}`)
+    const res = await fetch(`/api/public/onboarding/preview?${params}`)
     if (!res.ok) throw new Error("Failed to fetch matching preview")
 
     const json: ApiResponse<MatchingPreviewResponse> = await res.json()
@@ -245,7 +245,7 @@ export const clientApi = {
     if (options?.search) params.set("search", options.search)
     if (options?.role) params.set("role", options.role)
 
-    const res = await fetch(`${API_BASE_URL}/api/persona-world/explore?${params}`)
+    const res = await fetch(`/api/persona-world/explore?${params}`)
     if (!res.ok) throw new Error("Failed to fetch explore data")
 
     const json: ApiResponse<ExploreResponse> = await res.json()
@@ -255,7 +255,7 @@ export const clientApi = {
 
   // ── 댓글 조회 ────────────────────────────────────────────
   async getComments(postId: string) {
-    const res = await fetch(`${API_BASE_URL}/api/public/posts/${postId}/comments`)
+    const res = await fetch(`/api/public/posts/${postId}/comments`)
     if (!res.ok) throw new Error("Failed to fetch comments")
 
     const json: ApiResponse<CommentsResponse> = await res.json()
@@ -265,7 +265,7 @@ export const clientApi = {
 
   // ── 좋아요 토글 ──────────────────────────────────────────
   async toggleLike(postId: string, userId: string) {
-    const res = await fetch(`${API_BASE_URL}/api/public/posts/${postId}/likes`, {
+    const res = await fetch(`/api/public/posts/${postId}/likes`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId }),
@@ -279,7 +279,7 @@ export const clientApi = {
 
   // ── 팔로우 토글 ──────────────────────────────────────────
   async toggleFollow(personaId: string, userId: string) {
-    const res = await fetch(`${API_BASE_URL}/api/public/follows`, {
+    const res = await fetch(`/api/public/follows`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ followingPersonaId: personaId, followerUserId: userId }),
@@ -300,7 +300,7 @@ export const clientApi = {
       extractedData: Record<string, unknown>
     }>
   ) {
-    const res = await fetch(`${API_BASE_URL}/api/persona-world/onboarding/sns/connect`, {
+    const res = await fetch(`/api/persona-world/onboarding/sns/connect`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId, snsData }),
