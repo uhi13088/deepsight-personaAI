@@ -4,7 +4,7 @@ import { processOnboardingAnswers } from "@/lib/persona-world/onboarding/onboard
 import type { OnboardingDataProvider } from "@/lib/persona-world/onboarding/onboarding-engine"
 import type { OnboardingQuestion } from "@/lib/persona-world/onboarding/questions"
 import type { OnboardingAnswer, OnboardingResult } from "@/lib/persona-world/types"
-import type { Prisma } from "@prisma/client"
+import type { Prisma } from "@/generated/prisma"
 
 /**
  * POST /api/persona-world/onboarding/cold-start

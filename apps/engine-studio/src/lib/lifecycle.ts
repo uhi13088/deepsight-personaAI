@@ -5,7 +5,7 @@
 // States: DRAFT → REVIEW → ACTIVE → STANDARD → LEGACY → DEPRECATED → PAUSED → ARCHIVED
 // ═══════════════════════════════════════════════════════════════
 
-import type { PersonaStatus } from "@prisma/client"
+import type { PersonaStatus } from "@/generated/prisma"
 
 // ── Lifecycle Action ────────────────────────────────────────
 

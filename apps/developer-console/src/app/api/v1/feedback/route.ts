@@ -3,7 +3,7 @@ import crypto from "crypto"
 import prisma from "@/lib/prisma"
 import { validateApiKey, type ValidatedApiKey } from "@/lib/api-key-validator"
 import { trackApiUsage } from "@/lib/usage-tracker"
-import type { FeedbackType } from "@prisma/client"
+import type { FeedbackType } from "@/generated/prisma"
 
 // ============================================================================
 // Types

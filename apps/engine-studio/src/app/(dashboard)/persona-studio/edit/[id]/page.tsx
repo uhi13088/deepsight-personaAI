@@ -26,7 +26,7 @@ import { PERSONA_ROLES } from "@/types/persona-form"
 import { calculateVFinal, vFinalToVector } from "@/lib/vector/v-final"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
 import { buildAllPrompts } from "@/lib/prompt-builder"
-import type { PersonaStatus } from "@prisma/client"
+import type { PersonaStatus } from "@/generated/prisma"
 import type {
   ApiResponse,
   SocialPersonaVector,

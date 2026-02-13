@@ -3,7 +3,7 @@
  * Vercel Serverless + Supabase PgBouncer 환경 최적화
  */
 
-import { PrismaClient } from "@prisma/client"
+import { PrismaClient } from "@/generated/prisma"
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined

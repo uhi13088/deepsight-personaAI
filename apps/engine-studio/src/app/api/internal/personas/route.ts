@@ -10,7 +10,7 @@ import type {
   SortOrder,
 } from "@/types"
 import type { SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector } from "@/types"
-import type { Prisma } from "@prisma/client"
+import type { Prisma } from "@/generated/prisma"
 
 const MAX_LIMIT = 100
 const DEFAULT_LIMIT = 20

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { Prisma } from "@prisma/client"
+import { Prisma } from "@/generated/prisma"
 import { prisma } from "@/lib/prisma"
 import { runScheduler } from "@/lib/persona-world/scheduler"
 import type { SchedulerPersona, SchedulerDataProvider } from "@/lib/persona-world/scheduler"
