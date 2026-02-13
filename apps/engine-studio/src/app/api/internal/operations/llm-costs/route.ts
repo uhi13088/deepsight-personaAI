@@ -1,0 +1,203 @@
+import { NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
+import type { ApiResponse } from "@/types"
+
+// ── 타입 정의 ──────────────────────────────────────────────────
+
+interface DailyCost {
+  date: string
+  totalCostUsd: number
+  totalCalls: number
+  totalTokens: number
+}
+
+interface CallTypeBreakdown {
+  callType: string
+  totalCalls: number
+  totalCostUsd: number
+  totalInputTokens: number
+  totalOutputTokens: number
+  avgDurationMs: number
+}
+
+interface LlmCostsSummary {
+  totalCostUsd: number
+  totalCalls: number
+  totalInputTokens: number
+  totalOutputTokens: number
+  totalTokens: number
+  avgCostPerCall: number
+  avgDurationMs: number
+  errorCount: number
+  errorRate: number
+}
+
+interface RecentCall {
+  id: string
+  personaId: string | null
+  callType: string
+  model: string
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+  estimatedCostUsd: number
+  durationMs: number
+  status: string
+  errorMessage: string | null
+  createdAt: string
+}
+
+interface LlmCostsResponse {
+  summary: LlmCostsSummary
+  dailyCosts: DailyCost[]
+  callTypeBreakdown: CallTypeBreakdown[]
+  recentCalls: RecentCall[]
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GET /api/internal/operations/llm-costs
+// ═══════════════════════════════════════════════════════════════
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const days = Math.min(Number(searchParams.get("days") ?? "30"), 90)
+    const limit = Math.min(Number(searchParams.get("limit") ?? "50"), 100)
+
+    const since = new Date()
+    since.setDate(since.getDate() - days)
+
+    // 전체 요약 통계
+    const aggregates = await prisma.llmUsageLog.aggregate({
+      where: { createdAt: { gte: since } },
+      _sum: {
+        inputTokens: true,
+        outputTokens: true,
+        totalTokens: true,
+        durationMs: true,
+      },
+      _avg: { durationMs: true },
+      _count: true,
+    })
+
+    const costAgg = await prisma.llmUsageLog.aggregate({
+      where: { createdAt: { gte: since } },
+      _sum: { estimatedCostUsd: true },
+    })
+
+    const errorCount = await prisma.llmUsageLog.count({
+      where: { createdAt: { gte: since }, status: "ERROR" },
+    })
+
+    const totalCalls = aggregates._count
+    const totalCostUsd = Number(costAgg._sum.estimatedCostUsd ?? 0)
+
+    const summary: LlmCostsSummary = {
+      totalCostUsd,
+      totalCalls,
+      totalInputTokens: aggregates._sum.inputTokens ?? 0,
+      totalOutputTokens: aggregates._sum.outputTokens ?? 0,
+      totalTokens: aggregates._sum.totalTokens ?? 0,
+      avgCostPerCall: totalCalls > 0 ? totalCostUsd / totalCalls : 0,
+      avgDurationMs: Math.round(Number(aggregates._avg.durationMs ?? 0)),
+      errorCount,
+      errorRate: totalCalls > 0 ? errorCount / totalCalls : 0,
+    }
+
+    // 일별 비용 (groupBy raw query — Prisma의 날짜 groupBy 한계로 raw 사용)
+    const dailyRaw = await prisma.$queryRaw<
+      { date: Date; total_cost: string; total_calls: bigint; total_tokens: bigint }[]
+    >`
+      SELECT
+        DATE(created_at) as date,
+        SUM(estimated_cost_usd) as total_cost,
+        COUNT(*) as total_calls,
+        SUM(total_tokens) as total_tokens
+      FROM llm_usage_logs
+      WHERE created_at >= ${since}
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `
+
+    const dailyCosts: DailyCost[] = dailyRaw.map((row) => ({
+      date: new Date(row.date).toISOString().split("T")[0],
+      totalCostUsd: Number(row.total_cost),
+      totalCalls: Number(row.total_calls),
+      totalTokens: Number(row.total_tokens),
+    }))
+
+    // callType별 통계
+    const typeRaw = await prisma.$queryRaw<
+      {
+        call_type: string
+        total_calls: bigint
+        total_cost: string
+        total_input: bigint
+        total_output: bigint
+        avg_duration: string
+      }[]
+    >`
+      SELECT
+        call_type,
+        COUNT(*) as total_calls,
+        SUM(estimated_cost_usd) as total_cost,
+        SUM(input_tokens) as total_input,
+        SUM(output_tokens) as total_output,
+        AVG(duration_ms) as avg_duration
+      FROM llm_usage_logs
+      WHERE created_at >= ${since}
+      GROUP BY call_type
+      ORDER BY total_cost DESC
+    `
+
+    const callTypeBreakdown: CallTypeBreakdown[] = typeRaw.map((row) => ({
+      callType: row.call_type,
+      totalCalls: Number(row.total_calls),
+      totalCostUsd: Number(row.total_cost),
+      totalInputTokens: Number(row.total_input),
+      totalOutputTokens: Number(row.total_output),
+      avgDurationMs: Math.round(Number(row.avg_duration)),
+    }))
+
+    // 최근 호출 목록
+    const recentRaw = await prisma.llmUsageLog.findMany({
+      where: { createdAt: { gte: since } },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    })
+
+    const recentCalls: RecentCall[] = recentRaw.map((r) => ({
+      id: r.id,
+      personaId: r.personaId,
+      callType: r.callType,
+      model: r.model,
+      inputTokens: r.inputTokens,
+      outputTokens: r.outputTokens,
+      totalTokens: r.totalTokens,
+      estimatedCostUsd: Number(r.estimatedCostUsd),
+      durationMs: r.durationMs,
+      status: r.status,
+      errorMessage: r.errorMessage,
+      createdAt: r.createdAt.toISOString(),
+    }))
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        summary,
+        dailyCosts,
+        callTypeBreakdown,
+        recentCalls,
+      },
+    } satisfies ApiResponse<LlmCostsResponse>)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error"
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: "INTERNAL_ERROR", message: `LLM 비용 조회 실패: ${message}` },
+      } satisfies ApiResponse<never>,
+      { status: 500 }
+    )
+  }
+}

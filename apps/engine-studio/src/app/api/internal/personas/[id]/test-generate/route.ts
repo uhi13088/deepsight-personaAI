@@ -190,6 +190,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       userMessage: body.scenario.trim(),
       maxTokens: body.maxTokens ?? 1024,
       temperature: 0.7,
+      callType: `test-${body.type}`,
+      personaId: id,
     })
 
     return NextResponse.json({

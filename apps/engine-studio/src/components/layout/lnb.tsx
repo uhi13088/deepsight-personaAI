@@ -80,6 +80,7 @@ const navSections: NavSection[] = [
     basePath: "/operations",
     children: [
       { label: "System Monitoring", href: "/operations/monitoring" },
+      { label: "LLM 비용", href: "/operations/llm-costs" },
       { label: "Incident Management", href: "/operations/incidents" },
       { label: "Backup & Recovery", href: "/operations/backup" },
     ],
