@@ -570,14 +570,13 @@
 
 > 실시간 LLM 호출 비용 추적 및 대시보드. 기존 estimateRequestCost/CostPolicy 인프라 활용.
 
-- [ ] **T131: LLM 실시간 비용 모니터링 대시보드**
-  - 배경: estimateRequestCost(), CostPolicy, calculateMonthlyCost() 등 비용 추정 로직은 완성. 하지만 실제 LLM 호출을 기록하고 실시간 집계하는 기능 없음. model-settings 페이지는 데모 데이터만 표시
-  - AC1: DB 스키마 — LLMUsageLog 테이블 (requestId, modelId, provider, taskType, inputTokens, outputTokens, costUSD, personaId, status, timestamp)
-  - AC2: LLM 호출 인터셉터 — LLM 호출 시 자동으로 UsageLog 기록. estimateRequestCost() 연동
-  - AC3: API 엔드포인트 — GET /api/internal/operations/llm-costs (일별/모델별/작업유형별 집계, 예산 사용률)
-  - AC4: 대시보드 UI — /operations/llm-costs 페이지. 월간 총비용, 모델별 분석, 일별 트렌드, 작업유형별 분석, 예산 알림
-  - AC5: LNB 네비게이션 — Operations 하위에 "LLM 비용" 항목 추가
-  - AC6: 테스트 + Build PASS
+- [x] **T131: LLM 실시간 비용 모니터링 대시보드** ✅ 2026-02-13
+  - AC1: ✅ Prisma LlmUsageLog 모델 + LlmCallStatus enum
+  - AC2: ✅ llm-client.ts에 자동 로깅 인터셉터 (모델별 가격 추정, 소요시간, 에러 추적)
+  - AC3: ✅ GET /api/internal/operations/llm-costs (요약, 일별 추이, 유형별 통계, 최근 호출)
+  - AC4: ✅ /operations/llm-costs 대시보드 (요약 6카드, 바 차트, 유형별 테이블, 최근 호출 테이블)
+  - AC5: ✅ LNB Operations 하위 "LLM 비용" 추가
+  - AC6: ✅ 51 test files, 1931 tests PASS + Build PASS
 
 ### Phase DC-A: 개발자콘솔 v3 기반 인프라 (T116~T117)
 
@@ -721,6 +720,10 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T131: LLM 실시간 비용 모니터링 대시보드** ✅ 2026-02-13
+  - 변경: schema.prisma, llm-client.ts, llm-costs/route.ts, llm-costs/page.tsx, lnb.tsx, test-generate/route.ts
+  - 테스트: PASS (51 files, 1931/1931)
 
 - [x] **T130: 랜덤 페르소나 생성 버튼 + 수정 버튼** ✅ 2026-02-13
   - AC1: ✅ POST /api/internal/personas/generate-random — 6단계 파이프라인 (아키타입→벡터→Paradox→캐릭터→프롬프트→DB)
