@@ -116,25 +116,9 @@ export async function POST(request: NextRequest) {
             data: { status: "PAUSED" },
           })
         },
-        async saveQualityCheckResult(params) {
-          await prisma.personaActivityLog.create({
-            data: {
-              personaId: params.personaId,
-              activityType: "QUALITY_CHECK",
-              trigger: "SCHEDULED",
-              stateSnapshot: {
-                voiceCheck: params.voiceCheck,
-                qualityGate: params.qualityGate
-                  ? {
-                      status: params.qualityGate.status,
-                      pis: params.qualityGate.integrityScore.pis,
-                      shouldPause: params.qualityGate.shouldPauseActivity,
-                    }
-                  : null,
-                autoAction: params.autoAction,
-              },
-            },
-          })
+        async saveQualityCheckResult(_params) {
+          // 품질 체크 결과는 runPeriodicQualityCheck 반환값에 집계됨.
+          // PersonaActivityType에 QUALITY_CHECK이 없으므로 개별 저장 생략.
         },
       }
 

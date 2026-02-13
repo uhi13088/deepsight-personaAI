@@ -45,6 +45,7 @@ const navSections: NavSection[] = [
       { label: "Create New Persona", href: "/persona-studio/create" },
       { label: "Node Editor", href: "/persona-studio/node-editor" },
       { label: "Incubator Dashboard", href: "/persona-studio/incubator" },
+      { label: "Golden Samples", href: "/persona-studio/incubator/golden-samples" },
     ],
   },
   {

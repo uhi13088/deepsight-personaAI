@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { Prisma } from "@/generated/prisma"
+import { Prisma, type PersonaActivityType } from "@/generated/prisma"
 import { prisma } from "@/lib/prisma"
 import { runScheduler, getActivePersonas } from "@/lib/persona-world/scheduler"
 import type { SchedulerPersona, SchedulerDataProvider } from "@/lib/persona-world/scheduler"
@@ -247,11 +247,12 @@ function createPostPipelineDataProvider(): PostPipelineDataProvider {
       return getConsumptionContext(personaId)
     },
 
-    async saveActivityLog({ personaId, activityType, postId, metadata }) {
+    async saveActivityLog({ personaId, activityType, metadata }) {
       await prisma.personaActivityLog.create({
         data: {
           personaId,
-          activityType,
+          activityType: activityType as PersonaActivityType,
+          trigger: "SCHEDULED",
           metadata: metadata as Prisma.InputJsonValue,
         },
       })
@@ -286,7 +287,10 @@ function createInteractionDataProvider(): InteractionPipelineDataProvider {
     async isFollowing(followerId, targetId) {
       const follow = await prisma.personaFollow.findUnique({
         where: {
-          followerId_followingId: { followerId, followingId: targetId },
+          followerPersonaId_followingPersonaId: {
+            followerPersonaId: followerId,
+            followingPersonaId: targetId,
+          },
         },
       })
       return !!follow
@@ -374,7 +378,7 @@ function createInteractionDataProvider(): InteractionPipelineDataProvider {
         },
         update: {
           frequency: { increment: 0.01 },
-          lastInteractedAt: new Date(),
+          lastInteractionAt: new Date(),
         },
         create: {
           personaAId,
@@ -391,7 +395,9 @@ function createInteractionDataProvider(): InteractionPipelineDataProvider {
       await prisma.personaActivityLog.create({
         data: {
           personaId,
-          activityType,
+          activityType: activityType as PersonaActivityType,
+          trigger: "SCHEDULED",
+          targetId: targetId ?? undefined,
           metadata: metadata as Prisma.InputJsonValue,
         },
       })

@@ -50,25 +50,10 @@ export async function GET(request: NextRequest) {
         })
       },
 
-      async saveQualityCheckResult(params) {
-        await prisma.personaActivityLog.create({
-          data: {
-            personaId: params.personaId,
-            activityType: "QUALITY_CHECK",
-            trigger: "SCHEDULED",
-            stateSnapshot: {
-              voiceCheck: params.voiceCheck,
-              qualityGate: params.qualityGate
-                ? {
-                    status: params.qualityGate.status,
-                    pis: params.qualityGate.integrityScore.pis,
-                    shouldPause: params.qualityGate.shouldPauseActivity,
-                  }
-                : null,
-              autoAction: params.autoAction,
-            },
-          },
-        })
+      async saveQualityCheckResult(_params) {
+        // 품질 체크 결과는 runPeriodicQualityCheck 반환값 (QualityCheckSummary)에 집계됨.
+        // PersonaActivityType에 QUALITY_CHECK이 없으므로 개별 저장은 생략.
+        // 향후 별도 quality_check_results 테이블 추가 시 여기서 저장.
       },
     }
 

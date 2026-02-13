@@ -634,6 +634,20 @@
   - AC5: ✅ LNB Operations 하위 "LLM 비용" 추가
   - AC6: ✅ 51 test files, 1931 tests PASS + Build PASS
 
+### Phase H: 골든 샘플 관리 (T133)
+
+> T62-AC5에서 구현한 golden-sample.ts 백엔드 로직은 완성. 하지만 CRUD API/관리 UI 부재로 팀 운영 불가능.
+> 설계서: §3.6.4 골든 샘플 관리 정책 + §3.6.6 자동 확장 전략
+
+- [ ] **T133: 골든 샘플 CRUD API + 관리 UI 페이지**
+  - 배경: 스펙 §3.6.4~§3.6.6. Prisma GoldenSample 모델 + golden-sample.ts 로직 완성됨. 인큐베이터 대시보드에 read-only 메트릭 탭만 있고 등록/수정/삭제 UI 없음
+  - AC1: CRUD API — `GET/POST /api/internal/incubator/golden-samples` (목록+필터+페이지네이션, 생성), `GET/PUT/DELETE /api/internal/incubator/golden-samples/[id]` (조회/수정/삭제)
+  - AC2: 메트릭 API — `GET /api/internal/incubator/golden-samples/metrics` (풀 현황, 차원 커버리지, 확장 필요성)
+  - AC3: 관리 UI 페이지 `/persona-studio/incubator/golden-samples` — 테이블(제목/장르/난이도/차원/상태), 생성/수정 폼(제목/장르/질문/예상반응 JSON 에디터/난이도/검증차원), 삭제
+  - AC4: LNB 네비게이션 — Persona Studio > Incubator 하위에 "Golden Samples" 항목 추가
+  - AC5: 메트릭 카드 — 총 샘플 수, 활성 수, 차원별 커버리지, 확장 필요 여부
+  - AC6: 테스트 + Build PASS
+
 ### Phase DC-A: 개발자콘솔 v3 기반 인프라 (T116~T117)
 
 > 선택적 리빌드: 핵심(Schema/Types/API) 재작성 + 벡터 무관 페이지(API Keys/Usage/Logs/Settings/Team) 보존.
