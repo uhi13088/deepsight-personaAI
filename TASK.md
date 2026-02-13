@@ -723,6 +723,15 @@
 
 ## ✅ DONE (완료)
 
+- [x] **T133: Cold Start UI 전면 리디자인 + 관리자 테스트 모드** ✅ 2026-02-13
+  - 배경: T132에서 v3 24문항 DB + API 연동 완료. 기존 UI가 v2 테이블 형식 유지 + 복합질문(L1+L2 동시측정) 미반영. 관리자가 실제 질문 흐름을 테스트할 수 없음
+  - AC1: ✅ 복합질문 타입 리팩토링 — `targetDimension` → `targetDimensions[]`, `targetLayer` → `targetLayers[]`, `vectorDelta` → `l1Weights`/`l2Weights` 분리 (cold-start.ts, adaptive-profiling.ts, route.ts, test)
+  - AC2: ✅ UI 전면 리디자인 — 테이블 레이아웃 → 카드 기반 Phase 그룹핑 (Phase 1 blue / Phase 2 purple / Phase 3 amber). 질문 카드 확장 시 옵션별 WeightBar 시각화 (L1+L2 가중치, 양수=green/음수=red 바)
+  - AC3: ✅ 차원별 커버리지 차트 — L1 7D + L2 5D 진행 바 (목표: questionsPerAxis 기준). 모드별 정보 카드 (질문 수, 소요시간, 정밀도, 4bit/문항 정보밀도)
+  - AC4: ✅ 관리자 테스트 모드 — "테스트 시작" 버튼, 질문별 A/B/C/D 선택, 진행 바, 전체 답변 완료 시 추론 결과 패널 (L1/L2 벡터 도트 위치 + low/high 라벨 + 신뢰도 %)
+  - AC5: ✅ 검증 상태 배너 — validateQuestionSet() 결과 표시 (유효/오류 수)
+  - AC6: ✅ 테스트 1991개 PASS + Build PASS
+
 - [x] **T132: 콜드 스타트 v3 24문항 SQL + API 연동** ✅ 2026-02-13
   - 배경: 기존 003_cold_start_questions.sql은 6D 기반 60문항. v3 3-Layer(L1 7D + L2 5D) 기반 3-Phase × 8문항 = 24문항으로 전환
   - AC1: ✅ SQL 마이그레이션 `009_cold_start_v3.sql` — 기존 seed-q-\* 60문항 DELETE + v3 24문항 INSERT (Phase 1: L1 주력 8문항, Phase 2: L2 주력 8문항, Phase 3: 교차검증+역설 8문항). 설계서 §19.3~§19.4 기준
