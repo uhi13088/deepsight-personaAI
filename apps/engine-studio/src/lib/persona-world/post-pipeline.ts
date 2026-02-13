@@ -18,6 +18,7 @@ import type { VoiceMonitorProvider, VoiceCheckResult } from "./quality-monitor"
 import { generatePostContent } from "./content-generator"
 import { checkVoiceConsistency } from "./quality-monitor"
 import { updatePersonaState } from "./state-manager"
+import { buildVoiceAnchorFromProfile, parseVoiceProfile } from "./voice-anchor"
 
 // ── 타입 정의 ────────────────────────────────────────────────
 
@@ -46,6 +47,9 @@ export interface PostPipelineDataProvider {
 
   /** 주제 조회 (트리거/관심사/벡터 기반) */
   selectTopic(personaId: string, trigger: SchedulerContext["trigger"]): Promise<string | null>
+
+  /** DB에서 페르소나 voiceProfile JSON 조회 (콜드스타트 fallback용) */
+  getVoiceProfile?(personaId: string): Promise<unknown | null>
 }
 
 export interface PostCreationResult {
@@ -89,8 +93,17 @@ export async function executePostCreation(
     dataProvider.getConsumptionContext(persona.id),
   ])
 
-  const voiceAnchor =
-    recentTexts.length > 0 ? `[최근 글 스타일]\n${recentTexts.slice(0, 3).join("\n---\n")}` : ""
+  // Voice Anchor: 최근 글 기반 → 없으면 DB VoiceProfile fallback (콜드스타트 해결)
+  let voiceAnchor: string
+  if (recentTexts.length > 0) {
+    voiceAnchor = `[최근 글 스타일]\n${recentTexts.slice(0, 3).join("\n---\n")}`
+  } else if (dataProvider.getVoiceProfile) {
+    const rawProfile = await dataProvider.getVoiceProfile(persona.id)
+    const profile = parseVoiceProfile(rawProfile)
+    voiceAnchor = profile ? buildVoiceAnchorFromProfile(profile) : ""
+  } else {
+    voiceAnchor = ""
+  }
 
   const generationInput: PostGenerationInput = {
     personaId: persona.id,

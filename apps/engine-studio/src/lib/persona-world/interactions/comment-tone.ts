@@ -67,7 +67,7 @@ function getDimensionValue(
     }
     case "state": {
       const stateKey = dimension as keyof PersonaStateData
-      if (stateKey in state) return state[stateKey]
+      if (stateKey in state) return state[stateKey] ?? null
       return null
     }
     case "relationship": {
