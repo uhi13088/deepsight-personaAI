@@ -1441,10 +1441,11 @@ model PersonaState {
   personaId       String   @unique
   persona         Persona  @relation(fields: [personaId], references: [id], onDelete: Cascade)
 
-  mood            Decimal  @db.Decimal(3, 2) @default(0.50)  // 0.00~1.00
-  energy          Decimal  @db.Decimal(3, 2) @default(1.00)  // 0.00~1.00
-  socialBattery   Decimal  @db.Decimal(3, 2) @default(1.00)  // 0.00~1.00
-  paradoxTension  Decimal  @db.Decimal(3, 2) @default(0.00)  // 0.00~1.00
+  mood              Decimal  @db.Decimal(3, 2) @default(0.50)  // 0.00~1.00
+  energy            Decimal  @db.Decimal(3, 2) @default(1.00)  // 0.00~1.00
+  socialBattery     Decimal  @db.Decimal(3, 2) @default(1.00)  // 0.00~1.00
+  paradoxTension    Decimal  @db.Decimal(3, 2) @default(0.00)  // 0.00~1.00
+  narrativeTension  Decimal  @db.Decimal(3, 2) @default(0.00)  // 0.00~1.00 L3 서사 긴장
 
   updatedAt       DateTime @updatedAt
 

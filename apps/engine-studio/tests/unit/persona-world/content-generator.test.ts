@@ -3,8 +3,13 @@ import {
   buildSystemPrompt,
   buildUserPrompt,
   generatePostContent,
+  buildVoiceStyleInstruction,
 } from "@/lib/persona-world/content-generator"
-import type { PostGenerationInput, PersonaPostType } from "@/lib/persona-world/types"
+import type {
+  PostGenerationInput,
+  PersonaPostType,
+  VoiceStyleParams,
+} from "@/lib/persona-world/types"
 
 // ── 테스트용 입력 생성 ──
 
@@ -188,5 +193,125 @@ describe("generatePostContent", () => {
     const result = await generatePostContent(input)
 
     expect(result.content).toContain("자유 주제")
+  })
+})
+
+// ═══ buildVoiceStyleInstruction ═══
+
+describe("buildVoiceStyleInstruction", () => {
+  const neutralVoice: VoiceStyleParams = {
+    formality: 0.5,
+    humor: 0.5,
+    sentenceLength: 0.5,
+    emotionExpression: 0.5,
+    assertiveness: 0.5,
+    vocabularyLevel: 0.5,
+  }
+
+  it("중간 범위 값 → 빈 문자열 (지시 없음)", () => {
+    const result = buildVoiceStyleInstruction(neutralVoice)
+    expect(result).toBe("")
+  })
+
+  it("높은 formality → '격식있는 문어체' 포함", () => {
+    const result = buildVoiceStyleInstruction({ ...neutralVoice, formality: 0.8 })
+    expect(result).toContain("격식")
+  })
+
+  it("낮은 formality → '구어체' 포함", () => {
+    const result = buildVoiceStyleInstruction({ ...neutralVoice, formality: 0.2 })
+    expect(result).toContain("구어체")
+  })
+
+  it("높은 humor → '유머' 포함", () => {
+    const result = buildVoiceStyleInstruction({ ...neutralVoice, humor: 0.8 })
+    expect(result).toContain("유머")
+  })
+
+  it("낮은 humor → '진지' 포함", () => {
+    const result = buildVoiceStyleInstruction({ ...neutralVoice, humor: 0.2 })
+    expect(result).toContain("진지")
+  })
+
+  it("높은 assertiveness → '단정적' 포함", () => {
+    const result = buildVoiceStyleInstruction({ ...neutralVoice, assertiveness: 0.8 })
+    expect(result).toContain("단정적")
+  })
+
+  it("낮은 assertiveness → '조심스럽게' 포함", () => {
+    const result = buildVoiceStyleInstruction({ ...neutralVoice, assertiveness: 0.2 })
+    expect(result).toContain("조심스럽게")
+  })
+
+  it("높은 emotionExpression → '감정' 표현 지시 포함", () => {
+    const result = buildVoiceStyleInstruction({ ...neutralVoice, emotionExpression: 0.8 })
+    expect(result).toContain("감정")
+  })
+
+  it("높은 vocabularyLevel → '전문용어' 포함", () => {
+    const result = buildVoiceStyleInstruction({ ...neutralVoice, vocabularyLevel: 0.8 })
+    expect(result).toContain("전문용어")
+  })
+
+  it("복합: 격식적+진지+단정적 → 3개 지시 모두 포함", () => {
+    const result = buildVoiceStyleInstruction({
+      ...neutralVoice,
+      formality: 0.9,
+      humor: 0.1,
+      assertiveness: 0.9,
+    })
+    expect(result).toContain("격식")
+    expect(result).toContain("진지")
+    expect(result).toContain("단정적")
+  })
+
+  it("[말투 스타일] 섹션 헤더 포함", () => {
+    const result = buildVoiceStyleInstruction({ ...neutralVoice, formality: 0.9 })
+    expect(result).toContain("[말투 스타일]")
+  })
+})
+
+// ═══ buildSystemPrompt + voiceStyle ═══
+
+describe("buildSystemPrompt with voiceStyle", () => {
+  it("voiceStyle 제공 시 말투 스타일 섹션 포함", () => {
+    const input = makeInput({
+      voiceStyle: {
+        formality: 0.9,
+        humor: 0.1,
+        sentenceLength: 0.5,
+        emotionExpression: 0.5,
+        assertiveness: 0.8,
+        vocabularyLevel: 0.8,
+      },
+    })
+    const prompt = buildSystemPrompt(input)
+
+    expect(prompt).toContain("[말투 스타일]")
+    expect(prompt).toContain("격식")
+    expect(prompt).toContain("진지")
+  })
+
+  it("voiceStyle 미제공 시 말투 스타일 섹션 없음", () => {
+    const input = makeInput()
+    const prompt = buildSystemPrompt(input)
+
+    expect(prompt).not.toContain("[말투 스타일]")
+  })
+
+  it("voiceStyle 중간 값만 → 말투 스타일 섹션 없음", () => {
+    const input = makeInput({
+      voiceStyle: {
+        formality: 0.5,
+        humor: 0.5,
+        sentenceLength: 0.5,
+        emotionExpression: 0.5,
+        assertiveness: 0.5,
+        vocabularyLevel: 0.5,
+      },
+    })
+    const prompt = buildSystemPrompt(input)
+
+    expect(prompt).not.toContain("[말투 스타일]")
   })
 })
