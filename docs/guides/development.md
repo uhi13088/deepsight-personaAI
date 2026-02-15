@@ -11,7 +11,7 @@
 | -------------- | -------------------------------------------- |
 | **프로젝트명** | DeepSight                                    |
 | **설명**       | AI 페르소나 기반 콘텐츠 추천 B2B SaaS 플랫폼 |
-| **핵심 기술**  | 6D 벡터 매칭, LLM 스타일 캐싱, XAI 설명 생성 |
+| **핵심 기술**  | 3-Layer 106D+ 벡터 매칭, 3-Tier 매칭 엔진, XAI 설명 생성 |
 | **목표**       | MVP 개발 (2주) → 베타 서비스 → 상용화        |
 
 ---
@@ -63,7 +63,7 @@ Level 3: 비즈니스 정의
 
 ```yaml
 Frontend:
-  framework: Next.js 14 (App Router) + TypeScript 5
+  framework: Next.js 16 (App Router) + TypeScript 5
   styling: TailwindCSS + shadcn/ui
   state: Zustand
   serverState: TanStack Query v5
@@ -79,9 +79,8 @@ Backend:
   auth: NextAuth.js v5
 
 AI/ML:
-  llm: OpenAI GPT-4 / Claude API
-  vector: pgvector (Supabase)
-  embedding: OpenAI text-embedding-3-small
+  llm: Anthropic Claude (Sonnet) — @anthropic-ai/sdk
+  matching: 3-Layer 106D+ 벡터 (L1 7D + L2 5D + L3 4D + 83 교차축)
 
 Infrastructure:
   hosting: Vercel
@@ -257,7 +256,7 @@ model Persona {
   description String?
   color       String   @default("#6366f1")
   icon        String   @default("user")
-  vector      Float[]  // 6D 벡터 [0-1, 0-1, 0-1, 0-1, 0-1, 0-1]
+  vector      Float[]  // Legacy 6D (v3: PersonaLayerVector 3-Layer 사용)
   isActive    Boolean  @default(true)
   isDefault   Boolean  @default(false)
   sortOrder   Int      @default(0)
@@ -314,7 +313,7 @@ model SurveyResponse {
   surveyId    String
   sessionId   String   // 익명 사용자 세션
   answers     Json     // 질문별 응답
-  vector      Float[]  // 계산된 6D 벡터
+  vector      Float[]  // Legacy 6D (v3: UserVector 3-Layer 사용)
   personaId   String?  // 매칭된 페르소나 ID
   personaName String?  // 매칭된 페르소나 이름
   score       Float?   // 매칭 점수
@@ -517,24 +516,21 @@ GET    /api/recommendations/:sessionId
 
 ## 상수 관리
 
-### 6D 벡터 상수
+### 3-Layer 벡터 상수
 
 ```typescript
-// src/constants/vector.constants.ts
+// src/constants/v3/dimensions.ts
 
-export const VECTOR_DIMENSIONS = 6
-export const DIMENSION_NAMES = [
-  "depth", // 직관적 ↔ 심층적
-  "lens", // 감성적 ↔ 논리적
-  "stance", // 수용적 ↔ 비판적
-  "scope", // 핵심만 ↔ 디테일
-  "taste", // 클래식 ↔ 실험적
-  "purpose", // 즐거움 ↔ 유용함
-] as const
+// Layer 1: Social Persona (7D) — "The Mask"
+// depth, lens, stance, scope, taste, purpose, sociability
 
-export const MATCHING_THRESHOLD = 0.7
-export const HIGH_MATCH_THRESHOLD = 0.85
-export const PERFECT_MATCH_THRESHOLD = 0.95
+// Layer 2: Core Temperament OCEAN (5D) — "The Core Self"
+// openness, conscientiousness, extraversion, agreeableness, neuroticism
+
+// Layer 3: Narrative Drive (4D) — "The Shadow"
+// lack, moralCompass, volatility, growthArc
+
+// + 83 Cross-Layer Axes (L1×L2: 35, L1×L3: 28, L2×L3: 20)
 ```
 
 ### 플랜 상수
