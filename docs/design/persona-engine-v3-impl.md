@@ -5,7 +5,7 @@
 > **문서 정보**
 >
 > - 작성일: 2026-02-10
-> - 버전: v1.14
+> - 버전: v1.15
 > - 상태: 확정 — 구현 대기
 > - 관련 문서: `docs/design/persona-engine-v3.md` (설계서)
 > - 목적: 설계서의 "무엇을"에 대응하는 "어떻게" — 이 문서만 보고 구현 가능
@@ -30,6 +30,7 @@
 | v1.11 | 2026-02-11 | Phase 태스크 재배치 — InteractionLog 스키마→Phase 0(0-21~0-22, 기반 인프라), Auto-Interview→Phase 2(2-11~2-13, 생성 직후 품질 게이트), Integrity Score+Logger는 Phase 9 유지(9-23~9-29로 재번호). Phase 0 제목에 인터랙션 로그 스키마, Phase 2 제목에 Auto-Interview 품질 게이트 추가                                                                                                                                                                                                                                                                                   |
 | v1.12 | 2026-02-11 | 용어 통일 (T36) — 전체 문서 "106D+" 표기 통일                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | v1.13 | 2026-02-11 | 노드 실행 로직 (T37) — Section 13.12 신설: 22개 노드 executeNode() 구현 상세. 디스패처, Input 5종, Engine 4종(Paradox/Pressure/VFinal/Projection), Generation 7종(LLM 호출 패턴), Assembly 2종, Output 4종. 평가 전략별 실행 분류(Eager 14개/Manual 8개). Phase 8 태스크 8-23~8-26 추가(executor, helpers, prompts, tests)                                                                                                                                                                                                                                              |
+| v1.15 | 2026-02-15 | 코드 동기화 — LLM 모델 전략 3-Tier→2-Tier(Sonnet+규칙 기반), mini 모델 참조 제거, MODEL_TIERS에서 medium 제거 |
 | v1.14 | 2026-02-11 | 분기 노드 구현 스펙 (T38) — Section 13.13 신설: Control Flow 3종(Conditional/Switch/Merge) 실행 함수. ConditionalNodeData(threshold/range/enum/exists 4종 조건), SwitchNodeData(threshold-band/enum-match), MergeNodeData(first-active/combine). evaluateGraphWithBranching(활성 엣지 추적, ExecutionPath 기록, 비활성 경로 스킵). 그래프 검증 분기 규칙 4종(합류 필수/데드엔드/도달 가능성/기본 케이스). PortType에 'Any' 추가. 노드 레지스트리 Control Flow 카테고리. Phase 8 태스크 8-27~8-30 추가                                                                   |
 
 ---
@@ -6019,7 +6020,7 @@ function cosineSimilarity(a: VoiceFeatures, b: VoiceFeatures): number
  * 배치 테스트로 측정 (실시간 아님):
  *
  * 1. 같은 페르소나에게 P=0.1, 0.4, 0.7, 1.0으로 동일 질문
- * 2. 4개 응답의 감정 톤을 분석 (mini 모델):
+ * 2. 4개 응답의 감정 톤을 분석 (규칙 기반 분석기):
  *    → sentimentScore: -1.0(극부정) ~ 1.0(극긍정)
  *    → intensityScore: 0.0(차분) ~ 1.0(격렬)
  * 3. 변화량이 단조 증가하는지 검증:
@@ -6386,7 +6387,7 @@ function aggregateSessionMetrics(logs: InteractionLogEntry[]): {
 ## 17. LLM 모델 전략 구현
 
 > 설계서 Section 17 (LLM 모델 전략) 참조.
-> 이 섹션은 3-Tier 라우터, Prompt Caching, Provider Adapter의 구체적 구현에 집중한다.
+> 이 섹션은 2-Tier 라우터 (Sonnet + 규칙 기반), Prompt Caching, Provider Adapter의 구체적 구현에 집중한다.
 
 ### 17.1 모델 설정
 
@@ -6394,19 +6395,12 @@ function aggregateSessionMetrics(logs: InteractionLogEntry[]): {
 // src/lib/llm/model-config.ts
 
 const MODEL_TIERS = {
-  heavy: {
+  llm: {
     provider: "anthropic" as const,
     model: "claude-sonnet-4-5-20250929",
     maxTokens: 4096,
     costPerInputMToken: 3.0, // $3/M input
     costPerOutputMToken: 15.0, // $15/M output
-  },
-  medium: {
-    provider: "openai" as const,
-    model: "gpt-4o-mini",
-    maxTokens: 4096,
-    costPerInputMToken: 0.15, // $0.15/M input
-    costPerOutputMToken: 0.6, // $0.60/M output
   },
   light: {
     provider: "rule-based" as const,
@@ -6438,19 +6432,16 @@ interface TierRoutingInput {
 /**
  * 동적 분기 로직 (설계서 17.3):
  *
- * Heavy (Sonnet):
- *   - paradoxScore > 0.5
- *   - pressure > 0.4
- *   - triggerDetected
- *   - conflictScore > 0.7
+ * LLM (Sonnet): 텍스트 생성이 필요한 모든 작업
  *   - task == 'persona-generation'
  *   - task == 'review'
+ *   - task == 'post'
+ *   - task == 'comment'
+ *   - task == 'chat'
  *
- * Light (규칙 기반):
+ * Light (규칙 기반): 짧은 반응, 분류 작업
  *   - expectedResponseLength < 50
  *   - task == 'reaction'
- *
- * Medium (mini): 그 외 전부
  */
 function routeToTier(input: TierRoutingInput): ModelTier
 ```
@@ -6725,7 +6716,7 @@ function generateLightResponse(persona: PersonaProfile, context: InteractionCont
 | 9-5  | RAG 캐시 매니저 (LRU)                         | `src/lib/rag/cache-manager.ts`                 | **신규**  |
 | 9-6  | RAG 모듈 index                                | `src/lib/rag/index.ts`                         | **신규**  |
 | 9-7  | RAG 단위 테스트                               | `src/lib/rag/__tests__/`                       | **신규**  |
-| 9-8  | LLM 모델 설정 (3-Tier)                        | `src/lib/llm/model-config.ts`                  | **신규**  |
+| 9-8  | LLM 모델 설정 (2-Tier)                        | `src/lib/llm/model-config.ts`                  | **신규**  |
 | 9-9  | 동적 Tier 라우터                              | `src/lib/llm/tier-router.ts`                   | **신규**  |
 | 9-10 | Provider Adapter (통합)                       | `src/lib/llm/provider-adapter.ts`              | **신규**  |
 | 9-11 | Anthropic Provider + Prompt Caching           | `src/lib/llm/providers/anthropic.ts`           | **신규**  |
@@ -6859,7 +6850,7 @@ apps/engine-studio/src/lib/rag/__tests__/                  ← RAG 단위 테스
 
 # ── LLM 모듈 ──
 apps/engine-studio/src/lib/llm/index.ts                    ← 모듈 index
-apps/engine-studio/src/lib/llm/model-config.ts             ← 3-Tier 모델 설정
+apps/engine-studio/src/lib/llm/model-config.ts             ← 2-Tier 모델 설정 (Sonnet + 규칙 기반)
 apps/engine-studio/src/lib/llm/tier-router.ts              ← 동적 Tier 라우터
 apps/engine-studio/src/lib/llm/provider-adapter.ts         ← Provider 통합 어댑터
 apps/engine-studio/src/lib/llm/providers/anthropic.ts      ← Anthropic + Prompt Caching

@@ -785,11 +785,20 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-(없음)
+(비어 있음)
 
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T134: 설계서/가이드 문서 최신화 — 코드 ↔ 문서 동기화** ✅ 2026-02-15
+  - 배경: 코드가 설계서 작성 이후 상당히 진화. 기술 스택(Next.js 14→16), LLM 전략(3-Tier→2-Tier), 포스트 타입(13→18종), 프로필 등급명, 상태 delta 수치 등 17건 불일치 발견
+  - AC1: ✅ `docs/guides/development.md` — 6D→3-Layer, Next.js 14→16, OpenAI→Anthropic Claude
+  - AC2: ✅ `docs/design/persona-world-v3.md` — 포스트 타입 5종 추가, 댓글 톤 2종 추가, LLM 3-Tier→2-Tier, 프로필 등급명(STARTER→BASIC, EXPERT→PREMIUM), 상태 delta 테이블, 활동 임계값
+  - AC3: ✅ `docs/design/persona-engine-v3.md` — 아키타입 "12+"→"12개", 프로필 등급명, Haiku/mini 참조 제거, 3-Tier→2-Tier
+  - AC4: ✅ `docs/design/persona-engine-v3-impl.md` — mini 모델 참조 제거, 3-Tier→2-Tier, MODEL_TIERS medium 제거
+  - AC5: ✅ `CLAUDE.md` — 기술 스택 6D→3-Layer, Next.js 14→16, AI/LLM 라인 추가
+  - AC6: ✅ 각 문서 버전 번호 업데이트 (PW v1.0-draft.4, PE v3.0-draft.14, PE-impl v1.15)
 
 - [x] **T133: Cold Start UI 전면 리디자인 + 관리자 테스트 모드** ✅ 2026-02-13
   - 배경: T132에서 v3 24문항 DB + API 연동 완료. 기존 UI가 v2 테이블 형식 유지 + 복합질문(L1+L2 동시측정) 미반영. 관리자가 실제 질문 흐름을 테스트할 수 없음

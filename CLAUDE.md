@@ -2,12 +2,13 @@
 
 ## 목적
 
-- AI 페르소나 기반 콘텐츠 추천 B2B SaaS 플랫폼 (6D 벡터 매칭)
+- AI 페르소나 기반 콘텐츠 추천 B2B SaaS 플랫폼 (3-Layer 106D+ 벡터 매칭)
 
 ## 기술 스택
 
-- Frontend: Next.js 14, TypeScript, TailwindCSS, shadcn/ui
+- Frontend: Next.js 16, TypeScript, TailwindCSS, shadcn/ui
 - Backend: Next.js API Routes, Prisma, PostgreSQL
+- AI/LLM: Anthropic Claude (Sonnet) — @anthropic-ai/sdk
 - 테스트: Vitest
 - 패키지: pnpm (monorepo)
 
