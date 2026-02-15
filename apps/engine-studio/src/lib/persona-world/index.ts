@@ -185,6 +185,9 @@ export {
   isLLMConfigured,
 } from "./llm-adapter"
 
+// Voice Anchor (Cold Start)
+export { buildVoiceAnchorFromProfile, parseVoiceProfile } from "./voice-anchor"
+
 // Quality Runner
 export { runPeriodicQualityCheck } from "./quality-runner"
 export type { QualityRunnerDataProvider, QualityCheckSummary } from "./quality-runner"
@@ -207,3 +210,28 @@ export type {
   QualityGateResult,
   QualityGateProvider,
 } from "./quality-monitor"
+
+// Evolution (L3 Long-term)
+export {
+  EVOLUTION_STAGES,
+  getEvolutionStage,
+  hasStageTransition,
+  analyzeEvolutionTrend,
+  computeL3Evolution,
+  runEvolutionBatch,
+  MAX_GROWTH_ARC_DELTA_PER_WEEK,
+  MAX_DIMENSION_DELTA,
+  MIN_ACTIVITIES_FOR_EVOLUTION,
+  MIN_DAYS_FOR_EVOLUTION,
+} from "./evolution"
+export type {
+  EvolutionStage,
+  EvolutionTrend,
+  ActivityLogEntry,
+  StateSnapshotEntry,
+  EvolutionAnalyzerProvider,
+  L3EvolutionResult,
+  EvolutionPersona,
+  EvolutionRunnerDataProvider,
+  EvolutionBatchResult,
+} from "./evolution"

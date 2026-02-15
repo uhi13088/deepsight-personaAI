@@ -7,7 +7,7 @@ import { computeActivityTraits, computeActiveHours } from "@/lib/persona-world/a
 import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
 import type { ApiResponse } from "@/types"
-import type { PersonaRole, PersonaStatus } from "@prisma/client"
+import { Prisma, type PersonaRole, type PersonaStatus } from "@prisma/client"
 
 interface GenerateRandomBody {
   archetypeId?: string
@@ -143,6 +143,11 @@ export async function POST(request: NextRequest) {
           promptVersion: "1.0",
           basePrompt: prompts.base,
           createdById: systemUser.id,
+          // ── 정성적 4차원 DB 저장 (Voice 콜드스타트 해결) ──
+          voiceProfile: qualitative.voice as unknown as Prisma.InputJsonValue,
+          backstory: qualitative.backstory as unknown as Prisma.InputJsonValue,
+          pressureContext: qualitative.pressure as unknown as Prisma.InputJsonValue,
+          zeitgeist: qualitative.zeitgeist as unknown as Prisma.InputJsonValue,
           layerVectors: {
             create: [
               {

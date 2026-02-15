@@ -14,6 +14,7 @@ import type {
 import { generateComment } from "./interactions/comment-engine"
 import { computeLikeProbability } from "./interactions/like-engine"
 import { updatePersonaState } from "./state-manager"
+import { buildVoiceAnchorFromProfile, parseVoiceProfile } from "./voice-anchor"
 
 // ── 타입 정의 ────────────────────────────────────────────────
 
@@ -61,6 +62,9 @@ export interface InteractionPipelineDataProvider {
     targetId: string
     metadata: Record<string, unknown>
   }): Promise<void>
+
+  /** DB에서 페르소나 voiceProfile JSON 조회 (콜드스타트 fallback용) */
+  getVoiceProfile?(personaId: string): Promise<unknown | null>
 }
 
 export interface InteractionExecutionResult {
@@ -148,13 +152,23 @@ export async function executeInteractions(
       const vectors = await dataProvider.getPersonaVectors(persona.id)
       const rel = relationship ?? DEFAULT_RELATIONSHIP
 
+      // Voice Anchor: DB VoiceProfile fallback (콜드스타트 해결)
+      let voiceAnchor = ""
+      if (dataProvider.getVoiceProfile) {
+        const rawProfile = await dataProvider.getVoiceProfile(persona.id)
+        const profile = parseVoiceProfile(rawProfile)
+        if (profile) {
+          voiceAnchor = buildVoiceAnchorFromProfile(profile)
+        }
+      }
+
       const commentInput: CommentGenerationInput = {
         commenterId: persona.id,
         postId: post.id,
         postAuthorId: post.authorId,
         relationship: rel,
         ragContext: {
-          voiceAnchor: "",
+          voiceAnchor,
           relationMemory: "",
           interestContinuity: "",
           consumptionMemory: "",

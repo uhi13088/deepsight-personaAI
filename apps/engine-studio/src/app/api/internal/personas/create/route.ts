@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
+import { generateAllQualitativeDimensions } from "@/lib/qualitative"
 import type {
   ApiResponse,
   SocialPersonaVector,
   CoreTemperamentVector,
   NarrativeDriveVector,
 } from "@/types"
-import type { PersonaRole, PersonaStatus } from "@/generated/prisma"
+import { Prisma, type PersonaRole, type PersonaStatus } from "@/generated/prisma"
+import { ARCHETYPES } from "@/lib/persona-generation/archetypes"
 
 interface CreatePersonaBody {
   name: string
@@ -70,6 +72,12 @@ export async function POST(request: NextRequest) {
     const crossAxisProfile = calculateCrossAxisProfile(l1, l2, l3)
     const paradoxProfile = calculateExtendedParadoxScore(l1, l2, l3, crossAxisProfile)
 
+    // ── 정성적 4차원 자동 생성 (Voice 콜드스타트 해결) ──────
+    const archetype = body.archetypeId
+      ? ARCHETYPES.find((a) => a.id === body.archetypeId)
+      : undefined
+    const qualitative = generateAllQualitativeDimensions(l1, l2, l3, archetype)
+
     // ── Create Persona + LayerVectors in transaction ─────────
     const persona = await prisma.$transaction(async (tx) => {
       // Get a system user ID (first user available)
@@ -95,6 +103,11 @@ export async function POST(request: NextRequest) {
           promptVersion: body.promptVersion || "1.0",
           basePrompt: body.basePrompt,
           createdById: systemUser.id,
+          // ── 정성적 4차원 DB 저장 (Voice 콜드스타트 해결) ──
+          voiceProfile: qualitative.voice as unknown as Prisma.InputJsonValue,
+          backstory: qualitative.backstory as unknown as Prisma.InputJsonValue,
+          pressureContext: qualitative.pressure as unknown as Prisma.InputJsonValue,
+          zeitgeist: qualitative.zeitgeist as unknown as Prisma.InputJsonValue,
           // L1 vectors stored in PersonaLayerVector
           layerVectors: {
             create: [

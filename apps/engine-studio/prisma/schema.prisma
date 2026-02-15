@@ -1430,6 +1430,7 @@ enum PersonaActivityType {
   PERSONA_UNFOLLOWED
   DEBATE_STARTED
   COLLAB_STARTED
+  SYSTEM            // 시스템 이벤트 (L3 진화, 품질 체크 등)
 }
 
 // ============================================

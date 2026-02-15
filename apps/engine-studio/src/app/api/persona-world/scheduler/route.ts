@@ -262,6 +262,14 @@ function createPostPipelineDataProvider(): PostPipelineDataProvider {
       // 간소화: 자유 주제 (향후 RAG 연동)
       return null
     },
+
+    async getVoiceProfile(personaId) {
+      const persona = await prisma.persona.findUnique({
+        where: { id: personaId },
+        select: { voiceProfile: true },
+      })
+      return persona?.voiceProfile ?? null
+    },
   }
 }
 
@@ -401,6 +409,14 @@ function createInteractionDataProvider(): InteractionPipelineDataProvider {
           metadata: metadata as Prisma.InputJsonValue,
         },
       })
+    },
+
+    async getVoiceProfile(personaId) {
+      const persona = await prisma.persona.findUnique({
+        where: { id: personaId },
+        select: { voiceProfile: true },
+      })
+      return persona?.voiceProfile ?? null
     },
   }
 }
