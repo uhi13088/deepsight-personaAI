@@ -7,7 +7,7 @@ import { computeActivityTraits, computeActiveHours } from "@/lib/persona-world/a
 import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
 import type { ApiResponse } from "@/types"
-import type { PersonaRole, PersonaStatus } from "@prisma/client"
+import type { PersonaRole, PersonaStatus } from "@/generated/prisma"
 
 interface GenerateRandomBody {
   archetypeId?: string
