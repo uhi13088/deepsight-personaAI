@@ -813,29 +813,29 @@
 
 > v4.0 최우선 — 입구/내부/출구 3단계 보안 필터 + 킬 스위치.
 
-- [ ] **T138: Gate Guard — 입력 보안 계층**
+- [x] **T138: Gate Guard — 입력 보안 계층** ✅ 2026-02-16
   - 배경: 유저 발화/페르소나 간 메시지가 메모리에 닿기 전 1차 방어선
-  - AC1: `src/lib/security/gate-guard.ts` — 규칙 기반 필터 (Injection 패턴, 금지어, 구조적 검증)
-  - AC2: 의미론적 필터 — 규칙 필터에서 suspicious 판정 시에만 Haiku 모델로 2차 검증 (비용 최적화)
-  - AC3: 출처 태깅 — MemoryEntry 타입 정의 (source, trustLevel, propagationDepth, gateResult)
-  - AC4: 신뢰도 전파 규칙 — 직접경험 1.0, 1단계 전달 0.7×원본, 2단계 0.5×원본, 3단계+ 자동 격리
-  - AC5: 단위 테스트 + Build PASS
+  - AC1: ✅ `src/lib/security/gate-guard.ts` — 12개 Injection 패턴(정규식), 14개 금지어, 5가지 구조적 검증(길이/반복/URL/특수문자)
+  - AC2: ✅ 의미론적 필터 — SemanticFilterProvider DI, 규칙 high severity→즉시 차단(LLM 0), medium→Haiku 2차 검증
+  - AC3: ✅ 출처 태깅 — MemoryEntry 타입(source, trustLevel, propagationDepth, gateResult) + GateResult/RuleViolation/MemorySource/TrustLevel
+  - AC4: ✅ 신뢰도 전파 규칙 — direct 1.0, 1-hop 0.7×, 2-hop 0.5×, 3-hop+ quarantined + propagateMemoryEntry 연쇄 전파
+  - AC5: ✅ 79 단위 테스트 PASS + 전체 2270 테스트 PASS + Build PASS
 
-- [ ] **T139: Integrity Monitor — 내부 감시 계층**
+- [x] **T139: Integrity Monitor — 내부 감시 계층** ✅ 2026-02-16
   - 배경: 저장 후 시간이 지나면서 발생하는 오염 탐지
-  - AC1: `src/lib/security/integrity-monitor.ts` — 팩트북 해시 검증 (immutableFacts 변조 감지)
-  - AC2: 상태 드리프트 감지 — `cosineSimilarity(L1_original, L1_current)`, 0.85 이하 경고, 0.70 이하 붕괴 위험
-  - AC3: mutableContext 변경 로그 (changelog) + 하루 5회 이상 동일 항목 변경 시 자동 플래그
-  - AC4: 집단 이상 탐지 — 전체 페르소나 평균 mood 모니터링 (0.3 이하 집단 우울 경고)
-  - AC5: 단위 테스트 + Build PASS
+  - AC1: ✅ `src/lib/security/integrity-monitor.ts` — computeFactbookHash 재사용, immutableFacts 변조 감지
+  - AC2: ✅ 상태 드리프트 감지 — vectorCosineSimilarity + checkL1Drift (0.85 warning, 0.70 critical)
+  - AC3: ✅ mutableContext 변경 로그 — checkChangeLog (하루 5회/항목, 20회/전체), 자동 플래그
+  - AC4: ✅ 집단 이상 탐지 — checkCollectiveAnomaly (mood≤0.3 depression, ≥0.9 euphoria, minSample=3)
+  - AC5: ✅ 42 단위 테스트 PASS + 전체 2312 테스트 PASS + Build PASS
 
-- [ ] **T140: Output Sentinel — 출력 보안 계층**
+- [x] **T140: Output Sentinel — 출력 보안 계층** ✅ 2026-02-16
   - 배경: 페르소나 생성 콘텐츠가 유저에 도달하기 전 마지막 관문
-  - AC1: `src/lib/security/output-sentinel.ts` — 규칙 기반 (PII 패턴, 시스템 정보 유출, 욕설/혐오)
-  - AC2: 팩트북 위반 검증 — immutableFacts 키워드 매칭 기반 (LLM 불필요)
-  - AC3: 격리 시스템 (Quarantine) — flagged 판정 시 격리 큐 저장, 관리자 확인/승인/삭제
-  - AC4: Prisma 스키마 — QuarantineEntry 모델 (content, source, reason, status, reviewedBy)
-  - AC5: 단위 테스트 + Build PASS
+  - AC1: ✅ `src/lib/security/output-sentinel.ts` — 6개 PII 패턴, 8개 시스템 유출 패턴, 4개 혐오 패턴
+  - AC2: ✅ 팩트북 위반 검증 — extractKeywords(4자+) × FACTBOOK_NEGATION_PATTERNS(3개), LLM 불필요
+  - AC3: ✅ 격리 시스템 — createQuarantineEntry/reviewQuarantineEntry/countPendingQuarantine
+  - AC4: ✅ Prisma 스키마 — QuarantineEntry 모델 + QuarantineStatus enum + 011 마이그레이션
+  - AC5: ✅ 45 단위 테스트 PASS + Build PASS
 
 - [ ] **T141: 킬 스위치 + SystemSafetyConfig**
   - 배경: v4.1 회고/v4.2 확산 도입 시 "문제 발생 → 즉시 OFF" 인프라

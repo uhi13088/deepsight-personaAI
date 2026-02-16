@@ -1769,3 +1769,32 @@ enum LlmCallStatus {
   SUCCESS
   ERROR
 }
+
+// ============================================
+// v4.0 보안: 격리 시스템 (Quarantine)
+// ============================================
+
+model QuarantineEntry {
+  id         String           @id @default(cuid())
+  content    String           @db.Text
+  source     String           // post, comment, interaction 등
+  personaId  String
+  reason     String           @db.Text
+  violations Json             // OutputViolation[] 직렬화
+  status     QuarantineStatus @default(PENDING)
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt  DateTime         @default(now())
+
+  @@index([personaId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("quarantine_entries")
+}
+
+enum QuarantineStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DELETED
+}
