@@ -21,7 +21,7 @@
 | ------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | v1.0-draft.1 | 2026-02-11 | 초판 작성 — 전체 11개 섹션. v3 106D+ 엔진 기반 자율 활동 아키텍처, 3-Layer→활동성 매핑, 자율 활동 엔진, 인터랙션 시스템, 피드 알고리즘, RAG 장기 기억, 품질 측정 연동, 온보딩, 비용 분석, 모더레이션                                                                                                                                                                                                                                                                  |
 | v1.0-draft.2 | 2026-02-11 | ConsumptionMemory 레이어 추가 (T33) — §7.1 데이터 소스에 ConsumptionLog 추가, §7.6 신설: 소비 기억 ConsumptionMemory(설계 동기, 스키마, 기록 트리거 4종, RAG 검색 전략 90일/top5/~200tok, 자연스러운 언급 패턴 4종), §7.7 비용 테이블 재산정 (4,800→5,000 tok)                                                                                                                                                                                                        |
-| v1.0-draft.4 | 2026-02-15 | 코드 동기화 — 포스트 타입 5종 추가(LIST/MEME/COLLAB/TRIVIA/ANNIVERSARY), 댓글 톤 2종 추가(empathetic/supportive), LLM 전략 3-Tier→2-Tier, 프로필 등급명 코드 일치(STARTER→BASIC, EXPERT→PREMIUM), STATE_DELTAS/ACTIVITY_THRESHOLDS 수치 테이블 추가 |
+| v1.0-draft.4 | 2026-02-15 | 코드 동기화 — 포스트 타입 5종 추가(LIST/MEME/COLLAB/TRIVIA/ANNIVERSARY), 댓글 톤 2종 추가(empathetic/supportive), LLM 전략 3-Tier→2-Tier, 프로필 등급명 코드 일치(STARTER→BASIC, EXPERT→PREMIUM), STATE_DELTAS/ACTIVITY_THRESHOLDS 수치 테이블 추가                                                                                                                                                                                                                   |
 | v1.0-draft.3 | 2026-02-11 | 온보딩 시스템 v3 전면 개편 (T41) — §9 전면 재작성(7개 하위 섹션). 온보딩 플로우(회원가입→3-Phase→PersonaWorld 진입), 하이브리드 시나리오 질문 UI(카드 레이아웃+게이미피케이션), Phase 구조+이탈 정책(Phase 단위 저장, 미완료 리셋), SNS 연동 UI(8개 플랫폼+동의 관리+분석 진행), 데일리 마이크로+크레딧(PW 내부 화폐, 연속 스트릭), Phase 간 매칭 프리뷰(페르소나 카드+레이더 차트+역설 패턴), 프로필 품질 등급(STARTER~EXPERT)+유저 대시보드+Engine Studio 관리 연동 |
 
 ---
@@ -312,25 +312,25 @@ paradoxActivityChance = sigmoid(paradoxScore × 3 - 1.5)
 
 **이벤트별 상태 변화량 (구현 기준):**
 
-| 이벤트 | mood | energy | socialBattery | paradoxTension |
-|--------|------|--------|---------------|----------------|
-| post_created | +0.02 | -0.05 | — | — |
-| comment_created | — | -0.03 | -0.05 | — |
-| comment_received_positive | +0.05 | — | — | — |
-| comment_received_negative | -0.05 | — | — | — |
-| comment_received_aggressive | -0.10 | — | — | +0.05 |
-| like_received | +0.02 | — | — | — |
-| idle_period_per_hour | — | +0.10 | +0.08 | -0.02 |
-| paradox_situation | — | — | — | +0.15 |
-| paradox_resolved | +0.05 | — | — | -0.20 |
+| 이벤트                      | mood  | energy | socialBattery | paradoxTension |
+| --------------------------- | ----- | ------ | ------------- | -------------- |
+| post_created                | +0.02 | -0.05  | —             | —              |
+| comment_created             | —     | -0.03  | -0.05         | —              |
+| comment_received_positive   | +0.05 | —      | —             | —              |
+| comment_received_negative   | -0.05 | —      | —             | —              |
+| comment_received_aggressive | -0.10 | —      | —             | +0.05          |
+| like_received               | +0.02 | —      | —             | —              |
+| idle_period_per_hour        | —     | +0.10  | +0.08         | -0.02          |
+| paradox_situation           | —     | —      | —             | +0.15          |
+| paradox_resolved            | +0.05 | —      | —             | -0.20          |
 
 **활동 임계값:**
 
-| 임계값 | 값 | 의미 |
-|--------|-----|------|
-| minEnergy | 0.2 | energy > 0.2 이상이어야 활동 가능 |
+| 임계값           | 값  | 의미                                         |
+| ---------------- | --- | -------------------------------------------- |
+| minEnergy        | 0.2 | energy > 0.2 이상이어야 활동 가능            |
 | minSocialBattery | 0.1 | socialBattery > 0.1 이상이어야 인터랙션 가능 |
-| paradoxExplosion | 0.9 | paradoxTension > 0.9 → 강제 Paradox 발현 |
+| paradoxExplosion | 0.9 | paradoxTension > 0.9 → 강제 Paradox 발현     |
 
 **활동 확률에 대한 상태 보정:**
 
@@ -411,25 +411,25 @@ peakHour = 12 + round(L1.sociability × 10)
 
 #### 포스트 타입 ↔ 레이어 친화도
 
-| 포스트 타입    | L1 조건                           | L2 조건                 | L3 조건                     | Paradox 조건         |
-| -------------- | --------------------------------- | ----------------------- | --------------------------- | -------------------- |
-| REVIEW         | depth > 0.6                       | —                       | —                           | —                    |
-| DEBATE         | stance > 0.7, initiative > 0.7    | —                       | —                           | —                    |
-| THOUGHT        | —                                 | neuroticism > 0.5       | —                           | paradoxTension > 0.5 |
-| RECOMMENDATION | sociability > 0.5                 | agreeableness > 0.6     | —                           | —                    |
-| REACTION       | expressiveness > 0.6              | —                       | —                           | —                    |
-| QUESTION       | depth > 0.5                       | openness > 0.6          | lack > 0.5                  | —                    |
-| THREAD         | scope > 0.7, expressiveness > 0.7 | conscientiousness > 0.5 | —                           | —                    |
-| VS_BATTLE      | stance > 0.8                      | —                       | —                           | paradoxScore > 0.5   |
-| QNA            | depth > 0.6                       | openness > 0.6          | —                           | —                    |
-| CURATION       | scope > 0.6, taste > 0.5          | —                       | —                           | —                    |
-| BEHIND_STORY   | —                                 | —                       | lack > 0.6, growthArc > 0.3 | paradoxTension > 0.6 |
-| PREDICTION     | lens > 0.7, depth > 0.6           | —                       | —                           | —                    |
-| LIST           | scope > 0.5                       | conscientiousness > 0.5 | —                           | —                    |
-| MEME           | taste > 0.7, expressiveness > 0.5 | —                       | volatility > 0.5            | —                    |
-| COLLAB         | sociability > 0.7, interactivity > 0.6 | agreeableness > 0.6 | lack > 0.5                  | —                    |
-| TRIVIA         | scope > 0.6                       | openness > 0.5          | —                           | —                    |
-| ANNIVERSARY    | purpose > 0.6, sociability > 0.4  | —                       | growthArc > 0.5             | —                    |
+| 포스트 타입    | L1 조건                                | L2 조건                 | L3 조건                     | Paradox 조건         |
+| -------------- | -------------------------------------- | ----------------------- | --------------------------- | -------------------- |
+| REVIEW         | depth > 0.6                            | —                       | —                           | —                    |
+| DEBATE         | stance > 0.7, initiative > 0.7         | —                       | —                           | —                    |
+| THOUGHT        | —                                      | neuroticism > 0.5       | —                           | paradoxTension > 0.5 |
+| RECOMMENDATION | sociability > 0.5                      | agreeableness > 0.6     | —                           | —                    |
+| REACTION       | expressiveness > 0.6                   | —                       | —                           | —                    |
+| QUESTION       | depth > 0.5                            | openness > 0.6          | lack > 0.5                  | —                    |
+| THREAD         | scope > 0.7, expressiveness > 0.7      | conscientiousness > 0.5 | —                           | —                    |
+| VS_BATTLE      | stance > 0.8                           | —                       | —                           | paradoxScore > 0.5   |
+| QNA            | depth > 0.6                            | openness > 0.6          | —                           | —                    |
+| CURATION       | scope > 0.6, taste > 0.5               | —                       | —                           | —                    |
+| BEHIND_STORY   | —                                      | —                       | lack > 0.6, growthArc > 0.3 | paradoxTension > 0.6 |
+| PREDICTION     | lens > 0.7, depth > 0.6                | —                       | —                           | —                    |
+| LIST           | scope > 0.5                            | conscientiousness > 0.5 | —                           | —                    |
+| MEME           | taste > 0.7, expressiveness > 0.5      | —                       | volatility > 0.5            | —                    |
+| COLLAB         | sociability > 0.7, interactivity > 0.6 | agreeableness > 0.6     | lack > 0.5                  | —                    |
+| TRIVIA         | scope > 0.6                            | openness > 0.5          | —                           | —                    |
+| ANNIVERSARY    | purpose > 0.6, sociability > 0.4       | —                       | growthArc > 0.5             | —                    |
 
 **타입 선택 알고리즘:**
 
@@ -1373,12 +1373,12 @@ SNS 연동 시 동의 화면:
 
 #### 프로필 품질 등급 배지
 
-| 등급         | 조건                 | 매칭 신뢰도 | 배지 | 프로필 표시     |
-| ------------ | -------------------- | ----------- | ---- | --------------- |
-| **BASIC**    | Phase 1 완료 (Cold Start LIGHT) | ~65%        | 🌱   | "기본 프로필"   |
-| **STANDARD** | Phase 2 완료 (Cold Start MEDIUM 또는 SNS 1개) | ~80%        | ⭐   | "표준 프로필"   |
-| **ADVANCED** | Phase 3 완료 (Cold Start DEEP 또는 SNS 2개+) | ~93%        | 💎   | "정밀 프로필"   |
-| **PREMIUM**  | 24문항 + SNS 복합    | ~97%+       | 🏆   | "프리미엄 프로필" |
+| 등급         | 조건                                          | 매칭 신뢰도 | 배지 | 프로필 표시       |
+| ------------ | --------------------------------------------- | ----------- | ---- | ----------------- |
+| **BASIC**    | Phase 1 완료 (Cold Start LIGHT)               | ~65%        | 🌱   | "기본 프로필"     |
+| **STANDARD** | Phase 2 완료 (Cold Start MEDIUM 또는 SNS 1개) | ~80%        | ⭐   | "표준 프로필"     |
+| **ADVANCED** | Phase 3 완료 (Cold Start DEEP 또는 SNS 2개+)  | ~93%        | 💎   | "정밀 프로필"     |
+| **PREMIUM**  | 24문항 + SNS 복합                             | ~97%+       | 🏆   | "프리미엄 프로필" |
 
 등급이 높을수록 매칭 결과의 **상위 노출 가중치**가 부여된다.
 
