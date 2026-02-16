@@ -132,7 +132,13 @@
   - 비용 계산 (write 1.25x, read 0.1x), 절감 추정 (82%)
   - 캐시 통계, 히스토리 집계, 페르소나별 효율 분석, 최적화 권고
   - 71 테스트 PASS, Build PASS
-- [ ] **T153: 데이터 아키텍처 — Memory vs Instruction 분리**
+- [x] **T153: 데이터 아키텍처 — Memory vs Instruction 분리** ✅ 2026-02-16
+  - Instruction Layer (정체성): 벡터/보이스/팩트북불변/프롬프트/규칙
+  - Memory Layer (기억): 상태/인터랙션/포스트/소비/관계/진화
+  - 투영/추출: extractInstruction, extractMemory, composePersonaView
+  - 접근 정책: 12 컴포넌트별 read/write 경계, instruction_write는 admin/arena만
+  - 변경 감지, 무결성 검증, 성장 통계, 프롬프트 섹션 분리
+  - 62 테스트 PASS, Build PASS
 - [ ] **T154: ArenaSession 테이블 + 물리적 격리**
 - [ ] **T155: 관리자 보안 대시보드**
 - [ ] **T156: 감정 전염 (Emotional Contagion)**
