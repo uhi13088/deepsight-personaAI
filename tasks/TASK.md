@@ -90,7 +90,15 @@
   - LLM 심판 프롬프트: buildJudgmentPrompt
   - 가중 평균 종합 점수: computeOverallScore (JUDGMENT_WEIGHTS)
   - 61 테스트 PASS, Build PASS
-- [ ] **T146: 아레나 — 관리자 UI + 비용 제어**
+- [x] **T146: 아레나 — 관리자 UI + 비용 제어** ✅ 2026-02-16
+  - 예산 정책: ArenaBudgetPolicy (월간/일일/세션별 한도, 경고/차단 임계)
+  - 비용 추정: estimateSessionCost (프로필+턴+판정 토큰)
+  - 승인 검사: checkSessionApproval (일일 한도, 토큰 한도, 월간 예산)
+  - 지출 현황: computeMonthlySpending (일별 분류, 상태 판정)
+  - 교정 플로우: create/approve/reject + buildCorrectionApplyResult
+  - 관리자 통계: computeAdminStats (세션/판정/이슈/교정)
+  - 예산 검증: validateBudgetPolicy, getBudgetAlertLevel
+  - 59 테스트 PASS, Build PASS
 - [ ] **T147: 아레나 — 교정 루프 (스타일북 반영)**
 - [ ] **T150: RAG 가중 검색 통합 (Poignancy + Forgetting)**
 - [ ] **T151: 소셜 모듈 B — Connectivity (보안용)**
