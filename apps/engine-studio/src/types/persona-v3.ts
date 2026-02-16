@@ -160,6 +160,48 @@ export interface BackstoryDimension {
   nlpKeywords: string[]
 }
 
+// ── v4.0: Factbook — 불변/가변 기억 분리 ──────────────────────
+
+/** 불변 사실 (변조 감지 대상) */
+export interface ImmutableFact {
+  /** 고유 식별자 */
+  id: string
+  /** 카테고리 */
+  category: "origin" | "formativeExperience" | "innerConflict" | "coreIdentity"
+  /** 사실 내용 */
+  content: string
+  /** 생성 시점 */
+  createdAt: number
+}
+
+/** 가변 맥락 (시간에 따라 변할 수 있음) */
+export interface MutableContext {
+  /** 고유 식별자 */
+  id: string
+  /** 카테고리 */
+  category: "selfNarrative" | "currentGoal" | "recentExperience" | "evolvedPerspective"
+  /** 맥락 내용 */
+  content: string
+  /** 마지막 수정 시점 */
+  updatedAt: number
+  /** 변경 횟수 */
+  changeCount: number
+}
+
+/** 팩트북: 불변 사실 + 가변 맥락 + 무결성 해시 */
+export interface Factbook {
+  /** 불변의 진실 — 변조 시 경고 */
+  immutableFacts: ImmutableFact[]
+  /** 변할 수 있는 맥락 */
+  mutableContext: MutableContext[]
+  /** immutableFacts의 SHA256 해시 (변조 감지용) */
+  integrityHash: string
+  /** 팩트북 생성 시점 */
+  createdAt: number
+  /** 팩트북 마지막 업데이트 시점 */
+  updatedAt: number
+}
+
 export interface TriggerRule {
   condition: string
   affectedLayer: "L1" | "L2" | "L3"
@@ -319,4 +361,65 @@ export interface InteractionSessionSummary {
   peakPressure: number
   dominantTopic: string
   integrityScore: number | null
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v4.0: Security — Gate Guard / MemoryEntry / Trust Propagation
+// ═══════════════════════════════════════════════════════════════
+
+/** Gate Guard 판정 결과 */
+export type GateVerdict = "pass" | "suspicious" | "blocked"
+
+/** Gate Guard 검증 결과 상세 */
+export interface GateResult {
+  verdict: GateVerdict
+  /** 규칙 기반 필터 결과 */
+  ruleResult: {
+    passed: boolean
+    violations: RuleViolation[]
+  }
+  /** 의미론적 필터 결과 (suspicious일 때만 실행) */
+  semanticResult?: {
+    passed: boolean
+    reason: string
+    confidence: number
+  }
+  /** 처리 시간 (ms) */
+  processingTimeMs: number
+}
+
+/** 규칙 위반 정보 */
+export interface RuleViolation {
+  rule: string
+  category: "injection" | "forbidden" | "structural" | "trust"
+  severity: "low" | "medium" | "high"
+  detail: string
+}
+
+/** 메모리 엔트리 출처 */
+export type MemorySource =
+  | "direct_experience"
+  | "user_input"
+  | "persona_interaction"
+  | "system_generated"
+  | "external_feed"
+
+/** 신뢰도 등급 */
+export type TrustLevel = "trusted" | "standard" | "low" | "quarantined"
+
+/** 출처 태깅된 메모리 엔트리 */
+export interface MemoryEntry {
+  id: string
+  content: string
+  source: MemorySource
+  trustLevel: TrustLevel
+  /** 전파 깊이: 0=직접, 1=1단계, 2=2단계, 3+=격리 대상 */
+  propagationDepth: number
+  /** Gate Guard 판정 결과 */
+  gateResult: GateResult
+  /** 원본 신뢰도 (전파 시 감쇠 전 값) */
+  originalTrust: number
+  /** 최종 신뢰도 점수 (0.0~1.0) */
+  trustScore: number
+  createdAt: number
 }

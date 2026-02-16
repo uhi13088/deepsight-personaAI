@@ -19,6 +19,7 @@ import { generatePostContent } from "./content-generator"
 import { checkVoiceConsistency } from "./quality-monitor"
 import { updatePersonaState } from "./state-manager"
 import { buildVoiceAnchorFromProfile, parseVoiceProfile } from "./voice-anchor"
+import { calculatePostPoignancy } from "./poignancy"
 
 // ── 타입 정의 ────────────────────────────────────────────────
 
@@ -29,6 +30,7 @@ export interface PostPipelineDataProvider {
     type: PersonaPostType
     content: string
     metadata: Record<string, unknown>
+    poignancyScore?: number
   }): Promise<{ id: string }>
 
   /** 최근 포스트 텍스트 조회 (RAG voiceAnchor용) */
@@ -59,6 +61,7 @@ export interface PostCreationResult {
   tokensUsed: number
   voiceCheck: VoiceCheckResult | null
   regenerated: boolean
+  poignancyScore: number
 }
 
 // ── 파이프라인 메인 ──────────────────────────────────────────
@@ -149,7 +152,11 @@ export async function executePostCreation(
     }
   }
 
-  // Step 5: DB 저장
+  // Step 5: Poignancy 자동 계산 (v4.0)
+  const volatility = persona.vectors.narrative.volatility
+  const poignancyScore = calculatePostPoignancy(state, volatility)
+
+  // Step 6: DB 저장
   const saved = await dataProvider.savePost({
     personaId: persona.id,
     type: postType,
@@ -160,15 +167,16 @@ export async function executePostCreation(
       regenerated,
       trigger: context.trigger,
     },
+    poignancyScore,
   })
 
-  // Step 6: PersonaState 갱신
+  // Step 7: PersonaState 갱신
   await updatePersonaState(persona.id, {
     type: "post_created",
     tokensUsed: result.tokensUsed,
   })
 
-  // Step 7: 활동 로그
+  // Step 8: 활동 로그
   await dataProvider.saveActivityLog({
     personaId: persona.id,
     activityType: "POST_CREATED",
@@ -179,6 +187,7 @@ export async function executePostCreation(
       tokensUsed: result.tokensUsed,
       voiceStatus: voiceCheck?.status ?? "unchecked",
       regenerated,
+      poignancyScore,
     },
   })
 
@@ -189,6 +198,7 @@ export async function executePostCreation(
     tokensUsed: result.tokensUsed,
     voiceCheck,
     regenerated,
+    poignancyScore,
   }
 }
 
