@@ -7,6 +7,8 @@
 import type { ThreeLayerVector } from "@/types/persona-v3"
 import type { PersonaStateData, RelationshipScore } from "../types"
 import { decideCommentTone } from "./comment-tone"
+import { computeInteractionProvenance } from "@/lib/security/data-provenance"
+import type { ProvenanceData } from "@/lib/security/data-provenance"
 
 /**
  * 유저 태도 분석 결과 (UIV: User Interaction Vector).
@@ -44,6 +46,7 @@ export interface UserInteractionDataProvider {
     uiv: UserInteractionVector
     adaptDelta: Record<string, number>
     expressApplied: string[]
+    provenance?: ProvenanceData
   }): Promise<void>
 }
 
@@ -175,7 +178,12 @@ export async function respondToUser(
 
   const expressApplied: string[] = []
 
-  // Step 7: 로깅
+  // Step 7: 로깅 (출처 태깅 포함)
+  const provenance = computeInteractionProvenance({
+    source: "DIRECT",
+    propagationDepth: 0,
+  })
+
   await provider.saveInteractionLog({
     personaId,
     userId,
@@ -184,6 +192,7 @@ export async function respondToUser(
     uiv,
     adaptDelta,
     expressApplied,
+    provenance,
   })
 
   return { response, uiv, adaptDelta, expressApplied }

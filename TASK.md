@@ -849,12 +849,12 @@
 
 > 데이터 출처 추적 인프라 + 비용 최적화.
 
-- [ ] **T142: 출처 추적 시스템 (Data Provenance)**
+- [x] **T142: 출처 추적 시스템 (Data Provenance)** ✅ 2026-02-16
   - 배경: 향후 확산 기능 대비, 모든 기억에 출처/신뢰도/전파 깊이 추적
-  - AC1: Prisma 스키마 — InteractionLog에 source enum 확장, trustLevel, propagationDepth, originPersonaId 추가
-  - AC2: PersonaPost에 source 필드 추가 (autonomous/feed_inspired/arena_test)
-  - AC3: 신뢰도 자동 계산 로직 — 기존 interaction-pipeline에 출처 태깅 통합
-  - AC4: 단위 테스트 + Build PASS
+  - AC1: ✅ Prisma 스키마 — InteractionLog에 source(InteractionSource), trustLevel, propagationDepth, originPersonaId + PersonaPost에 postSource(PostSource) (T138~T141에서 완료)
+  - AC2: ✅ PostSource enum (AUTONOMOUS/FEED_INSPIRED/ARENA_TEST/SCHEDULED) + InteractionSource enum (DIRECT/PERSONA_RELAY/EXTERNAL_FEED/SYSTEM)
+  - AC3: ✅ 신뢰도 자동 계산 — data-provenance.ts(computeInteractionProvenance/determinePostSource/computeRelayProvenance/summarizeProvenance) + post-pipeline.ts(postSource 태깅) + interaction-pipeline.ts(좋아요/댓글 provenance 태깅) + user-interaction.ts(DIRECT 출처 태깅) + scheduler/route.ts(Prisma 연동)
+  - AC4: ✅ 27개 data-provenance 테스트 PASS + 전체 77파일 3136개 PASS + Build PASS
 
 - [ ] **T143: 프롬프트 캐싱 전략**
   - 배경: 팩트북(~500 tok) + 보이스 스펙(~300 tok) + 시스템 프롬프트(~200 tok) = ~1,000 토큰이 매 턴 동일
@@ -923,6 +923,10 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T142: 출처 추적 시스템 (Data Provenance)** ✅ 2026-02-16
+  - 변경: post-pipeline.ts, interaction-pipeline.ts, user-interaction.ts, scheduler/route.ts, data-provenance.ts(기존), data-provenance.test.ts(기존)
+  - 테스트: PASS (77 files, 3136/3136) + Build PASS
 
 - [x] **T134: 설계서/가이드 문서 최신화 — 코드 ↔ 문서 동기화** ✅ 2026-02-15
   - 배경: 코드가 설계서 작성 이후 상당히 진화. 기술 스택(Next.js 14→16), LLM 전략(3-Tier→2-Tier), 포스트 타입(13→18종), 프로필 등급명, 상태 delta 수치 등 17건 불일치 발견
