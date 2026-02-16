@@ -146,7 +146,14 @@
   - 라이프사이클: active→completed→archived→expired 5단계
   - 토큰 추적: 페이즈별 비용 집계, 아카이브 정리 워크플로우
   - 46 테스트 PASS, Build PASS
-- [ ] **T155: 관리자 보안 대시보드**
+- [x] **T155: 관리자 보안 대시보드** ✅ 2026-02-16
+  - 4계층 통합 모니터링: GateGuard/IntegrityMonitor/OutputSentinel/KillSwitch
+  - 계층별 메트릭 집계: 판정 분포, 위반 카테고리, 차단률, 격리 통계
+  - 출처 추적 메트릭: 신뢰도 분포 (high/medium/low/minimal), 격리 카운트
+  - 보안 알림 생성: 계층별 알림 (인젝션/PII/드리프트/팩트북/동결/트리거)
+  - 전체 상태 판정: healthy/warning/critical/frozen
+  - 스냅샷 비교: 상태 변화 감지, 새 알림/해결 알림 추적
+  - 68 테스트 PASS, Build PASS
 - [ ] **T156: 감정 전염 (Emotional Contagion)**
 
 ---
