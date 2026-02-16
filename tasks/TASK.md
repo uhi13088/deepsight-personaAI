@@ -117,7 +117,15 @@
   - 타입별 검색: searchInteractionMemories, searchPostMemories, searchConsumptionMemories
   - 통계: computeMemoryRetentionStats (retention 분포, 활성/망각/핵심 카운트)
   - 43 테스트 PASS, Build PASS
-- [ ] **T151: 소셜 모듈 B — Connectivity (보안용)**
+- [x] **T151: 소셜 모듈 B — Connectivity (보안용)** ✅ 2026-02-16
+  - 타입: SocialModuleConfig, FeatureBindings, RelationshipEdge, NodeMetrics
+  - 그래프 분석: buildAdjacencyMap, extractNodeIds, computeNodeDegree
+  - 클러스터링: computeClusteringCoefficient, computeNodeMetrics
+  - Hub/Isolate 탐지: classifyNode (HUB/NORMAL/PERIPHERAL/ISOLATE)
+  - 보안 이상 탐지: detectAnomalies (연결 급증/긴장 클러스터/봇 패턴/고립 위험)
+  - 기능 바인딩: FEATURE_BINDINGS (matching/feed/arena/security)
+  - 설정 검증: validateSocialModuleConfig
+  - 52 테스트 PASS, Build PASS
 - [ ] **T152: 프롬프트 캐싱 적용**
 - [ ] **T153: 데이터 아키텍처 — Memory vs Instruction 분리**
 - [ ] **T154: ArenaSession 테이블 + 물리적 격리**
