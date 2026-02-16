@@ -154,7 +154,15 @@
   - 전체 상태 판정: healthy/warning/critical/frozen
   - 스냅샷 비교: 상태 변화 감지, 새 알림/해결 알림 추적
   - 68 테스트 PASS, Build PASS
-- [ ] **T156: 감정 전염 (Emotional Contagion)**
+- [x] **T156: 감정 전염 (Emotional Contagion)** ✅ 2026-02-16
+  - 분위기(atmosphere) 전파 모델: 정보 아닌 감정만 전달
+  - 관계 가중치: warmth(0.5) + frequency(0.3) + inverseTension(0.2)
+  - 수신 저항: paradoxTension + agreeableness + socialOpenness 기반
+  - 위상 증폭: 허브(1.3×), 클러스터(1.2×), 고립 감쇠(0.3×)
+  - 전파 라운드: 단일 효과 계산 → 집계 → maxDelta 제한 → 상태 적용
+  - 안전 검사: checkMoodSafety (warning/critical 임계), 수렴 판정
+  - 통계: 양/음 효과 분류, topInfluencer, mostAffected, 분산 추적
+  - 53 테스트 PASS, Build PASS
 
 ---
 
