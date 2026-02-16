@@ -99,10 +99,39 @@
   - 관리자 통계: computeAdminStats (세션/판정/이슈/교정)
   - 예산 검증: validateBudgetPolicy, getBudgetAlertLevel
   - 59 테스트 PASS, Build PASS
-- [ ] **T147: 아레나 — 교정 루프 (스타일북 반영)**
-- [ ] **T150: RAG 가중 검색 통합 (Poignancy + Forgetting)**
-- [ ] **T151: 소셜 모듈 B — Connectivity (보안용)**
-- [ ] **T152: 프롬프트 캐싱 적용**
+- [x] **T147: 아레나 — 교정 루프 (스타일북 반영)** ✅ 2026-02-16
+  - 교정 제안 추출: extractCorrectionSuggestions (판정 이슈 → 제안)
+  - 패치 생성: buildStyleBookPatch (5카테고리별 패치 오퍼레이션)
+  - 패치 검증: validatePatch (confidence, 일일 한도, 오퍼레이션 수)
+  - 패치 적용: applyVoiceProfilePatch, applyStyleParamsPatch, applyFactbookPatch
+  - 전체 파이프라인: executeCorrectionLoop (생성→검증→적용)
+  - 과교정 감지: detectOverCorrection (일일 한도, 동일 카테고리 연속)
+  - 스냅샷 diff: summarizeSnapshotDiff (전후 비교)
+  - 60 테스트 PASS, Build PASS
+- [x] **T150: RAG 가중 검색 통합 (Poignancy + Forgetting)** ✅ 2026-02-16
+  - 가중 검색: searchMemories (recency×0.3 + similarity×0.4 + poignancy×retention×0.3)
+  - 최신성: computeRecency (지수 감쇠, 윈도우 설정)
+  - 항목 점수: scoreMemoryItem (retention, recency, effectivePoignancy, ragScore)
+  - 핵심 기억 부스트: CORE_POIGNANCY_THRESHOLD (0.8) × 1.2
+  - 컨텍스트 빌더: buildRAGContextText (토큰 한도, 태그)
+  - 타입별 검색: searchInteractionMemories, searchPostMemories, searchConsumptionMemories
+  - 통계: computeMemoryRetentionStats (retention 분포, 활성/망각/핵심 카운트)
+  - 43 테스트 PASS, Build PASS
+- [x] **T151: 소셜 모듈 B — Connectivity (보안용)** ✅ 2026-02-16
+  - 타입: SocialModuleConfig, FeatureBindings, RelationshipEdge, NodeMetrics
+  - 그래프 분석: buildAdjacencyMap, extractNodeIds, computeNodeDegree
+  - 클러스터링: computeClusteringCoefficient, computeNodeMetrics
+  - Hub/Isolate 탐지: classifyNode (HUB/NORMAL/PERIPHERAL/ISOLATE)
+  - 보안 이상 탐지: detectAnomalies (연결 급증/긴장 클러스터/봇 패턴/고립 위험)
+  - 기능 바인딩: FEATURE_BINDINGS (matching/feed/arena/security)
+  - 설정 검증: validateSocialModuleConfig
+  - 52 테스트 PASS, Build PASS
+- [x] **T152: 프롬프트 캐싱 적용** ✅ 2026-02-16
+  - Anthropic API cache_control 블록 레벨 캐싱
+  - 프롬프트 분리 (static/dynamic), 블록 병합, cache_control 빌드
+  - 비용 계산 (write 1.25x, read 0.1x), 절감 추정 (82%)
+  - 캐시 통계, 히스토리 집계, 페르소나별 효율 분석, 최적화 권고
+  - 71 테스트 PASS, Build PASS
 - [ ] **T153: 데이터 아키텍처 — Memory vs Instruction 분리**
 - [ ] **T154: ArenaSession 테이블 + 물리적 격리**
 - [ ] **T155: 관리자 보안 대시보드**
