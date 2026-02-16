@@ -1798,3 +1798,20 @@ enum QuarantineStatus {
   REJECTED
   DELETED
 }
+
+// ============================================
+// v4.0 보안: 시스템 안전 설정 (Kill Switch)
+// ============================================
+
+model SystemSafetyConfig {
+  id              String   @id @default("singleton")
+  emergencyFreeze Boolean  @default(false)
+  freezeReason    String?
+  freezeAt        DateTime?
+  featureToggles  Json     // Record<SafetyFeatureKey, FeatureToggle>
+  autoTriggers    Json     // AutoTriggerConfig
+  updatedAt       DateTime @updatedAt
+  updatedBy       String
+
+  @@map("system_safety_config")
+}

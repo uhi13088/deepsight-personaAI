@@ -837,13 +837,13 @@
   - AC4: ✅ Prisma 스키마 — QuarantineEntry 모델 + QuarantineStatus enum + 011 마이그레이션
   - AC5: ✅ 45 단위 테스트 PASS + Build PASS
 
-- [ ] **T141: 킬 스위치 + SystemSafetyConfig**
+- [x] **T141: 킬 스위치 + SystemSafetyConfig** ✅ 2026-02-16
   - 배경: v4.1 회고/v4.2 확산 도입 시 "문제 발생 → 즉시 OFF" 인프라
-  - AC1: `src/lib/security/kill-switch.ts` — SystemSafetyConfig (emergencyFreeze, 기능별 ON/OFF)
-  - AC2: 기능별 토글 — diffusion(off), reflection(off), emotionalContagion(off), arena(on)
-  - AC3: 자동 트리거 — 격리 50건/10분 → 자동 동결, 집단 mood 0.2 이하 → 경고, L1 드리프트 0.7 이하 20% 초과 → 동결
-  - AC4: DB 스키마 — SystemSafetyConfig 테이블 + API (GET/PUT /api/internal/safety-config)
-  - AC5: 단위 테스트 + Build PASS
+  - AC1: ✅ `src/lib/security/kill-switch.ts` — SystemSafetyConfig (freeze/unfreeze + 불변 업데이트)
+  - AC2: ✅ 6개 기능 토글 — diffusion(off), reflection(off), emotionalContagion(off), arena/evolution/autonomousPosting(on)
+  - AC3: ✅ 자동 트리거 — quarantine 50/10min→freeze, mood≤0.2→warning, drift≤0.7 20%→freeze
+  - AC4: ✅ Prisma SystemSafetyConfig(singleton) + API GET/PUT /api/internal/safety-config + 012 마이그레이션
+  - AC5: ✅ 35 단위 테스트 PASS + Build PASS
 
 ### Phase V4-C: 출처 추적 + 프롬프트 캐싱 (T142~T143)
 

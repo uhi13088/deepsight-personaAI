@@ -87,3 +87,32 @@ export type {
   QuarantineStatus,
   QuarantineEntry,
 } from "./output-sentinel"
+
+// Kill Switch + SystemSafetyConfig
+export {
+  // Config management
+  createDefaultConfig,
+  activateEmergencyFreeze,
+  deactivateEmergencyFreeze,
+  // Feature toggles
+  enableFeature,
+  disableFeature,
+  isFeatureEnabled,
+  getEnabledFeatures,
+  // Auto triggers
+  evaluateQuarantineTrigger,
+  evaluateMoodTrigger,
+  evaluateDriftTrigger,
+  evaluateAllTriggers,
+  // Constants
+  DEFAULT_AUTO_TRIGGERS,
+  DEFAULT_FEATURE_TOGGLES,
+} from "./kill-switch"
+export type {
+  SafetyFeatureKey,
+  FeatureToggle,
+  SystemSafetyConfig,
+  AutoTriggerConfig,
+  TriggerAction,
+  AutoTriggerResult,
+} from "./kill-switch"
