@@ -139,7 +139,13 @@
   - 접근 정책: 12 컴포넌트별 read/write 경계, instruction_write는 admin/arena만
   - 변경 감지, 무결성 검증, 성장 통계, 프롬프트 섹션 분리
   - 62 테스트 PASS, Build PASS
-- [ ] **T154: ArenaSession 테이블 + 물리적 격리**
+- [x] **T154: ArenaSession 테이블 + 물리적 격리** ✅ 2026-02-16
+  - DB 레코드 타입: Session/Turn/Judgment/Correction/TokenUsage 5종
+  - 물리적 격리: 네임스페이스, 쓰기 검증 (Persona 직접 변경 금지)
+  - 영속성: sessionToRecord, sessionToRecordSet (트랜잭션 단위)
+  - 라이프사이클: active→completed→archived→expired 5단계
+  - 토큰 추적: 페이즈별 비용 집계, 아카이브 정리 워크플로우
+  - 46 테스트 PASS, Build PASS
 - [ ] **T155: 관리자 보안 대시보드**
 - [ ] **T156: 감정 전염 (Emotional Contagion)**
 
