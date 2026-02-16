@@ -52,7 +52,7 @@ function createInitialAnalyticsData(): AnalyticsStore {
     detractors: 45,
     recommendedPersonaIds: Array.from(
       { length: 1250 },
-      () => `persona_${Math.floor(Math.random() * 8)}`
+      () => `demo-persona-${Math.floor(Math.random() * 8)}`
     ),
   }
 
