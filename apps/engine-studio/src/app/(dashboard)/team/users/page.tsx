@@ -272,7 +272,7 @@ export default function UserManagementPage() {
               <input
                 type="email"
                 className="border-border bg-background w-full rounded-md border px-3 py-2 text-sm"
-                placeholder="user@deepsight.ai"
+                placeholder="user@example.com"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
               />

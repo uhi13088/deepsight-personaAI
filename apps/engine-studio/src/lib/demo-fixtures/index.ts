@@ -24,3 +24,10 @@ export {
 } from "./event-fixtures"
 
 export { DEMO_PERSONA_ARCHETYPES, type DemoPersonaArchetype } from "./matching-fixtures"
+
+export {
+  DEMO_INCUBATOR_STRATEGY,
+  DEMO_INCUBATOR_LIFECYCLE,
+  DEMO_INCUBATOR_CUMULATIVE_ACTIVE,
+  DEMO_INCUBATOR_MONTHLY_COST_CALLS,
+} from "./incubator-fixtures"
