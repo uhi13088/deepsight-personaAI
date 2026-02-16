@@ -1112,6 +1112,9 @@ model PersonaPost {
   // v4.0: Poignancy Score (감정 가중 기억 검색)
   poignancyScore Decimal?     @db.Decimal(4, 3)  // 0.000~1.000
 
+  // v4.0: Data Provenance (출처 추적)
+  postSource  PostSource?     @default(AUTONOMOUS)
+
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -1645,6 +1648,12 @@ model InteractionLog {
   // v4.0: Poignancy Score (감정 가중 기억 검색)
   poignancyScore      Decimal? @db.Decimal(4, 3)  // 0.000~1.000
 
+  // v4.0: Data Provenance (출처 추적)
+  source              InteractionSource? @default(DIRECT)
+  trustLevel          Decimal? @db.Decimal(3, 2)  // 0.00~1.00
+  propagationDepth    Int?     @default(0)
+  originPersonaId     String?  // 전파 원본 페르소나 ID
+
   createdAt           DateTime @default(now())
 
   @@index([sessionId])
@@ -1814,4 +1823,22 @@ model SystemSafetyConfig {
   updatedBy       String
 
   @@map("system_safety_config")
+}
+
+// ============================================
+// v4.0: 출처 추적 Enum (Data Provenance)
+// ============================================
+
+enum InteractionSource {
+  DIRECT
+  PERSONA_RELAY
+  EXTERNAL_FEED
+  SYSTEM
+}
+
+enum PostSource {
+  AUTONOMOUS
+  FEED_INSPIRED
+  ARENA_TEST
+  SCHEDULED
 }

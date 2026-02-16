@@ -116,3 +116,20 @@ export type {
   TriggerAction,
   AutoTriggerResult,
 } from "./kill-switch"
+
+// Data Provenance (출처 추적)
+export {
+  computeInteractionProvenance,
+  computeRelayProvenance,
+  isProvenanceQuarantined,
+  determinePostSource,
+  summarizeProvenance,
+  INTERACTION_SOURCE_TRUST,
+  SOURCE_MAPPING,
+} from "./data-provenance"
+export type {
+  InteractionSource,
+  PostSource,
+  ProvenanceData,
+  PostProvenanceData,
+} from "./data-provenance"
