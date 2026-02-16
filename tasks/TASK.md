@@ -132,10 +132,37 @@
   - 비용 계산 (write 1.25x, read 0.1x), 절감 추정 (82%)
   - 캐시 통계, 히스토리 집계, 페르소나별 효율 분석, 최적화 권고
   - 71 테스트 PASS, Build PASS
-- [ ] **T153: 데이터 아키텍처 — Memory vs Instruction 분리**
-- [ ] **T154: ArenaSession 테이블 + 물리적 격리**
-- [ ] **T155: 관리자 보안 대시보드**
-- [ ] **T156: 감정 전염 (Emotional Contagion)**
+- [x] **T153: 데이터 아키텍처 — Memory vs Instruction 분리** ✅ 2026-02-16
+  - Instruction Layer (정체성): 벡터/보이스/팩트북불변/프롬프트/규칙
+  - Memory Layer (기억): 상태/인터랙션/포스트/소비/관계/진화
+  - 투영/추출: extractInstruction, extractMemory, composePersonaView
+  - 접근 정책: 12 컴포넌트별 read/write 경계, instruction_write는 admin/arena만
+  - 변경 감지, 무결성 검증, 성장 통계, 프롬프트 섹션 분리
+  - 62 테스트 PASS, Build PASS
+- [x] **T154: ArenaSession 테이블 + 물리적 격리** ✅ 2026-02-16
+  - DB 레코드 타입: Session/Turn/Judgment/Correction/TokenUsage 5종
+  - 물리적 격리: 네임스페이스, 쓰기 검증 (Persona 직접 변경 금지)
+  - 영속성: sessionToRecord, sessionToRecordSet (트랜잭션 단위)
+  - 라이프사이클: active→completed→archived→expired 5단계
+  - 토큰 추적: 페이즈별 비용 집계, 아카이브 정리 워크플로우
+  - 46 테스트 PASS, Build PASS
+- [x] **T155: 관리자 보안 대시보드** ✅ 2026-02-16
+  - 4계층 통합 모니터링: GateGuard/IntegrityMonitor/OutputSentinel/KillSwitch
+  - 계층별 메트릭 집계: 판정 분포, 위반 카테고리, 차단률, 격리 통계
+  - 출처 추적 메트릭: 신뢰도 분포 (high/medium/low/minimal), 격리 카운트
+  - 보안 알림 생성: 계층별 알림 (인젝션/PII/드리프트/팩트북/동결/트리거)
+  - 전체 상태 판정: healthy/warning/critical/frozen
+  - 스냅샷 비교: 상태 변화 감지, 새 알림/해결 알림 추적
+  - 68 테스트 PASS, Build PASS
+- [x] **T156: 감정 전염 (Emotional Contagion)** ✅ 2026-02-16
+  - 분위기(atmosphere) 전파 모델: 정보 아닌 감정만 전달
+  - 관계 가중치: warmth(0.5) + frequency(0.3) + inverseTension(0.2)
+  - 수신 저항: paradoxTension + agreeableness + socialOpenness 기반
+  - 위상 증폭: 허브(1.3×), 클러스터(1.2×), 고립 감쇠(0.3×)
+  - 전파 라운드: 단일 효과 계산 → 집계 → maxDelta 제한 → 상태 적용
+  - 안전 검사: checkMoodSafety (warning/critical 임계), 수렴 판정
+  - 통계: 양/음 효과 분류, topInfluencer, mostAffected, 분산 추적
+  - 53 테스트 PASS, Build PASS
 
 ---
 
