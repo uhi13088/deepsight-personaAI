@@ -76,7 +76,12 @@
   - 단계+유형 기반 행동 프로토콜 (톤 허용/자기노출/논쟁 의지)
   - 단계 전환 감지, 진행률 추적, 관계 요약
   - 41 테스트 PASS, Build PASS
-- [ ] **T144: 보이스 스펙 (Voice Spec) 정의**
+- [x] **T144: 보이스 스펙 (Voice Spec) 정의** ✅ 2026-02-16
+  - VoiceSpec: VoiceProfile + VoiceStyleParams + 가드레일 + 적응 규칙
+  - 가드레일: 금지 패턴/행동, 톤 경계 (격식도/공격성)
+  - 상태 기반 적응: mood/energy/socialBattery/paradoxTension
+  - 일관성 설정, 요약 생성, 경계 검사
+  - 34 테스트 PASS, Build PASS
 - [ ] **T145: 아레나 — 1:1 스파링 + 심판관**
 - [ ] **T146: 아레나 — 관리자 UI + 비용 제어**
 - [ ] **T147: 아레나 — 교정 루프 (스타일북 반영)**
