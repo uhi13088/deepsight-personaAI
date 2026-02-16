@@ -867,14 +867,14 @@
 
 > 1:1 스파링 + AI 심판 + 비용 제어 + 교정 플로우.
 
-- [ ] **T144: 아레나 세션 인프라**
+- [x] **T144: 아레나 세션 인프라** ✅ 2026-02-16
   - 배경: 페르소나 품질 검증을 위한 대전 테스트 시스템
-  - AC1: Prisma 스키마 — ArenaSession (mode, participants, profileLoadLevel, maxTurns, budget, status)
-  - AC2: ArenaTurn 모델 (sessionId, turnNumber, speakerId, content, vectorSnapshot, poignancy)
-  - AC3: ArenaJudgment 모델 (sessionId, characterConsistency, l2Emergence, paradoxEmergence, triggerResponse, issues[])
-  - AC4: API — POST /api/internal/arena/sessions (세션 생성, 예상 비용 계산)
-  - AC5: 프로필 로드 수준 3단계 — Full(3-Layer+Voice+RAG ~3,200tok), Standard(L1+L2+Voice ~1,800tok), Lite(L1+Stance ~600tok)
-  - AC6: 단위 테스트 + Build PASS
+  - AC1: ✅ Prisma 스키마 — ArenaSession (mode, participants, profileLoadLevel, maxTurns, budget, status) + 6 enum + 5 model
+  - AC2: ✅ ArenaTurn 모델 (sessionId, turnNumber, speakerId, content, vectorSnapshot, poignancy) + Cascade 삭제
+  - AC3: ✅ ArenaJudgment 모델 (sessionId, characterConsistency, l2Emergence, paradoxEmergence, triggerResponse, issues[]) + 1:1 관계
+  - AC4: ✅ API — POST /api/internal/arena/sessions (입력 검증, 참가자 존재 확인, 예상 비용 계산)
+  - AC5: ✅ 프로필 로드 수준 3단계 — Full(~3,200tok), Standard(~1,800tok), Lite(~600tok) + PROFILE_TOKEN_ESTIMATES
+  - AC6: ✅ 78파일 3149개 테스트 PASS + Build PASS
 
 - [ ] **T145: 아레나 실행 엔진 + AI 심판**
   - 배경: 1:1 스파링 실행 + 심판관 자동 평가
@@ -923,6 +923,10 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T144: 아레나 세션 인프라** ✅ 2026-02-16
+  - 변경: schema.prisma, 015_arena_session_infra.sql, api/internal/arena/sessions/route.ts
+  - 테스트: PASS (78파일/3149개)
 
 - [x] **T143: 프롬프트 캐싱 전략** ✅ 2026-02-16
   - 변경: llm-client.ts, llm-adapter.ts, schema.prisma, 014_prompt_caching.sql, llm-client.test.ts, llm-adapter.test.ts
