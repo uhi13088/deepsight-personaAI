@@ -70,7 +70,12 @@
   - 우선순위 기반 규칙 평가 + 효과 병합 + 쿨다운
   - 규칙/세트 검증 + 컴파일 + 기존 TriggerRule 호환 변환
   - 67 테스트 PASS, Build PASS
-- [ ] **T143: 관계 프로토콜 (Relationship Protocol)**
+- [x] **T143: 관계 프로토콜 (Relationship Protocol)** ✅ 2026-02-16
+  - 4단계 관계 발전: STRANGER→ACQUAINTANCE→FAMILIAR→CLOSE
+  - 5종 관계 유형: NEUTRAL/ALLY/RIVAL/MENTOR/FAN
+  - 단계+유형 기반 행동 프로토콜 (톤 허용/자기노출/논쟁 의지)
+  - 단계 전환 감지, 진행률 추적, 관계 요약
+  - 41 테스트 PASS, Build PASS
 - [ ] **T144: 보이스 스펙 (Voice Spec) 정의**
 - [ ] **T145: 아레나 — 1:1 스파링 + 심판관**
 - [ ] **T146: 아레나 — 관리자 UI + 비용 제어**
