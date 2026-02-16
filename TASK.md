@@ -856,12 +856,12 @@
   - AC3: ✅ 신뢰도 자동 계산 — data-provenance.ts(computeInteractionProvenance/determinePostSource/computeRelayProvenance/summarizeProvenance) + post-pipeline.ts(postSource 태깅) + interaction-pipeline.ts(좋아요/댓글 provenance 태깅) + user-interaction.ts(DIRECT 출처 태깅) + scheduler/route.ts(Prisma 연동)
   - AC4: ✅ 27개 data-provenance 테스트 PASS + 전체 77파일 3136개 PASS + Build PASS
 
-- [ ] **T143: 프롬프트 캐싱 전략**
+- [x] **T143: 프롬프트 캐싱 전략** ✅ 2026-02-16
   - 배경: 팩트북(~500 tok) + 보이스 스펙(~300 tok) + 시스템 프롬프트(~200 tok) = ~1,000 토큰이 매 턴 동일
-  - AC1: LLM 클라이언트에 Anthropic prompt caching 적용 — 정적 prefix 분리
-  - AC2: cache_control 블록 설정 — 팩트북+보이스+시스템 프롬프트를 캐시 대상으로 지정
-  - AC3: 비용 절감 추적 — LlmUsageLog에 cacheHit 필드 추가, 캐싱 절감액 계산
-  - AC4: 단위 테스트 + Build PASS
+  - AC1: ✅ LLM 클라이언트에 Anthropic prompt caching 적용 — llm-client.ts(systemPromptPrefix 파라미터, buildSystemBlocks, cache_control: ephemeral)
+  - AC2: ✅ cache_control 블록 설정 — llm-adapter.ts(포스트/댓글/감상/UIV분석/유저응답 5개 provider에 정적 prefix 분리, splitSystemPromptForCache)
+  - AC3: ✅ 비용 절감 추적 — LlmUsageLog에 cacheCreationInputTokens/cacheReadInputTokens/cacheSavingsUsd 3필드 추가, calculateCacheSavings() + 014_prompt_caching.sql 마이그레이션
+  - AC4: ✅ 78파일 3149개 테스트 PASS + Build PASS
 
 ### Phase V4-D: 아레나 v1 (T144~T146)
 
@@ -923,6 +923,10 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T143: 프롬프트 캐싱 전략** ✅ 2026-02-16
+  - 변경: llm-client.ts, llm-adapter.ts, schema.prisma, 014_prompt_caching.sql, llm-client.test.ts, llm-adapter.test.ts
+  - 테스트: PASS (78파일/3149개)
 
 - [x] **T142: 출처 추적 시스템 (Data Provenance)** ✅ 2026-02-16
   - 변경: post-pipeline.ts, interaction-pipeline.ts, user-interaction.ts, scheduler/route.ts, data-provenance.ts(기존), data-provenance.test.ts(기존)

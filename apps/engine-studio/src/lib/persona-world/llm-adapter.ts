@@ -21,8 +21,12 @@ import type { ConsumptionContentType } from "./types"
 export function createPostLLMProvider(personaId: string): LLMProvider {
   return {
     async generateText(params) {
+      // T143: 정적 역할 정의를 캐시 prefix로 분리
+      const { prefix, suffix } = splitSystemPromptForCache(params.systemPrompt)
+
       const result = await generateText({
-        systemPrompt: params.systemPrompt,
+        systemPrompt: suffix,
+        systemPromptPrefix: prefix || undefined,
         userMessage: params.userPrompt,
         maxTokens: params.maxTokens,
         temperature: 0.8,
@@ -47,11 +51,14 @@ export function createCommentLLMProvider(personaId: string): CommentLLMProvider 
       ragContext: CommentGenerationInput["ragContext"]
       commenterState: PersonaStateData
     }): Promise<string> {
-      const systemPrompt = buildCommentSystemPrompt(params.commenterState, params.tone)
+      // T143: 정적 역할 정의(prefix) + 동적 상태/톤(suffix) 분리
+      const staticPrefix = COMMENT_ROLE_PREFIX
+      const dynamicSuffix = buildCommentDynamicSuffix(params.commenterState, params.tone)
       const userPrompt = buildCommentUserPrompt(params.postContent, params.tone, params.ragContext)
 
       const result = await generateText({
-        systemPrompt,
+        systemPrompt: dynamicSuffix,
+        systemPromptPrefix: staticPrefix,
         userMessage: userPrompt,
         maxTokens: 300,
         temperature: 0.8,
@@ -64,24 +71,35 @@ export function createCommentLLMProvider(personaId: string): CommentLLMProvider 
   }
 }
 
-function buildCommentSystemPrompt(state: PersonaStateData, tone: CommentToneDecision): string {
-  return `당신은 SNS에서 활동하는 페르소나입니다. 다른 사람의 포스트에 댓글을 작성합니다.
+/** T143: 캐시 대상 — 댓글 작성 역할 정의 (정적, 매 호출 동일) */
+const COMMENT_ROLE_PREFIX = `당신은 SNS에서 활동하는 페르소나입니다. 다른 사람의 포스트에 댓글을 작성합니다.
 
-[현재 상태]
+[주의사항]
+- 댓글만 출력하세요 (부가 설명 없이)
+- 자연스러운 SNS 댓글처럼 작성하세요`
+
+/** T143: 동적 suffix — 호출마다 달라지는 상태/톤 */
+function buildCommentDynamicSuffix(state: PersonaStateData, tone: CommentToneDecision): string {
+  const toneGuide =
+    tone.tone === "playful"
+      ? "가볍고 재미있는 톤으로"
+      : tone.tone === "analytical"
+        ? "논리적이고 분석적인 톤으로"
+        : tone.tone === "empathetic"
+          ? "공감하는 따뜻한 톤으로"
+          : tone.tone === "counter_argument"
+            ? "정중하지만 다른 의견을 제시하는 톤으로"
+            : tone.tone === "vulnerable"
+              ? "솔직하고 진솔한 톤으로"
+              : ""
+
+  return `[현재 상태]
 기분: ${state.mood.toFixed(2)}, 에너지: ${state.energy.toFixed(2)}, 소셜배터리: ${state.socialBattery.toFixed(2)}
 
 [댓글 톤]
 ${tone.tone} (확신: ${tone.confidence.toFixed(2)})
 이유: ${tone.reason}
-
-[주의사항]
-- 댓글만 출력하세요 (부가 설명 없이)
-- 자연스러운 SNS 댓글처럼 작성하세요
-- ${tone.tone === "playful" ? "가볍고 재미있는 톤으로" : ""}
-- ${tone.tone === "analytical" ? "논리적이고 분석적인 톤으로" : ""}
-- ${tone.tone === "empathetic" ? "공감하는 따뜻한 톤으로" : ""}
-- ${tone.tone === "counter_argument" ? "정중하지만 다른 의견을 제시하는 톤으로" : ""}
-- ${tone.tone === "vulnerable" ? "솔직하고 진솔한 톤으로" : ""}`
+${toneGuide ? `- ${toneGuide}` : ""}`
 }
 
 function buildCommentUserPrompt(
@@ -104,6 +122,11 @@ function buildCommentUserPrompt(
 
 // ── Consumption LLM Provider ─────────────────────────────────
 
+/** T143: 캐시 대상 — 감상 생성 역할 정의 (정적) */
+const IMPRESSION_ROLE_PREFIX = `당신은 콘텐츠를 소비한 페르소나입니다. 한줄 감상을 작성하세요.
+- 50자 이내의 짧은 감상만 출력하세요
+- 감상만 출력하세요 (부가 설명 없이)`
+
 export function createConsumptionLLMProvider(personaId: string): ConsumptionLLMProvider {
   return {
     async generateImpression(params: {
@@ -111,11 +134,10 @@ export function createConsumptionLLMProvider(personaId: string): ConsumptionLLMP
       title: string
       personaContext: string
     }): Promise<string> {
+      // T143: 정적 역할(prefix) + 동적 컨텍스트(suffix)
       const result = await generateText({
-        systemPrompt: `당신은 콘텐츠를 소비한 페르소나입니다. 한줄 감상을 작성하세요.
-${params.personaContext}
-- 50자 이내의 짧은 감상만 출력하세요
-- 감상만 출력하세요 (부가 설명 없이)`,
+        systemPrompt: params.personaContext,
+        systemPromptPrefix: IMPRESSION_ROLE_PREFIX,
         userMessage: `[${params.contentType}] "${params.title}"에 대한 한줄 감상을 작성하세요.`,
         maxTokens: 100,
         temperature: 0.7,
@@ -130,17 +152,30 @@ ${params.personaContext}
 
 // ── User Interaction LLM Provider ────────────────────────────
 
-export function createUserInteractionLLMProvider(personaId: string): UserInteractionLLMProvider {
-  return {
-    async analyzeUserAttitude(userComment: string): Promise<UserInteractionVector> {
-      const result = await generateText({
-        systemPrompt: `유저 댓글의 태도를 분석하세요. JSON만 출력하세요.
+/** T143: 캐시 대상 — UIV 분석 역할 정의 (정적, 매 호출 동일) */
+const UIV_ANALYSIS_PREFIX = `유저 댓글의 태도를 분석하세요. JSON만 출력하세요.
 분석 기준:
 - politeness: 0~1 (공손함 정도)
 - aggression: 0~1 (공격성 정도)
 - intimacy: 0~1 (친밀감 정도)
 
-출력 형식: {"politeness": 0.X, "aggression": 0.X, "intimacy": 0.X}`,
+출력 형식: {"politeness": 0.X, "aggression": 0.X, "intimacy": 0.X}`
+
+/** T143: 캐시 대상 — 유저 응답 역할 정의 (정적) */
+const USER_RESPONSE_PREFIX = `당신은 SNS에서 활동하는 페르소나입니다. 유저 댓글에 답변합니다.
+
+[주의사항]
+- 답변만 출력하세요 (부가 설명 없이)
+- 자연스러운 SNS 답변처럼 작성하세요
+- 유저 태도에 맞춰 반응하세요`
+
+export function createUserInteractionLLMProvider(personaId: string): UserInteractionLLMProvider {
+  return {
+    async analyzeUserAttitude(userComment: string): Promise<UserInteractionVector> {
+      // T143: UIV 분석은 전체 시스템 프롬프트가 정적 → prefix만 사용
+      const result = await generateText({
+        systemPrompt: "",
+        systemPromptPrefix: UIV_ANALYSIS_PREFIX,
         userMessage: userComment,
         maxTokens: 50,
         temperature: 0.3,
@@ -158,19 +193,14 @@ export function createUserInteractionLLMProvider(personaId: string): UserInterac
       ragContext: string
       tone: string
     }): Promise<string> {
-      const systemPrompt = `당신은 SNS에서 활동하는 페르소나입니다. 유저 댓글에 답변합니다.
-
-[응답 톤] ${params.tone}
+      // T143: 정적 역할(prefix) + 동적 톤/태도(suffix)
+      const dynamicSuffix = `[응답 톤] ${params.tone}
 [유저 태도] 공손: ${params.uiv.politeness.toFixed(1)}, 공격: ${params.uiv.aggression.toFixed(1)}, 친밀: ${params.uiv.intimacy.toFixed(1)}
-${params.ragContext ? `[맥락] ${params.ragContext}` : ""}
-
-[주의사항]
-- 답변만 출력하세요 (부가 설명 없이)
-- 자연스러운 SNS 답변처럼 작성하세요
-- 유저 태도에 맞춰 반응하세요`
+${params.ragContext ? `[맥락] ${params.ragContext}` : ""}`
 
       const result = await generateText({
-        systemPrompt,
+        systemPrompt: dynamicSuffix,
+        systemPromptPrefix: USER_RESPONSE_PREFIX,
         userMessage: `유저 댓글: "${params.userComment}"\n\n위 댓글에 대한 답변을 작성하세요.`,
         maxTokens: 300,
         temperature: 0.8,
@@ -180,6 +210,32 @@ ${params.ragContext ? `[맥락] ${params.ragContext}` : ""}
 
       return result.text
     },
+  }
+}
+
+// ── 시스템 프롬프트 캐시 분리 (T143) ─────────────────────────
+
+/**
+ * content-generator가 빌드한 systemPrompt를 정적 prefix / 동적 suffix로 분리.
+ *
+ * 분리 기준: "[현재 상태]" 마커 — 그 이전은 페르소나 역할+Voice로 캐시 가능,
+ * 그 이후는 매 호출 달라지는 상태/감정/주의사항.
+ */
+export function splitSystemPromptForCache(systemPrompt: string): {
+  prefix: string
+  suffix: string
+} {
+  const marker = "[현재 상태]"
+  const idx = systemPrompt.indexOf(marker)
+
+  if (idx <= 0) {
+    // 마커가 없거나 맨 앞이면 분리 불가 → 전부 suffix
+    return { prefix: "", suffix: systemPrompt }
+  }
+
+  return {
+    prefix: systemPrompt.slice(0, idx).trimEnd(),
+    suffix: systemPrompt.slice(idx),
   }
 }
 
