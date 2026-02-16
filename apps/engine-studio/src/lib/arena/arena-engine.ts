@@ -376,6 +376,112 @@ export function buildJudgmentPrompt(session: ArenaSession): string {
   ].join("\n")
 }
 
+// ── 심판 모델 선택 (T145 AC3) ──────────────────────────────
+
+/** 심판 정밀도 */
+export type JudgmentPrecision = "PRECISE" | "QUICK"
+
+/** 정밀도별 추천 모델 */
+export const JUDGMENT_MODEL_MAP: Record<JudgmentPrecision, string> = {
+  PRECISE: "claude-sonnet-4-5-20250929",
+  QUICK: "claude-haiku-4-5-20251001",
+}
+
+/**
+ * LLM 기반 판정 (T145 AC2, AC3).
+ *
+ * buildJudgmentPrompt → LLM 호출 → 응답 파싱 → ArenaJudgment.
+ * 파싱 실패 시 룰 기반 판정으로 폴백.
+ */
+export async function judgeSessionLLM(
+  session: ArenaSession,
+  llm: ArenaLLMProvider,
+  _precision: JudgmentPrecision = "PRECISE"
+): Promise<ArenaJudgment> {
+  const prompt = buildJudgmentPrompt(session)
+
+  try {
+    const result = await llm.generateJudgment(prompt)
+    const parsed = parseJudgmentResponse(result.content)
+
+    if (parsed) {
+      const overallScore = computeOverallScore(parsed.scores)
+      return {
+        sessionId: session.id,
+        scores: parsed.scores,
+        overallScore,
+        issues: parsed.issues,
+        summary: generateJudgmentSummary(parsed.scores, parsed.issues, session),
+        judgedAt: Date.now(),
+      }
+    }
+  } catch {
+    // LLM 실패 → 룰 기반 폴백
+  }
+
+  return judgeSessionRuleBased(session)
+}
+
+/**
+ * LLM 응답에서 판정 데이터 파싱.
+ * { scores: {...}, issues: [...] } JSON 추출.
+ */
+export function parseJudgmentResponse(
+  text: string
+): { scores: JudgmentScores; issues: TurnIssue[] } | null {
+  try {
+    const match = text.match(/\{[\s\S]*\}/)
+    if (!match) return null
+
+    const parsed = JSON.parse(match[0]) as Record<string, unknown>
+
+    const rawScores = parsed.scores as Record<string, unknown> | undefined
+    if (!rawScores) return null
+
+    const scores: JudgmentScores = {
+      characterConsistency: clampScore(Number(rawScores.characterConsistency) || 0),
+      l2Emergence: clampScore(Number(rawScores.l2Emergence) || 0),
+      paradoxEmergence: clampScore(Number(rawScores.paradoxEmergence) || 0),
+      triggerResponse: clampScore(Number(rawScores.triggerResponse) || 0),
+    }
+
+    const rawIssues = Array.isArray(parsed.issues) ? parsed.issues : []
+    const issues: TurnIssue[] = rawIssues
+      .filter(
+        (item: unknown): item is Record<string, unknown> =>
+          typeof item === "object" && item !== null
+      )
+      .map((item) => ({
+        turnNumber: Number(item.turnNumber) || 0,
+        personaId: String(item.personaId ?? ""),
+        category: validateCategory(String(item.category ?? "consistency")),
+        severity: validateSeverity(String(item.severity ?? "minor")),
+        description: String(item.description ?? ""),
+        suggestion: String(item.suggestion ?? ""),
+      }))
+
+    return { scores, issues }
+  } catch {
+    return null
+  }
+}
+
+function clampScore(v: number): number {
+  return Math.max(0, Math.min(1, v))
+}
+
+function validateCategory(c: string): "consistency" | "l2" | "paradox" | "trigger" | "voice" {
+  const valid = new Set(["consistency", "l2", "paradox", "trigger", "voice"])
+  return valid.has(c)
+    ? (c as "consistency" | "l2" | "paradox" | "trigger" | "voice")
+    : "consistency"
+}
+
+function validateSeverity(s: string): "minor" | "major" | "critical" {
+  const valid = new Set(["minor", "major", "critical"])
+  return valid.has(s) ? (s as "minor" | "major" | "critical") : "minor"
+}
+
 /** 가중 평균 계산 */
 export function computeOverallScore(scores: JudgmentScores): number {
   let total = 0

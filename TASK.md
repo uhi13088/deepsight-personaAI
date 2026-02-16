@@ -876,14 +876,14 @@
   - AC5: ✅ 프로필 로드 수준 3단계 — Full(~3,200tok), Standard(~1,800tok), Lite(~600tok) + PROFILE_TOKEN_ESTIMATES
   - AC6: ✅ 78파일 3149개 테스트 PASS + Build PASS
 
-- [ ] **T145: 아레나 실행 엔진 + AI 심판**
+- [x] **T145: 아레나 실행 엔진 + AI 심판** ✅ 2026-02-16
   - 배경: 1:1 스파링 실행 + 심판관 자동 평가
-  - AC1: `src/lib/arena/session-runner.ts` — 턴 기반 대화 실행 (세션 예산 내)
-  - AC2: `src/lib/arena/judge.ts` — AI 심판관 (캐릭터 일관성, L2 발현, 역설 발현, 트리거 반응 평가)
-  - AC3: 심판 모델 선택 — Sonnet(정밀) / Haiku(빠른 체크)
-  - AC4: 문제 구간 지적 — 턴별 이슈 + 교정 제안
-  - AC5: 세션 예산 제어 — 토큰 상한 도달 시 자동 중단, 잔여 예산 실시간 추적
-  - AC6: 단위 테스트 + Build PASS
+  - AC1: ✅ arena-engine.ts runSession() — 턴 기반 대화 실행 (예산 내 자동 반복)
+  - AC2: ✅ judgeSessionLLM() — LLM 기반 AI 심판 + parseJudgmentResponse() 응답 파싱 + 룰 기반 폴백
+  - AC3: ✅ JUDGMENT_MODEL_MAP — Sonnet(PRECISE) / Haiku(QUICK) 모델 선택
+  - AC4: ✅ TurnIssue[] — 턴별 이슈 (category/severity/description/suggestion)
+  - AC5: ✅ addTurn()에서 budgetTokens/maxTurns 초과 시 자동 중단 + getRemainingBudget()
+  - AC6: ✅ 78파일 3159개 테스트 PASS + Build PASS
 
 - [ ] **T146: 아레나 교정 플로우 + 관리자 UI**
   - 배경: 심판 자동 체크 → 보고서 → 관리자 승인 → 페르소나 지침 자동 반영
@@ -923,6 +923,10 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T145: 아레나 실행 엔진 + AI 심판** ✅ 2026-02-16
+  - 변경: arena-engine.ts(judgeSessionLLM, parseJudgmentResponse, JUDGMENT_MODEL_MAP), arena-engine.test.ts
+  - 테스트: PASS (78파일/3159개)
 
 - [x] **T144: 아레나 세션 인프라** ✅ 2026-02-16
   - 변경: schema.prisma, 015_arena_session_infra.sql, api/internal/arena/sessions/route.ts
