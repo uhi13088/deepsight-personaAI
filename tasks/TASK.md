@@ -6,14 +6,16 @@
 
 ## DONE (v3.0)
 
-- [x] **T0~T73**: v3.0 전체 구현 완료 ✅ 2026-02-15
-  - 3-Layer 106D+ 벡터 엔진, PersonaWorld SNS, 매칭, 생성 파이프라인, 피드, 스케줄러 등
+- [x] **T0~T135**: v3.0 전체 구현 완료 ✅ 2026-02-15
+  - 3-Layer 106D+ 벡터 엔진, PersonaWorld SNS, 매칭, 생성 파이프라인, 피드, 스케줄러
+  - Voice 콜드스타트, L3 장기 행동 진화, 골든 샘플, LLM 비용 모니터링
+  - 온보딩 v3 24문항, 콜드 스타트 UI, 자율 활동 시스템, 관리자 대시보드
 
 ---
 
 ## IN_PROGRESS
 
-- [ ] **T74: v4.0 설계서 작성**
+- [ ] **T136: v4.0 설계서 작성**
   - 설명: v3 아카이브 + v4.0 설계서/구현계획서 4개 문서 작성
   - AC:
     1. v3 설계서 4개 → `docs/archive/`로 이동 ✅
@@ -38,26 +40,26 @@
 
 ## QUEUE
 
-- [ ] **T75: 보안 3계층 구현 — Gate Guard**
-- [ ] **T76: 보안 3계층 구현 — Integrity Monitor**
-- [ ] **T77: 보안 3계층 구현 — Output Sentinel**
-- [ ] **T78: 킬 스위치 + 격리 시스템**
-- [ ] **T79: 팩트북 (Fact Book) 구현**
-- [ ] **T80: 트리거 맵 Rule DSL 확장**
-- [ ] **T81: 관계 프로토콜 (Relationship Protocol)**
-- [ ] **T82: 보이스 스펙 (Voice Spec) 정의**
-- [ ] **T83: 아레나 — 1:1 스파링 + 심판관**
-- [ ] **T84: 아레나 — 관리자 UI + 비용 제어**
-- [ ] **T85: 아레나 — 교정 루프 (스타일북 반영)**
-- [ ] **T86: Poignancy Score 구현**
-- [ ] **T87: Forgetting Curve 구현**
-- [ ] **T88: RAG 가중 검색 통합 (Poignancy + Forgetting)**
-- [ ] **T89: 소셜 모듈 B — Connectivity (보안용)**
-- [ ] **T90: 프롬프트 캐싱 적용**
-- [ ] **T91: 데이터 아키텍처 — Memory vs Instruction 분리**
-- [ ] **T92: ArenaSession 테이블 + 물리적 격리**
-- [ ] **T93: 관리자 보안 대시보드**
-- [ ] **T94: 감정 전염 (Emotional Contagion)**
+- [ ] **T137: 보안 3계층 구현 — Gate Guard**
+- [ ] **T138: 보안 3계층 구현 — Integrity Monitor**
+- [ ] **T139: 보안 3계층 구현 — Output Sentinel**
+- [ ] **T140: 킬 스위치 + 격리 시스템**
+- [ ] **T141: 팩트북 (Fact Book) 구현**
+- [ ] **T142: 트리거 맵 Rule DSL 확장**
+- [ ] **T143: 관계 프로토콜 (Relationship Protocol)**
+- [ ] **T144: 보이스 스펙 (Voice Spec) 정의**
+- [ ] **T145: 아레나 — 1:1 스파링 + 심판관**
+- [ ] **T146: 아레나 — 관리자 UI + 비용 제어**
+- [ ] **T147: 아레나 — 교정 루프 (스타일북 반영)**
+- [ ] **T148: Poignancy Score 구현**
+- [ ] **T149: Forgetting Curve 구현**
+- [ ] **T150: RAG 가중 검색 통합 (Poignancy + Forgetting)**
+- [ ] **T151: 소셜 모듈 B — Connectivity (보안용)**
+- [ ] **T152: 프롬프트 캐싱 적용**
+- [ ] **T153: 데이터 아키텍처 — Memory vs Instruction 분리**
+- [ ] **T154: ArenaSession 테이블 + 물리적 격리**
+- [ ] **T155: 관리자 보안 대시보드**
+- [ ] **T156: 감정 전염 (Emotional Contagion)**
 
 ---
 
