@@ -20,6 +20,8 @@ import { checkVoiceConsistency } from "./quality-monitor"
 import { updatePersonaState } from "./state-manager"
 import { buildVoiceAnchorFromProfile, parseVoiceProfile } from "./voice-anchor"
 import { calculatePostPoignancy } from "./poignancy"
+import { determinePostSource } from "@/lib/security/data-provenance"
+import type { PostSource } from "@/lib/security/data-provenance"
 
 // ── 타입 정의 ────────────────────────────────────────────────
 
@@ -31,6 +33,7 @@ export interface PostPipelineDataProvider {
     content: string
     metadata: Record<string, unknown>
     poignancyScore?: number
+    postSource?: PostSource
   }): Promise<{ id: string }>
 
   /** 최근 포스트 텍스트 조회 (RAG voiceAnchor용) */
@@ -156,7 +159,13 @@ export async function executePostCreation(
   const volatility = persona.vectors.narrative.volatility
   const poignancyScore = calculatePostPoignancy(state, volatility)
 
-  // Step 6: DB 저장
+  // Step 6: DB 저장 (출처 태깅 포함)
+  const postSource = determinePostSource({
+    isScheduled: context.trigger === "SCHEDULED",
+    isArenaTest: false,
+    isFeedInspired: context.trigger === "CONTENT_RELEASE",
+  })
+
   const saved = await dataProvider.savePost({
     personaId: persona.id,
     type: postType,
@@ -168,6 +177,7 @@ export async function executePostCreation(
       trigger: context.trigger,
     },
     poignancyScore,
+    postSource,
   })
 
   // Step 7: PersonaState 갱신
