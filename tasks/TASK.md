@@ -99,7 +99,15 @@
   - 관리자 통계: computeAdminStats (세션/판정/이슈/교정)
   - 예산 검증: validateBudgetPolicy, getBudgetAlertLevel
   - 59 테스트 PASS, Build PASS
-- [ ] **T147: 아레나 — 교정 루프 (스타일북 반영)**
+- [x] **T147: 아레나 — 교정 루프 (스타일북 반영)** ✅ 2026-02-16
+  - 교정 제안 추출: extractCorrectionSuggestions (판정 이슈 → 제안)
+  - 패치 생성: buildStyleBookPatch (5카테고리별 패치 오퍼레이션)
+  - 패치 검증: validatePatch (confidence, 일일 한도, 오퍼레이션 수)
+  - 패치 적용: applyVoiceProfilePatch, applyStyleParamsPatch, applyFactbookPatch
+  - 전체 파이프라인: executeCorrectionLoop (생성→검증→적용)
+  - 과교정 감지: detectOverCorrection (일일 한도, 동일 카테고리 연속)
+  - 스냅샷 diff: summarizeSnapshotDiff (전후 비교)
+  - 60 테스트 PASS, Build PASS
 - [ ] **T150: RAG 가중 검색 통합 (Poignancy + Forgetting)**
 - [ ] **T151: 소셜 모듈 B — Connectivity (보안용)**
 - [ ] **T152: 프롬프트 캐싱 적용**
