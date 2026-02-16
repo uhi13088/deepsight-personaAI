@@ -108,7 +108,15 @@
   - 과교정 감지: detectOverCorrection (일일 한도, 동일 카테고리 연속)
   - 스냅샷 diff: summarizeSnapshotDiff (전후 비교)
   - 60 테스트 PASS, Build PASS
-- [ ] **T150: RAG 가중 검색 통합 (Poignancy + Forgetting)**
+- [x] **T150: RAG 가중 검색 통합 (Poignancy + Forgetting)** ✅ 2026-02-16
+  - 가중 검색: searchMemories (recency×0.3 + similarity×0.4 + poignancy×retention×0.3)
+  - 최신성: computeRecency (지수 감쇠, 윈도우 설정)
+  - 항목 점수: scoreMemoryItem (retention, recency, effectivePoignancy, ragScore)
+  - 핵심 기억 부스트: CORE_POIGNANCY_THRESHOLD (0.8) × 1.2
+  - 컨텍스트 빌더: buildRAGContextText (토큰 한도, 태그)
+  - 타입별 검색: searchInteractionMemories, searchPostMemories, searchConsumptionMemories
+  - 통계: computeMemoryRetentionStats (retention 분포, 활성/망각/핵심 카운트)
+  - 43 테스트 PASS, Build PASS
 - [ ] **T151: 소셜 모듈 B — Connectivity (보안용)**
 - [ ] **T152: 프롬프트 캐싱 적용**
 - [ ] **T153: 데이터 아키텍처 — Memory vs Instruction 분리**
