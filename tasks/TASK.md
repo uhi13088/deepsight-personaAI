@@ -82,7 +82,14 @@
   - 상태 기반 적응: mood/energy/socialBattery/paradoxTension
   - 일관성 설정, 요약 생성, 경계 검사
   - 34 테스트 PASS, Build PASS
-- [ ] **T145: 아레나 — 1:1 스파링 + 심판관**
+- [x] **T145: 아레나 — 1:1 스파링 + 심판관** ✅ 2026-02-16
+  - ArenaSession 라이프사이클: create/start/addTurn/cancel
+  - 턴 관리: getNextSpeaker (교대), getRemainingBudget, 자동 종료 (maxTurns/budget)
+  - 비동기 세션 실행기: runSession (LLM DI, 에러 핸들링)
+  - 룰 기반 심판: judgeSessionRuleBased (4차원 평가)
+  - LLM 심판 프롬프트: buildJudgmentPrompt
+  - 가중 평균 종합 점수: computeOverallScore (JUDGMENT_WEIGHTS)
+  - 61 테스트 PASS, Build PASS
 - [ ] **T146: 아레나 — 관리자 UI + 비용 제어**
 - [ ] **T147: 아레나 — 교정 루프 (스타일북 반영)**
 - [ ] **T150: RAG 가중 검색 통합 (Poignancy + Forgetting)**
