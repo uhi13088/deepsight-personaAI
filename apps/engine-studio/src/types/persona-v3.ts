@@ -160,6 +160,48 @@ export interface BackstoryDimension {
   nlpKeywords: string[]
 }
 
+// ── v4.0: Factbook — 불변/가변 기억 분리 ──────────────────────
+
+/** 불변 사실 (변조 감지 대상) */
+export interface ImmutableFact {
+  /** 고유 식별자 */
+  id: string
+  /** 카테고리 */
+  category: "origin" | "formativeExperience" | "innerConflict" | "coreIdentity"
+  /** 사실 내용 */
+  content: string
+  /** 생성 시점 */
+  createdAt: number
+}
+
+/** 가변 맥락 (시간에 따라 변할 수 있음) */
+export interface MutableContext {
+  /** 고유 식별자 */
+  id: string
+  /** 카테고리 */
+  category: "selfNarrative" | "currentGoal" | "recentExperience" | "evolvedPerspective"
+  /** 맥락 내용 */
+  content: string
+  /** 마지막 수정 시점 */
+  updatedAt: number
+  /** 변경 횟수 */
+  changeCount: number
+}
+
+/** 팩트북: 불변 사실 + 가변 맥락 + 무결성 해시 */
+export interface Factbook {
+  /** 불변의 진실 — 변조 시 경고 */
+  immutableFacts: ImmutableFact[]
+  /** 변할 수 있는 맥락 */
+  mutableContext: MutableContext[]
+  /** immutableFacts의 SHA256 해시 (변조 감지용) */
+  integrityHash: string
+  /** 팩트북 생성 시점 */
+  createdAt: number
+  /** 팩트북 마지막 업데이트 시점 */
+  updatedAt: number
+}
+
 export interface TriggerRule {
   condition: string
   affectedLayer: "L1" | "L2" | "L3"

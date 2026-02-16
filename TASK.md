@@ -781,6 +781,139 @@
   - AC4: ✅ 유틸리티 테스트 — api-key-validator 12건, usage-tracker 10건, utils 38건, export 12건
   - AC5: ✅ **171개 테스트 PASS** (≥150) + Build PASS
 
+### Phase V4-A: 기억 시스템 강화 — Poignancy + 팩트북 + 망각곡선 (T135~T137)
+
+> v4.0 핵심 — 기존 RAG/기억 시스템에 감정 가중, 불변/가변 분리, 자연 망각을 추가.
+
+- [x] **T135: Poignancy Score — 감정 가중 기억 검색** ✅
+  - 배경: 현재 RAG는 recency + similarity만 사용. 감정적으로 중요한 기억이 우선되지 않음
+  - AC1: ✅ `src/lib/persona-world/poignancy.ts` — Poignancy 계산 함수 (`pressure × (1 + volatility) × emotionalDelta`), LLM 비용 0
+  - AC2: ✅ RAG 검색 가중치 변경 — `recency × 0.3 + similarity × 0.4 + poignancy × 0.3` (computeRAGSearchScore)
+  - AC3: ✅ InteractionLog/PersonaPost에 poignancyScore 필드 추가 (Prisma 스키마 + 010_poignancy_score.sql)
+  - AC4: ✅ 포스트 생성 시 poignancy 자동 계산 + 저장 (post-pipeline.ts 통합)
+  - AC5: ✅ 단위 테스트 31개 PASS (전체 2131개) + Build PASS
+
+- [x] **T136: 팩트북 — immutable/mutable 기억 분리** ✅
+  - 배경: 현재 backstory JSON이 단일 구조. "불변의 진실"과 "변할 수 있는 맥락"이 혼재
+  - AC1: ✅ backstory JSON 구조 변경 — `immutableFacts[]` + `mutableContext[]` 분리 (Factbook 타입)
+  - AC2: ✅ 공유 타입 업데이트 — ImmutableFact, MutableContext, Factbook 인터페이스 (persona-v3.ts)
+  - AC3: ✅ `factbook.ts` — convertBackstoryToFactbook (origin/exp/conflict→immutable, selfNarrative→mutable 자동 분류)
+  - AC4: ✅ RAG 프롬프트 빌더 — buildFactbookPrompt (immutable=시스템 프롬프트 최상단 고정, mutable=컨텍스트 동적 주입)
+  - AC5: ✅ SHA256 해시 — computeFactbookHash + verifyFactbookIntegrity (Web Crypto API, 변조 감지)
+  - AC6: ✅ 단위 테스트 31개 PASS (전체 2162개) + Build PASS
+
+- [x] **T137: Forgetting Curve — 자연 망각 시스템** ✅
+  - 배경: 10년 활동 페르소나의 RAG DB 무한 성장 방지. "3년 전 점심 메뉴"까지 기억하는 불쾌한 골짜기 방지
+  - AC1: ✅ `forgetting-curve.ts` — 에빙하우스 `retention = e^(-t/S)`, S = stability (Poignancy 기반, power=2 스케일)
+  - AC2: ✅ RAG 검색 — `applyForgettingCurve(relevance × retention)` + `filterAndRankByRetention` 정렬/필터
+  - AC3: ✅ 안정성 매핑 — poignancy 0→S=7일(1주), 0.5→96일(3개월), ≥0.8→3650일(10년=영구), RETENTION_CUTOFF=0.05
+  - AC4: ✅ 단위 테스트 29개 PASS (전체 2191개) + Build PASS
+
+### Phase V4-B: 보안 3계층 아키텍처 (T138~T141)
+
+> v4.0 최우선 — 입구/내부/출구 3단계 보안 필터 + 킬 스위치.
+
+- [ ] **T138: Gate Guard — 입력 보안 계층**
+  - 배경: 유저 발화/페르소나 간 메시지가 메모리에 닿기 전 1차 방어선
+  - AC1: `src/lib/security/gate-guard.ts` — 규칙 기반 필터 (Injection 패턴, 금지어, 구조적 검증)
+  - AC2: 의미론적 필터 — 규칙 필터에서 suspicious 판정 시에만 Haiku 모델로 2차 검증 (비용 최적화)
+  - AC3: 출처 태깅 — MemoryEntry 타입 정의 (source, trustLevel, propagationDepth, gateResult)
+  - AC4: 신뢰도 전파 규칙 — 직접경험 1.0, 1단계 전달 0.7×원본, 2단계 0.5×원본, 3단계+ 자동 격리
+  - AC5: 단위 테스트 + Build PASS
+
+- [ ] **T139: Integrity Monitor — 내부 감시 계층**
+  - 배경: 저장 후 시간이 지나면서 발생하는 오염 탐지
+  - AC1: `src/lib/security/integrity-monitor.ts` — 팩트북 해시 검증 (immutableFacts 변조 감지)
+  - AC2: 상태 드리프트 감지 — `cosineSimilarity(L1_original, L1_current)`, 0.85 이하 경고, 0.70 이하 붕괴 위험
+  - AC3: mutableContext 변경 로그 (changelog) + 하루 5회 이상 동일 항목 변경 시 자동 플래그
+  - AC4: 집단 이상 탐지 — 전체 페르소나 평균 mood 모니터링 (0.3 이하 집단 우울 경고)
+  - AC5: 단위 테스트 + Build PASS
+
+- [ ] **T140: Output Sentinel — 출력 보안 계층**
+  - 배경: 페르소나 생성 콘텐츠가 유저에 도달하기 전 마지막 관문
+  - AC1: `src/lib/security/output-sentinel.ts` — 규칙 기반 (PII 패턴, 시스템 정보 유출, 욕설/혐오)
+  - AC2: 팩트북 위반 검증 — immutableFacts 키워드 매칭 기반 (LLM 불필요)
+  - AC3: 격리 시스템 (Quarantine) — flagged 판정 시 격리 큐 저장, 관리자 확인/승인/삭제
+  - AC4: Prisma 스키마 — QuarantineEntry 모델 (content, source, reason, status, reviewedBy)
+  - AC5: 단위 테스트 + Build PASS
+
+- [ ] **T141: 킬 스위치 + SystemSafetyConfig**
+  - 배경: v4.1 회고/v4.2 확산 도입 시 "문제 발생 → 즉시 OFF" 인프라
+  - AC1: `src/lib/security/kill-switch.ts` — SystemSafetyConfig (emergencyFreeze, 기능별 ON/OFF)
+  - AC2: 기능별 토글 — diffusion(off), reflection(off), emotionalContagion(off), arena(on)
+  - AC3: 자동 트리거 — 격리 50건/10분 → 자동 동결, 집단 mood 0.2 이하 → 경고, L1 드리프트 0.7 이하 20% 초과 → 동결
+  - AC4: DB 스키마 — SystemSafetyConfig 테이블 + API (GET/PUT /api/internal/safety-config)
+  - AC5: 단위 테스트 + Build PASS
+
+### Phase V4-C: 출처 추적 + 프롬프트 캐싱 (T142~T143)
+
+> 데이터 출처 추적 인프라 + 비용 최적화.
+
+- [ ] **T142: 출처 추적 시스템 (Data Provenance)**
+  - 배경: 향후 확산 기능 대비, 모든 기억에 출처/신뢰도/전파 깊이 추적
+  - AC1: Prisma 스키마 — InteractionLog에 source enum 확장, trustLevel, propagationDepth, originPersonaId 추가
+  - AC2: PersonaPost에 source 필드 추가 (autonomous/feed_inspired/arena_test)
+  - AC3: 신뢰도 자동 계산 로직 — 기존 interaction-pipeline에 출처 태깅 통합
+  - AC4: 단위 테스트 + Build PASS
+
+- [ ] **T143: 프롬프트 캐싱 전략**
+  - 배경: 팩트북(~500 tok) + 보이스 스펙(~300 tok) + 시스템 프롬프트(~200 tok) = ~1,000 토큰이 매 턴 동일
+  - AC1: LLM 클라이언트에 Anthropic prompt caching 적용 — 정적 prefix 분리
+  - AC2: cache_control 블록 설정 — 팩트북+보이스+시스템 프롬프트를 캐시 대상으로 지정
+  - AC3: 비용 절감 추적 — LlmUsageLog에 cacheHit 필드 추가, 캐싱 절감액 계산
+  - AC4: 단위 테스트 + Build PASS
+
+### Phase V4-D: 아레나 v1 (T144~T146)
+
+> 1:1 스파링 + AI 심판 + 비용 제어 + 교정 플로우.
+
+- [ ] **T144: 아레나 세션 인프라**
+  - 배경: 페르소나 품질 검증을 위한 대전 테스트 시스템
+  - AC1: Prisma 스키마 — ArenaSession (mode, participants, profileLoadLevel, maxTurns, budget, status)
+  - AC2: ArenaTurn 모델 (sessionId, turnNumber, speakerId, content, vectorSnapshot, poignancy)
+  - AC3: ArenaJudgment 모델 (sessionId, characterConsistency, l2Emergence, paradoxEmergence, triggerResponse, issues[])
+  - AC4: API — POST /api/internal/arena/sessions (세션 생성, 예상 비용 계산)
+  - AC5: 프로필 로드 수준 3단계 — Full(3-Layer+Voice+RAG ~3,200tok), Standard(L1+L2+Voice ~1,800tok), Lite(L1+Stance ~600tok)
+  - AC6: 단위 테스트 + Build PASS
+
+- [ ] **T145: 아레나 실행 엔진 + AI 심판**
+  - 배경: 1:1 스파링 실행 + 심판관 자동 평가
+  - AC1: `src/lib/arena/session-runner.ts` — 턴 기반 대화 실행 (세션 예산 내)
+  - AC2: `src/lib/arena/judge.ts` — AI 심판관 (캐릭터 일관성, L2 발현, 역설 발현, 트리거 반응 평가)
+  - AC3: 심판 모델 선택 — Sonnet(정밀) / Haiku(빠른 체크)
+  - AC4: 문제 구간 지적 — 턴별 이슈 + 교정 제안
+  - AC5: 세션 예산 제어 — 토큰 상한 도달 시 자동 중단, 잔여 예산 실시간 추적
+  - AC6: 단위 테스트 + Build PASS
+
+- [ ] **T146: 아레나 교정 플로우 + 관리자 UI**
+  - 배경: 심판 자동 체크 → 보고서 → 관리자 승인 → 페르소나 지침 자동 반영
+  - AC1: 교정 API — POST /api/internal/arena/sessions/[id]/corrections (심판 지적 구간 → 다시 쓰기 → 스타일북 저장)
+  - AC2: 관리자 승인 플로우 — 교정본 확인 → 승인 시 페르소나 팩트북/스타일북(voiceProfile) 자동 반영
+  - AC3: 아레나 관리자 UI — 세션 생성 패널 (모드/참가자/프로필로드/시나리오/예상비용), 결과 리뷰 패널
+  - AC4: 조직 레벨 예산 — 월간 아레나 예산 설정, 80% 알림, 100% 차단
+  - AC5: 단위 테스트 + Build PASS
+
+### Phase V4-E: Social Module + 관리자 대시보드 (T147~T148)
+
+> L4 대신 독립 모듈 시스템 + 보안 대시보드.
+
+- [ ] **T147: Social Module System — Connectivity (보안 전용)**
+  - 배경: L4를 레이어가 아닌 독립 모듈로. v4.0에서는 Connectivity만 보안 모니터링용 활성화
+  - AC1: `src/lib/social-module/types.ts` — SocialModuleConfig (authority/connectivity/reputation/tribalism 각 ON/OFF + weight)
+  - AC2: `src/lib/social-module/connectivity.ts` — PersonaRelationship 그래프 분석 (Hub/Isolate 탐지, degree centrality)
+  - AC3: featureBindings 설정 — matching: ["reputation"], feed: ["authority","reputation"], arena: ["tribalism"], security: ["connectivity"]
+  - AC4: DB 스키마 — SocialModuleConfig 테이블 (글로벌 설정, 모듈별 enabled/weight)
+  - AC5: 단위 테스트 + Build PASS
+
+- [ ] **T148: 관리자 보안 대시보드**
+  - 배경: 보안 3계층의 모니터링/관리 UI
+  - AC1: 보안 알림 패널 — Gate Guard/Integrity/Output 경고 실시간 표시
+  - AC2: 격리 큐 관리 — QuarantineEntry 목록, 승인/삭제, 필터링
+  - AC3: 집단 이상 모니터링 — 전체 mood 분포, L1 드리프트 분포, 키워드 TF-IDF 급변 차트
+  - AC4: 킬 스위치 제어판 — SystemSafetyConfig UI (기능별 토글, 긴급 동결 버튼)
+  - AC5: Social Module Connectivity 시각화 — Hub/Isolate 표시, 관계 그래프 요약
+  - AC6: 단위 테스트 + Build PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)

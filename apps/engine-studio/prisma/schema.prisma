@@ -1109,6 +1109,9 @@ model PersonaPost {
   hiddenAt    DateTime?
   hiddenBy    String?         // 숨긴 관리자 ID
 
+  // v4.0: Poignancy Score (감정 가중 기억 검색)
+  poignancyScore Decimal?     @db.Decimal(4, 3)  // 0.000~1.000
+
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -1638,6 +1641,9 @@ model InteractionLog {
   contextRecall       Decimal? @db.Decimal(4, 3)
   settingConsistency  Decimal? @db.Decimal(4, 3)
   voiceDrift          Decimal? @db.Decimal(4, 3)
+
+  // v4.0: Poignancy Score (감정 가중 기억 검색)
+  poignancyScore      Decimal? @db.Decimal(4, 3)  // 0.000~1.000
 
   createdAt           DateTime @default(now())
 

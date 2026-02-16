@@ -176,6 +176,48 @@ export type {
   ActivityLearnResult,
 } from "./onboarding"
 
+// v4.0: Poignancy Score (감정 가중 기억 검색)
+export {
+  calculatePoignancy,
+  derivePressureFromState,
+  computeEmotionalDelta,
+  computeRAGSearchScore,
+  calculatePostPoignancy,
+  calculateInteractionPoignancy,
+  RAG_SEARCH_WEIGHTS,
+  POIGNANCY_THRESHOLDS,
+} from "./poignancy"
+export type { PoignancyInput, PoignancyEventType, RAGSearchScoreInput } from "./poignancy"
+
+// v4.0: Factbook (불변/가변 기억 분리)
+export {
+  computeFactbookHash,
+  verifyFactbookIntegrity,
+  convertBackstoryToFactbook,
+  addMutableContext,
+  updateMutableContext,
+  detectExcessiveChanges,
+  buildFactbookPrompt,
+  factbookToBackstory,
+  MUTABLE_CHANGE_ALERT_THRESHOLD,
+  FACTBOOK_CATEGORIES,
+} from "./factbook"
+
+// v4.0: Forgetting Curve (자연 망각 시스템)
+export {
+  computeStability,
+  computeRetention,
+  computeRetentionFromPoignancy,
+  applyForgettingCurve,
+  filterAndRankByRetention,
+  BASE_STABILITY,
+  MAX_STABILITY,
+  CORE_MEMORY_STABILITY,
+  RETENTION_CUTOFF,
+  STABILITY_CONFIG,
+} from "./forgetting-curve"
+export type { ForgettingCurveInput } from "./forgetting-curve"
+
 // LLM Adapter
 export {
   createPostLLMProvider,
