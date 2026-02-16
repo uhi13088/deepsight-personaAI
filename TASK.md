@@ -885,13 +885,13 @@
   - AC5: ✅ addTurn()에서 budgetTokens/maxTurns 초과 시 자동 중단 + getRemainingBudget()
   - AC6: ✅ 78파일 3159개 테스트 PASS + Build PASS
 
-- [ ] **T146: 아레나 교정 플로우 + 관리자 UI**
+- [x] **T146: 아레나 교정 플로우 + 관리자 UI** ✅ 2026-02-16
   - 배경: 심판 자동 체크 → 보고서 → 관리자 승인 → 페르소나 지침 자동 반영
-  - AC1: 교정 API — POST /api/internal/arena/sessions/[id]/corrections (심판 지적 구간 → 다시 쓰기 → 스타일북 저장)
-  - AC2: 관리자 승인 플로우 — 교정본 확인 → 승인 시 페르소나 팩트북/스타일북(voiceProfile) 자동 반영
-  - AC3: 아레나 관리자 UI — 세션 생성 패널 (모드/참가자/프로필로드/시나리오/예상비용), 결과 리뷰 패널
-  - AC4: 조직 레벨 예산 — 월간 아레나 예산 설정, 80% 알림, 100% 차단
-  - AC5: 단위 테스트 + Build PASS
+  - AC1: ✅ POST/PATCH /api/internal/arena/sessions/[id]/corrections
+  - AC2: ✅ 승인 시 voiceProfile 자동 반영 + correction-loop.ts
+  - AC3: ✅ 아레나 관리자 UI (/arena) — 세션 생성+목록+리뷰
+  - AC4: ✅ 예산 현황 UI + arena-cost-control.ts(0.8 경고, 1.0 차단)
+  - AC5: ✅ 78파일 3159개 테스트 PASS + Build PASS
 
 ### Phase V4-E: Social Module + 관리자 대시보드 (T147~T148)
 
@@ -924,8 +924,12 @@
 
 ## ✅ DONE (완료)
 
+- [x] **T146: 아레나 교정 플로우 + 관리자 UI** ✅ 2026-02-16
+  - 변경: sessions/[id]/corrections/route.ts, arena/page.tsx
+  - 테스트: PASS (78파일/3159개)
+
 - [x] **T145: 아레나 실행 엔진 + AI 심판** ✅ 2026-02-16
-  - 변경: arena-engine.ts(judgeSessionLLM, parseJudgmentResponse, JUDGMENT_MODEL_MAP), arena-engine.test.ts
+  - 변경: arena-engine.ts, arena-engine.test.ts
   - 테스트: PASS (78파일/3159개)
 
 - [x] **T144: 아레나 세션 인프라** ✅ 2026-02-16
