@@ -64,7 +64,12 @@
 
 ## QUEUE
 
-- [ ] **T142: 트리거 맵 Rule DSL 확장**
+- [x] **T142: 트리거 맵 Rule DSL 확장** ✅ 2026-02-16
+  - 구조화된 표현식 (Compare/Range/Contains/AND/OR/NOT)
+  - 필드 경로 해석 (L1/L2/L3/state/context)
+  - 우선순위 기반 규칙 평가 + 효과 병합 + 쿨다운
+  - 규칙/세트 검증 + 컴파일 + 기존 TriggerRule 호환 변환
+  - 67 테스트 PASS, Build PASS
 - [ ] **T143: 관계 프로토콜 (Relationship Protocol)**
 - [ ] **T144: 보이스 스펙 (Voice Spec) 정의**
 - [ ] **T145: 아레나 — 1:1 스파링 + 심판관**
