@@ -1,14 +1,26 @@
 -- ============================================================
--- DeepSight Engine Studio — Cold Start v3 Questions Seed
--- Generated: 2026-02-17
+-- DeepSight Engine Studio — Cold Start v3.1 Questions Seed
+-- Updated: 2026-02-17
 --
--- Cold Start v3 질문 24문항 (3-Phase × 8)
+-- Cold Start v3.1 질문 24문항 (3-Phase × 8)
+-- 직교(Orthogonal) 설계: 옵션이 L1×L2 4사분면을 형성
+-- → 역설(Paradox) 감지 구조적 지원
+--
+-- v3.0 → v3.1 주요 변경:
+--   1. Phase 1: 선형 → 직교 옵션 (4사분면)
+--   2. Phase 2: L3 가중치 추가 (Narrative Drive 4D)
+--   3. Phase 3: 3/7 역설 쌍 → 7/7 역설 쌍 완전 커버
+--
 -- 독립 실행 가능: 기존 v3 질문 삭제 후 재등록
 -- 업데이트 시 이 파일만 재실행하면 됩니다.
 --
--- Phase 1 (Q1~Q8):  L1 주력 + L2 부가 → BASIC (~65% 신뢰도)
--- Phase 2 (Q9~Q16): L2 주력 + L1 교차 → STANDARD (~80% 신뢰도)
--- Phase 3 (Q17~Q24): 교차검증 + 역설 감지 → ADVANCED (~93% 신뢰도)
+-- Phase 1 (Q1~Q8):  L1 주력 + L2 직교 → BASIC (~65% 신뢰도)
+-- Phase 2 (Q9~Q16): L2 주력 + L1 교차 + L3 탐색 → STANDARD (~80% 신뢰도)
+-- Phase 3 (Q17~Q24): 7쌍 역설 직교 검증 + L3 종합 → ADVANCED (~93% 신뢰도)
+--
+-- 직교 설계 원칙:
+--   aligned 쌍: A(L1↑L2↑) B(L1↑L2↓=역설) C(L1↓L2↑=역설) D(L1↓L2↓)
+--   inverse 쌍: A(L1↑L2↓=일관) B(L1↑L2↑=역설) C(L1↓L2↓=역설) D(L1↓L2↑=일관)
 -- ============================================================
 
 -- 기존 v3 질문 삭제
@@ -18,445 +30,487 @@ DELETE FROM psych_profile_templates WHERE id LIKE 'v3-q%';
 DELETE FROM psych_profile_templates WHERE id LIKE 'seed-q-%';
 
 -- ============================================
--- Phase 1: L1 주력 (8문항)
+-- Phase 1: L1 주력 + L2 직교 (8문항)
+-- 7개 L1↔L2 역설 쌍 각각에 직교 4사분면
 -- ============================================
 
+-- Q01: depth↔openness (aligned) — "지적 호기심의 역설"
+-- 직교: A(depth↑open↑) B(depth↑open↓=역설) C(depth↓open↑=역설) D(depth↓open↓)
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
   'v3-q01-depth-openness',
-  'Q01-depth-콘텐츠 깊이 선호',
+  'Q01-depth↔openness-탐구 스타일',
   'LIGHT', 1,
-  '주말에 관심 있는 주제의 다큐멘터리를 발견했습니다. 당신은?',
+  '3일간 자유 시간이 주어졌습니다. 어떤 프로젝트에 몰두하고 싶나요?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "흥미로운 장면만 골라서 빠르게 훑어본다", "l1Weights": {"depth": -0.2}, "l2Weights": {"openness": 0.1}},
-    {"key": "B", "label": "한 편 정도는 끝까지 본다", "l1Weights": {"depth": 0.1}, "l2Weights": {"openness": 0.15}},
-    {"key": "C", "label": "관련 자료까지 찾아보며 깊이 파고든다", "l1Weights": {"depth": 0.3}, "l2Weights": {"openness": 0.25}},
-    {"key": "D", "label": "시리즈 전체를 정주행하고 감독 인터뷰까지 찾아본다", "l1Weights": {"depth": 0.4}, "l2Weights": {"openness": 0.3}}
+    {"key": "A", "label": "이전부터 궁금했던 새로운 분야를 처음부터 깊이 공부한다", "l1Weights": {"depth": 0.25}, "l2Weights": {"openness": 0.2}},
+    {"key": "B", "label": "이미 잘 아는 분야에서 전문가 수준의 심화 연구를 한다", "l1Weights": {"depth": 0.25}, "l2Weights": {"openness": -0.15}},
+    {"key": "C", "label": "여러 새로운 분야를 빠르게 체험하며 가능성을 탐색한다", "l1Weights": {"depth": -0.15}, "l2Weights": {"openness": 0.2}},
+    {"key": "D", "label": "좋아하는 콘텐츠를 편하게 즐기며 충전한다", "l1Weights": {"depth": -0.2}, "l2Weights": {"openness": -0.15}}
   ]'::jsonb,
   ARRAY['depth', 'openness'],
-  '{"type": "mapped", "phase": 1}'::jsonb,
+  '{"type": "orthogonal", "phase": 1, "pair": "depth↔openness", "direction": "aligned"}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
 
+-- Q02: lens↔neuroticism (inverse) — "감성/불안의 역설"
+-- inverse 직교: A(lens↑neuro↓=일관) B(lens↑neuro↑=역설) C(lens↓neuro↓=역설) D(lens↓neuro↑=일관)
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
-  'v3-q02-lens-conscientiousness',
-  'Q02-lens-평가 기준',
+  'v3-q02-lens-neuroticism',
+  'Q02-lens↔neuroticism-결정 방식',
   'LIGHT', 2,
-  '새로운 레스토랑을 고를 때, 가장 먼저 확인하는 것은?',
+  '인생의 중요한 결정(이직, 이사 등)을 앞두고 있습니다. 당신의 접근 방식은?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "분위기 사진을 보고 직감으로 결정한다", "l1Weights": {"lens": -0.3}, "l2Weights": {"conscientiousness": -0.2}},
-    {"key": "B", "label": "친구의 추천을 믿고 따라간다", "l1Weights": {"lens": -0.1}, "l2Weights": {"conscientiousness": 0.0}},
-    {"key": "C", "label": "평점과 리뷰 수를 비교해본다", "l1Weights": {"lens": 0.2}, "l2Weights": {"conscientiousness": 0.25}},
-    {"key": "D", "label": "메뉴, 가격, 위치, 리뷰를 종합 분석한다", "l1Weights": {"lens": 0.35}, "l2Weights": {"conscientiousness": 0.35}}
+    {"key": "A", "label": "데이터와 장단점을 정리하면 답이 보인다. 분석하면 마음이 편해진다", "l1Weights": {"lens": 0.25}, "l2Weights": {"neuroticism": -0.2}},
+    {"key": "B", "label": "논리적으로 따져볼수록 변수가 보여 불안하다. 분석해도 확신이 안 선다", "l1Weights": {"lens": 0.2}, "l2Weights": {"neuroticism": 0.2}},
+    {"key": "C", "label": "직감을 믿는다. 어떤 선택이든 잘 될 거라는 편안한 확신이 있다", "l1Weights": {"lens": -0.2}, "l2Weights": {"neuroticism": -0.2}},
+    {"key": "D", "label": "마음이 끌리는 쪽으로 가지만, 선택 후에도 계속 괜찮은지 되돌아본다", "l1Weights": {"lens": -0.2}, "l2Weights": {"neuroticism": 0.2}}
   ]'::jsonb,
-  ARRAY['lens', 'conscientiousness'],
-  '{"type": "mapped", "phase": 1}'::jsonb,
+  ARRAY['lens', 'neuroticism'],
+  '{"type": "orthogonal", "phase": 1, "pair": "lens↔neuroticism", "direction": "inverse"}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
 
+-- Q03: stance↔agreeableness (inverse) — "태도의 역설 (츤데레)"
+-- inverse 직교: A(stance↑agree↓=일관) B(stance↑agree↑=역설/츤데레) C(stance↓agree↓=역설) D(stance↓agree↑=일관)
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
   'v3-q03-stance-agreeableness',
-  'Q03-stance-의견 충돌 상황',
+  'Q03-stance↔agreeableness-팀 의사결정',
   'LIGHT', 3,
-  '친구와 영화에 대해 정반대 의견일 때, 당신은?',
+  '팀 회의에서 다수의 의견이 당신의 분석과 충돌합니다. 당신은?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "\"그럴 수도 있지\" 하고 넘어간다", "l1Weights": {"stance": -0.3}, "l2Weights": {"agreeableness": 0.3}},
-    {"key": "B", "label": "상대 의견을 들어보고 공감 포인트를 찾는다", "l1Weights": {"stance": -0.1}, "l2Weights": {"agreeableness": 0.2}},
-    {"key": "C", "label": "내 근거를 조목조목 설명한다", "l1Weights": {"stance": 0.25}, "l2Weights": {"agreeableness": -0.1}},
-    {"key": "D", "label": "토론을 즐기며 끝까지 논쟁한다", "l1Weights": {"stance": 0.4}, "l2Weights": {"agreeableness": -0.3}}
+    {"key": "A", "label": "내 분석이 정확하다면 소수 의견이라도 끝까지 주장한다", "l1Weights": {"stance": 0.25}, "l2Weights": {"agreeableness": -0.2}},
+    {"key": "B", "label": "내 의견을 분명히 전달하되, 최종 결정은 팀의 합의를 따른다", "l1Weights": {"stance": 0.2}, "l2Weights": {"agreeableness": 0.2}},
+    {"key": "C", "label": "특별한 이견은 없지만, 팀의 방향보다 내 방식대로 실행하겠다", "l1Weights": {"stance": -0.2}, "l2Weights": {"agreeableness": -0.15}},
+    {"key": "D", "label": "다수의 의견에 자연스럽게 동의한다. 팀워크가 더 중요하다", "l1Weights": {"stance": -0.2}, "l2Weights": {"agreeableness": 0.25}}
   ]'::jsonb,
   ARRAY['stance', 'agreeableness'],
-  '{"type": "mapped", "phase": 1}'::jsonb,
+  '{"type": "orthogonal", "phase": 1, "pair": "stance↔agreeableness", "direction": "inverse"}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
 
+-- Q04: scope↔conscientiousness (aligned) — "게으른 완벽주의자"
+-- 직교: A(scope↑consc↑) B(scope↑consc↓=역설) C(scope↓consc↑=역설) D(scope↓consc↓)
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
-  'v3-q04-scope-openness',
-  'Q04-scope-정보 탐색 범위',
+  'v3-q04-scope-conscientiousness',
+  'Q04-scope↔conscientiousness-프로젝트 접근',
   'LIGHT', 4,
-  '온라인 서점에서 책을 고를 때, 어떤 방식이 자연스럽나요?',
+  '새로운 프로젝트를 시작할 때 당신의 접근 방식은?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "좋아하는 장르 베스트셀러만 확인한다", "l1Weights": {"scope": -0.3}, "l2Weights": {"openness": -0.2}},
-    {"key": "B", "label": "관심 분야 2~3개를 번갈아 본다", "l1Weights": {"scope": -0.05}, "l2Weights": {"openness": 0.05}},
-    {"key": "C", "label": "추천 알고리즘이 보여주는 다양한 카테고리를 탐색한다", "l1Weights": {"scope": 0.2}, "l2Weights": {"openness": 0.2}},
-    {"key": "D", "label": "전혀 모르는 분야까지 호기심에 이끌려 둘러본다", "l1Weights": {"scope": 0.35}, "l2Weights": {"openness": 0.35}}
+    {"key": "A", "label": "세부 사항까지 꼼꼼하게 계획을 세우고 체계적으로 진행한다", "l1Weights": {"scope": 0.25}, "l2Weights": {"conscientiousness": 0.2}},
+    {"key": "B", "label": "디테일에 집착하지만 정작 실행은 기분 따라, 마감에 쫓기기도 한다", "l1Weights": {"scope": 0.2}, "l2Weights": {"conscientiousness": -0.2}},
+    {"key": "C", "label": "큰 그림만 잡지만 일단 시작하면 규칙적이고 꾸준하게 한다", "l1Weights": {"scope": -0.15}, "l2Weights": {"conscientiousness": 0.2}},
+    {"key": "D", "label": "핵심만 파악하고 유연하게, 흐름을 타며 진행한다", "l1Weights": {"scope": -0.2}, "l2Weights": {"conscientiousness": -0.2}}
   ]'::jsonb,
-  ARRAY['scope', 'openness'],
-  '{"type": "mapped", "phase": 1}'::jsonb,
+  ARRAY['scope', 'conscientiousness'],
+  '{"type": "orthogonal", "phase": 1, "pair": "scope↔conscientiousness", "direction": "aligned"}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
 
+-- Q05: taste↔openness (aligned) — "보수적 힙스터"
+-- 직교: A(taste↑open↑) B(taste↑open↓=역설) C(taste↓open↑=역설) D(taste↓open↓)
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
   'v3-q05-taste-openness',
-  'Q05-taste-새로운 장르 반응',
+  'Q05-taste↔openness-문화생활 태도',
   'LIGHT', 5,
-  '친구가 평소 안 듣던 장르의 음악을 추천해줍니다. 당신은?',
+  '문화생활(음악, 영화, 전시 등)에 대한 당신의 태도는?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "별로 끌리지 않아서 내 플레이리스트를 튼다", "l1Weights": {"taste": -0.3}, "l2Weights": {"openness": -0.3}},
-    {"key": "B", "label": "한 곡 정도는 예의상 들어본다", "l1Weights": {"taste": -0.1}, "l2Weights": {"openness": -0.05}},
-    {"key": "C", "label": "흥미롭다, 비슷한 곡을 더 찾아본다", "l1Weights": {"taste": 0.2}, "l2Weights": {"openness": 0.25}},
-    {"key": "D", "label": "완전 새로운 경험! 그 장르를 파보기 시작한다", "l1Weights": {"taste": 0.4}, "l2Weights": {"openness": 0.35}}
+    {"key": "A", "label": "다양한 장르의 실험적인 작품을 적극 탐색한다. 새로운 것이 곧 자극이다", "l1Weights": {"taste": 0.25}, "l2Weights": {"openness": 0.2}},
+    {"key": "B", "label": "취향은 독특하고 까다롭지만, 일상은 안정적인 루틴을 선호한다", "l1Weights": {"taste": 0.2}, "l2Weights": {"openness": -0.2}},
+    {"key": "C", "label": "검증된 클래식을 좋아하지만, 삶에서는 새로운 경험에 열려 있다", "l1Weights": {"taste": -0.15}, "l2Weights": {"openness": 0.2}},
+    {"key": "D", "label": "좋아하는 장르가 정해져 있고, 삶의 패턴도 익숙한 것을 유지한다", "l1Weights": {"taste": -0.2}, "l2Weights": {"openness": -0.2}}
   ]'::jsonb,
   ARRAY['taste', 'openness'],
-  '{"type": "mapped", "phase": 1}'::jsonb,
+  '{"type": "orthogonal", "phase": 1, "pair": "taste↔openness", "direction": "aligned"}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
 
+-- Q06: purpose↔conscientiousness (aligned) — "목표/실천의 역설"
+-- 직교: A(purpose↑consc↑) B(purpose↑consc↓=역설) C(purpose↓consc↑=역설) D(purpose↓consc↓)
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
   'v3-q06-purpose-conscientiousness',
-  'Q06-purpose-콘텐츠 소비 동기',
+  'Q06-purpose↔conscientiousness-소비 패턴',
   'LIGHT', 6,
-  '유튜브를 켤 때, 주된 이유는?',
+  '콘텐츠 소비 패턴에 가장 가까운 것은?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "그냥 시간을 때우려고, 뭐든 재미있으면 OK", "l1Weights": {"purpose": -0.3}, "l2Weights": {"conscientiousness": -0.25}},
-    {"key": "B", "label": "기분 전환이나 힐링이 필요해서", "l1Weights": {"purpose": -0.1}, "l2Weights": {"conscientiousness": -0.05}},
-    {"key": "C", "label": "관심 분야의 새로운 정보를 얻으려고", "l1Weights": {"purpose": 0.2}, "l2Weights": {"conscientiousness": 0.2}},
-    {"key": "D", "label": "구체적으로 배우거나 해결할 문제가 있어서", "l1Weights": {"purpose": 0.35}, "l2Weights": {"conscientiousness": 0.35}}
+    {"key": "A", "label": "배울 목표가 분명하고, 학습 일정까지 체계적으로 관리한다", "l1Weights": {"purpose": 0.25}, "l2Weights": {"conscientiousness": 0.2}},
+    {"key": "B", "label": "의미 있는 콘텐츠를 추구하지만, 기분이 내킬 때 충동적으로 본다", "l1Weights": {"purpose": 0.2}, "l2Weights": {"conscientiousness": -0.2}},
+    {"key": "C", "label": "특별한 목적 없이 보지만, 보는 시간과 양은 철저히 관리한다", "l1Weights": {"purpose": -0.15}, "l2Weights": {"conscientiousness": 0.2}},
+    {"key": "D", "label": "재미있으면 그만, 자유롭게 기분 따라 즐긴다", "l1Weights": {"purpose": -0.2}, "l2Weights": {"conscientiousness": -0.2}}
   ]'::jsonb,
   ARRAY['purpose', 'conscientiousness'],
-  '{"type": "mapped", "phase": 1}'::jsonb,
+  '{"type": "orthogonal", "phase": 1, "pair": "purpose↔conscientiousness", "direction": "aligned"}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
 
+-- Q07: sociability↔extraversion (aligned) — "사교적 내향인"
+-- 직교: A(soc↑extra↑) B(soc↑extra↓=역설) C(soc↓extra↑=역설) D(soc↓extra↓)
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
   'v3-q07-sociability-extraversion',
-  'Q07-sociability-공유 토론 성향',
+  'Q07-sociability↔extraversion-공유 성향',
   'LIGHT', 7,
-  '인상 깊은 콘텐츠를 발견했을 때, 가장 먼저 하는 행동은?',
+  '인상 깊은 경험을 한 후 당신의 반응은?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "혼자 조용히 감상을 음미한다", "l1Weights": {"sociability": -0.3}, "l2Weights": {"extraversion": -0.3}},
-    {"key": "B", "label": "마음에 담아두고, 나중에 기회가 되면 언급한다", "l1Weights": {"sociability": -0.1}, "l2Weights": {"extraversion": -0.1}},
-    {"key": "C", "label": "가까운 친구에게 바로 공유한다", "l1Weights": {"sociability": 0.2}, "l2Weights": {"extraversion": 0.2}},
-    {"key": "D", "label": "SNS에 올리고 사람들과 토론하고 싶다", "l1Weights": {"sociability": 0.4}, "l2Weights": {"extraversion": 0.35}}
+    {"key": "A", "label": "바로 SNS에 올리거나 모임에서 이야기한다. 사람들과 나눌 때 에너지가 난다", "l1Weights": {"sociability": 0.25}, "l2Weights": {"extraversion": 0.2}},
+    {"key": "B", "label": "온라인에서 활발히 공유하지만, 실제로는 혼자 있는 시간에서 에너지를 얻는다", "l1Weights": {"sociability": 0.2}, "l2Weights": {"extraversion": -0.2}},
+    {"key": "C", "label": "혼자 감상하는 편이지만, 사교 모임 자체는 즐기고 활발하다", "l1Weights": {"sociability": -0.15}, "l2Weights": {"extraversion": 0.2}},
+    {"key": "D", "label": "혼자 조용히 음미한다. 내 감상은 나만의 것이다", "l1Weights": {"sociability": -0.2}, "l2Weights": {"extraversion": -0.2}}
   ]'::jsonb,
   ARRAY['sociability', 'extraversion'],
-  '{"type": "mapped", "phase": 1}'::jsonb,
+  '{"type": "orthogonal", "phase": 1, "pair": "sociability↔extraversion", "direction": "aligned"}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
 
+-- Q08: 복합 교차 (depth+lens ↔ neuroticism+openness) — 다차원 직교
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
-  'v3-q08-depth-lens-neuroticism',
-  'Q08-depth+lens-복합 반응 상황',
+  'v3-q08-complex-cross',
+  'Q08-복합-평론 갈등 상황',
   'LIGHT', 8,
-  '기대하던 영화가 평론가 호평, 관객 혹평을 받았습니다. 당신은?',
+  '기대하던 영화가 평론가 호평과 관객 혹평으로 갈렸습니다. 당신의 반응은?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "일단 가서 본다, 내 감각을 믿는다", "l1Weights": {"depth": 0.1, "lens": -0.2}, "l2Weights": {"neuroticism": -0.2}},
-    {"key": "B", "label": "관객 리뷰를 몇 개 더 읽어보고 결정한다", "l1Weights": {"depth": 0.1, "lens": 0.15}, "l2Weights": {"neuroticism": 0.1}},
-    {"key": "C", "label": "혼란스러워서 다른 콘텐츠로 눈을 돌린다", "l1Weights": {"depth": -0.15, "lens": 0.0}, "l2Weights": {"neuroticism": 0.3}},
-    {"key": "D", "label": "평론가와 관객의 시각 차이 자체가 흥미롭다", "l1Weights": {"depth": 0.3, "lens": 0.2}, "l2Weights": {"neuroticism": -0.1}}
+    {"key": "A", "label": "내 직감으로 직접 보고 판단한다. 남의 평가에 흔들리지 않는다", "l1Weights": {"depth": 0.15, "lens": -0.2}, "l2Weights": {"neuroticism": -0.15, "openness": 0.1}},
+    {"key": "B", "label": "평론가와 관객 리뷰를 꼼꼼히 비교 분석하지만, 결정이 어렵다", "l1Weights": {"depth": 0.2, "lens": 0.2}, "l2Weights": {"neuroticism": 0.15, "openness": 0.15}},
+    {"key": "C", "label": "혼란스러워서 결정을 미룬다. 차라리 검증된 다른 작품을 본다", "l1Weights": {"depth": -0.1, "lens": -0.15}, "l2Weights": {"neuroticism": 0.2, "openness": -0.15}},
+    {"key": "D", "label": "시각 차이 자체가 흥미롭다. 두 관점 모두 이해하며 관람한다", "l1Weights": {"depth": 0.2, "lens": 0.15}, "l2Weights": {"neuroticism": -0.1, "openness": 0.2}}
   ]'::jsonb,
-  ARRAY['depth', 'lens', 'neuroticism'],
-  '{"type": "mapped", "phase": 1}'::jsonb,
+  ARRAY['depth', 'lens', 'neuroticism', 'openness'],
+  '{"type": "orthogonal", "phase": 1, "pair": "complex_cross"}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
 
 -- ============================================
--- Phase 2: L2 주력 (8문항)
+-- Phase 2: L2 주력 + L1 교차 + L3 탐색 (8문항)
+-- L3(Narrative Drive): lack, moralCompass, volatility, growthArc
 -- ============================================
 
+-- Q09: openness + taste + L3(growthArc, lack)
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
-  'v3-q09-openness-taste',
-  'Q09-openness-변화에 대한 태도',
+  'v3-q09-openness-taste-l3',
+  'Q09-openness+taste+L3-전환 기회',
   'LIGHT', 9,
-  '매일 가는 카페에서 메뉴를 고를 때, 당신의 패턴은?',
+  '만약 지금과 전혀 다른 분야로 전환할 기회가 주어진다면?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "항상 같은 메뉴를 주문한다, 실패하고 싶지 않다", "l2Weights": {"openness": -0.3}, "l1Weights": {"taste": -0.25}},
-    {"key": "B", "label": "가끔 신메뉴를 시도하지만 대체로 단골 메뉴", "l2Weights": {"openness": -0.05}, "l1Weights": {"taste": -0.05}},
-    {"key": "C", "label": "시즌 메뉴가 나오면 꼭 한번 먹어본다", "l2Weights": {"openness": 0.2}, "l1Weights": {"taste": 0.15}},
-    {"key": "D", "label": "매번 다른 메뉴를 시도하는 게 즐겁다", "l2Weights": {"openness": 0.35}, "l1Weights": {"taste": 0.3}}
+    {"key": "A", "label": "지금에 갈증이 있다. 새로운 도전으로 성장하고 싶다", "l2Weights": {"openness": 0.3}, "l1Weights": {"taste": 0.2}, "l3Weights": {"growthArc": 0.25, "lack": 0.15}},
+    {"key": "B", "label": "새로운 것에 열려 있지만, 지금 충분히 만족해서 천천히 탐색한다", "l2Weights": {"openness": 0.2}, "l1Weights": {"taste": -0.1}, "l3Weights": {"growthArc": -0.1, "lack": -0.1}},
+    {"key": "C", "label": "다른 분야보다, 지금 분야에서 더 특별한 것을 만들고 싶다", "l2Weights": {"openness": -0.15}, "l1Weights": {"taste": 0.15}, "l3Weights": {"growthArc": 0.15, "lack": 0.2}},
+    {"key": "D", "label": "현재가 좋다. 안정적인 지금을 지키겠다", "l2Weights": {"openness": -0.2}, "l1Weights": {"taste": -0.15}, "l3Weights": {"growthArc": -0.2, "lack": -0.15}}
   ]'::jsonb,
-  ARRAY['openness', 'taste'],
-  '{"type": "mapped", "phase": 2}'::jsonb,
+  ARRAY['openness', 'taste', 'growthArc', 'lack'],
+  '{"type": "mapped", "phase": 2, "layers": ["L2", "L1", "L3"]}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
 
+-- Q10: conscientiousness + scope + L3(moralCompass, volatility)
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
-  'v3-q10-conscientiousness-scope',
-  'Q10-conscientiousness-계획성 vs 즉흥성',
+  'v3-q10-conscientiousness-scope-l3',
+  'Q10-conscientiousness+scope+L3-마감 압박',
   'LIGHT', 10,
-  '여행을 갈 때, 일정을 어떻게 준비하나요?',
+  '프로젝트 마감 3일 전, 결과물 품질이 기대에 못 미칩니다. 당신은?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "즉흥적으로 간다, 그때그때 결정이 재미있다", "l2Weights": {"conscientiousness": -0.3}, "l1Weights": {"scope": 0.2}},
-    {"key": "B", "label": "큰 틀만 잡고 나머지는 현지에서 결정한다", "l2Weights": {"conscientiousness": -0.05}, "l1Weights": {"scope": 0.1}},
-    {"key": "C", "label": "주요 일정은 미리 예약하고, 자유 시간도 배분한다", "l2Weights": {"conscientiousness": 0.2}, "l1Weights": {"scope": -0.05}},
-    {"key": "D", "label": "시간표, 동선, 예산까지 꼼꼼하게 계획한다", "l2Weights": {"conscientiousness": 0.35}, "l1Weights": {"scope": -0.2}}
+    {"key": "A", "label": "마감까지 체계적으로 수정한다. 모든 세부사항이 기준에 맞아야 한다", "l2Weights": {"conscientiousness": 0.25}, "l1Weights": {"scope": 0.15}, "l3Weights": {"moralCompass": 0.2, "volatility": -0.1}},
+    {"key": "B", "label": "핵심만 완벽하게 다듬고 나머지는 과감히 잘라낸다. 타협은 없다", "l2Weights": {"conscientiousness": 0.2}, "l1Weights": {"scope": -0.1}, "l3Weights": {"moralCompass": 0.15, "volatility": 0.15}},
+    {"key": "C", "label": "완벽하지 않아도 전체적으로 봤을 때 충분하다. 큰 그림이 중요하다", "l2Weights": {"conscientiousness": -0.1}, "l1Weights": {"scope": 0.1}, "l3Weights": {"moralCompass": -0.1, "volatility": -0.1}},
+    {"key": "D", "label": "스트레스가 폭발한다. 일단 제출하고 후회는 나중에", "l2Weights": {"conscientiousness": -0.2}, "l1Weights": {"scope": -0.15}, "l3Weights": {"moralCompass": -0.2, "volatility": 0.2}}
   ]'::jsonb,
-  ARRAY['conscientiousness', 'scope'],
-  '{"type": "mapped", "phase": 2}'::jsonb,
+  ARRAY['conscientiousness', 'scope', 'moralCompass', 'volatility'],
+  '{"type": "mapped", "phase": 2, "layers": ["L2", "L1", "L3"]}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
 
+-- Q11: extraversion + sociability + L3(lack, growthArc)
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
-  'v3-q11-extraversion-sociability',
-  'Q11-extraversion-사회적 에너지',
+  'v3-q11-extraversion-sociability-l3',
+  'Q11-extraversion+sociability+L3-연휴 계획',
   'LIGHT', 11,
-  '금요일 저녁, 에너지 충전을 위해 선택하는 것은?',
+  '긴 연휴가 주어졌을 때, 가장 하고 싶은 것은?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "혼자 집에서 좋아하는 콘텐츠에 몰입한다", "l2Weights": {"extraversion": -0.3}, "l1Weights": {"sociability": -0.25}},
-    {"key": "B", "label": "친한 친구 한두 명과 조용히 만난다", "l2Weights": {"extraversion": -0.05}, "l1Weights": {"sociability": 0.05}},
-    {"key": "C", "label": "여러 친구를 불러 모아 함께 논다", "l2Weights": {"extraversion": 0.25}, "l1Weights": {"sociability": 0.2}},
-    {"key": "D", "label": "새로운 모임이나 행사에 참여해서 사람들을 만난다", "l2Weights": {"extraversion": 0.35}, "l1Weights": {"sociability": 0.35}}
+    {"key": "A", "label": "새로운 사람들과 여행하며, 경험을 통해 자극받고 싶다", "l2Weights": {"extraversion": 0.25}, "l1Weights": {"sociability": 0.15}, "l3Weights": {"lack": 0.15, "growthArc": 0.15}},
+    {"key": "B", "label": "혼자 여행을 떠나 낯선 곳에서 새로운 시각을 얻는다", "l2Weights": {"extraversion": 0.15}, "l1Weights": {"sociability": -0.1}, "l3Weights": {"lack": -0.1, "growthArc": 0.2}},
+    {"key": "C", "label": "친한 친구들과 편한 공간에서 깊은 대화를 나눈다", "l2Weights": {"extraversion": -0.15}, "l1Weights": {"sociability": 0.15}, "l3Weights": {"lack": 0.1, "growthArc": -0.1}},
+    {"key": "D", "label": "혼자 집에서 밀린 콘텐츠를 즐기며 충전한다", "l2Weights": {"extraversion": -0.25}, "l1Weights": {"sociability": -0.2}, "l3Weights": {"lack": -0.15, "growthArc": -0.15}}
   ]'::jsonb,
-  ARRAY['extraversion', 'sociability'],
-  '{"type": "mapped", "phase": 2}'::jsonb,
+  ARRAY['extraversion', 'sociability', 'lack', 'growthArc'],
+  '{"type": "mapped", "phase": 2, "layers": ["L2", "L1", "L3"]}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
 
+-- Q12: agreeableness + stance + L3(moralCompass, volatility)
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
-  'v3-q12-agreeableness-stance',
-  'Q12-agreeableness-갈등 해결 방식',
+  'v3-q12-agreeableness-stance-l3',
+  'Q12-agreeableness+stance+L3-도덕 딜레마',
   'LIGHT', 12,
-  '온라인 커뮤니티에서 누군가 잘못된 정보를 확신에 차서 올렸습니다. 당신은?',
+  '존경하던 사람의 도덕적 문제가 밝혀졌을 때, 당신은?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "그냥 넘어간다, 내가 나설 일은 아니다", "l2Weights": {"agreeableness": 0.2}, "l1Weights": {"stance": -0.3}},
-    {"key": "B", "label": "틀렸다는 것만 알려주고, 반응은 기대하지 않는다", "l2Weights": {"agreeableness": 0.05}, "l1Weights": {"stance": 0.1}},
-    {"key": "C", "label": "근거를 들어 정중하게 바로잡는다", "l2Weights": {"agreeableness": -0.05}, "l1Weights": {"stance": 0.25}},
-    {"key": "D", "label": "확실한 출처와 함께 반박 글을 작성한다", "l2Weights": {"agreeableness": -0.25}, "l1Weights": {"stance": 0.35}}
+    {"key": "A", "label": "기준이 명확하다. 잘못은 잘못이고, 실망을 분명히 표현한다", "l2Weights": {"agreeableness": -0.2}, "l1Weights": {"stance": 0.25}, "l3Weights": {"moralCompass": 0.25, "volatility": 0.1}},
+    {"key": "B", "label": "비판하되 맥락을 고려한다. 사람과 행동은 구분해야 한다", "l2Weights": {"agreeableness": 0.15}, "l1Weights": {"stance": 0.15}, "l3Weights": {"moralCompass": 0.15, "volatility": -0.1}},
+    {"key": "C", "label": "누구나 실수한다. 전체적인 기여를 보면 이해할 수 있다", "l2Weights": {"agreeableness": 0.2}, "l1Weights": {"stance": -0.2}, "l3Weights": {"moralCompass": -0.15, "volatility": -0.15}},
+    {"key": "D", "label": "혼란스럽다. 뭐가 맞는지 모르겠고, 감정이 요동친다", "l2Weights": {"agreeableness": -0.1}, "l1Weights": {"stance": -0.15}, "l3Weights": {"moralCompass": -0.2, "volatility": 0.25}}
   ]'::jsonb,
-  ARRAY['agreeableness', 'stance'],
-  '{"type": "mapped", "phase": 2}'::jsonb,
+  ARRAY['agreeableness', 'stance', 'moralCompass', 'volatility'],
+  '{"type": "mapped", "phase": 2, "layers": ["L2", "L1", "L3"]}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
 
+-- Q13: neuroticism + lens + L3(volatility, lack)
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
-  'v3-q13-neuroticism-lens',
-  'Q13-neuroticism-스트레스 반응',
+  'v3-q13-neuroticism-lens-l3',
+  'Q13-neuroticism+lens+L3-실패 반응',
   'MEDIUM', 13,
-  '중요한 발표를 앞두고 있을 때, 콘텐츠 소비 패턴은?',
+  '큰 실패를 경험한 직후, 당신의 반응은?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "평소와 다를 것 없다, 스트레스를 별로 안 받는다", "l2Weights": {"neuroticism": -0.3}, "l1Weights": {"lens": 0.0}},
-    {"key": "B", "label": "가벼운 예능이나 음악으로 긴장을 푼다", "l2Weights": {"neuroticism": 0.1}, "l1Weights": {"lens": -0.15}},
-    {"key": "C", "label": "발표 관련 자료를 반복해서 확인한다", "l2Weights": {"neuroticism": 0.2}, "l1Weights": {"lens": 0.2}},
-    {"key": "D", "label": "불안해서 이것저것 검색하다 시간을 보낸다", "l2Weights": {"neuroticism": 0.35}, "l1Weights": {"lens": -0.1}}
+    {"key": "A", "label": "냉정하게 원인을 분석한다. 감정에 휘둘리지 않는다", "l2Weights": {"neuroticism": -0.2}, "l1Weights": {"lens": 0.2}, "l3Weights": {"volatility": -0.2, "lack": -0.1}},
+    {"key": "B", "label": "불안하지만 분석을 멈출 수 없다. 어디서 잘못됐는지 끊임없이 복기한다", "l2Weights": {"neuroticism": 0.15}, "l1Weights": {"lens": 0.15}, "l3Weights": {"volatility": 0.15, "lack": 0.15}},
+    {"key": "C", "label": "직감적으로 괜찮을 거라 느낀다. 어차피 다음 기회가 있다", "l2Weights": {"neuroticism": -0.1}, "l1Weights": {"lens": -0.15}, "l3Weights": {"volatility": -0.1, "lack": 0.1}},
+    {"key": "D", "label": "감정이 몰아친다. 한동안 아무것도 손에 잡히지 않는다", "l2Weights": {"neuroticism": 0.25}, "l1Weights": {"lens": -0.2}, "l3Weights": {"volatility": 0.25, "lack": 0.2}}
   ]'::jsonb,
-  ARRAY['neuroticism', 'lens'],
-  '{"type": "mapped", "phase": 2}'::jsonb,
+  ARRAY['neuroticism', 'lens', 'volatility', 'lack'],
+  '{"type": "mapped", "phase": 2, "layers": ["L2", "L1", "L3"]}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
 
+-- Q14: openness+extraversion + purpose + L3(growthArc)
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
-  'v3-q14-openness-extraversion-purpose',
-  'Q14-openness+extraversion-경험 추구 동기',
+  'v3-q14-openness-extraversion-l3',
+  'Q14-openness+extraversion+L3-커뮤니티 참여',
   'MEDIUM', 14,
-  '새로운 취미 활동을 시작하게 된 계기는 보통?',
+  '완전히 새로운 분야의 커뮤니티에 초대받았을 때?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "주변 사람이 하는 걸 보고 따라 시작했다", "l2Weights": {"openness": 0.05, "extraversion": 0.15}, "l1Weights": {"purpose": -0.1}},
-    {"key": "B", "label": "우연히 접했는데 재미있어서 계속했다", "l2Weights": {"openness": 0.2, "extraversion": -0.05}, "l1Weights": {"purpose": -0.05}},
-    {"key": "C", "label": "배우고 싶은 것이 있어서 의도적으로 찾았다", "l2Weights": {"openness": 0.15, "extraversion": 0.0}, "l1Weights": {"purpose": 0.25}},
-    {"key": "D", "label": "완전히 새로운 도전을 위해 스스로 발굴했다", "l2Weights": {"openness": 0.35, "extraversion": 0.1}, "l1Weights": {"purpose": 0.3}}
+    {"key": "A", "label": "성장의 기회! 적극 참여하며 배울 것을 찾는다", "l2Weights": {"openness": 0.2, "extraversion": 0.15}, "l1Weights": {"purpose": 0.1}, "l3Weights": {"growthArc": 0.2}},
+    {"key": "B", "label": "관심 분야라면 조용히 참여해 관찰하고 배운다", "l2Weights": {"openness": 0.15, "extraversion": -0.1}, "l1Weights": {"purpose": 0.15}, "l3Weights": {"growthArc": 0.15}},
+    {"key": "C", "label": "사람 만나는 건 좋지만, 특별한 목적 없이 분위기를 즐긴다", "l2Weights": {"openness": -0.1, "extraversion": 0.15}, "l1Weights": {"purpose": -0.1}, "l3Weights": {"growthArc": -0.1}},
+    {"key": "D", "label": "낯선 환경은 부담스럽다. 익숙한 곳에 머무르겠다", "l2Weights": {"openness": -0.2, "extraversion": -0.2}, "l1Weights": {"purpose": -0.15}, "l3Weights": {"growthArc": -0.2}}
   ]'::jsonb,
-  ARRAY['openness', 'extraversion', 'purpose'],
-  '{"type": "mapped", "phase": 2}'::jsonb,
+  ARRAY['openness', 'extraversion', 'purpose', 'growthArc'],
+  '{"type": "mapped", "phase": 2, "layers": ["L2", "L1", "L3"]}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
 
+-- Q15: conscientiousness+agreeableness + depth + L3(moralCompass)
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
-  'v3-q15-conscientiousness-agreeableness-depth',
-  'Q15-conscientiousness+agreeableness-규범 vs 유연성',
+  'v3-q15-conscientiousness-agreeableness-l3',
+  'Q15-conscientiousness+agreeableness+L3-팀원 발견',
   'MEDIUM', 15,
-  '팀 프로젝트에서 마감이 촉박할 때, 당신의 우선순위는?',
+  '팀원이 의도적으로 일을 대충 하는 것을 발견했을 때?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "일단 제출하는 게 중요하다, 대충이라도 완성한다", "l2Weights": {"conscientiousness": -0.2, "agreeableness": 0.1}, "l1Weights": {"depth": -0.2}},
-    {"key": "B", "label": "핵심만 잘 정리하고 나머지는 추후 보완한다", "l2Weights": {"conscientiousness": 0.1, "agreeableness": 0.05}, "l1Weights": {"depth": 0.05}},
-    {"key": "C", "label": "마감을 연장 요청하더라도 퀄리티를 지킨다", "l2Weights": {"conscientiousness": 0.25, "agreeableness": -0.15}, "l1Weights": {"depth": 0.25}},
-    {"key": "D", "label": "다른 팀원에게 분담을 제안하고 각자 강점을 살린다", "l2Weights": {"conscientiousness": 0.15, "agreeableness": 0.25}, "l1Weights": {"depth": 0.1}}
+    {"key": "A", "label": "증거를 정리해 상위에 보고한다. 원칙은 지켜야 한다", "l2Weights": {"conscientiousness": 0.2, "agreeableness": -0.15}, "l1Weights": {"depth": 0.1}, "l3Weights": {"moralCompass": 0.2}},
+    {"key": "B", "label": "직접 대화하며 이유를 듣고, 함께 개선 방법을 찾는다", "l2Weights": {"conscientiousness": 0.15, "agreeableness": 0.15}, "l1Weights": {"depth": 0.1}, "l3Weights": {"moralCompass": 0.1}},
+    {"key": "C", "label": "사정이 있겠지. 내 일에 집중하고 넘어간다", "l2Weights": {"conscientiousness": -0.1, "agreeableness": 0.2}, "l1Weights": {"depth": -0.1}, "l3Weights": {"moralCompass": -0.15}},
+    {"key": "D", "label": "나도 가끔 그러니까. 서로 눈감아주는 게 현실적이다", "l2Weights": {"conscientiousness": -0.15, "agreeableness": -0.1}, "l1Weights": {"depth": -0.1}, "l3Weights": {"moralCompass": -0.2}}
   ]'::jsonb,
-  ARRAY['conscientiousness', 'agreeableness', 'depth'],
-  '{"type": "mapped", "phase": 2}'::jsonb,
+  ARRAY['conscientiousness', 'agreeableness', 'depth', 'moralCompass'],
+  '{"type": "mapped", "phase": 2, "layers": ["L2", "L1", "L3"]}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
 
+-- Q16: neuroticism+openness + taste + L3(volatility, growthArc)
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
-  'v3-q16-neuroticism-openness-taste',
-  'Q16-neuroticism+openness-불확실성 반응',
+  'v3-q16-neuroticism-openness-l3',
+  'Q16-neuroticism+openness+L3-인생관 충격',
   'MEDIUM', 16,
-  '결말을 모르는 열린 결말 영화를 봤을 때, 당신의 반응은?',
+  '인생관을 뒤흔드는 콘텐츠(책, 영화, 강연)를 접했을 때?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "찝찝하다, 확실한 결말을 선호한다", "l2Weights": {"neuroticism": 0.2, "openness": -0.2}, "l1Weights": {"taste": -0.2}},
-    {"key": "B", "label": "아쉽지만 나름 여운이 남는다", "l2Weights": {"neuroticism": 0.05, "openness": 0.05}, "l1Weights": {"taste": 0.0}},
-    {"key": "C", "label": "해석의 여지가 있어서 재미있다", "l2Weights": {"neuroticism": -0.1, "openness": 0.25}, "l1Weights": {"taste": 0.2}},
-    {"key": "D", "label": "오히려 정해진 결말보다 좋다, 상상이 확장된다", "l2Weights": {"neuroticism": -0.25, "openness": 0.35}, "l1Weights": {"taste": 0.3}}
+    {"key": "A", "label": "내 세계가 넓어졌다. 담담하게 받아들이고 성장의 계기로 삼는다", "l2Weights": {"neuroticism": -0.15, "openness": 0.2}, "l1Weights": {"taste": 0.15}, "l3Weights": {"volatility": -0.1, "growthArc": 0.25}},
+    {"key": "B", "label": "충격적이지만 끌린다. 불안하면서도 더 깊이 알고 싶다", "l2Weights": {"neuroticism": 0.15, "openness": 0.15}, "l1Weights": {"taste": 0.1}, "l3Weights": {"volatility": 0.2, "growthArc": 0.15}},
+    {"key": "C", "label": "흥미롭지만 내 가치관은 변하지 않는다. 참고만 한다", "l2Weights": {"neuroticism": -0.1, "openness": -0.15}, "l1Weights": {"taste": -0.15}, "l3Weights": {"volatility": -0.15, "growthArc": -0.1}},
+    {"key": "D", "label": "혼란스럽고 불안하다. 지금까지 믿어온 것들이 흔들린다", "l2Weights": {"neuroticism": 0.2, "openness": -0.1}, "l1Weights": {"taste": -0.1}, "l3Weights": {"volatility": 0.25, "growthArc": -0.1}}
   ]'::jsonb,
-  ARRAY['neuroticism', 'openness', 'taste'],
-  '{"type": "mapped", "phase": 2}'::jsonb,
+  ARRAY['neuroticism', 'openness', 'taste', 'volatility', 'growthArc'],
+  '{"type": "mapped", "phase": 2, "layers": ["L2", "L1", "L3"]}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
 
 -- ============================================
--- Phase 3: 교차검증 + 역설 감지 (8문항)
+-- Phase 3: 7쌍 역설 직교 검증 + L3 종합 (8문항)
+-- 각 역설 쌍에 대해 직교 4사분면으로 교차검증
 -- ============================================
 
+-- Q17: depth↔openness (aligned) — 역설 검증
+-- 직교: A(depth↑open↑) B(depth↑open↓) C(depth↓open↑) D(depth↓open↓)
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
   'v3-q17-paradox-depth-openness',
-  'Q17-역설-depth↔openness',
+  'Q17-역설검증-depth↔openness',
   'MEDIUM', 17,
-  '전혀 관심 없던 분야의 전문 서적을 선물 받았습니다. 당신은?',
+  '이상적인 학습 방식을 하나만 고른다면?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "읽지 않을 것 같다, 관심 밖이다", "l1Weights": {"depth": -0.1}, "l2Weights": {"openness": -0.2}},
-    {"key": "B", "label": "목차만 훑어보고 흥미로운 챕터만 읽는다", "l1Weights": {"depth": 0.05}, "l2Weights": {"openness": 0.1}},
-    {"key": "C", "label": "의외로 빠져들어 끝까지 읽을 수도 있다", "l1Weights": {"depth": 0.2}, "l2Weights": {"openness": 0.25}},
-    {"key": "D", "label": "몰랐던 세계를 알게 되어 관련 책을 더 찾아본다", "l1Weights": {"depth": 0.3}, "l2Weights": {"openness": 0.3}}
+    {"key": "A", "label": "다양한 분야를 깊이 파는 폴리매스형 — 넓고 깊게", "l1Weights": {"depth": 0.15}, "l2Weights": {"openness": 0.15}},
+    {"key": "B", "label": "한 분야를 끝까지 파는 장인형 — 좁고 깊게", "l1Weights": {"depth": 0.15}, "l2Weights": {"openness": -0.15}},
+    {"key": "C", "label": "폭넓은 교양을 갖추는 제너럴리스트 — 넓고 얕게", "l1Weights": {"depth": -0.15}, "l2Weights": {"openness": 0.15}},
+    {"key": "D", "label": "필요한 것만 실용적으로 익히는 것 — 좁고 얕게", "l1Weights": {"depth": -0.15}, "l2Weights": {"openness": -0.15}}
   ]'::jsonb,
   ARRAY['depth', 'openness'],
-  '{"type": "mapped", "phase": 3, "purpose": "paradox_verification"}'::jsonb,
+  '{"type": "orthogonal", "phase": 3, "purpose": "paradox_verification", "pair": "depth↔openness"}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
 
+-- Q18: lens↔neuroticism (inverse) — 역설 검증
+-- inverse 직교: A(lens↑neuro↓=일관) B(lens↑neuro↑=역설) C(lens↓neuro↓=역설) D(lens↓neuro↑=일관)
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
-  'v3-q18-paradox-stance-agreeableness',
-  'Q18-역설-stance↔agreeableness',
+  'v3-q18-paradox-lens-neuroticism',
+  'Q18-역설검증-lens↔neuroticism',
   'MEDIUM', 18,
-  '존경하는 사람이 당신과 반대되는 의견을 표명했습니다. 당신은?',
+  '감정적으로 힘든 친구의 고민을 들을 때, 당신의 방식은?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "그 사람이 말하니까 일리가 있을 것이다", "l1Weights": {"stance": -0.25}, "l2Weights": {"agreeableness": 0.25}},
-    {"key": "B", "label": "존중하되, 내 생각은 따로 유지한다", "l1Weights": {"stance": 0.1}, "l2Weights": {"agreeableness": 0.1}},
-    {"key": "C", "label": "직접 대화를 나눠서 차이를 이해하고 싶다", "l1Weights": {"stance": 0.15}, "l2Weights": {"agreeableness": 0.05}},
-    {"key": "D", "label": "누구든 틀릴 수 있다, 내 근거를 다시 점검한다", "l1Weights": {"stance": 0.3}, "l2Weights": {"agreeableness": -0.15}}
+    {"key": "A", "label": "상황을 객관적으로 정리해주고, 냉정하게 해결책을 제시한다", "l1Weights": {"lens": 0.15}, "l2Weights": {"neuroticism": -0.15}},
+    {"key": "B", "label": "분석적으로 조언하지만, 속으로는 나도 같이 불안해진다", "l1Weights": {"lens": 0.15}, "l2Weights": {"neuroticism": 0.15}},
+    {"key": "C", "label": "감정적으로 공감하면서도, 내 마음은 흔들리지 않는다", "l1Weights": {"lens": -0.15}, "l2Weights": {"neuroticism": -0.15}},
+    {"key": "D", "label": "함께 감정을 나누며, 나도 같이 마음이 무거워진다", "l1Weights": {"lens": -0.15}, "l2Weights": {"neuroticism": 0.15}}
+  ]'::jsonb,
+  ARRAY['lens', 'neuroticism'],
+  '{"type": "orthogonal", "phase": 3, "purpose": "paradox_verification", "pair": "lens↔neuroticism"}'::jsonb,
+  true
+) ON CONFLICT (id) DO NOTHING;
+
+-- Q19: stance↔agreeableness (inverse) — 역설 검증
+-- inverse 직교: A(stance↑agree↓=일관) B(stance↑agree↑=역설/츤데레) C(stance↓agree↓=역설) D(stance↓agree↑=일관)
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+VALUES (
+  'v3-q19-paradox-stance-agreeableness',
+  'Q19-역설검증-stance↔agreeableness',
+  'MEDIUM', 19,
+  '존경하는 사람이 당신과 정반대 의견을 강하게 주장합니다.',
+  'MULTIPLE_CHOICE',
+  '[
+    {"key": "A", "label": "존경과 별개로, 틀린 것은 지적한다. 진실이 더 중요하다", "l1Weights": {"stance": 0.15}, "l2Weights": {"agreeableness": -0.15}},
+    {"key": "B", "label": "내 반론을 정리하되, 대화를 통해 공통점을 찾으려 한다", "l1Weights": {"stance": 0.15}, "l2Weights": {"agreeableness": 0.15}},
+    {"key": "C", "label": "크게 신경 쓰지 않지만, 그 사람의 방식을 따르지도 않는다", "l1Weights": {"stance": -0.15}, "l2Weights": {"agreeableness": -0.15}},
+    {"key": "D", "label": "그 사람의 의견을 신뢰하고, 자연스럽게 수용한다", "l1Weights": {"stance": -0.15}, "l2Weights": {"agreeableness": 0.15}}
   ]'::jsonb,
   ARRAY['stance', 'agreeableness'],
-  '{"type": "mapped", "phase": 3, "purpose": "paradox_verification"}'::jsonb,
+  '{"type": "orthogonal", "phase": 3, "purpose": "paradox_verification", "pair": "stance↔agreeableness"}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
 
+-- Q20: scope↔conscientiousness (aligned) — 역설 검증
+-- 직교: A(scope↑consc↑) B(scope↑consc↓=역설) C(scope↓consc↑=역설) D(scope↓consc↓)
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
-  'v3-q19-paradox-sociability-extraversion',
-  'Q19-역설-sociability↔extraversion',
-  'MEDIUM', 19,
-  '온라인에서는 활발하게 글을 쓰는 편인데, 오프라인 모임에서는?',
+  'v3-q20-paradox-scope-conscientiousness',
+  'Q20-역설검증-scope↔conscientiousness',
+  'MEDIUM', 20,
+  '대규모 이벤트(여행, 프로젝트)를 준비할 때 당신은?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "오프라인에서도 똑같이 활발하다", "l1Weights": {"sociability": 0.15}, "l2Weights": {"extraversion": 0.3}},
-    {"key": "B", "label": "오프라인에서는 약간 조용해진다", "l1Weights": {"sociability": 0.1}, "l2Weights": {"extraversion": -0.1}},
-    {"key": "C", "label": "오프라인에서는 듣는 편이 많다", "l1Weights": {"sociability": 0.05}, "l2Weights": {"extraversion": -0.2}},
-    {"key": "D", "label": "온라인이 편하다, 오프라인은 피곤하다", "l1Weights": {"sociability": 0.2}, "l2Weights": {"extraversion": -0.3}}
+    {"key": "A", "label": "모든 세부사항을 체크리스트로 만들어 하나씩 확인한다", "l1Weights": {"scope": 0.15}, "l2Weights": {"conscientiousness": 0.15}},
+    {"key": "B", "label": "세부사항을 신경 쓰면서도 정작 실행은 즉흥적으로 한다", "l1Weights": {"scope": 0.15}, "l2Weights": {"conscientiousness": -0.15}},
+    {"key": "C", "label": "큰 틀만 정하고, 정해진 일정에 맞춰 체계적으로 움직인다", "l1Weights": {"scope": -0.15}, "l2Weights": {"conscientiousness": 0.15}},
+    {"key": "D", "label": "대략적으로 파악하고, 그때그때 유연하게 대처한다", "l1Weights": {"scope": -0.15}, "l2Weights": {"conscientiousness": -0.15}}
+  ]'::jsonb,
+  ARRAY['scope', 'conscientiousness'],
+  '{"type": "orthogonal", "phase": 3, "purpose": "paradox_verification", "pair": "scope↔conscientiousness"}'::jsonb,
+  true
+) ON CONFLICT (id) DO NOTHING;
+
+-- Q21: taste↔openness (aligned) — 역설 검증
+-- 직교: A(taste↑open↑) B(taste↑open↓=역설) C(taste↓open↑=역설) D(taste↓open↓)
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+VALUES (
+  'v3-q21-paradox-taste-openness',
+  'Q21-역설검증-taste↔openness',
+  'MEDIUM', 21,
+  '음식, 음악, 패션 등 취향과 실제 생활방식을 비교하면?',
+  'MULTIPLE_CHOICE',
+  '[
+    {"key": "A", "label": "독특한 것을 추구하며, 삶 전반에서도 새로운 시도를 즐긴다", "l1Weights": {"taste": 0.15}, "l2Weights": {"openness": 0.15}},
+    {"key": "B", "label": "취향은 독특하지만, 일상은 변화보다 안정을 선호한다", "l1Weights": {"taste": 0.15}, "l2Weights": {"openness": -0.15}},
+    {"key": "C", "label": "취향은 대중적이지만, 삶에서는 새로운 경험에 적극적이다", "l1Weights": {"taste": -0.15}, "l2Weights": {"openness": 0.15}},
+    {"key": "D", "label": "검증된 것을 좋아하고, 삶도 익숙한 패턴을 유지한다", "l1Weights": {"taste": -0.15}, "l2Weights": {"openness": -0.15}}
+  ]'::jsonb,
+  ARRAY['taste', 'openness'],
+  '{"type": "orthogonal", "phase": 3, "purpose": "paradox_verification", "pair": "taste↔openness"}'::jsonb,
+  true
+) ON CONFLICT (id) DO NOTHING;
+
+-- Q22: purpose↔conscientiousness (aligned) — 역설 검증
+-- 직교: A(purpose↑consc↑) B(purpose↑consc↓=역설) C(purpose↓consc↑=역설) D(purpose↓consc↓)
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+VALUES (
+  'v3-q22-paradox-purpose-conscientiousness',
+  'Q22-역설검증-purpose↔conscientiousness',
+  'MEDIUM', 22,
+  '하루 일과를 돌아보면, 콘텐츠는 주로 어떤 역할인가요?',
+  'MULTIPLE_CHOICE',
+  '[
+    {"key": "A", "label": "정해진 시간에 의미 있는 콘텐츠를 계획적으로 소비한다", "l1Weights": {"purpose": 0.15}, "l2Weights": {"conscientiousness": 0.15}},
+    {"key": "B", "label": "의미 있는 것을 찾지만, 보는 시간과 양은 통제가 안 된다", "l1Weights": {"purpose": 0.15}, "l2Weights": {"conscientiousness": -0.15}},
+    {"key": "C", "label": "특별한 목적 없이 보지만, 정해진 시간 안에서만 본다", "l1Weights": {"purpose": -0.15}, "l2Weights": {"conscientiousness": 0.15}},
+    {"key": "D", "label": "재미있으면 시간 가는 줄 모르고 자유롭게 즐긴다", "l1Weights": {"purpose": -0.15}, "l2Weights": {"conscientiousness": -0.15}}
+  ]'::jsonb,
+  ARRAY['purpose', 'conscientiousness'],
+  '{"type": "orthogonal", "phase": 3, "purpose": "paradox_verification", "pair": "purpose↔conscientiousness"}'::jsonb,
+  true
+) ON CONFLICT (id) DO NOTHING;
+
+-- Q23: sociability↔extraversion (aligned) — 역설 검증
+-- 직교: A(soc↑extra↑) B(soc↑extra↓=역설) C(soc↓extra↑=역설) D(soc↓extra↓)
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+VALUES (
+  'v3-q23-paradox-sociability-extraversion',
+  'Q23-역설검증-sociability↔extraversion',
+  'MEDIUM', 23,
+  '새로운 사교 모임에 가게 되었을 때, 당신의 패턴은?',
+  'MULTIPLE_CHOICE',
+  '[
+    {"key": "A", "label": "적극적으로 대화를 시작하고, 모임 후에도 연락을 이어간다", "l1Weights": {"sociability": 0.15}, "l2Weights": {"extraversion": 0.15}},
+    {"key": "B", "label": "온라인으로 먼저 친해지고, 현장에서는 조용히 관찰하는 편이다", "l1Weights": {"sociability": 0.15}, "l2Weights": {"extraversion": -0.15}},
+    {"key": "C", "label": "현장에서는 활발하지만, 모임 후 연락을 이어가진 않는다", "l1Weights": {"sociability": -0.15}, "l2Weights": {"extraversion": 0.15}},
+    {"key": "D", "label": "소규모로 조용히 어울리거나, 참여 자체를 망설인다", "l1Weights": {"sociability": -0.15}, "l2Weights": {"extraversion": -0.15}}
   ]'::jsonb,
   ARRAY['sociability', 'extraversion'],
-  '{"type": "mapped", "phase": 3, "purpose": "paradox_verification"}'::jsonb,
+  '{"type": "orthogonal", "phase": 3, "purpose": "paradox_verification", "pair": "sociability↔extraversion"}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
 
+-- Q24: L3 종합 + 교차 레이어 통합
+-- L3 4차원(lack, moralCompass, volatility, growthArc)을 직접 탐색 + L1/L2 교차
 INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
 VALUES (
-  'v3-q20-revalidate-depth-scope',
-  'Q20-재검증-depth+scope',
-  'MEDIUM', 20,
-  '뉴스 앱에서 기사를 읽을 때, 보통 어떤 패턴인가요?',
-  'MULTIPLE_CHOICE',
-  '[
-    {"key": "A", "label": "헤드라인만 빠르게 훑는다", "l1Weights": {"depth": -0.15, "scope": 0.15}, "l2Weights": {}},
-    {"key": "B", "label": "관심 분야 기사 2~3개를 꼼꼼히 읽는다", "l1Weights": {"depth": 0.2, "scope": -0.1}, "l2Weights": {}},
-    {"key": "C", "label": "다양한 분야를 고르게 살펴본다", "l1Weights": {"depth": 0.0, "scope": 0.25}, "l2Weights": {}},
-    {"key": "D", "label": "하나의 이슈를 여러 매체로 비교하며 깊이 읽는다", "l1Weights": {"depth": 0.3, "scope": 0.1}, "l2Weights": {}}
-  ]'::jsonb,
-  ARRAY['depth', 'scope'],
-  '{"type": "mapped", "phase": 3, "purpose": "l1_revalidation"}'::jsonb,
-  true
-) ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
-VALUES (
-  'v3-q21-revalidate-taste-purpose',
-  'Q21-재검증-taste+purpose',
-  'MEDIUM', 21,
-  '넷플릭스에서 새 시리즈를 고를 때, 가장 끌리는 기준은?',
-  'MULTIPLE_CHOICE',
-  '[
-    {"key": "A", "label": "인기 순위 1위, 다들 보니까 나도 본다", "l1Weights": {"taste": -0.2, "purpose": -0.15}, "l2Weights": {}},
-    {"key": "B", "label": "좋아하는 배우나 감독이 참여한 작품", "l1Weights": {"taste": -0.05, "purpose": 0.05}, "l2Weights": {}},
-    {"key": "C", "label": "독특한 설정이나 새로운 시도가 보이는 작품", "l1Weights": {"taste": 0.25, "purpose": 0.1}, "l2Weights": {}},
-    {"key": "D", "label": "관심 주제를 다루는 작품, 배울 게 있으면 좋다", "l1Weights": {"taste": 0.1, "purpose": 0.3}, "l2Weights": {}}
-  ]'::jsonb,
-  ARRAY['taste', 'purpose'],
-  '{"type": "mapped", "phase": 3, "purpose": "l1_revalidation"}'::jsonb,
-  true
-) ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
-VALUES (
-  'v3-q22-revalidate-openness-neuroticism',
-  'Q22-재검증-openness+neuroticism',
-  'MEDIUM', 22,
-  '갑자기 해외 출장이 잡혀서 낯선 도시에 혼자 가게 되었습니다. 당신의 첫 반응은?',
-  'MULTIPLE_CHOICE',
-  '[
-    {"key": "A", "label": "불안하다, 가능하면 피하고 싶다", "l2Weights": {"openness": -0.2, "neuroticism": 0.3}, "l1Weights": {}},
-    {"key": "B", "label": "긴장되지만 준비를 잘 하면 괜찮을 것이다", "l2Weights": {"openness": 0.05, "neuroticism": 0.1}, "l1Weights": {}},
-    {"key": "C", "label": "새로운 경험이 될 수 있겠다, 기대된다", "l2Weights": {"openness": 0.25, "neuroticism": -0.1}, "l1Weights": {}},
-    {"key": "D", "label": "완전 신난다! 현지 맛집과 명소를 미리 찾아본다", "l2Weights": {"openness": 0.35, "neuroticism": -0.25}, "l1Weights": {}}
-  ]'::jsonb,
-  ARRAY['openness', 'neuroticism'],
-  '{"type": "mapped", "phase": 3, "purpose": "l2_revalidation"}'::jsonb,
-  true
-) ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
-VALUES (
-  'v3-q23-revalidate-conscientiousness-extraversion',
-  'Q23-재검증-conscientiousness+extraversion',
-  'MEDIUM', 23,
-  '주말 계획이 갑자기 취소되었을 때, 당신은?',
-  'MULTIPLE_CHOICE',
-  '[
-    {"key": "A", "label": "오히려 좋아, 하고 싶은 것을 하며 혼자 보낸다", "l2Weights": {"conscientiousness": -0.1, "extraversion": -0.25}, "l1Weights": {}},
-    {"key": "B", "label": "밀린 할 일을 처리할 기회로 삼는다", "l2Weights": {"conscientiousness": 0.3, "extraversion": -0.15}, "l1Weights": {}},
-    {"key": "C", "label": "다른 친구에게 연락해서 대안 약속을 잡는다", "l2Weights": {"conscientiousness": -0.05, "extraversion": 0.25}, "l1Weights": {}},
-    {"key": "D", "label": "근처 카페에 가서 새로운 사람들 구경이라도 한다", "l2Weights": {"conscientiousness": -0.15, "extraversion": 0.3}, "l1Weights": {}}
-  ]'::jsonb,
-  ARRAY['conscientiousness', 'extraversion'],
-  '{"type": "mapped", "phase": 3, "purpose": "l2_revalidation"}'::jsonb,
-  true
-) ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
-VALUES (
-  'v3-q24-comprehensive-paradox',
-  'Q24-종합-복합 딜레마',
+  'v3-q24-l3-comprehensive',
+  'Q24-L3종합-삶의 태도',
   'MEDIUM', 24,
-  '혼자 깊이 파고드는 것도 좋지만 사람들과 나누는 것도 좋아하는 편입니다. 둘 중 하나만 골라야 한다면?',
+  '가장 공감되는 삶의 태도는?',
   'MULTIPLE_CHOICE',
   '[
-    {"key": "A", "label": "혼자 깊이 집중하는 시간이 더 소중하다", "l1Weights": {"depth": 0.15, "sociability": -0.15}, "l2Weights": {"extraversion": -0.15, "openness": 0.1}},
-    {"key": "B", "label": "알게 된 것을 다른 사람과 나눌 때 완성된다", "l1Weights": {"depth": 0.05, "sociability": 0.2}, "l2Weights": {"extraversion": 0.15, "agreeableness": 0.1}},
-    {"key": "C", "label": "때에 따라 다르다, 컨디션과 주제에 따라 바뀐다", "l1Weights": {"depth": 0.05, "sociability": 0.05}, "l2Weights": {"neuroticism": 0.1, "openness": 0.1}},
-    {"key": "D", "label": "둘 다 포기할 수 없다, 나만의 방식으로 양립한다", "l1Weights": {"depth": 0.1, "sociability": 0.1}, "l2Weights": {"openness": 0.2, "conscientiousness": 0.1}}
+    {"key": "A", "label": "채워야 할 것이 있다. 명확한 기준을 갖고 꾸준히 성장해 나간다", "l3Weights": {"lack": 0.2, "moralCompass": 0.2, "volatility": -0.15, "growthArc": 0.2}, "l1Weights": {"depth": 0.1, "purpose": 0.1}, "l2Weights": {"conscientiousness": 0.1, "openness": 0.1}},
+    {"key": "B", "label": "불안정하지만 자유롭다. 기존 틀을 깨며 나만의 길을 만들어간다", "l3Weights": {"lack": 0.15, "moralCompass": -0.15, "volatility": 0.2, "growthArc": 0.15}, "l1Weights": {"taste": 0.1, "stance": 0.1}, "l2Weights": {"openness": 0.1, "neuroticism": 0.1}},
+    {"key": "C", "label": "지금에 만족한다. 안정적인 가치관 안에서 맡은 바를 충실히 한다", "l3Weights": {"lack": -0.15, "moralCompass": 0.15, "volatility": -0.2, "growthArc": -0.1}, "l1Weights": {"scope": 0.1, "lens": 0.1}, "l2Weights": {"conscientiousness": 0.1, "agreeableness": 0.1}},
+    {"key": "D", "label": "규칙보다 경험이 중요하다. 사람들과 부딪히며 변화해 나간다", "l3Weights": {"lack": -0.1, "moralCompass": -0.2, "volatility": 0.15, "growthArc": 0.2}, "l1Weights": {"sociability": 0.1, "scope": -0.1}, "l2Weights": {"extraversion": 0.1, "agreeableness": -0.1}}
   ]'::jsonb,
-  ARRAY['depth', 'sociability', 'extraversion', 'openness'],
-  '{"type": "mapped", "phase": 3, "purpose": "comprehensive_paradox"}'::jsonb,
+  ARRAY['lack', 'moralCompass', 'volatility', 'growthArc', 'depth', 'purpose', 'taste', 'stance', 'scope', 'lens', 'sociability'],
+  '{"type": "orthogonal", "phase": 3, "purpose": "l3_comprehensive", "layers": ["L3", "L1", "L2"]}'::jsonb,
   true
 ) ON CONFLICT (id) DO NOTHING;
