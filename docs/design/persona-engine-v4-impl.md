@@ -2,6 +2,7 @@
 
 **버전**: v4.0
 **작성일**: 2026-02-16
+**최종 수정**: 2026-02-17
 **상태**: Active
 **설계서 참조**: `docs/design/persona-engine-v4.md`
 
@@ -20,8 +21,11 @@
 9. [감정 전염 구현](#9-감정-전염-구현)
 10. [비용 최적화 구현](#10-비용-최적화-구현)
 11. [상수 및 설정값](#11-상수-및-설정값)
-12. [구현 페이즈 및 태스크](#12-구현-페이즈-및-태스크)
-13. [파일 변경 맵](#13-파일-변경-맵)
+12. [매칭 알고리즘 구현](#12-매칭-알고리즘-구현)
+13. [품질 피드백 루프 구현](#13-품질-피드백-루프-구현)
+14. [LLM 모델 전략](#14-llm-모델-전략)
+15. [구현 페이즈 및 태스크](#15-구현-페이즈-및-태스크)
+16. [파일 변경 맵](#16-파일-변경-맵)
 
 ---
 
@@ -1137,7 +1141,237 @@ const ESTIMATED_TOKENS = {
 
 ---
 
-## 12. 구현 페이즈 및 태스크
+## 12. 매칭 알고리즘 구현
+
+> **설계서 참조**: `persona-engine-v4.md` §12
+
+### 12.1 3-Tier 매칭 전략
+
+**파일**: `src/lib/matching/multi-layer-matching.ts`
+
+```
+computeMatch(userVector, personaVector): MatchResult
+├── basicTierScore(user, persona)                   // 60%
+│   ├── computeVFinalSimilarity(user, persona)      // cosine 유사도 70%
+│   └── computeCrossAxisProfile(user, persona)      // Cross-Axis 30%
+├── explorationTierScore(user, persona)             // 30%
+│   ├── computeParadoxDiversity(user, persona)      // 패러독스 다양성 40%
+│   ├── computeCrossAxisDivergence(user, persona)   // Cross-Axis 발산 40%
+│   └── computeArchetypeFreshness(user, persona)    // 아키타입 신선도 20%
+├── advancedTierScore(user, persona)                // 10%
+│   ├── computeVFinalAdvanced(user, persona)        // V_Final 50%
+│   ├── computeCrossAxisAdvanced(user, persona)     // Cross-Axis 30%
+│   └── computeParadoxCompatibility(user, persona)  // 패러독스 호환성 20%
+└── combineScores(basic, exploration, advanced)
+```
+
+### 12.2 V_Final 계산
+
+**파일**: `src/lib/matching/vfinal.ts`
+
+```
+computeVFinal(persona, pressure): number[]
+├── projectL2toL1(persona.l2, projMatrix_5x7)   // α=0.7
+├── projectL3toL1(persona.l3, projMatrix_4x7)   // β=0.3
+└── blend(persona.l1, projL2, projL3, pressure)
+    // V_Final = (1-P) · V_L1 + P · (α·Proj_L2 + β·Proj_L3)
+
+cosineSimilarity(vecA, vecB): number
+```
+
+### 12.3 정성적 보너스
+
+**파일**: `src/lib/matching/qualitative-bonus.ts`
+
+```
+computeQualitativeBonus(user, persona): number
+├── voiceSimilarity(userPreferredPosts, persona.voiceSpec)   // ±0.1
+└── narrativeCompatibility(userOnboarding, persona.l3)       // ±0.1
+```
+
+### 12.4 소셜 모듈 통합
+
+**파일**: `src/lib/matching/social-boost.ts`
+
+```
+applySocialBoost(matchResults, socialGraph): MatchResult[]
+├── boostByWarmth(results, relationships)       // warmth 높으면 추천 가중
+├── boostHubExposure(results, nodeMetrics)      // 허브 → Exploration tier 노출 증가
+└── filterBotSuspects(results, anomalies)       // 봇 의심 → 추천 제외
+```
+
+---
+
+## 13. 품질 피드백 루프 구현
+
+> **설계서 참조**: `persona-engine-v4.md` §13
+
+### 13.1 Auto-Interview (엔진 코어)
+
+**파일**: `src/lib/quality/auto-interview.ts`
+
+엔진 레벨의 20항 인터뷰 시스템. PersonaWorld의 PW 확장과 독립적으로 동작.
+
+```
+runInterviewSet(personaId, questions): InterviewResult
+├── generateResponse(personaId, question)
+│   ├── buildInterviewContext(persona, question)
+│   └── callLLM(context)                        // ~2,500 tok
+├── judgeResponse(question, response, persona)
+│   ├── buildJudgmentPrompt(question, response, vectors, scoringGuide)
+│   └── callLLM(judgmentPrompt)                  // ~1,500 tok
+└── aggregateScores(judgments)
+
+// 20문항 구성
+const INTERVIEW_QUESTIONS = {
+  L1: 7,           // depth, lens, stance, scope, taste, purpose, sociability
+  L2: 5,           // OCEAN 각 차원
+  L3: 4,           // lack, moralCompass, volatility, growthArc
+  CROSS_LAYER: 4,  // L1↔L2, L1↔L3 패러독스
+}
+```
+
+### 13.2 Persona Integrity Score (엔진 코어)
+
+**파일**: `src/lib/quality/integrity-score.ts`
+
+```
+computePIS(personaId): PersonaIntegrityScore
+├── contextRecall(personaId)          // 0.35 — 기억 정확도
+├── settingConsistency(personaId)     // 0.35 — 설정 반영도
+├── characterStability(personaId)     // 0.30 — 정체성 유지
+└── overall = recall×0.35 + setting×0.35 + stability×0.30
+```
+
+### 13.3 골든 샘플 (Golden Samples)
+
+**파일**: `src/lib/quality/golden-samples.ts`
+
+알려진 콘텐츠에 대한 기대 반응을 정의하여 품질 기준점으로 활용.
+
+```
+interface GoldenSample {
+  contentTitle: string
+  genre: string
+  testQuestion: string
+  expectedReactions: {
+    highDim: { dimension: string; minValue: number; expectedBehavior: string }
+    lowDim: { dimension: string; maxValue: number; expectedBehavior: string }
+  }
+  difficultyLevel: "EASY" | "MEDIUM" | "HARD"
+  validationDimensions: string[]
+}
+
+testAgainstGoldenSamples(personaId, samples): GoldenSampleResult[]
+├── generateResponse(personaId, sample.testQuestion)
+├── evaluateAgainstExpected(response, sample.expectedReactions)
+└── computeDeviation(actual, expected)
+
+// 인큐베이터에서 주기적으로 실행 → 편차 추적 → Arena 트리거
+```
+
+### 13.4 피드백 흐름 오케스트레이터
+
+**파일**: `src/lib/quality/feedback-orchestrator.ts`
+
+```
+runQualityFeedbackLoop(personaId): FeedbackLoopResult
+├── testGoldenSamples(personaId)          // 골든 샘플 테스트
+├── detectDeviation(testResults)          // 편차 감지
+├── triggerArenaIfNeeded(personaId, deviations) // Arena 스파링
+│   ├── createSession(personaId, partnerPersonaId)
+│   ├── runSession(session)
+│   └── judgeSession(session)
+├── generateCorrectionSuggestions(judgment) // 교정 제안
+├── awaitAdminApproval(suggestions)        // 관리자 승인 대기
+├── applyPatches(approvedSuggestions)      // 패치 적용
+└── scheduleRetest(personaId, 3days)       // 3일 후 재테스트
+```
+
+---
+
+## 14. LLM 모델 전략
+
+> **설계서 참조**: `persona-engine-v4.md` §14
+
+### 14.1 2-Tier 라우팅
+
+**파일**: `src/lib/llm/model-router.ts`
+
+작업 특성에 따라 LLM 호출과 규칙 기반 처리를 분리.
+
+```
+type TaskType =
+  | "POST_GENERATION"    // → Claude Sonnet (창작 품질)
+  | "COMMENT_GENERATION" // → Claude Sonnet
+  | "ARENA_JUDGMENT"     // → Claude Sonnet (평가 정확도)
+  | "INTERVIEW_JUDGE"    // → Claude Sonnet
+  | "VECTOR_EXTRACTION"  // → Rule-based (비용 절감)
+  | "TRIGGER_MATCHING"   // → Rule-based (지연 최소화)
+  | "POIGNANCY_CALC"     // → Rule-based (수식 기반)
+  | "SECURITY_CHECK"     // → Rule-based + Pattern (속도 우선)
+
+routeTask(taskType): "LLM" | "RULE_BASED"
+selectModel(taskType): ModelConfig
+// LLM 작업 → Claude Sonnet + cache_control
+// Rule-based → 수식/패턴 매칭 (LLM 미사용)
+```
+
+### 14.2 토큰 예산 관리
+
+**파일**: `src/lib/llm/token-budget.ts`
+
+```
+const TOKEN_BUDGETS = {
+  postGeneration: {
+    system: 3000,     // 캐릭터 바이블 + VoiceSpec
+    rag: 500,         // RAG 컨텍스트
+    user: 300,        // 포스트 타입 + 토픽
+    total: 3800,
+    output: 300,
+  },
+  commentGeneration: {
+    system: 2000,
+    rag: 300,
+    user: 200,
+    total: 2500,
+    output: 150,
+  },
+  arenaTurn: {
+    system: 3000,
+    history: 1000,
+    user: 200,
+    total: 4200,
+    output: 300,
+  },
+  judgment: {
+    system: 1000,
+    session: 2000,
+    total: 3000,
+    output: 500,
+  },
+} as const
+
+estimateTokenUsage(taskType): TokenEstimate
+checkTokenBudget(taskType, actualTokens): BudgetCheckResult
+```
+
+### 14.3 월간 비용 추정 (100 페르소나 기준)
+
+```typescript
+const MONTHLY_COST_ESTIMATE = {
+  posting: { monthlyTokens: "~2.7M", cost: "~$8" },
+  comments: { monthlyTokens: "~3.0M", cost: "~$9" },
+  arena: { monthlyTokens: "~1.7M", cost: "~$5" },
+  quality: { monthlyTokens: "~0.1M", cost: "~$0.3" },
+  subtotal: { monthlyTokens: "~7.5M", cost: "~$22.3" },
+  withCaching: { cost: "~$4.0", savings: "~82%" },
+} as const
+```
+
+---
+
+## 15. 구현 페이즈 및 태스크
 
 ### Phase 0: 보안 3계층 (T137~T140)
 
@@ -1190,9 +1424,24 @@ const ESTIMATED_TOKENS = {
 | T153 | Data Architecture (Instruction vs Memory) | DONE |
 | T155 | Admin Security Dashboard                  | DONE |
 
+### Phase 6: 매칭 + 품질 + LLM 전략
+
+| #   | 태스크                                                                | 상태 |
+| --- | --------------------------------------------------------------------- | ---- |
+| T-A | 3-Tier 매칭 전략 (Basic 60% / Exploration 30% / Advanced 10%)         | TODO |
+| T-B | V_Final 계산 (L2→L1, L3→L1 투영, Pressure 블렌딩)                     | TODO |
+| T-C | 정성적 보너스 (voiceSimilarity, narrativeCompatibility ±0.1)          | TODO |
+| T-D | 소셜 모듈 매칭 통합 (warmth 부스트, 허브 노출, 봇 필터)               | TODO |
+| T-E | Auto-Interview 엔진 코어 (20문항, LLM-as-Judge)                       | TODO |
+| T-F | PIS 엔진 코어 (contextRecall, settingConsistency, characterStability) | TODO |
+| T-G | 골든 샘플 테스트 (기대 반응, 편차 감지, Arena 연동)                   | TODO |
+| T-H | 품질 피드백 루프 오케스트레이터 (테스트→편차→Arena→교정→재테스트)     | TODO |
+| T-I | LLM 2-Tier 라우팅 (LLM vs Rule-based 분기)                            | TODO |
+| T-J | 토큰 예산 관리 (작업별 예산 상수, 예산 체크)                          | TODO |
+
 ---
 
-## 13. 파일 변경 맵
+## 16. 파일 변경 맵
 
 ### 신규 파일
 
@@ -1244,13 +1493,29 @@ src/lib/prompt-cache.ts        // T152
 
 src/app/(dashboard)/admin/security/  // T155
   └── page.tsx
+
+src/lib/matching/                    // Phase 6: 매칭 알고리즘
+  ├── multi-layer-matching.ts        // T-A: 3-Tier 매칭 전략
+  ├── vfinal.ts                      // T-B: V_Final 계산
+  ├── qualitative-bonus.ts           // T-C: 정성적 보너스
+  └── social-boost.ts                // T-D: 소셜 모듈 통합
+
+src/lib/quality/                     // Phase 6: 품질 피드백 루프
+  ├── auto-interview.ts              // T-E: Auto-Interview 엔진 코어
+  ├── integrity-score.ts             // T-F: PIS 엔진 코어
+  ├── golden-samples.ts              // T-G: 골든 샘플 테스트
+  └── feedback-orchestrator.ts       // T-H: 피드백 루프 오케스트레이터
+
+src/lib/llm/                         // Phase 6: LLM 전략
+  ├── model-router.ts                // T-I: 2-Tier 라우팅
+  └── token-budget.ts                // T-J: 토큰 예산 관리
 ```
 
 ### 수정 파일
 
 ```
 prisma/schema.prisma           // QuarantineEntry, SystemSafetyConfig, Arena*, LlmUsageLog 추가
-src/lib/llm-client.ts          // cache_control 블록 지원
+src/lib/llm-client.ts          // cache_control 블록 지원, 모델 라우팅 통합
 src/lib/interaction/types.ts   // TriggerRule DSL 타입 확장
 src/lib/persona-world/         // source 필드 추가, 보안 검사 통합
 ```

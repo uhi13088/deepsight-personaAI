@@ -37,28 +37,28 @@
 
 ---
 
+## DONE (v4.0 — 구현계획서/설계서)
+
+- [x] **T136: v4.0 설계서 작성** ✅ 2026-02-17
+  - v3 아카이브, 엔진 설계서/구현계획서, PW 설계서(3파트)/구현계획서
+  - PW 설계서 3분할: Core(§1-4), Social(§5-8), Operations(§9-12)
+- [x] **T157: PersonaWorld 구현계획서 최신화 (Part 3 Operations)** ✅ 2026-02-17
+  - 보안 확장(§9): PW 특화 규칙 6종, Trust Decay, Kill Switch 8토글, Quarantine
+  - 품질 측정(§10): Auto-Interview PW확장, PIS 3요소, 품질 로깅, Arena 피드백 루프
+  - 모더레이션(§11): 자동 모더레이션 3단계, 대시보드, 관리자 액션, 신고 6종, KPI
+  - 비용 제어(§12): 예산 알림 4단계, 비용 모드 3종, 최적화 3전략
+  - Phase 6-8 추가 (Task #31~#50), 파일 맵 확장
+- [x] **T158: 엔진 구현계획서 최신화 (매칭 + 품질 + LLM)** ✅ 2026-02-17
+  - 매칭(§12): 3-Tier 전략, V_Final, 정성적 보너스, 소셜 부스트
+  - 품질(§13): Auto-Interview 코어, PIS, 골든 샘플, 피드백 오케스트레이터
+  - LLM(§14): 2-Tier 라우팅, 토큰 예산 관리
+  - Phase 6 추가 (Task T-A~T-J), 파일 맵 확장
+
+---
+
 ## IN_PROGRESS
 
-- [ ] **T136: v4.0 설계서 작성**
-  - 설명: v3 아카이브 + v4.0 설계서/구현계획서 4개 문서 작성
-  - AC:
-    1. v3 설계서 4개 → `docs/archive/`로 이동 ✅
-    2. `docs/design/persona-engine-v4.md` 작성
-    3. `docs/design/persona-engine-v4-impl.md` 작성
-    4. `docs/design/persona-world-v4.md` 작성
-    5. `docs/design/persona-world-v4-impl.md` 작성
-    6. `docs/README.md` + `CLAUDE.md` 참조 업데이트
-  - 범위:
-    - 보안 3계층 아키텍처 (Security Triad)
-    - 캐릭터 바이블 (Character Bible) — 4 모듈
-    - 아레나 (The Arena) — 심판→보고→관리자승인→자동교정
-    - 기억 지능 (Memory Intelligence) — Poignancy + Forgetting Curve
-    - 소셜 모듈 시스템 (Social Module System) — L4 대신 독립 모듈
-    - 비용 최적화 (Cost Optimization) — 캐싱 + Batch API
-    - 데이터 아키텍처 (Memory vs Instruction 분리)
-    - 감정 전염 (Emotional Contagion) — 정보 없이 분위기만
-    - 킬 스위치 + 격리 시스템
-    - v4.0/v4.1/v4.2 로드맵
+(없음)
 
 ---
 
