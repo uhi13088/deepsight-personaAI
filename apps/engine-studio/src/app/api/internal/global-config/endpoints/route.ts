@@ -1,19 +1,72 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { ApiResponse } from "@/types"
-import {
-  createAPIEndpointManager,
-  registerEndpoint,
-  updateRateLimit,
-  recordHealthCheck,
-  getHealthSummary,
-  DEFAULT_RATE_LIMITS,
-  DEFAULT_HEALTH_CHECK,
+import { prisma } from "@/lib/prisma"
+import { Prisma } from "@/generated/prisma"
+import type { HttpMethod as PrismaHttpMethod } from "@/generated/prisma"
+import { getHealthSummary, DEFAULT_RATE_LIMITS, DEFAULT_HEALTH_CHECK } from "@/lib/global-config"
+import type {
+  APIEndpoint,
+  HealthCheckResult,
+  APIEndpointManager,
+  RateLimitConfig,
+  HealthCheckConfig,
+  HTTPMethod,
+  APIScope,
+  EndpointStatus,
+  APIVersion,
 } from "@/lib/global-config"
-import type { APIEndpointManager, APIEndpoint, HealthCheckResult } from "@/lib/global-config"
 
-// ── In-memory store (persists within server session) ─────────
-let store: APIEndpointManager | null = null
+// ── Prisma DB row → lib APIEndpoint conversion ──────────────
+interface DbApiEndpointRow {
+  id: string
+  path: string
+  method: PrismaHttpMethod
+  name: string
+  description: string | null
+  version: string
+  status: "ACTIVE" | "DEPRECATED" | "DISABLED"
+  scope: string
+  rateLimit: number
+  timeout: number
+  rateLimitConfig: unknown
+  healthCheckConfig: unknown
+  tags: string[]
+}
 
+function toLibEndpoint(row: DbApiEndpointRow): APIEndpoint {
+  const rateLimitConfig = row.rateLimitConfig as Partial<RateLimitConfig> | null
+  const healthCheckConfig = row.healthCheckConfig as Partial<HealthCheckConfig> | null
+
+  const scope = row.scope as APIScope
+  const defaultRL = DEFAULT_RATE_LIMITS[scope] ?? DEFAULT_RATE_LIMITS.external
+
+  return {
+    id: row.id,
+    name: row.name,
+    path: row.path,
+    method: row.method as HTTPMethod,
+    scope,
+    version: row.version as APIVersion,
+    status: row.status.toLowerCase() as EndpointStatus,
+    description: row.description ?? "",
+    rateLimit: {
+      requestsPerMinute: rateLimitConfig?.requestsPerMinute ?? row.rateLimit,
+      burstLimit: rateLimitConfig?.burstLimit ?? defaultRL.burstLimit,
+      windowMs: rateLimitConfig?.windowMs ?? defaultRL.windowMs,
+      retryAfterMs: rateLimitConfig?.retryAfterMs ?? defaultRL.retryAfterMs,
+    },
+    healthCheck: {
+      enabled: healthCheckConfig?.enabled ?? DEFAULT_HEALTH_CHECK.enabled,
+      intervalMs: healthCheckConfig?.intervalMs ?? DEFAULT_HEALTH_CHECK.intervalMs,
+      timeoutMs: healthCheckConfig?.timeoutMs ?? row.timeout,
+      unhealthyThreshold:
+        healthCheckConfig?.unhealthyThreshold ?? DEFAULT_HEALTH_CHECK.unhealthyThreshold,
+    },
+    tags: row.tags,
+  }
+}
+
+// ── Sample endpoint data for initial seed ────────────────────
 const SAMPLE_ENDPOINTS: Array<Omit<APIEndpoint, "id">> = [
   {
     name: "Get Personas",
@@ -77,56 +130,142 @@ const SAMPLE_ENDPOINTS: Array<Omit<APIEndpoint, "id">> = [
   },
 ]
 
-function getStore(): APIEndpointManager {
-  if (!store) {
-    let manager = createAPIEndpointManager()
-    for (const ep of SAMPLE_ENDPOINTS) {
-      manager = registerEndpoint(manager, ep)
+// ── Seed DB with sample endpoints if empty ───────────────────
+async function seedEndpointsIfEmpty(): Promise<void> {
+  const count = await prisma.apiEndpoint.count()
+  if (count > 0) return
+
+  for (const ep of SAMPLE_ENDPOINTS) {
+    const statusMap: Record<string, "ACTIVE" | "DEPRECATED" | "DISABLED"> = {
+      active: "ACTIVE",
+      deprecated: "DEPRECATED",
+      disabled: "DISABLED",
     }
-    // Record some sample health checks
-    for (const ep of manager.endpoints) {
-      if (ep.status === "active" && ep.healthCheck.enabled) {
-        const isHealthy = ep.path !== "/api/v3/match"
-        const responseTime = isHealthy ? 50 + Math.floor(Math.random() * 200) : 4200
-        manager = recordHealthCheck(
-          manager,
-          ep.id,
-          responseTime,
-          isHealthy,
-          isHealthy ? undefined : "High latency"
-        )
-      }
-    }
-    store = manager
+
+    await prisma.apiEndpoint.create({
+      data: {
+        path: ep.path,
+        method: ep.method as PrismaHttpMethod,
+        name: ep.name,
+        description: ep.description || null,
+        version: ep.version,
+        status: statusMap[ep.status] ?? "ACTIVE",
+        scope: ep.scope,
+        rateLimit: ep.rateLimit.requestsPerMinute,
+        timeout: ep.healthCheck.timeoutMs,
+        rateLimitConfig: {
+          requestsPerMinute: ep.rateLimit.requestsPerMinute,
+          burstLimit: ep.rateLimit.burstLimit,
+          windowMs: ep.rateLimit.windowMs,
+          retryAfterMs: ep.rateLimit.retryAfterMs,
+        },
+        healthCheckConfig: {
+          enabled: ep.healthCheck.enabled,
+          intervalMs: ep.healthCheck.intervalMs,
+          timeoutMs: ep.healthCheck.timeoutMs,
+          unhealthyThreshold: ep.healthCheck.unhealthyThreshold,
+        },
+        tags: ep.tags,
+      },
+    })
   }
-  return store
+
+  // Record sample health checks for seeded endpoints
+  const seeded = await prisma.apiEndpoint.findMany()
+  for (const row of seeded) {
+    const ep = toLibEndpoint(row)
+    if (ep.status === "active" && ep.healthCheck.enabled) {
+      const isHealthy = ep.path !== "/api/v3/match"
+      const responseTimeMs = isHealthy ? 50 + Math.floor(Math.random() * 200) : 4200
+      const result: HealthCheckResult = {
+        endpointId: ep.id,
+        status: isHealthy ? "healthy" : "degraded",
+        responseTimeMs,
+        checkedAt: Date.now(),
+        consecutiveFailures: isHealthy ? 0 : 1,
+        lastSuccessAt: isHealthy ? Date.now() : null,
+        errorMessage: isHealthy ? null : "High latency",
+      }
+      await prisma.systemConfig.upsert({
+        where: { category_key: { category: "HEALTH_CHECK", key: ep.id } },
+        update: { value: result as unknown as Prisma.InputJsonValue },
+        create: {
+          category: "HEALTH_CHECK",
+          key: ep.id,
+          value: result as unknown as Prisma.InputJsonValue,
+          description: `Health check result for ${ep.name}`,
+        },
+      })
+    }
+  }
+}
+
+// ── Load health check results from SystemConfig ──────────────
+async function loadHealthResults(): Promise<Map<string, HealthCheckResult>> {
+  const rows = await prisma.systemConfig.findMany({
+    where: { category: "HEALTH_CHECK" },
+  })
+  const map = new Map<string, HealthCheckResult>()
+  for (const row of rows) {
+    const value = row.value as unknown as HealthCheckResult
+    if (value && typeof value === "object" && "endpointId" in value) {
+      map.set(value.endpointId, value)
+    }
+  }
+  return map
+}
+
+// ── Build versions grouping (Record<string, string[]>) ───────
+function buildVersions(endpoints: APIEndpoint[]): Record<string, string[]> {
+  const versions: Record<string, string[]> = {}
+  for (const ep of endpoints) {
+    if (!versions[ep.version]) {
+      versions[ep.version] = []
+    }
+    versions[ep.version].push(ep.id)
+  }
+  return versions
 }
 
 // ── Serialized response type ─────────────────────────────────
 interface EndpointManagerResponse {
   endpoints: APIEndpoint[]
-  versions: APIEndpointManager["versions"]
+  versions: Record<string, string[]>
   healthResults: Record<string, HealthCheckResult>
   healthSummary: ReturnType<typeof getHealthSummary>
 }
 
-function serialize(manager: APIEndpointManager): EndpointManagerResponse {
+function buildResponse(
+  endpoints: APIEndpoint[],
+  healthResults: Map<string, HealthCheckResult>
+): EndpointManagerResponse {
+  // Reconstruct an APIEndpointManager-like object for getHealthSummary
+  const manager: APIEndpointManager = {
+    endpoints,
+    versions: [],
+    healthResults,
+  }
+
   return {
-    endpoints: manager.endpoints,
-    versions: manager.versions,
-    healthResults: Object.fromEntries(manager.healthResults),
+    endpoints,
+    versions: buildVersions(endpoints),
+    healthResults: Object.fromEntries(healthResults),
     healthSummary: getHealthSummary(manager),
   }
 }
 
-// GET — returns endpoint manager state
+// GET — returns endpoint manager state from DB
 export async function GET() {
   try {
-    const manager = getStore()
+    await seedEndpointsIfEmpty()
+
+    const rows = await prisma.apiEndpoint.findMany({ orderBy: { createdAt: "asc" } })
+    const endpoints = rows.map(toLibEndpoint)
+    const healthResults = await loadHealthResults()
 
     return NextResponse.json<ApiResponse<EndpointManagerResponse>>({
       success: true,
-      data: serialize(manager),
+      data: buildResponse(endpoints, healthResults),
     })
   } catch {
     return NextResponse.json<ApiResponse<never>>(
@@ -148,7 +287,6 @@ type PostAction =
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as PostAction
-    const manager = getStore()
 
     switch (body.action) {
       case "register": {
@@ -161,12 +299,51 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           )
         }
-        store = registerEndpoint(manager, body.endpoint)
+
+        const ep = body.endpoint
+        const statusMap: Record<string, "ACTIVE" | "DEPRECATED" | "DISABLED"> = {
+          active: "ACTIVE",
+          deprecated: "DEPRECATED",
+          disabled: "DISABLED",
+        }
+
+        await prisma.apiEndpoint.create({
+          data: {
+            path: ep.path,
+            method: ep.method as PrismaHttpMethod,
+            name: ep.name,
+            description: ep.description || null,
+            version: ep.version,
+            status: statusMap[ep.status] ?? "ACTIVE",
+            scope: ep.scope,
+            rateLimit: ep.rateLimit.requestsPerMinute,
+            timeout: ep.healthCheck.timeoutMs,
+            rateLimitConfig: {
+              requestsPerMinute: ep.rateLimit.requestsPerMinute,
+              burstLimit: ep.rateLimit.burstLimit,
+              windowMs: ep.rateLimit.windowMs,
+              retryAfterMs: ep.rateLimit.retryAfterMs,
+            },
+            healthCheckConfig: {
+              enabled: ep.healthCheck.enabled,
+              intervalMs: ep.healthCheck.intervalMs,
+              timeoutMs: ep.healthCheck.timeoutMs,
+              unhealthyThreshold: ep.healthCheck.unhealthyThreshold,
+            },
+            tags: ep.tags,
+          },
+        })
+
+        const rows = await prisma.apiEndpoint.findMany({ orderBy: { createdAt: "asc" } })
+        const endpoints = rows.map(toLibEndpoint)
+        const healthResults = await loadHealthResults()
+
         return NextResponse.json<ApiResponse<EndpointManagerResponse>>({
           success: true,
-          data: serialize(store),
+          data: buildResponse(endpoints, healthResults),
         })
       }
+
       case "healthCheck": {
         if (!body.endpointId) {
           return NextResponse.json<ApiResponse<never>>(
@@ -177,20 +354,75 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           )
         }
+
+        // Verify the endpoint exists
+        const dbEndpoint = await prisma.apiEndpoint.findUnique({
+          where: { id: body.endpointId },
+        })
+        if (!dbEndpoint) {
+          return NextResponse.json<ApiResponse<never>>(
+            {
+              success: false,
+              error: { code: "NOT_FOUND", message: "엔드포인트를 찾을 수 없습니다" },
+            },
+            { status: 404 }
+          )
+        }
+
+        const ep = toLibEndpoint(dbEndpoint)
+
+        // Load previous result to track consecutive failures
+        const prevConfig = await prisma.systemConfig.findUnique({
+          where: { category_key: { category: "HEALTH_CHECK", key: body.endpointId } },
+        })
+        const prevResult = prevConfig ? (prevConfig.value as unknown as HealthCheckResult) : null
+
         const success = Math.random() > 0.3
-        const responseTime = success ? 50 + Math.floor(Math.random() * 300) : 0
-        store = recordHealthCheck(
-          manager,
-          body.endpointId,
-          responseTime,
-          success,
-          success ? undefined : "Connection timeout"
-        )
+        const responseTimeMs = success ? 50 + Math.floor(Math.random() * 300) : 0
+        const consecutiveFailures = success ? 0 : (prevResult?.consecutiveFailures ?? 0) + 1
+
+        let status: HealthCheckResult["status"]
+        if (!success && consecutiveFailures >= ep.healthCheck.unhealthyThreshold) {
+          status = "down"
+        } else if (!success) {
+          status = "degraded"
+        } else if (responseTimeMs > ep.healthCheck.timeoutMs * 0.8) {
+          status = "degraded"
+        } else {
+          status = "healthy"
+        }
+
+        const result: HealthCheckResult = {
+          endpointId: body.endpointId,
+          status,
+          responseTimeMs,
+          checkedAt: Date.now(),
+          consecutiveFailures,
+          lastSuccessAt: success ? Date.now() : (prevResult?.lastSuccessAt ?? null),
+          errorMessage: success ? null : "Connection timeout",
+        }
+
+        await prisma.systemConfig.upsert({
+          where: { category_key: { category: "HEALTH_CHECK", key: body.endpointId } },
+          update: { value: result as unknown as Prisma.InputJsonValue },
+          create: {
+            category: "HEALTH_CHECK",
+            key: body.endpointId,
+            value: result as unknown as Prisma.InputJsonValue,
+            description: `Health check result for ${ep.name}`,
+          },
+        })
+
+        const rows = await prisma.apiEndpoint.findMany({ orderBy: { createdAt: "asc" } })
+        const endpoints = rows.map(toLibEndpoint)
+        const healthResults = await loadHealthResults()
+
         return NextResponse.json<ApiResponse<EndpointManagerResponse>>({
           success: true,
-          data: serialize(store),
+          data: buildResponse(endpoints, healthResults),
         })
       }
+
       case "updateRateLimit": {
         if (!body.endpointId) {
           return NextResponse.json<ApiResponse<never>>(
@@ -201,14 +433,45 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           )
         }
-        store = updateRateLimit(manager, body.endpointId, {
-          requestsPerMinute: body.requestsPerMinute,
+
+        // Verify the endpoint exists and get current rateLimitConfig
+        const existing = await prisma.apiEndpoint.findUnique({
+          where: { id: body.endpointId },
         })
+        if (!existing) {
+          return NextResponse.json<ApiResponse<never>>(
+            {
+              success: false,
+              error: { code: "NOT_FOUND", message: "엔드포인트를 찾을 수 없습니다" },
+            },
+            { status: 404 }
+          )
+        }
+
+        const currentConfig = (existing.rateLimitConfig as Partial<RateLimitConfig> | null) ?? {}
+        const updatedConfig = {
+          ...currentConfig,
+          requestsPerMinute: body.requestsPerMinute,
+        }
+
+        await prisma.apiEndpoint.update({
+          where: { id: body.endpointId },
+          data: {
+            rateLimit: body.requestsPerMinute,
+            rateLimitConfig: updatedConfig as unknown as Prisma.InputJsonValue,
+          },
+        })
+
+        const rows = await prisma.apiEndpoint.findMany({ orderBy: { createdAt: "asc" } })
+        const endpoints = rows.map(toLibEndpoint)
+        const healthResults = await loadHealthResults()
+
         return NextResponse.json<ApiResponse<EndpointManagerResponse>>({
           success: true,
-          data: serialize(store),
+          data: buildResponse(endpoints, healthResults),
         })
       }
+
       default: {
         return NextResponse.json<ApiResponse<never>>(
           {

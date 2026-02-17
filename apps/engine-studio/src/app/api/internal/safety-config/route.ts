@@ -1,4 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// 안전 설정 — DB 기반 SystemSafetyConfig 관리
+// ═══════════════════════════════════════════════════════════════
+
 import { NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
 import type { ApiResponse } from "@/types"
 import {
   createDefaultConfig,
@@ -8,23 +13,62 @@ import {
   disableFeature,
 } from "@/lib/security/kill-switch"
 import type { SystemSafetyConfig, SafetyFeatureKey } from "@/lib/security/kill-switch"
+import type { Prisma } from "@/generated/prisma"
 
-// ── In-memory store (singleton) ──────────────────────────────
-let store: SystemSafetyConfig | null = null
+// ── DB에서 안전 설정 로드 ─────────────────────────────────────
 
-function getStore(): SystemSafetyConfig {
-  if (!store) {
-    store = createDefaultConfig("system")
+async function loadConfig(): Promise<SystemSafetyConfig> {
+  const row = await prisma.systemSafetyConfig.findUnique({
+    where: { id: "singleton" },
+  })
+
+  if (!row) {
+    return createDefaultConfig("system")
   }
-  return store
+
+  return {
+    emergencyFreeze: row.emergencyFreeze,
+    freezeReason: row.freezeReason ?? undefined,
+    freezeAt: row.freezeAt ? row.freezeAt.getTime() : undefined,
+    featureToggles: row.featureToggles as unknown as SystemSafetyConfig["featureToggles"],
+    autoTriggers: row.autoTriggers as unknown as SystemSafetyConfig["autoTriggers"],
+    updatedAt: row.updatedAt.getTime(),
+    updatedBy: row.updatedBy,
+  }
 }
 
-// GET /api/internal/safety-config
+async function saveConfig(config: SystemSafetyConfig): Promise<void> {
+  await prisma.systemSafetyConfig.upsert({
+    where: { id: "singleton" },
+    update: {
+      emergencyFreeze: config.emergencyFreeze,
+      freezeReason: config.freezeReason ?? null,
+      freezeAt: config.freezeAt ? new Date(config.freezeAt) : null,
+      featureToggles: config.featureToggles as unknown as Prisma.InputJsonValue,
+      autoTriggers: config.autoTriggers as unknown as Prisma.InputJsonValue,
+      updatedBy: config.updatedBy,
+    },
+    create: {
+      id: "singleton",
+      emergencyFreeze: config.emergencyFreeze,
+      freezeReason: config.freezeReason ?? null,
+      freezeAt: config.freezeAt ? new Date(config.freezeAt) : null,
+      featureToggles: config.featureToggles as unknown as Prisma.InputJsonValue,
+      autoTriggers: config.autoTriggers as unknown as Prisma.InputJsonValue,
+      updatedBy: config.updatedBy,
+    },
+  })
+}
+
+// ── GET /api/internal/safety-config ─────────────────────────────
+
 export async function GET() {
   try {
+    const config = await loadConfig()
+
     return NextResponse.json<ApiResponse<SystemSafetyConfig>>({
       success: true,
-      data: getStore(),
+      data: config,
     })
   } catch {
     return NextResponse.json<ApiResponse<never>>(
@@ -37,7 +81,8 @@ export async function GET() {
   }
 }
 
-// PUT /api/internal/safety-config
+// ── PUT /api/internal/safety-config ─────────────────────────────
+
 type PutAction =
   | { action: "freeze"; reason: string; updatedBy: string }
   | { action: "unfreeze"; updatedBy: string }
@@ -52,7 +97,7 @@ type PutAction =
 export async function PUT(request: NextRequest) {
   try {
     const body = (await request.json()) as PutAction
-    const config = getStore()
+    let config = await loadConfig()
 
     switch (body.action) {
       case "freeze": {
@@ -65,7 +110,7 @@ export async function PUT(request: NextRequest) {
             { status: 400 }
           )
         }
-        store = activateEmergencyFreeze(config, body.reason, body.updatedBy)
+        config = activateEmergencyFreeze(config, body.reason, body.updatedBy)
         break
       }
       case "unfreeze": {
@@ -78,7 +123,7 @@ export async function PUT(request: NextRequest) {
             { status: 400 }
           )
         }
-        store = deactivateEmergencyFreeze(config, body.updatedBy)
+        config = deactivateEmergencyFreeze(config, body.updatedBy)
         break
       }
       case "enableFeature": {
@@ -91,7 +136,7 @@ export async function PUT(request: NextRequest) {
             { status: 400 }
           )
         }
-        store = enableFeature(config, body.feature, body.updatedBy)
+        config = enableFeature(config, body.feature, body.updatedBy)
         break
       }
       case "disableFeature": {
@@ -107,7 +152,7 @@ export async function PUT(request: NextRequest) {
             { status: 400 }
           )
         }
-        store = disableFeature(config, body.feature, body.reason, body.updatedBy)
+        config = disableFeature(config, body.feature, body.reason, body.updatedBy)
         break
       }
       default: {
@@ -121,9 +166,11 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    await saveConfig(config)
+
     return NextResponse.json<ApiResponse<SystemSafetyConfig>>({
       success: true,
-      data: store!,
+      data: config,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : "안전 설정 업데이트 실패"

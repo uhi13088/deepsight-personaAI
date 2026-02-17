@@ -17,14 +17,31 @@ import type {
   VersionDiff,
   DeployEnvironment,
 } from "@/lib/system-integration"
+import { prisma } from "@/lib/prisma"
 
-// ── In-memory Store ────────────────────────────────────────────
+// ── Prisma Helpers ───────────────────────────────────────────
 
-let versions: AlgorithmVersion[] = []
+async function loadVersions(): Promise<AlgorithmVersion[]> {
+  const row = await prisma.systemConfig.findUnique({
+    where: { category_key: { category: "ALGORITHM_VERSION", key: "versions" } },
+  })
+  if (!row) return []
+  return row.value as unknown as AlgorithmVersion[]
+}
 
-// Seed data initialization
-function ensureSeedData() {
-  if (versions.length > 0) return
+async function saveVersions(versions: AlgorithmVersion[]): Promise<void> {
+  await prisma.systemConfig.upsert({
+    where: { category_key: { category: "ALGORITHM_VERSION", key: "versions" } },
+    update: { value: versions as any },
+    create: { category: "ALGORITHM_VERSION", key: "versions", value: versions as any },
+  })
+}
+
+// ── Seed Data ────────────────────────────────────────────────
+
+async function ensureSeedData(): Promise<AlgorithmVersion[]> {
+  const existing = await loadVersions()
+  if (existing.length > 0) return existing
 
   const v1 = createVersion(
     "matching",
@@ -59,11 +76,14 @@ function ensureSeedData() {
     "v1.1.0"
   )
 
-  versions = [
+  const seeded: AlgorithmVersion[] = [
     { ...v1, status: "deprecated" as const },
     { ...v11, status: "active" as const, deployedEnvironments: ["development", "staging"] },
     { ...v12, status: "draft" as const },
   ]
+
+  await saveVersions(seeded)
+  return seeded
 }
 
 // ── Response Types ─────────────────────────────────────────────
@@ -75,7 +95,7 @@ interface VersionListResponse {
 // GET — 알고리즘 버전 목록 반환
 export async function GET() {
   try {
-    ensureSeedData()
+    const versions = await ensureSeedData()
 
     return NextResponse.json<ApiResponse<VersionListResponse>>({
       success: true,
@@ -132,7 +152,7 @@ type VersionAction =
 // POST — 버전 액션 처리
 export async function POST(request: NextRequest) {
   try {
-    ensureSeedData()
+    const versions = await ensureSeedData()
     const body = (await request.json()) as VersionAction
 
     switch (body.action) {
@@ -177,6 +197,7 @@ export async function POST(request: NextRequest) {
           latest.version
         )
         versions.push(newVer)
+        await saveVersions(versions)
 
         return NextResponse.json<ApiResponse<AlgorithmVersion>>({
           success: true,
@@ -215,6 +236,7 @@ export async function POST(request: NextRequest) {
           )
         }
         versions[idx] = setVersionTesting(versions[idx])
+        await saveVersions(versions)
         return NextResponse.json<ApiResponse<AlgorithmVersion>>({
           success: true,
           data: versions[idx],
@@ -233,6 +255,7 @@ export async function POST(request: NextRequest) {
           )
         }
         versions[idx] = activateVersion(versions[idx], versions, DEFAULT_VERSION_POLICY)
+        await saveVersions(versions)
         return NextResponse.json<ApiResponse<AlgorithmVersion>>({
           success: true,
           data: versions[idx],
@@ -251,6 +274,7 @@ export async function POST(request: NextRequest) {
           )
         }
         versions[idx] = deprecateVersion(versions[idx], body.reason ?? "Replaced by newer version")
+        await saveVersions(versions)
         return NextResponse.json<ApiResponse<AlgorithmVersion>>({
           success: true,
           data: versions[idx],
@@ -278,6 +302,7 @@ export async function POST(request: NextRequest) {
         )
         versions[currentIdx] = updatedCurrent
         versions[targetIdx] = updatedTarget
+        await saveVersions(versions)
 
         return NextResponse.json<
           ApiResponse<{ updatedCurrent: AlgorithmVersion; updatedTarget: AlgorithmVersion }>

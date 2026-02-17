@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { ApiResponse } from "@/types"
+import { prisma } from "@/lib/prisma"
 import {
   createIncident,
   advanceIncidentPhase,
@@ -13,32 +14,149 @@ import type {
   IncidentPhase,
   PostMortem,
   DetectionRule,
+  IncidentTimelineEntry,
 } from "@/lib/operations"
-import { DEMO_INCIDENTS, DEMO_DETECTION_RULES } from "@/lib/demo-fixtures"
+import type { Prisma } from "@/generated/prisma"
+import { DEMO_DETECTION_RULES } from "@/lib/demo-fixtures"
 
-// ── In-memory store ─────────────────────────────────────────────
+// ── Severity/Phase mapping ────────────────────────────────────
 
-interface IncidentStore {
-  incidents: Incident[]
-  postMortems: PostMortem[]
-  detectionRules: DetectionRule[]
+const SEVERITY_TO_DB: Record<IncidentSeverity, string> = {
+  P0: "CRITICAL",
+  P1: "HIGH",
+  P2: "MEDIUM",
+  P3: "LOW",
 }
 
-function buildInitialStore(): IncidentStore {
+const DB_TO_SEVERITY: Record<string, IncidentSeverity> = {
+  CRITICAL: "P0",
+  HIGH: "P1",
+  MEDIUM: "P2",
+  LOW: "P3",
+}
+
+const PHASE_TO_DB: Record<IncidentPhase, string> = {
+  detected: "REPORTED",
+  triaged: "INVESTIGATING",
+  investigating: "INVESTIGATING",
+  mitigating: "FIXING",
+  resolved: "RESOLVED",
+  postmortem: "CLOSED",
+}
+
+const DB_TO_PHASE: Record<string, IncidentPhase> = {
+  REPORTED: "detected",
+  INVESTIGATING: "investigating",
+  IDENTIFIED: "investigating",
+  FIXING: "mitigating",
+  RESOLVED: "resolved",
+  CLOSED: "postmortem",
+}
+
+// ── DB → Lib conversion ─────────────────────────────────────────
+
+interface DbIncidentRow {
+  id: string
+  title: string
+  description: string
+  severity: string
+  status: string
+  affectedSystems: string[]
+  resolution: string | null
+  reportedById: string
+  createdAt: Date
+  resolvedAt: Date | null
+  timeline: Array<{
+    id: string
+    action: string
+    description: string
+    performedById: string
+    createdAt: Date
+  }>
+}
+
+function dbIncidentToLib(row: DbIncidentRow): Incident {
+  const timelineEntries: IncidentTimelineEntry[] = row.timeline.map((t) => ({
+    timestamp: t.createdAt.getTime(),
+    phase: DB_TO_PHASE[t.action] ?? "detected",
+    actor: t.performedById,
+    description: t.description,
+  }))
+
   return {
-    incidents: [...DEMO_INCIDENTS],
-    postMortems: [],
-    detectionRules: [...DEMO_DETECTION_RULES],
+    id: row.id,
+    title: row.title,
+    severity: DB_TO_SEVERITY[row.severity] ?? "P3",
+    phase: DB_TO_PHASE[row.status] ?? "detected",
+    detectedAt: row.createdAt.getTime(),
+    resolvedAt: row.resolvedAt?.getTime() ?? null,
+    commander: null,
+    affectedServices: row.affectedSystems,
+    timeline: timelineEntries,
+    rootCause: null,
+    mitigation: row.resolution,
   }
 }
 
-let store: IncidentStore | null = null
-
-function getStore(): IncidentStore {
-  if (!store) {
-    store = buildInitialStore()
+interface DbPostMortemRow {
+  id: string
+  incidentId: string
+  rootCause: string
+  affectedUsers: number
+  downtimeMinutes: number
+  dataLoss: boolean
+  actionItems: unknown
+  lessons: string[]
+  createdAt: Date
+  incident: {
+    title: string
+    affectedSystems: string[]
+    timeline: Array<{
+      id: string
+      action: string
+      description: string
+      performedById: string
+      createdAt: Date
+    }>
   }
-  return store
+}
+
+function dbPostMortemToLib(row: DbPostMortemRow): PostMortem {
+  const timeline: IncidentTimelineEntry[] = row.incident.timeline.map((t) => ({
+    timestamp: t.createdAt.getTime(),
+    phase: DB_TO_PHASE[t.action] ?? "detected",
+    actor: t.performedById,
+    description: t.description,
+  }))
+
+  return {
+    incidentId: row.incidentId,
+    title: `${row.incident.title} 포스트모템`,
+    summary: row.rootCause,
+    timeline,
+    rootCause: row.rootCause,
+    impact: {
+      affectedUsers: row.affectedUsers,
+      affectedServices: row.incident.affectedSystems,
+      downtimeMinutes: row.downtimeMinutes,
+      dataLoss: row.dataLoss,
+    },
+    actionItems: (row.actionItems as PostMortem["actionItems"]) ?? [],
+    lessonsLearned: row.lessons,
+    createdAt: row.createdAt.getTime(),
+  }
+}
+
+// ── Load detection rules from SystemConfig ──────────────────────
+
+async function loadDetectionRules(): Promise<DetectionRule[]> {
+  const row = await prisma.systemConfig.findUnique({
+    where: { category_key: { category: "INCIDENT", key: "detectionRules" } },
+  })
+  if (row) {
+    return row.value as unknown as DetectionRule[]
+  }
+  return DEMO_DETECTION_RULES
 }
 
 // ── Response type ───────────────────────────────────────────────
@@ -58,22 +176,50 @@ interface IncidentResponse {
 
 export async function GET() {
   try {
-    const s = getStore()
+    const [dbIncidents, dbPostMortems, detectionRules] = await Promise.all([
+      prisma.incident.findMany({
+        include: {
+          timeline: { orderBy: { createdAt: "asc" } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.postMortem.findMany({
+        include: {
+          incident: {
+            include: {
+              timeline: { orderBy: { createdAt: "asc" } },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      loadDetectionRules(),
+    ])
 
-    const incidentsBySeverity: Record<IncidentSeverity, number> = { P0: 0, P1: 0, P2: 0, P3: 0 }
-    for (const inc of s.incidents) {
+    const incidents = dbIncidents.map((row) => dbIncidentToLib(row as unknown as DbIncidentRow))
+    const postMortems = dbPostMortems.map((row) =>
+      dbPostMortemToLib(row as unknown as DbPostMortemRow)
+    )
+
+    const incidentsBySeverity: Record<IncidentSeverity, number> = {
+      P0: 0,
+      P1: 0,
+      P2: 0,
+      P3: 0,
+    }
+    for (const inc of incidents) {
       incidentsBySeverity[inc.severity]++
     }
 
     return NextResponse.json<ApiResponse<IncidentResponse>>({
       success: true,
       data: {
-        incidents: s.incidents,
-        postMortems: s.postMortems,
-        detectionRules: s.detectionRules,
+        incidents,
+        postMortems,
+        detectionRules,
         stats: {
-          totalIncidents: s.incidents.length,
-          mttrMinutes: calculateMTTR(s.incidents),
+          totalIncidents: incidents.length,
+          mttrMinutes: calculateMTTR(incidents),
           incidentsBySeverity,
         },
       },
@@ -111,7 +257,6 @@ interface IncidentPostRequest {
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as IncidentPostRequest
-    const s = getStore()
 
     if (body.action === "create_incident") {
       if (!body.title || !body.severity) {
@@ -138,17 +283,49 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      const incident = createIncident(
+      // Use lib function for business logic
+      const libIncident = createIncident(
         body.title,
         body.severity,
         body.affectedServices ?? [],
         "operator"
       )
-      s.incidents = [incident, ...s.incidents]
+
+      // Persist to DB
+      const dbSeverity = SEVERITY_TO_DB[body.severity] ?? "LOW"
+      const created = await prisma.incident.create({
+        data: {
+          title: body.title,
+          description: `${body.title} - 자동 생성`,
+          severity: dbSeverity as Prisma.IncidentCreateInput["severity"],
+          status: "REPORTED" as Prisma.IncidentCreateInput["status"],
+          affectedSystems: body.affectedServices ?? [],
+          reportedById: "operator",
+        },
+        include: {
+          timeline: { orderBy: { createdAt: "asc" } },
+        },
+      })
+
+      // Add initial timeline entry
+      await prisma.incidentTimeline.create({
+        data: {
+          incidentId: created.id,
+          action: "REPORTED",
+          description: `장애 감지: ${body.title}`,
+          performedById: "operator",
+        },
+      })
+
+      // Return lib-format incident with DB id
+      const result: Incident = {
+        ...libIncident,
+        id: created.id,
+      }
 
       return NextResponse.json<ApiResponse<Incident>>({
         success: true,
-        data: incident,
+        data: result,
       })
     }
 
@@ -163,8 +340,12 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      const idx = s.incidents.findIndex((i) => i.id === body.incidentId)
-      if (idx === -1) {
+      const dbIncident = await prisma.incident.findUnique({
+        where: { id: body.incidentId },
+        include: { timeline: { orderBy: { createdAt: "asc" } } },
+      })
+
+      if (!dbIncident) {
         return NextResponse.json<ApiResponse<never>>(
           {
             success: false,
@@ -174,13 +355,39 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      // Convert to lib type, apply phase change
+      const libIncident = dbIncidentToLib(dbIncident as unknown as DbIncidentRow)
       const updated = advanceIncidentPhase(
-        s.incidents[idx],
+        libIncident,
         body.nextPhase,
         body.actor ?? "operator",
         body.description ?? `${body.nextPhase} 단계로 전환`
       )
-      s.incidents[idx] = updated
+
+      // Persist phase change to DB
+      const dbStatus = PHASE_TO_DB[body.nextPhase] ?? "REPORTED"
+      const updateData: Record<string, unknown> = {
+        status: dbStatus as Prisma.IncidentUpdateInput["status"],
+      }
+
+      if (body.nextPhase === "resolved" || body.nextPhase === "postmortem") {
+        updateData.resolvedAt = new Date()
+      }
+
+      await prisma.incident.update({
+        where: { id: body.incidentId },
+        data: updateData as Prisma.IncidentUpdateInput,
+      })
+
+      // Add timeline entry
+      await prisma.incidentTimeline.create({
+        data: {
+          incidentId: body.incidentId,
+          action: dbStatus,
+          description: body.description ?? `${body.nextPhase} 단계로 전환`,
+          performedById: body.actor ?? "operator",
+        },
+      })
 
       return NextResponse.json<ApiResponse<Incident>>({
         success: true,
@@ -199,8 +406,12 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      const incident = s.incidents.find((i) => i.id === body.incidentId)
-      if (!incident) {
+      const dbIncident = await prisma.incident.findUnique({
+        where: { id: body.incidentId },
+        include: { timeline: { orderBy: { createdAt: "asc" } } },
+      })
+
+      if (!dbIncident) {
         return NextResponse.json<ApiResponse<never>>(
           {
             success: false,
@@ -210,8 +421,10 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      // Use lib function for business logic
+      const libIncident = dbIncidentToLib(dbIncident as unknown as DbIncidentRow)
       const pm = createPostMortem(
-        incident,
+        libIncident,
         body.rootCause,
         body.affectedUsers ?? 0,
         body.downtimeMinutes ?? 0,
@@ -226,7 +439,19 @@ export async function POST(request: NextRequest) {
         ],
         ["재발 방지 위해 알림 임계값 조정 필요"]
       )
-      s.postMortems = [...s.postMortems, pm]
+
+      // Persist to DB
+      await prisma.postMortem.create({
+        data: {
+          incidentId: body.incidentId,
+          rootCause: body.rootCause,
+          affectedUsers: body.affectedUsers ?? 0,
+          downtimeMinutes: body.downtimeMinutes ?? 0,
+          dataLoss: false,
+          actionItems: pm.actionItems as unknown as Prisma.InputJsonValue,
+          lessons: pm.lessonsLearned,
+        },
+      })
 
       return NextResponse.json<ApiResponse<PostMortem>>({
         success: true,

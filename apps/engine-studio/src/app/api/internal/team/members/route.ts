@@ -1,42 +1,57 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { ApiResponse } from "@/types"
-import {
-  createTeam,
-  inviteMember,
-  deactivateMember,
-  reactivateMember,
-  updateMemberRole,
-  listMembers,
-} from "@/lib/team"
-import type { TeamMember, TeamState, Role, InviteResult } from "@/lib/team"
-import { DEMO_TEAM_NAME, DEMO_TEAM_MEMBERS } from "@/lib/demo-fixtures"
+import type { TeamMember, Role, InviteResult } from "@/lib/team"
+import type { UserRole } from "@/generated/prisma"
+import { prisma } from "@/lib/prisma"
 
-// ── Seed team state (in-memory, persists within server session) ──
-function initializeSeedTeam(): TeamState {
-  let team = createTeam(DEMO_TEAM_NAME, "Admin", "admin@example.com")
+// ── Role conversion helpers ──────────────────────────────────
 
-  for (const m of DEMO_TEAM_MEMBERS) {
-    const { team: updated } = inviteMember(team, {
-      email: m.email,
-      name: m.name,
-      role: m.role,
-      invitedBy: team.members[0].id,
-    })
-    team = updated
+function toUserRole(role: Role): UserRole {
+  const map: Record<Role, UserRole> = {
+    admin: "ADMIN" as UserRole,
+    ai_engineer: "AI_ENGINEER" as UserRole,
+    content_manager: "CONTENT_MANAGER" as UserRole,
+    analyst: "ANALYST" as UserRole,
   }
-
-  // Activate first two invited members for demo
-  team = {
-    ...team,
-    members: team.members.map((m, i) =>
-      i > 0 && i < 3 ? { ...m, status: "active" as const, lastActiveAt: Date.now() } : m
-    ),
-  }
-
-  return team
+  return map[role]
 }
 
-let teamState: TeamState = initializeSeedTeam()
+function fromUserRole(role: UserRole): Role {
+  return role.toLowerCase() as Role
+}
+
+// ── User → TeamMember conversion ─────────────────────────────
+
+function toTeamMember(user: {
+  id: string
+  name: string | null
+  email: string
+  role: UserRole
+  isActive: boolean
+  lastLoginAt: Date | null
+  createdAt: Date
+}): TeamMember {
+  let status: TeamMember["status"]
+  if (!user.isActive) {
+    status = "deactivated"
+  } else if (user.lastLoginAt !== null) {
+    status = "active"
+  } else {
+    status = "invited"
+  }
+
+  return {
+    id: user.id,
+    name: user.name ?? user.email,
+    email: user.email,
+    role: fromUserRole(user.role),
+    status,
+    joinedAt: user.createdAt.getTime(),
+    lastActiveAt: user.lastLoginAt ? user.lastLoginAt.getTime() : null,
+  }
+}
+
+// ── Response types ───────────────────────────────────────────
 
 interface MembersResponse {
   members: TeamMember[]
@@ -59,13 +74,40 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status") as TeamMember["status"] | null
     const keyword = searchParams.get("keyword")
 
-    const members = listMembers(teamState, {
-      roles: role ? [role] : null,
-      statuses: status ? [status] : null,
-      keyword: keyword || null,
+    // Load all users from DB
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        lastLoginAt: true,
+        createdAt: true,
+      },
     })
 
-    const allMembers = teamState.members
+    const allMembers = users.map(toTeamMember)
+
+    // Apply filters
+    let members = [...allMembers]
+
+    if (role) {
+      members = members.filter((m) => m.role === role)
+    }
+    if (status) {
+      members = members.filter((m) => m.status === status)
+    }
+    if (keyword && keyword.length > 0) {
+      const kw = keyword.toLowerCase()
+      members = members.filter(
+        (m) => m.name.toLowerCase().includes(kw) || m.email.toLowerCase().includes(kw)
+      )
+    }
+
+    // Sort by name
+    members.sort((a, b) => a.name.localeCompare(b.name))
+
     const totalByStatus = {
       active: allMembers.filter((m) => m.status === "active").length,
       invited: allMembers.filter((m) => m.status === "invited").length,
@@ -106,24 +148,64 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      const { team: updated, result } = inviteMember(teamState, {
-        email: body.email,
-        name: body.name,
-        role: body.role,
-        invitedBy: teamState.members[0].id,
+      // Check if email already exists
+      const existing = await prisma.user.findUnique({
+        where: { email: body.email.toLowerCase() },
+        select: { id: true, isActive: true },
       })
 
-      if (!result.success) {
+      if (existing) {
+        if (!existing.isActive) {
+          return NextResponse.json<ApiResponse<never>>(
+            {
+              success: false,
+              error: {
+                code: "INVITE_FAILED",
+                message: `비활성화된 사용자입니다. 재활성화를 사용하세요: ${body.email}`,
+              },
+            },
+            { status: 409 }
+          )
+        }
         return NextResponse.json<ApiResponse<never>>(
           {
             success: false,
-            error: { code: "INVITE_FAILED", message: result.error ?? "초대 실패" },
+            error: {
+              code: "INVITE_FAILED",
+              message: `이미 존재하는 이메일입니다: ${body.email}`,
+            },
           },
           { status: 409 }
         )
       }
 
-      teamState = updated
+      const newUser = await prisma.user.create({
+        data: {
+          email: body.email.toLowerCase(),
+          name: body.name,
+          role: toUserRole(body.role),
+          isActive: true,
+          lastLoginAt: null,
+          password: null,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isActive: true,
+          lastLoginAt: true,
+          createdAt: true,
+        },
+      })
+
+      const member = toTeamMember(newUser)
+
+      const result: InviteResult = {
+        success: true,
+        member,
+        error: null,
+      }
 
       return NextResponse.json<ApiResponse<InviteResult>>({
         success: true,
@@ -142,7 +224,61 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      teamState = deactivateMember(teamState, body.memberId)
+      const user = await prisma.user.findUnique({
+        where: { id: body.memberId },
+        select: { id: true, role: true, isActive: true },
+      })
+
+      if (!user) {
+        return NextResponse.json<ApiResponse<never>>(
+          {
+            success: false,
+            error: { code: "NOT_FOUND", message: `멤버를 찾을 수 없습니다: ${body.memberId}` },
+          },
+          { status: 404 }
+        )
+      }
+
+      if (!user.isActive) {
+        return NextResponse.json<ApiResponse<never>>(
+          {
+            success: false,
+            error: {
+              code: "INVALID_STATE",
+              message: `이미 비활성화된 멤버입니다: ${body.memberId}`,
+            },
+          },
+          { status: 400 }
+        )
+      }
+
+      // Check last admin constraint
+      if (user.role === ("ADMIN" as UserRole)) {
+        const activeAdminCount = await prisma.user.count({
+          where: {
+            role: "ADMIN" as UserRole,
+            isActive: true,
+            id: { not: body.memberId },
+          },
+        })
+        if (activeAdminCount === 0) {
+          return NextResponse.json<ApiResponse<never>>(
+            {
+              success: false,
+              error: {
+                code: "LAST_ADMIN",
+                message: "마지막 관리자는 비활성화할 수 없습니다. 다른 관리자를 먼저 지정하세요",
+              },
+            },
+            { status: 400 }
+          )
+        }
+      }
+
+      await prisma.user.update({
+        where: { id: body.memberId },
+        data: { isActive: false },
+      })
 
       return NextResponse.json<ApiResponse<{ memberId: string }>>({
         success: true,
@@ -161,7 +297,38 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      teamState = reactivateMember(teamState, body.memberId)
+      const user = await prisma.user.findUnique({
+        where: { id: body.memberId },
+        select: { id: true, isActive: true },
+      })
+
+      if (!user) {
+        return NextResponse.json<ApiResponse<never>>(
+          {
+            success: false,
+            error: { code: "NOT_FOUND", message: `멤버를 찾을 수 없습니다: ${body.memberId}` },
+          },
+          { status: 404 }
+        )
+      }
+
+      if (user.isActive) {
+        return NextResponse.json<ApiResponse<never>>(
+          {
+            success: false,
+            error: {
+              code: "INVALID_STATE",
+              message: `비활성화 상태가 아닌 멤버는 재활성화할 수 없습니다: ${body.memberId}`,
+            },
+          },
+          { status: 400 }
+        )
+      }
+
+      await prisma.user.update({
+        where: { id: body.memberId },
+        data: { isActive: true },
+      })
 
       return NextResponse.json<ApiResponse<{ memberId: string }>>({
         success: true,
@@ -180,7 +347,64 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      teamState = updateMemberRole(teamState, body.memberId, body.role)
+      const user = await prisma.user.findUnique({
+        where: { id: body.memberId },
+        select: { id: true, role: true, isActive: true, lastLoginAt: true },
+      })
+
+      if (!user) {
+        return NextResponse.json<ApiResponse<never>>(
+          {
+            success: false,
+            error: { code: "NOT_FOUND", message: `멤버를 찾을 수 없습니다: ${body.memberId}` },
+          },
+          { status: 404 }
+        )
+      }
+
+      // Only active members can have their role changed
+      const isActive = user.isActive
+      if (!isActive) {
+        return NextResponse.json<ApiResponse<never>>(
+          {
+            success: false,
+            error: {
+              code: "INVALID_STATE",
+              message: `활성 상태의 멤버만 역할을 변경할 수 있습니다: ${body.memberId}`,
+            },
+          },
+          { status: 400 }
+        )
+      }
+
+      // Check last admin constraint
+      const newUserRole = toUserRole(body.role)
+      if (user.role === ("ADMIN" as UserRole) && newUserRole !== ("ADMIN" as UserRole)) {
+        const activeAdminCount = await prisma.user.count({
+          where: {
+            role: "ADMIN" as UserRole,
+            isActive: true,
+            id: { not: body.memberId },
+          },
+        })
+        if (activeAdminCount === 0) {
+          return NextResponse.json<ApiResponse<never>>(
+            {
+              success: false,
+              error: {
+                code: "LAST_ADMIN",
+                message: "마지막 관리자의 역할을 변경할 수 없습니다. 다른 관리자를 먼저 지정하세요",
+              },
+            },
+            { status: 400 }
+          )
+        }
+      }
+
+      await prisma.user.update({
+        where: { id: body.memberId },
+        data: { role: newUserRole },
+      })
 
       return NextResponse.json<ApiResponse<{ memberId: string; role: Role }>>({
         success: true,
