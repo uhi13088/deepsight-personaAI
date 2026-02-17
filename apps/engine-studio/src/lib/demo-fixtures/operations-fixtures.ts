@@ -174,12 +174,12 @@ export const DEMO_INCIDENTS = buildDemoIncidents()
 
 export const DEMO_DETECTION_RULES: DetectionRule[] = [
   {
-    id: "rule_api_latency",
-    name: "API 응답시간 초과",
-    description: "API 응답시간이 2초를 초과하면 P1 장애 탐지",
-    metricType: "api_latency",
+    id: "rule_llm_error_rate",
+    name: "LLM 에러율 급증",
+    description: "LLM 에러율이 15%를 초과하면 P1 장애 탐지",
+    metricType: "llm_error_rate",
     condition: "above",
-    threshold: 2000,
+    threshold: 15,
     durationSeconds: 60,
     severity: "P1",
     enabled: true,

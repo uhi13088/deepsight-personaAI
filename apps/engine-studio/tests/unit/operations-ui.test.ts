@@ -131,9 +131,9 @@ function buildResolvedIncident(): Incident {
 
 describe("Monitoring Page Logic", () => {
   describe("메트릭 데이터 포인트 생성", () => {
-    it("CPU 메트릭을 올바르게 생성해야 한다", () => {
-      const dp = createMetricDataPoint("cpu", 72.5, "server-1", { env: "prod" })
-      expect(dp.metricType).toBe("cpu")
+    it("llm_error_rate 메트릭을 올바르게 생성해야 한다", () => {
+      const dp = createMetricDataPoint("llm_error_rate", 72.5, "server-1", { env: "prod" })
+      expect(dp.metricType).toBe("llm_error_rate")
       expect(dp.value).toBe(72.5)
       expect(dp.source).toBe("server-1")
       expect(dp.labels.env).toBe("prod")
@@ -141,52 +141,52 @@ describe("Monitoring Page Logic", () => {
     })
 
     it("소수점 이하 2자리까지 반올림해야 한다", () => {
-      const dp = createMetricDataPoint("memory", 68.333333, "server-1")
+      const dp = createMetricDataPoint("llm_cost", 68.333333, "server-1")
       expect(dp.value).toBe(68.33)
     })
 
     it("라벨 없이도 생성 가능해야 한다", () => {
-      const dp = createMetricDataPoint("disk", 50, "server-1")
+      const dp = createMetricDataPoint("avg_latency", 50, "server-1")
       expect(dp.labels).toEqual({})
     })
   })
 
   describe("임계값 평가", () => {
     it("임계값 초과 시 warning 알림을 생성해야 한다", () => {
-      const points = [createMetricDataPoint("cpu", 75, "server-1")]
+      const points = [createMetricDataPoint("llm_error_rate", 10, "server-1")]
       const alerts = evaluateThresholds(points, DEFAULT_METRIC_THRESHOLDS)
       expect(alerts.length).toBe(1)
       expect(alerts[0].level).toBe("warning")
-      expect(alerts[0].metricType).toBe("cpu")
+      expect(alerts[0].metricType).toBe("llm_error_rate")
     })
 
     it("critical 임계값 초과 시 critical 알림을 생성해야 한다", () => {
-      const points = [createMetricDataPoint("cpu", 95, "server-1")]
+      const points = [createMetricDataPoint("llm_error_rate", 20, "server-1")]
       const alerts = evaluateThresholds(points, DEFAULT_METRIC_THRESHOLDS)
       expect(alerts.length).toBe(1)
       expect(alerts[0].level).toBe("critical")
     })
 
     it("임계값 미만이면 알림이 없어야 한다", () => {
-      const points = [createMetricDataPoint("cpu", 50, "server-1")]
+      const points = [createMetricDataPoint("llm_error_rate", 2, "server-1")]
       const alerts = evaluateThresholds(points, DEFAULT_METRIC_THRESHOLDS)
       expect(alerts.length).toBe(0)
     })
 
     it("다수 메트릭에서 복합 알림을 생성해야 한다", () => {
       const points = [
-        createMetricDataPoint("cpu", 95, "server-1"),
-        createMetricDataPoint("memory", 80, "server-1"),
-        createMetricDataPoint("disk", 50, "server-1"),
+        createMetricDataPoint("llm_error_rate", 20, "server-1"),
+        createMetricDataPoint("llm_cost", 200, "server-1"),
+        createMetricDataPoint("avg_latency", 3000, "server-1"),
       ]
       const alerts = evaluateThresholds(points, DEFAULT_METRIC_THRESHOLDS)
-      expect(alerts.length).toBe(2) // cpu critical + memory warning
+      expect(alerts.length).toBe(2) // llm_error_rate critical + llm_cost warning
     })
   })
 
   describe("알림 확인", () => {
     it("알림을 확인(acknowledged) 처리할 수 있어야 한다", () => {
-      const points = [createMetricDataPoint("cpu", 95, "server-1")]
+      const points = [createMetricDataPoint("llm_error_rate", 20, "server-1")]
       const alerts = evaluateThresholds(points, DEFAULT_METRIC_THRESHOLDS)
       expect(alerts[0].acknowledged).toBe(false)
       const acked = acknowledgeThresholdAlert(alerts[0])
@@ -294,8 +294,8 @@ describe("Monitoring Page Logic", () => {
   describe("대시보드 빌드", () => {
     it("대시보드 데이터를 올바르게 빌드해야 한다", () => {
       const metrics = [
-        createMetricDataPoint("cpu", 75, "server-1"),
-        createMetricDataPoint("memory", 96, "server-1"),
+        createMetricDataPoint("llm_error_rate", 10, "server-1"),
+        createMetricDataPoint("llm_cost", 600, "server-1"),
       ]
       const logs = buildSampleLogs()
       const dashboard = buildMonitoringDashboard(metrics, logs)
@@ -647,12 +647,12 @@ describe("DR Plan & Drill Logic", () => {
 describe("Capacity & Cost Logic", () => {
   describe("리소스 사용률", () => {
     it("사용률 퍼센트를 올바르게 계산해야 한다", () => {
-      const resource = createResourceUsage("cpu", 60, 100, "%")
+      const resource = createResourceUsage("llm_error_rate", 60, 100, "%")
       expect(getUsagePercent(resource)).toBe(60)
     })
 
     it("maxCapacity가 0이면 0을 반환해야 한다", () => {
-      const resource = createResourceUsage("cpu", 60, 0, "%")
+      const resource = createResourceUsage("llm_error_rate", 60, 0, "%")
       expect(getUsagePercent(resource)).toBe(0)
     })
   })
@@ -663,10 +663,12 @@ describe("Capacity & Cost Logic", () => {
       const baseTime = Date.now() - 30 * msPerDay
       const snapshots: UsageSnapshot[] = []
       for (let day = 0; day < 30; day++) {
-        const resources: ResourceUsage[] = [createResourceUsage("cpu", 40 + day * 1.5, 100, "%")]
+        const resources: ResourceUsage[] = [
+          createResourceUsage("llm_error_rate", 40 + day * 1.5, 100, "%"),
+        ]
         snapshots.push({ timestamp: baseTime + day * msPerDay, resources })
       }
-      const forecast = forecastLinear(snapshots, "cpu", 90)
+      const forecast = forecastLinear(snapshots, "llm_error_rate", 90)
       expect(forecast.trend).toBe("increasing")
       expect(forecast.projectedUsagePercent).toBeGreaterThan(forecast.currentUsagePercent)
       expect(forecast.confidence).toBeGreaterThan(0)
@@ -674,9 +676,9 @@ describe("Capacity & Cost Logic", () => {
 
     it("데이터 포인트가 1개일 때 stable을 반환해야 한다", () => {
       const snapshots: UsageSnapshot[] = [
-        { timestamp: Date.now(), resources: [createResourceUsage("cpu", 50, 100, "%")] },
+        { timestamp: Date.now(), resources: [createResourceUsage("llm_error_rate", 50, 100, "%")] },
       ]
-      const forecast = forecastLinear(snapshots, "cpu", 90)
+      const forecast = forecastLinear(snapshots, "llm_error_rate", 90)
       expect(forecast.trend).toBe("stable")
       expect(forecast.confidence).toBe(0)
     })
@@ -684,7 +686,7 @@ describe("Capacity & Cost Logic", () => {
 
   describe("비용 최적화", () => {
     it("과소 사용 리소스에 대해 다운사이징을 제안해야 한다", () => {
-      const resources = [createResourceUsage("cpu", 10, 100, "%")]
+      const resources = [createResourceUsage("llm_error_rate", 10, 100, "%")]
       const optimizations = generateCostOptimizations(resources, [])
       const rightsizing = optimizations.find((o) => o.category === "rightsizing")
       expect(rightsizing).toBeTruthy()
@@ -692,7 +694,7 @@ describe("Capacity & Cost Logic", () => {
     })
 
     it("비업무 시간 스케일 다운 제안을 항상 포함해야 한다", () => {
-      const resources = [createResourceUsage("cpu", 50, 100, "%")]
+      const resources = [createResourceUsage("llm_error_rate", 50, 100, "%")]
       const optimizations = generateCostOptimizations(resources, [])
       const scheduling = optimizations.find((o) => o.category === "scheduling")
       expect(scheduling).toBeTruthy()
@@ -701,14 +703,14 @@ describe("Capacity & Cost Logic", () => {
 
   describe("스케일링 권고", () => {
     it("90% 초과 시 scale_up immediate를 권고해야 한다", () => {
-      const resources = [createResourceUsage("cpu", 95, 100, "%")]
+      const resources = [createResourceUsage("llm_error_rate", 95, 100, "%")]
       const recommendations = generateScalingRecommendations(resources, [])
       expect(recommendations[0].direction).toBe("scale_up")
       expect(recommendations[0].urgency).toBe("immediate")
     })
 
     it("적정 사용률에서 no_change를 권고해야 한다", () => {
-      const resources = [createResourceUsage("cpu", 50, 100, "%")]
+      const resources = [createResourceUsage("llm_error_rate", 50, 100, "%")]
       const recommendations = generateScalingRecommendations(resources, [])
       expect(recommendations[0].direction).toBe("no_change")
     })
@@ -721,23 +723,23 @@ describe("Capacity & Cost Logic", () => {
       const snapshots: UsageSnapshot[] = []
       for (let day = 0; day < 30; day++) {
         const resources: ResourceUsage[] = [
-          createResourceUsage("cpu", 50 + day * 0.5, 100, "%"),
-          createResourceUsage("memory", 60, 100, "%"),
-          createResourceUsage("disk", 40 + day * 0.8, 100, "%"),
-          createResourceUsage("network", 30, 100, "%"),
-          createResourceUsage("api_latency", 200, 5000, "ms"),
-          createResourceUsage("error_rate", 0.5, 100, "%"),
+          createResourceUsage("llm_error_rate", 50 + day * 0.5, 100, "%"),
+          createResourceUsage("llm_cost", 60, 100, "%"),
+          createResourceUsage("avg_latency", 40 + day * 0.8, 100, "%"),
+          createResourceUsage("llm_calls", 30, 100, "%"),
+          createResourceUsage("matching_count", 200, 5000, "ms"),
+          createResourceUsage("active_personas", 0.5, 100, "%"),
         ]
         snapshots.push({ timestamp: baseTime + day * msPerDay, resources })
       }
 
       const currentResources: ResourceUsage[] = [
-        createResourceUsage("cpu", 65, 100, "%"),
-        createResourceUsage("memory", 60, 100, "%"),
-        createResourceUsage("disk", 64, 100, "%"),
-        createResourceUsage("network", 30, 100, "%"),
-        createResourceUsage("api_latency", 200, 5000, "ms"),
-        createResourceUsage("error_rate", 0.5, 100, "%"),
+        createResourceUsage("llm_error_rate", 65, 100, "%"),
+        createResourceUsage("llm_cost", 60, 100, "%"),
+        createResourceUsage("avg_latency", 64, 100, "%"),
+        createResourceUsage("llm_calls", 30, 100, "%"),
+        createResourceUsage("matching_count", 200, 5000, "ms"),
+        createResourceUsage("active_personas", 0.5, 100, "%"),
       ]
 
       const report = buildCapacityReport(snapshots, currentResources, 90, 80)
