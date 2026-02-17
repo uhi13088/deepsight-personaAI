@@ -17,6 +17,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Globe,
+  Swords,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
@@ -67,6 +68,12 @@ const navSections: NavSection[] = [
       { label: "Algorithm Tuning", href: "/matching-lab/tuning" },
       { label: "Performance Analytics", href: "/matching-lab/analytics" },
     ],
+  },
+  {
+    label: "Arena",
+    icon: Swords,
+    basePath: "/arena",
+    children: [],
   },
   {
     label: "System Integration",
@@ -123,7 +130,7 @@ const navSections: NavSection[] = [
   },
 ]
 
-const SEPARATOR_INDICES = [1, 4, 7]
+const SEPARATOR_INDICES = [1, 5, 8]
 
 const LNB_COLLAPSED_KEY = "lnb-collapsed"
 
