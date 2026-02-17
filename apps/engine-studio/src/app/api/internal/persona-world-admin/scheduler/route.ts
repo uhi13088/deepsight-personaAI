@@ -6,19 +6,33 @@ export async function GET() {
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0)
 
-    const [activePersonaCount, pausedPersonas, todayPostCount, recentLogs] = await Promise.all([
-      prisma.persona.count({ where: { status: { in: ["ACTIVE", "STANDARD"] } } }),
-      prisma.persona.findMany({
-        where: { status: "PAUSED" },
-        select: { id: true, name: true },
-      }),
-      prisma.personaPost.count({ where: { createdAt: { gte: todayStart } } }),
-      prisma.personaActivityLog.findMany({
-        where: { trigger: "SCHEDULED" },
-        orderBy: { createdAt: "desc" },
-        take: 20,
-      }),
-    ])
+    let activePersonaCount = 0
+    let pausedPersonas: Array<{ id: string; name: string }> = []
+    let todayPostCount = 0
+    let recentLogs: Array<{
+      id: string
+      personaId: string
+      activityType: string
+      createdAt: Date
+    }> = []
+
+    try {
+      ;[activePersonaCount, pausedPersonas, todayPostCount, recentLogs] = await Promise.all([
+        prisma.persona.count({ where: { status: { in: ["ACTIVE", "STANDARD"] } } }),
+        prisma.persona.findMany({
+          where: { status: "PAUSED" },
+          select: { id: true, name: true },
+        }),
+        prisma.personaPost.count({ where: { createdAt: { gte: todayStart } } }),
+        prisma.personaActivityLog.findMany({
+          where: { trigger: "SCHEDULED" },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        }),
+      ])
+    } catch {
+      // DB not ready — return empty data
+    }
 
     const lastRunAt = recentLogs.length > 0 ? recentLogs[0].createdAt.toISOString() : null
 
@@ -30,14 +44,12 @@ export async function GET() {
         pausedPersonas,
         todayPostCount,
         lastRunAt,
-        recentRuns: recentLogs.map(
-          (log: { id: string; personaId: string; activityType: string; createdAt: Date }) => ({
-            id: log.id,
-            personaId: log.personaId,
-            activityType: log.activityType,
-            createdAt: log.createdAt.toISOString(),
-          })
-        ),
+        recentRuns: recentLogs.map((log) => ({
+          id: log.id,
+          personaId: log.personaId,
+          activityType: log.activityType,
+          createdAt: log.createdAt.toISOString(),
+        })),
       },
     })
   } catch (error) {

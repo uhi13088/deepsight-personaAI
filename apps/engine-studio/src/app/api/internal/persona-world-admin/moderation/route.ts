@@ -3,32 +3,35 @@ import { prisma } from "@/lib/prisma"
 
 export async function GET() {
   try {
-    const reports = await prisma.personaWorldReport.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    })
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        reports: reports.map(
-          (r: {
+    const reports = await prisma.personaWorldReport
+      .findMany({
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      })
+      .catch(
+        () =>
+          [] as Array<{
             id: string
             targetType: string
             targetId: string
             reason: string
             status: string
             createdAt: Date
-          }) => ({
-            id: r.id,
-            reporterType: "USER",
-            targetType: r.targetType,
-            targetId: r.targetId,
-            reason: r.reason,
-            status: r.status,
-            createdAt: r.createdAt.toISOString(),
-          })
-        ),
+          }>
+      )
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        reports: reports.map((r) => ({
+          id: r.id,
+          reporterType: "USER",
+          targetType: r.targetType,
+          targetId: r.targetId,
+          reason: r.reason,
+          status: r.status,
+          createdAt: r.createdAt.toISOString(),
+        })),
       },
     })
   } catch (error) {

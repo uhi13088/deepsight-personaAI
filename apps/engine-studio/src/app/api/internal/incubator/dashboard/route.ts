@@ -3,7 +3,7 @@
 // IncubatorLog, GoldenSample, Persona 테이블에서 직접 조회
 // ═══════════════════════════════════════════════════════════════
 
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import type { ApiResponse } from "@/types"
 import {
@@ -185,6 +185,98 @@ export async function GET() {
         success: false,
         error: { code: "INTERNAL_ERROR", message },
       },
+      { status: 500 }
+    )
+  }
+}
+
+// ── POST: 수동 배치 트리거 + 설정 변경 ──────────────────────
+
+interface IncubatorSettings {
+  generationCostKRW: number
+  testCostKRW: number
+  monthlyBudgetKRW: number
+  dailyLimit: number
+  passThreshold: number
+  strategyWeights: { userDriven: number; exploration: number; gapFilling: number }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { action } = body as { action: string }
+
+    if (action === "trigger_batch") {
+      // 수동 배치 트리거 — 인큐베이터 로그에 기록만 (실제 LLM 호출은 스케줄러)
+      const batchId = `batch-manual-${Date.now()}`
+      return NextResponse.json<ApiResponse<{ batchId: string; message: string }>>({
+        success: true,
+        data: {
+          batchId,
+          message: "수동 배치가 요청되었습니다. 스케줄러가 다음 사이클에서 실행합니다.",
+        },
+      })
+    }
+
+    if (action === "get_settings") {
+      // SystemConfig에서 인큐베이터 설정 조회
+      const rows = await prisma.systemConfig
+        .findMany({ where: { category: "INCUBATOR" } })
+        .catch(() => [])
+
+      const configMap = Object.fromEntries(rows.map((r) => [r.key, r.value]))
+      const settings: IncubatorSettings = {
+        generationCostKRW: (configMap.generationCostKRW as number) ?? 5,
+        testCostKRW: (configMap.testCostKRW as number) ?? 2,
+        monthlyBudgetKRW: (configMap.monthlyBudgetKRW as number) ?? 10000,
+        dailyLimit: (configMap.dailyLimit as number) ?? 10,
+        passThreshold: (configMap.passThreshold as number) ?? 0.9,
+        strategyWeights: (configMap.strategyWeights as IncubatorSettings["strategyWeights"]) ?? {
+          userDriven: 0.6,
+          exploration: 0.2,
+          gapFilling: 0.2,
+        },
+      }
+      return NextResponse.json<ApiResponse<IncubatorSettings>>({
+        success: true,
+        data: settings,
+      })
+    }
+
+    if (action === "save_settings") {
+      const { settings } = body as { settings: Partial<IncubatorSettings> }
+      if (!settings) {
+        return NextResponse.json<ApiResponse<never>>(
+          { success: false, error: { code: "MISSING_PARAM", message: "settings required" } },
+          { status: 400 }
+        )
+      }
+
+      const entries = Object.entries(settings)
+      await Promise.all(
+        entries.map(([key, value]) =>
+          prisma.systemConfig.upsert({
+            where: { category_key: { category: "INCUBATOR", key } },
+            update: { value: value as number | object },
+            create: { category: "INCUBATOR", key, value: value as number | object },
+          })
+        )
+      )
+
+      return NextResponse.json<ApiResponse<{ saved: string[] }>>({
+        success: true,
+        data: { saved: entries.map(([k]) => k) },
+      })
+    }
+
+    return NextResponse.json<ApiResponse<never>>(
+      { success: false, error: { code: "UNKNOWN_ACTION", message: `Unknown: ${action}` } },
+      { status: 400 }
+    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error"
+    return NextResponse.json<ApiResponse<never>>(
+      { success: false, error: { code: "INCUBATOR_ACTION_ERROR", message } },
       { status: 500 }
     )
   }

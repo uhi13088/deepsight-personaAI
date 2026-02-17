@@ -119,6 +119,14 @@ export default function LlmCostsPage() {
     fetchData()
   }, [fetchData])
 
+  // 30초 간격 자동 갱신
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchData()
+    }, 30_000)
+    return () => clearInterval(interval)
+  }, [fetchData])
+
   return (
     <div className="flex flex-1 flex-col">
       <Header title="LLM 비용 모니터링" description="LLM API 호출 비용 및 사용량 실시간 대시보드" />
