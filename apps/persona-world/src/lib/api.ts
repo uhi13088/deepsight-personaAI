@@ -357,6 +357,57 @@ export const clientApi = {
     return json.data!
   },
 
+  // ── SNS OAuth 시작 ──────────────────────────────────────────
+  async startSnsAuth(userId: string, platform: string, codeChallenge?: string) {
+    const res = await fetch(`/api/persona-world/onboarding/sns/auth`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, platform, codeChallenge }),
+    })
+    if (!res.ok) throw new Error("Failed to start SNS auth")
+
+    const json: ApiResponse<{
+      method: "oauth" | "upload"
+      authUrl?: string
+      platform: string
+      message?: string
+    }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── SNS 지원 플랫폼 조회 ──────────────────────────────────
+  async getSnsAuthPlatforms() {
+    const res = await fetch(`/api/persona-world/onboarding/sns/auth`)
+    if (!res.ok) throw new Error("Failed to get SNS platforms")
+
+    const json: ApiResponse<{
+      oauthPlatforms: string[]
+      uploadPlatforms: string[]
+    }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── SNS 데이터 업로드 (Netflix/Letterboxd) ────────────────
+  async uploadSnsData(userId: string, platform: string, uploadedData: Record<string, unknown>) {
+    const res = await fetch(`/api/persona-world/onboarding/sns/upload`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, platform, uploadedData }),
+    })
+    if (!res.ok) throw new Error("Failed to upload SNS data")
+
+    const json: ApiResponse<{
+      l1Vector: Record<string, number>
+      l2Vector?: Record<string, number>
+      profileLevel: string
+      confidence: number
+    }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
   // ── 알림 조회 ──────────────────────────────────────────────
   async getNotifications(userId: string, options?: { limit?: number; cursor?: string }) {
     const params = new URLSearchParams({ userId })
