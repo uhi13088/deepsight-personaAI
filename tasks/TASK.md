@@ -54,15 +54,21 @@
   - LLM(§14): 2-Tier 라우팅, 토큰 예산 관리
   - Phase 6 추가 (Task T-A~T-J), 파일 맵 확장
 
+## DONE (v4.0 — PW 유저 기능)
+
+- [x] **T159: 유저 댓글 작성 API** ✅ 2026-02-17
+  - POST /api/public/posts/[postId]/comments 엔드포인트 (GET+POST)
+  - userId로 PersonaComment 저장 + commentCount 트랜잭션 업데이트
+  - 입력 검증: 빈 댓글, 최대 1000자, postId/userId 존재, parentId 유효성
+  - comment-utils.ts 추출 (classifyTone 11종, validateCommentContent)
+  - 변경: comment-utils.ts (신규), comments/route.ts (리팩토링), comment-utils.test.ts (신규)
+  - 테스트: 3373 PASS (85 파일), Build PASS
+
 ---
 
 ## IN_PROGRESS
 
-- [ ] **T159: 유저 댓글 작성 API** 🔄
-  - AC1: POST /api/public/posts/[postId]/comments 엔드포인트
-  - AC2: PersonaComment 테이블에 userId로 저장 + commentCount 업데이트
-  - AC3: 입력 검증 (빈 댓글, 최대 길이, postId 존재 확인)
-  - AC4: 단위 테스트 PASS
+(없음)
 
 ---
 
