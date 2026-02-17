@@ -6,7 +6,13 @@
 // ═══════════════════════════════════════════════════════════════
 
 import type { OnboardingAnswer, OnboardingResult } from "../types"
-import { computeL1Vector, computeL2Vector, crossValidate, ONBOARDING_CONFIDENCE } from "./questions"
+import {
+  computeL1Vector,
+  computeL2Vector,
+  computeL3Vector,
+  crossValidateWithParadox,
+  ONBOARDING_CONFIDENCE,
+} from "./questions"
 import type { OnboardingQuestion, OnboardingQuestionsProvider } from "./questions"
 
 /**
@@ -48,26 +54,37 @@ export async function processOnboardingAnswers(
     }
   }
 
-  // Phase 2: L2 벡터 산출
+  // Phase 2: L2 + L3 벡터 산출
   const phase2Questions = await provider.getQuestionsByPhase(2)
-  const l2Vector = computeL2Vector(phase2Questions, answers)
+  const allPhase12 = [...phase1Questions, ...phase2Questions]
+  const l2Vector = computeL2Vector(allPhase12, answers)
+  const l3Vector = computeL3Vector(allPhase12, answers)
 
   if (level === "MEDIUM") {
     return {
       l1Vector,
       l2Vector,
+      l3Vector,
       profileLevel: "STANDARD",
       confidence: ONBOARDING_CONFIDENCE.MEDIUM,
     }
   }
 
-  // Phase 3: 교차 검증 + Paradox 감지
+  // Phase 3: 교차 검증 + 7쌍 역설 감지 + EPS 계산
   const phase3Questions = await provider.getQuestionsByPhase(3)
-  const { adjustedL1, adjustedL2 } = crossValidate(l1Vector, l2Vector, phase3Questions, answers)
+  const { adjustedL1, adjustedL2, adjustedL3, paradoxProfile } = crossValidateWithParadox(
+    l1Vector,
+    l2Vector,
+    l3Vector,
+    phase3Questions,
+    answers
+  )
 
   return {
     l1Vector: adjustedL1,
     l2Vector: adjustedL2,
+    l3Vector: adjustedL3,
+    paradoxProfile,
     profileLevel: "ADVANCED",
     confidence: ONBOARDING_CONFIDENCE.DEEP,
   }

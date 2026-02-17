@@ -7,7 +7,9 @@ import type {
   ThreeLayerVector,
   SocialPersonaVector,
   CoreTemperamentVector,
+  NarrativeDriveVector,
 } from "@/types/persona-v3"
+import type { ParadoxProfile } from "@/types"
 import type { PersonaPostType } from "@/generated/prisma"
 
 // ── 확장된 8개 활동 특성 ──────────────────────────────────────
@@ -276,6 +278,8 @@ export interface OnboardingAnswer {
 export interface OnboardingResult {
   l1Vector: SocialPersonaVector
   l2Vector?: CoreTemperamentVector
+  l3Vector?: NarrativeDriveVector
+  paradoxProfile?: ParadoxProfile
   profileLevel: "BASIC" | "STANDARD" | "ADVANCED" | "PREMIUM"
   confidence: number
 }
@@ -294,5 +298,5 @@ export interface UserActivity {
 }
 
 // ── Re-export for convenience ────────────────────────────────
-export type { ThreeLayerVector, SocialPersonaVector, CoreTemperamentVector }
+export type { ThreeLayerVector, SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector }
 export type { PersonaPostType }
