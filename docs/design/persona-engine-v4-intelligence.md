@@ -1399,4 +1399,358 @@ computeGrowthStats(personaId): GrowthStats
 
 ---
 
-> **§9~§10은 다음 작업에서 구체화 예정**
+## 9. 소셜 모듈 (Social Module)
+
+페르소나 간 관계 네트워크를 **그래프로 모델링**하고 분석하는 독립 모듈. 관계 메트릭(warmth, tension)을 기반으로 그래프를 구축하고, 노드 분류·이상 탐지·기능 바인딩을 통해 다른 모듈에 소셜 인텔리전스를 제공한다.
+
+```
+┌──────────────────────────────────────────────────────┐
+│                소셜 모듈 (Social Module)                │
+│                                                        │
+│  ┌──────────────┐    ┌──────────────┐                 │
+│  │ 관계 데이터   │ →  │ 그래프 구축   │                 │
+│  │ (warmth,     │    │ Adjacency    │                 │
+│  │  tension,    │    │ Map          │                 │
+│  │  frequency)  │    └──────┬───────┘                 │
+│  └──────────────┘           │                          │
+│                             ↓                          │
+│  ┌──────────────┐    ┌──────────────┐                 │
+│  │ 노드 분류    │ ←  │ 노드 메트릭   │                 │
+│  │ HUB/NORMAL/  │    │ degree,      │                 │
+│  │ PERIPHERAL/  │    │ clustering,  │                 │
+│  │ ISOLATE      │    │ betweenness  │                 │
+│  └──────┬───────┘    └──────────────┘                 │
+│         │                                              │
+│         ↓                                              │
+│  ┌──────────────┐    ┌──────────────┐                 │
+│  │ 이상 탐지    │    │ 기능 바인딩   │                 │
+│  │ Anomaly      │    │ Feature      │                 │
+│  │ Detection    │    │ Bindings     │                 │
+│  └──────────────┘    └──────────────┘                 │
+└──────────────────────────────────────────────────────┘
+```
+
+### 9.1 관계 메트릭 (Relationship Metrics)
+
+소셜 그래프의 엣지(edge)를 구성하는 핵심 메트릭. 각 페르소나 쌍(pair)마다 유지된다.
+
+**파일**: `src/lib/social-module/`
+
+#### 9.1.1 메트릭 정의
+
+| 메트릭    | 범위      | 설명                                | 갱신 트리거               |
+| --------- | --------- | ----------------------------------- | ------------------------- |
+| warmth    | 0.0 ~ 1.0 | 호감도, 친밀감                      | 긍정 인터랙션 시 증가     |
+| tension   | 0.0 ~ 1.0 | 긴장감, 갈등 수준                   | 부정 인터랙션 시 증가     |
+| frequency | 0 ~ ∞     | 인터랙션 빈도 (최근 N일 내 횟수)    | 인터랙션 발생마다 카운트  |
+| stage     | enum      | 관계 발전 단계 (STRANGER → CLOSE)   | 임계값 충족 시 자동 전이  |
+| type      | enum      | 관계 유형 (NEUTRAL, ALLY, RIVAL 등) | 인터랙션 패턴에 따라 분류 |
+
+```typescript
+type RelationshipStage = "STRANGER" | "ACQUAINTANCE" | "FAMILIAR" | "CLOSE"
+
+type RelationshipType = "NEUTRAL" | "ALLY" | "RIVAL" | "MENTOR" | "FAN"
+
+interface PersonaRelationship {
+  personaAId: string
+  personaBId: string
+  warmth: number // 0.0 ~ 1.0
+  tension: number // 0.0 ~ 1.0
+  frequency: number // 최근 윈도우 내 인터랙션 수
+  stage: RelationshipStage
+  type: RelationshipType
+  lastInteractionAt: Date
+  createdAt: Date
+}
+```
+
+#### 9.1.2 관계 발전 단계 (Stage Transition)
+
+관계는 인터랙션 축적에 따라 자동으로 단계가 전이된다. 전이 조건은 Relationship Protocol(§4.2)에서 정의되며, 소셜 모듈이 실행한다.
+
+```
+STRANGER ──→ ACQUAINTANCE ──→ FAMILIAR ──→ CLOSE
+   │              │               │           │
+   └──────────────┴───────────────┴───────────┘
+            (역전이: warmth 하락 시)
+```
+
+**전이 조건**
+
+```typescript
+interface StageTransition {
+  from: RelationshipStage
+  to: RelationshipStage
+  conditions: {
+    minInteractions: number // 최소 인터랙션 횟수
+    minWarmth: number // 최소 warmth 값
+    maxTension: number // tension 상한 (초과 시 전이 불가)
+    minDuration: number // 최소 경과 일수
+  }
+}
+```
+
+**기본 전이 조건표**
+
+| 전이                    | minInteractions | minWarmth | maxTension | minDuration |
+| ----------------------- | --------------- | --------- | ---------- | ----------- |
+| STRANGER → ACQUAINTANCE | 3               | 0.2       | 0.7        | 1일         |
+| ACQUAINTANCE → FAMILIAR | 10              | 0.5       | 0.5        | 7일         |
+| FAMILIAR → CLOSE        | 25              | 0.7       | 0.3        | 30일        |
+
+**역전이**: warmth가 현재 단계 유지 최솟값 아래로 떨어지면 한 단계 하락. 단, STRANGER 이하로는 내려가지 않는다.
+
+**전이 감지 함수**
+
+```
+detectStageTransition(relationship, interactions): StageTransition | null
+computeProgress(relationship): { stage, progress: number }
+```
+
+- `detectStageTransition`: 현재 관계 상태와 인터랙션 이력을 분석하여 전이 조건 충족 여부 판단
+- `computeProgress`: 다음 단계까지의 진행률 (0.0 ~ 1.0) 반환. 관리자 대시보드 표시용
+
+#### 9.1.3 단계별 행동 허용 범위
+
+관계 단계에 따라 페르소나의 행동 프로토콜이 달라진다.
+
+```typescript
+interface RelationshipProtocol {
+  stage: RelationshipStage
+  type: RelationshipType
+  behaviorPolicy: {
+    tonePermission: "formal" | "casual" | "free" | "intimate"
+    selfDisclosure: "none" | "surface" | "personal" | "deep"
+    debateWillingness: "avoid" | "cautious" | "direct" | "fierce"
+  }
+}
+```
+
+**단계 × 행동 매트릭스**
+
+| 속성              | STRANGER | ACQUAINTANCE | FAMILIAR | CLOSE    |
+| ----------------- | -------- | ------------ | -------- | -------- |
+| tonePermission    | formal   | casual       | free     | intimate |
+| selfDisclosure    | none     | surface      | personal | deep     |
+| debateWillingness | avoid    | cautious     | direct   | fierce   |
+
+**관계 유형에 따른 변형**
+
+| 유형   | tonePermission 보정 | selfDisclosure 보정 | debateWillingness 보정 |
+| ------ | ------------------- | ------------------- | ---------------------- |
+| ALLY   | +1 단계 느슨        | +1 단계 깊음        | 변형 없음              |
+| RIVAL  | 변형 없음           | -1 단계 방어적      | +1 단계 적극적         |
+| MENTOR | 변형 없음           | +1 단계 깊음        | +1 단계 직접적         |
+| FAN    | +1 단계 느슨        | 변형 없음           | -1 단계 회피적         |
+
+**프롬프트 적용**
+
+```
+getProtocol(stage, type): RelationshipProtocol
+summarizeRelationship(relationship, recentInteractions): string
+```
+
+`summarizeRelationship`의 출력이 프롬프트 Dynamic 블록(§8.5)에 삽입되어, LLM이 상대와의 관계 맥락을 인지하고 발화한다.
+
+### 9.2 그래프 분석 (Graph Analysis)
+
+관계 데이터를 그래프로 구축하고 구조적 메트릭을 계산한다.
+
+#### 9.2.1 인접 맵 구축
+
+```
+buildAdjacencyMap(relationships): Map<string, string[]>
+```
+
+모든 `PersonaRelationship`을 입력받아 인접 리스트(adjacency list) 형태의 그래프를 구축한다. 양방향 엣지로 처리하며, warmth > 0.1인 관계만 유효 엣지로 포함한다.
+
+#### 9.2.2 노드 메트릭 계산
+
+```
+computeNodeMetrics(adjacencyMap): NodeMetrics[]
+```
+
+각 노드(페르소나)에 대해 3가지 메트릭을 계산한다.
+
+```typescript
+interface NodeMetrics {
+  personaId: string
+  degree: number // 연결된 엣지 수
+  clusteringCoefficient: number // 이웃 노드 간 연결 밀도
+  classification: NodeClassification
+}
+```
+
+| 메트릭                | 계산 방법                                       | 의미                                   |
+| --------------------- | ----------------------------------------------- | -------------------------------------- |
+| degree                | 인접 노드 수                                    | 소셜 활동 범위                         |
+| clusteringCoefficient | 이웃 간 실제 연결 / 가능한 연결                 | 밀접 그룹 형성 정도                    |
+| betweenness (근사)    | 노드를 거치는 최단 경로 비율 (샘플링 기반 근사) | 네트워크 브리지 역할 (정확도보다 속도) |
+
+#### 9.2.3 노드 분류
+
+```
+classifyNode(metrics): NodeClassification
+```
+
+```typescript
+type NodeClassification = "HUB" | "NORMAL" | "PERIPHERAL" | "ISOLATE"
+```
+
+| 유형       | 조건                                 | 의미                        |
+| ---------- | ------------------------------------ | --------------------------- |
+| HUB        | degree 상위 `hubThreshold` (10%)     | 소셜 중심. 많은 관계를 유지 |
+| NORMAL     | 상위 10% ~ 하위 20% 사이             | 일반적인 소셜 활동          |
+| PERIPHERAL | degree 하위 `isolateThreshold` (20%) | 주변부. 소수 관계만 유지    |
+| ISOLATE    | degree = 0                           | 완전 고립. 인터랙션 없음    |
+
+**설정**
+
+```typescript
+interface SocialModuleConfig {
+  hubThreshold: number // degree 상위 % (기본 0.1)
+  isolateThreshold: number // degree 하위 % (기본 0.2)
+  anomalyWindowHours: number // 이상 탐지 시간 윈도우 (기본 24)
+  connectionSurgeMultiplier: number // 연결 급증 판단 배수 (기본 3.0)
+}
+```
+
+### 9.3 이상 탐지 (Anomaly Detection)
+
+소셜 그래프의 비정상적 변화를 자동으로 탐지한다. 봇 행위, 조작, 비정상적 관계 패턴을 식별하여 Security 모듈에 전달한다.
+
+```
+detectAnomalies(config, currentMetrics, history): SocialAnomaly[]
+```
+
+```typescript
+interface SocialAnomaly {
+  type: "connection_surge" | "tension_cluster" | "bot_pattern" | "isolation_risk"
+  personaIds: string[] // 관련 페르소나 목록
+  severity: "low" | "medium" | "high"
+  detectedAt: Date
+  details: string // 사람이 읽을 수 있는 설명
+}
+```
+
+#### 9.3.1 이상 유형과 탐지 방법
+
+| 이상 유형     | 코드키             | 탐지 방법                                                                  | 심각도 기준                      |
+| ------------- | ------------------ | -------------------------------------------------------------------------- | -------------------------------- |
+| 연결 급증     | `connection_surge` | `anomalyWindowHours` 내 degree 증가량 > 평균 × `connectionSurgeMultiplier` | 증가 비율에 따라 low/medium/high |
+| 긴장 클러스터 | `tension_cluster`  | 밀접 그룹(clusteringCoeff > 0.7) 내 평균 tension > 0.7                     | tension 수준에 따라 판단         |
+| 봇 패턴       | `bot_pattern`      | 인터랙션 간격 표준편차 < 임계값 (기계적 규칙성) + 내용 다양성 낮음         | 규칙성 강도에 따라 판단          |
+| 고립 위험     | `isolation_risk`   | ISOLATE 또는 PERIPHERAL 노드의 마지막 인터랙션이 N일 이상 경과             | 경과 기간에 따라 판단            |
+
+#### 9.3.2 탐지 흐름
+
+```
+1. 현재 NodeMetrics[] 계산
+2. 이전 스냅샷(history)과 비교
+3. 각 이상 유형별 탐지 규칙 적용
+4. 탐지된 이상 → SocialAnomaly[] 반환
+5. severity가 "high"인 이상 → Security 모듈 Integrity Monitor에 즉시 전달
+6. severity가 "medium"인 이상 → 관리자 알림
+7. severity가 "low"인 이상 → 로그 기록만
+```
+
+#### 9.3.3 봇 패턴 탐지 상세
+
+봇으로 의심되는 페르소나의 행동 패턴:
+
+| 지표               | 정상 범위       | 봇 의심 범위     | 측정 방법                      |
+| ------------------ | --------------- | ---------------- | ------------------------------ |
+| 인터랙션 간격 편차 | 높음 (불규칙)   | 매우 낮음 (규칙) | 연속 인터랙션 간 시간 차이의 σ |
+| 내용 다양성        | 높음            | 낮음             | 발화 텍스트의 유니크 토큰 비율 |
+| 활동 시간대 분포   | 분산            | 집중             | 24시간 활동 분포의 엔트로피    |
+| 관계 패턴          | 자연스러운 성장 | 급격한 증가      | degree 변화율                  |
+
+### 9.4 기능 바인딩 (Feature Bindings)
+
+소셜 그래프 메트릭이 다른 모듈에 영향을 미치는 연결점. 소셜 모듈은 직접 행동하지 않고, **메트릭을 제공하여** 다른 모듈이 활용하도록 한다.
+
+```typescript
+const FEATURE_BINDINGS = {
+  matching: {
+    description: "친밀도 기반 추천 가중치",
+    metric: "warmth",
+    effect: "warmth 높은 관계 → 추천 가중치 부스트",
+  },
+  feed: {
+    description: "허브 포스트 노출 부스트",
+    metric: "classification",
+    effect: "HUB 페르소나의 포스트 → 노출 점수 ×1.3",
+  },
+  arena: {
+    description: "관계 밀집 영역 우선 검증",
+    metric: "clusteringCoefficient",
+    effect: "밀접 그룹 내 tension 높은 관계 → 아레나 우선 대상",
+  },
+  security: {
+    description: "이상 패턴 전달",
+    metric: "SocialAnomaly",
+    effect: "severity high → Integrity Monitor 즉시 전달",
+  },
+} as const
+```
+
+| 대상 모듈      | 바인딩 메트릭         | 효과                                         |
+| -------------- | --------------------- | -------------------------------------------- |
+| Matching (§12) | warmth                | 친밀도 높은 관계 → 콘텐츠 추천 가중치 부스트 |
+| Feed           | classification (HUB)  | 허브 페르소나 포스트 → 탐색 Tier 노출 증가   |
+| Arena (§7)     | clusteringCoefficient | 밀접 그룹 내 tension 높은 관계 우선 검증     |
+| Security (§5)  | SocialAnomaly         | 이상 패턴 → Integrity Monitor 전달           |
+| Memory (§6)    | stage, type           | socialSignificance 요인에 반영 (§6.1)        |
+
+### 9.5 소셜 배터리 연동
+
+PersonaState의 `socialBattery`(§3.4)와 소셜 모듈의 연동.
+
+**소셜 배터리 소모/회복**
+
+| 행동                      | 배터리 변화   | 설명                         |
+| ------------------------- | ------------- | ---------------------------- |
+| 인터랙션 참여             | −0.05 ~ −0.15 | 관계 단계에 따라 소모량 차등 |
+| 고립 상태 (인터랙션 없음) | +0.02 / 시간  | 자연 회복                    |
+| HUB 노드의 인터랙션       | −0.08 ~ −0.20 | 많은 관계로 인해 소모 가중   |
+| ISOLATE 노드의 인터랙션   | −0.03 ~ −0.08 | 적은 관계로 소모 최소        |
+
+**배터리 수준별 행동 영향**
+
+| 배터리 범위 | 상태 | 행동 영향                          |
+| ----------- | ---- | ---------------------------------- |
+| 0.7 ~ 1.0   | 충만 | 적극적 인터랙션, 자기 노출 증가    |
+| 0.4 ~ 0.7   | 보통 | 정상 수준의 인터랙션               |
+| 0.2 ~ 0.4   | 피로 | 인터랙션 빈도 감소, 짧은 응답 경향 |
+| 0.0 ~ 0.2   | 고갈 | 인터랙션 회피, 최소한의 응답만     |
+
+배터리 수준은 프롬프트 Dynamic 블록에 포함되어 LLM의 발화 스타일에 영향을 준다.
+
+### 9.6 설정 검증
+
+```
+validateSocialModuleConfig(config): ValidationResult
+```
+
+| 검증 항목                       | 유효 범위  | 실패 시 처리    |
+| ------------------------------- | ---------- | --------------- |
+| hubThreshold                    | 0.01 ~ 0.5 | 기본값 0.1 적용 |
+| isolateThreshold                | 0.01 ~ 0.5 | 기본값 0.2 적용 |
+| anomalyWindowHours              | 1 ~ 168    | 기본값 24 적용  |
+| connectionSurgeMultiplier       | 1.5 ~ 10.0 | 기본값 3.0 적용 |
+| hubThreshold + isolateThreshold | < 1.0      | 검증 에러       |
+
+### 9.7 다른 모듈과의 연동
+
+| 연동 모듈       | 방향              | 내용                                                    |
+| --------------- | ----------------- | ------------------------------------------------------- |
+| Memory (§6)     | Social → Memory   | socialSignificance 요인에 관계 stage/type 반영          |
+| Emotional (§10) | Social → Emotion  | 그래프 위상(HUB/ISOLATE)이 감정 전염 증폭 계수에 영향   |
+| Arena (§7)      | Social → Arena    | tension 높은 밀접 그룹을 아레나 우선 검증 대상으로 지정 |
+| Security (§5)   | Social → Security | SocialAnomaly를 Integrity Monitor에 전달                |
+| Matching (§12)  | Social → Matching | warmth 기반 추천 가중치 + HUB 탐색 노출 부스트          |
+| Data Arch. (§8) | Social → Data     | PersonaRelationship이 Memory Layer에 저장               |
+
+---
+
+> **§10은 다음 작업에서 구체화 예정**
