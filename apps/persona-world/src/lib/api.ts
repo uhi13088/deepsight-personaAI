@@ -120,26 +120,32 @@ export const clientApi = {
     personaId?: string
     tab?: string
   }) {
-    // userId가 있으면 persona-world 개인화 피드, 없으면 public 피드
+    // userId가 있으면 persona-world 개인화 피드 시도, 실패 시 public 피드로 폴백
     if (options?.userId) {
-      const res = await fetch(`/api/persona-world/feed`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: options.userId,
-          limit: options.limit,
-          cursor: options.cursor,
-          tab: options.tab,
-        }),
-      })
-      if (!res.ok) throw new Error("Failed to fetch personalized feed")
+      try {
+        const res = await fetch(`/api/persona-world/feed`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: options.userId,
+            limit: options.limit,
+            cursor: options.cursor,
+            tab: options.tab,
+          }),
+        })
 
-      const json: ApiResponse<FeedResponse> = await res.json()
-      if (!json.success) throw new Error(json.error?.message || "Unknown error")
-      return json.data!
+        if (res.ok) {
+          const json: ApiResponse<FeedResponse> = await res.json()
+          if (json.success && json.data) return json.data
+        }
+        // personalized feed 실패 → public feed로 폴백
+        console.warn("[clientApi.getFeed] Personalized feed failed, falling back to public feed")
+      } catch {
+        console.warn("[clientApi.getFeed] Personalized feed error, falling back to public feed")
+      }
     }
 
-    // Fallback: public feed
+    // Public feed (폴백 포함)
     const params = new URLSearchParams()
     if (options?.limit) params.set("limit", String(options.limit))
     if (options?.cursor) params.set("cursor", options.cursor)
@@ -245,12 +251,31 @@ export const clientApi = {
     if (options?.search) params.set("search", options.search)
     if (options?.role) params.set("role", options.role)
 
-    const res = await fetch(`/api/persona-world/explore?${params}`)
-    if (!res.ok) throw new Error("Failed to fetch explore data")
+    try {
+      const res = await fetch(`/api/persona-world/explore?${params}`)
+      if (res.ok) {
+        const json: ApiResponse<ExploreResponse> = await res.json()
+        if (json.success && json.data) return json.data
+      }
+      // 실패 시 public explore 폴백
+      console.warn("[clientApi.getExplore] persona-world explore failed, trying public explore")
+    } catch {
+      console.warn("[clientApi.getExplore] persona-world explore error, trying public explore")
+    }
 
-    const json: ApiResponse<ExploreResponse> = await res.json()
-    if (!json.success) throw new Error(json.error?.message || "Unknown error")
-    return json.data!
+    // Fallback: public explore
+    try {
+      const res = await fetch(`/api/public/explore?${params}`)
+      if (res.ok) {
+        const json: ApiResponse<ExploreResponse> = await res.json()
+        if (json.success && json.data) return json.data
+      }
+    } catch {
+      console.warn("[clientApi.getExplore] public explore also failed")
+    }
+
+    // 최종 폴백: 빈 데이터
+    return { clusters: [], hotTopics: [], activeDebates: [], newPersonas: [] }
   },
 
   // ── 댓글 조회 ────────────────────────────────────────────

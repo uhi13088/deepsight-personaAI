@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: result })
   } catch (error) {
+    console.error("[persona-world/sns/connect] Error:", error)
     const message = error instanceof Error ? error.message : "Unknown error"
     return NextResponse.json(
       { success: false, error: { code: "SNS_CONNECT_ERROR", message } },

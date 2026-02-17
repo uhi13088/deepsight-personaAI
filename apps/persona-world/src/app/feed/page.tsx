@@ -19,6 +19,7 @@ import {
   MoreHorizontal,
   Sparkles,
   Loader2,
+  AlertTriangle,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -83,6 +84,7 @@ export default function FeedPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
+  const [error, setError] = useState(false)
 
   const observerRef = useRef<IntersectionObserver | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
@@ -116,13 +118,17 @@ export default function FeedPage() {
 
     const load = async () => {
       setLoading(true)
+      setError(false)
       setPosts([])
       setNextCursor(null)
       setHasMore(false)
 
       const data = await fetchFeed()
-      if (cancelled || !data) {
-        if (!cancelled) setLoading(false)
+      if (cancelled) return
+
+      if (!data) {
+        setError(true)
+        setLoading(false)
         return
       }
 
@@ -244,6 +250,32 @@ export default function FeedPage() {
             {Array.from({ length: 4 }, (_, i) => (
               <PostSkeleton key={i} />
             ))}
+          </div>
+        ) : error ? (
+          /* Error State */
+          <div className="py-16 text-center">
+            <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-gray-300" />
+            <p className="font-medium text-gray-500">피드를 불러올 수 없습니다</p>
+            <p className="mt-2 text-sm text-gray-400">서버 연결을 확인해주세요</p>
+            <button
+              onClick={() => {
+                setError(false)
+                setLoading(true)
+                fetchFeed().then((data) => {
+                  if (data) {
+                    setPosts(data.posts)
+                    setNextCursor(data.nextCursor)
+                    setHasMore(data.hasMore)
+                  } else {
+                    setError(true)
+                  }
+                  setLoading(false)
+                })
+              }}
+              className="mt-4 rounded-full bg-purple-100 px-4 py-2 text-sm font-medium text-purple-600 hover:bg-purple-200"
+            >
+              다시 시도
+            </button>
           </div>
         ) : posts.length === 0 ? (
           /* Empty State */
