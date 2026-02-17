@@ -1,11 +1,94 @@
 -- ============================================================
 -- 017: 스키마 누락 테이블/컬럼/열거형 보정
--- interaction_sessions, interaction_logs, llm_usage_logs 테이블 생성
+-- PersonaWorld 누락 열거형 + interaction/llm 테이블 생성
 -- user_vectors v3 컬럼, persona_states narrativeTension 추가
 -- api_endpoints 컬럼명 보정
 -- ============================================================
 
--- ── 1. 누락 열거형 생성 ──────────────────────────────────────
+-- ── 1. PersonaWorld 누락 열거형 생성 ──────────────────────────
+-- 004_persona_world_system.sql이 참조하는 열거형들이
+-- 20260208 Prisma 마이그레이션에만 존재하여 프로덕션에 누락됨
+
+DO $$ BEGIN
+  CREATE TYPE "PersonaPostType" AS ENUM (
+    'REVIEW', 'THOUGHT', 'RECOMMENDATION', 'REACTION', 'QUESTION',
+    'LIST', 'THREAD', 'VS_BATTLE', 'QNA', 'CURATION',
+    'DEBATE', 'MEME', 'COLLAB', 'TRIVIA', 'PREDICTION',
+    'ANNIVERSARY', 'BEHIND_STORY'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "ActivityTrigger" AS ENUM (
+    'SCHEDULED', 'CONTENT_RELEASE', 'SOCIAL_EVENT',
+    'USER_INTERACTION', 'TRENDING', 'AUTONOMOUS'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "ProfileQuality" AS ENUM ('BASIC', 'STANDARD', 'ADVANCED', 'PREMIUM');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "SNSPlatform" AS ENUM (
+    'NETFLIX', 'YOUTUBE', 'INSTAGRAM', 'SPOTIFY',
+    'LETTERBOXD', 'TWITTER', 'TIKTOK'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "ReportTargetType" AS ENUM ('POST', 'COMMENT');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "ReportReason" AS ENUM (
+    'SPAM', 'INAPPROPRIATE', 'HARASSMENT', 'MISINFORMATION', 'OTHER'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "ReportStatus" AS ENUM ('PENDING', 'REVIEWED', 'RESOLVED', 'DISMISSED');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "PersonaActivityType" AS ENUM (
+    'POST_CREATED', 'POST_LIKED', 'POST_COMMENTED', 'POST_REPOSTED',
+    'PERSONA_FOLLOWED', 'PERSONA_UNFOLLOWED',
+    'DEBATE_STARTED', 'COLLAB_STARTED', 'SYSTEM'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+-- PersonaActivityType가 이미 존재하면 SYSTEM 값만 추가
+DO $$ BEGIN
+  ALTER TYPE "PersonaActivityType" ADD VALUE IF NOT EXISTS 'SYSTEM';
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+-- PersonaSource에 AUTO_GENERATED 값 추가 (001에서 3개만 생성됨)
+DO $$ BEGIN
+  ALTER TYPE "PersonaSource" ADD VALUE IF NOT EXISTS 'AUTO_GENERATED';
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+-- ── 2. Interaction/LLM 열거형 생성 ───────────────────────────
 
 DO $$ BEGIN
   CREATE TYPE "ParticipantType" AS ENUM ('PERSONA', 'USER', 'CONTENT');
@@ -14,7 +97,9 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE "InteractionType" AS ENUM ('CONVERSATION', 'COMMENT', 'REPLY', 'REACTION', 'POST', 'MENTION');
+  CREATE TYPE "InteractionType" AS ENUM (
+    'CONVERSATION', 'COMMENT', 'REPLY', 'REACTION', 'POST', 'MENTION'
+  );
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
@@ -26,19 +111,14 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE "InteractionSource" AS ENUM ('DIRECT', 'PERSONA_RELAY', 'EXTERNAL_FEED', 'SYSTEM');
+  CREATE TYPE "InteractionSource" AS ENUM (
+    'DIRECT', 'PERSONA_RELAY', 'EXTERNAL_FEED', 'SYSTEM'
+  );
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
 
--- PersonaActivityType에 SYSTEM 값 추가
-DO $$ BEGIN
-  ALTER TYPE "PersonaActivityType" ADD VALUE IF NOT EXISTS 'SYSTEM';
-EXCEPTION
-  WHEN duplicate_object THEN NULL;
-END $$;
-
--- ── 2. interaction_sessions 테이블 ───────────────────────────
+-- ── 3. interaction_sessions 테이블 ───────────────────────────
 
 CREATE TABLE IF NOT EXISTS "interaction_sessions" (
   "id" TEXT NOT NULL,
@@ -69,12 +149,16 @@ CREATE INDEX IF NOT EXISTS "interaction_sessions_userId_idx"
 CREATE INDEX IF NOT EXISTS "interaction_sessions_personaId_userId_idx"
   ON "interaction_sessions" ("personaId", "userId");
 
-ALTER TABLE "interaction_sessions"
-  ADD CONSTRAINT "interaction_sessions_personaId_fkey"
-  FOREIGN KEY ("personaId") REFERENCES "personas" ("id")
-  ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "interaction_sessions"
+    ADD CONSTRAINT "interaction_sessions_personaId_fkey"
+    FOREIGN KEY ("personaId") REFERENCES "personas" ("id")
+    ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
--- ── 3. interaction_logs 테이블 ───────────────────────────────
+-- ── 4. interaction_logs 테이블 ───────────────────────────────
 
 CREATE TABLE IF NOT EXISTS "interaction_logs" (
   "id" TEXT NOT NULL,
@@ -122,12 +206,16 @@ CREATE INDEX IF NOT EXISTS "interaction_logs_interactionType_idx"
 CREATE INDEX IF NOT EXISTS "interaction_logs_timestamp_idx"
   ON "interaction_logs" ("timestamp");
 
-ALTER TABLE "interaction_logs"
-  ADD CONSTRAINT "interaction_logs_sessionId_fkey"
-  FOREIGN KEY ("sessionId") REFERENCES "interaction_sessions" ("id")
-  ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "interaction_logs"
+    ADD CONSTRAINT "interaction_logs_sessionId_fkey"
+    FOREIGN KEY ("sessionId") REFERENCES "interaction_sessions" ("id")
+    ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
--- ── 4. llm_usage_logs 테이블 ─────────────────────────────────
+-- ── 5. llm_usage_logs 테이블 ─────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS "llm_usage_logs" (
   "id" TEXT NOT NULL,
@@ -158,7 +246,7 @@ CREATE INDEX IF NOT EXISTS "llm_usage_logs_callType_idx"
 CREATE INDEX IF NOT EXISTS "llm_usage_logs_personaId_idx"
   ON "llm_usage_logs" ("personaId");
 
--- ── 5. user_vectors: v3 컬럼 추가 ────────────────────────────
+-- ── 6. user_vectors: v3 컬럼 추가 ────────────────────────────
 
 ALTER TABLE "user_vectors"
   ADD COLUMN IF NOT EXISTS "sociability" DECIMAL(3,2),
@@ -169,12 +257,12 @@ ALTER TABLE "user_vectors"
   ADD COLUMN IF NOT EXISTS "neuroticism" DECIMAL(3,2),
   ADD COLUMN IF NOT EXISTS "hasOceanProfile" BOOLEAN NOT NULL DEFAULT false;
 
--- ── 6. persona_states: narrativeTension 추가 ─────────────────
+-- ── 7. persona_states: narrativeTension 추가 ─────────────────
 
 ALTER TABLE "persona_states"
   ADD COLUMN IF NOT EXISTS "narrativeTension" DECIMAL(3,2) NOT NULL DEFAULT 0.00;
 
--- ── 7. api_endpoints: 컬럼명 보정 (snake_case → camelCase) ───
+-- ── 8. api_endpoints: 컬럼명 보정 (snake_case → camelCase) ───
 -- Prisma 스키마에 @map 없으므로 camelCase 컬럼명이 필요
 
 DO $$ BEGIN
