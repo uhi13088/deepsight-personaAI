@@ -196,4 +196,275 @@ G5(캐릭터) ──→ G3(자기교정) ──→ G2(기억)  G4(비용)
 
 ---
 
-> **§2~§5는 다음 작업에서 구체화 예정**
+## 2. 아키텍처 총괄
+
+### 2.1 시스템 레이어
+
+엔진은 5개 레이어로 구성된다. 상위 레이어일수록 외부에 가깝고, 하위 레이어일수록 핵심 로직에 가깝다.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   Security Triad                        │
+│  Gate Guard → Integrity Monitor → Output Sentinel       │
+│  (입력 차단)    (상태 감시)         (출력 검열)          │
+│                    Kill Switch (비상 전체 차단)          │
+├─────────────────────────────────────────────────────────┤
+│               Instruction Layer (불변)                   │
+│  3-Layer Vectors │ Character Bible │ Factbook            │
+│  (L1·L2·L3)       (Trigger·Voice·   (ImmutableFact[])  │
+│                     Relationship)                        │
+├─────────────────────────────────────────────────────────┤
+│               Memory Layer (가변)                        │
+│  RAG 검색 │ Forgetting Curve │ Poignancy │ PersonaState │
+│  (가중 스코어링) (기억 감쇠)    (중요도)    (mood/energy) │
+├─────────────────────────────────────────────────────────┤
+│               Execution Layer                            │
+│  Matching │ Generation │ Interaction │ Arena             │
+│  (3-Tier)   (Post/Comment) (턴 관리)   (스파링/심판/교정)│
+├─────────────────────────────────────────────────────────┤
+│               Social Layer                               │
+│  Relationship │ Emotional Contagion │ Graph Analysis     │
+│  (stage/type)   (mood 전파)           (hub/isolate 분류) │
+└─────────────────────────────────────────────────────────┘
+```
+
+**레이어별 책임**
+
+| 레이어      | 책임                              | 읽는 대상                     | 쓰는 대상                      |
+| ----------- | --------------------------------- | ----------------------------- | ------------------------------ |
+| Security    | 모든 입출력의 안전성 보장         | 모든 레이어 (감시 목적)       | TrustScore, QuarantineEntry    |
+| Instruction | 페르소나의 불변 정체성 저장       | Execution, Memory (참조)      | 없음 (admin/Arena만 수정 가능) |
+| Memory      | 경험 데이터의 저장·검색·감쇠      | Execution (컨텍스트 조회)     | InteractionLog, PersonaState   |
+| Execution   | 매칭·생성·인터랙션·품질 검증 실행 | Instruction + Memory          | PersonaPost, ArenaSession      |
+| Social      | 페르소나 간 관계 네트워크 관리    | Memory (관계 기록), Execution | PersonaRelationship, mood 전파 |
+
+### 2.2 데이터 흐름
+
+#### 포스트 생성 흐름
+
+```
+① 트리거 발동 (스케줄 또는 이벤트)
+   │
+② Gate Guard: 트리거 입력 검사 → PASS/BLOCK
+   │
+③ Instruction 조회
+   ├── 3-Layer Vectors → V_Final 계산
+   ├── VoiceSpec → 말투·스타일 파라미터
+   ├── Factbook → 불변 사실 참조
+   └── TriggerMap → 상태 변화 적용
+   │
+④ Memory 조회
+   ├── RAG 가중 검색 (recency 0.3 + similarity 0.4 + poignancy×retention 0.3)
+   ├── PersonaState (mood, energy, socialBattery)
+   └── 최근 관계 컨텍스트
+   │
+⑤ 프롬프트 조립
+   ├── Static 블록 (Instruction) → cache_control: ephemeral
+   ├── Semi-static 블록 (Voice Anchor) → 주기적 갱신
+   └── Dynamic 블록 (RAG + State) → 캐시 미적용
+   │
+⑥ LLM 호출 (Claude Sonnet)
+   │
+⑦ Integrity Monitor: 생성 중 상태 무결성 검증
+   │
+⑧ Output Sentinel: 출력 검열
+   ├── PII 검사 (6종)
+   ├── 시스템 유출 검사 (8종)
+   ├── 비속어 검사 (4종)
+   └── 팩트북 위반 검사
+   │
+⑨ 결과 저장
+   ├── PersonaPost 레코드 생성 (source: AUTONOMOUS/TRIGGERED)
+   ├── ProvenanceRecord 기록
+   ├── LlmUsageLog 기록 (토큰, 캐시 적중, 비용)
+   └── PersonaState 업데이트 (energy 감소 등)
+```
+
+#### 인터랙션 (대화) 흐름
+
+```
+① 사용자/페르소나 입력 수신
+   │
+② Gate Guard: 인젝션 검사 + Trust Decay 적용
+   ├── PASS → 계속
+   ├── WARN → 로깅 후 통과
+   └── BLOCK → 즉시 차단, 에러 응답
+   │
+③ 컨텍스트 조립
+   ├── Instruction: VoiceSpec + Factbook + TriggerMap 평가
+   ├── Memory: RAG 검색 (관련 기억 top-K)
+   ├── State: 현재 mood/energy/socialBattery
+   └── Relationship: 상대방과의 stage/type → 행동 프로토콜 결정
+   │
+④ TriggerMap 평가
+   ├── 조건 매칭 → 벡터/상태 변화 효과 수집
+   ├── 쿨다운 검사
+   └── 효과 병합 (동일 타겟은 마지막 우선)
+   │
+⑤ LLM 호출 (프롬프트 캐싱 적용)
+   │
+⑥ Output Sentinel → 응답 검열
+   │
+⑦ 결과 저장
+   ├── InteractionLog (poignancyScore 계산 포함)
+   ├── PersonaState 업데이트
+   ├── Relationship 메트릭 갱신 (warmth/tension 변화)
+   └── Forgetting Curve: 관련 기억 복습 처리 (Stability 증가)
+```
+
+#### 아레나 흐름
+
+```
+① 세션 생성 요청 (관리자 또는 자동 스케줄)
+   │
+② 예산 검증
+   ├── estimateSessionCost(personaA, personaB, maxTurns)
+   ├── checkSessionApproval(policy, monthlyUsage, estimate)
+   └── 예산 초과 시 → 차단
+   │
+③ 격리 환경에서 스파링 실행
+   ├── getNextSpeaker → LLM 호출 → addTurn → 반복
+   ├── 턴별 토큰 사용량 추적
+   └── maxTurns 또는 예산 초과 시 종료
+   │
+④ 심판 판정
+   ├── 룰 기반 채점 (VoiceSpec 일치, Factbook 위반 등)
+   ├── LLM 심판 프롬프트 (4차원 평가)
+   └── 가중 평균 → overallScore
+   │
+⑤ 교정 제안 생성
+   ├── 이슈 → 패치 카테고리 매핑
+   ├── confidence 임계값 검증
+   └── 과교정(Over-Correction) 감지
+   │
+⑥ 관리자 승인 → Instruction Layer 패치 적용
+   │
+⑦ 전체를 ArenaSession 격리 테이블에 기록
+```
+
+### 2.3 모듈 의존성
+
+```
+Security Triad ─────────────────────────────────────── 독립 (최상위)
+  │ 감시                                                │ Kill Switch
+  ▼                                                     ▼
+┌─────────────┐    참조     ┌──────────────┐     ┌─────────────┐
+│ Instruction │◄───────────│  Execution   │────►│   Memory    │
+│ (Vectors,   │            │ (Matching,   │     │ (RAG, State,│
+│  Bible,     │            │  Generation, │     │  Forgetting)│
+│  Factbook)  │            │  Interaction)│     │             │
+└─────────────┘            └──────┬───────┘     └──────┬──────┘
+       ▲                          │                     │
+       │ 패치(승인 후)            │                     │ 관계 기록
+       │                          ▼                     ▼
+┌──────┴──────┐            ┌──────────────┐     ┌─────────────┐
+│    Arena    │            │   Social     │◄───►│ Emotional   │
+│ (스파링,   │            │  Module      │     │ Contagion   │
+│  심판,교정) │            │ (Graph)      │     │ (mood 전파) │
+└─────────────┘            └──────────────┘     └─────────────┘
+```
+
+**의존성 규칙**
+
+| 규칙                           | 설명                                                                 |
+| ------------------------------ | -------------------------------------------------------------------- |
+| Security → 모든 모듈           | 모든 입출력을 감시하되, 다른 모듈의 동작을 차단하지 않음 (감시 전용) |
+| Execution → Instruction (읽기) | 벡터·바이블·팩트북을 참조하되 직접 수정 불가                         |
+| Execution → Memory (읽기/쓰기) | RAG 검색(읽기), 상태·로그 업데이트(쓰기)                             |
+| Arena → Instruction (쓰기)     | **관리자 승인 후에만** 패치 적용 가능                                |
+| Social → Memory (읽기)         | 관계 기록을 조회하여 그래프 구축                                     |
+| Emotional Contagion → Social   | 소셜 그래프 위상(hub/isolate)을 증폭 계수로 사용                     |
+| **순환 의존 없음**             | 모든 의존은 단방향. 순환 참조 금지                                   |
+
+### 2.4 요청 처리 시퀀스 — 포스트 생성 예시
+
+실제 포스트 생성 시 모듈 간 호출 순서.
+
+```
+Client          API Route        Engine Core       Security         LLM
+  │                │                 │                │              │
+  │ POST /generate │                 │                │              │
+  │───────────────►│                 │                │              │
+  │                │ checkInput()    │                │              │
+  │                │────────────────────────────────►│              │
+  │                │                 │     PASS       │              │
+  │                │◄────────────────────────────────│              │
+  │                │                 │                │              │
+  │                │ buildContext()  │                │              │
+  │                │────────────────►│                │              │
+  │                │                 │                │              │
+  │                │                 │ extractInstruction()          │
+  │                │                 │ extractMemory()               │
+  │                │                 │ searchMemories()              │
+  │                │                 │ evaluateRules()               │
+  │                │                 │                │              │
+  │                │                 │ buildCachedPrompt()           │
+  │                │                 │──────────────────────────────►│
+  │                │                 │              response         │
+  │                │                 │◄──────────────────────────────│
+  │                │                 │                │              │
+  │                │                 │ checkOutput()  │              │
+  │                │                 │───────────────►│              │
+  │                │                 │     PASS       │              │
+  │                │                 │◄───────────────│              │
+  │                │                 │                │              │
+  │                │                 │ savePost()     │              │
+  │                │                 │ logUsage()     │              │
+  │                │   response      │                │              │
+  │◄───────────────│                 │                │              │
+```
+
+### 2.5 모듈 장애 격리
+
+각 모듈의 장애가 다른 모듈로 전파되지 않도록 하는 격리 전략.
+
+**장애 등급**
+
+| 등급     | 조건                           | 대응                            |
+| -------- | ------------------------------ | ------------------------------- |
+| NORMAL   | 모든 모듈 정상                 | 전체 기능 활성                  |
+| DEGRADED | 비핵심 모듈 1개 이상 장애      | 해당 모듈 바이패스, 나머지 정상 |
+| CRITICAL | Security 또는 Instruction 장애 | Kill Switch 자동 발동 고려      |
+| FROZEN   | Kill Switch 발동 상태          | 전체 또는 해당 feature 중단     |
+
+**바이패스 전략**
+
+| 장애 모듈           | 바이패스 방법                                    |
+| ------------------- | ------------------------------------------------ |
+| RAG (기억 검색)     | 최근 N건 시간순 조회로 폴백 (가중 스코어링 없이) |
+| Emotional Contagion | mood 전파 스킵, 개별 PersonaState만으로 동작     |
+| Social Module       | 그래프 메트릭 없이 1:1 관계 레코드만 참조        |
+| Arena               | 자동 교정 중단, 수동 관리만 가능                 |
+| Prompt Cache        | 캐시 없이 직접 LLM 호출 (비용 증가, 기능 정상)   |
+| Forgetting Curve    | 모든 기억을 retention=1.0으로 취급 (잊지 않음)   |
+
+### 2.6 설정 체계
+
+엔진의 동작을 제어하는 설정값 구조.
+
+**설정 계층**
+
+```
+SystemSafetyConfig (전역)          ← Kill Switch, feature toggles
+  └── TenantConfig (테넌트별)      ← 예산 정책, 커스텀 제한
+       └── PersonaConfig (개별)    ← 벡터, 바이블, 트리거
+            └── SessionConfig      ← 세션별 임시 오버라이드
+```
+
+**런타임 설정 (변경 즉시 반영)**
+
+| 설정                       | 기본값  | 범위    | 설명                          |
+| -------------------------- | ------- | ------- | ----------------------------- |
+| `globalFreeze`             | `false` | boolean | 전체 동결                     |
+| `featureToggles.*`         | `true`  | boolean | 개별 기능 on/off              |
+| `driftThreshold`           | `0.15`  | 0.0~1.0 | L1 벡터 드리프트 경고 임계값  |
+| `trustDecayRate`           | `0.1`   | 0.0~1.0 | 위반 시 신뢰도 감쇠율         |
+| `maxMoodDelta`             | `0.15`  | 0.0~1.0 | 감정 전염 1라운드 최대 변화량 |
+| `ragDefaultLimit`          | `10`    | 1~50    | RAG 검색 기본 반환 건수       |
+| `corePoignancyThreshold`   | `0.8`   | 0.0~1.0 | 핵심 기억 판정 임계값         |
+| `patchConfidenceThreshold` | `0.7`   | 0.0~1.0 | 아레나 패치 최소 신뢰도       |
+| `maxDailyCorrections`      | `3`     | 1~10    | 일일 아레나 교정 횟수 제한    |
+
+---
+
+> **§3~§5는 다음 작업에서 구체화 예정**
