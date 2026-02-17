@@ -975,4 +975,428 @@ archiveSession(sessionId): void  // status → ARCHIVED
 
 ---
 
-> **§8~§10은 다음 작업에서 구체화 예정**
+## 8. 데이터 아키텍처 — Instruction vs Memory
+
+페르소나 데이터를 **정체성(Instruction)**과 **경험(Memory)**으로 물리적 분리하는 아키텍처. 정체성은 관리자(또는 아레나 승인)만 수정할 수 있고, 경험은 엔진이 자율적으로 관리한다. 이 분리는 프롬프트 구성, 캐싱 전략, 접근 제어의 기반이 된다.
+
+```
+┌──────────────────────────────────────────────────────────┐
+│            페르소나 데이터 (Persona Data)                   │
+│                                                            │
+│  ┌─────────────────────────────────────────┐              │
+│  │     Instruction Layer (불변/정체성)       │              │
+│  │                                           │              │
+│  │  ┌─────────┐ ┌─────────┐ ┌──────────┐   │              │
+│  │  │ Vectors │ │VoiceSpec│ │ Factbook │   │              │
+│  │  │ L1/L2/L3│ │         │ │          │   │              │
+│  │  └─────────┘ └─────────┘ └──────────┘   │              │
+│  │  ┌──────────┐ ┌────────────┐ ┌────────┐ │              │
+│  │  │TriggerMap│ │ Rel.Proto  │ │Prompt  │ │              │
+│  │  │   DSL    │ │  col       │ │Template│ │              │
+│  │  └──────────┘ └────────────┘ └────────┘ │              │
+│  │                                           │              │
+│  │  수정: admin 또는 arena_approved만        │              │
+│  └─────────────────────────────────────────┘              │
+│                                                            │
+│  ┌─────────────────────────────────────────┐              │
+│  │     Memory Layer (가변/경험)              │              │
+│  │                                           │              │
+│  │  ┌──────────┐ ┌────────────┐ ┌────────┐ │              │
+│  │  │  State   │ │Interaction │ │ Posts  │ │              │
+│  │  │mood/enrgy│ │   Log      │ │Comments│ │              │
+│  │  └──────────┘ └────────────┘ └────────┘ │              │
+│  │  ┌──────────┐ ┌────────────┐ ┌────────┐ │              │
+│  │  │Consumpt. │ │Relationship│ │Growth  │ │              │
+│  │  │  Log     │ │  Metrics   │ │  Arc   │ │              │
+│  │  └──────────┘ └────────────┘ └────────┘ │              │
+│  │                                           │              │
+│  │  수정: engine 자율 동작으로만              │              │
+│  └─────────────────────────────────────────┘              │
+└──────────────────────────────────────────────────────────┘
+```
+
+### 8.1 분리 원칙
+
+**왜 분리하는가?**
+
+| 목적             | 설명                                                                    |
+| ---------------- | ----------------------------------------------------------------------- |
+| 정체성 보호      | 캐릭터 핵심 설정이 런타임 동작에 의해 변질되지 않도록 보장              |
+| 캐싱 최적화      | 불변(Instruction)은 캐시하고, 가변(Memory)만 매번 갱신하여 비용 절감    |
+| 접근 제어 명확화 | 누가 무엇을 수정할 수 있는지 레이어 단위로 명확하게 정의                |
+| 감사 추적 간소화 | Instruction 변경만 감사 로그를 기록하면 캐릭터 변동 이력 완전 추적 가능 |
+| 프롬프트 구조화  | System(Static) + Context(Dynamic) 분리로 프롬프트 엔지니어링 체계화     |
+
+**핵심 규칙**
+
+1. Instruction은 **런타임에 절대 자동 변경되지 않는다** (admin/arena만 가능)
+2. Memory는 **관리자가 직접 수정하지 않는다** (엔진 자율 영역)
+3. 두 레이어는 **독립적으로 읽을 수 있다** (투영 API)
+4. Instruction 변경 시 **반드시 감사 로그가 기록된다**
+5. 프롬프트에서 Instruction은 **Static 블록**, Memory는 **Dynamic 블록**에 배치된다
+
+### 8.2 Instruction Layer 구성요소
+
+정체성을 정의하는 불변 데이터. 관리자가 설정하거나 아레나 교정을 통해서만 변경된다.
+
+**파일**: `src/lib/data-architecture/`
+
+| 컴포넌트              | 내용                            | 수정 권한    | 참조 섹션 |
+| --------------------- | ------------------------------- | ------------ | --------- |
+| 3-Layer Vectors       | L1 7D + L2 5D + L3 4D 벡터 값   | admin, arena | §3        |
+| VoiceSpec             | 말투, 가드레일, 스타일 파라미터 | admin, arena | §4.3      |
+| Factbook              | 불변 사실 (ImmutableFact[])     | admin, arena | §4.4      |
+| TriggerMap            | 트리거 규칙 DSL                 | admin, arena | §4.1      |
+| Prompt Template       | 시스템 프롬프트 정적 부분       | admin        | §8.5      |
+| Relationship Protocol | 관계 발전 규칙 (단계 전이 조건) | admin        | §4.2      |
+
+```typescript
+interface InstructionView {
+  vectors: {
+    l1: Record<string, number> // 7개 축
+    l2: Record<string, number> // 5개 축
+    l3: Record<string, number> // 4개 축
+  }
+  voiceSpec: VoiceSpec
+  factbook: Factbook
+  triggerMap: TriggerRuleSet
+  promptTemplate: string
+  relationshipProtocol: StageTransition[]
+}
+```
+
+**Instruction 불변성 보장**
+
+- VoiceSpec, Factbook의 해시값(SHA-256)을 DB에 저장
+- API 호출 시 해시 검증 → 불일치 시 Integrity Monitor 알림 (§5.2)
+- 변경 이력은 `AuditLog`에 자동 기록 (who, when, what, before/after)
+
+### 8.3 Memory Layer 구성요소
+
+경험을 축적하는 가변 데이터. 엔진이 인터랙션, 포스트 생성, 콘텐츠 소비 등의 과정에서 자율적으로 생성·갱신한다.
+
+| 컴포넌트            | 내용                                        | 수정 권한 | 참조 섹션 |
+| ------------------- | ------------------------------------------- | --------- | --------- |
+| PersonaState        | mood, energy, socialBattery, paradoxTension | engine    | §3.4      |
+| InteractionLog      | 턴별 대화 기록, 벡터 스냅샷                 | engine    | §6        |
+| PersonaPost/Comment | 생성된 포스트, 댓글                         | engine    | —         |
+| ConsumptionLog      | 콘텐츠 소비 기록                            | engine    | §6        |
+| PersonaRelationship | 관계 메트릭 (warmth, tension, stage 등)     | engine    | §9        |
+| GrowthArc           | 시간에 따른 벡터 변화 이력                  | engine    | §3.4      |
+
+```typescript
+interface MemoryView {
+  state: {
+    mood: number // -1.0 ~ 1.0
+    energy: number // 0.0 ~ 1.0
+    socialBattery: number // 0.0 ~ 1.0
+    paradoxTension: number // 0.0 ~ 1.0
+  }
+  recentInteractions: ScoredMemoryItem[]
+  recentPosts: ScoredMemoryItem[]
+  relationships: {
+    personaId: string
+    warmth: number
+    tension: number
+    stage: RelationshipStage
+    type: RelationshipType
+  }[]
+  consumptionHistory: ScoredMemoryItem[]
+}
+```
+
+**Memory 자율 관리 원칙**
+
+- 엔진이 매 인터랙션 후 자동으로 상태 갱신 (mood, energy 등)
+- Forgetting Curve에 의해 기억의 Retention이 시간에 따라 자연 감쇠 (§6.2)
+- 관계 메트릭은 인터랙션 빈도·품질에 따라 자동 업데이트
+- GrowthArc는 Pressure Coefficient에 의한 벡터 미세 변동 누적 기록
+
+### 8.4 접근 정책 (Access Policy)
+
+레이어별·컴포넌트별로 누가 어떤 동작을 할 수 있는지 정의한다.
+
+#### 8.4.1 역할 정의
+
+| 역할        | 코드키           | 설명                                      |
+| ----------- | ---------------- | ----------------------------------------- |
+| 관리자      | `admin`          | 엔진 스튜디오를 통해 접근하는 운영자      |
+| 아레나 승인 | `arena_approved` | 관리자 승인을 받은 아레나 교정 패치       |
+| 엔진        | `engine`         | 런타임 자율 동작 (인터랙션, 상태 갱신 등) |
+| 읽기 전용   | `readonly`       | 조회만 가능 (API 소비자, 모니터링 등)     |
+
+```typescript
+type AccessAction = "instruction_read" | "instruction_write" | "memory_read" | "memory_write"
+
+type AccessRole = "admin" | "arena_approved" | "engine" | "readonly"
+
+interface AccessPolicy {
+  component: string
+  allowedActions: Record<AccessAction, AccessRole[]>
+}
+```
+
+#### 8.4.2 정책 매트릭스
+
+| 컴포넌트              | instruction_read | instruction_write     | memory_read | memory_write |
+| --------------------- | ---------------- | --------------------- | ----------- | ------------ |
+| 3-Layer Vectors       | all              | admin, arena_approved | —           | —            |
+| VoiceSpec             | all              | admin, arena_approved | —           | —            |
+| Factbook              | all              | admin, arena_approved | —           | —            |
+| TriggerMap            | all              | admin, arena_approved | —           | —            |
+| Prompt Template       | all              | admin                 | —           | —            |
+| Relationship Protocol | all              | admin                 | —           | —            |
+| PersonaState          | —                | —                     | all         | engine       |
+| InteractionLog        | —                | —                     | all         | engine       |
+| PersonaPost/Comment   | —                | —                     | all         | engine       |
+| ConsumptionLog        | —                | —                     | all         | engine       |
+| PersonaRelationship   | —                | —                     | all         | engine       |
+| GrowthArc             | —                | —                     | all         | engine       |
+
+**`checkAccess` 함수**
+
+```typescript
+function checkAccess(role: AccessRole, action: AccessAction, component: string): boolean {
+  const policy = ACCESS_POLICIES.find((p) => p.component === component)
+  if (!policy) return false
+  const allowedRoles = policy.allowedActions[action]
+  return allowedRoles.includes(role) || allowedRoles.includes("all")
+}
+```
+
+#### 8.4.3 변경 감지와 감사 로그
+
+Instruction Layer 변경 시 자동으로 변경 로그를 기록한다.
+
+```typescript
+interface ChangeLog {
+  personaId: string
+  component: string // "voiceSpec" | "factbook" | "triggerMap" | ...
+  action: "create" | "update" | "delete"
+  changedBy: AccessRole // 누가 변경했는가
+  changedAt: Date
+  before: unknown // 변경 전 값 (JSON)
+  after: unknown // 변경 후 값 (JSON)
+  reason?: string // 변경 사유 (아레나 교정 시 judgmentId 등)
+}
+```
+
+```
+detectInstructionChange(before, after): ChangeLog
+```
+
+- Instruction 컴포넌트의 전후 상태를 비교하여 diff 생성
+- 변경이 감지되면 `ChangeLog`를 DB에 기록
+- Security 모듈의 Integrity Monitor가 이 로그를 감시 (§5.2)
+
+### 8.5 프롬프트 분리 전략
+
+Instruction/Memory 분리가 프롬프트 구성에 직접 반영된다. 이를 통해 Anthropic API의 `cache_control` 블록 캐싱을 최대한 활용한다.
+
+#### 8.5.1 프롬프트 4블록 구조
+
+```
+┌──────────────────────────────────────────────┐
+│ Block 1: System Prompt (Static)              │
+│ ─────────────────────────────────────────    │
+│ 캐시: ✅ cache_control: { type: "ephemeral" } │
+│                                               │
+│ • 페르소나 정체성 요약                        │
+│ • VoiceProfile (말투, 어미, 습관 표현)        │
+│ • Factbook (불변 사실)                        │
+│ • TriggerMap (트리거 규칙)                    │
+│ • GuardRails (금지/주의 주제)                 │
+│ • StyleParams (격식도, 유머 빈도 등 수치)     │
+│                                               │
+│ → Instruction Layer에서 추출                  │
+│ → buildInstructionPrompt(instruction)         │
+├──────────────────────────────────────────────┤
+│ Block 2: Voice Anchor (Semi-Static)          │
+│ ─────────────────────────────────────────    │
+│ 캐시: ✅ cache_control (주기적 갱신)          │
+│                                               │
+│ • 최근 발화 예시 3~5개                        │
+│ • 어조·톤 리마인더                            │
+│                                               │
+│ → §4.3.4 Voice Anchor 메커니즘                │
+├──────────────────────────────────────────────┤
+│ Block 3: RAG Context (Dynamic)               │
+│ ─────────────────────────────────────────    │
+│ 캐시: ❌ 매 호출마다 변경                     │
+│                                               │
+│ • 관련 기억 (Poignancy × Retention 순)        │
+│ • 현재 상태 (mood, energy)                    │
+│ • 관계 정보 (상대 페르소나와의 관계)          │
+│ • 최근 대화 맥락                              │
+│                                               │
+│ → Memory Layer에서 추출                       │
+│ → buildMemoryPrompt(memory)                   │
+├──────────────────────────────────────────────┤
+│ Block 4: User Input (Dynamic)                │
+│ ─────────────────────────────────────────    │
+│ 캐시: ❌ 매 호출마다 변경                     │
+│                                               │
+│ • 사용자/상대 페르소나의 발화                  │
+│ • 시스템 지시 (포스트 생성, 댓글 작성 등)     │
+└──────────────────────────────────────────────┘
+```
+
+#### 8.5.2 캐싱 전략
+
+| 블록                   | 타입        | 캐시 적용 | 갱신 주기                          |
+| ---------------------- | ----------- | --------- | ---------------------------------- |
+| System Prompt (정체성) | Static      | ✅        | Instruction 변경 시에만 갱신       |
+| Voice Anchor           | Semi-Static | ✅        | 일정 인터랙션 수마다 갱신 (§4.3.4) |
+| RAG Context            | Dynamic     | ❌        | 매 호출마다 새로 구성              |
+| User Input             | Dynamic     | ❌        | 매 호출마다 새로 구성              |
+
+**캐시 비용 효과**
+
+| 항목             | 비율            | 설명                         |
+| ---------------- | --------------- | ---------------------------- |
+| Cache write      | 1.25× 기본 비용 | 최초 1회 캐시 기록 비용      |
+| Cache read       | 0.1× 기본 비용  | 캐시 적중 시 비용 (90% 절감) |
+| 예상 캐시 적중률 | ~85%            | Static + Semi-Static 비율    |
+| 예상 전체 절감률 | ~82%            | 프롬프트 입력 비용 기준      |
+
+```typescript
+interface CacheBlock {
+  type: "static" | "semi_static" | "dynamic"
+  content: string
+  cacheControl?: { type: "ephemeral" }
+}
+```
+
+**캐시 블록 분리 함수**
+
+```
+splitPromptBlocks(instruction, memory, userInput): CacheBlock[]
+```
+
+1. `instruction` → Static CacheBlock (cache_control 포함)
+2. Voice Anchor → Semi-Static CacheBlock (cache_control 포함)
+3. `memory` (RAG context) → Dynamic CacheBlock (cache_control 없음)
+4. `userInput` → Dynamic CacheBlock (cache_control 없음)
+
+**캐시 통계 추적**
+
+```typescript
+interface CacheStats {
+  totalCalls: number
+  cacheHits: number
+  cacheMisses: number
+  hitRate: number // cacheHits / totalCalls
+  costSaved: number // 절감된 비용 ($)
+  writeTokens: number // 캐시 기록에 사용된 토큰
+  readTokens: number // 캐시 적중으로 읽은 토큰
+}
+```
+
+```
+computeCacheStats(logs: LlmUsageRecord[]): CacheStats
+computePersonaCacheEfficiency(personaId): EfficiencyReport
+generateOptimizationRecommendations(stats): string[]
+```
+
+#### 8.5.3 LLM 사용량 기록
+
+모든 LLM 호출의 토큰 사용량과 캐시 적중 여부를 기록한다.
+
+```typescript
+interface LlmUsageRecord {
+  id: string
+  personaId: string
+  operation: string // "interaction" | "post" | "arena_turn" | ...
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number // 캐시 적중 토큰
+  cacheWriteTokens: number // 캐시 기록 토큰
+  cost: number // 계산된 비용 ($)
+  timestamp: Date
+}
+```
+
+**비용 계수**
+
+```typescript
+const CACHE_COST = {
+  writeMultiplier: 1.25, // 캐시 기록 비용 배수
+  readMultiplier: 0.1, // 캐시 적중 비용 배수
+  normalInputCost: 3.0, // $/1M tokens (Sonnet 기준)
+  outputCost: 15.0, // $/1M tokens (Sonnet 기준)
+} as const
+```
+
+### 8.6 투영 API (Projection API)
+
+두 레이어의 데이터를 독립적으로 또는 통합하여 조회하는 API.
+
+```
+extractInstruction(persona): InstructionView
+extractMemory(persona, recentItems): MemoryView
+composePersonaView(instruction, memory): FullPersonaView
+```
+
+**`extractInstruction`**: Persona 데이터에서 Instruction 컴포넌트만 추출. 벡터, VoiceSpec, Factbook, TriggerMap, Prompt Template, Relationship Protocol을 포함한 읽기 전용 뷰를 반환한다.
+
+**`extractMemory`**: 현재 상태(mood, energy 등) + RAG 검색 결과(recentItems) + 관계 정보를 포함한 가변 데이터 뷰를 반환한다.
+
+**`composePersonaView`**: Instruction + Memory를 결합하여 전체 페르소나 뷰를 구성한다. 프롬프트 빌딩, 관리자 대시보드, API 응답 등 다양한 용도로 사용된다.
+
+**용도별 활용**
+
+| 용도            | 사용 API                               | 설명                               |
+| --------------- | -------------------------------------- | ---------------------------------- |
+| 프롬프트 빌딩   | `extractInstruction` + `extractMemory` | Static/Dynamic 블록 분리 구성      |
+| 관리자 대시보드 | `composePersonaView`                   | 전체 페르소나 상태 표시            |
+| 아레나 스파링   | `extractInstruction` (읽기 전용)       | 스타일북만 참조                    |
+| API 응답        | `composePersonaView`                   | 외부 소비자에게 전체 뷰 제공       |
+| 무결성 검증     | `extractInstruction`                   | 해시 비교를 통한 변조 감지         |
+| 캐시 키 생성    | `extractInstruction`                   | Instruction 해시 기반 캐시 키 구성 |
+
+### 8.7 데이터 무결성 검증
+
+Instruction Layer의 무결성을 주기적으로 검증한다.
+
+```
+verifyIntegrity(instruction): boolean
+```
+
+**검증 절차**
+
+```
+1. InstructionView 추출
+2. 각 컴포넌트의 현재 해시 계산
+   - factbookHash = SHA-256(JSON.stringify(factbook))
+   - voiceSpecHash = SHA-256(JSON.stringify(voiceSpec))
+   - ...
+3. DB에 저장된 해시와 비교
+4. 불일치 → Integrity Monitor 알림 (§5.2)
+5. 일치 → 정상
+```
+
+**GrowthStats**: 시간에 따른 벡터 변동 통계. Memory Layer의 GrowthArc 데이터를 분석한다.
+
+```
+computeGrowthStats(personaId): GrowthStats
+```
+
+- 벡터 변동 폭 (각 축별 표준편차)
+- 변동 추세 (상승/하락/안정)
+- Pressure Coefficient 누적 영향 분석
+- 비정상 변동 감지 (GrowthArc 이상치)
+
+### 8.8 다른 모듈과의 연동
+
+| 연동 모듈       | 방향            | 내용                                                           |
+| --------------- | --------------- | -------------------------------------------------------------- |
+| Execution       | Data → Exec     | `buildInstructionPrompt` + `buildMemoryPrompt`로 프롬프트 구성 |
+| Memory          | Data ↔ Memory   | Memory Layer 데이터의 저장소 역할. RAG 검색 대상 제공          |
+| Arena           | Data → Arena    | `extractInstruction`으로 스파링용 읽기 전용 스타일북 제공      |
+| Security        | Data → Security | `verifyIntegrity`로 Instruction 무결성 검증. 감사 로그 제공    |
+| Cost (§11)      | Data → Cost     | 캐시 통계, LLM 사용량 기록을 비용 최적화 모듈에 제공           |
+| Character Bible | Bible → Data    | Instruction Layer의 원본 데이터 소스 (VoiceSpec, Factbook 등)  |
+
+---
+
+> **§9~§10은 다음 작업에서 구체화 예정**
