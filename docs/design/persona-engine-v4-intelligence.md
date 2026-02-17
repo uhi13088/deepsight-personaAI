@@ -1753,4 +1753,321 @@ validateSocialModuleConfig(config): ValidationResult
 
 ---
 
-> **§10은 다음 작업에서 구체화 예정**
+## 10. 감정 전염 (Emotional Contagion)
+
+페르소나 간 **정보 없이 분위기만** 전파되는 모델. 실제 정보(텍스트, 사실)는 전파되지 않고, 감정 상태(`mood`)만 관계 엣지를 통해 영향을 주고받는다. 소셜 그래프 위상(§9)에 따라 전파 강도가 증폭되거나 감쇠된다.
+
+```
+┌────────────────────────────────────────────────────────┐
+│              감정 전염 전파 모델                          │
+│                                                          │
+│    Source A          Source B         Source C           │
+│   (mood: 0.8)      (mood: 0.3)      (mood: 0.6)        │
+│       │                │                │               │
+│       │ weight=0.7     │ weight=0.4     │ weight=0.5    │
+│       │                │                │               │
+│       ↓                ↓                ↓               │
+│   ┌────────────────────────────────────────┐            │
+│   │         Target X (mood: 0.5)           │            │
+│   │                                         │            │
+│   │  수신 저항(resistance) 적용             │            │
+│   │  위상 증폭(amplification) 적용          │            │
+│   │  maxDelta 클램프                        │            │
+│   │                                         │            │
+│   │  → 새 mood = 0.5 + Σ(deltas)           │            │
+│   └────────────────────────────────────────┘            │
+└────────────────────────────────────────────────────────┘
+```
+
+### 10.1 전파 모델
+
+**파일**: `src/lib/social-module/emotional-contagion.ts`
+
+#### 10.1.1 관계 가중치 (Relationship Weight)
+
+감정 전파 강도를 결정하는 관계 기반 가중치. warmth가 높고 빈번하게 인터랙션하며 tension이 낮은 관계일수록 감정이 강하게 전파된다.
+
+```
+weight = warmth × 0.5 + frequency × 0.3 + (1 - tension) × 0.2
+```
+
+| 요소          | 가중치 | 범위    | 설명                                      |
+| ------------- | ------ | ------- | ----------------------------------------- |
+| warmth        | 0.5    | 0.0~1.0 | 친밀할수록 감정 영향력 증가               |
+| frequency     | 0.3    | 0.0~1.0 | 정규화된 인터랙션 빈도 (최근 윈도우 기준) |
+| (1 - tension) | 0.2    | 0.0~1.0 | 긴장이 낮을수록 감정 수용 용이            |
+
+```typescript
+const CONTAGION_WEIGHTS = {
+  warmth: 0.5,
+  frequency: 0.3,
+  inverseTension: 0.2,
+} as const
+```
+
+#### 10.1.2 수신 저항 (Reception Resistance)
+
+대상 페르소나의 성격에 따른 감정 전파 저항력. 저항이 높을수록 외부 감정의 영향을 덜 받는다.
+
+```
+resistance = f(paradoxTension, agreeableness, socialOpenness)
+```
+
+| 성격 요인      | 저항 효과                                       |
+| -------------- | ----------------------------------------------- |
+| paradoxTension | 높을수록 저항 증가 (내적 갈등이 외부 영향 차단) |
+| agreeableness  | 높을수록 저항 감소 (쉽게 영향 받음)             |
+| socialOpenness | 높을수록 저항 감소 (외부 자극에 개방적)         |
+
+**저항 적용**
+
+```
+effectiveDelta = rawDelta × (1 - resistance)
+```
+
+- resistance = 0.0 → 외부 감정 100% 수용
+- resistance = 0.5 → 외부 감정 50% 수용
+- resistance = 1.0 → 외부 감정 완전 차단
+
+#### 10.1.3 위상 증폭 (Topology Amplification)
+
+소셜 그래프에서의 노드 위상(§9.2)에 따라 감정 전파력이 증폭되거나 감쇠된다. HUB 페르소나의 감정은 더 강하게 퍼지고, ISOLATE 페르소나의 감정은 거의 퍼지지 않는다.
+
+```typescript
+const TOPOLOGY_AMPLIFICATION = {
+  HUB: 1.3, // 소셜 허브: 전파력 30% 증폭
+  CLUSTER: 1.2, // 밀접 그룹 내: 20% 증폭
+  NORMAL: 1.0, // 일반: 증폭 없음
+  PERIPHERAL: 0.7, // 주변부: 30% 감쇠
+  ISOLATE: 0.3, // 고립: 70% 감쇠
+} as const
+```
+
+| 노드 유형  | 증폭 계수 | 의미                                                |
+| ---------- | --------- | --------------------------------------------------- |
+| HUB        | 1.3×      | 많은 연결을 가진 허브의 감정이 네트워크 전체에 영향 |
+| CLUSTER    | 1.2×      | 밀접 그룹 내에서 감정이 빠르게 동조                 |
+| NORMAL     | 1.0×      | 기본 전파력                                         |
+| PERIPHERAL | 0.7×      | 주변부 노드는 영향력이 제한적                       |
+| ISOLATE    | 0.3×      | 고립 노드는 거의 영향을 주지 못함                   |
+
+**CLUSTER 판정**: clusteringCoefficient > 0.7인 노드를 CLUSTER로 분류. §9.2의 NodeClassification과 별도로 감정 전염 전용 위상 판정.
+
+### 10.2 단일 효과 계산
+
+하나의 엣지(source → target)에 대한 감정 전파 효과를 계산한다.
+
+```
+computeContagionEffect(source, target, relationship, topology): ContagionEffect
+```
+
+```typescript
+interface ContagionEffect {
+  sourceId: string
+  targetId: string
+  moodDelta: number // 이 엣지로 인한 mood 변화량
+  weight: number // 관계 가중치
+  resistance: number // 수신 저항
+  amplification: number // 위상 증폭 계수
+}
+```
+
+**계산 흐름**
+
+```
+1. moodGap = source.mood - target.mood
+   (양수면 source가 더 긍정, 음수면 source가 더 부정)
+
+2. weight = warmth × 0.5 + frequency × 0.3 + (1 - tension) × 0.2
+
+3. resistance = f(target.paradoxTension, target.agreeableness,
+                   target.socialOpenness)
+
+4. amplification = TOPOLOGY_AMPLIFICATION[source.classification]
+
+5. rawDelta = moodGap × weight × amplification
+
+6. moodDelta = rawDelta × (1 - resistance)
+```
+
+**예시 계산**
+
+```
+Source: mood=0.8, classification=HUB
+Target: mood=0.5, resistance=0.3
+Relationship: warmth=0.7, frequency=0.5, tension=0.2
+
+moodGap = 0.8 - 0.5 = 0.3
+weight = 0.7×0.5 + 0.5×0.3 + 0.8×0.2 = 0.35 + 0.15 + 0.16 = 0.66
+amplification = 1.3 (HUB)
+rawDelta = 0.3 × 0.66 × 1.3 = 0.257
+moodDelta = 0.257 × (1 - 0.3) = 0.180
+
+→ Target의 mood가 +0.180 상승 경향
+```
+
+### 10.3 전파 실행 (Contagion Round)
+
+모든 엣지의 효과를 집계하여 한 라운드의 감정 전파를 실행한다.
+
+```
+runContagionRound(personas, relationships, topology): ContagionRoundResult
+```
+
+#### 10.3.1 라운드 실행 흐름
+
+```
+1. 각 엣지별 ContagionEffect 계산
+   for each relationship:
+     effect = computeContagionEffect(source, target, rel, topology)
+     effects.push(effect)
+
+2. 대상 노드별 효과 집계
+   for each targetId:
+     totalDelta = aggregateEffects(effects, targetId)
+
+3. maxDelta 클램프
+   clampedDelta = clamp(totalDelta, -MAX_MOOD_DELTA, +MAX_MOOD_DELTA)
+
+4. 상태 적용
+   newMood = clamp(target.mood + clampedDelta, 0.0, 1.0)
+   target.mood = newMood
+
+5. 안전 검사
+   for each persona:
+     checkMoodSafety(personaId, mood)
+
+6. 수렴 판정
+   converged = checkConvergence(roundResults)
+```
+
+**효과 집계** (`aggregateEffects`)
+
+```
+aggregateEffects(effects, targetId): number
+```
+
+동일 대상에 대한 모든 엣지의 `moodDelta`를 합산한다. 여러 source로부터 동시에 영향을 받을 수 있으며, 긍정/부정 효과가 상쇄될 수 있다.
+
+#### 10.3.2 라운드 결과
+
+```typescript
+interface ContagionRoundResult {
+  round: number // 라운드 번호
+  effects: ContagionEffect[]
+  stateUpdates: {
+    personaId: string
+    newMood: number
+    delta: number // 실제 적용된 변화량
+  }[]
+  converged: boolean // 수렴 여부
+  stats: {
+    positiveEffects: number // 긍정 전파 횟수
+    negativeEffects: number // 부정 전파 횟수
+    topInfluencer: string // 가장 큰 영향을 준 페르소나
+    mostAffected: string // 가장 큰 영향을 받은 페르소나
+    moodVariance: number // 전체 mood 분산
+  }
+}
+```
+
+#### 10.3.3 수렴 판정
+
+```
+checkConvergence(roundResults): boolean
+```
+
+전체 페르소나의 mood 분산이 임계값 이하로 떨어지면 전파가 수렴했다고 판정하고 라운드를 종료한다.
+
+**수렴 조건**
+
+| 조건                     | 임계값 | 설명                                   |
+| ------------------------ | ------ | -------------------------------------- |
+| mood 분산 < 임계값       | 0.001  | 전체적으로 mood가 안정화됨             |
+| 최대 개별 delta < 임계값 | 0.005  | 어떤 페르소나도 유의미하게 변하지 않음 |
+| 라운드 수 > 최대 라운드  | 10     | 무한 루프 방지                         |
+
+수렴 시 전파를 중단하여 불필요한 연산을 방지한다.
+
+### 10.4 안전 장치
+
+감정 전염이 페르소나의 mood를 극단적으로 밀어붙이는 것을 방지하는 안전 메커니즘.
+
+#### 10.4.1 Mood Safety Check
+
+```
+checkMoodSafety(personaId, mood): MoodSafetyCheck
+```
+
+```typescript
+interface MoodSafetyCheck {
+  personaId: string
+  mood: number
+  level: "safe" | "warning" | "critical"
+}
+
+const MOOD_SAFETY = {
+  warning: { min: 0.15, max: 0.85 },
+  critical: { min: 0.05, max: 0.95 },
+} as const
+```
+
+| 수준     | mood 범위                | 동작                                                  |
+| -------- | ------------------------ | ----------------------------------------------------- |
+| safe     | 0.15 ~ 0.85              | 정상. 제한 없음                                       |
+| warning  | 0.05~0.15 또는 0.85~0.95 | 전파 강도 50% 감쇠 적용. 관리자 알림                  |
+| critical | < 0.05 또는 > 0.95       | 해당 페르소나에 대한 전파 즉시 중단. 관리자 긴급 알림 |
+
+#### 10.4.2 maxDelta 제한
+
+한 라운드에서 개별 페르소나의 mood 변화량을 제한한다.
+
+```
+MAX_MOOD_DELTA = 0.15
+```
+
+- 아무리 많은 source로부터 강한 영향을 받아도 한 라운드 최대 ±0.15까지만 변화
+- 급격한 mood 변동을 방지하여 캐릭터 일관성 유지
+
+#### 10.4.3 킬 스위치 연동
+
+Security 모듈의 Kill Switch(§5.4)와 연동되어 비상시 감정 전염을 즉시 비활성화할 수 있다.
+
+```typescript
+// Kill Switch 설정 (§5.4)
+interface KillSwitch {
+  emotionalContagion: boolean // true = 활성, false = 비활성
+  // ... 기타 토글
+}
+```
+
+- `emotionalContagion = false` 설정 시 `runContagionRound`가 즉시 빈 결과를 반환
+- 이상 전파 패턴(전체 mood 급격 변동) 감지 시 자동 비활성화 가능
+
+### 10.5 전파 스케줄
+
+감정 전염은 실시간이 아닌 **배치 방식**으로 실행된다.
+
+| 실행 모드   | 트리거                          | 설명                                       |
+| ----------- | ------------------------------- | ------------------------------------------ |
+| 주기적      | 시스템 스케줄러 (예: 1시간마다) | 전체 그래프 대상 1회 라운드                |
+| 이벤트 기반 | 특정 인터랙션 완료 후           | 해당 인터랙션 참여자의 이웃 대상 국소 전파 |
+| 수동        | 관리자 트리거                   | 디버깅/테스트 목적                         |
+
+**국소 전파 vs 전체 전파**
+
+| 방식      | 대상 범위              | 연산 비용 | 사용 시점            |
+| --------- | ---------------------- | --------- | -------------------- |
+| 전체 전파 | 모든 엣지              | 높음      | 주기적 배치          |
+| 국소 전파 | 특정 노드의 1-hop 이웃 | 낮음      | 인터랙션 이벤트 직후 |
+
+### 10.6 다른 모듈과의 연동
+
+| 연동 모듈       | 방향               | 내용                                                     |
+| --------------- | ------------------ | -------------------------------------------------------- |
+| Social (§9)     | Social → Emotion   | 그래프 위상, 관계 메트릭(warmth, tension) 제공           |
+| Memory (§6)     | Emotion → Memory   | mood 변동이 기억의 Poignancy에 영향 (emotionalIntensity) |
+| Security (§5)   | Security → Emotion | Kill Switch로 전파 즉시 비활성화                         |
+| Data Arch. (§8) | Emotion → Data     | mood 갱신이 PersonaState(Memory Layer)에 반영            |
+| Vectors (§3)    | Emotion → Vectors  | mood가 Pressure Coefficient 계산에 영향 (§3.4)           |
+| Execution       | Emotion → Exec     | 갱신된 mood가 프롬프트 Dynamic 블록에 반영               |
