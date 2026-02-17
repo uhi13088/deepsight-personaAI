@@ -8,13 +8,13 @@ import {
   PWLikeButton,
   PWPostTypeCard,
 } from "@/components/persona-world"
+import { PWRepostButton } from "@/components/persona-world/pw-repost-button"
 import {
   Home,
   Search,
   Bell,
   User,
   MessageCircle,
-  Share2,
   Bookmark,
   MoreHorizontal,
   Sparkles,
@@ -75,8 +75,16 @@ function PostSkeleton() {
 // ── 메인 페이지 ───────────────────────────────────────────────
 
 export default function FeedPage() {
-  const { profile, likedPosts, bookmarkedPosts, toggleLike, toggleBookmark, notifications } =
-    useUserStore()
+  const {
+    profile,
+    likedPosts,
+    repostedPosts,
+    bookmarkedPosts,
+    toggleLike,
+    toggleRepost,
+    toggleBookmark,
+    notifications,
+  } = useUserStore()
 
   const [activeTab, setActiveTab] = useState<FeedTab>("for-you")
   const [posts, setPosts] = useState<FeedPost[]>([])
@@ -184,6 +192,12 @@ export default function FeedPage() {
 
   const handleLike = (postId: string) => {
     toggleLike(postId)
+  }
+
+  const handleRepost = (postId: string) => {
+    const isReposted = repostedPosts.includes(postId)
+    toggleRepost(postId)
+    toast.success(isReposted ? "리포스트가 취소되었습니다" : "리포스트되었습니다")
   }
 
   const handleBookmark = (postId: string) => {
@@ -296,8 +310,10 @@ export default function FeedPage() {
                 key={post.id}
                 post={post}
                 liked={likedPosts.includes(post.id)}
+                reposted={repostedPosts.includes(post.id)}
                 bookmarked={bookmarkedPosts.includes(post.id)}
                 onLike={() => handleLike(post.id)}
+                onRepost={() => handleRepost(post.id)}
                 onBookmark={() => handleBookmark(post.id)}
               />
             ))}
@@ -359,12 +375,22 @@ export default function FeedPage() {
 interface FeedPostCardProps {
   post: FeedPost
   liked: boolean
+  reposted: boolean
   bookmarked: boolean
   onLike: () => void
+  onRepost: () => void
   onBookmark: () => void
 }
 
-function FeedPostCard({ post, liked, bookmarked, onLike, onBookmark }: FeedPostCardProps) {
+function FeedPostCard({
+  post,
+  liked,
+  reposted,
+  bookmarked,
+  onLike,
+  onRepost,
+  onBookmark,
+}: FeedPostCardProps) {
   const sourceConfig = post.source ? FEED_SOURCE_CONFIG[post.source] : null
 
   return (
@@ -417,12 +443,11 @@ function FeedPostCard({ post, liked, bookmarked, onLike, onBookmark }: FeedPostC
           <MessageCircle className="h-4 w-4" />
           <span className="text-xs">{post.commentCount}</span>
         </button>
-        <button
-          onClick={() => toast.info("공유 기능이 곧 추가됩니다")}
-          className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-green-50 hover:text-green-500"
-        >
-          <Share2 className="h-4 w-4" />
-        </button>
+        <PWRepostButton
+          reposted={reposted}
+          count={post.repostCount + (reposted ? 1 : 0)}
+          onToggle={onRepost}
+        />
         <button
           onClick={onBookmark}
           className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors ${

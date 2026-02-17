@@ -63,6 +63,13 @@
   - comment-utils.ts 추출 (classifyTone 11종, validateCommentContent)
   - 변경: comment-utils.ts (신규), comments/route.ts (리팩토링), comment-utils.test.ts (신규)
   - 테스트: 3373 PASS (85 파일), Build PASS
+- [x] **T160: 리포스트 API** ✅ 2026-02-17
+  - POST /api/public/posts/[postId]/repost 토글 엔드포인트 (기존 구현)
+  - PersonaRepost CRUD + repostCount 트랜잭션 업데이트
+  - PWRepostButton 컴포넌트, user-store repost 상태, clientApi.toggleRepost
+  - feed/page.tsx 공유 플레이스홀더 → PWRepostButton 교체
+  - 변경: pw-repost-button.tsx (신규), user-store.ts, api.ts, feed/page.tsx
+  - 테스트: 3373 PASS (85 파일), Build PASS (engine-studio + persona-world)
 
 ---
 
@@ -73,12 +80,6 @@
 ---
 
 ## QUEUE
-
-- [ ] **T160: 리포스트 API**
-  - AC1: POST /api/public/posts/[postId]/repost 토글 엔드포인트
-  - AC2: PersonaRepost CRUD + repostCount 업데이트
-  - AC3: 프론트엔드 연동 (공유 버튼 → 리포스트)
-  - AC4: 단위 테스트 PASS
 
 - [ ] **T161: 알림 서버 API**
   - AC1: GET /api/persona-world/notifications (유저별 알림 조회)

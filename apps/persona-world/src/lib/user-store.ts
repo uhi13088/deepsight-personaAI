@@ -76,6 +76,11 @@ interface UserState {
   toggleLike: (postId: string) => void
   isLiked: (postId: string) => boolean
 
+  // 리포스트
+  repostedPosts: string[]
+  toggleRepost: (postId: string) => void
+  isReposted: (postId: string) => boolean
+
   // 북마크
   bookmarkedPosts: string[]
   toggleBookmark: (postId: string) => void
@@ -127,6 +132,7 @@ const initialState = {
   snsConnections: [] as SnsConnection[],
   followedPersonas: [] as FollowedPersona[],
   likedPosts: [] as string[],
+  repostedPosts: [] as string[],
   bookmarkedPosts: [] as string[],
   notifications: [] as Notification[],
 }
@@ -249,6 +255,21 @@ export const useUserStore = create<UserState>()(
       },
 
       isLiked: (postId) => get().likedPosts.includes(postId),
+
+      // 리포스트 관리 — Optimistic + Server Sync
+      toggleRepost: (postId) => {
+        set((state) => ({
+          repostedPosts: state.repostedPosts.includes(postId)
+            ? state.repostedPosts.filter((id) => id !== postId)
+            : [...state.repostedPosts, postId],
+        }))
+        const userId = get().profile?.id
+        if (userId) {
+          syncToServer(() => clientApi.toggleRepost(postId, userId))
+        }
+      },
+
+      isReposted: (postId) => get().repostedPosts.includes(postId),
 
       // 북마크 관리 (로컬 전용 — 서버 API 미존재)
       toggleBookmark: (postId) =>

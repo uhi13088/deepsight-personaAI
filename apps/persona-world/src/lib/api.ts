@@ -302,6 +302,20 @@ export const clientApi = {
     return json.data!
   },
 
+  // ── 리포스트 토글 ────────────────────────────────────────
+  async toggleRepost(postId: string, userId: string) {
+    const res = await fetch(`/api/public/posts/${postId}/repost`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    })
+    if (!res.ok) throw new Error("Failed to toggle repost")
+
+    const json: ApiResponse<{ reposted: boolean; postId: string }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
   // ── 팔로우 토글 ──────────────────────────────────────────
   async toggleFollow(personaId: string, userId: string) {
     const res = await fetch(`/api/public/follows`, {
