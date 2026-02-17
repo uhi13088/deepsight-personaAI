@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { notifyPostLiked } from "@/lib/persona-world/notification-service"
 
 /**
  * POST /api/public/posts/[postId]/likes
@@ -83,6 +84,24 @@ export async function POST(
         data: { likeCount: { increment: 1 } },
       }),
     ])
+
+    // 좋아요 알림 (fire-and-forget) — 포스트 작성 페르소나 팔로워에게
+    const likedPost = await prisma.personaPost.findUnique({
+      where: { id: postId },
+      select: { personaId: true },
+    })
+    if (likedPost?.personaId) {
+      const likerName = userId
+        ? ((
+            await prisma.personaWorldUser.findUnique({
+              where: { id: userId },
+              select: { name: true },
+            })
+          )?.name ?? "유저")
+        : ((await prisma.persona.findUnique({ where: { id: personaId! }, select: { name: true } }))
+            ?.name ?? "페르소나")
+      void notifyPostLiked({ postId, likerName, postAuthorPersonaId: likedPost.personaId })
+    }
 
     return NextResponse.json({
       success: true,

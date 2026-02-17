@@ -85,7 +85,7 @@ export const TYPE_THRESHOLDS = {
 const STAGE_PROTOCOLS: Record<RelationshipStage, BehaviorProtocol> = {
   STRANGER: {
     interactionBoost: 0.5,
-    allowedTones: ["analytical", "supportive", "playful"],
+    allowedTones: ["formal_analysis", "supportive", "light_reaction"],
     selfDisclosure: 0.1,
     debateWillingness: 0.2,
     personalReferences: false,
@@ -93,7 +93,13 @@ const STAGE_PROTOCOLS: Record<RelationshipStage, BehaviorProtocol> = {
   },
   ACQUAINTANCE: {
     interactionBoost: 0.8,
-    allowedTones: ["analytical", "supportive", "playful", "empathetic"],
+    allowedTones: [
+      "formal_analysis",
+      "deep_analysis",
+      "supportive",
+      "light_reaction",
+      "empathetic",
+    ],
     selfDisclosure: 0.3,
     debateWillingness: 0.4,
     personalReferences: false,
@@ -101,7 +107,14 @@ const STAGE_PROTOCOLS: Record<RelationshipStage, BehaviorProtocol> = {
   },
   FAMILIAR: {
     interactionBoost: 1.2,
-    allowedTones: ["analytical", "supportive", "playful", "empathetic", "counter_argument"],
+    allowedTones: [
+      "deep_analysis",
+      "supportive",
+      "light_reaction",
+      "empathetic",
+      "soft_rebuttal",
+      "unique_perspective",
+    ],
     selfDisclosure: 0.5,
     debateWillingness: 0.6,
     personalReferences: true,
@@ -110,13 +123,16 @@ const STAGE_PROTOCOLS: Record<RelationshipStage, BehaviorProtocol> = {
   CLOSE: {
     interactionBoost: 1.5,
     allowedTones: [
-      "analytical",
-      "supportive",
-      "playful",
+      "paradox_response",
+      "direct_rebuttal",
+      "intimate_joke",
+      "soft_rebuttal",
+      "deep_analysis",
       "empathetic",
-      "counter_argument",
-      "defensive",
-      "vulnerable",
+      "light_reaction",
+      "unique_perspective",
+      "over_agreement",
+      "supportive",
     ],
     selfDisclosure: 0.8,
     debateWillingness: 0.8,
@@ -151,19 +167,19 @@ const TYPE_MODIFIERS: Record<RelationshipType, TypeModifier> = {
     interactionBoostDelta: 0.2,
     debateWillingnessDelta: 0.3,
     selfDisclosureDelta: -0.1,
-    extraTones: ["counter_argument", "defensive"],
+    extraTones: ["direct_rebuttal", "soft_rebuttal"],
   },
   MENTOR: {
     interactionBoostDelta: 0.2,
     debateWillingnessDelta: 0.1,
     selfDisclosureDelta: 0.2,
-    extraTones: ["analytical", "empathetic"],
+    extraTones: ["deep_analysis", "empathetic"],
   },
   FAN: {
     interactionBoostDelta: 0.4,
     debateWillingnessDelta: -0.2,
     selfDisclosureDelta: 0,
-    extraTones: ["supportive", "playful"],
+    extraTones: ["supportive", "light_reaction"],
   },
 }
 

@@ -80,18 +80,24 @@ const COMMENT_ROLE_PREFIX = `당신은 SNS에서 활동하는 페르소나입니
 
 /** T143: 동적 suffix — 호출마다 달라지는 상태/톤 */
 function buildCommentDynamicSuffix(state: PersonaStateData, tone: CommentToneDecision): string {
-  const toneGuide =
-    tone.tone === "playful"
-      ? "가볍고 재미있는 톤으로"
-      : tone.tone === "analytical"
-        ? "논리적이고 분석적인 톤으로"
-        : tone.tone === "empathetic"
-          ? "공감하는 따뜻한 톤으로"
-          : tone.tone === "counter_argument"
-            ? "정중하지만 다른 의견을 제시하는 톤으로"
-            : tone.tone === "vulnerable"
-              ? "솔직하고 진솔한 톤으로"
-              : ""
+  const TONE_GUIDES: Record<string, string> = {
+    playful: "가볍고 재미있는 톤으로",
+    analytical: "논리적이고 분석적인 톤으로",
+    empathetic: "공감하는 따뜻한 톤으로",
+    counter_argument: "정중하지만 다른 의견을 제시하는 톤으로",
+    vulnerable: "솔직하고 진솔한 톤으로",
+    paradox_response: "평소와 다른, 반전된 톤으로",
+    direct_rebuttal: "직접적으로 반박하는 톤으로",
+    intimate_joke: "친밀하고 가벼운 농담 톤으로",
+    formal_analysis: "정중하고 격식있는 분석 톤으로",
+    soft_rebuttal: "부드럽게 다른 의견을 제시하는 톤으로",
+    deep_analysis: "논리적이고 깊이있는 분석 톤으로",
+    light_reaction: "가볍고 재미있는 리액션 톤으로",
+    unique_perspective: "독특한 시각으로 해석하는 톤으로",
+    over_agreement: "강하게 동의하는 톤으로",
+    supportive: "지지하고 응원하는 톤으로",
+  }
+  const toneGuide = TONE_GUIDES[tone.tone] ?? ""
 
   return `[현재 상태]
 기분: ${state.mood.toFixed(2)}, 에너지: ${state.energy.toFixed(2)}, 소셜배터리: ${state.socialBattery.toFixed(2)}

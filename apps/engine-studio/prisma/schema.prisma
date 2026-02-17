@@ -1168,6 +1168,7 @@ model PersonaComment {
   user      PersonaWorldUser? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   content   String      @db.Text
+  tone      String?     // 11종 댓글 톤 (v4: paradox_response~supportive)
 
   // 답글 지원
   parentId  String?
@@ -1190,14 +1191,18 @@ model PersonaRepost {
   originalPostId String
   originalPost  PersonaPost @relation(fields: [originalPostId], references: [id], onDelete: Cascade)
 
-  personaId     String
-  persona       Persona     @relation("PersonaReposts", fields: [personaId], references: [id], onDelete: Cascade)
+  // 페르소나 또는 유저 (둘 중 하나만)
+  personaId     String?
+  persona       Persona?    @relation("PersonaReposts", fields: [personaId], references: [id], onDelete: Cascade)
+  userId        String?
+  user          PersonaWorldUser? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   comment       String?     @db.Text // 리포스트 코멘트
 
   createdAt     DateTime    @default(now())
 
   @@unique([originalPostId, personaId])
+  @@unique([originalPostId, userId])
   @@map("persona_reposts")
 }
 
@@ -1302,8 +1307,10 @@ model PersonaWorldUser {
   // Relations
   likes           PersonaPostLike[]
   comments        PersonaComment[]
+  reposts         PersonaRepost[]
   following       PersonaFollow[] @relation("UserFollowing")
   bookmarks       PersonaPostBookmark[]
+  notifications   PWNotification[]
   surveyResponses PWUserSurveyResponse[]
 
   @@map("persona_world_users")
@@ -1369,6 +1376,30 @@ enum SNSPlatform {
   LETTERBOXD
   TWITTER
   TIKTOK
+}
+
+// ============================================
+// PersonaWorld - 알림
+// ============================================
+
+model PWNotification {
+  id          String   @id @default(cuid())
+  userId      String
+  user        PersonaWorldUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type        String   // like, comment, follow, mention, recommendation, new_post, system
+  message     String
+  personaId   String?  // 관련 페르소나 (있을 때)
+  personaName String?
+  postId      String?  // 관련 포스트 (있을 때)
+  commentId   String?  // 관련 댓글 (있을 때)
+
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+  @@map("pw_notifications")
 }
 
 // ============================================

@@ -68,7 +68,7 @@ const makeRelationship = (overrides?: Partial<RelationshipScore>): RelationshipS
 // ═══ decideCommentTone ═══
 
 describe("decideCommentTone", () => {
-  it("stance+lens 높으면 counter_argument", () => {
+  it("lens+stance 높으면 soft_rebuttal", () => {
     const vectors = makeVectors({
       social: {
         depth: 0.5,
@@ -82,11 +82,11 @@ describe("decideCommentTone", () => {
     })
     const state = makeState()
     const result = decideCommentTone(vectors, state, null, 0.3)
-    expect(result.tone).toBe("counter_argument")
+    expect(result.tone).toBe("soft_rebuttal")
     expect(result.confidence).toBeGreaterThan(0)
   })
 
-  it("sociability+interactivity 높으면 playful", () => {
+  it("sociability 높으면 light_reaction", () => {
     const vectors = makeVectors({
       social: {
         depth: 0.5,
@@ -107,11 +107,13 @@ describe("decideCommentTone", () => {
     })
     const state = makeState()
     const result = decideCommentTone(vectors, state, null, 0.3)
-    // sociability>0.6 + interactivity (derived) > 0.6
-    expect(["playful", "counter_argument", "analytical", "supportive"]).toContain(result.tone)
+    // sociability>0.6 → light_reaction
+    expect(["light_reaction", "soft_rebuttal", "deep_analysis", "supportive"]).toContain(
+      result.tone
+    )
   })
 
-  it("depth+purpose 높으면 analytical", () => {
+  it("depth+purpose 높으면 deep_analysis", () => {
     const vectors = makeVectors({
       social: {
         depth: 0.8,
@@ -125,26 +127,26 @@ describe("decideCommentTone", () => {
     })
     const state = makeState()
     const result = decideCommentTone(vectors, state, null, 0.3)
-    expect(result.tone).toBe("analytical")
+    expect(result.tone).toBe("deep_analysis")
   })
 
-  it("lack 높음 + mood 낮음 → defensive", () => {
+  it("lack 높음 + mood 낮음 → over_agreement", () => {
     const vectors = makeVectors({
       narrative: { lack: 0.8, moralCompass: 0.5, volatility: 0.5, growthArc: 0.5 },
     })
-    const state = makeState({ mood: 0.3 })
+    const state = makeState({ mood: 0.2 })
     const result = decideCommentTone(vectors, state, null, 0.3)
-    expect(result.tone).toBe("defensive")
+    expect(result.tone).toBe("over_agreement")
   })
 
-  it("agreeableness 높음 + warmth 높음 → empathetic", () => {
+  it("agreeableness 높음 + mood 높음 → empathetic", () => {
     const vectors = makeVectors({
       social: {
         depth: 0.3,
         lens: 0.3,
         stance: 0.3,
         scope: 0.5,
-        taste: 0.5,
+        taste: 0.3,
         purpose: 0.3,
         sociability: 0.3,
       },
@@ -157,61 +159,52 @@ describe("decideCommentTone", () => {
       },
       narrative: { lack: 0.3, moralCompass: 0.5, volatility: 0.3, growthArc: 0.5 },
     })
-    const rel = makeRelationship({ warmth: 0.7 })
-    const state = makeState({ mood: 0.6 })
-    const result = decideCommentTone(vectors, state, rel, 0.1)
+    const state = makeState({ mood: 0.8 })
+    const result = decideCommentTone(vectors, state, null, 0.1)
     expect(result.tone).toBe("empathetic")
   })
 
   it("기본 fallback → supportive", () => {
     const vectors = makeVectors({
       social: {
-        depth: 0.3,
-        lens: 0.3,
-        stance: 0.3,
-        scope: 0.3,
-        taste: 0.3,
-        purpose: 0.3,
-        sociability: 0.3,
+        depth: 0.2,
+        lens: 0.2,
+        stance: 0.2,
+        scope: 0.2,
+        taste: 0.2,
+        purpose: 0.2,
+        sociability: 0.2,
       },
       temperament: {
-        openness: 0.3,
-        conscientiousness: 0.3,
-        extraversion: 0.3,
-        agreeableness: 0.3,
-        neuroticism: 0.3,
+        openness: 0.2,
+        conscientiousness: 0.2,
+        extraversion: 0.2,
+        agreeableness: 0.2,
+        neuroticism: 0.2,
       },
-      narrative: { lack: 0.3, moralCompass: 0.3, volatility: 0.3, growthArc: 0.3 },
+      narrative: { lack: 0.2, moralCompass: 0.2, volatility: 0.2, growthArc: 0.2 },
     })
-    const state = makeState({ mood: 0.6 })
+    const state = makeState({ mood: 0.5, paradoxTension: 0.1 })
     const result = decideCommentTone(vectors, state, null, 0.1)
     expect(result.tone).toBe("supportive")
   })
 
-  it("Paradox 영향 — vulnerable + paradoxScore > 0.4", () => {
+  it("Paradox 영향 — paradoxTension > 0.7 → paradox_response", () => {
     const vectors = makeVectors({
       social: {
         depth: 0.5,
         lens: 0.5,
-        stance: 0.8,
+        stance: 0.5,
         scope: 0.5,
         taste: 0.5,
         purpose: 0.5,
         sociability: 0.5,
       },
-      temperament: {
-        openness: 0.5,
-        conscientiousness: 0.5,
-        extraversion: 0.5,
-        agreeableness: 0.7,
-        neuroticism: 0.5,
-      },
     })
-    const state = makeState()
+    const state = makeState({ paradoxTension: 0.8 })
     const result = decideCommentTone(vectors, state, null, 0.6)
-    if (result.tone === "vulnerable") {
-      expect(result.paradoxInfluence).toBe(true)
-    }
+    expect(result.tone).toBe("paradox_response")
+    expect(result.paradoxInfluence).toBe(true)
   })
 
   it("reason에 조건 포함", () => {
@@ -236,9 +229,14 @@ describe("decideCommentTone", () => {
 // ═══ applyExpress ═══
 
 describe("applyExpress", () => {
-  it("높은 에너지 + playful → playful_reaction applied", () => {
+  it("높은 에너지 + light_reaction → playful_reaction applied", () => {
     const state = makeState({ energy: 0.9 })
-    const tone = { tone: "playful" as const, confidence: 0.8, reason: "", paradoxInfluence: false }
+    const tone = {
+      tone: "light_reaction" as const,
+      confidence: 0.8,
+      reason: "",
+      paradoxInfluence: false,
+    }
     const result = applyExpress("좋은 글이에요", state, tone)
     expect(result.applied).toContain("playful_reaction")
   })
@@ -246,7 +244,7 @@ describe("applyExpress", () => {
   it("낮은 에너지 + 긴 콘텐츠 → low_energy_brevity", () => {
     const state = makeState({ energy: 0.2 })
     const tone = {
-      tone: "analytical" as const,
+      tone: "deep_analysis" as const,
       confidence: 0.8,
       reason: "",
       paradoxInfluence: false,
@@ -259,7 +257,7 @@ describe("applyExpress", () => {
   it("paradox 긴장 + paradoxInfluence → paradox_honesty", () => {
     const state = makeState({ paradoxTension: 0.7 })
     const tone = {
-      tone: "vulnerable" as const,
+      tone: "paradox_response" as const,
       confidence: 0.8,
       reason: "",
       paradoxInfluence: true,

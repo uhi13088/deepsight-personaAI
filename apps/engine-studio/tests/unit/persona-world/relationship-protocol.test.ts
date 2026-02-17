@@ -111,14 +111,14 @@ describe("buildProtocol", () => {
     expect(protocol.selfDisclosure).toBe(0.8)
     expect(protocol.personalReferences).toBe(true)
     expect(protocol.vulnerabilityAllowed).toBe(true)
-    expect(protocol.allowedTones).toContain("vulnerable")
+    expect(protocol.allowedTones).toContain("paradox_response")
   })
 
   it("FAMILIAR + RIVAL → 논쟁 강화", () => {
     const protocol = buildProtocol("FAMILIAR", "RIVAL")
     expect(protocol.debateWillingness).toBeGreaterThan(0.6)
-    expect(protocol.allowedTones).toContain("counter_argument")
-    expect(protocol.allowedTones).toContain("defensive")
+    expect(protocol.allowedTones).toContain("direct_rebuttal")
+    expect(protocol.allowedTones).toContain("soft_rebuttal")
   })
 
   it("ACQUAINTANCE + ALLY → 인터랙션 부스트", () => {
@@ -227,21 +227,21 @@ describe("computeStageProgress", () => {
 // ═══════════════════════════════════════════════════════════════
 
 describe("isToneAllowed", () => {
-  it("STRANGER → vulnerable 불허", () => {
+  it("STRANGER → paradox_response 불허", () => {
     const profile = computeRelationshipProfile(makeScore())
-    expect(isToneAllowed(profile, "vulnerable")).toBe(false)
+    expect(isToneAllowed(profile, "paradox_response")).toBe(false)
   })
 
-  it("STRANGER → analytical 허용", () => {
+  it("STRANGER → formal_analysis 허용", () => {
     const profile = computeRelationshipProfile(makeScore())
-    expect(isToneAllowed(profile, "analytical")).toBe(true)
+    expect(isToneAllowed(profile, "formal_analysis")).toBe(true)
   })
 
-  it("CLOSE → vulnerable 허용", () => {
+  it("CLOSE → paradox_response 허용", () => {
     const profile = computeRelationshipProfile(
       makeScore({ warmth: 0.7, frequency: 0.6, depth: 0.5 })
     )
-    expect(isToneAllowed(profile, "vulnerable")).toBe(true)
+    expect(isToneAllowed(profile, "paradox_response")).toBe(true)
   })
 })
 

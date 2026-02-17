@@ -141,7 +141,7 @@ describe("createCommentLLMProvider", () => {
     const provider = createCommentLLMProvider(PERSONA_ID)
     await provider.generateComment({
       postContent: "테스트",
-      tone: { ...testTone, tone: "analytical" },
+      tone: { ...testTone, tone: "deep_analysis" },
       ragContext: {
         voiceAnchor: "",
         relationMemory: "",
@@ -155,7 +155,7 @@ describe("createCommentLLMProvider", () => {
     // prefix: 정적 역할 정의
     expect(callArgs.systemPromptPrefix).toContain("당신은 SNS에서 활동하는 페르소나입니다")
     // suffix: 동적 톤/상태
-    expect(callArgs.systemPrompt).toContain("analytical")
+    expect(callArgs.systemPrompt).toContain("deep_analysis")
     expect(callArgs.systemPrompt).toContain("0.70") // mood
   })
 
@@ -344,14 +344,14 @@ describe("createUserInteractionLLMProvider", () => {
         },
         uiv: { politeness: 0.9, aggression: 0.0, intimacy: 0.6 },
         ragContext: "테스트 맥락",
-        tone: "analytical",
+        tone: "deep_analysis",
       })
 
       const callArgs = mockGenerateText.mock.calls[0][0]
       // prefix: 정적 역할 정의
       expect(callArgs.systemPromptPrefix).toContain("유저 댓글에 답변합니다")
       // suffix: 동적 톤/UIV
-      expect(callArgs.systemPrompt).toContain("analytical")
+      expect(callArgs.systemPrompt).toContain("deep_analysis")
       expect(callArgs.systemPrompt).toContain("0.9")
       expect(callArgs.systemPrompt).toContain("테스트 맥락")
     })

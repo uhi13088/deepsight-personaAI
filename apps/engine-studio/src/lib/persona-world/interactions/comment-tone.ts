@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
-// PersonaWorld v3 — Comment Tone Decision
-// 구현계획서 §6.2, 설계서 §5.3
-// 벡터 + 관계 + 상태 → 7종 댓글 톤 결정
+// PersonaWorld v4 — Comment Tone Decision
+// 구현계획서 §6.2, 설계서 §5.4
+// 벡터 + 관계 + 상태 → 11종 댓글 톤 결정
 // Soft sigmoid scoring: hard threshold → 연속적 확률 분포
 // ═══════════════════════════════════════════════════════════════
 
@@ -129,11 +129,10 @@ function scoreRule(
 /**
  * Paradox가 톤에 영향을 주는지 판정.
  *
- * 설계서 §5.3: stance 높음 + agreeableness 높음 → Paradox 발현
- * paradoxScore > 0.4이고 tone이 vulnerable이면 Paradox 영향
+ * 설계서 §5.4: paradox_response 톤이거나, paradoxScore > 0.4이면 Paradox 영향
  */
 function isParadoxInfluenced(tone: CommentTone, paradoxScore: number): boolean {
-  return tone === "vulnerable" && paradoxScore > 0.4
+  return tone === "paradox_response" || paradoxScore > 0.4
 }
 
 /**
@@ -145,7 +144,7 @@ const MIN_SCORE_THRESHOLD = 0.01
 /**
  * 댓글 톤 결정 (Soft Sigmoid Scoring).
  *
- * 설계서 §5.3 톤 결정 매트릭스를 확장:
+ * 설계서 §5.4 톤 결정 매트릭스 (11종):
  * 1. 모든 규칙에 대해 sigmoid 기반 연속 점수 계산
  * 2. 가장 높은 점수의 규칙 선택
  * 3. Paradox 영향 판정

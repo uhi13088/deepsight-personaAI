@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { notifyFollowed } from "@/lib/persona-world/notification-service"
 
 /**
  * POST /api/public/follows
@@ -92,6 +93,19 @@ export async function POST(request: NextRequest) {
         followerUserId: followerUserId ?? null,
       },
     })
+
+    // 팔로우 알림 (fire-and-forget) — 유저 팔로우인 경우만
+    if (followerUserId) {
+      const persona = await prisma.persona.findUnique({
+        where: { id: followingPersonaId },
+        select: { name: true },
+      })
+      void notifyFollowed({
+        followerUserId,
+        followedPersonaId: followingPersonaId,
+        followedPersonaName: persona?.name ?? "페르소나",
+      })
+    }
 
     return NextResponse.json({
       success: true,

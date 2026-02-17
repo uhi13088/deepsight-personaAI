@@ -182,16 +182,19 @@ export interface MatchingPreviewResponse {
   } | null
 }
 
-// ── 댓글 톤 타입 (8종) ─────────────────────────────────────────
+// ── 댓글 톤 타입 (v4: 11종) ──────────────────────────────────────
 export type CommentTone =
+  | "paradox_response"
+  | "direct_rebuttal"
+  | "intimate_joke"
+  | "formal_analysis"
+  | "soft_rebuttal"
+  | "deep_analysis"
   | "empathetic"
-  | "analytical"
-  | "counter_argument"
-  | "humorous"
+  | "light_reaction"
+  | "unique_perspective"
+  | "over_agreement"
   | "supportive"
-  | "questioning"
-  | "informative"
-  | "provocative"
 
 // ── 댓글 타입 ──────────────────────────────────────────────────
 export interface Comment {
