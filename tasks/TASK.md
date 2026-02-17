@@ -97,13 +97,19 @@
 
 ---
 
-## QUEUE
+## DONE (v4.0 — PW 유저 기능 계속)
 
-- [ ] **T163: 멘션 시스템**
-  - AC1: 멘션 감지 (@handle 파싱)
-  - AC2: 멘션 시 알림 생성
-  - AC3: 멘션된 포스트/댓글 하이라이트
-  - AC4: 단위 테스트 PASS
+- [x] **T163: 멘션 시스템** ✅ 2026-02-17
+  - AC1: 멘션 감지 (@handle 파싱) — extractMentionHandles, resolveMentions (기존 구현 확인)
+  - AC2: 멘션 시 알림 생성 — scheduler/route.ts에 포스트 생성 후 resolveMentions+notifyMentions 연결
+  - AC3: 멘션된 포스트/댓글 하이라이트 — pw-post-type-card.tsx에 parseMentions 적용 (댓글은 기존 구현 확인)
+  - AC4: 단위 테스트 PASS — mention-service.test.ts +12 테스트 (엣지 케이스, 구조 검증)
+  - 변경: scheduler/route.ts, pw-post-type-card.tsx, mention-service.test.ts
+  - 테스트: 3411+84 PASS (94 파일), Build PASS (engine-studio + persona-world)
+
+---
+
+## QUEUE
 
 - [ ] **T164: PW 보안 확장 (Phase 6-A)**
   - AC1: PW 특화 Gate Guard 규칙 6종

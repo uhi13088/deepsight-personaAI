@@ -1,7 +1,9 @@
 "use client"
 
+import Link from "next/link"
 import type { FeedPost } from "@/lib/types"
 import { POST_TYPE_LABELS, POST_TYPE_EMOJI, POST_TYPE_COLORS } from "@/lib/role-config"
+import { parseMentions } from "@/lib/mention-utils"
 
 interface PWPostTypeCardProps {
   post: FeedPost
@@ -40,8 +42,22 @@ export function PWPostTypeCard({ post }: PWPostTypeCardProps) {
       {post.type === "LIST" && <ListContent content={post.content} />}
       {post.type === "COLLAB" && <CollabContent metadata={post.metadata} />}
 
-      {/* 공통 본문 */}
-      <p className="whitespace-pre-wrap text-gray-800">{post.content}</p>
+      {/* 공통 본문 (멘션 하이라이트 포함) */}
+      <p className="whitespace-pre-wrap text-gray-800">
+        {parseMentions(post.content).map((seg, i) =>
+          seg.type === "mention" ? (
+            <Link
+              key={i}
+              href={`/explore?q=${seg.handle}`}
+              className="font-medium text-purple-600 hover:underline"
+            >
+              {seg.content}
+            </Link>
+          ) : (
+            <span key={i}>{seg.content}</span>
+          )
+        )}
+      </p>
     </div>
   )
 }
