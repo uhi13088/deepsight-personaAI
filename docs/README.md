@@ -4,14 +4,14 @@
 
 ---
 
-## design/ — v3 설계서 + 구현계획서 (Active)
+## design/ — v4 설계서 + 구현계획서 (Active)
 
-| 문서                                                          | 설명                                                     |
-| ------------------------------------------------------------- | -------------------------------------------------------- |
-| [persona-engine-v3.md](design/persona-engine-v3.md)           | 엔진 v3 설계서 — 3-Layer Orthogonal Multi-Vector (106D+) |
-| [persona-engine-v3-impl.md](design/persona-engine-v3-impl.md) | 엔진 v3 구현계획서 — Phase 0~9, 타입/모델/함수 명세      |
-| [persona-world-v3.md](design/persona-world-v3.md)             | PersonaWorld v3 설계서 — 자율 SNS 아키텍처               |
-| [persona-world-v3-impl.md](design/persona-world-v3-impl.md)   | PersonaWorld v3 구현계획서 — PW-Phase 0~5, 43 태스크     |
+| 문서                                                          | 설명                                                          |
+| ------------------------------------------------------------- | ------------------------------------------------------------- |
+| [persona-engine-v4.md](design/persona-engine-v4.md)           | 엔진 v4 설계서 — 보안 3계층, 기억 지능, 아레나, 캐릭터 바이블 |
+| [persona-engine-v4-impl.md](design/persona-engine-v4-impl.md) | 엔진 v4 구현계획서 — 타입/모델/함수 명세, Phase 0~5           |
+| [persona-world-v4.md](design/persona-world-v4.md)             | PersonaWorld v4 설계서 — 자율 SNS + 보안/기억/감정전염 통합   |
+| [persona-world-v4-impl.md](design/persona-world-v4-impl.md)   | PersonaWorld v4 구현계획서 — PW-Phase 0~5, 30 태스크          |
 
 ---
 
@@ -47,6 +47,10 @@
 | 문서                                                                   | 설명                                             |
 | ---------------------------------------------------------------------- | ------------------------------------------------ |
 | [persona-system-v2-design.md](archive/persona-system-v2-design.md)     | v2 페르소나 설계서 (v3로 대체됨)                 |
+| [persona-engine-v3.md](archive/persona-engine-v3.md)                   | 엔진 v3 설계서 (v4로 대체됨)                     |
+| [persona-engine-v3-impl.md](archive/persona-engine-v3-impl.md)         | 엔진 v3 구현계획서 (v4로 대체됨)                 |
+| [persona-world-v3.md](archive/persona-world-v3.md)                     | PersonaWorld v3 설계서 (v4로 대체됨)             |
+| [persona-world-v3-impl.md](archive/persona-world-v3-impl.md)           | PersonaWorld v3 구현계획서 (v4로 대체됨)         |
 | [marketing-pricing-guide.md](archive/marketing-pricing-guide.md)       | 마케팅/가격 전략 가이드                          |
 | [landing-page-image-request.md](archive/landing-page-image-request.md) | 랜딩페이지 이미지 요청서                         |
 | [claude-code-legacy.md](archive/claude-code-legacy.md)                 | Claude Code 가이드 (Python/FastAPI 기준, 구버전) |
@@ -57,15 +61,15 @@
 
 ### PersonaWorld 개발 시
 
-1. v3 설계 → `design/persona-world-v3.md`
-2. 구현 명세 → `design/persona-world-v3-impl.md`
+1. v4 설계 → `design/persona-world-v4.md`
+2. 구현 명세 → `design/persona-world-v4-impl.md`
 3. 기능 요구사항 → `specs/persona-world.md`
 4. UI 컴포넌트 → `specs/persona-world-ui.md`
 
 ### 페르소나 엔진 개발 시
 
-1. v3 설계 → `design/persona-engine-v3.md`
-2. 구현 명세 → `design/persona-engine-v3-impl.md`
+1. v4 설계 → `design/persona-engine-v4.md`
+2. 구현 명세 → `design/persona-engine-v4-impl.md`
 3. 기능 요구사항 → `specs/engine-studio.md`
 
 ### API/대시보드 개발 시
