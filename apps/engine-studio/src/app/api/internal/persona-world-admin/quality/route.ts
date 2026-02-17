@@ -14,18 +14,20 @@ interface PersonaQualityRow {
 
 export async function GET() {
   try {
-    const activePersonas = (await prisma.persona.findMany({
-      where: { status: { in: ["ACTIVE", "STANDARD"] } },
-      select: {
-        id: true,
-        name: true,
-        status: true,
-        qualityScore: true,
-        consistencyScore: true,
-        lastValidationDate: true,
-      },
-      orderBy: { name: "asc" },
-    })) as PersonaQualityRow[]
+    const activePersonas = (await prisma.persona
+      .findMany({
+        where: { status: { in: ["ACTIVE", "STANDARD"] } },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          qualityScore: true,
+          consistencyScore: true,
+          lastValidationDate: true,
+        },
+        orderBy: { name: "asc" },
+      })
+      .catch(() => [])) as PersonaQualityRow[]
 
     const results = activePersonas.map((p) => ({
       personaId: p.id,
