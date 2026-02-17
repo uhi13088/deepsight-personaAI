@@ -131,7 +131,7 @@ describe("랜덤 페르소나 생성 파이프라인", () => {
       expect(result.quality.consistencyScore).toBeGreaterThanOrEqual(0)
     })
 
-    it("12종 아키타입 각각으로 생성 성공", () => {
+    it("22종 아키타입 각각으로 생성 성공", () => {
       for (const archetype of ARCHETYPES) {
         const result = generatePersona({ archetypeId: archetype.id })
         expect(result.archetype?.id).toBe(archetype.id)
@@ -235,11 +235,11 @@ describe("랜덤 페르소나 생성 파이프라인", () => {
 
     it("배치 생성 — 아키타입 순환", () => {
       const batch = generatePersonaBatch(3, {
-        archetypeIds: ["ironic-philosopher", "social-introvert", "dangerous-mentor"],
+        archetypeIds: ["ironic-philosopher", "volatile-intellectual", "cheerful-nihilist"],
       })
       expect(batch[0].archetype?.id).toBe("ironic-philosopher")
-      expect(batch[1].archetype?.id).toBe("social-introvert")
-      expect(batch[2].archetype?.id).toBe("dangerous-mentor")
+      expect(batch[1].archetype?.id).toBe("volatile-intellectual")
+      expect(batch[2].archetype?.id).toBe("cheerful-nihilist")
     })
   })
 })

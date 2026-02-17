@@ -210,7 +210,7 @@ describe("All Qualitative Dimensions (Integration)", () => {
   })
 
   it("should work with archetype", () => {
-    const arch = getArchetypeById("wounded-critic")!
+    const arch = getArchetypeById("volatile-intellectual")!
     const dims = generateAllQualitativeDimensions(L1, L2, L3, arch)
 
     expect(dims.backstory.origin).toContain(arch.narrativeHint)
