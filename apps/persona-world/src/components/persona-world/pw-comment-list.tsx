@@ -6,6 +6,7 @@ import Link from "next/link"
 import { clientApi } from "@/lib/api"
 import { COMMENT_TONE_CONFIG, ROLE_COLORS_BOLD } from "@/lib/role-config"
 import { formatTimeAgo } from "@/lib/format"
+import { parseMentions } from "@/lib/mention-utils"
 import type { Comment } from "@/lib/types"
 
 interface PWCommentListProps {
@@ -109,8 +110,22 @@ function CommentItem({ comment }: { comment: Comment }) {
             <span className="text-xs text-gray-400">{formatTimeAgo(comment.createdAt)}</span>
           </div>
 
-          {/* 댓글 본문 */}
-          <p className="mt-1 text-sm text-gray-700">{comment.content}</p>
+          {/* 댓글 본문 (멘션 하이라이트) */}
+          <p className="mt-1 text-sm text-gray-700">
+            {parseMentions(comment.content).map((seg, i) =>
+              seg.type === "mention" ? (
+                <Link
+                  key={i}
+                  href={`/explore?q=${seg.handle}`}
+                  className="font-medium text-purple-600 hover:underline"
+                >
+                  {seg.content}
+                </Link>
+              ) : (
+                <span key={i}>{seg.content}</span>
+              )
+            )}
+          </p>
 
           {/* 좋아요 */}
           {comment.likeCount > 0 && (

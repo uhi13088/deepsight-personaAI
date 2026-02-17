@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { notifyNewComment } from "@/lib/persona-world/notification-service"
+import { resolveMentions, notifyMentions } from "@/lib/persona-world/mention-service"
 
 /**
  * GET /api/public/posts/[postId]/comments
@@ -268,6 +269,18 @@ export async function POST(
         postAuthorPersonaId: postForNotif.personaId,
       })
     }
+
+    // 멘션 알림 (fire-and-forget) — @handle 감지 시
+    void resolveMentions(trimmedContent).then((mentions) => {
+      if (mentions.length > 0) {
+        void notifyMentions({
+          mentions,
+          mentionerName: user.name ?? "유저",
+          postId,
+          commentId: comment.id,
+        })
+      }
+    })
 
     return NextResponse.json({
       success: true,
