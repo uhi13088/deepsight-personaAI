@@ -5,23 +5,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id } = await params
 
-    // Mock data - replace with database query
+    // TODO: Replace with database query when auth is implemented
     const apiKey = {
       id,
-      name: "Production Server",
+      name: "",
       prefix: "pk_live_",
-      lastFour: "xyz8",
+      lastFour: "****",
       environment: "live",
       status: "active",
       permissions: ["match", "personas", "feedback"],
-      createdAt: "2025-01-01T00:00:00Z",
-      lastUsedAt: new Date(Date.now() - 120000).toISOString(),
+      createdAt: new Date().toISOString(),
+      lastUsedAt: new Date().toISOString(),
       rateLimit: 1000,
       stats: {
-        totalCalls: 125000,
-        callsThisMonth: 45678,
-        successRate: 99.2,
-        avgLatency: 142,
+        totalCalls: 0,
+        callsThisMonth: 0,
+        successRate: 0,
+        avgLatency: 0,
       },
     }
 

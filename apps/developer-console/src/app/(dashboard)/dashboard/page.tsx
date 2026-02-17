@@ -188,7 +188,7 @@ export default function DashboardPage() {
     }
   }
 
-  const userName = "Developer" // Replace with actual user name
+  const userName = "개발자" // TODO: Replace with actual user name from auth
 
   const dashboardMetrics = {
     apiCalls: { today: stats?.apiCalls.today ?? 0, change: stats?.apiCalls.change ?? 0 },

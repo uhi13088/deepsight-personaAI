@@ -7,12 +7,12 @@ export async function GET() {
   // TODO: Replace with actual database query when auth is implemented
   const settingsData = {
     profile: {
-      id: "user-1",
+      id: "pending-auth",
       name: "개발자",
-      email: "developer@example.com",
+      email: "",
       avatar: null,
       phone: "",
-      company: "DeepSight",
+      company: "",
       timezone: "Asia/Seoul",
       language: "ko",
       twoFactorEnabled: false,
@@ -36,9 +36,9 @@ export async function GET() {
     },
     sessions: [
       {
-        id: "session-1",
+        id: `session-${Date.now()}`,
         device: "Chrome on Windows",
-        ip: "192.168.1.1",
+        ip: "0.0.0.0",
         location: "Seoul, South Korea",
         lastActive: new Date().toISOString(),
         current: true,
