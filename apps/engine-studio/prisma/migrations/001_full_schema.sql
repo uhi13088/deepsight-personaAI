@@ -1997,17 +1997,12 @@ CREATE INDEX IF NOT EXISTS idx_user_answers_user ON user_profiling_answers(user_
 CREATE INDEX IF NOT EXISTS idx_user_sns_user ON user_sns_connections(user_id, platform);
 CREATE INDEX IF NOT EXISTS idx_coin_transactions_user ON user_coin_transactions(user_id, created_at);
 
--- ############################################################
--- SECTION 6: SEED DATA
--- ############################################################
-
--- 기본 브랜치
-INSERT INTO "branches" ("id", "name", "isDefault", "isProtected", "lastCommitMessage")
-VALUES (generate_cuid(), 'main', true, true, 'Initial commit')
-ON CONFLICT ("name") DO NOTHING;
-
 -- ============================================================
--- 완료
+-- 완료 — 시드 데이터는 별도 마이그레이션 파일 참조
+-- 002: 기본 인프라 (branches, api_endpoints)
+-- 003: 골든 샘플
+-- 004: Cold Start v3 질문
+-- 005: 아키타입 12종
 -- ============================================================
 
-SELECT 'DeepSight Engine Studio — Consolidated Schema Migration 완료!' AS status;
+SELECT 'DeepSight Engine Studio — Schema Migration 완료!' AS status;
