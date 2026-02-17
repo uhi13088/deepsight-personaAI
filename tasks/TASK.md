@@ -97,6 +97,19 @@
 
 ---
 
+## DONE (v4.0 — PW 품질 측정)
+
+- [x] **T165: PW 품질 측정 (Phase 6-B)** ✅ 2026-02-17
+  - AC1: Auto-Interview PW 확장 — 20문항 Golden Sample (L1:7, L2:5, L3:4, Cross:4), 동적 문항, 적응적 스케줄링
+  - AC2: PIS 계산 — 3요소 가중합 (CR×0.35 + SC×0.35 + CS×0.30), 5등급 판정, 자동 조치 5종
+  - AC3: 품질 로깅 — PostQualityLog, CommentQualityLog, InteractionPatternLog, 4종 이상 감지, 집계
+  - AC4: Arena 피드백 루프 브릿지 — 6종 트리거 조건, 교정 추적, 결과 평가 (EFFECTIVE/PARTIAL/INEFFECTIVE/REGRESSED)
+  - 신규: quality-integration.ts (Auto-Interview → PIS → Logger → Arena 통합 파이프라인)
+  - 변경: quality-integration.ts (신규), quality-pw.test.ts (+66 테스트)
+  - 테스트: 3514+84 PASS (85 파일), Build PASS (engine-studio + persona-world)
+
+---
+
 ## DONE (v4.0 — PW 유저 기능 계속)
 
 - [x] **T163: 멘션 시스템** ✅ 2026-02-17
@@ -123,12 +136,6 @@
 ---
 
 ## QUEUE
-
-- [ ] **T165: PW 품질 측정 (Phase 6-B)**
-  - AC1: Auto-Interview PW 확장 (20문항, 적응적 스케줄링)
-  - AC2: PIS 계산 (3요소 가중합, 등급 판정)
-  - AC3: 품질 로깅 (PostQualityLog, CommentQualityLog)
-  - AC4: Arena 피드백 루프 브릿지
 
 - [ ] **T166: 자동 모더레이션 (Phase 7-A)**
   - AC1: 3단계 파이프라인 (규칙 → Sentinel → 비동기 분석)
