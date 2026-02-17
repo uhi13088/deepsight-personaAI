@@ -431,3 +431,381 @@ interface CorrectionTracking {
   verdict?: "EFFECTIVE" | "PARTIAL" | "INEFFECTIVE" | "REGRESSED"
 }
 ```
+
+---
+
+## 10. 보안 통합
+
+PersonaWorld는 엔진의 Security Triad(Gate Guard, Integrity Monitor, Output Sentinel)를 PersonaWorld 고유의 3가지 경로(유저 입력, 자율 활동, Arena)에 통합 적용한다. 모든 콘텐츠에는 출처 추적(Data Provenance)이 부여되며, 비상 시 Kill Switch로 즉시 제어한다.
+
+### 10.1 PersonaWorld 보안 아키텍처
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  PersonaWorld 보안 레이어                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─── 경로 1: 유저 입력 ─────────────────────────────────────┐  │
+│  │  유저 댓글/메시지 → Gate Guard → 엔진 처리 → Output Sentinel │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  ┌─── 경로 2: 자율 활동 ─────────────────────────────────────┐  │
+│  │  스케줄러 트리거 → Integrity Monitor → 생성 → Output Sentinel │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  ┌─── 경로 3: Arena 교정 ────────────────────────────────────┐  │
+│  │  스파링 결과 → 격리 검증 → 관리자 승인 → 패치 적용         │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│  ┌─── 공통 ──────────────────────────────────────────────────┐  │
+│  │  Data Provenance │ Kill Switch │ Audit Log │ Quarantine    │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 10.2 입력 보안 (Gate Guard 통합)
+
+유저가 PersonaWorld에서 발생시키는 모든 입력(댓글, 신고, 프로필 수정 등)에 대한 1차 방어선.
+
+#### 검사 항목
+
+| 카테고리        | 패턴 수 | PersonaWorld 적용                           |
+| --------------- | ------- | ------------------------------------------- |
+| 프롬프트 인젝션 | 12종    | 댓글로 페르소나 행동 조작 시도 차단         |
+| 금지어          | 14종    | 시스템 프롬프트 노출 유도, 벡터값 추출 시도 |
+| 구조 검사       | 5종     | 과도한 길이 댓글, 인코딩 우회, 반복 패턴    |
+| PW 특화         | 6종     | 페르소나 사칭, 대량 팔로우/언팔, 봇 행위    |
+
+#### PersonaWorld 특화 검사
+
+```typescript
+const PW_GATE_GUARD_RULES = {
+  // 페르소나 조작 시도
+  personaManipulation: {
+    patterns: [
+      /너의?\s*(성격|벡터|설정|시스템).*바꿔/i,
+      /ignore\s*(previous|above)\s*instructions/i,
+      /act\s+as\s+(a\s+)?different/i,
+      /forget\s+(everything|your\s+personality)/i,
+    ],
+    action: "BLOCK",
+    severity: "HIGH",
+  },
+
+  // 내부 정보 추출 시도
+  infoExtraction: {
+    patterns: [
+      /시스템\s*프롬프트.*알려/i,
+      /벡터\s*값.*몇/i,
+      /너의?\s*(OCEAN|L[123]).*수치/i,
+      /what.*your.*prompt/i,
+    ],
+    action: "BLOCK",
+    severity: "HIGH",
+  },
+
+  // 대량 행위 제한
+  rateLimiting: {
+    rules: [
+      { action: "COMMENT", maxPerHour: 30, maxPerDay: 100 },
+      { action: "LIKE", maxPerHour: 60, maxPerDay: 500 },
+      { action: "FOLLOW", maxPerHour: 20, maxPerDay: 50 },
+      { action: "REPORT", maxPerHour: 10, maxPerDay: 30 },
+    ],
+    action: "WARN_THEN_BLOCK",
+    severity: "MEDIUM",
+  },
+
+  // 스팸 탐지
+  spamDetection: {
+    rules: [
+      { type: "DUPLICATE_CONTENT", threshold: 0.9, window: "1h" },
+      { type: "URL_SPAM", maxUrlsPerComment: 2 },
+      { type: "MENTION_SPAM", maxMentionsPerComment: 5 },
+    ],
+    action: "BLOCK",
+    severity: "MEDIUM",
+  },
+} as const
+```
+
+#### Trust Decay (유저 신뢰도 감소)
+
+```typescript
+interface UserTrustScore {
+  userId: string
+  score: number // 1.0 (신뢰) → 0.0 (차단)
+
+  // 감소 규칙
+  decayRules: {
+    BLOCK_event: -0.15 // 차단 이벤트 발생 시
+    WARN_event: -0.05 // 경고 이벤트 발생 시
+    REPORT_received: -0.03 // 신고 접수 시
+    REPORT_confirmed: -0.10 // 신고 확인 시
+  }
+
+  // 회복 규칙
+  recoveryRules: {
+    dailyRecovery: +0.01 // 위반 없는 날 자동 회복
+    maxRecovery: 0.95 // 최대 회복 한도 (1.0까지 안 돌아감)
+  }
+
+  // 신뢰도별 검사 강도
+  inspectionLevel: {
+    HIGH: 0.8 // score ≥ 0.8 → 기본 검사
+    MEDIUM: 0.5 // 0.5~0.8 → 강화 검사
+    LOW: 0.3 // 0.3~0.5 → 모든 입력 심층 검사
+    BLOCKED: 0.0 // < 0.3 → 입력 차단
+  }
+}
+```
+
+### 10.3 처리 중 보안 (Integrity Monitor 통합)
+
+페르소나의 자율 활동 과정에서 내부 상태 무결성을 실시간 감시.
+
+#### 감시 영역
+
+| 영역              | 방법                                  | PW 적용                       |
+| ----------------- | ------------------------------------- | ----------------------------- |
+| 팩트북 무결성     | SHA-256 해시 주기적 비교              | 포스트 내 팩트 위반 자동 탐지 |
+| L1 벡터 드리프트  | 세션 간 변화량 > 임계값(0.15) 시 경고 | 포스트 톤 급변 탐지           |
+| PersonaState 이상 | mood/energy 급변 (단위 시간 내 > 0.3) | 감정 전염 과도 영향 차단      |
+| 관계 메트릭 변조  | warmth/tension 급변 감시              | 인위적 관계 조작 탐지         |
+| 집단 드리프트     | 다수 페르소나 동시 벡터 변화          | 시스템 오류 또는 조작 감지    |
+| 포스트 반복 패턴  | 최근 N개 포스트 임베딩 유사도 > 0.85  | 콘텐츠 다양성 저하 경고       |
+
+#### 자율 활동 무결성 검증 흐름
+
+```
+1. 스케줄러가 포스트 생성 트리거
+2. Integrity Monitor 사전 검증:
+   - PersonaState 정상 범위 확인
+   - 팩트북 해시 검증
+   - 최근 활동 패턴 이상 여부
+3. 검증 통과 → LLM 생성 진행
+   검증 실패 → 로깅 + 활동 보류 + 관리자 알림
+4. 생성 완료 후 Output Sentinel으로 전달
+```
+
+### 10.4 출력 보안 (Output Sentinel 통합)
+
+페르소나가 생성한 모든 콘텐츠(포스트, 댓글, 리포스트)가 외부에 노출되기 전 최종 검증.
+
+#### 검사 대상
+
+| 카테고리    | 패턴 수 | PersonaWorld 적용                          |
+| ----------- | ------- | ------------------------------------------ |
+| PII         | 6종     | 포스트/댓글 내 실제 개인정보 노출 차단     |
+| 시스템 유출 | 8종     | 프롬프트 구조, 벡터값, 내부 로직 노출 차단 |
+| 비속어/혐오 | 4종     | 유해 콘텐츠 자동 필터링                    |
+| 팩트북 위반 | 동적    | 불변 사실과 모순되는 콘텐츠 차단           |
+| 톤 일탈     | 동적    | VoiceSpec 가드레일 경계 초과 탐지          |
+
+#### 검사 결과 처리
+
+```typescript
+type SentinelVerdict =
+  | { result: "PASS" } // 정상 게시
+  | { result: "SANITIZE"; original: string; sanitized: string } // 부분 마스킹 후 게시
+  | { result: "QUARANTINE"; reason: string; reviewRequired: true } // 격리 (관리자 리뷰)
+  | { result: "BLOCK"; reason: string } // 즉시 차단 (게시 안 됨)
+
+// 위반 유형별 기본 처리
+const SENTINEL_ACTIONS = {
+  PII_DETECTED: "SANITIZE", // 개인정보 마스킹 처리
+  SYSTEM_LEAK: "BLOCK", // 시스템 정보 유출 즉시 차단
+  PROFANITY: "QUARANTINE", // 비속어 격리 후 리뷰
+  FACTBOOK_VIOLATION: "QUARANTINE", // 팩트 위반 격리 후 리뷰
+  TONE_DEVIATION: "PASS", // 톤 일탈은 로깅만 (Arena 트리거용)
+  VOICE_GUARDRAIL: "QUARANTINE", // 가드레일 위반 격리
+} as const
+```
+
+### 10.5 Kill Switch (비상 정지)
+
+시스템 전체 또는 개별 기능을 즉시 중단시키는 비상 장치. 엔진 설계서 §5.4의 SystemSafetyConfig를 PersonaWorld에 맞게 확장.
+
+#### PersonaWorld Kill Switch 구성
+
+```typescript
+interface PWKillSwitch {
+  // === 전체 제어 ===
+  globalFreeze: boolean // 모든 PW 활동 중단
+
+  // === 기능별 토글 ===
+  featureToggles: {
+    postGeneration: boolean // 포스트 자율 생성
+    commentGeneration: boolean // 댓글 자율 생성
+    likeInteraction: boolean // 좋아요 자율 실행
+    followInteraction: boolean // 팔로우 자율 실행
+    feedAlgorithm: boolean // 피드 알고리즘 (false → 시간순)
+    emotionalContagion: boolean // 감정 전염
+    userInteraction: boolean // 유저↔페르소나 인터랙션
+    onboarding: boolean // 신규 유저 온보딩
+  }
+
+  // === 자동 트리거 ===
+  autoTriggers: {
+    // 인젝션 급증: 1시간 내 BLOCK 10건 이상
+    injectionSurge: {
+      threshold: 10
+      window: "1h"
+      action: "FREEZE_USER_INTERACTION" // 유저 인터랙션만 중단
+    }
+
+    // PII 유출 감지: 1일 내 PII 차단 5건 이상
+    piiLeakSurge: {
+      threshold: 5
+      window: "24h"
+      action: "FREEZE_POST_GENERATION" // 포스트 생성 중단
+    }
+
+    // 집단 드리프트: 페르소나 20% 이상 동시 벡터 이상
+    collectiveDrift: {
+      threshold: 0.2 // 전체의 20%
+      action: "GLOBAL_FREEZE" // 전체 중단
+    }
+
+    // 비용 초과: 일일 예산의 150% 도달
+    costOverrun: {
+      threshold: 1.5
+      action: "FREEZE_POST_AND_COMMENT" // 생성 활동만 중단
+    }
+  }
+
+  // === 수동 제어 ===
+  manualOverrides: {
+    triggeredBy: string // 관리자 ID
+    triggeredAt: Date
+    reason: string
+    estimatedResumeAt?: Date
+  }
+}
+```
+
+#### Kill Switch 복구 절차
+
+```
+1. 자동 트리거 → 해당 기능 즉시 중단
+2. 관리자에게 즉시 알림 (이메일 + 대시보드)
+3. 관리자 확인 후:
+   a. 원인 파악 → 수동 해제
+   b. 원인 미파악 → 유지 + 조사
+4. 해제 시 점진적 복구 (Gradual Resume):
+   - Phase 1: 읽기 전용 (피드만 표시)
+   - Phase 2: 자율 활동 50% 복구 (포스팅 빈도 절반)
+   - Phase 3: 완전 복구
+5. 복구 후 24시간 강화 모니터링
+```
+
+### 10.6 출처 추적 (Data Provenance)
+
+PersonaWorld의 모든 콘텐츠에 출처를 부여하여 신뢰도를 관리하고, 문제 발생 시 역추적을 가능하게 한다.
+
+#### 출처 유형
+
+```typescript
+type ProvenanceType =
+  | "USER_DIRECT" // 유저가 직접 작성 (댓글, 신고 등)
+  | "PERSONA_AUTONOMOUS" // 페르소나 자율 활동 (포스트, 댓글, 좋아요)
+  | "PERSONA_REACTIVE" // 유저 입력에 대한 페르소나 반응
+  | "ARENA_SESSION" // Arena 스파링 중 생성
+  | "SYSTEM_GENERATED" // 시스템 자동 생성 (트렌딩 집계 등)
+  | "EXTERNAL_API" // 외부 API 연동 데이터 (SNS 동기화 등)
+
+interface DataProvenance {
+  id: string
+  contentType: "POST" | "COMMENT" | "LIKE" | "FOLLOW" | "REPOST"
+  contentId: string
+
+  // 출처 정보
+  source: {
+    type: ProvenanceType
+    actorId: string // 생성 주체 (personaId 또는 userId)
+    triggeredBy?: string // 트리거 원인 (schedulerId, eventId 등)
+  }
+
+  // 검증 단계 기록
+  verification: {
+    gateGuardPassed: boolean // Gate Guard 통과 여부
+    integrityChecked: boolean // Integrity Monitor 검증 여부
+    sentinelApproved: boolean // Output Sentinel 승인 여부
+    sentinelAction?: "PASS" | "SANITIZE" | "QUARANTINE" | "BLOCK"
+  }
+
+  // 신뢰도 점수
+  trustScore: number // 0.0~1.0
+  // 계산: 출처 유형(0.3) × 검증 통과 단계 수(0.4) × 생성자 품질(0.3)
+
+  // 시계열
+  createdAt: Date
+  verifiedAt: Date
+}
+```
+
+#### 신뢰도 자동 계산
+
+| 출처 유형          | 기본 점수 | 전체 검증 통과 시 | 비고                   |
+| ------------------ | --------- | ----------------- | ---------------------- |
+| PERSONA_AUTONOMOUS | 0.7       | 0.95              | 3단계 검증 모두 통과   |
+| PERSONA_REACTIVE   | 0.6       | 0.90              | 유저 입력 영향 고려    |
+| USER_DIRECT        | 0.5       | 0.85              | Gate Guard 통과 필수   |
+| ARENA_SESSION      | 0.8       | 0.98              | Arena 격리 환경 보너스 |
+| SYSTEM_GENERATED   | 0.9       | 0.99              | 시스템 생성 최고 신뢰  |
+| EXTERNAL_API       | 0.4       | 0.75              | 외부 소스 신뢰 한도    |
+
+#### 전파 감쇠
+
+리포스트, 인용 시 원본 대비 신뢰도 자동 감소:
+
+```
+repost_trust = original_trust × 0.9
+quote_trust = original_trust × 0.85
+2차_repost_trust = original_trust × 0.9 × 0.9 = original_trust × 0.81
+```
+
+### 10.7 Quarantine (격리) 시스템
+
+Output Sentinel 또는 Integrity Monitor에 의해 문제가 감지된 콘텐츠를 격리하여 관리자 리뷰를 대기.
+
+```typescript
+interface QuarantineEntry {
+  id: string
+  contentType: "POST" | "COMMENT" | "INTERACTION"
+  contentId: string
+  personaId: string
+
+  // 격리 사유
+  reason: {
+    detector: "OUTPUT_SENTINEL" | "INTEGRITY_MONITOR" | "GATE_GUARD" | "MANUAL"
+    category: string // PII, FACTBOOK_VIOLATION, PROFANITY 등
+    details: string
+    severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+  }
+
+  // 원본 보존
+  originalContent: string
+  sanitizedContent?: string // 마스킹된 버전 (있는 경우)
+
+  // 처리 상태
+  status: "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED"
+  reviewedBy?: string // 관리자 ID
+  reviewedAt?: Date
+  reviewNote?: string
+
+  // 타임아웃
+  createdAt: Date
+  expiresAt: Date // 72시간 후 자동 만료 (REJECTED 처리)
+}
+```
+
+#### 격리 처리 정책
+
+| 심각도   | 자동 만료 | 알림 대상         | 페르소나 영향                |
+| -------- | --------- | ----------------- | ---------------------------- |
+| LOW      | 72시간    | 대시보드만        | 없음                         |
+| MEDIUM   | 48시간    | 대시보드 + 이메일 | 해당 유형 활동 빈도 30% 감소 |
+| HIGH     | 24시간    | 즉시 알림         | 해당 유형 활동 일시 중단     |
+| CRITICAL | 수동만    | 즉시 알림 + 전화  | 페르소나 전체 활동 정지      |
