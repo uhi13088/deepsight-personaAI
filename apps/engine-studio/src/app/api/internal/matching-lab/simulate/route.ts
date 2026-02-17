@@ -1,4 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// 매칭 시뮬레이션 — DB에서 실제 페르소나를 로드하여 매칭 테스트
+// ═══════════════════════════════════════════════════════════════
+
 import { NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
 import type { ApiResponse } from "@/types"
 import type { SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector } from "@/types"
 import { matchAll, DEFAULT_MATCHING_CONFIG } from "@/lib/matching/three-tier-engine"
@@ -13,19 +18,80 @@ import { calculateVFinal } from "@/lib/vector/v-final"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
 import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
 import { DEMO_PERSONA_ARCHETYPES } from "@/lib/demo-fixtures"
+import { DEFAULT_L1_VECTOR, DEFAULT_L2_VECTOR, DEFAULT_L3_VECTOR } from "@/constants/v3/dimensions"
 
-// ── Module-level store (persists during server session) ─────────
+// ── DB에서 페르소나 로드 ─────────────────────────────────────
 
-let personaStore: PersonaCandidate[] | null = null
+const L1_KEYS = ["depth", "lens", "stance", "scope", "taste", "purpose", "sociability"] as const
+const L2_KEYS = [
+  "openness",
+  "conscientiousness",
+  "extraversion",
+  "agreeableness",
+  "neuroticism",
+] as const
+const L3_KEYS = ["lack", "moralCompass", "volatility", "growthArc"] as const
 
-function getPersonaStore(): PersonaCandidate[] {
-  if (!personaStore) {
-    personaStore = createSamplePersonas()
+async function loadPersonasFromDB(): Promise<PersonaCandidate[]> {
+  const personas = await prisma.persona.findMany({
+    where: { status: { in: ["ACTIVE", "STANDARD", "REVIEW"] } },
+    include: {
+      layerVectors: {
+        orderBy: { version: "desc" },
+      },
+    },
+    take: 100,
+  })
+
+  if (personas.length === 0) {
+    return []
   }
-  return personaStore
+
+  return personas.map((p) => {
+    const socialVec = p.layerVectors.find((v) => v.layerType === "SOCIAL")
+    const tempVec = p.layerVectors.find((v) => v.layerType === "TEMPERAMENT")
+    const narrVec = p.layerVectors.find((v) => v.layerType === "NARRATIVE")
+
+    const l1: SocialPersonaVector = socialVec
+      ? (Object.fromEntries(
+          L1_KEYS.map((k, i) => [
+            k,
+            Number(socialVec[`dim${i + 1}` as keyof typeof socialVec] ?? 0.5),
+          ])
+        ) as unknown as SocialPersonaVector)
+      : { ...DEFAULT_L1_VECTOR }
+
+    const l2: CoreTemperamentVector = tempVec
+      ? (Object.fromEntries(
+          L2_KEYS.map((k, i) => [k, Number(tempVec[`dim${i + 1}` as keyof typeof tempVec] ?? 0.5)])
+        ) as unknown as CoreTemperamentVector)
+      : { ...DEFAULT_L2_VECTOR }
+
+    const l3: NarrativeDriveVector = narrVec
+      ? (Object.fromEntries(
+          L3_KEYS.map((k, i) => [k, Number(narrVec[`dim${i + 1}` as keyof typeof narrVec] ?? 0)])
+        ) as unknown as NarrativeDriveVector)
+      : { ...DEFAULT_L3_VECTOR }
+
+    const crossAxisProfile = calculateCrossAxisProfile(l1, l2, l3)
+    const paradoxProfile = calculateExtendedParadoxScore(l1, l2, l3)
+
+    return {
+      id: p.id,
+      name: p.name,
+      l1,
+      l2,
+      l3,
+      crossAxisProfile,
+      paradoxProfile,
+      archetype: p.archetypeId ?? undefined,
+    }
+  })
 }
 
-function createSamplePersonas(): PersonaCandidate[] {
+// ── 데모 페르소나 (DB에 데이터 없을 때 폴백) ────────────────
+
+function createDemoPersonas(): PersonaCandidate[] {
   return DEMO_PERSONA_ARCHETYPES.map((a, i) => {
     const crossAxisProfile = calculateCrossAxisProfile(a.l1, a.l2, a.l3)
     const paradoxProfile = calculateExtendedParadoxScore(a.l1, a.l2, a.l3)
@@ -64,21 +130,29 @@ interface SimulateResponse {
     avgMatchScore: number
     failureRate: number
   }
+  personaSource: "db" | "demo"
 }
 
 interface PersonaListResponse {
   personas: PersonaCandidate[]
+  source: "db" | "demo"
 }
 
-// ── GET — 시뮬레이션용 샘플 페르소나 목록 반환 ─────────────────
+// ── GET — 시뮬레이션용 페르소나 목록 반환 ───────────────────────
 
 export async function GET() {
   try {
-    const personas = getPersonaStore()
+    let personas = await loadPersonasFromDB()
+    let source: "db" | "demo" = "db"
+
+    if (personas.length === 0) {
+      personas = createDemoPersonas()
+      source = "demo"
+    }
 
     return NextResponse.json<ApiResponse<PersonaListResponse>>({
       success: true,
-      data: { personas },
+      data: { personas, source },
     })
   } catch {
     return NextResponse.json<ApiResponse<never>>(
@@ -97,8 +171,19 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as SimulateRequest
 
-    // Use provided personas or fall back to the stored ones
-    const personas = body.personas && body.personas.length > 0 ? body.personas : getPersonaStore()
+    // 커스텀 페르소나가 없으면 DB에서 로드
+    let personas: PersonaCandidate[]
+    let personaSource: "db" | "demo" = "db"
+
+    if (body.personas && body.personas.length > 0) {
+      personas = body.personas
+    } else {
+      personas = await loadPersonasFromDB()
+      if (personas.length === 0) {
+        personas = createDemoPersonas()
+        personaSource = "demo"
+      }
+    }
 
     if (personas.length === 0) {
       return NextResponse.json<ApiResponse<never>>(
@@ -145,7 +230,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json<ApiResponse<SimulateResponse>>({
         success: true,
-        data: { mode: "single", results },
+        data: { mode: "single", results, personaSource },
       })
     }
 
@@ -188,6 +273,7 @@ export async function POST(request: NextRequest) {
           avgMatchScore: Math.round(avg * 100) / 100,
           failureRate: scores.length > 0 ? Math.round((failures / scores.length) * 100) / 100 : 0,
         },
+        personaSource,
       },
     })
   } catch {
