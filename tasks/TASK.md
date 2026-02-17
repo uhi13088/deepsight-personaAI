@@ -58,11 +58,67 @@
 
 ## IN_PROGRESS
 
-(없음)
+- [ ] **T159: 유저 댓글 작성 API** 🔄
+  - AC1: POST /api/public/posts/[postId]/comments 엔드포인트
+  - AC2: PersonaComment 테이블에 userId로 저장 + commentCount 업데이트
+  - AC3: 입력 검증 (빈 댓글, 최대 길이, postId 존재 확인)
+  - AC4: 단위 테스트 PASS
 
 ---
 
 ## QUEUE
+
+- [ ] **T160: 리포스트 API**
+  - AC1: POST /api/public/posts/[postId]/repost 토글 엔드포인트
+  - AC2: PersonaRepost CRUD + repostCount 업데이트
+  - AC3: 프론트엔드 연동 (공유 버튼 → 리포스트)
+  - AC4: 단위 테스트 PASS
+
+- [ ] **T161: 알림 서버 API**
+  - AC1: GET /api/persona-world/notifications (유저별 알림 조회)
+  - AC2: 알림 생성 트리거 (like, comment, follow, mention, new_post)
+  - AC3: POST /api/persona-world/notifications/read (읽음 처리)
+  - AC4: 프론트엔드 서버 동기화 연동
+  - AC5: 단위 테스트 PASS
+
+- [ ] **T162: 댓글 톤 시스템 업그레이드 (키워드 → 11종 벡터 기반)**
+  - AC1: comments GET API에서 keyword 분류 → comment-tone.ts 벡터 기반으로 교체
+  - AC2: 설계서 11종 톤 매트릭스 반영 (paradox_response~supportive)
+  - AC3: 프론트엔드 8종 → 11종 톤 확장
+  - AC4: 단위 테스트 PASS
+
+- [ ] **T163: 멘션 시스템**
+  - AC1: 멘션 감지 (@handle 파싱)
+  - AC2: 멘션 시 알림 생성
+  - AC3: 멘션된 포스트/댓글 하이라이트
+  - AC4: 단위 테스트 PASS
+
+- [ ] **T164: PW 보안 확장 (Phase 6-A)**
+  - AC1: PW 특화 Gate Guard 규칙 6종
+  - AC2: 유저 Trust Score 관리
+  - AC3: PW Kill Switch 8종 토글 + 4종 자동 트리거
+  - AC4: Quarantine 시스템 (격리 CRUD, 심각도별 정책)
+
+- [ ] **T165: PW 품질 측정 (Phase 6-B)**
+  - AC1: Auto-Interview PW 확장 (20문항, 적응적 스케줄링)
+  - AC2: PIS 계산 (3요소 가중합, 등급 판정)
+  - AC3: 품질 로깅 (PostQualityLog, CommentQualityLog)
+  - AC4: Arena 피드백 루프 브릿지
+
+- [ ] **T166: 자동 모더레이션 (Phase 7-A)**
+  - AC1: 3단계 파이프라인 (규칙 → Sentinel → 비동기 분석)
+  - AC2: 신고 처리 시스템 6종 카테고리
+  - AC3: 관리자 대시보드 서비스 + API 6개
+
+- [ ] **T167: 운영 스케줄 + KPI (Phase 7-B)**
+  - AC1: 8종 예약 작업 (cron)
+  - AC2: 운영 KPI 트래커 (서비스 8종 + UX 6종)
+
+- [ ] **T168: 비용 모니터링 & 제어 (Phase 8)**
+  - AC1: 비용 추적 확장 (활동 유형별 LLM 로깅)
+  - AC2: 예산 알림 체계 4단계
+  - AC3: 비용 모드 3종 (QUALITY / BALANCE / COST_PRIORITY)
+  - AC4: 비용 최적화 (적응적 스케줄링, 배치, 캐시)
 
 - [x] **T142: 트리거 맵 Rule DSL 확장** ✅ 2026-02-16
   - 구조화된 표현식 (Compare/Range/Contains/AND/OR/NOT)
