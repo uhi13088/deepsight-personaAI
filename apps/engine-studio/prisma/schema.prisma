@@ -354,6 +354,7 @@ model UserVector {
 model Archetype {
   id              String   @id @default(cuid())
   name            String   @unique
+  nameKo          String?  @map("name_ko")
   description     String?
 
   // Vector ranges (min-max for each dimension)
@@ -369,6 +370,10 @@ model Archetype {
   tasteMax        Decimal  @db.Decimal(3, 2)
   purposeMin      Decimal  @db.Decimal(3, 2)
   purposeMax      Decimal  @db.Decimal(3, 2)
+
+  referenceVector Json?    @map("reference_vector") // Record<SocialDimension, number>
+  thresholdConfig Json?    @map("threshold_config") // ArchetypeThreshold[]
+  isBuiltin       Boolean  @default(false) @map("is_builtin")
 
   recommendedPersonaIds String[] @default([])
 
@@ -791,9 +796,13 @@ model ApiEndpoint {
   version         String         @default("v1")
   status          EndpointStatus @default(ACTIVE)
   category        String         @default("general")
+  scope           String         @default("external") // internal | external
   requiresAuth    Boolean        @default(true)
   rateLimit       Int            @default(100)  // req/min
   timeout         Int            @default(30000) // ms
+  rateLimitConfig Json?          // { requestsPerMinute, burstLimit, windowSizeMs }
+  healthCheckConfig Json?        // { enabled, intervalMs, timeoutMs, unhealthyThreshold }
+  tags            String[]       @default([])
 
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -914,6 +923,7 @@ model Incident {
 
   // Relations
   timeline        IncidentTimeline[]
+  postMortems     PostMortem[]
 
   @@map("incidents")
 }
@@ -2001,4 +2011,75 @@ model ArenaTokenUsage {
 
   @@index([sessionId])
   @@map("arena_token_usage")
+}
+
+// ============================================
+// 시스템 로그 (모니터링)
+// ============================================
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  level     String   // error, warn, info, debug, fatal
+  service   String
+  message   String
+  metadata  Json?
+  traceId   String?  @map("trace_id")
+
+  createdAt DateTime @default(now())
+
+  @@index([level, createdAt])
+  @@index([service, createdAt])
+  @@map("system_logs")
+}
+
+// ============================================
+// 포스트모템 (장애 분석)
+// ============================================
+
+model PostMortem {
+  id              String   @id @default(cuid())
+  incidentId      String   @map("incident_id")
+  incident        Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  rootCause       String   @db.Text @map("root_cause")
+  affectedUsers   Int      @default(0) @map("affected_users")
+  downtimeMinutes Int      @default(0) @map("downtime_minutes")
+  dataLoss        Boolean  @default(false) @map("data_loss")
+  actionItems     Json?    @map("action_items") // Array<{ description, assignee, dueDate, priority }>
+  lessons         String[] @default([])
+
+  createdAt       DateTime @default(now())
+
+  @@index([incidentId])
+  @@map("post_mortems")
+}
+
+// ============================================
+// DR 훈련 (재해 복구)
+// ============================================
+
+model DRDrill {
+  id              String        @id @default(cuid())
+  planId          String        @map("plan_id")
+  scenario        String
+  status          DRDrillStatus @default(SCHEDULED)
+  scheduledAt     DateTime      @map("scheduled_at")
+  startedAt       DateTime?     @map("started_at")
+  completedAt     DateTime?     @map("completed_at")
+  actualRtoMinutes Int?         @map("actual_rto_minutes")
+  actualRpoMinutes Int?         @map("actual_rpo_minutes")
+  issues          String[]      @default([])
+  improvements    String[]      @default([])
+
+  createdAt       DateTime      @default(now())
+
+  @@index([status])
+  @@index([planId])
+  @@map("dr_drills")
+}
+
+enum DRDrillStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
 }

@@ -2,18 +2,31 @@ import { NextRequest, NextResponse } from "next/server"
 import type { ApiResponse } from "@/types"
 import { createModelConfig, recordSpend, getBudgetStatus } from "@/lib/global-config"
 import type { ModelConfig, RoutingRule, SupportedModel } from "@/lib/global-config"
+import { prisma } from "@/lib/prisma"
+import type { Prisma } from "@/generated/prisma"
 
-// ── In-memory store (persists within server session) ─────────
-let store: ModelConfig | null = null
+// ── Prisma-backed helpers ─────────────────────────────────────
 
-function getStore(): ModelConfig {
-  if (!store) {
-    const config = createModelConfig()
-    // Seed with sample spend
-    const budget = recordSpend(config.budget, 127.5)
-    store = { ...config, budget }
+async function loadModelConfig(): Promise<ModelConfig> {
+  const rows = await prisma.systemConfig.findMany({ where: { category: "MODEL" } })
+  if (rows.length === 0) return createModelConfig()
+
+  const configMap = Object.fromEntries(rows.map((r) => [r.key, r.value]))
+  const defaults = createModelConfig()
+  return {
+    models: (configMap.models ?? defaults.models) as ModelConfig["models"],
+    routingRules: (configMap.routingRules ?? defaults.routingRules) as ModelConfig["routingRules"],
+    defaultModel: (configMap.defaultModel ?? defaults.defaultModel) as ModelConfig["defaultModel"],
+    budget: (configMap.budget ?? defaults.budget) as ModelConfig["budget"],
   }
-  return store
+}
+
+async function saveModelConfigField(key: string, value: unknown): Promise<void> {
+  await prisma.systemConfig.upsert({
+    where: { category_key: { category: "MODEL", key } },
+    update: { value: value as Prisma.InputJsonValue },
+    create: { category: "MODEL", key, value: value as Prisma.InputJsonValue },
+  })
 }
 
 // ── Serialized response type ─────────────────────────────────
@@ -38,7 +51,7 @@ function serialize(config: ModelConfig): ModelConfigResponse {
 // GET — returns model config with budget status
 export async function GET() {
   try {
-    const config = getStore()
+    const config = await loadModelConfig()
 
     return NextResponse.json<ApiResponse<ModelConfigResponse>>({
       success: true,
@@ -65,40 +78,34 @@ type PostAction =
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as PostAction
-    const config = getStore()
+    const config = await loadModelConfig()
+
+    let updated: ModelConfig
 
     switch (body.action) {
       case "toggleModel": {
-        store = {
-          ...config,
-          models: config.models.map((m) =>
-            m.id === body.modelId ? { ...m, enabled: !m.enabled } : m
-          ),
-        }
+        const models = config.models.map((m) =>
+          m.id === body.modelId ? { ...m, enabled: !m.enabled } : m
+        )
+        await saveModelConfigField("models", models)
+        updated = { ...config, models }
         break
       }
       case "updateBudgetLimit": {
-        store = {
-          ...config,
-          budget: {
-            ...config.budget,
-            limitUsd: body.limitUsd,
-          },
-        }
+        const budget = { ...config.budget, limitUsd: body.limitUsd }
+        await saveModelConfigField("budget", budget)
+        updated = { ...config, budget }
         break
       }
       case "recordSpend": {
-        store = {
-          ...config,
-          budget: recordSpend(config.budget, body.amountUsd),
-        }
+        const budget = recordSpend(config.budget, body.amountUsd)
+        await saveModelConfigField("budget", budget)
+        updated = { ...config, budget }
         break
       }
       case "updateRoutingRules": {
-        store = {
-          ...config,
-          routingRules: body.routingRules,
-        }
+        await saveModelConfigField("routingRules", body.routingRules)
+        updated = { ...config, routingRules: body.routingRules }
         break
       }
       default: {
@@ -114,7 +121,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json<ApiResponse<ModelConfigResponse>>({
       success: true,
-      data: serialize(store),
+      data: serialize(updated),
     })
   } catch {
     return NextResponse.json<ApiResponse<never>>(

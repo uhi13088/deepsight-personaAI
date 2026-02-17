@@ -1,6 +1,6 @@
 # DeepSight v4.0 — TASK 관리
 
-> 마지막 업데이트: 2026-02-16
+> 마지막 업데이트: 2026-02-17
 
 ---
 
@@ -173,6 +173,18 @@
   - 하드코딩 IP(192.168.1.1, 10.0.0.5) → 0.0.0.0으로 교체
   - 골든 샘플은 인큐베이터 스펙 기능이므로 유지 (의도된 데이터)
   - 3159 테스트 PASS, Build PASS
+
+- [x] **T158: 운영/설정 API 전면 DB 동적 연결 + 마이그레이션** ✅ 2026-02-17
+  - 11개 API 라우트 인메모리→Prisma DB 전환 (graceful degradation 유지)
+  - Prisma 스키마 보강: ApiEndpoint/Archetype 컬럼 추가, SystemLog/PostMortem/DRDrill 모델 신규
+  - 마이그레이션 SQL: `016_ops_config_db_connect.sql`
+  - 3159 테스트 PASS, Build PASS
+
+---
+
+## IN_PROGRESS
+
+(없음)
 
 ---
 

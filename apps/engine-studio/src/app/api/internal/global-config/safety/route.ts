@@ -13,22 +13,44 @@ import type {
   FilterLevel,
   FilterEvaluationResult,
 } from "@/lib/global-config"
+import { prisma } from "@/lib/prisma"
+import type { Prisma } from "@/generated/prisma"
 
-// ── In-memory store (persists within server session) ─────────
-let store: SafetyFilter | null = null
+// ── Prisma-backed persistence ────────────────────────────────
 
-function getStore(): SafetyFilter {
-  if (!store) {
-    // Initialize with some sample log entries
-    let f = createSafetyFilter()
-    const samples = ["안녕하세요", "폭력적인 내용", "좋은 하루 되세요", "차별 발언", "도박 사이트"]
-    for (const text of samples) {
-      const { updatedFilter } = evaluateFilter(f, text)
-      f = updatedFilter
-    }
-    store = f
+async function loadSafetyFilter(): Promise<SafetyFilter> {
+  const rows = await prisma.systemConfig.findMany({ where: { category: "SAFETY" } })
+  if (rows.length === 0) return createSafetyFilter()
+
+  const configMap = Object.fromEntries(rows.map((r) => [r.key, r.value]))
+  const defaults = createSafetyFilter()
+  return {
+    config: (configMap.config ?? defaults.config) as SafetyFilter["config"],
+    logs: (configMap.logs ?? defaults.logs) as SafetyFilter["logs"],
   }
-  return store
+}
+
+async function saveSafetyFilter(filter: SafetyFilter): Promise<void> {
+  await Promise.all([
+    prisma.systemConfig.upsert({
+      where: { category_key: { category: "SAFETY", key: "config" } },
+      update: { value: filter.config as unknown as Prisma.InputJsonValue },
+      create: {
+        category: "SAFETY",
+        key: "config",
+        value: filter.config as unknown as Prisma.InputJsonValue,
+      },
+    }),
+    prisma.systemConfig.upsert({
+      where: { category_key: { category: "SAFETY", key: "logs" } },
+      update: { value: filter.logs as unknown as Prisma.InputJsonValue },
+      create: {
+        category: "SAFETY",
+        key: "logs",
+        value: filter.logs as unknown as Prisma.InputJsonValue,
+      },
+    }),
+  ])
 }
 
 // ── Serialized response type ─────────────────────────────────
@@ -49,7 +71,7 @@ function serialize(filter: SafetyFilter): SafetyFilterResponse {
 // GET — returns safety filter state with log summary
 export async function GET() {
   try {
-    const filter = getStore()
+    const filter = await loadSafetyFilter()
 
     return NextResponse.json<ApiResponse<SafetyFilterResponse>>({
       success: true,
@@ -81,7 +103,7 @@ interface EvaluateResponse {
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as PostAction
-    const filter = getStore()
+    const filter = await loadSafetyFilter()
 
     switch (body.action) {
       case "addWord": {
@@ -94,10 +116,11 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           )
         }
-        store = addForbiddenWord(filter, body.word)
+        const updated = addForbiddenWord(filter, body.word)
+        await saveSafetyFilter(updated)
         return NextResponse.json<ApiResponse<SafetyFilterResponse>>({
           success: true,
-          data: serialize(store),
+          data: serialize(updated),
         })
       }
       case "removeWord": {
@@ -110,10 +133,11 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           )
         }
-        store = removeForbiddenWord(filter, body.word, body.category)
+        const updated = removeForbiddenWord(filter, body.word, body.category)
+        await saveSafetyFilter(updated)
         return NextResponse.json<ApiResponse<SafetyFilterResponse>>({
           success: true,
-          data: serialize(store),
+          data: serialize(updated),
         })
       }
       case "changeLevel": {
@@ -126,13 +150,14 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           )
         }
-        store = {
+        const updated: SafetyFilter = {
           ...filter,
           config: { ...filter.config, level: body.level },
         }
+        await saveSafetyFilter(updated)
         return NextResponse.json<ApiResponse<SafetyFilterResponse>>({
           success: true,
-          data: serialize(store),
+          data: serialize(updated),
         })
       }
       case "evaluate": {
@@ -146,12 +171,12 @@ export async function POST(request: NextRequest) {
           )
         }
         const { result, updatedFilter } = evaluateFilter(filter, body.input)
-        store = updatedFilter
+        await saveSafetyFilter(updatedFilter)
         return NextResponse.json<ApiResponse<EvaluateResponse>>({
           success: true,
           data: {
             result,
-            filter: serialize(store),
+            filter: serialize(updatedFilter),
           },
         })
       }
