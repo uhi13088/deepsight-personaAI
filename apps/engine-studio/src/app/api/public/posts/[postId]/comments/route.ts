@@ -4,6 +4,7 @@ import { notifyNewComment } from "@/lib/persona-world/notification-service"
 import { resolveMentions, notifyMentions } from "@/lib/persona-world/mention-service"
 import {
   classifyTone,
+  classifyToneWithVectors,
   validateCommentContent,
   MAX_COMMENT_LENGTH,
 } from "@/lib/persona-world/comment-utils"
@@ -166,10 +167,25 @@ export async function POST(
       )
     }
 
-    // 유저 존재 확인
+    // 유저 존재 확인 + 벡터 조회 (톤 분류용)
     const user = await prisma.personaWorldUser.findUnique({
       where: { id: userId },
-      select: { id: true, name: true, profileImageUrl: true },
+      select: {
+        id: true,
+        name: true,
+        profileImageUrl: true,
+        depth: true,
+        lens: true,
+        stance: true,
+        scope: true,
+        taste: true,
+        purpose: true,
+        openness: true,
+        conscientiousness: true,
+        extraversion: true,
+        agreeableness: true,
+        neuroticism: true,
+      },
     })
 
     if (!user) {
@@ -197,7 +213,20 @@ export async function POST(
     }
 
     // 댓글 생성 + commentCount 업데이트 (트랜잭션)
-    const userTone = classifyTone(trimmedContent)
+    const userVectors = {
+      depth: user.depth ? Number(user.depth) : null,
+      lens: user.lens ? Number(user.lens) : null,
+      stance: user.stance ? Number(user.stance) : null,
+      scope: user.scope ? Number(user.scope) : null,
+      taste: user.taste ? Number(user.taste) : null,
+      purpose: user.purpose ? Number(user.purpose) : null,
+      openness: user.openness ? Number(user.openness) : null,
+      conscientiousness: user.conscientiousness ? Number(user.conscientiousness) : null,
+      extraversion: user.extraversion ? Number(user.extraversion) : null,
+      agreeableness: user.agreeableness ? Number(user.agreeableness) : null,
+      neuroticism: user.neuroticism ? Number(user.neuroticism) : null,
+    }
+    const userTone = classifyToneWithVectors(trimmedContent, userVectors)
 
     const [comment] = await prisma.$transaction([
       prisma.personaComment.create({

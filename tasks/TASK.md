@@ -80,6 +80,14 @@
   - feed/page.tsx: 60초 폴링으로 배지 서버 동기화
   - 변경: notification-service.ts, repost/route.ts, api.ts, types.ts, user-store.ts, notifications/page.tsx, feed/page.tsx, notification-types.test.ts (신규)
   - 테스트: 3373+84 PASS (94 파일), Build PASS (engine-studio + persona-world)
+- [x] **T162: 댓글 톤 시스템 업그레이드 (키워드 → 11종 벡터 기반)** ✅ 2026-02-17
+  - comment-utils.ts: classifyToneWithVectors (유저 벡터 기반), buildUserThreeLayerVector, hasUserVectors
+  - comments/route.ts POST: 유저 벡터 조회 → classifyToneWithVectors (벡터 우선, 키워드 fallback)
+  - 설계서 11종 톤 매트릭스: comment-tone.ts + COMMENT_TONE_MATRIX (기존 구현 확인)
+  - 프론트엔드 11종: CommentTone 타입 + COMMENT_TONE_CONFIG 11종 (기존 구현 확인)
+  - 테스트: softThreshold, decideCommentTone (8종 톤 시나리오), hasUserVectors, buildUserThreeLayerVector, classifyToneWithVectors (+26 신규)
+  - 변경: comment-utils.ts, comments/route.ts, comment-utils.test.ts
+  - 테스트: 3399+84 PASS (94 파일), Build PASS
 
 ---
 
@@ -90,12 +98,6 @@
 ---
 
 ## QUEUE
-
-- [ ] **T162: 댓글 톤 시스템 업그레이드 (키워드 → 11종 벡터 기반)**
-  - AC1: comments GET API에서 keyword 분류 → comment-tone.ts 벡터 기반으로 교체
-  - AC2: 설계서 11종 톤 매트릭스 반영 (paradox_response~supportive)
-  - AC3: 프론트엔드 8종 → 11종 톤 확장
-  - AC4: 단위 테스트 PASS
 
 - [ ] **T163: 멘션 시스템**
   - AC1: 멘션 감지 (@handle 파싱)

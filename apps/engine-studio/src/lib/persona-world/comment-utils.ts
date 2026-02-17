@@ -1,9 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
 // PersonaWorld — User Comment Utilities
-// 키워드 기반 톤 분류 + 입력 검증
+// 벡터 기반 톤 분류 + 키워드 fallback + 입력 검증
 // ═══════════════════════════════════════════════════════════════
 
-import type { CommentTone } from "./types"
+import type { ThreeLayerVector } from "@/types/persona-v3"
+import type { CommentTone, PersonaStateData } from "./types"
+import { decideCommentTone } from "./interactions/comment-tone"
 
 export const MAX_COMMENT_LENGTH = 1000
 
@@ -28,6 +30,82 @@ export function classifyTone(content: string): CommentTone {
     }
   }
   return "supportive"
+}
+
+/** 유저 DB 벡터 데이터 */
+export interface UserVectorData {
+  depth?: number | null
+  lens?: number | null
+  stance?: number | null
+  scope?: number | null
+  taste?: number | null
+  purpose?: number | null
+  openness?: number | null
+  conscientiousness?: number | null
+  extraversion?: number | null
+  agreeableness?: number | null
+  neuroticism?: number | null
+}
+
+/** 유저 벡터가 충분한지 판단 (L1 6D 중 최소 3개 이상) */
+export function hasUserVectors(data: UserVectorData): boolean {
+  const l1Dims = [data.depth, data.lens, data.stance, data.scope, data.taste, data.purpose]
+  return l1Dims.filter((v) => v != null).length >= 3
+}
+
+/** 유저 DB 벡터 → ThreeLayerVector 변환 (없는 차원은 0.5 중립값) */
+export function buildUserThreeLayerVector(data: UserVectorData): ThreeLayerVector {
+  return {
+    social: {
+      depth: Number(data.depth ?? 0.5),
+      lens: Number(data.lens ?? 0.5),
+      stance: Number(data.stance ?? 0.5),
+      scope: Number(data.scope ?? 0.5),
+      taste: Number(data.taste ?? 0.5),
+      purpose: Number(data.purpose ?? 0.5),
+      sociability: Number(data.extraversion ?? 0.5),
+    },
+    temperament: {
+      openness: Number(data.openness ?? 0.5),
+      conscientiousness: Number(data.conscientiousness ?? 0.5),
+      extraversion: Number(data.extraversion ?? 0.5),
+      agreeableness: Number(data.agreeableness ?? 0.5),
+      neuroticism: Number(data.neuroticism ?? 0.5),
+    },
+    narrative: {
+      lack: 0.5,
+      moralCompass: 0.5,
+      volatility: 0.5,
+      growthArc: 0.5,
+    },
+  }
+}
+
+/** 유저 기본 상태 (중립값) */
+const DEFAULT_USER_STATE: PersonaStateData = {
+  mood: 0.5,
+  energy: 0.5,
+  socialBattery: 0.5,
+  paradoxTension: 0,
+}
+
+/**
+ * 벡터 기반 톤 분류 (유저 댓글용).
+ * 유저 벡터 데이터가 충분하면 decideCommentTone 사용,
+ * 부족하면 키워드 기반 classifyTone fallback.
+ */
+export function classifyToneWithVectors(
+  content: string,
+  userVectors: UserVectorData | null
+): CommentTone {
+  if (userVectors && hasUserVectors(userVectors)) {
+    const vectors = buildUserThreeLayerVector(userVectors)
+    const decision = decideCommentTone(vectors, DEFAULT_USER_STATE, null, 0)
+    if (decision.confidence > 0.15) {
+      return decision.tone
+    }
+  }
+  return classifyTone(content)
 }
 
 /** 댓글 내용 검증. 에러 시 { code, message } 반환, 성공 시 null */
