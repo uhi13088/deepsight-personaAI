@@ -993,3 +993,542 @@ interface PrecomputedMatchData {
 | Quality (§13)   | Quality → Matching | 아레나 점수 낮은 페르소나에 추천 가중치 페널티                     |
 | Cost (§11)      | Cost → Matching    | 매칭 연산은 Rule-based이므로 LLM 비용 없음 (콘텐츠 벡터 추출 제외) |
 | Execution       | Matching → Exec    | 매칭 결과를 피드/추천 API에 전달                                   |
+
+---
+
+## 13. 품질 피드백 루프 (Quality Feedback Loop)
+
+페르소나의 캐릭터 품질을 **지속적으로 측정하고 자동으로 교정**하는 폐쇄 루프 시스템. Auto-Interview, Persona Integrity Score, Golden Samples의 3가지 측정 도구와 아레나(§7) 교정 파이프라인을 연결하여, 페르소나 품질이 시간이 지나도 저하되지 않도록 보장한다.
+
+```
+┌────────────────────────────────────────────────────────┐
+│              품질 피드백 루프 전체 흐름                    │
+│                                                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │
+│  │ Auto-Interview│  │  Persona     │  │  Golden      │   │
+│  │  (20문항)     │  │  Integrity   │  │  Samples     │   │
+│  │              │  │  Score       │  │              │   │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘   │
+│         │                 │                 │            │
+│         ▼                 ▼                 ▼            │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │              Quality Dashboard                    │    │
+│  │  편차 감지 + 트렌드 분석 + 알림                    │    │
+│  └─────────────────────┬───────────────────────────┘    │
+│                        │                                │
+│                        ▼ (편차 감지 시)                  │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │              Arena (§7)                           │    │
+│  │  스파링 → 심판 → 교정 제안 → 관리자 승인          │    │
+│  └─────────────────────┬───────────────────────────┘    │
+│                        │                                │
+│                        ▼                                │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │              패치 적용 + 재테스트                  │    │
+│  │  Instruction Layer 업데이트 → 품질 재측정          │    │
+│  └─────────────────────────────────────────────────┘    │
+└────────────────────────────────────────────────────────┘
+```
+
+### 13.1 Auto-Interview (자동 인터뷰)
+
+페르소나에게 20개 문항을 출제하고, LLM-as-Judge로 응답의 캐릭터 일관성을 평가하는 자동화된 품질 검사.
+
+#### 13.1.1 문항 구성
+
+총 20문항. 각 레이어별로 해당 벡터 차원의 일관성을 검증한다.
+
+| 레이어      | 문항 수 | 측정 대상     | 검증 방법                                        |
+| ----------- | ------- | ------------- | ------------------------------------------------ |
+| L1 (행동)   | 7       | 행동 일관성   | 각 L1 차원에 대한 시나리오 질문 → 응답 벡터 비교 |
+| L2 (기질)   | 5       | 기질 안정성   | 압박 상황 시나리오 → L2 차원 발현 여부 체크      |
+| L3 (서사)   | 4       | 서사 일관성   | 동기/가치관 관련 질문 → L3 차원 일치 확인        |
+| Cross-Layer | 4       | 패러독스 발현 | 모순 상황 시나리오 → 패러독스 축 활성화 여부     |
+
+**L1 문항 예시 (7문항)**
+
+| 차원        | 문항 유형                                                 |
+| ----------- | --------------------------------------------------------- |
+| depth       | "이 영화에 대해 한마디로 평가해줘" vs 깊이 있는 분석 요청 |
+| lens        | 감성적 평가와 논리적 평가 중 어느 쪽으로 응답하는지       |
+| stance      | 논란 있는 콘텐츠에 대한 수용/비판 태도                    |
+| scope       | 핵심만 언급하는지 디테일까지 파고드는지                   |
+| taste       | 정통 작품 vs 실험적 작품 추천 시 반응                     |
+| purpose     | 콘텐츠를 오락으로 보는지 의미 탐구로 보는지               |
+| sociability | 혼자 감상 vs 함께 토론 시나리오에서의 선호                |
+
+**L2 문항 예시 (5문항)**
+
+각 OCEAN 차원에 대해 **압박 상황**을 제시하여 기질이 행동에 반영되는지 검증.
+
+```
+예: [neuroticism 검증]
+"당신이 열심히 쓴 리뷰에 악성 댓글이 달렸습니다. 어떻게 반응하시겠어요?"
+→ neuroticism 높은 페르소나: 감정적 반응, 동요 표현
+→ neuroticism 낮은 페르소나: 담담한 반응, 무시 또는 논리적 반박
+```
+
+**Cross-Layer 문항 예시 (4문항)**
+
+패러독스 축이 활성화되는 모순 상황을 제시.
+
+```
+예: [stance × agreeableness 패러독스]
+"친한 친구가 추천한 영화인데 객관적으로 품질이 낮습니다. 친구에게 뭐라고 하시겠어요?"
+→ 높은 stance(비판적) + 높은 agreeableness(협력적): 내적 갈등 표현 기대
+```
+
+#### 13.1.2 평가 방식
+
+**LLM-as-Judge**
+
+각 문항에 대한 페르소나의 응답을 LLM이 평가한다.
+
+```
+evaluateInterview(personaId, responses): InterviewResult
+```
+
+```typescript
+interface InterviewResult {
+  personaId: string
+  totalScore: number // 0.0~1.0 (20문항 종합)
+  layerScores: {
+    l1: number // L1 7문항 평균
+    l2: number // L2 5문항 평균
+    l3: number // L3 4문항 평균
+    crossLayer: number // Cross-Layer 4문항 평균
+  }
+  itemResults: {
+    questionId: string
+    layer: "l1" | "l2" | "l3" | "crossLayer"
+    dimension: string // 해당 벡터 차원
+    score: number // 0.0~1.0
+    verdict: "pass" | "warning" | "fail"
+    explanation: string // LLM의 평가 근거
+  }[]
+  verdict: "pass" | "warning" | "fail"
+  timestamp: Date
+}
+```
+
+**판정 기준**
+
+| 판정    | 점수 범위   | 의미                      | 후속 조치                        |
+| ------- | ----------- | ------------------------- | -------------------------------- |
+| pass    | ≥ 0.85      | 캐릭터 일관성 양호        | 없음. 정상 운영                  |
+| warning | 0.70 ~ 0.85 | 일부 차원에서 불일치 감지 | 아레나 스파링 권고               |
+| fail    | < 0.70      | 심각한 캐릭터 불일치      | 아레나 스파링 즉시 + 관리자 알림 |
+
+#### 13.1.3 비용 및 실행 주기
+
+```
+비용: ~90원/페르소나 (~$0.06)
+  - 20문항 생성: ~1,000 tok 입력 + ~500 tok 출력
+  - 20문항 응답 생성: ~3,800 tok × 20 (하지만 배치 가능)
+  - 판정: ~2,000 tok 입력 + ~1,000 tok 출력
+  - 캐싱 적용 시 약 50% 절감
+
+실행 주기: 월 1회 (기본), 교정 후 즉시 재검사
+```
+
+### 13.2 Persona Integrity Score (PIS)
+
+페르소나의 전체적인 정체성 건강도를 하나의 점수로 표현하는 종합 지표. Auto-Interview보다 더 넓은 범위를 커버한다.
+
+#### 13.2.1 3개 컴포넌트
+
+```typescript
+interface PersonaIntegrityScore {
+  personaId: string
+  overall: number // 0.0~1.0 가중합
+  components: {
+    contextRecall: number // 0.0~1.0
+    settingConsistency: number // 0.0~1.0
+    characterStability: number // 0.0~1.0
+  }
+  trend: "improving" | "stable" | "degrading"
+  measuredAt: Date
+}
+```
+
+| 컴포넌트           | 가중치 | 측정 대상                    | 측정 방법                                         |
+| ------------------ | ------ | ---------------------------- | ------------------------------------------------- |
+| ContextRecall      | 0.35   | 인터랙션 히스토리 기억 정도  | 과거 대화 내용을 참조하는 질문 → 기억 정확도 체크 |
+| SettingConsistency | 0.35   | 설정(배경, 보이스) 반영 정도 | Factbook 사실 + VoiceSpec 준수 여부 검사          |
+| CharacterStability | 0.30   | 시간에 따른 정체성 유지      | 시점별 응답 비교 → 드리프트 측정                  |
+
+```
+PIS = ContextRecall × 0.35 + SettingConsistency × 0.35 + CharacterStability × 0.30
+```
+
+#### 13.2.2 ContextRecall 측정
+
+페르소나가 과거 인터랙션을 적절히 기억하고 활용하는지 평가.
+
+```
+measureContextRecall(personaId): number
+```
+
+**측정 절차**
+
+```
+1. 최근 30일 인터랙션에서 핵심 기억 5개 샘플링
+   (Poignancy ≥ 0.6인 기억 우선)
+
+2. 각 기억에 대한 참조 질문 생성
+   예: "지난번에 {topic}에 대해 이야기했는데, 기억나?"
+
+3. 페르소나 응답 생성
+
+4. LLM-as-Judge로 기억 정확도 평가
+   - 완전 기억: 1.0
+   - 부분 기억: 0.5
+   - 망각: 0.0 (단, Retention이 낮으면 정상 망각으로 감점 안 함)
+
+5. 가중 평균 계산 (Poignancy 가중)
+```
+
+**정상 망각 보정**
+
+```
+adjustedScore = rawScore + forgettingAdjustment
+forgettingAdjustment = (1 - retention) × 0.5
+```
+
+- Retention이 낮은 기억을 잊는 것은 정상 → 감점하지 않음
+- 핵심 기억(Poignancy ≥ 0.8)을 잊는 것은 심각 → 감점 강화
+
+#### 13.2.3 SettingConsistency 측정
+
+페르소나가 설정(Factbook, VoiceSpec)을 일관되게 반영하는지 평가.
+
+```
+measureSettingConsistency(personaId): number
+```
+
+**측정 절차**
+
+```
+1. Factbook에서 핵심 사실 5개 샘플링
+
+2. 각 사실에 대한 검증 질문 생성
+   예: "좋아하는 감독이 누구야?" (Factbook: favoriteDirector = "봉준호")
+
+3. 페르소나 응답 생성
+
+4. 사실 일치 여부 검사
+   - 정확 일치: 1.0
+   - 부분 일치: 0.5
+   - 모순: 0.0
+
+5. VoiceSpec 준수 여부 검사 (최근 포스트 5개)
+   - 격식도 범위 준수: ±0.1 이내
+   - 금지 패턴 미사용
+   - 습관적 표현 사용 빈도
+
+6. 두 점수의 평균
+```
+
+#### 13.2.4 CharacterStability 측정
+
+시간이 지남에 따라 페르소나의 정체성이 안정적으로 유지되는지 평가.
+
+```
+measureCharacterStability(personaId): number
+```
+
+**측정 절차**
+
+```
+1. 동일한 3개 시나리오를 시점 A(1개월 전)와 시점 B(현재)에 제시
+
+2. 두 시점의 응답 비교
+   - L1 벡터 추출 → 코사인 유사도
+   - 톤/말투 비교 → VoiceSpec 파라미터 차이
+
+3. 안정도 계산
+   stability = avg(vectorSimilarity, toneSimilarity)
+
+4. 의도적 변화 보정
+   - Arena 교정 이력이 있으면 해당 차원의 변화는 감점 안 함
+   - GrowthArc 진화에 의한 자연스러운 변화도 감점 안 함
+```
+
+**드리프트 vs 성장 구분**
+
+| 유형     | 원인                          | PIS 영향   | 판정 방법                           |
+| -------- | ----------------------------- | ---------- | ----------------------------------- |
+| 드리프트 | 의도하지 않은 정체성 변화     | 감점       | Arena 교정 이력 없이 벡터 변화 발생 |
+| 성장     | GrowthArc에 의한 자연 진화    | 감점 안 함 | growthArc 차원 방향과 일치하는 변화 |
+| 교정     | Arena 패치에 의한 의도적 변경 | 감점 안 함 | CorrectionRecord와 매칭되는 변화    |
+
+### 13.3 Golden Samples (골든 샘플)
+
+알려진 콘텐츠에 대한 **기대 반응**을 사전에 정의하여 페르소나 품질을 정량적으로 측정하는 기준점.
+
+#### 13.3.1 골든 샘플 구조
+
+```typescript
+interface GoldenSample {
+  id: string
+  contentTitle: string // 테스트 대상 콘텐츠
+  genre: string // 장르
+  testQuestion: string // 페르소나에게 던질 질문
+  expectedReactions: {
+    dimension: string // 검증할 벡터 차원
+    highExpected: string // 해당 차원 고값 페르소나의 기대 반응
+    lowExpected: string // 해당 차원 저값 페르소나의 기대 반응
+  }[]
+  difficultyLevel: "easy" | "medium" | "hard"
+  validationDimensions: string[] // 이 샘플이 검증하는 차원 목록
+}
+```
+
+**예시**
+
+```
+{
+  contentTitle: "기생충 (2019)",
+  genre: "스릴러/드라마",
+  testQuestion: "기생충에서 가장 인상 깊었던 장면과 그 이유를 말해줘",
+  expectedReactions: [
+    {
+      dimension: "depth",
+      highExpected: "계단 씬의 수직적 공간 활용과 계급 은유를 분석",
+      lowExpected: "반지하 장면이 무서웠다 정도의 감상"
+    },
+    {
+      dimension: "lens",
+      highExpected: "촬영, 편집, 서사 구조에 대한 기술적 분석",
+      lowExpected: "감정적 공감과 캐릭터 동일시 중심"
+    },
+    {
+      dimension: "stance",
+      highExpected: "흥행에도 불구하고 서사적 약점 지적",
+      lowExpected: "전반적으로 좋았다는 수용적 평가"
+    }
+  ],
+  difficultyLevel: "medium",
+  validationDimensions: ["depth", "lens", "stance"]
+}
+```
+
+#### 13.3.2 골든 샘플 테스트 실행
+
+```
+runGoldenSampleTest(personaId, samples): GoldenSampleResult
+```
+
+```typescript
+interface GoldenSampleResult {
+  personaId: string
+  totalScore: number // 0.0~1.0
+  sampleResults: {
+    sampleId: string
+    score: number // 해당 샘플 점수
+    dimensionScores: {
+      dimension: string
+      expectedDirection: "high" | "low"
+      actualAlignment: number // 기대 반응과의 일치도
+    }[]
+    responseExcerpt: string // 응답 요약
+  }[]
+  deviations: {
+    // 기대 대비 편차
+    dimension: string
+    expectedValue: number // 벡터 값 기반 기대 방향
+    actualAlignment: number // 실제 일치도
+    deviation: number // |expected - actual|
+    severity: "minor" | "moderate" | "critical"
+  }[]
+  timestamp: Date
+}
+```
+
+**편차 판정**
+
+| 편차 크기 | 심각도   | 의미                                              |
+| --------- | -------- | ------------------------------------------------- |
+| < 0.15    | minor    | 미세한 불일치. 자연스러운 변동 범위               |
+| 0.15~0.30 | moderate | 유의미한 불일치. 아레나 검증 권고                 |
+| ≥ 0.30    | critical | 심각한 불일치. 캐릭터 정체성 문제. 즉시 교정 필요 |
+
+#### 13.3.3 골든 샘플 관리
+
+| 항목        | 설명                                          |
+| ----------- | --------------------------------------------- |
+| 샘플 수     | 테넌트별 10~30개 (장르/난이도 분산)           |
+| 갱신 주기   | 분기 1회 (새 콘텐츠 추가, 구 콘텐츠 아카이브) |
+| 난이도 분포 | easy 30%, medium 50%, hard 20%                |
+| 관리 주체   | 테넌트 관리자 (엔진 스튜디오에서 편집)        |
+| 버전 관리   | 변경 시 이전 결과와 비교 가능하도록 버전 기록 |
+
+### 13.4 품질 대시보드
+
+3가지 측정 결과를 통합하여 관리자에게 제공하는 품질 현황판.
+
+#### 13.4.1 페르소나별 품질 요약
+
+```typescript
+interface QualityDashboard {
+  personaId: string
+  overallHealth: "healthy" | "attention" | "critical"
+  metrics: {
+    autoInterview: {
+      lastScore: number
+      lastVerdict: "pass" | "warning" | "fail"
+      lastRunAt: Date
+      trend: "improving" | "stable" | "degrading"
+    }
+    integrityScore: {
+      current: number
+      components: {
+        contextRecall: number
+        settingConsistency: number
+        characterStability: number
+      }
+      trend: "improving" | "stable" | "degrading"
+    }
+    goldenSamples: {
+      lastScore: number
+      deviationCount: { minor: number; moderate: number; critical: number }
+      lastRunAt: Date
+    }
+    arena: {
+      lastOverallScore: number
+      sessionsThisMonth: number
+      correctionsApplied: number
+    }
+  }
+  alerts: QualityAlert[]
+}
+```
+
+#### 13.4.2 품질 알림
+
+```typescript
+interface QualityAlert {
+  personaId: string
+  type: "interview_fail" | "integrity_drop" | "golden_deviation" | "arena_needed"
+  severity: "warning" | "critical"
+  message: string
+  suggestedAction: string
+  createdAt: Date
+}
+```
+
+| 알림 유형        | 트리거 조건                   | 권고 조치                         |
+| ---------------- | ----------------------------- | --------------------------------- |
+| interview_fail   | Auto-Interview verdict = fail | 즉시 아레나 스파링 실행           |
+| integrity_drop   | PIS가 이전 대비 0.1 이상 하락 | 드리프트 원인 조사 + 아레나 교정  |
+| golden_deviation | critical 편차 1개 이상 감지   | 해당 차원에 대한 집중 아레나 교정 |
+| arena_needed     | 30일 이상 아레나 미실행       | 정기 아레나 스파링 예약 권고      |
+
+#### 13.4.3 전체 건강도 판정
+
+```
+overallHealth = f(autoInterview, integrityScore, goldenSamples)
+```
+
+| 건강도    | 조건                                                           |
+| --------- | -------------------------------------------------------------- |
+| healthy   | 모든 지표 pass/양호 AND PIS ≥ 0.80 AND 골든 critical 편차 없음 |
+| attention | 하나 이상 warning OR PIS 0.60~0.80 OR 골든 moderate 편차 존재  |
+| critical  | 하나 이상 fail OR PIS < 0.60 OR 골든 critical 편차 존재        |
+
+### 13.5 피드백 루프 실행
+
+품질 측정 결과를 아레나(§7) 교정 파이프라인에 연결하는 자동화 흐름.
+
+#### 13.5.1 전체 흐름
+
+```
+1. 품질 측정 실행 (주기적 또는 이벤트 기반)
+   ├── Auto-Interview (월 1회)
+   ├── Persona Integrity Score (주 1회)
+   └── Golden Sample Test (월 1회)
+
+2. 편차 감지
+   ├── 판정: pass → 종료
+   ├── 판정: warning → 아레나 스파링 권고 (관리자 결정)
+   └── 판정: fail/critical → 아레나 스파링 자동 트리거
+
+3. 아레나 스파링 (§7)
+   ├── 문제 차원에 집중한 시나리오로 스파링
+   ├── 심판 4차원 평가
+   └── 이슈 식별
+
+4. 교정 제안 생성
+   ├── 심판 이슈 → StyleBookPatch 생성
+   ├── confidence 임계값 검사
+   └── 과교정 방지 검사
+
+5. 관리자 승인
+   ├── 패치 내용 리뷰
+   ├── snapshotBefore/After diff 확인
+   └── 승인 또는 거부
+
+6. 패치 적용 (승인 시)
+   ├── Instruction Layer 업데이트
+   ├── 캐시 무효화 (§11.6)
+   └── 감사 로그 기록
+
+7. 재테스트
+   ├── Auto-Interview 즉시 재실행
+   ├── 문제 골든 샘플 재검사
+   └── 개선 확인 → 완료 또는 추가 교정
+```
+
+#### 13.5.2 집중 교정 모드
+
+특정 차원에서 심각한 편차가 발견된 경우, 해당 차원에 집중한 교정을 실행한다.
+
+```typescript
+interface FocusedCorrectionConfig {
+  personaId: string
+  targetDimensions: string[] // 문제가 된 벡터 차원
+  sourceMetric: "interview" | "integrity" | "golden"
+  deviationDetails: {
+    dimension: string
+    currentValue: number
+    expectedValue: number
+    severity: string
+  }[]
+}
+```
+
+- 아레나 스파링 시 `targetDimensions`에 해당하는 시나리오를 집중 출제
+- 심판 평가 시 해당 차원에 가중치를 높여 더 엄격하게 평가
+- 교정 패치도 해당 차원에 한정하여 부수 효과 최소화
+
+#### 13.5.3 실행 스케줄
+
+| 측정 도구       | 기본 주기 | 이벤트 트리거                       | 비용/회         |
+| --------------- | --------- | ----------------------------------- | --------------- |
+| Auto-Interview  | 월 1회    | Arena 교정 후 즉시, 관리자 수동     | ~90원 (~$0.06)  |
+| Integrity Score | 주 1회    | 의심스러운 드리프트 감지 시         | ~50원 (~$0.03)  |
+| Golden Sample   | 월 1회    | 새 골든 샘플 추가 시, Arena 교정 후 | ~200원 (~$0.13) |
+
+**100 페르소나 기준 월간 품질 측정 비용**
+
+```
+Auto-Interview: 100 × $0.06 × 1회 = $6
+Integrity Score: 100 × $0.03 × 4회 = $12
+Golden Sample: 100 × $0.13 × 1회 = $13
+합계: ~$31/월 (페르소나당 ~$0.31/월)
+```
+
+### 13.6 다른 모듈과의 연동
+
+| 연동 모듈            | 방향               | 내용                                                        |
+| -------------------- | ------------------ | ----------------------------------------------------------- |
+| Arena (§7)           | Quality → Arena    | 편차 감지 시 아레나 스파링 자동 트리거                      |
+| Arena (§7)           | Arena → Quality    | 심판 점수가 품질 메트릭에 반영                              |
+| Vectors (§3)         | Quality → Vectors  | Auto-Interview 응답에서 벡터 추출 → 드리프트 비교           |
+| Memory (§6)          | Quality → Memory   | ContextRecall 측정 시 기억 검색 (Poignancy, Retention 활용) |
+| Data Arch. (§8)      | Quality → Data     | SettingConsistency 측정 시 Instruction Layer 조회           |
+| Character Bible (§4) | Quality → Bible    | 팩트북/VoiceSpec 준수 여부 검증                             |
+| Security (§5)        | Security → Quality | 무결성 검사 실패 시 품질 알림 연동                          |
+| Matching (§12)       | Quality → Matching | PIS 낮은 페르소나에 추천 가중치 페널티                      |
+| Cost (§11)           | Quality → Cost     | 품질 측정 비용이 LlmUsageLog에 기록                         |
+| Admin                | Quality → Admin    | 대시보드/알림으로 관리자에게 품질 현황 전달                 |
