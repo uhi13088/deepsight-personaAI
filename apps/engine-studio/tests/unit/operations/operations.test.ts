@@ -86,7 +86,7 @@ function makeDataPoint(overrides: Partial<MetricDataPoint> = {}): MetricDataPoin
   return {
     timestamp: Date.now(),
     value: 50,
-    metricType: "cpu",
+    metricType: "llm_error_rate",
     source: "server-1",
     labels: {},
     ...overrides,
@@ -120,7 +120,7 @@ function makeIncident(overrides: Partial<Incident> = {}): Incident {
 
 function makeResourceUsage(overrides: Partial<ResourceUsage> = {}): ResourceUsage {
   return {
-    metricType: "cpu",
+    metricType: "llm_error_rate",
     currentValue: 50,
     maxCapacity: 100,
     unit: "%",
@@ -151,9 +151,9 @@ describe("AC1: System Monitoring", () => {
 
   describe("createMetricDataPoint", () => {
     it("returns correct structure with all fields", () => {
-      const point = createMetricDataPoint("cpu", 72.567, "server-1", { env: "prod" })
+      const point = createMetricDataPoint("llm_error_rate", 72.567, "server-1", { env: "prod" })
 
-      expect(point.metricType).toBe("cpu")
+      expect(point.metricType).toBe("llm_error_rate")
       expect(point.value).toBe(72.57) // rounded to 2 decimals
       expect(point.source).toBe("server-1")
       expect(point.labels).toEqual({ env: "prod" })
@@ -161,12 +161,12 @@ describe("AC1: System Monitoring", () => {
     })
 
     it("defaults labels to empty object", () => {
-      const point = createMetricDataPoint("memory", 80, "server-2")
+      const point = createMetricDataPoint("llm_cost", 80, "server-2")
       expect(point.labels).toEqual({})
     })
 
     it("rounds value to 2 decimal places", () => {
-      const point = createMetricDataPoint("api_latency", 123.456789, "api")
+      const point = createMetricDataPoint("matching_count", 123.456789, "api")
       expect(point.value).toBe(123.46)
     })
   })
@@ -175,31 +175,35 @@ describe("AC1: System Monitoring", () => {
 
   describe("evaluateThresholds", () => {
     it("detects critical level when value exceeds critical threshold", () => {
-      const dataPoints: MetricDataPoint[] = [makeDataPoint({ metricType: "cpu", value: 95 })]
+      const dataPoints: MetricDataPoint[] = [
+        makeDataPoint({ metricType: "llm_error_rate", value: 20 }),
+      ]
 
       const alerts = evaluateThresholds(dataPoints)
       expect(alerts).toHaveLength(1)
       expect(alerts[0].level).toBe("critical")
-      expect(alerts[0].metricType).toBe("cpu")
-      expect(alerts[0].currentValue).toBe(95)
-      expect(alerts[0].threshold).toBe(90) // CPU critical threshold
+      expect(alerts[0].metricType).toBe("llm_error_rate")
+      expect(alerts[0].currentValue).toBe(20)
+      expect(alerts[0].threshold).toBe(15) // llm_error_rate critical threshold
       expect(alerts[0].acknowledged).toBe(false)
     })
 
     it("detects warning level when value between warning and critical", () => {
-      const dataPoints: MetricDataPoint[] = [makeDataPoint({ metricType: "cpu", value: 75 })]
+      const dataPoints: MetricDataPoint[] = [
+        makeDataPoint({ metricType: "llm_error_rate", value: 10 }),
+      ]
 
       const alerts = evaluateThresholds(dataPoints)
       expect(alerts).toHaveLength(1)
       expect(alerts[0].level).toBe("warning")
-      expect(alerts[0].threshold).toBe(70) // CPU warning threshold
+      expect(alerts[0].threshold).toBe(5) // llm_error_rate warning threshold
     })
 
     it("returns no alerts when values are below thresholds", () => {
       const dataPoints: MetricDataPoint[] = [
-        makeDataPoint({ metricType: "cpu", value: 30 }),
-        makeDataPoint({ metricType: "memory", value: 40 }),
-        makeDataPoint({ metricType: "disk", value: 50 }),
+        makeDataPoint({ metricType: "llm_error_rate", value: 2 }),
+        makeDataPoint({ metricType: "llm_cost", value: 50 }),
+        makeDataPoint({ metricType: "avg_latency", value: 3000 }),
       ]
 
       const alerts = evaluateThresholds(dataPoints)
@@ -208,10 +212,12 @@ describe("AC1: System Monitoring", () => {
 
     it("uses custom thresholds when provided", () => {
       const customThresholds: MetricThreshold[] = [
-        { metricType: "cpu", warningLevel: 50, criticalLevel: 70, comparison: "above" },
+        { metricType: "llm_error_rate", warningLevel: 50, criticalLevel: 70, comparison: "above" },
       ]
 
-      const dataPoints: MetricDataPoint[] = [makeDataPoint({ metricType: "cpu", value: 55 })]
+      const dataPoints: MetricDataPoint[] = [
+        makeDataPoint({ metricType: "llm_error_rate", value: 55 }),
+      ]
 
       const alerts = evaluateThresholds(dataPoints, customThresholds)
       expect(alerts).toHaveLength(1)
@@ -220,10 +226,12 @@ describe("AC1: System Monitoring", () => {
 
     it("handles 'below' comparison mode", () => {
       const thresholds: MetricThreshold[] = [
-        { metricType: "cpu", warningLevel: 30, criticalLevel: 10, comparison: "below" },
+        { metricType: "llm_error_rate", warningLevel: 30, criticalLevel: 10, comparison: "below" },
       ]
 
-      const dataPoints: MetricDataPoint[] = [makeDataPoint({ metricType: "cpu", value: 5 })]
+      const dataPoints: MetricDataPoint[] = [
+        makeDataPoint({ metricType: "llm_error_rate", value: 5 }),
+      ]
 
       const alerts = evaluateThresholds(dataPoints, thresholds)
       expect(alerts).toHaveLength(1)
@@ -232,31 +240,31 @@ describe("AC1: System Monitoring", () => {
 
     it("handles multiple data points with mixed alert levels", () => {
       const dataPoints: MetricDataPoint[] = [
-        makeDataPoint({ metricType: "cpu", value: 95 }), // critical
-        makeDataPoint({ metricType: "memory", value: 80 }), // warning
-        makeDataPoint({ metricType: "disk", value: 50 }), // no alert
-        makeDataPoint({ metricType: "error_rate", value: 6 }), // critical
+        makeDataPoint({ metricType: "llm_error_rate", value: 20 }), // critical
+        makeDataPoint({ metricType: "llm_cost", value: 200 }), // warning
+        makeDataPoint({ metricType: "avg_latency", value: 3000 }), // no alert
+        makeDataPoint({ metricType: "llm_calls", value: 60000 }), // critical
       ]
 
       const alerts = evaluateThresholds(dataPoints)
       expect(alerts).toHaveLength(3)
 
-      const cpuAlert = alerts.find((a) => a.metricType === "cpu")
-      expect(cpuAlert?.level).toBe("critical")
+      const llmErrorAlert = alerts.find((a) => a.metricType === "llm_error_rate")
+      expect(llmErrorAlert?.level).toBe("critical")
 
-      const memAlert = alerts.find((a) => a.metricType === "memory")
-      expect(memAlert?.level).toBe("warning")
+      const llmCostAlert = alerts.find((a) => a.metricType === "llm_cost")
+      expect(llmCostAlert?.level).toBe("warning")
 
-      const errorAlert = alerts.find((a) => a.metricType === "error_rate")
-      expect(errorAlert?.level).toBe("critical")
+      const llmCallsAlert = alerts.find((a) => a.metricType === "llm_calls")
+      expect(llmCallsAlert?.level).toBe("critical")
     })
 
     it("skips data points with no matching threshold", () => {
       const thresholds: MetricThreshold[] = [
-        { metricType: "cpu", warningLevel: 70, criticalLevel: 90, comparison: "above" },
+        { metricType: "llm_error_rate", warningLevel: 70, criticalLevel: 90, comparison: "above" },
       ]
 
-      const dataPoints: MetricDataPoint[] = [makeDataPoint({ metricType: "memory", value: 99 })]
+      const dataPoints: MetricDataPoint[] = [makeDataPoint({ metricType: "llm_cost", value: 99 })]
 
       const alerts = evaluateThresholds(dataPoints, thresholds)
       expect(alerts).toHaveLength(0)
@@ -381,7 +389,9 @@ describe("AC1: System Monitoring", () => {
 
   describe("buildMonitoringDashboard", () => {
     it("combines data points, alerts, and logs into dashboard", () => {
-      const dataPoints: MetricDataPoint[] = [makeDataPoint({ metricType: "cpu", value: 95 })]
+      const dataPoints: MetricDataPoint[] = [
+        makeDataPoint({ metricType: "llm_error_rate", value: 20 }),
+      ]
       const logs: LogEntry[] = [
         makeLogEntry({ level: "error", message: "server error" }),
         makeLogEntry({ level: "info", message: "normal log" }),
@@ -392,7 +402,7 @@ describe("AC1: System Monitoring", () => {
       expect(dashboard.layout).toBeDefined()
       expect(dashboard.layout.id).toBe("default")
       expect(dashboard.dataPoints).toEqual(dataPoints)
-      expect(dashboard.activeAlerts).toHaveLength(1) // cpu 95 -> critical
+      expect(dashboard.activeAlerts).toHaveLength(1) // llm_error_rate 20 -> critical
       // recentLogs only includes warn/error/fatal
       expect(dashboard.recentLogs).toHaveLength(1)
       expect(dashboard.recentLogs[0].level).toBe("error")
@@ -401,10 +411,12 @@ describe("AC1: System Monitoring", () => {
     it("uses custom layout and thresholds", () => {
       const customLayout = { ...DEFAULT_DASHBOARD_LAYOUT, id: "custom", name: "Custom" }
       const customThresholds: MetricThreshold[] = [
-        { metricType: "cpu", warningLevel: 50, criticalLevel: 80, comparison: "above" },
+        { metricType: "llm_error_rate", warningLevel: 50, criticalLevel: 80, comparison: "above" },
       ]
 
-      const dataPoints: MetricDataPoint[] = [makeDataPoint({ metricType: "cpu", value: 60 })]
+      const dataPoints: MetricDataPoint[] = [
+        makeDataPoint({ metricType: "llm_error_rate", value: 60 }),
+      ]
 
       const dashboard = buildMonitoringDashboard(dataPoints, [], customThresholds, customLayout)
 
@@ -420,12 +432,12 @@ describe("AC1: System Monitoring", () => {
     it("has thresholds for all 6 metric types", () => {
       expect(DEFAULT_METRIC_THRESHOLDS).toHaveLength(6)
       const types = DEFAULT_METRIC_THRESHOLDS.map((t) => t.metricType)
-      expect(types).toContain("cpu")
-      expect(types).toContain("memory")
-      expect(types).toContain("disk")
-      expect(types).toContain("network")
-      expect(types).toContain("api_latency")
-      expect(types).toContain("error_rate")
+      expect(types).toContain("active_personas")
+      expect(types).toContain("llm_calls")
+      expect(types).toContain("llm_cost")
+      expect(types).toContain("llm_error_rate")
+      expect(types).toContain("avg_latency")
+      expect(types).toContain("matching_count")
     })
   })
 })
@@ -1396,9 +1408,9 @@ describe("AC5: Capacity Planning", () => {
 
   describe("createResourceUsage", () => {
     it("creates resource with rounded currentValue", () => {
-      const resource = createResourceUsage("cpu", 72.567, 100, "%")
+      const resource = createResourceUsage("llm_error_rate", 72.567, 100, "%")
 
-      expect(resource.metricType).toBe("cpu")
+      expect(resource.metricType).toBe("llm_error_rate")
       expect(resource.currentValue).toBe(72.57) // rounded
       expect(resource.maxCapacity).toBe(100)
       expect(resource.unit).toBe("%")
@@ -1443,12 +1455,16 @@ describe("AC5: Capacity Planning", () => {
       for (let day = 0; day < 10; day++) {
         snapshots.push(
           makeUsageSnapshot(baseTime + day * msPerDay, [
-            makeResourceUsage({ metricType: "cpu", currentValue: 30 + day * 3, maxCapacity: 100 }),
+            makeResourceUsage({
+              metricType: "llm_error_rate",
+              currentValue: 30 + day * 3,
+              maxCapacity: 100,
+            }),
           ])
         )
       }
 
-      const forecast = forecastLinear(snapshots, "cpu", 30)
+      const forecast = forecastLinear(snapshots, "llm_error_rate", 30)
 
       expect(forecast.trend).toBe("increasing")
       expect(forecast.projectedUsagePercent).toBeGreaterThan(forecast.currentUsagePercent)
@@ -1461,12 +1477,12 @@ describe("AC5: Capacity Planning", () => {
       for (let day = 0; day < 10; day++) {
         snapshots.push(
           makeUsageSnapshot(baseTime + day * msPerDay, [
-            makeResourceUsage({ metricType: "memory", currentValue: 50, maxCapacity: 100 }),
+            makeResourceUsage({ metricType: "llm_cost", currentValue: 50, maxCapacity: 100 }),
           ])
         )
       }
 
-      const forecast = forecastLinear(snapshots, "memory", 30)
+      const forecast = forecastLinear(snapshots, "llm_cost", 30)
       expect(forecast.trend).toBe("stable")
     })
 
@@ -1475,12 +1491,16 @@ describe("AC5: Capacity Planning", () => {
       for (let day = 0; day < 10; day++) {
         snapshots.push(
           makeUsageSnapshot(baseTime + day * msPerDay, [
-            makeResourceUsage({ metricType: "disk", currentValue: 80 - day * 3, maxCapacity: 100 }),
+            makeResourceUsage({
+              metricType: "avg_latency",
+              currentValue: 80 - day * 3,
+              maxCapacity: 100,
+            }),
           ])
         )
       }
 
-      const forecast = forecastLinear(snapshots, "disk", 30)
+      const forecast = forecastLinear(snapshots, "avg_latency", 30)
       expect(forecast.trend).toBe("decreasing")
     })
 
@@ -1489,12 +1509,16 @@ describe("AC5: Capacity Planning", () => {
       for (let day = 0; day < 10; day++) {
         snapshots.push(
           makeUsageSnapshot(baseTime + day * msPerDay, [
-            makeResourceUsage({ metricType: "cpu", currentValue: 30 + day * 5, maxCapacity: 100 }),
+            makeResourceUsage({
+              metricType: "llm_error_rate",
+              currentValue: 30 + day * 5,
+              maxCapacity: 100,
+            }),
           ])
         )
       }
 
-      const forecast = forecastLinear(snapshots, "cpu", 60, 80)
+      const forecast = forecastLinear(snapshots, "llm_error_rate", 60, 80)
 
       expect(forecast.daysUntilThreshold).not.toBeNull()
       expect(forecast.daysUntilThreshold!).toBeGreaterThan(0)
@@ -1506,23 +1530,23 @@ describe("AC5: Capacity Planning", () => {
       for (let day = 0; day < 10; day++) {
         snapshots.push(
           makeUsageSnapshot(baseTime + day * msPerDay, [
-            makeResourceUsage({ metricType: "cpu", currentValue: 50, maxCapacity: 100 }),
+            makeResourceUsage({ metricType: "llm_error_rate", currentValue: 50, maxCapacity: 100 }),
           ])
         )
       }
 
-      const forecast = forecastLinear(snapshots, "cpu", 30, 80)
+      const forecast = forecastLinear(snapshots, "llm_error_rate", 30, 80)
       expect(forecast.daysUntilThreshold).toBeNull()
     })
 
     it("handles insufficient data (< 2 points)", () => {
       const snapshots: UsageSnapshot[] = [
         makeUsageSnapshot(baseTime, [
-          makeResourceUsage({ metricType: "cpu", currentValue: 50, maxCapacity: 100 }),
+          makeResourceUsage({ metricType: "llm_error_rate", currentValue: 50, maxCapacity: 100 }),
         ]),
       ]
 
-      const forecast = forecastLinear(snapshots, "cpu", 30)
+      const forecast = forecastLinear(snapshots, "llm_error_rate", 30)
 
       expect(forecast.trend).toBe("stable")
       expect(forecast.confidence).toBe(0)
@@ -1534,11 +1558,11 @@ describe("AC5: Capacity Planning", () => {
     it("handles no data points for the metric type", () => {
       const snapshots: UsageSnapshot[] = [
         makeUsageSnapshot(baseTime, [
-          makeResourceUsage({ metricType: "memory", currentValue: 50, maxCapacity: 100 }),
+          makeResourceUsage({ metricType: "llm_cost", currentValue: 50, maxCapacity: 100 }),
         ]),
       ]
 
-      const forecast = forecastLinear(snapshots, "cpu", 30)
+      const forecast = forecastLinear(snapshots, "llm_error_rate", 30)
       expect(forecast.currentUsagePercent).toBe(0)
       expect(forecast.confidence).toBe(0)
     })
@@ -1548,12 +1572,16 @@ describe("AC5: Capacity Planning", () => {
       for (let day = 0; day < 10; day++) {
         snapshots.push(
           makeUsageSnapshot(baseTime + day * msPerDay, [
-            makeResourceUsage({ metricType: "cpu", currentValue: 90 + day, maxCapacity: 100 }),
+            makeResourceUsage({
+              metricType: "llm_error_rate",
+              currentValue: 90 + day,
+              maxCapacity: 100,
+            }),
           ])
         )
       }
 
-      const forecast = forecastLinear(snapshots, "cpu", 365)
+      const forecast = forecastLinear(snapshots, "llm_error_rate", 365)
       expect(forecast.projectedUsagePercent).toBeLessThanOrEqual(100)
       expect(forecast.projectedDataPoints.every((p) => p.value <= 100 && p.value >= 0)).toBe(true)
     })
@@ -1564,7 +1592,7 @@ describe("AC5: Capacity Planning", () => {
   describe("generateCostOptimizations", () => {
     it("recommends rightsizing for underutilized resources (< 20%)", () => {
       const resources: ResourceUsage[] = [
-        makeResourceUsage({ metricType: "cpu", currentValue: 10, maxCapacity: 100 }),
+        makeResourceUsage({ metricType: "llm_error_rate", currentValue: 10, maxCapacity: 100 }),
       ]
       const forecasts: ForecastResult[] = []
 
@@ -1572,12 +1600,12 @@ describe("AC5: Capacity Planning", () => {
 
       const rightsizing = opts.filter((o) => o.category === "rightsizing")
       expect(rightsizing.length).toBeGreaterThan(0)
-      expect(rightsizing[0].title).toContain("cpu")
+      expect(rightsizing[0].title).toContain("llm_error_rate")
     })
 
     it("does not recommend rightsizing for well-utilized resources", () => {
       const resources: ResourceUsage[] = [
-        makeResourceUsage({ metricType: "cpu", currentValue: 60, maxCapacity: 100 }),
+        makeResourceUsage({ metricType: "llm_error_rate", currentValue: 60, maxCapacity: 100 }),
       ]
       const forecasts: ForecastResult[] = []
 
@@ -1590,7 +1618,7 @@ describe("AC5: Capacity Planning", () => {
       const resources: ResourceUsage[] = []
       const forecasts: ForecastResult[] = [
         {
-          metricType: "cpu",
+          metricType: "llm_error_rate",
           currentUsagePercent: 50,
           projectedUsagePercent: 50,
           daysUntilThreshold: null,
@@ -1612,9 +1640,9 @@ describe("AC5: Capacity Planning", () => {
       expect(scheduling).toHaveLength(1)
     })
 
-    it("recommends storage tiering when disk usage > 50%", () => {
+    it("recommends cost optimization when llm_cost usage > 50%", () => {
       const resources: ResourceUsage[] = [
-        makeResourceUsage({ metricType: "disk", currentValue: 60, maxCapacity: 100 }),
+        makeResourceUsage({ metricType: "llm_cost", currentValue: 60, maxCapacity: 100 }),
       ]
 
       const opts = generateCostOptimizations(resources, [])
@@ -1628,7 +1656,7 @@ describe("AC5: Capacity Planning", () => {
   describe("generateScalingRecommendations", () => {
     it("recommends immediate scale up for usage > 90%", () => {
       const resources: ResourceUsage[] = [
-        makeResourceUsage({ metricType: "cpu", currentValue: 95, maxCapacity: 100 }),
+        makeResourceUsage({ metricType: "llm_error_rate", currentValue: 95, maxCapacity: 100 }),
       ]
 
       const recs = generateScalingRecommendations(resources, [])
@@ -1641,7 +1669,7 @@ describe("AC5: Capacity Planning", () => {
 
     it("recommends soon scale up for usage > 75%", () => {
       const resources: ResourceUsage[] = [
-        makeResourceUsage({ metricType: "memory", currentValue: 80, maxCapacity: 100 }),
+        makeResourceUsage({ metricType: "llm_cost", currentValue: 80, maxCapacity: 100 }),
       ]
 
       const recs = generateScalingRecommendations(resources, [])
@@ -1653,11 +1681,11 @@ describe("AC5: Capacity Planning", () => {
 
     it("recommends scale down for usage < 20% with decreasing trend", () => {
       const resources: ResourceUsage[] = [
-        makeResourceUsage({ metricType: "cpu", currentValue: 10, maxCapacity: 100 }),
+        makeResourceUsage({ metricType: "llm_error_rate", currentValue: 10, maxCapacity: 100 }),
       ]
       const forecasts: ForecastResult[] = [
         {
-          metricType: "cpu",
+          metricType: "llm_error_rate",
           currentUsagePercent: 10,
           projectedUsagePercent: 5,
           daysUntilThreshold: null,
@@ -1676,7 +1704,7 @@ describe("AC5: Capacity Planning", () => {
 
     it("recommends no change for moderate usage", () => {
       const resources: ResourceUsage[] = [
-        makeResourceUsage({ metricType: "cpu", currentValue: 50, maxCapacity: 100 }),
+        makeResourceUsage({ metricType: "llm_error_rate", currentValue: 50, maxCapacity: 100 }),
       ]
 
       const recs = generateScalingRecommendations(resources, [])
@@ -1686,11 +1714,11 @@ describe("AC5: Capacity Planning", () => {
 
     it("recommends soon scale up when forecast shows threshold approaching within 30 days", () => {
       const resources: ResourceUsage[] = [
-        makeResourceUsage({ metricType: "cpu", currentValue: 60, maxCapacity: 100 }),
+        makeResourceUsage({ metricType: "llm_error_rate", currentValue: 60, maxCapacity: 100 }),
       ]
       const forecasts: ForecastResult[] = [
         {
-          metricType: "cpu",
+          metricType: "llm_error_rate",
           currentUsagePercent: 60,
           projectedUsagePercent: 85,
           daysUntilThreshold: 15,
@@ -1718,15 +1746,19 @@ describe("AC5: Capacity Planning", () => {
       for (let day = 0; day < 10; day++) {
         snapshots.push(
           makeUsageSnapshot(baseTime + day * msPerDay, [
-            makeResourceUsage({ metricType: "cpu", currentValue: 50 + day, maxCapacity: 100 }),
-            makeResourceUsage({ metricType: "memory", currentValue: 40, maxCapacity: 100 }),
+            makeResourceUsage({
+              metricType: "llm_error_rate",
+              currentValue: 50 + day,
+              maxCapacity: 100,
+            }),
+            makeResourceUsage({ metricType: "llm_cost", currentValue: 40, maxCapacity: 100 }),
           ])
         )
       }
 
       const currentResources: ResourceUsage[] = [
-        makeResourceUsage({ metricType: "cpu", currentValue: 60, maxCapacity: 100 }),
-        makeResourceUsage({ metricType: "memory", currentValue: 40, maxCapacity: 100 }),
+        makeResourceUsage({ metricType: "llm_error_rate", currentValue: 60, maxCapacity: 100 }),
+        makeResourceUsage({ metricType: "llm_cost", currentValue: 40, maxCapacity: 100 }),
       ]
 
       const report = buildCapacityReport(snapshots, currentResources, 30, 80)
@@ -1745,34 +1777,34 @@ describe("AC5: Capacity Planning", () => {
     it("identifies critical resources (usage > 90%)", () => {
       const snapshots: UsageSnapshot[] = [
         makeUsageSnapshot(baseTime, [
-          makeResourceUsage({ metricType: "cpu", currentValue: 95, maxCapacity: 100 }),
+          makeResourceUsage({ metricType: "llm_error_rate", currentValue: 95, maxCapacity: 100 }),
         ]),
         makeUsageSnapshot(baseTime + msPerDay, [
-          makeResourceUsage({ metricType: "cpu", currentValue: 96, maxCapacity: 100 }),
+          makeResourceUsage({ metricType: "llm_error_rate", currentValue: 96, maxCapacity: 100 }),
         ]),
       ]
 
       const currentResources: ResourceUsage[] = [
-        makeResourceUsage({ metricType: "cpu", currentValue: 95, maxCapacity: 100 }),
+        makeResourceUsage({ metricType: "llm_error_rate", currentValue: 95, maxCapacity: 100 }),
       ]
 
       const report = buildCapacityReport(snapshots, currentResources)
 
-      expect(report.summary.criticalResources).toContain("cpu")
+      expect(report.summary.criticalResources).toContain("llm_error_rate")
     })
 
     it("returns healthy score when all resources are moderate", () => {
       const snapshots: UsageSnapshot[] = [
         makeUsageSnapshot(baseTime, [
-          makeResourceUsage({ metricType: "cpu", currentValue: 40, maxCapacity: 100 }),
+          makeResourceUsage({ metricType: "llm_error_rate", currentValue: 40, maxCapacity: 100 }),
         ]),
         makeUsageSnapshot(baseTime + msPerDay, [
-          makeResourceUsage({ metricType: "cpu", currentValue: 41, maxCapacity: 100 }),
+          makeResourceUsage({ metricType: "llm_error_rate", currentValue: 41, maxCapacity: 100 }),
         ]),
       ]
 
       const currentResources: ResourceUsage[] = [
-        makeResourceUsage({ metricType: "cpu", currentValue: 40, maxCapacity: 100 }),
+        makeResourceUsage({ metricType: "llm_error_rate", currentValue: 40, maxCapacity: 100 }),
       ]
 
       const report = buildCapacityReport(snapshots, currentResources)

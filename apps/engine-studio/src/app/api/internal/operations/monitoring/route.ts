@@ -12,8 +12,8 @@ import type {
   MetricDataPoint,
   LogEntry,
   ThresholdAlert,
-  DashboardLayout,
   MetricThreshold,
+  DashboardLayout,
 } from "@/lib/operations"
 
 // ── Response / Request types ────────────────────────────────────
@@ -27,33 +27,11 @@ interface MonitoringResponse {
 }
 
 interface MonitoringPostRequest {
-  action: "create_alert" | "refresh_metrics" | "acknowledge_alert"
-  // For create_alert
-  metricType?: string
-  value?: number
-  source?: string
-  // For acknowledge_alert
+  action: "refresh_metrics" | "acknowledge_alert"
   alertId?: string
 }
 
-// ── Conversion helpers ──────────────────────────────────────────
-
-function systemMetricToDataPoint(row: {
-  id: string
-  metricType: string
-  value: unknown
-  unit: string
-  tags: unknown
-  recordedAt: Date
-}): MetricDataPoint {
-  return {
-    metricType: row.metricType as MetricDataPoint["metricType"],
-    value: Number(row.value),
-    source: (row.tags as Record<string, string>)?.source ?? "unknown",
-    timestamp: row.recordedAt.getTime(),
-    labels: (row.tags as Record<string, string>) ?? {},
-  }
-}
+// ── DB → LogEntry 변환 ─────────────────────────────────────────
 
 function systemLogToLogEntry(row: {
   id: string
@@ -75,135 +53,68 @@ function systemLogToLogEntry(row: {
   }
 }
 
-// ── Seed helpers (when DB tables are empty) ─────────────────────
-
-async function seedInitialMetrics(): Promise<void> {
-  const seedData = [
-    { metricType: "cpu", value: 72.5, unit: "%", tags: { source: "server-1", env: "prod" } },
-    { metricType: "memory", value: 68.3, unit: "%", tags: { source: "server-1", env: "prod" } },
-    { metricType: "disk", value: 54.2, unit: "%", tags: { source: "server-1", env: "prod" } },
-    { metricType: "network", value: 45.8, unit: "%", tags: { source: "server-1", env: "prod" } },
-    {
-      metricType: "api_latency",
-      value: 320,
-      unit: "ms",
-      tags: { source: "api-gateway", env: "prod" },
-    },
-    {
-      metricType: "error_rate",
-      value: 0.8,
-      unit: "%",
-      tags: { source: "api-gateway", env: "prod" },
-    },
-  ]
-
-  await prisma.systemMetric.createMany({ data: seedData })
-}
-
-async function seedInitialLogs(): Promise<void> {
-  const now = new Date()
-  const seedData = [
-    {
-      level: "error",
-      service: "api-gateway",
-      message: "Connection timeout to database pool",
-      metadata: { host: "db-primary" },
-      traceId: "trace-001",
-      createdAt: new Date(now.getTime() - 1000),
-    },
-    {
-      level: "warn",
-      service: "worker",
-      message: "Queue depth exceeding threshold",
-      metadata: { queue: "persona-processing" },
-      traceId: "trace-002",
-      createdAt: new Date(now.getTime() - 5000),
-    },
-    {
-      level: "info",
-      service: "api-gateway",
-      message: "Health check passed",
-      metadata: {},
-      traceId: null,
-      createdAt: new Date(now.getTime() - 10000),
-    },
-    {
-      level: "error",
-      service: "matching-engine",
-      message: "Vector computation failed for persona batch",
-      metadata: { batchId: "batch-42" },
-      traceId: "trace-003",
-      createdAt: new Date(now.getTime() - 15000),
-    },
-    {
-      level: "info",
-      service: "worker",
-      message: "Backup job completed successfully",
-      metadata: {},
-      traceId: null,
-      createdAt: new Date(now.getTime() - 20000),
-    },
-    {
-      level: "debug",
-      service: "api-gateway",
-      message: "Request processed in 120ms",
-      metadata: {},
-      traceId: "trace-004",
-      createdAt: new Date(now.getTime() - 30000),
-    },
-    {
-      level: "warn",
-      service: "matching-engine",
-      message: "Slow query detected: persona search took 2.3s",
-      metadata: { queryId: "q-789" },
-      traceId: "trace-005",
-      createdAt: new Date(now.getTime() - 45000),
-    },
-    {
-      level: "fatal",
-      service: "worker",
-      message: "Out of memory error — process restarting",
-      metadata: { pid: "12345" },
-      traceId: null,
-      createdAt: new Date(now.getTime() - 60000),
-    },
-  ]
-
-  await prisma.systemLog.createMany({ data: seedData })
-}
-
-// ── DB loaders ──────────────────────────────────────────────────
+// ── 실제 애플리케이션 메트릭 조회 ───────────────────────────────
 
 async function loadMetrics(): Promise<MetricDataPoint[]> {
-  let rows = await prisma.systemMetric.findMany({
-    orderBy: { recordedAt: "desc" },
-    take: 100,
-  })
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+  const now = Date.now()
 
-  if (rows.length === 0) {
-    await seedInitialMetrics()
-    rows = await prisma.systemMetric.findMany({
-      orderBy: { recordedAt: "desc" },
-      take: 100,
-    })
-  }
+  const [activePersonaCount, llmTotal, llmErrorCount, llmAgg, matchingCount] = await Promise.all([
+    // 활성 페르소나 수
+    prisma.persona.count({ where: { status: "ACTIVE" } }),
 
-  return rows.map(systemMetricToDataPoint)
+    // LLM 호출 수 (24h)
+    prisma.llmUsageLog.count({ where: { createdAt: { gte: dayAgo } } }),
+
+    // LLM 에러 수 (24h)
+    prisma.llmUsageLog.count({
+      where: { createdAt: { gte: dayAgo }, status: "ERROR" },
+    }),
+
+    // LLM 집계: 비용 합계, 평균 응답시간
+    prisma.llmUsageLog.aggregate({
+      where: { createdAt: { gte: dayAgo } },
+      _sum: { estimatedCostUsd: true },
+      _avg: { durationMs: true },
+    }),
+
+    // 매칭 요청 수 (24h)
+    prisma.matchingLog.count({ where: { createdAt: { gte: dayAgo } } }),
+  ])
+
+  const llmCost = llmAgg._sum.estimatedCostUsd ? Number(llmAgg._sum.estimatedCostUsd) : 0
+  const avgLatency = llmAgg._avg.durationMs ?? 0
+  const llmErrorRate = llmTotal > 0 ? (llmErrorCount / llmTotal) * 100 : 0
+
+  return [
+    createMetricDataPoint("active_personas", activePersonaCount, "database", {
+      timestamp: String(now),
+    }),
+    createMetricDataPoint("llm_calls", llmTotal, "llm_usage_log", {
+      period: "24h",
+    }),
+    createMetricDataPoint("llm_cost", llmCost, "llm_usage_log", {
+      unit: "USD",
+      period: "24h",
+    }),
+    createMetricDataPoint("llm_error_rate", llmErrorRate, "llm_usage_log", {
+      period: "24h",
+    }),
+    createMetricDataPoint("avg_latency", avgLatency, "llm_usage_log", {
+      unit: "ms",
+      period: "24h",
+    }),
+    createMetricDataPoint("matching_count", matchingCount, "matching_log", {
+      period: "24h",
+    }),
+  ]
 }
 
 async function loadLogs(): Promise<LogEntry[]> {
-  let rows = await prisma.systemLog.findMany({
+  const rows = await prisma.systemLog.findMany({
     orderBy: { createdAt: "desc" },
     take: 100,
   })
-
-  if (rows.length === 0) {
-    await seedInitialLogs()
-    rows = await prisma.systemLog.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    })
-  }
 
   return rows.map(systemLogToLogEntry)
 }
@@ -230,7 +141,9 @@ async function loadLayout(): Promise<DashboardLayout> {
 
 async function loadAcknowledgedAlertIds(): Promise<Set<string>> {
   const row = await prisma.systemConfig.findUnique({
-    where: { category_key: { category: "MONITORING", key: "acknowledgedAlerts" } },
+    where: {
+      category_key: { category: "MONITORING", key: "acknowledgedAlerts" },
+    },
   })
 
   if (!row) return new Set()
@@ -240,7 +153,9 @@ async function loadAcknowledgedAlertIds(): Promise<Set<string>> {
 
 async function saveAcknowledgedAlertIds(ids: string[]): Promise<void> {
   await prisma.systemConfig.upsert({
-    where: { category_key: { category: "MONITORING", key: "acknowledgedAlerts" } },
+    where: {
+      category_key: { category: "MONITORING", key: "acknowledgedAlerts" },
+    },
     update: { value: ids },
     create: {
       category: "MONITORING",
@@ -287,39 +202,23 @@ export async function GET() {
     return NextResponse.json<ApiResponse<never>>(
       {
         success: false,
-        error: { code: "INTERNAL_ERROR", message: "모니터링 데이터 조회 실패" },
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "모니터링 데이터 조회 실패",
+        },
       },
       { status: 500 }
     )
   }
 }
 
-// ── POST: Create alert or refresh metrics or acknowledge alert ──
+// ── POST: Refresh metrics or acknowledge alert ──────────────────
 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as MonitoringPostRequest
 
     if (body.action === "refresh_metrics") {
-      // Create new SystemMetric records with current values
-      const newDataPoints = [
-        createMetricDataPoint("cpu", 72.5, "server-1", { env: "prod" }),
-        createMetricDataPoint("memory", 68.3, "server-1", { env: "prod" }),
-        createMetricDataPoint("disk", 54.2, "server-1", { env: "prod" }),
-        createMetricDataPoint("network", 45.8, "server-1", { env: "prod" }),
-        createMetricDataPoint("api_latency", 320, "api-gateway", { env: "prod" }),
-        createMetricDataPoint("error_rate", 0.8, "api-gateway", { env: "prod" }),
-      ]
-
-      await prisma.systemMetric.createMany({
-        data: newDataPoints.map((dp) => ({
-          metricType: dp.metricType,
-          value: dp.value,
-          unit: dp.metricType === "api_latency" ? "ms" : "%",
-          tags: { source: dp.source, ...dp.labels },
-        })),
-      })
-
       const data = await buildFullResponse()
 
       return NextResponse.json<ApiResponse<MonitoringResponse>>({
@@ -333,18 +232,19 @@ export async function POST(request: NextRequest) {
         return NextResponse.json<ApiResponse<never>>(
           {
             success: false,
-            error: { code: "INVALID_INPUT", message: "alertId가 필요합니다" },
+            error: {
+              code: "INVALID_INPUT",
+              message: "alertId가 필요합니다",
+            },
           },
           { status: 400 }
         )
       }
 
-      // Load existing acknowledged IDs, add the new one, and persist
       const existingIds = await loadAcknowledgedAlertIds()
       existingIds.add(body.alertId)
       await saveAcknowledgedAlertIds([...existingIds])
 
-      // Recalculate alerts with acknowledgment status
       const [metrics, thresholds] = await Promise.all([loadMetrics(), loadThresholds()])
       const rawAlerts = evaluateThresholds(metrics, thresholds)
       const alerts = applyAcknowledgments(rawAlerts, existingIds)
@@ -355,49 +255,12 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    if (body.action === "create_alert") {
-      if (!body.metricType || body.value === undefined || !body.source) {
-        return NextResponse.json<ApiResponse<never>>(
-          {
-            success: false,
-            error: { code: "INVALID_INPUT", message: "metricType, value, source가 필요합니다" },
-          },
-          { status: 400 }
-        )
-      }
-
-      // Create a new SystemMetric record
-      const dataPoint = createMetricDataPoint(
-        body.metricType as Parameters<typeof createMetricDataPoint>[0],
-        body.value,
-        body.source
-      )
-
-      await prisma.systemMetric.create({
-        data: {
-          metricType: dataPoint.metricType,
-          value: dataPoint.value,
-          unit: dataPoint.metricType === "api_latency" ? "ms" : "%",
-          tags: { source: dataPoint.source, ...dataPoint.labels },
-        },
-      })
-
-      // Evaluate thresholds against the new data point
-      const thresholds = await loadThresholds()
-      const newAlerts = evaluateThresholds([dataPoint], thresholds)
-
-      return NextResponse.json<ApiResponse<{ alerts: ThresholdAlert[] }>>({
-        success: true,
-        data: { alerts: newAlerts },
-      })
-    }
-
     return NextResponse.json<ApiResponse<never>>(
       {
         success: false,
         error: {
           code: "INVALID_INPUT",
-          message: "유효한 action이 필요합니다: create_alert, refresh_metrics, acknowledge_alert",
+          message: "유효한 action이 필요합니다: refresh_metrics, acknowledge_alert",
         },
       },
       { status: 400 }

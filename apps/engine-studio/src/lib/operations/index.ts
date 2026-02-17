@@ -9,7 +9,13 @@
 
 // ── 메트릭 타입 정의 ──────────────────────────────────────────
 
-export type MetricType = "cpu" | "memory" | "disk" | "network" | "api_latency" | "error_rate"
+export type MetricType =
+  | "active_personas"
+  | "llm_calls"
+  | "llm_cost"
+  | "llm_error_rate"
+  | "avg_latency"
+  | "matching_count"
 
 export interface MetricDataPoint {
   timestamp: number
@@ -85,64 +91,64 @@ export interface MonitoringDashboardData {
 // ── 기본 임계값 ─────────────────────────────────────────────
 
 export const DEFAULT_METRIC_THRESHOLDS: MetricThreshold[] = [
-  { metricType: "cpu", warningLevel: 70, criticalLevel: 90, comparison: "above" },
-  { metricType: "memory", warningLevel: 75, criticalLevel: 95, comparison: "above" },
-  { metricType: "disk", warningLevel: 80, criticalLevel: 95, comparison: "above" },
-  { metricType: "network", warningLevel: 80, criticalLevel: 95, comparison: "above" },
-  { metricType: "api_latency", warningLevel: 500, criticalLevel: 2000, comparison: "above" },
-  { metricType: "error_rate", warningLevel: 1, criticalLevel: 5, comparison: "above" },
+  { metricType: "llm_error_rate", warningLevel: 5, criticalLevel: 15, comparison: "above" },
+  { metricType: "avg_latency", warningLevel: 5000, criticalLevel: 15000, comparison: "above" },
+  { metricType: "llm_cost", warningLevel: 100, criticalLevel: 500, comparison: "above" },
+  { metricType: "llm_calls", warningLevel: 10000, criticalLevel: 50000, comparison: "above" },
+  { metricType: "matching_count", warningLevel: 10000, criticalLevel: 50000, comparison: "above" },
+  { metricType: "active_personas", warningLevel: 1, criticalLevel: 0, comparison: "below" },
 ]
 
 // ── 기본 대시보드 레이아웃 ────────────────────────────────────
 
 export const DEFAULT_DASHBOARD_LAYOUT: DashboardLayout = {
   id: "default",
-  name: "시스템 개요",
+  name: "애플리케이션 현황",
   panels: [
     {
-      id: "panel_cpu",
-      title: "CPU 사용률",
-      metricTypes: ["cpu"],
-      chartType: "gauge",
+      id: "panel_personas",
+      title: "활성 페르소나",
+      metricTypes: ["active_personas"],
+      chartType: "stat",
       position: { row: 0, col: 0, width: 4, height: 2 },
     },
     {
-      id: "panel_memory",
-      title: "메모리 사용률",
-      metricTypes: ["memory"],
-      chartType: "gauge",
+      id: "panel_llm_calls",
+      title: "LLM 호출 (24h)",
+      metricTypes: ["llm_calls"],
+      chartType: "stat",
       position: { row: 0, col: 4, width: 4, height: 2 },
     },
     {
-      id: "panel_disk",
-      title: "디스크 사용률",
-      metricTypes: ["disk"],
-      chartType: "gauge",
+      id: "panel_llm_cost",
+      title: "LLM 비용 (24h)",
+      metricTypes: ["llm_cost"],
+      chartType: "stat",
       position: { row: 0, col: 8, width: 4, height: 2 },
     },
     {
+      id: "panel_error_rate",
+      title: "LLM 에러율",
+      metricTypes: ["llm_error_rate"],
+      chartType: "gauge",
+      position: { row: 2, col: 0, width: 4, height: 3 },
+    },
+    {
       id: "panel_latency",
-      title: "API 응답시간",
-      metricTypes: ["api_latency"],
-      chartType: "line",
-      position: { row: 2, col: 0, width: 6, height: 3 },
+      title: "평균 응답시간",
+      metricTypes: ["avg_latency"],
+      chartType: "gauge",
+      position: { row: 2, col: 4, width: 4, height: 3 },
     },
     {
-      id: "panel_errors",
-      title: "에러율",
-      metricTypes: ["error_rate"],
-      chartType: "line",
-      position: { row: 2, col: 6, width: 6, height: 3 },
-    },
-    {
-      id: "panel_network",
-      title: "네트워크 트래픽",
-      metricTypes: ["network"],
-      chartType: "bar",
-      position: { row: 5, col: 0, width: 12, height: 3 },
+      id: "panel_matching",
+      title: "매칭 요청 (24h)",
+      metricTypes: ["matching_count"],
+      chartType: "stat",
+      position: { row: 2, col: 8, width: 4, height: 3 },
     },
   ],
-  refreshIntervalMs: 5000,
+  refreshIntervalMs: 30000,
   createdAt: 0,
   updatedAt: 0,
 }
@@ -1516,9 +1522,9 @@ export function generateCostOptimizations(
     })
   }
 
-  // 스토리지 티어링 제안
-  const diskResource = resources.find((r) => r.metricType === "disk")
-  if (diskResource && getUsagePercent(diskResource) > 50) {
+  // LLM 비용 최적화 제안
+  const costResource = resources.find((r) => r.metricType === "llm_cost")
+  if (costResource && getUsagePercent(costResource) > 50) {
     optimizations.push({
       id: "opt_storage_tiering",
       category: "storage_tiering",
@@ -1614,12 +1620,12 @@ export function buildCapacityReport(
   thresholdPercent: number = 80
 ): CapacityReport {
   const metricTypes: MetricType[] = [
-    "cpu",
-    "memory",
-    "disk",
-    "network",
-    "api_latency",
-    "error_rate",
+    "active_personas",
+    "llm_calls",
+    "llm_cost",
+    "llm_error_rate",
+    "avg_latency",
+    "matching_count",
   ]
 
   const forecasts = metricTypes

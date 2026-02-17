@@ -121,23 +121,23 @@ function buildDefaultCapacityReport(): CapacityReport {
   const snapshots: UsageSnapshot[] = []
   for (let day = 0; day < 30; day++) {
     const resources: ResourceUsage[] = [
-      createResourceUsage("cpu", 45 + day * 0.5 + (day % 5), 100, "%"),
-      createResourceUsage("memory", 55 + day * 0.3 + (day % 3), 100, "%"),
-      createResourceUsage("disk", 40 + day * 0.8 + (day % 2), 100, "%"),
-      createResourceUsage("network", 30 + (day % 10), 100, "%"),
-      createResourceUsage("api_latency", 200 + (day % 100), 5000, "ms"),
-      createResourceUsage("error_rate", 0.5 + (day % 5) * 0.1, 100, "%"),
+      createResourceUsage("active_personas", 10 + day * 0.5, 100, "개"),
+      createResourceUsage("llm_calls", 200 + day * 10 + (day % 5), 10000, "회"),
+      createResourceUsage("llm_cost", 5 + day * 0.3 + (day % 3), 500, "USD"),
+      createResourceUsage("llm_error_rate", 1 + (day % 5) * 0.3, 100, "%"),
+      createResourceUsage("avg_latency", 800 + (day % 100) * 10, 15000, "ms"),
+      createResourceUsage("matching_count", 50 + day * 3 + (day % 10), 10000, "회"),
     ]
     snapshots.push({ timestamp: baseTime + day * msPerDay, resources })
   }
 
   const currentResources: ResourceUsage[] = [
-    createResourceUsage("cpu", 60, 100, "%"),
-    createResourceUsage("memory", 65, 100, "%"),
-    createResourceUsage("disk", 64, 100, "%"),
-    createResourceUsage("network", 35, 100, "%"),
-    createResourceUsage("api_latency", 250, 5000, "ms"),
-    createResourceUsage("error_rate", 0.8, 100, "%"),
+    createResourceUsage("active_personas", 25, 100, "개"),
+    createResourceUsage("llm_calls", 500, 10000, "회"),
+    createResourceUsage("llm_cost", 14, 500, "USD"),
+    createResourceUsage("llm_error_rate", 2.5, 100, "%"),
+    createResourceUsage("avg_latency", 1200, 15000, "ms"),
+    createResourceUsage("matching_count", 140, 10000, "회"),
   ]
 
   return buildCapacityReport(snapshots, currentResources, 90, 80)
