@@ -2,145 +2,14 @@ import { NextRequest, NextResponse } from "next/server"
 import type { ApiResponse } from "@/types"
 import { createAuditLog, recordAuditEntry, searchAuditLog, getAuditSummary } from "@/lib/team"
 import type { AuditLogEntry, AuditAction, AuditTargetType, AuditSummary } from "@/lib/team"
+import { DEMO_AUDIT_ENTRIES } from "@/lib/demo-fixtures"
 
 // ── Seed audit log (in-memory, persists within server session) ───
 function initializeSeedAuditLog() {
   let log = createAuditLog()
-
   const now = Date.now()
-  const entries: Array<{
-    actorId: string
-    actorName: string
-    action: AuditAction
-    targetType: AuditTargetType
-    targetId: string
-    details: Record<string, string>
-    ip: string
-    offset: number
-  }> = [
-    {
-      actorId: "u1",
-      actorName: "Admin",
-      action: "team.created",
-      targetType: "team",
-      targetId: "team_1",
-      details: { name: "DeepSight" },
-      ip: "192.168.1.1",
-      offset: -86400000 * 5,
-    },
-    {
-      actorId: "u1",
-      actorName: "Admin",
-      action: "user.invited",
-      targetType: "user",
-      targetId: "u2",
-      details: { email: "engineer@deepsight.ai", role: "ai_engineer" },
-      ip: "192.168.1.1",
-      offset: -86400000 * 4,
-    },
-    {
-      actorId: "u1",
-      actorName: "Admin",
-      action: "user.invited",
-      targetType: "user",
-      targetId: "u3",
-      details: { email: "content@deepsight.ai", role: "content_manager" },
-      ip: "192.168.1.1",
-      offset: -86400000 * 4,
-    },
-    {
-      actorId: "u2",
-      actorName: "Kim Engineer",
-      action: "persona.created",
-      targetType: "persona",
-      targetId: "p1",
-      details: { name: "심층 분석가" },
-      ip: "10.0.0.5",
-      offset: -86400000 * 3,
-    },
-    {
-      actorId: "u2",
-      actorName: "Kim Engineer",
-      action: "persona.updated",
-      targetType: "persona",
-      targetId: "p1",
-      details: { field: "vectors", description: "L1 벡터 조정" },
-      ip: "10.0.0.5",
-      offset: -86400000 * 2,
-    },
-    {
-      actorId: "u2",
-      actorName: "Kim Engineer",
-      action: "matching.executed",
-      targetType: "matching",
-      targetId: "match_1",
-      details: { mode: "single", score: "0.87" },
-      ip: "10.0.0.5",
-      offset: -86400000 * 2,
-    },
-    {
-      actorId: "u3",
-      actorName: "Lee Content",
-      action: "content.created",
-      targetType: "content",
-      targetId: "c1",
-      details: { title: "트렌드 리포트 2024" },
-      ip: "10.0.0.10",
-      offset: -86400000,
-    },
-    {
-      actorId: "u3",
-      actorName: "Lee Content",
-      action: "content.published",
-      targetType: "content",
-      targetId: "c1",
-      details: { title: "트렌드 리포트 2024" },
-      ip: "10.0.0.10",
-      offset: -86400000,
-    },
-    {
-      actorId: "u1",
-      actorName: "Admin",
-      action: "settings.updated",
-      targetType: "settings",
-      targetId: "global",
-      details: { key: "matching.threshold", oldValue: "0.5", newValue: "0.6" },
-      ip: "192.168.1.1",
-      offset: -43200000,
-    },
-    {
-      actorId: "u2",
-      actorName: "Kim Engineer",
-      action: "persona.published",
-      targetType: "persona",
-      targetId: "p1",
-      details: { name: "심층 분석가" },
-      ip: "10.0.0.5",
-      offset: -3600000,
-    },
-    {
-      actorId: "u1",
-      actorName: "Admin",
-      action: "user.role_changed",
-      targetType: "user",
-      targetId: "u3",
-      details: { from: "content_manager", to: "analyst" },
-      ip: "192.168.1.1",
-      offset: -1800000,
-    },
-    {
-      actorId: "u2",
-      actorName: "Kim Engineer",
-      action: "matching.configured",
-      targetType: "matching",
-      targetId: "config_1",
-      details: { parameter: "diversity_weight", value: "0.3" },
-      ip: "10.0.0.5",
-      offset: -600000,
-    },
-  ]
 
-  for (const entry of entries) {
+  for (const entry of DEMO_AUDIT_ENTRIES) {
     const entryLog = recordAuditEntry(log, {
       actorId: entry.actorId,
       actorName: entry.actorName,

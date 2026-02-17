@@ -3,13 +3,18 @@ import type { ApiResponse } from "@/types"
 import {
   buildDashboard,
   type IncubatorDashboard,
-  type StrategyMetric,
   type LifecycleMetric,
   type BatchResult,
   type IncubatorLogEntry,
 } from "@/lib/incubator"
 import { calculateMonthlyCost } from "@/lib/incubator/cost-control"
 import { INITIAL_GOLDEN_SAMPLES, calculateGoldenSampleMetrics } from "@/lib/incubator/golden-sample"
+import {
+  DEMO_INCUBATOR_STRATEGY,
+  DEMO_INCUBATOR_LIFECYCLE,
+  DEMO_INCUBATOR_CUMULATIVE_ACTIVE,
+  DEMO_INCUBATOR_MONTHLY_COST_CALLS,
+} from "@/lib/demo-fixtures"
 
 // ── Demo data builder ──────────────────────────────────────────
 
@@ -27,7 +32,7 @@ function makeDemoLog(
     personaConfig: null,
     generatedVector: null,
     generatedPrompt: null,
-    testSampleIds: ["gs-001", "gs-002"],
+    testSampleIds: INITIAL_GOLDEN_SAMPLES.slice(0, 2).map((s) => s.id),
     testResults: null,
     consistencyScore: Math.round(score * 100) / 100,
     scoreBreakdown: {
@@ -43,7 +48,7 @@ function makeDemoLog(
 function makeDemoBatch(daysAgo: number): BatchResult {
   const date = new Date()
   date.setDate(date.getDate() - daysAgo)
-  const batchId = `batch-demo-${daysAgo}`
+  const batchId = `demo-batch-${daysAgo}`
   const total = 8 + Math.floor(Math.random() * 5)
   const passCount = Math.floor(total * (0.6 + Math.random() * 0.3))
   const failCount = total - passCount
@@ -70,24 +75,10 @@ function buildDemoData(): IncubatorDashboard {
   const recentBatches = Array.from({ length: 7 }, (_, i) => makeDemoBatch(i))
   const todayBatch = recentBatches[0]
 
-  const costUsage = calculateMonthlyCost(85, 85)
-
-  const strategy: StrategyMetric = {
-    userDriven: 52,
-    exploration: 18,
-    gapFilling: 15,
-    gapRegions: ["high-depth+low-sociability", "mid-stance+high-taste"],
-    archetypeDistribution: {
-      "The Analyst": 12,
-      "The Enthusiast": 9,
-      "The Curator": 8,
-      "The Contrarian": 7,
-      "The Storyteller": 6,
-      "The Explorer": 5,
-      "The Socialite": 4,
-      "The Minimalist": 3,
-    },
-  }
+  const costUsage = calculateMonthlyCost(
+    DEMO_INCUBATOR_MONTHLY_COST_CALLS,
+    DEMO_INCUBATOR_MONTHLY_COST_CALLS
+  )
 
   const gsMetrics = calculateGoldenSampleMetrics(
     INITIAL_GOLDEN_SAMPLES,
@@ -95,16 +86,11 @@ function buildDemoData(): IncubatorDashboard {
   )
 
   const lifecycle: LifecycleMetric = {
-    active: 42,
-    standard: 18,
-    legacy: 8,
-    deprecated: 3,
-    archived: 2,
-    zombieCount: 2,
+    ...DEMO_INCUBATOR_LIFECYCLE,
     recentTransitions: [
-      { personaId: "p-demo-1", from: "STANDARD", to: "ACTIVE", date: new Date() },
+      { personaId: "demo-persona-1", from: "STANDARD", to: "ACTIVE", date: new Date() },
       {
-        personaId: "p-demo-2",
+        personaId: "demo-persona-2",
         from: "ACTIVE",
         to: "LEGACY",
         date: new Date(Date.now() - 86400000),
@@ -116,8 +102,8 @@ function buildDemoData(): IncubatorDashboard {
     todayBatch,
     recentBatches,
     costUsage,
-    cumulativeActive: 73,
-    strategy,
+    cumulativeActive: DEMO_INCUBATOR_CUMULATIVE_ACTIVE,
+    strategy: DEMO_INCUBATOR_STRATEGY,
     goldenSamples: gsMetrics,
     lifecycle,
   })

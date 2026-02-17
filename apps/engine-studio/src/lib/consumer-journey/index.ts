@@ -1648,7 +1648,7 @@ function buildErrorCodes(): ErrorCodeDefinition[] {
       code: "INTERNAL_ERROR",
       httpStatus: 500,
       message: "Internal server error",
-      resolution: "지속 발생 시 support@deepsight.ai로 문의하세요.",
+      resolution: "지속 발생 시 관리자에게 문의하세요.",
     },
   ]
 }

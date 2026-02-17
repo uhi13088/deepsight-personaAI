@@ -164,6 +164,16 @@
   - 통계: 양/음 효과 분류, topInfluencer, mostAffected, 분산 추적
   - 53 테스트 PASS, Build PASS
 
+- [x] **T157: 하드코딩/더미데이터 전수 삭제** ✅ 2026-02-16
+  - `src/lib/demo-fixtures/` 모듈 생성 (4개 fixture 파일 + index)
+  - 7개 API 라우트에서 인라인 더미데이터 제거 → fixtures 참조로 교체
+  - 하드코딩 연락처(전화번호, 이메일) → example.com/000-0000-0000으로 교체
+  - 하드코딩 ID(u1, p_001, INC-1001) → demo- 접두사 ID로 교체
+  - 하드코딩 URL(deepsight.ai/webhooks) → example.com으로 교체
+  - 하드코딩 IP(192.168.1.1, 10.0.0.5) → 0.0.0.0으로 교체
+  - 골든 샘플은 인큐베이터 스펙 기능이므로 유지 (의도된 데이터)
+  - 3159 테스트 PASS, Build PASS
+
 ---
 
 ## BLOCKED

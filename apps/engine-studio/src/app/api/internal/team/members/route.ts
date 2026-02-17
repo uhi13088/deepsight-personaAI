@@ -9,18 +9,13 @@ import {
   listMembers,
 } from "@/lib/team"
 import type { TeamMember, TeamState, Role, InviteResult } from "@/lib/team"
+import { DEMO_TEAM_NAME, DEMO_TEAM_MEMBERS } from "@/lib/demo-fixtures"
 
 // ── Seed team state (in-memory, persists within server session) ──
 function initializeSeedTeam(): TeamState {
-  let team = createTeam("DeepSight", "Admin", "admin@deepsight.ai")
+  let team = createTeam(DEMO_TEAM_NAME, "Admin", "admin@example.com")
 
-  const sampleMembers: Array<{ email: string; name: string; role: Role }> = [
-    { email: "engineer@deepsight.ai", name: "Kim Engineer", role: "ai_engineer" },
-    { email: "content@deepsight.ai", name: "Lee Content", role: "content_manager" },
-    { email: "analyst@deepsight.ai", name: "Park Analyst", role: "analyst" },
-  ]
-
-  for (const m of sampleMembers) {
+  for (const m of DEMO_TEAM_MEMBERS) {
     const { team: updated } = inviteMember(team, {
       email: m.email,
       name: m.name,

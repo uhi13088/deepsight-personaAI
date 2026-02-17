@@ -14,6 +14,7 @@ import type {
   PostMortem,
   DetectionRule,
 } from "@/lib/operations"
+import { DEMO_INCIDENTS, DEMO_DETECTION_RULES } from "@/lib/demo-fixtures"
 
 // ── In-memory store ─────────────────────────────────────────────
 
@@ -23,189 +24,11 @@ interface IncidentStore {
   detectionRules: DetectionRule[]
 }
 
-function buildInitialIncidents(): Incident[] {
-  const now = Date.now()
-  return [
-    {
-      id: "INC-1001",
-      title: "API 게이트웨이 응답 지연",
-      severity: "P1",
-      phase: "investigating",
-      detectedAt: now - 45 * 60 * 1000,
-      resolvedAt: null,
-      commander: "김운영",
-      affectedServices: ["api-gateway", "matching-engine"],
-      timeline: [
-        {
-          timestamp: now - 45 * 60 * 1000,
-          phase: "detected",
-          actor: "monitoring-bot",
-          description: "API 응답시간 2초 초과 탐지",
-        },
-        {
-          timestamp: now - 40 * 60 * 1000,
-          phase: "triaged",
-          actor: "김운영",
-          description: "P1 분류, 담당자 배정",
-        },
-        {
-          timestamp: now - 35 * 60 * 1000,
-          phase: "investigating",
-          actor: "김운영",
-          description: "DB 커넥션 풀 조사 시작",
-        },
-      ],
-      rootCause: null,
-      mitigation: null,
-    },
-    {
-      id: "INC-1002",
-      title: "페르소나 매칭 엔진 OOM",
-      severity: "P0",
-      phase: "mitigating",
-      detectedAt: now - 90 * 60 * 1000,
-      resolvedAt: null,
-      commander: "박개발",
-      affectedServices: ["matching-engine", "worker"],
-      timeline: [
-        {
-          timestamp: now - 90 * 60 * 1000,
-          phase: "detected",
-          actor: "system",
-          description: "OOM 에러 발생",
-        },
-        {
-          timestamp: now - 85 * 60 * 1000,
-          phase: "triaged",
-          actor: "박개발",
-          description: "P0 분류",
-        },
-        {
-          timestamp: now - 80 * 60 * 1000,
-          phase: "investigating",
-          actor: "박개발",
-          description: "메모리 릭 조사",
-        },
-        {
-          timestamp: now - 60 * 60 * 1000,
-          phase: "mitigating",
-          actor: "박개발",
-          description: "메모리 제한 상향 및 재배포",
-        },
-      ],
-      rootCause: null,
-      mitigation: null,
-    },
-    {
-      id: "INC-1003",
-      title: "백업 작업 실패",
-      severity: "P2",
-      phase: "resolved",
-      detectedAt: now - 24 * 60 * 60 * 1000,
-      resolvedAt: now - 23 * 60 * 60 * 1000,
-      commander: "이인프라",
-      affectedServices: ["backup-service"],
-      timeline: [
-        {
-          timestamp: now - 24 * 60 * 60 * 1000,
-          phase: "detected",
-          actor: "cron-monitor",
-          description: "일일 백업 실패 감지",
-        },
-        {
-          timestamp: now - 23.5 * 60 * 60 * 1000,
-          phase: "triaged",
-          actor: "이인프라",
-          description: "P2 분류",
-        },
-        {
-          timestamp: now - 23.25 * 60 * 60 * 1000,
-          phase: "investigating",
-          actor: "이인프라",
-          description: "디스크 용량 조사",
-        },
-        {
-          timestamp: now - 23.1 * 60 * 60 * 1000,
-          phase: "mitigating",
-          actor: "이인프라",
-          description: "임시 스토리지 확보",
-        },
-        {
-          timestamp: now - 23 * 60 * 60 * 1000,
-          phase: "resolved",
-          actor: "이인프라",
-          description: "스토리지 확장 완료",
-        },
-      ],
-      rootCause: "디스크 용량 부족",
-      mitigation: "스토리지 볼륨 2배 확장",
-    },
-    {
-      id: "INC-1004",
-      title: "로그 수집기 지연",
-      severity: "P3",
-      phase: "resolved",
-      detectedAt: now - 3 * 24 * 60 * 60 * 1000,
-      resolvedAt: now - 3 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000,
-      commander: "최데브옵스",
-      affectedServices: ["log-collector"],
-      timeline: [
-        {
-          timestamp: now - 3 * 24 * 60 * 60 * 1000,
-          phase: "detected",
-          actor: "system",
-          description: "로그 수집 지연 탐지",
-        },
-        {
-          timestamp: now - 3 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000,
-          phase: "triaged",
-          actor: "최데브옵스",
-          description: "P3 분류",
-        },
-        {
-          timestamp: now - 3 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000,
-          phase: "investigating",
-          actor: "최데브옵스",
-          description: "버퍼 크기 조사",
-        },
-        {
-          timestamp: now - 3 * 24 * 60 * 60 * 1000 + 90 * 60 * 1000,
-          phase: "mitigating",
-          actor: "최데브옵스",
-          description: "버퍼 크기 증가",
-        },
-        {
-          timestamp: now - 3 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000,
-          phase: "resolved",
-          actor: "최데브옵스",
-          description: "정상화 확인",
-        },
-      ],
-      rootCause: "로그 버퍼 크기 부족",
-      mitigation: "버퍼 크기 4배 증가",
-    },
-  ]
-}
-
-const sampleRules: DetectionRule[] = [
-  {
-    id: "rule_api_latency",
-    name: "API 응답시간 초과",
-    description: "API 응답시간이 2초를 초과하면 P1 장애 탐지",
-    metricType: "api_latency",
-    condition: "above",
-    threshold: 2000,
-    durationSeconds: 60,
-    severity: "P1",
-    enabled: true,
-  },
-]
-
 function buildInitialStore(): IncidentStore {
   return {
-    incidents: buildInitialIncidents(),
+    incidents: [...DEMO_INCIDENTS],
     postMortems: [],
-    detectionRules: sampleRules,
+    detectionRules: [...DEMO_DETECTION_RULES],
   }
 }
 

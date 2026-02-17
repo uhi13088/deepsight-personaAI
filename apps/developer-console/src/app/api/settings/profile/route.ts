@@ -9,12 +9,12 @@ export async function PATCH(request: NextRequest) {
 
     // TODO: Replace with actual database update when auth is implemented
     const updatedProfile = {
-      id: "user-1",
+      id: "pending-auth",
       name: body.name || "개발자",
-      email: body.email || "developer@example.com",
+      email: body.email || "",
       avatar: null,
       phone: body.phone || "",
-      company: body.company || "DeepSight",
+      company: body.company || "",
       timezone: body.timezone || "Asia/Seoul",
       language: body.language || "ko",
       twoFactorEnabled: false,

@@ -21,6 +21,7 @@ import type {
   ResourceUsage,
   UsageSnapshot,
 } from "@/lib/operations"
+import { DEMO_DR_PLAN } from "@/lib/demo-fixtures"
 
 // ── In-memory store ─────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ function buildInitialRecords(): BackupRecord[] {
       const completed = completeBackupRecord(
         { ...record, startedAt },
         1024 * 1024 * (50 + i * 100),
-        `sha256-sample-${policy.id}-${i}`
+        `sha256-demo-${policy.id}-${i}`
       )
       records.push(completed)
     }
@@ -54,49 +55,12 @@ function buildInitialRecords(): BackupRecord[] {
 
 function buildInitialDRPlan(): DRPlan {
   return createDRPlan(
-    "데이터베이스 장애 복구",
-    "database_failure",
-    30,
-    5,
-    [
-      {
-        description: "DB 페일오버 실행",
-        responsible: "DBA팀",
-        estimatedMinutes: 10,
-        prerequisites: [],
-        verificationCommand: "pg_isready",
-      },
-      {
-        description: "트래픽 리다이렉트",
-        responsible: "인프라팀",
-        estimatedMinutes: 5,
-        prerequisites: ["DB 페일오버 실행"],
-        verificationCommand: null,
-      },
-      {
-        description: "서비스 검증",
-        responsible: "QA팀",
-        estimatedMinutes: 15,
-        prerequisites: ["트래픽 리다이렉트"],
-        verificationCommand: "curl /health",
-      },
-    ],
-    [
-      {
-        name: "김DBA",
-        role: "DBA Lead",
-        phone: "010-1234-5678",
-        email: "dba@deepsight.ai",
-        isPrimary: true,
-      },
-      {
-        name: "박인프라",
-        role: "Infra Lead",
-        phone: "010-2345-6789",
-        email: "infra@deepsight.ai",
-        isPrimary: false,
-      },
-    ]
+    DEMO_DR_PLAN.name,
+    DEMO_DR_PLAN.scenario,
+    DEMO_DR_PLAN.rtoMinutes,
+    DEMO_DR_PLAN.rpoMinutes,
+    DEMO_DR_PLAN.steps,
+    DEMO_DR_PLAN.contacts
   )
 }
 

@@ -104,7 +104,7 @@ export default function ProfilePage() {
   const handleSnsConnect = useCallback(
     (provider: SnsProvider) => {
       setConsentProvider(null)
-      connectSns(provider, `user_${provider}`)
+      connectSns(provider, `${provider}_${Date.now()}`)
       setSnsAnalyzing(provider, true)
       toast.success(`${SNS_PROVIDER_CONFIG[provider].label} 연동 완료! 분석을 시작합니다`)
       // 분석 완료 시뮬레이션

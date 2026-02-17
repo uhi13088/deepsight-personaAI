@@ -29,7 +29,7 @@ function ensureSeedData() {
   const v1 = createVersion(
     "matching",
     "v1.0.0",
-    "admin@deepsight.ai",
+    "demo-admin",
     "Initial matching algorithm",
     "First stable release of 3-tier matching",
     { threshold: 0.5, diversity_weight: 0.3, exploration_rate: 0.1 },
@@ -40,7 +40,7 @@ function ensureSeedData() {
   const v11 = createVersion(
     "matching",
     "v1.1.0",
-    "admin@deepsight.ai",
+    "demo-admin",
     "Improved diversity scoring",
     "Enhanced diversity index calculation",
     { threshold: 0.55, diversity_weight: 0.4, exploration_rate: 0.1 },
@@ -51,7 +51,7 @@ function ensureSeedData() {
   const v12 = createVersion(
     "matching",
     "v1.2.0",
-    "admin@deepsight.ai",
+    "demo-admin",
     "Cross-axis optimization",
     "Optimized cross-axis weight distribution",
     { threshold: 0.55, diversity_weight: 0.4, exploration_rate: 0.15 },
@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
         const newVer = createVersion(
           body.category,
           newVersionStr,
-          "admin@deepsight.ai",
+          "demo-admin",
           desc,
           changelog,
           { ...latest.config },
@@ -273,7 +273,7 @@ export async function POST(request: NextRequest) {
           versions[currentIdx],
           versions[targetIdx],
           body.reason ?? "Performance regression detected",
-          "admin@deepsight.ai",
+          "demo-admin",
           body.environments ?? ["development"]
         )
         versions[currentIdx] = updatedCurrent

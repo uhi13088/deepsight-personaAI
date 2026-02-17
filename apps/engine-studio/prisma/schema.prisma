@@ -1766,6 +1766,11 @@ model LlmUsageLog {
   status          LlmCallStatus @default(SUCCESS)
   errorMessage    String?  @db.Text
 
+  // v4.0: Prompt Caching (T143)
+  cacheCreationInputTokens Int?     // 캐시 생성 시 사용된 입력 토큰
+  cacheReadInputTokens     Int?     // 캐시 히트 시 읽은 입력 토큰
+  cacheSavingsUsd          Decimal? @db.Decimal(10, 6) // 캐싱 절감액 (USD)
+
   createdAt       DateTime @default(now())
 
   @@index([createdAt])
@@ -1841,4 +1846,159 @@ enum PostSource {
   FEED_INSPIRED
   ARENA_TEST
   SCHEDULED
+}
+
+// ============================================
+// v4.0: 아레나 시스템 (T144~T146)
+// 물리적 격리: 일반 페르소나 데이터와 완전히 분리
+// ============================================
+
+enum ArenaMode {
+  SPARRING_1V1
+}
+
+enum ArenaSessionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  CANCELLED
+}
+
+enum ProfileLoadLevel {
+  FULL
+  STANDARD
+  LITE
+}
+
+enum ArenaJudgmentMethod {
+  RULE_BASED
+  LLM
+}
+
+enum CorrectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ArenaTokenPhase {
+  TURN
+  JUDGMENT
+  PROFILE_LOAD
+}
+
+model ArenaSession {
+  id               String             @id @default(cuid())
+  mode             ArenaMode          @default(SPARRING_1V1)
+  participantA     String
+  participantB     String
+  profileLoadLevel ProfileLoadLevel   @default(STANDARD)
+  topic            String
+  maxTurns         Int                @default(6)
+  budgetTokens     Int                @default(10000)
+  usedTokens       Int                @default(0)
+  status           ArenaSessionStatus @default(PENDING)
+  createdAt        DateTime           @default(now())
+  startedAt        DateTime?
+  completedAt      DateTime?
+
+  // Relations
+  turns      ArenaTurn[]
+  judgment   ArenaJudgment?
+  tokenUsage ArenaTokenUsage[]
+
+  @@index([status])
+  @@index([participantA])
+  @@index([participantB])
+  @@index([createdAt])
+  @@map("arena_sessions")
+}
+
+model ArenaTurn {
+  id         String   @id @default(cuid())
+  sessionId  String
+  turnNumber Int
+  speakerId  String
+  content    String
+  tokensUsed Int      @default(0)
+  timestamp  DateTime @default(now())
+
+  // 스냅샷: 턴 시점의 벡터 상태 (디버깅용)
+  vectorSnapshot Json?
+  // 감정적 중요도 (0~1)
+  poignancy      Decimal? @db.Decimal(3, 2)
+
+  // Relations
+  session ArenaSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, turnNumber])
+  @@index([sessionId])
+  @@index([speakerId])
+  @@map("arena_turns")
+}
+
+model ArenaJudgment {
+  id        String               @id @default(cuid())
+  sessionId String               @unique
+  method    ArenaJudgmentMethod  @default(RULE_BASED)
+
+  // 평가 점수 (0~1)
+  characterConsistency Decimal @db.Decimal(3, 2) @default(0)
+  l2Emergence          Decimal @db.Decimal(3, 2) @default(0)
+  paradoxEmergence     Decimal @db.Decimal(3, 2) @default(0)
+  triggerResponse      Decimal @db.Decimal(3, 2) @default(0)
+  overallScore         Decimal @db.Decimal(3, 2) @default(0)
+
+  // 이슈 목록 (TurnIssue[])
+  issues  Json @default("[]")
+  summary String @default("")
+
+  judgedAt DateTime @default(now())
+
+  // Relations
+  session     ArenaSession          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  corrections ArenaCorrectionRequest[]
+
+  @@index([sessionId])
+  @@map("arena_judgments")
+}
+
+model ArenaCorrectionRequest {
+  id               String           @id @default(cuid())
+  sessionId        String
+  judgmentId       String
+  personaId        String
+  category         String           // consistency | l2 | paradox | trigger | voice
+  originalContent  String
+  correctedContent String
+  reason           String
+  status           CorrectionStatus @default(PENDING)
+  createdAt        DateTime         @default(now())
+  reviewedAt       DateTime?
+  reviewedBy       String?
+
+  // Relations
+  judgment ArenaJudgment @relation(fields: [judgmentId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([judgmentId])
+  @@index([status])
+  @@map("arena_correction_requests")
+}
+
+model ArenaTokenUsage {
+  id              String          @id @default(cuid())
+  sessionId       String
+  turnId          String?
+  phase           ArenaTokenPhase
+  inputTokens     Int             @default(0)
+  outputTokens    Int             @default(0)
+  estimatedCostUsd Decimal        @db.Decimal(10, 6) @default(0)
+  timestamp       DateTime        @default(now())
+
+  // Relations
+  session ArenaSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("arena_token_usage")
 }
