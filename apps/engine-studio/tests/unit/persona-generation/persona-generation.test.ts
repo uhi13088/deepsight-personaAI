@@ -55,8 +55,8 @@ const IRONIC_L3: NarrativeDriveVector = {
 // ═══════════════════════════════════════════════════════════════
 
 describe("Archetypes (AC1)", () => {
-  it("should have exactly 12 archetypes", () => {
-    expect(ARCHETYPES).toHaveLength(12)
+  it("should have exactly 22 archetypes", () => {
+    expect(ARCHETYPES).toHaveLength(22)
   })
 
   it("each archetype should have required fields", () => {
@@ -85,8 +85,8 @@ describe("Archetypes (AC1)", () => {
     expect(getArchetypeById("unknown")).toBeUndefined()
   })
 
-  it("getArchetypeIds should return all 12 ids", () => {
-    expect(getArchetypeIds()).toHaveLength(12)
+  it("getArchetypeIds should return all 22 ids", () => {
+    expect(getArchetypeIds()).toHaveLength(22)
   })
 
   it("generateVectorsFromArchetype should produce vectors within ranges", () => {
@@ -150,7 +150,7 @@ describe("Vector Generator (AC2)", () => {
   })
 
   it("should generate vectors within archetype ranges", () => {
-    const arch = getArchetypeById("wounded-critic")!
+    const arch = getArchetypeById("volatile-intellectual")!
     const vectors = generateDiverseVectors({ archetype: arch })
 
     for (const [key, [min, max]] of Object.entries(arch.layer1)) {
@@ -243,7 +243,7 @@ describe("Paradox Designer (AC3)", () => {
   })
 
   it("tension map entries should have aligned flag", () => {
-    const arch = getArchetypeById("social-introvert")!
+    const arch = getArchetypeById("reluctant-leader")!
     const vectors = generateVectorsFromArchetype(arch)
     const result = designParadox(vectors.l1, vectors.l2, vectors.l3, arch)
 
@@ -498,7 +498,7 @@ describe("Generation Pipeline (Integration)", () => {
     expect(names.every((n) => n.length > 0)).toBe(true)
   })
 
-  it("all 12 archetypes should produce valid personas", () => {
+  it("all 22 archetypes should produce valid personas", () => {
     for (const arch of ARCHETYPES) {
       const persona = generatePersona({ archetypeId: arch.id })
       expect(persona.validation.valid).toBe(true)
