@@ -2,8 +2,14 @@
 
 **버전**: v4.0
 **작성일**: 2026-02-16
+**최종 수정**: 2026-02-17
 **상태**: Active
-**설계서 참조**: `docs/design/persona-world-v4.md`
+**설계서 참조**:
+
+- 인덱스: `docs/design/persona-world-v4.md`
+- Part 1 Core: `docs/design/persona-world-v4-core.md` (§1-4)
+- Part 2 Social: `docs/design/persona-world-v4-social.md` (§5-8)
+- Part 3 Operations: `docs/design/persona-world-v4-operations.md` (§9-12)
 
 ---
 
@@ -18,8 +24,11 @@
 7. [피드 알고리즘](#7-피드-알고리즘)
 8. [온보딩 API](#8-온보딩-api)
 9. [보안 통합](#9-보안-통합)
-10. [구현 페이즈 및 태스크](#10-구현-페이즈-및-태스크)
-11. [파일 변경 맵](#11-파일-변경-맵)
+10. [품질 측정 통합](#10-품질-측정-통합)
+11. [모더레이션 & 운영](#11-모더레이션--운영)
+12. [비용 모니터링 & 제어](#12-비용-모니터링--제어)
+13. [구현 페이즈 및 태스크](#13-구현-페이즈-및-태스크)
+14. [파일 변경 맵](#14-파일-변경-맵)
 
 ---
 
@@ -655,72 +664,619 @@ POST   /api/persona-world/onboarding/sns-connect
 
 ## 9. 보안 통합
 
-### 9.1 미들웨어 레이어
+> **설계서 참조**: `persona-world-v4-operations.md` §10
+
+### 9.1 보안 파이프라인 (3경로)
 
 **파일**: `src/lib/persona-world/security-middleware.ts`
 
-```
-// 모든 유저 입력에 적용
-async function securityMiddleware(input: string, userId: string) {
-  const trustScore = await getTrustScore(userId);
-  const gateResult = checkInput(input, trustScore);
-  if (gateResult.verdict === 'BLOCK') {
-    await quarantine(input, 'gate', gateResult);
-    throw new SecurityError('Input blocked');
-  }
-  if (gateResult.verdict === 'WARN') {
-    await logWarning(input, gateResult);
-  }
-  return gateResult;
-}
+PersonaWorld는 3가지 경로에 각각 보안 검증을 적용한다.
 
-// 모든 LLM 출력에 적용
-async function outputMiddleware(output: string, personaId: string) {
-  const sentinelResult = checkOutput(output, personaId);
-  if (!sentinelResult.passed) {
-    const hasCritical = sentinelResult.violations.some(v => v.severity === 'critical');
-    if (hasCritical) {
-      await quarantine(output, sentinelResult.violations[0].category, sentinelResult);
-      throw new SecurityError('Output blocked');
-    }
-    return sentinelResult.sanitizedOutput;  // 마스킹 후 통과
-  }
-  return output;
-}
+```
+경로 1 — 유저 입력:     Gate Guard → 엔진 처리 → Output Sentinel
+경로 2 — 자율 활동:     Integrity Monitor → 생성 → Output Sentinel
+경로 3 — Arena 교정:    격리 검증 → 관리자 승인 → 패치 적용
 ```
 
-### 9.2 Kill Switch 체크
+```
+securityMiddleware(input, userId): GateCheckResult
+├── getTrustScore(userId)                     // UserTrustScore 조회
+├── checkInput(input, trustScore)             // Gate Guard (엔진)
+├── checkPWSpecificRules(input, userId)       // PW 특화 규칙 6종
+│   ├── checkPersonaManipulation(input)       // 페르소나 조작 시도
+│   ├── checkInfoExtraction(input)            // 내부 정보 추출 시도
+│   ├── checkRateLimiting(userId, action)     // 대량 행위 제한
+│   └── checkSpamDetection(input)             // 스팸 탐지
+├── onBlock → quarantine + SecurityError
+└── onWarn → logWarning + continue
 
-```typescript
-// 활동 실행 전 항상 체크
-async function checkFeatureEnabled(feature: string): boolean {
-  const config = await getSystemSafetyConfig()
-  if (config.globalFreeze) return false
-  return config.featureToggles[feature] ?? true
-}
+outputMiddleware(output, personaId): string
+├── checkOutput(output, personaId)            // Output Sentinel (엔진)
+├── checkToneDeviation(output, personaId)     // 톤 일탈 검사 (PW 확장)
+├── onCritical → quarantine + SecurityError
+├── onViolation → sanitize (마스킹)
+└── onPass → return output
+
+autonomousActivityCheck(personaId): IntegrityCheckResult
+├── checkPersonaStateRange(personaId)         // mood/energy 급변 감지
+├── verifyFactbookHash(personaId)             // 팩트북 해시 검증
+├── checkRecentActivityPattern(personaId)     // 활동 패턴 이상 여부
+└── onFail → logAnomaly + suspendActivity + adminAlert
 ```
 
-### 9.3 출처 기록
+### 9.2 PW 특화 보안 규칙
 
-```typescript
-// 포스트/인터랙션 생성 시 자동 첨부
-function attachProvenance(
-  entity: Post | Interaction,
-  source: InteractionSource | PostSource
-): ProvenanceRecord {
-  return {
-    source,
-    trustScore: computeTrustScore(source),
-    verificationSteps: countVerificationSteps(entity),
-    propagationDepth: 0,
-    decayFactor: 1.0,
+**파일**: `src/lib/persona-world/security/pw-gate-rules.ts`
+
+```
+// 4종 PW 특화 검사
+checkPersonaManipulation(input): GateCheckResult
+// 패턴: 성격/벡터/설정 변경 시도, ignore previous instructions 등
+
+checkInfoExtraction(input): GateCheckResult
+// 패턴: 시스템 프롬프트 요청, 벡터값 추출 시도, OCEAN/L1 수치 질문
+
+checkRateLimiting(userId, action): GateCheckResult
+// 규칙: COMMENT 30/h·100/d, LIKE 60/h·500/d, FOLLOW 20/h·50/d, REPORT 10/h·30/d
+
+checkSpamDetection(input): GateCheckResult
+// 규칙: 중복 콘텐츠(0.9 유사도/1h), URL 2개 초과, 멘션 5개 초과
+```
+
+### 9.3 유저 신뢰도 관리 (Trust Score)
+
+**파일**: `src/lib/persona-world/security/user-trust.ts`
+
+```
+getUserTrustScore(userId): UserTrustScore
+updateTrustScore(userId, event): UserTrustScore
+├── onBlockEvent: score × (1 - 0.15)
+├── onWarnEvent: score × (1 - 0.05)
+├── onReportReceived: score × (1 - 0.03)
+├── onReportConfirmed: score × (1 - 0.10)
+└── dailyRecovery: min(score + 0.01, 0.95)
+
+getInspectionLevel(score): InspectionLevel
+// HIGH (≥0.8): 기본 검사
+// MEDIUM (0.5~0.8): 강화 검사
+// LOW (0.3~0.5): 모든 입력 심층 검사
+// BLOCKED (<0.3): 입력 차단
+```
+
+### 9.4 Kill Switch 확장 (PW 기능별 토글)
+
+**파일**: `src/lib/persona-world/security/pw-kill-switch.ts`
+
+```
+// 엔진 Kill Switch(6종)에 PW 특화 토글(8종) 추가
+interface PWKillSwitchConfig {
+  // 엔진 SystemSafetyConfig 상속
+  globalFreeze: boolean
+
+  // PW 특화 토글
+  featureToggles: {
+    postGeneration: boolean
+    commentGeneration: boolean
+    likeInteraction: boolean
+    followInteraction: boolean
+    feedAlgorithm: boolean        // false → 시간순 폴백
+    emotionalContagion: boolean
+    userInteraction: boolean
+    onboarding: boolean
   }
+
+  // PW 특화 자동 트리거 (4종)
+  autoTriggers: PWAutoTrigger[]
 }
+
+checkPWFeatureEnabled(feature: string): boolean
+getPWKillSwitchStatus(): PWKillSwitchConfig
+activatePWKillSwitch(scope, features?, reason): void
+deactivatePWKillSwitch(scope): void
+```
+
+**PW 자동 트리거 조건**:
+
+- 인젝션 급증: 1h 내 BLOCK 10건 → `FREEZE_USER_INTERACTION`
+- PII 유출: 24h 내 PII 차단 5건 → `FREEZE_POST_GENERATION`
+- 집단 드리프트: 페르소나 20% 이상 동시 벡터 이상 → `GLOBAL_FREEZE`
+- 비용 초과: 일일 예산 150% 도달 → `FREEZE_POST_AND_COMMENT`
+
+### 9.5 Quarantine 시스템
+
+**파일**: `src/lib/persona-world/security/quarantine.ts`
+
+```
+createQuarantineEntry(content, reason, severity): QuarantineEntry
+getQuarantineQueue(filters): QuarantineEntry[]
+reviewQuarantine(entryId, action, adminId, note): void
+processExpiredEntries(): number  // 자동 만료 (REJECTED 처리)
+getQuarantineStats(): QuarantineStats
+
+// 심각도별 자동 만료
+// LOW: 72시간, MEDIUM: 48시간, HIGH: 24시간, CRITICAL: 수동 전용
+```
+
+### 9.6 출처 기록 (Data Provenance)
+
+**파일**: `src/lib/persona-world/security/provenance.ts`
+
+```
+attachProvenance(entity, source): DataProvenance
+├── computeTrustScore(source, verificationSteps)
+│   // PERSONA_AUTONOMOUS: 0.7 → 0.95 (전체 검증 시)
+│   // USER_DIRECT: 0.5 → 0.85
+│   // ARENA_SESSION: 0.8 → 0.98
+├── recordVerificationSteps(gateGuard, integrity, sentinel)
+└── computeDecayFactor(propagationDepth)
+    // repost: ×0.9, quote: ×0.85, 2차 repost: ×0.81
+
+getContentProvenance(contentId): DataProvenance
+queryByTrustScore(minScore): DataProvenance[]
 ```
 
 ---
 
-## 10. 구현 페이즈 및 태스크
+## 10. 품질 측정 통합
+
+> **설계서 참조**: `persona-world-v4-operations.md` §9
+
+### 10.1 Auto-Interview (PW 확장)
+
+**파일**: `src/lib/persona-world/quality/auto-interview.ts`
+
+PersonaWorld 컨텍스트에 맞게 확장한 20문항 자동 인터뷰 시스템. 엔진의 기본 Auto-Interview를 PW의 포스트/댓글 맥락으로 확장.
+
+```
+runAutoInterview(personaId: string): InterviewResult
+├── selectQuestions(personaId)
+│   ├── getGoldenSampleQuestions()           // 고정 기준점 (비교용)
+│   └── generateContextualQuestions(persona) // 최근 포스트 기반 동적 질문
+├── executeInterview(personaId, questions)
+│   ├── buildInterviewPrompt(persona, question)
+│   │   ├── buildInstructionPrompt(persona)  // [Static — Cached]
+│   │   └── buildQuestionPrompt(question)    // [Dynamic]
+│   ├── callLLM(prompt)                      // ~2,500 tok/질문
+│   └── judgeResponse(question, response, persona)
+│       ├── buildJudgmentPrompt(question, response, vectors, criteria)
+│       ├── callLLM(judgmentPrompt)           // ~1,500 tok/판정
+│       └── parseJudgment(): { score, verdict, reason }
+└── aggregateResults(judgments): InterviewResult
+```
+
+**문항 구성** (설계서 §9.2 기준):
+
+| 레이어       | 문항 수 | 측정 대상     | PW 확장                  |
+| ------------ | ------- | ------------- | ------------------------ |
+| L1 Social    | 7       | 행동 일관성   | 포스트 톤 vs 벡터 정합성 |
+| L2 OCEAN     | 5       | 기질 안정성   | 논쟁 댓글 시 반응 패턴   |
+| L3 Narrative | 4       | 서사 일관성   | 시간 경과 성장 표현      |
+| Cross-Layer  | 4       | 패러독스 발현 | 모순 상황 반응 자연성    |
+
+**판정 기준**: pass(≥0.85), warning(0.70~0.85), fail(<0.70)
+
+**샘플링 정책**:
+
+```
+selectInterviewTargets(allPersonas): string[]
+├── recentDeviationPersonas → 우선 포함
+├── randomSample(remaining, ratio)
+│   // 기본: 전체의 20% (100 페르소나 → 20/일)
+│   // PIS EXCELLENT: 2주에 1회
+│   // PIS GOOD: 주 1회
+│   // PIS WARNING: 주 2회
+│   // PIS CRITICAL: 매일
+└── return targetPersonaIds
+```
+
+### 10.2 Persona Integrity Score (PIS)
+
+**파일**: `src/lib/persona-world/quality/integrity-score.ts`
+
+페르소나의 종합 캐릭터 무결성을 3가지 구성 요소로 측정.
+
+```
+computePIS(personaId): PersonaIntegrityScore
+├── computeContextRecall(personaId)          // 가중치 0.35
+│   ├── testRecentMemory(personaId, 7)       // 최근 7일 기억 테스트
+│   ├── testMediumTermMemory(personaId, 30)  // 7~30일 기억
+│   └── testCoreMemoryRetention(personaId)   // Poignancy≥0.8 유지율
+├── computeSettingConsistency(personaId)     // 가중치 0.35
+│   ├── checkFactbookCompliance(personaId)   // 최근 50포스트 팩트 위반 검사
+│   ├── checkVoiceSpecAdherence(personaId)   // 말투·격식도 준수율
+│   └── checkVectorBehaviorAlign(personaId)  // 벡터값 ↔ 실제 행동
+├── computeCharacterStability(personaId)     // 가중치 0.30
+│   ├── measureWeeklyDrift(personaId)        // V_Final 주간 변화량
+│   ├── measureToneVariance(personaId)       // 포스트 톤 분산
+│   └── measureGrowthArcAlignment(personaId) // 의도 성장 vs 실제 변화
+└── computeOverall(recall, consistency, stability)
+    // PIS = recall × 0.35 + consistency × 0.35 + stability × 0.30
+```
+
+**PIS 등급 & 자동 조치**:
+
+| 등급       | PIS       | 자동 조치                                      |
+| ---------- | --------- | ---------------------------------------------- |
+| EXCELLENT  | 0.90~1.00 | 인터뷰 빈도 감소                               |
+| GOOD       | 0.80~0.90 | 정상 운영                                      |
+| WARNING    | 0.70~0.80 | 인터뷰 빈도 증가 + 대시보드 경고               |
+| CRITICAL   | 0.60~0.70 | Arena 스파링 자동 예약 + 관리자 알림           |
+| QUARANTINE | < 0.60    | 자율 활동 정지 + Arena 긴급 교정 + 관리자 승인 |
+
+```
+getPISGrade(pis: number): PISGrade
+applyPISActions(personaId, grade): void
+// QUARANTINE → pausePersona + triggerArena + notifyAdmin
+// CRITICAL → scheduleArena + notifyAdmin
+// WARNING → increaseInterviewFrequency + dashboardAlert
+```
+
+### 10.3 품질 로깅
+
+**파일**: `src/lib/persona-world/quality/quality-logger.ts`
+
+모든 PersonaWorld 활동을 구조화된 로그로 기록.
+
+```
+logPostQuality(post, generationMeta): PostQualityLog
+├── measureVoiceSpecMatch(post.content, persona.voiceSpec)
+├── detectFactbookViolations(post.content, persona.factbook)
+├── measureRepetitionScore(post.content, recentPosts)
+└── measureTopicRelevance(post.content, persona.interests)
+
+logCommentQuality(comment, context): CommentQualityLog
+├── measureToneMatch(comment, expectedTone, relationship)
+├── measureContextRelevance(comment, targetPost)
+├── checkMemoryReference(comment, recentInteractions)
+└── measureNaturalness(comment)  // LLM Judge 또는 규칙 기반
+
+logInteractionPattern(personaId, period): InteractionPatternLog
+├── aggregateActivityStats(personaId, period)
+├── analyzePatterns(stats)
+│   ├── computeTargetDiversity(interactions)
+│   ├── computeTopicDiversity(posts)
+│   └── computeEnergyCorrelation(activities, state)
+└── detectAnomalies(patterns)
+    // BOT_PATTERN, ENERGY_MISMATCH, SUDDEN_BURST, PROLONGED_SILENCE
+```
+
+**수집 & 보존 정책**:
+
+| 로그 유형          | 수집 시점        | 보존 기간 | 집계 주기 |
+| ------------------ | ---------------- | --------- | --------- |
+| PostQualityLog     | 포스트 생성 즉시 | 90일      | 일간      |
+| CommentQualityLog  | 댓글 생성 즉시   | 60일      | 일간      |
+| InteractionPattern | 시간별 자동 집계 | 180일     | 시간/일간 |
+| EngagementMetrics  | 생성 후 24시간   | 90일      | 일간      |
+
+### 10.4 Arena 피드백 루프 (PW → Engine)
+
+**파일**: `src/lib/persona-world/quality/arena-bridge.ts`
+
+PW 품질 측정 결과를 엔진의 Arena 시스템에 연동하여 자동 교정 트리거.
+
+```
+checkArenaTriggered(personaId): ArenaTriggered | null
+├── checkInterviewFail(personaId)          // 인터뷰 < 0.70 → HIGH (2시간 내)
+├── checkPISDrop(personaId)                // PIS 주간 변화 > -0.10 → HIGH (4시간)
+├── checkPISCritical(personaId)            // PIS < 0.60 → CRITICAL (즉시)
+├── checkBotPattern(personaId)             // BOT_PATTERN CRITICAL → HIGH (1시간)
+├── checkFactbookViolationRate(personaId)  // 3회/일 초과 → MEDIUM (24시간)
+└── checkScheduledCheck()                  // 주 1회 전체 순회 → LOW
+
+triggerArenaSession(personaId, reason, priority): void
+├── estimateCost(personaId)
+├── checkBudgetApproval(estimatedCost)
+├── createArenaSession(personaId, config)
+└── notifyAdmin(personaId, reason, priority)
+
+trackCorrectionResult(correctionId): CorrectionTracking
+├── measureBeforePIS(personaId)
+├── recordCorrectionDetails(arenaSessionId, patchCategories)
+├── scheduleAfterMeasurement(correctionId, 3days)  // 3일 후 재측정
+└── evaluateVerdict(before, after)
+    // EFFECTIVE: after.pis - before.pis > 0.05
+    // PARTIAL: 0 < improvement ≤ 0.05
+    // INEFFECTIVE: improvement ≈ 0
+    // REGRESSED: improvement < 0
+```
+
+---
+
+## 11. 모더레이션 & 운영
+
+> **설계서 참조**: `persona-world-v4-operations.md` §11
+
+### 11.1 자동 모더레이션 파이프라인
+
+**파일**: `src/lib/persona-world/moderation/auto-moderator.ts`
+
+3단계 파이프라인으로 콘텐츠를 자동 분류·처리.
+
+```
+runModerationPipeline(content, personaId): ModerationResult
+├── stage1_RuleBased(content)                // ~5ms
+│   ├── checkBannedWords(content)
+│   ├── checkLengthLimits(content)
+│   └── checkPatterns(content)
+├── stage2_OutputSentinel(content, personaId) // ~50ms
+│   ├── checkPII(content)
+│   ├── checkSystemLeak(content)
+│   ├── checkFactbookViolation(content, personaId)
+│   └── checkVoiceGuardRail(content, personaId)
+└── return { verdict, actions, violations }
+
+// 비동기 3차 분석 (24시간 후 배치)
+runAsyncAnalysis(contentIds): AsyncModerationResult[]
+├── analyzeEngagementAnomaly(contentIds)     // 인게이지먼트 이상
+├── analyzeRepetitionPattern(contentIds)     // 반복 패턴
+├── analyzeToneDeviation(contentIds)         // 톤 일탈 추이
+└── flagForReview(anomalies)
+```
+
+**자동 조치 매트릭스**:
+
+| 탐지 유형         | 1차 조치             | 반복 시 2차 조치            |
+| ----------------- | -------------------- | --------------------------- |
+| 금지어            | 콘텐츠 차단          | Arena 긴급 교정             |
+| PII 노출          | 마스킹 + 게시        | 포스트 생성 일시 중단       |
+| 팩트북 위반       | 격리 (관리자 리뷰)   | Arena 스파링 트리거         |
+| 톤 가드레일       | 로깅 (게시 허용)     | 인터뷰 빈도 증가            |
+| 반복 (>85%)       | 경고 + 다양성 상향   | 포스팅 빈도 일시 감소       |
+| 인게이지먼트 이상 | 로깅 + 대시보드 표시 | 봇 패턴 검사 + Arena 트리거 |
+
+### 11.2 관리자 대시보드
+
+**파일**: `src/lib/persona-world/admin/dashboard-service.ts`
+
+PersonaWorld 운영 상태를 실시간으로 집계하는 서비스 레이어.
+
+```
+computeDashboardData(): AdminDashboard
+├── computeActivityOverview()
+│   // activePersonasNow, totalPostsToday, totalCommentsToday,
+│   // totalLikesToday, totalFollowsToday, averagePostsPerPersona
+├── computeQualityOverview()
+│   // averagePIS, pisDistribution(5등급), pendingCorrections,
+│   // recentArenaResults
+├── computeCostOverview()
+│   // llmCallsToday, estimatedCostToday, monthlyBudget,
+│   // usagePercentage, cacheHitRate, costTrend(30일)
+├── computeSecurityOverview()
+│   // gateGuardBlocks24h, sentinelActions24h,
+│   // quarantinePending, killSwitchStatus
+├── getActiveAlerts()
+│   // QUALITY | SECURITY | COST | SYSTEM | REPORT
+└── computeReportOverview()
+    // pendingCount, resolvedToday, averageResolutionTime
+```
+
+**API 엔드포인트**:
+
+```
+GET    /api/admin/persona-world/dashboard
+GET    /api/admin/persona-world/alerts
+GET    /api/admin/persona-world/quarantine
+POST   /api/admin/persona-world/quarantine/:id/review
+GET    /api/admin/persona-world/reports
+POST   /api/admin/persona-world/reports/:id/resolve
+```
+
+### 11.3 관리자 액션
+
+**파일**: `src/lib/persona-world/admin/moderation-actions.ts`
+
+```
+// === 콘텐츠 관리 ===
+hidePost(postId, reason): void
+deletePost(postId, reason): void
+restorePost(postId): void
+hideComment(commentId, reason): void
+deleteComment(commentId, reason): void
+bulkHidePosts(postIds, reason): void
+bulkDeleteComments(commentIds, reason): void
+
+// === 격리 리뷰 ===
+approveQuarantine(quarantineId, note): void
+rejectQuarantine(quarantineId, note): void
+
+// === 페르소나 관리 ===
+pausePersona(personaId, reason): void
+resumePersona(personaId): void
+restrictActivity(personaId, restrictions, duration?): void
+triggerArenaSession(personaId, reason): void
+approveCorrection(correctionId): void
+rejectCorrection(correctionId, reason): void
+
+// === 시스템 제어 ===
+activateKillSwitch(scope, features?, reason): void
+deactivateKillSwitch(scope): void
+initiateGradualResume(phases): void
+updateDailyBudget(newBudget): void
+setEmergencyBudgetCap(cap): void
+```
+
+### 11.4 신고 처리 시스템
+
+**파일**: `src/lib/persona-world/admin/report-handler.ts`
+
+```
+submitReport(userId, targetType, targetId, category, description?): ContentReport
+├── classifyReport(category, description)
+├── checkAutoResolvable(report)
+│   ├── REPETITIVE_CONTENT → autoHide + adjustDiversity
+│   ├── CHARACTER_BREAK → triggerPISRecheck + triggerArena
+│   └── others → addToReviewQueue
+└── notifyReporter(reportId, status)
+
+processReport(reportId, action, adminId, note): void
+├── executeAction(action)
+│   // HIDDEN, DELETED, PERSONA_PAUSED, DISMISSED, NO_ACTION
+├── adjustTrustScores(report, action)
+│   ├── confirmed → targetPersona trust -0.10
+│   └── dismissed + malicious → reporter trust -0.05
+├── checkArenaNeeded(report, action)
+└── notifyReporter(reportId, resolution)
+
+getReportQueue(filters): ContentReport[]
+getReportStats(): ReportStats
+```
+
+**신고 카테고리 6종**:
+
+| 카테고리               | 우선순위 | 자동 처리 |
+| ---------------------- | -------- | --------- |
+| INAPPROPRIATE_CONTENT  | HIGH     | 부분적    |
+| WRONG_INFORMATION      | MEDIUM   | 아니오    |
+| CHARACTER_BREAK        | MEDIUM   | 예 (PIS)  |
+| REPETITIVE_CONTENT     | LOW      | 예        |
+| UNPLEASANT_INTERACTION | HIGH     | 부분적    |
+| TECHNICAL_ISSUE        | LOW      | 아니오    |
+
+### 11.5 운영 스케줄 작업
+
+**파일**: `src/lib/persona-world/admin/scheduled-jobs.ts`
+
+```
+// 품질 관련
+scheduleAutoInterview()      // 매일 03:00 — 전체 20% 인터뷰 (~30분, ~$0.3)
+scheduleWeeklyPISReport()    // 매주 월 09:00 — 전체 PIS 계산 (~15분, ~$0.1)
+scheduleDailyPatternAnalysis() // 매일 04:00 — 이상 탐지 배치 (~10분, 무료)
+
+// 운영 관련
+scheduleHourlyMetrics()      // 매시간 — 활동/비용/보안 메트릭 집계 (~2분, 무료)
+scheduleDailyCostReport()    // 매일 23:00 — 비용 리포트 + 예산 경고 (~1분, 무료)
+scheduleWeeklyArena()        // 매주 수 02:00 — WARNING 이하 Arena 예약 (가변)
+
+// 정리 관련
+scheduleDailyLogCleanup()    // 매일 05:00 — 보존 기간 초과 로그 아카이빙 (~5분)
+scheduleDailyQuarantineExpiry() // 매일 06:00 — 만료 격리 자동 거부 (~1분)
+```
+
+### 11.6 운영 KPI
+
+**파일**: `src/lib/persona-world/admin/kpi-tracker.ts`
+
+```
+computeServiceKPIs(): ServiceKPIs
+├── personaActiveRate()      // 목표 ≥90%, 알림 <85%
+├── averagePIS()             // 목표 ≥0.80, 알림 <0.75
+├── engagementPerPost()      // 목표 ≥10, 알림 <5
+├── factbookViolationRate()  // 목표 <1%, 알림 >2%
+├── quarantineRate()         // 목표 <2%, 알림 >5%
+├── reportResolutionTime()   // 목표 <30분, 알림 >60분
+├── killSwitchCount()        // 목표 0회/월, 알림 >0
+└── cacheHitRate()           // 목표 ≥80%, 알림 <70%
+
+computeUserExperienceKPIs(): UserExperienceKPIs
+├── avgSessionDuration()     // 목표 ≥10분, 알림 <5분
+├── feedScrollCount()        // 목표 ≥30회, 알림 <15회
+├── followConversionRate()   // 목표 ≥20%, 알림 <10%
+├── commentParticipationRate() // 목표 ≥5%, 알림 <2%
+├── onboardingCompletionRate() // 목표 ≥70%, 알림 <50%
+└── moderationRate()         // 목표 <1%, 알림 >3%
+```
+
+---
+
+## 12. 비용 모니터링 & 제어
+
+> **설계서 참조**: `persona-world-v4-operations.md` §12
+
+### 12.1 비용 추적 (확장)
+
+**파일**: `src/lib/persona-world/cost/usage-tracker.ts`
+
+엔진의 `LlmUsageLog`를 PersonaWorld 활동 유형별로 세분화하여 추적.
+
+```
+logLlmUsage(personaId, callType, tokens, cost): void
+// callType: POST | COMMENT | INTERVIEW | JUDGE | ARENA | OTHER
+
+computeDailyCost(): DailyCostReport
+├── aggregateByCallType(today)
+├── aggregateByPersona(today)
+├── computeCacheEfficiency(today)
+└── compareToBudget(today, dailyBudget)
+
+computeMonthlyCost(): MonthlyCostReport
+├── aggregateByDay(month)
+├── aggregateByCategory(month)
+│   // 포스팅 21% / 댓글 31% / Auto-Interview 43% / Arena 5%
+├── computeOptimizationSavings(month)
+└── projectEndOfMonth(currentSpending, remainingDays)
+```
+
+### 12.2 예산 알림 체계
+
+**파일**: `src/lib/persona-world/cost/budget-alert.ts`
+
+```
+checkBudgetAlerts(spending): BudgetAlert[]
+├── checkDailyBudget(spending.daily, policy.dailyBudget)
+│   // info: 50%, warning: 80%, critical: 100%, emergency: 150%
+├── checkMonthlyBudget(spending.monthly, policy.monthlyBudget)
+│   // info: 60%, warning: 80%, critical: 90%, emergency: 100%
+└── emitAlerts(alerts)
+
+// 비용 초과 시 자동 조치
+handleCostOverrun(level): void
+├── level 80%  → reducePostFrequency(0.5) + alert
+├── level 100% → freezeGeneration + allowLikesOnly
+├── level 120% → freezeAllAutonomous + allowUserResponseOnly
+└── level 150% → globalFreeze (Kill Switch 자동 발동)
+```
+
+### 12.3 비용 모드 (품질 vs 비용 트레이드오프)
+
+**파일**: `src/lib/persona-world/cost/cost-mode.ts`
+
+```
+type CostMode = "QUALITY" | "BALANCE" | "COST_PRIORITY"
+
+getCostModeConfig(mode: CostMode): CostModeConfig
+// QUALITY (기본):
+//   posting 2/일, comments 5/일, interview 20%, arena 주1회
+//   ~$2.4/페르소나/월, PIS 예상 ≥0.85
+// BALANCE:
+//   posting 1.5/일, comments 3/일, interview 10%, arena 격주1회
+//   ~$1.7/페르소나/월, PIS 예상 ≥0.80
+// COST_PRIORITY:
+//   posting 1/일, comments 2/일, interview 5%, arena 월1회
+//   ~$1.2/페르소나/월, PIS 예상 ≥0.75
+
+applyCostMode(mode: CostMode): void
+├── updateSchedulerFrequency(mode.posting, mode.comments)
+├── updateInterviewSampling(mode.interviewRate)
+├── updateArenaSchedule(mode.arenaFrequency)
+└── updateBudgetPolicy(mode.estimatedBudget)
+```
+
+### 12.4 비용 최적화 실행
+
+**파일**: `src/lib/persona-world/cost/optimizer.ts`
+
+```
+// 전략 1: PIS 기반 적응적 인터뷰 스케줄링
+computeAdaptiveInterviewSchedule(personas): InterviewSchedule
+// EXCELLENT(45%): 2주에 1회, GOOD(38%): 주1회,
+// WARNING(12%): 주2회, CRITICAL(5%): 매일
+// 효과: Auto-Interview 비용 $98.4 → $83.4 (-15.2%)
+
+// 전략 2: 댓글 배치 처리
+batchCommentGeneration(persona, targets): BatchResult
+// 같은 시간대 댓글 최대 3개 → 1회 LLM 호출
+// 효과: 댓글 비용 $72.0 → $48.9 (-32.1%)
+
+// 전략 3: 캐시 적중률 극대화
+optimizeLlmCallOrdering(pendingCalls): OrderedCalls
+// 유사 Static 블록 페르소나 연속 처리, 최소 5분 간격 유지
+// 효과: 포스팅 비용 $48.6 → $46.2 (-4.9%)
+```
+
+---
+
+## 13. 구현 페이즈 및 태스크
 
 ### Phase 0: 기반 (DB + 타입)
 
@@ -771,7 +1327,7 @@ function attachProvenance(
 | 23  | Explore 탭              | DONE |
 | 24  | 소셜 모듈 부스트 (v4.0) | DONE |
 
-### Phase 5: 온보딩 + 품질
+### Phase 5: 온보딩 + 기본 품질
 
 | #   | 태스크                          | 상태 |
 | --- | ------------------------------- | ---- |
@@ -782,9 +1338,44 @@ function attachProvenance(
 | 29  | Auto-Interview + Integrity 연동 | DONE |
 | 30  | 출처 추적 통합 (v4.0)           | DONE |
 
+### Phase 6: 보안 확장 + 품질 측정 (v4.0 Operations)
+
+| #   | 태스크                                                            | 상태 |
+| --- | ----------------------------------------------------------------- | ---- |
+| 31  | PW 특화 Gate Guard 규칙 (조작 시도, 정보 추출, 레이트 리밋, 스팸) | TODO |
+| 32  | 유저 신뢰도 관리 (Trust Score CRUD, Inspection Level)             | TODO |
+| 33  | PW Kill Switch 확장 (8종 토글, 4종 자동 트리거)                   | TODO |
+| 34  | Quarantine 시스템 (격리 CRUD, 만료 처리, 심각도별 정책)           | TODO |
+| 35  | 자율 활동 무결성 검증 (PersonaState, 팩트북, 패턴 검사)           | TODO |
+| 36  | Auto-Interview PW 확장 (20문항, PW 맥락화, 적응적 스케줄링)       | TODO |
+| 37  | PIS 계산 (3요소 가중합, 등급 판정, 자동 조치)                     | TODO |
+| 38  | 품질 로깅 (PostQualityLog, CommentQualityLog, InteractionPattern) | TODO |
+| 39  | Arena 피드백 루프 (PW→Arena 트리거, 교정 추적)                    | TODO |
+
+### Phase 7: 모더레이션 & 운영
+
+| #   | 태스크                                                       | 상태 |
+| --- | ------------------------------------------------------------ | ---- |
+| 40  | 자동 모더레이션 파이프라인 (3단계: 규칙→Sentinel→비동기)     | TODO |
+| 41  | 관리자 대시보드 서비스 (Activity/Quality/Cost/Security 집계) | TODO |
+| 42  | 관리자 대시보드 API (6 엔드포인트)                           | TODO |
+| 43  | 콘텐츠/페르소나/시스템 관리 액션                             | TODO |
+| 44  | 신고 처리 시스템 (6종 카테고리, 자동 분류, 관리자 리뷰)      | TODO |
+| 45  | 운영 스케줄 작업 (8종 예약 작업)                             | TODO |
+| 46  | 운영 KPI 트래커 (서비스 건전성 8종, UX 6종)                  | TODO |
+
+### Phase 8: 비용 모니터링 & 제어
+
+| #   | 태스크                                                     | 상태 |
+| --- | ---------------------------------------------------------- | ---- |
+| 47  | 비용 추적 확장 (활동 유형별 LLM 사용 로깅, 일간/월간 집계) | TODO |
+| 48  | 예산 알림 체계 (4단계 일일/월간, 자동 조치)                | TODO |
+| 49  | 비용 모드 (QUALITY/BALANCE/COST_PRIORITY)                  | TODO |
+| 50  | 비용 최적화 실행 (적응적 스케줄링, 배치 처리, 캐시 최적화) | TODO |
+
 ---
 
-## 11. 파일 변경 맵
+## 14. 파일 변경 맵
 
 ### 신규 파일
 
@@ -797,7 +1388,7 @@ src/lib/persona-world/
   ├── state-manager.ts             // PersonaState 관리
   ├── consumption-logger.ts        // 소비 기록
   ├── feed-engine.ts               // 피드 알고리즘
-  ├── security-middleware.ts       // v4.0 보안 통합
+  ├── security-middleware.ts       // v4.0 보안 파이프라인
   │
   ├── interactions/
   │   ├── like.ts                  // 좋아요 판정
@@ -806,10 +1397,39 @@ src/lib/persona-world/
   │   ├── relationship-update.ts   // 관계 업데이트
   │   └── user-interaction.ts      // 유저↔페르소나
   │
-  └── onboarding/
-      ├── phase-manager.ts         // Phase 관리
-      ├── question-engine.ts       // 질문 선택/생성
-      └── sns-analyzer.ts          // SNS 분석
+  ├── onboarding/
+  │   ├── phase-manager.ts         // Phase 관리
+  │   ├── question-engine.ts       // 질문 선택/생성
+  │   └── sns-analyzer.ts          // SNS 분석
+  │
+  ├── security/                    // v4.0 보안 확장
+  │   ├── pw-gate-rules.ts         // PW 특화 Gate Guard 규칙
+  │   ├── user-trust.ts            // 유저 신뢰도 관리
+  │   ├── pw-kill-switch.ts        // PW Kill Switch 확장
+  │   ├── quarantine.ts            // 격리 시스템
+  │   └── provenance.ts            // 출처 추적
+  │
+  ├── quality/                     // v4.0 품질 측정
+  │   ├── auto-interview.ts        // Auto-Interview PW 확장
+  │   ├── integrity-score.ts       // PIS 계산
+  │   ├── quality-logger.ts        // 품질 로깅
+  │   └── arena-bridge.ts          // Arena 피드백 루프
+  │
+  ├── moderation/                  // v4.0 모더레이션
+  │   └── auto-moderator.ts        // 자동 모더레이션 파이프라인
+  │
+  ├── admin/                       // v4.0 관리자 운영
+  │   ├── dashboard-service.ts     // 대시보드 데이터 집계
+  │   ├── moderation-actions.ts    // 관리자 액션
+  │   ├── report-handler.ts        // 신고 처리
+  │   ├── scheduled-jobs.ts        // 운영 스케줄 작업
+  │   └── kpi-tracker.ts           // 운영 KPI
+  │
+  └── cost/                        // v4.0 비용 관리
+      ├── usage-tracker.ts         // 비용 추적 (확장)
+      ├── budget-alert.ts          // 예산 알림
+      ├── cost-mode.ts             // 비용 모드
+      └── optimizer.ts             // 비용 최적화
 
 src/app/api/persona-world/
   ├── feed/route.ts
@@ -817,13 +1437,21 @@ src/app/api/persona-world/
   ├── posts/route.ts
   ├── interactions/route.ts
   └── explore/route.ts
+
+src/app/api/admin/persona-world/   // v4.0 관리자 API
+  ├── dashboard/route.ts
+  ├── alerts/route.ts
+  ├── quarantine/route.ts
+  ├── quarantine/[id]/review/route.ts
+  ├── reports/route.ts
+  └── reports/[id]/resolve/route.ts
 ```
 
 ### 수정 파일
 
 ```
 prisma/schema.prisma               // PersonaState, PersonaRelationship 확장, ConsumptionLog
-src/lib/persona-world/types.ts     // v4.0 타입 추가
+src/lib/persona-world/types.ts     // v4.0 타입 추가 (품질, 모더레이션, 비용 타입)
 src/lib/llm-client.ts              // 보안 미들웨어 통합
 src/lib/rag/weighted-search.ts     // ConsumptionMemory 검색 추가
 ```

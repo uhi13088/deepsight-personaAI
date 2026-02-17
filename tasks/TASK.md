@@ -1,6 +1,6 @@
 # DeepSight v4.0 — TASK 관리
 
-> 마지막 업데이트: 2026-02-16
+> 마지막 업데이트: 2026-02-17
 
 ---
 
@@ -37,28 +37,32 @@
 
 ---
 
+## DONE (v4.0 — 구현계획서/설계서)
+
+- [x] **T136: v4.0 설계서 작성** ✅ 2026-02-17
+  - v3 아카이브, 엔진 설계서/구현계획서, PW 설계서(3파트)/구현계획서
+  - PW 설계서 3분할: Core(§1-4), Social(§5-8), Operations(§9-12)
+
+---
+
 ## IN_PROGRESS
 
-- [ ] **T136: v4.0 설계서 작성**
-  - 설명: v3 아카이브 + v4.0 설계서/구현계획서 4개 문서 작성
+- [ ] **T157: PersonaWorld 구현계획서 최신화 (Part 3 Operations)**
+  - 설명: PW 설계서 Operations(§9-12) 내용을 구현계획서에 반영
   - AC:
-    1. v3 설계서 4개 → `docs/archive/`로 이동 ✅
-    2. `docs/design/persona-engine-v4.md` 작성
-    3. `docs/design/persona-engine-v4-impl.md` 작성
-    4. `docs/design/persona-world-v4.md` 작성
-    5. `docs/design/persona-world-v4-impl.md` 작성
-    6. `docs/README.md` + `CLAUDE.md` 참조 업데이트
-  - 범위:
-    - 보안 3계층 아키텍처 (Security Triad)
-    - 캐릭터 바이블 (Character Bible) — 4 모듈
-    - 아레나 (The Arena) — 심판→보고→관리자승인→자동교정
-    - 기억 지능 (Memory Intelligence) — Poignancy + Forgetting Curve
-    - 소셜 모듈 시스템 (Social Module System) — L4 대신 독립 모듈
-    - 비용 최적화 (Cost Optimization) — 캐싱 + Batch API
-    - 데이터 아키텍처 (Memory vs Instruction 분리)
-    - 감정 전염 (Emotional Contagion) — 정보 없이 분위기만
-    - 킬 스위치 + 격리 시스템
-    - v4.0/v4.1/v4.2 로드맵
+    1. 설계서 참조 경로를 3분할 구조로 업데이트
+    2. §9 보안 통합 확장 (PW 특화 규칙, Trust Decay, Kill Switch 확장)
+    3. §10 품질 측정 구현 추가 (Auto-Interview, PIS, 품질 로깅, Arena 연동)
+    4. §11 모더레이션 & 운영 구현 추가 (자동 모더레이션, 대시보드, 신고, 스케줄 작업)
+    5. §12 비용 모니터링 & 제어 추가 (예산 알림, LLM 사용 로깅, 비용 모드)
+    6. 구현 페이즈 테이블 + 파일 변경 맵 업데이트
+- [ ] **T158: 엔진 구현계획서 최신화 (매칭 + 품질 + LLM)**
+  - 설명: 엔진 설계서 §12-14 내용을 구현계획서에 반영
+  - AC:
+    1. 매칭 알고리즘 구현 섹션 추가 (3-Tier, V_Final, 정성적 보너스)
+    2. 품질 피드백 루프 구현 섹션 추가 (Auto-Interview, PIS, 골든 샘플)
+    3. LLM 모델 전략 섹션 추가 (2-Tier 라우팅, 토큰 예산)
+    4. 구현 페이즈 테이블 + 파일 변경 맵 업데이트
 
 ---
 
