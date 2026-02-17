@@ -109,13 +109,20 @@
 
 ---
 
-## QUEUE
+## DONE (v4.0 — PW 보안 확장)
 
-- [ ] **T164: PW 보안 확장 (Phase 6-A)**
-  - AC1: PW 특화 Gate Guard 규칙 6종
-  - AC2: 유저 Trust Score 관리
-  - AC3: PW Kill Switch 8종 토글 + 4종 자동 트리거
-  - AC4: Quarantine 시스템 (격리 CRUD, 심각도별 정책)
+- [x] **T164: PW 보안 확장 (Phase 6-A)** ✅ 2026-02-17
+  - AC1: PW 특화 Gate Guard 규칙 6종 — pw-gate-rules.ts (패턴 4종 + 구조 4종 + Rate Limit 4종)
+  - AC2: 유저 Trust Score 관리 — user-trust.ts (5이벤트 Decay/Recovery, 4수준 Inspection)
+  - AC3: PW Kill Switch 8종 토글 + 4종 자동 트리거 — pw-kill-switch.ts (글로벌 프리즈, 기능별 토글)
+  - AC4: Quarantine 시스템 — quarantine.ts (CRUD, 심각도별 만료 72h/48h/24h/수동, 활동 제한)
+  - 신규: security-integration.ts (Gate Guard → Trust → Kill Switch → Quarantine 통합 파이프라인)
+  - 변경: security-integration.ts (신규), security.test.ts (+37 테스트)
+  - 테스트: 3448+84 PASS (94 파일), Build PASS
+
+---
+
+## QUEUE
 
 - [ ] **T165: PW 품질 측정 (Phase 6-B)**
   - AC1: Auto-Interview PW 확장 (20문항, 적응적 스케줄링)
