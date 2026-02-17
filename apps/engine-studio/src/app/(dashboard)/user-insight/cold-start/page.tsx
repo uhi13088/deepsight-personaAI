@@ -26,6 +26,8 @@ import {
   RotateCcw,
   ArrowRight,
   Layers,
+  Sparkles,
+  Loader2,
 } from "lucide-react"
 
 // ── 상수 ──────────────────────────────────────────────────────
@@ -286,6 +288,56 @@ function CoverageChart({
   )
 }
 
+// ── AI 프로필 요약 훅 ─────────────────────────────────────────
+
+function useAiSummary() {
+  const [summary, setSummary] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const requestSummary = useCallback(
+    async (
+      l1: Record<string, number>,
+      l2: Record<string, number> | null,
+      confidence: Record<string, number>
+    ) => {
+      setLoading(true)
+      setError(null)
+      setSummary(null)
+      try {
+        const res = await fetch("/api/internal/user-insight/cold-start/summarize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ l1, l2, confidence }),
+        })
+        const json = (await res.json()) as {
+          success: boolean
+          data?: { summary: string }
+          error?: { code: string; message: string }
+        }
+        if (json.success && json.data) {
+          setSummary(json.data.summary)
+        } else {
+          setError(json.error?.message ?? "AI 요약 생성에 실패했습니다")
+        }
+      } catch {
+        setError("AI 서버와 통신 중 오류가 발생했습니다")
+      } finally {
+        setLoading(false)
+      }
+    },
+    []
+  )
+
+  const reset = useCallback(() => {
+    setSummary(null)
+    setError(null)
+    setLoading(false)
+  }, [])
+
+  return { summary, loading, error, requestSummary, reset }
+}
+
 // ── 테스트 결과 패널 ──────────────────────────────────────────
 
 function TestResultPanel({
@@ -312,89 +364,160 @@ function TestResultPanel({
       }))
     : null
 
-  return (
-    <div className="bg-card rounded-lg border p-4">
-      <h3 className="mb-4 flex items-center gap-2 text-sm font-medium">
-        <Layers className="h-4 w-4" />
-        추론된 벡터 결과
-      </h3>
+  // AI 요약
+  const { summary, loading: aiLoading, error: aiError, requestSummary } = useAiSummary()
 
-      {/* L1 */}
-      <p className="mb-2 text-xs font-medium text-blue-400">L1 Social Persona</p>
-      <div className="mb-4 space-y-1.5">
-        {l1Result.map((dim) => (
-          <div key={dim.key} className="flex items-center gap-2">
-            <span className="text-muted-foreground w-20 truncate text-xs">{dim.label}</span>
-            <div className="relative h-4 flex-1">
-              <div className="bg-muted absolute inset-0 rounded-full" />
-              {/* marker at value position */}
-              <div
-                className="absolute top-0 h-4 w-4 rounded-full border-2 border-blue-400 bg-blue-500"
-                style={{ left: `calc(${dim.value * 100}% - 8px)` }}
-              />
-              {/* low/high labels */}
-              <span className="text-muted-foreground absolute -bottom-3.5 left-0 text-[10px]">
-                {dim.low}
-              </span>
-              <span className="text-muted-foreground absolute -bottom-3.5 right-0 text-[10px]">
-                {dim.high}
-              </span>
-            </div>
-            <span className="w-10 text-right font-mono text-xs text-blue-400">
-              {dim.value.toFixed(2)}
-            </span>
+  const handleRequestSummary = useCallback(() => {
+    const l1Map: Record<string, number> = {}
+    for (const dim of l1Result) {
+      l1Map[dim.key] = dim.value
+    }
+    const l2Map: Record<string, number> | null = l2Result
+      ? Object.fromEntries(l2Result.map((d) => [d.key, d.value]))
+      : null
+    void requestSummary(l1Map, l2Map, result.confidence)
+  }, [l1Result, l2Result, result.confidence, requestSummary])
+
+  return (
+    <div className="space-y-4">
+      {/* AI 프로필 요약 */}
+      <div className="bg-card rounded-lg border p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="flex items-center gap-2 text-sm font-medium">
+            <Sparkles className="h-4 w-4 text-amber-400" />
+            AI 프로필 분석
+          </h3>
+          {!summary && !aiLoading && (
+            <Button variant="outline" size="sm" onClick={handleRequestSummary}>
+              <Sparkles className="mr-1 h-3 w-3" />
+              분석 요청
+            </Button>
+          )}
+        </div>
+
+        {/* 초기 상태 */}
+        {!summary && !aiLoading && !aiError && (
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            벡터 결과를 AI가 자연어로 분석합니다. &quot;분석 요청&quot; 버튼을 눌러주세요.
+          </p>
+        )}
+
+        {/* 로딩 */}
+        {aiLoading && (
+          <div className="flex items-center gap-2 py-2">
+            <Loader2 className="h-4 w-4 animate-spin text-amber-400" />
+            <span className="text-muted-foreground text-sm">프로필 분석 중...</span>
           </div>
-        ))}
+        )}
+
+        {/* 에러 */}
+        {aiError && (
+          <div className="space-y-2">
+            <p className="text-sm text-red-400">{aiError}</p>
+            <Button variant="outline" size="sm" onClick={handleRequestSummary}>
+              재시도
+            </Button>
+          </div>
+        )}
+
+        {/* 요약 결과 */}
+        {summary && (
+          <div className="space-y-3">
+            <p className="text-sm leading-relaxed">{summary}</p>
+            <button
+              onClick={handleRequestSummary}
+              className="text-muted-foreground hover:text-foreground text-xs transition-colors"
+            >
+              다시 분석
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* L2 */}
-      {l2Result && (
-        <>
-          <p className="mb-2 mt-6 text-xs font-medium text-purple-400">L2 OCEAN</p>
-          <div className="space-y-1.5">
-            {l2Result.map((dim) => (
-              <div key={dim.key} className="flex items-center gap-2">
-                <span className="text-muted-foreground w-20 truncate text-xs">{dim.label}</span>
-                <div className="relative h-4 flex-1">
-                  <div className="bg-muted absolute inset-0 rounded-full" />
-                  <div
-                    className="absolute top-0 h-4 w-4 rounded-full border-2 border-purple-400 bg-purple-500"
-                    style={{ left: `calc(${dim.value * 100}% - 8px)` }}
-                  />
-                  <span className="text-muted-foreground absolute -bottom-3.5 left-0 text-[10px]">
-                    {dim.low}
-                  </span>
-                  <span className="text-muted-foreground absolute -bottom-3.5 right-0 text-[10px]">
-                    {dim.high}
+      {/* 벡터 결과 */}
+      <div className="bg-card rounded-lg border p-4">
+        <h3 className="mb-4 flex items-center gap-2 text-sm font-medium">
+          <Layers className="h-4 w-4" />
+          추론된 벡터 결과
+        </h3>
+
+        {/* L1 */}
+        <p className="mb-2 text-xs font-medium text-blue-400">L1 Social Persona</p>
+        <div className="mb-4 space-y-1.5">
+          {l1Result.map((dim) => (
+            <div key={dim.key} className="flex items-center gap-2">
+              <span className="text-muted-foreground w-20 truncate text-xs">{dim.label}</span>
+              <div className="relative h-4 flex-1">
+                <div className="bg-muted absolute inset-0 rounded-full" />
+                {/* marker at value position */}
+                <div
+                  className="absolute top-0 h-4 w-4 rounded-full border-2 border-blue-400 bg-blue-500"
+                  style={{ left: `calc(${dim.value * 100}% - 8px)` }}
+                />
+                {/* low/high labels */}
+                <span className="text-muted-foreground absolute -bottom-3.5 left-0 text-[10px]">
+                  {dim.low}
+                </span>
+                <span className="text-muted-foreground absolute -bottom-3.5 right-0 text-[10px]">
+                  {dim.high}
+                </span>
+              </div>
+              <span className="w-10 text-right font-mono text-xs text-blue-400">
+                {dim.value.toFixed(2)}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* L2 */}
+        {l2Result && (
+          <>
+            <p className="mb-2 mt-6 text-xs font-medium text-purple-400">L2 OCEAN</p>
+            <div className="space-y-1.5">
+              {l2Result.map((dim) => (
+                <div key={dim.key} className="flex items-center gap-2">
+                  <span className="text-muted-foreground w-20 truncate text-xs">{dim.label}</span>
+                  <div className="relative h-4 flex-1">
+                    <div className="bg-muted absolute inset-0 rounded-full" />
+                    <div
+                      className="absolute top-0 h-4 w-4 rounded-full border-2 border-purple-400 bg-purple-500"
+                      style={{ left: `calc(${dim.value * 100}% - 8px)` }}
+                    />
+                    <span className="text-muted-foreground absolute -bottom-3.5 left-0 text-[10px]">
+                      {dim.low}
+                    </span>
+                    <span className="text-muted-foreground absolute -bottom-3.5 right-0 text-[10px]">
+                      {dim.high}
+                    </span>
+                  </div>
+                  <span className="w-10 text-right font-mono text-xs text-purple-400">
+                    {dim.value.toFixed(2)}
                   </span>
                 </div>
-                <span className="w-10 text-right font-mono text-xs text-purple-400">
-                  {dim.value.toFixed(2)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+              ))}
+            </div>
+          </>
+        )}
 
-      {/* Confidence */}
-      <div className="mt-6 border-t pt-3">
-        <p className="text-muted-foreground mb-2 text-xs">신뢰도</p>
-        <div className="flex flex-wrap gap-2">
-          {Object.entries(result.confidence).map(([dim, conf]) => {
-            const def = getDimDef(dim)
-            if (!def || conf === 0) return null
-            return (
-              <div key={dim} className="flex items-center gap-1 text-xs">
-                <span className="text-muted-foreground">{def.label}</span>
-                <span
-                  className={`font-mono ${conf >= 0.5 ? "text-emerald-400" : "text-amber-400"}`}
-                >
-                  {Math.round(conf * 100)}%
-                </span>
-              </div>
-            )
-          })}
+        {/* Confidence */}
+        <div className="mt-6 border-t pt-3">
+          <p className="text-muted-foreground mb-2 text-xs">신뢰도</p>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(result.confidence).map(([dim, conf]) => {
+              const def = getDimDef(dim)
+              if (!def || conf === 0) return null
+              return (
+                <div key={dim} className="flex items-center gap-1 text-xs">
+                  <span className="text-muted-foreground">{def.label}</span>
+                  <span
+                    className={`font-mono ${conf >= 0.5 ? "text-emerald-400" : "text-amber-400"}`}
+                  >
+                    {Math.round(conf * 100)}%
+                  </span>
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
     </div>
