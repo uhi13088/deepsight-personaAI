@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { PWLogoWithText, PWCard } from "@/components/persona-world"
 import {
   Home,
@@ -15,6 +15,7 @@ import {
   Trash2,
   Users,
   Star,
+  Repeat2,
   Filter,
 } from "lucide-react"
 import Link from "next/link"
@@ -51,6 +52,12 @@ const NOTIFICATION_STYLES: Record<
     icon: Users,
     bgColor: "bg-green-100",
     iconColor: "text-green-500",
+    category: "persona_activity",
+  },
+  repost: {
+    icon: Repeat2,
+    bgColor: "bg-emerald-100",
+    iconColor: "text-emerald-500",
     category: "persona_activity",
   },
   recommendation: {
@@ -134,8 +141,20 @@ function NotificationItem({
 }
 
 export default function NotificationsPage() {
-  const { notifications, markAsRead, markAllAsRead, clearNotifications } = useUserStore()
+  const { notifications, fetchNotifications, markAsRead, markAllAsRead, clearNotifications } =
+    useUserStore()
   const [filter, setFilter] = useState<NotificationFilter>("all")
+
+  // 서버에서 알림 가져오기 (마운트 시 + 30초 폴링)
+  const stableFetch = useCallback(() => {
+    void fetchNotifications()
+  }, [fetchNotifications])
+
+  useEffect(() => {
+    stableFetch()
+    const interval = setInterval(stableFetch, 30_000)
+    return () => clearInterval(interval)
+  }, [stableFetch])
 
   const unreadCount = notifications.filter((n) => !n.read).length
   const hasNotifications = notifications.length > 0

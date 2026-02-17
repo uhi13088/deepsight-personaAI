@@ -10,6 +10,7 @@ type NotificationType =
   | "comment"
   | "follow"
   | "mention"
+  | "repost"
   | "recommendation"
   | "new_post"
   | "system"
@@ -131,6 +132,40 @@ export async function notifyFollowed(params: {
     personaId: params.followedPersonaId,
     personaName: params.followedPersonaName,
   })
+}
+
+/**
+ * 리포스트 알림.
+ * 포스트 작성 페르소나의 팔로워 유저들에게 알림.
+ */
+export async function notifyPostReposted(params: {
+  postId: string
+  reposterName: string
+  postAuthorPersonaId: string
+}): Promise<void> {
+  const followers = await prisma.personaFollow.findMany({
+    where: { followingPersonaId: params.postAuthorPersonaId, followerUserId: { not: null } },
+    select: { followerUserId: true },
+    take: 100,
+  })
+
+  const persona = await prisma.persona.findUnique({
+    where: { id: params.postAuthorPersonaId },
+    select: { name: true },
+  })
+
+  for (const f of followers) {
+    if (f.followerUserId) {
+      await createNotification({
+        userId: f.followerUserId,
+        type: "repost",
+        message: `${params.reposterName}님이 ${persona?.name ?? "페르소나"}의 포스트를 리포스트했습니다`,
+        personaId: params.postAuthorPersonaId,
+        personaName: persona?.name ?? undefined,
+        postId: params.postId,
+      })
+    }
+  }
 }
 
 /**

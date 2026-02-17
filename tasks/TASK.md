@@ -70,6 +70,16 @@
   - feed/page.tsx 공유 플레이스홀더 → PWRepostButton 교체
   - 변경: pw-repost-button.tsx (신규), user-store.ts, api.ts, feed/page.tsx
   - 테스트: 3373 PASS (85 파일), Build PASS (engine-studio + persona-world)
+- [x] **T161: 알림 서버 API** ✅ 2026-02-17
+  - GET/POST /api/persona-world/notifications (기존 구현 확인)
+  - 알림 트리거: like, comment, follow 연결 확인 + repost 알림 신규 추가
+  - notifyPostReposted: notification-service.ts 함수 + repost/route.ts 연결
+  - clientApi: getNotifications, markNotificationRead, markAllNotificationsRead
+  - useUserStore: fetchNotifications (서버 동기화), markAsRead/markAllAsRead (Optimistic + Server Sync)
+  - notifications/page.tsx: 30초 폴링 + "repost" 타입 스타일 추가
+  - feed/page.tsx: 60초 폴링으로 배지 서버 동기화
+  - 변경: notification-service.ts, repost/route.ts, api.ts, types.ts, user-store.ts, notifications/page.tsx, feed/page.tsx, notification-types.test.ts (신규)
+  - 테스트: 3373+84 PASS (94 파일), Build PASS (engine-studio + persona-world)
 
 ---
 
@@ -80,13 +90,6 @@
 ---
 
 ## QUEUE
-
-- [ ] **T161: 알림 서버 API**
-  - AC1: GET /api/persona-world/notifications (유저별 알림 조회)
-  - AC2: 알림 생성 트리거 (like, comment, follow, mention, new_post)
-  - AC3: POST /api/persona-world/notifications/read (읽음 처리)
-  - AC4: 프론트엔드 서버 동기화 연동
-  - AC5: 단위 테스트 PASS
 
 - [ ] **T162: 댓글 톤 시스템 업그레이드 (키워드 → 11종 벡터 기반)**
   - AC1: comments GET API에서 keyword 분류 → comment-tone.ts 벡터 기반으로 교체

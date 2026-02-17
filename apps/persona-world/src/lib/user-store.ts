@@ -26,10 +26,20 @@ export interface FollowedPersona {
 // 알림 타입
 export interface Notification {
   id: string
-  type: "like" | "comment" | "follow" | "mention" | "recommendation" | "new_post" | "system"
+  type:
+    | "like"
+    | "comment"
+    | "follow"
+    | "mention"
+    | "repost"
+    | "recommendation"
+    | "new_post"
+    | "system"
   message: string
   personaId?: string
   personaName?: string
+  postId?: string
+  commentId?: string
   read: boolean
   createdAt: string
 }
@@ -89,6 +99,7 @@ interface UserState {
   // 알림
   notifications: Notification[]
   addNotification: (notification: Omit<Notification, "id" | "createdAt" | "read">) => void
+  fetchNotifications: () => Promise<void>
   markAsRead: (notificationId: string) => void
   markAllAsRead: () => void
   clearNotifications: () => void
@@ -281,7 +292,7 @@ export const useUserStore = create<UserState>()(
 
       isBookmarked: (postId) => get().bookmarkedPosts.includes(postId),
 
-      // 알림 관리 (로컬 전용)
+      // 알림 관리 — Server Sync
       addNotification: (notification) =>
         set((state) => ({
           notifications: [
@@ -292,20 +303,53 @@ export const useUserStore = create<UserState>()(
               createdAt: new Date().toISOString(),
             },
             ...state.notifications,
-          ].slice(0, 50), // 최대 50개 유지
+          ].slice(0, 50),
         })),
 
-      markAsRead: (notificationId) =>
+      fetchNotifications: async () => {
+        const userId = get().profile?.id
+        if (!userId) return
+        try {
+          const data = await clientApi.getNotifications(userId, { limit: 50 })
+          set({
+            notifications: data.notifications.map((n) => ({
+              id: n.id,
+              type: n.type as Notification["type"],
+              message: n.message,
+              personaId: n.personaId ?? undefined,
+              personaName: n.personaName ?? undefined,
+              postId: n.postId ?? undefined,
+              commentId: n.commentId ?? undefined,
+              read: n.read,
+              createdAt: n.createdAt,
+            })),
+          })
+        } catch (err) {
+          console.warn("[user-store] Failed to fetch notifications:", err)
+        }
+      },
+
+      markAsRead: (notificationId) => {
         set((state) => ({
           notifications: state.notifications.map((n) =>
             n.id === notificationId ? { ...n, read: true } : n
           ),
-        })),
+        }))
+        const userId = get().profile?.id
+        if (userId) {
+          syncToServer(() => clientApi.markNotificationRead(userId, notificationId))
+        }
+      },
 
-      markAllAsRead: () =>
+      markAllAsRead: () => {
         set((state) => ({
           notifications: state.notifications.map((n) => ({ ...n, read: true })),
-        })),
+        }))
+        const userId = get().profile?.id
+        if (userId) {
+          syncToServer(() => clientApi.markAllNotificationsRead(userId))
+        }
+      },
 
       clearNotifications: () => set({ notifications: [] }),
 

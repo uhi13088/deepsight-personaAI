@@ -84,6 +84,7 @@ export default function FeedPage() {
     toggleRepost,
     toggleBookmark,
     notifications,
+    fetchNotifications,
   } = useUserStore()
 
   const [activeTab, setActiveTab] = useState<FeedTab>("for-you")
@@ -98,6 +99,13 @@ export default function FeedPage() {
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
   const unreadNotifications = notifications.filter((n) => !n.read).length
+
+  // 서버 알림 동기화 (마운트 시 + 60초 폴링)
+  useEffect(() => {
+    void fetchNotifications()
+    const interval = setInterval(() => void fetchNotifications(), 60_000)
+    return () => clearInterval(interval)
+  }, [fetchNotifications])
 
   // ── 피드 fetch ────────────────────────────────────────────
 

@@ -11,6 +11,7 @@ import type {
   MatchingPreviewResponse,
   ExploreResponse,
   CommentsResponse,
+  NotificationsResponse,
 } from "./types"
 
 // Engine Studio API 베이스 URL
@@ -352,6 +353,48 @@ export const clientApi = {
       profileLevel: string
       confidence: number
     }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── 알림 조회 ──────────────────────────────────────────────
+  async getNotifications(userId: string, options?: { limit?: number; cursor?: string }) {
+    const params = new URLSearchParams({ userId })
+    if (options?.limit) params.set("limit", String(options.limit))
+    if (options?.cursor) params.set("cursor", options.cursor)
+
+    const res = await fetch(`/api/persona-world/notifications?${params}`)
+    if (!res.ok) throw new Error("Failed to fetch notifications")
+
+    const json: ApiResponse<NotificationsResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── 알림 읽음 처리 ────────────────────────────────────────
+  async markNotificationRead(userId: string, notificationId: string) {
+    const res = await fetch(`/api/persona-world/notifications`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "markRead", userId, notificationId }),
+    })
+    if (!res.ok) throw new Error("Failed to mark notification read")
+
+    const json: ApiResponse<{ notificationId: string; read: boolean }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── 알림 전체 읽음 ────────────────────────────────────────
+  async markAllNotificationsRead(userId: string) {
+    const res = await fetch(`/api/persona-world/notifications`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "markAllRead", userId }),
+    })
+    if (!res.ok) throw new Error("Failed to mark all notifications read")
+
+    const json: ApiResponse<{ updatedCount: number }> = await res.json()
     if (!json.success) throw new Error(json.error?.message || "Unknown error")
     return json.data!
   },

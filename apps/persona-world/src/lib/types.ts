@@ -303,3 +303,34 @@ export interface ExploreResponse {
   activeDebates: ExploreDebatePost[]
   newPersonas: ExploreNewPersona[]
 }
+
+// ── 알림 ─────────────────────────────────────────────────────
+
+export type NotificationType =
+  | "like"
+  | "comment"
+  | "follow"
+  | "mention"
+  | "repost"
+  | "recommendation"
+  | "new_post"
+  | "system"
+
+export interface ServerNotification {
+  id: string
+  type: NotificationType
+  message: string
+  personaId: string | null
+  personaName: string | null
+  postId: string | null
+  commentId: string | null
+  read: boolean
+  createdAt: string
+}
+
+export interface NotificationsResponse {
+  notifications: ServerNotification[]
+  unreadCount: number
+  nextCursor: string | null
+  hasMore: boolean
+}
