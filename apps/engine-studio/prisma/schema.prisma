@@ -354,6 +354,7 @@ model UserVector {
 model Archetype {
   id              String   @id @default(cuid())
   name            String   @unique
+  nameKo          String?  @map("name_ko")
   description     String?
 
   // Vector ranges (min-max for each dimension)
@@ -369,6 +370,10 @@ model Archetype {
   tasteMax        Decimal  @db.Decimal(3, 2)
   purposeMin      Decimal  @db.Decimal(3, 2)
   purposeMax      Decimal  @db.Decimal(3, 2)
+
+  referenceVector Json?    @map("reference_vector") // Record<SocialDimension, number>
+  thresholdConfig Json?    @map("threshold_config") // ArchetypeThreshold[]
+  isBuiltin       Boolean  @default(false) @map("is_builtin")
 
   recommendedPersonaIds String[] @default([])
 
@@ -791,9 +796,13 @@ model ApiEndpoint {
   version         String         @default("v1")
   status          EndpointStatus @default(ACTIVE)
   category        String         @default("general")
+  scope           String         @default("external") // internal | external
   requiresAuth    Boolean        @default(true)
   rateLimit       Int            @default(100)  // req/min
   timeout         Int            @default(30000) // ms
+  rateLimitConfig Json?          // { requestsPerMinute, burstLimit, windowSizeMs }
+  healthCheckConfig Json?        // { enabled, intervalMs, timeoutMs, unhealthyThreshold }
+  tags            String[]       @default([])
 
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -914,6 +923,7 @@ model Incident {
 
   // Relations
   timeline        IncidentTimeline[]
+  postMortems     PostMortem[]
 
   @@map("incidents")
 }
@@ -1797,6 +1807,11 @@ model LlmUsageLog {
   status          LlmCallStatus @default(SUCCESS)
   errorMessage    String?  @db.Text
 
+  // v4.0: Prompt Caching (T143)
+  cacheCreationInputTokens Int?     // 캐시 생성 시 사용된 입력 토큰
+  cacheReadInputTokens     Int?     // 캐시 히트 시 읽은 입력 토큰
+  cacheSavingsUsd          Decimal? @db.Decimal(10, 6) // 캐싱 절감액 (USD)
+
   createdAt       DateTime @default(now())
 
   @@index([createdAt])
@@ -1872,4 +1887,230 @@ enum PostSource {
   FEED_INSPIRED
   ARENA_TEST
   SCHEDULED
+}
+
+// ============================================
+// v4.0: 아레나 시스템 (T144~T146)
+// 물리적 격리: 일반 페르소나 데이터와 완전히 분리
+// ============================================
+
+enum ArenaMode {
+  SPARRING_1V1
+}
+
+enum ArenaSessionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  CANCELLED
+}
+
+enum ProfileLoadLevel {
+  FULL
+  STANDARD
+  LITE
+}
+
+enum ArenaJudgmentMethod {
+  RULE_BASED
+  LLM
+}
+
+enum CorrectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ArenaTokenPhase {
+  TURN
+  JUDGMENT
+  PROFILE_LOAD
+}
+
+model ArenaSession {
+  id               String             @id @default(cuid())
+  mode             ArenaMode          @default(SPARRING_1V1)
+  participantA     String
+  participantB     String
+  profileLoadLevel ProfileLoadLevel   @default(STANDARD)
+  topic            String
+  maxTurns         Int                @default(6)
+  budgetTokens     Int                @default(10000)
+  usedTokens       Int                @default(0)
+  status           ArenaSessionStatus @default(PENDING)
+  createdAt        DateTime           @default(now())
+  startedAt        DateTime?
+  completedAt      DateTime?
+
+  // Relations
+  turns      ArenaTurn[]
+  judgment   ArenaJudgment?
+  tokenUsage ArenaTokenUsage[]
+
+  @@index([status])
+  @@index([participantA])
+  @@index([participantB])
+  @@index([createdAt])
+  @@map("arena_sessions")
+}
+
+model ArenaTurn {
+  id         String   @id @default(cuid())
+  sessionId  String
+  turnNumber Int
+  speakerId  String
+  content    String
+  tokensUsed Int      @default(0)
+  timestamp  DateTime @default(now())
+
+  // 스냅샷: 턴 시점의 벡터 상태 (디버깅용)
+  vectorSnapshot Json?
+  // 감정적 중요도 (0~1)
+  poignancy      Decimal? @db.Decimal(3, 2)
+
+  // Relations
+  session ArenaSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, turnNumber])
+  @@index([sessionId])
+  @@index([speakerId])
+  @@map("arena_turns")
+}
+
+model ArenaJudgment {
+  id        String               @id @default(cuid())
+  sessionId String               @unique
+  method    ArenaJudgmentMethod  @default(RULE_BASED)
+
+  // 평가 점수 (0~1)
+  characterConsistency Decimal @db.Decimal(3, 2) @default(0)
+  l2Emergence          Decimal @db.Decimal(3, 2) @default(0)
+  paradoxEmergence     Decimal @db.Decimal(3, 2) @default(0)
+  triggerResponse      Decimal @db.Decimal(3, 2) @default(0)
+  overallScore         Decimal @db.Decimal(3, 2) @default(0)
+
+  // 이슈 목록 (TurnIssue[])
+  issues  Json @default("[]")
+  summary String @default("")
+
+  judgedAt DateTime @default(now())
+
+  // Relations
+  session     ArenaSession          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  corrections ArenaCorrectionRequest[]
+
+  @@index([sessionId])
+  @@map("arena_judgments")
+}
+
+model ArenaCorrectionRequest {
+  id               String           @id @default(cuid())
+  sessionId        String
+  judgmentId       String
+  personaId        String
+  category         String           // consistency | l2 | paradox | trigger | voice
+  originalContent  String
+  correctedContent String
+  reason           String
+  status           CorrectionStatus @default(PENDING)
+  createdAt        DateTime         @default(now())
+  reviewedAt       DateTime?
+  reviewedBy       String?
+
+  // Relations
+  judgment ArenaJudgment @relation(fields: [judgmentId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([judgmentId])
+  @@index([status])
+  @@map("arena_correction_requests")
+}
+
+model ArenaTokenUsage {
+  id              String          @id @default(cuid())
+  sessionId       String
+  turnId          String?
+  phase           ArenaTokenPhase
+  inputTokens     Int             @default(0)
+  outputTokens    Int             @default(0)
+  estimatedCostUsd Decimal        @db.Decimal(10, 6) @default(0)
+  timestamp       DateTime        @default(now())
+
+  // Relations
+  session ArenaSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("arena_token_usage")
+}
+
+// ============================================
+// 시스템 로그 (모니터링)
+// ============================================
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  level     String   // error, warn, info, debug, fatal
+  service   String
+  message   String
+  metadata  Json?
+  traceId   String?  @map("trace_id")
+
+  createdAt DateTime @default(now())
+
+  @@index([level, createdAt])
+  @@index([service, createdAt])
+  @@map("system_logs")
+}
+
+// ============================================
+// 포스트모템 (장애 분석)
+// ============================================
+
+model PostMortem {
+  id              String   @id @default(cuid())
+  incidentId      String   @map("incident_id")
+  incident        Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  rootCause       String   @db.Text @map("root_cause")
+  affectedUsers   Int      @default(0) @map("affected_users")
+  downtimeMinutes Int      @default(0) @map("downtime_minutes")
+  dataLoss        Boolean  @default(false) @map("data_loss")
+  actionItems     Json?    @map("action_items") // Array<{ description, assignee, dueDate, priority }>
+  lessons         String[] @default([])
+
+  createdAt       DateTime @default(now())
+
+  @@index([incidentId])
+  @@map("post_mortems")
+}
+
+// ============================================
+// DR 훈련 (재해 복구)
+// ============================================
+
+model DRDrill {
+  id              String        @id @default(cuid())
+  planId          String        @map("plan_id")
+  scenario        String
+  status          DRDrillStatus @default(SCHEDULED)
+  scheduledAt     DateTime      @map("scheduled_at")
+  startedAt       DateTime?     @map("started_at")
+  completedAt     DateTime?     @map("completed_at")
+  actualRtoMinutes Int?         @map("actual_rto_minutes")
+  actualRpoMinutes Int?         @map("actual_rpo_minutes")
+  issues          String[]      @default([])
+  improvements    String[]      @default([])
+
+  createdAt       DateTime      @default(now())
+
+  @@index([status])
+  @@index([planId])
+  @@map("dr_drills")
+}
+
+enum DRDrillStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
 }

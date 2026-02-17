@@ -1,4 +1,9 @@
+// ═══════════════════════════════════════════════════════════════
+// 매칭 시뮬레이션 — DB에서 실제 페르소나를 로드하여 매칭 테스트
+// ═══════════════════════════════════════════════════════════════
+
 import { NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
 import type { ApiResponse } from "@/types"
 import type { SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector } from "@/types"
 import { matchAll, DEFAULT_MATCHING_CONFIG } from "@/lib/matching/three-tier-engine"
@@ -12,134 +17,82 @@ import { createRandomVirtualUser } from "@/lib/matching/simulator"
 import { calculateVFinal } from "@/lib/vector/v-final"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
 import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
+import { DEMO_PERSONA_ARCHETYPES } from "@/lib/demo-fixtures"
+import { DEFAULT_L1_VECTOR, DEFAULT_L2_VECTOR, DEFAULT_L3_VECTOR } from "@/constants/v3/dimensions"
 
-// ── Module-level store (persists during server session) ─────────
+// ── DB에서 페르소나 로드 ─────────────────────────────────────
 
-let personaStore: PersonaCandidate[] | null = null
+const L1_KEYS = ["depth", "lens", "stance", "scope", "taste", "purpose", "sociability"] as const
+const L2_KEYS = [
+  "openness",
+  "conscientiousness",
+  "extraversion",
+  "agreeableness",
+  "neuroticism",
+] as const
+const L3_KEYS = ["lack", "moralCompass", "volatility", "growthArc"] as const
 
-function getPersonaStore(): PersonaCandidate[] {
-  if (!personaStore) {
-    personaStore = createSamplePersonas()
+async function loadPersonasFromDB(): Promise<PersonaCandidate[]> {
+  const personas = await prisma.persona.findMany({
+    where: { status: { in: ["ACTIVE", "STANDARD", "REVIEW"] } },
+    include: {
+      layerVectors: {
+        orderBy: { version: "desc" },
+      },
+    },
+    take: 100,
+  })
+
+  if (personas.length === 0) {
+    return []
   }
-  return personaStore
+
+  return personas.map((p) => {
+    const socialVec = p.layerVectors.find((v) => v.layerType === "SOCIAL")
+    const tempVec = p.layerVectors.find((v) => v.layerType === "TEMPERAMENT")
+    const narrVec = p.layerVectors.find((v) => v.layerType === "NARRATIVE")
+
+    const l1: SocialPersonaVector = socialVec
+      ? (Object.fromEntries(
+          L1_KEYS.map((k, i) => [
+            k,
+            Number(socialVec[`dim${i + 1}` as keyof typeof socialVec] ?? 0.5),
+          ])
+        ) as unknown as SocialPersonaVector)
+      : { ...DEFAULT_L1_VECTOR }
+
+    const l2: CoreTemperamentVector = tempVec
+      ? (Object.fromEntries(
+          L2_KEYS.map((k, i) => [k, Number(tempVec[`dim${i + 1}` as keyof typeof tempVec] ?? 0.5)])
+        ) as unknown as CoreTemperamentVector)
+      : { ...DEFAULT_L2_VECTOR }
+
+    const l3: NarrativeDriveVector = narrVec
+      ? (Object.fromEntries(
+          L3_KEYS.map((k, i) => [k, Number(narrVec[`dim${i + 1}` as keyof typeof narrVec] ?? 0)])
+        ) as unknown as NarrativeDriveVector)
+      : { ...DEFAULT_L3_VECTOR }
+
+    const crossAxisProfile = calculateCrossAxisProfile(l1, l2, l3)
+    const paradoxProfile = calculateExtendedParadoxScore(l1, l2, l3)
+
+    return {
+      id: p.id,
+      name: p.name,
+      l1,
+      l2,
+      l3,
+      crossAxisProfile,
+      paradoxProfile,
+      archetype: p.archetypeId ?? undefined,
+    }
+  })
 }
 
-function createSamplePersonas(): PersonaCandidate[] {
-  const archetypes: Array<{
-    name: string
-    archetype: string
-    l1: SocialPersonaVector
-    l2: CoreTemperamentVector
-    l3: NarrativeDriveVector
-  }> = [
-    {
-      name: "심층 분석가",
-      archetype: "analyst",
-      l1: {
-        depth: 0.9,
-        lens: 0.8,
-        stance: 0.7,
-        scope: 0.85,
-        taste: 0.4,
-        purpose: 0.8,
-        sociability: 0.3,
-      },
-      l2: {
-        openness: 0.7,
-        conscientiousness: 0.9,
-        extraversion: 0.3,
-        agreeableness: 0.5,
-        neuroticism: 0.4,
-      },
-      l3: { lack: 0.3, moralCompass: 0.7, volatility: 0.2, growthArc: 0.6 },
-    },
-    {
-      name: "트렌드 큐레이터",
-      archetype: "curator",
-      l1: {
-        depth: 0.5,
-        lens: 0.5,
-        stance: 0.4,
-        scope: 0.6,
-        taste: 0.9,
-        purpose: 0.5,
-        sociability: 0.8,
-      },
-      l2: {
-        openness: 0.9,
-        conscientiousness: 0.5,
-        extraversion: 0.8,
-        agreeableness: 0.7,
-        neuroticism: 0.3,
-      },
-      l3: { lack: 0.2, moralCompass: 0.4, volatility: 0.5, growthArc: 0.7 },
-    },
-    {
-      name: "감성 공감러",
-      archetype: "empath",
-      l1: {
-        depth: 0.6,
-        lens: 0.2,
-        stance: 0.3,
-        scope: 0.5,
-        taste: 0.5,
-        purpose: 0.7,
-        sociability: 0.9,
-      },
-      l2: {
-        openness: 0.6,
-        conscientiousness: 0.4,
-        extraversion: 0.7,
-        agreeableness: 0.9,
-        neuroticism: 0.6,
-      },
-      l3: { lack: 0.5, moralCompass: 0.6, volatility: 0.4, growthArc: 0.5 },
-    },
-    {
-      name: "독립 비평가",
-      archetype: "critic",
-      l1: {
-        depth: 0.8,
-        lens: 0.7,
-        stance: 0.9,
-        scope: 0.7,
-        taste: 0.6,
-        purpose: 0.6,
-        sociability: 0.2,
-      },
-      l2: {
-        openness: 0.5,
-        conscientiousness: 0.7,
-        extraversion: 0.2,
-        agreeableness: 0.3,
-        neuroticism: 0.5,
-      },
-      l3: { lack: 0.4, moralCompass: 0.8, volatility: 0.3, growthArc: 0.4 },
-    },
-    {
-      name: "엔터테인먼트 가이드",
-      archetype: "entertainer",
-      l1: {
-        depth: 0.3,
-        lens: 0.4,
-        stance: 0.2,
-        scope: 0.4,
-        taste: 0.7,
-        purpose: 0.2,
-        sociability: 0.9,
-      },
-      l2: {
-        openness: 0.8,
-        conscientiousness: 0.3,
-        extraversion: 0.9,
-        agreeableness: 0.8,
-        neuroticism: 0.2,
-      },
-      l3: { lack: 0.1, moralCompass: 0.3, volatility: 0.6, growthArc: 0.8 },
-    },
-  ]
+// ── 데모 페르소나 (DB에 데이터 없을 때 폴백) ────────────────
 
-  return archetypes.map((a, i) => {
+function createDemoPersonas(): PersonaCandidate[] {
+  return DEMO_PERSONA_ARCHETYPES.map((a, i) => {
     const crossAxisProfile = calculateCrossAxisProfile(a.l1, a.l2, a.l3)
     const paradoxProfile = calculateExtendedParadoxScore(a.l1, a.l2, a.l3)
     return {
@@ -177,21 +130,29 @@ interface SimulateResponse {
     avgMatchScore: number
     failureRate: number
   }
+  personaSource: "db" | "demo"
 }
 
 interface PersonaListResponse {
   personas: PersonaCandidate[]
+  source: "db" | "demo"
 }
 
-// ── GET — 시뮬레이션용 샘플 페르소나 목록 반환 ─────────────────
+// ── GET — 시뮬레이션용 페르소나 목록 반환 ───────────────────────
 
 export async function GET() {
   try {
-    const personas = getPersonaStore()
+    let personas = await loadPersonasFromDB()
+    let source: "db" | "demo" = "db"
+
+    if (personas.length === 0) {
+      personas = createDemoPersonas()
+      source = "demo"
+    }
 
     return NextResponse.json<ApiResponse<PersonaListResponse>>({
       success: true,
-      data: { personas },
+      data: { personas, source },
     })
   } catch {
     return NextResponse.json<ApiResponse<never>>(
@@ -210,8 +171,19 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as SimulateRequest
 
-    // Use provided personas or fall back to the stored ones
-    const personas = body.personas && body.personas.length > 0 ? body.personas : getPersonaStore()
+    // 커스텀 페르소나가 없으면 DB에서 로드
+    let personas: PersonaCandidate[]
+    let personaSource: "db" | "demo" = "db"
+
+    if (body.personas && body.personas.length > 0) {
+      personas = body.personas
+    } else {
+      personas = await loadPersonasFromDB()
+      if (personas.length === 0) {
+        personas = createDemoPersonas()
+        personaSource = "demo"
+      }
+    }
 
     if (personas.length === 0) {
       return NextResponse.json<ApiResponse<never>>(
@@ -258,7 +230,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json<ApiResponse<SimulateResponse>>({
         success: true,
-        data: { mode: "single", results },
+        data: { mode: "single", results, personaSource },
       })
     }
 
@@ -301,6 +273,7 @@ export async function POST(request: NextRequest) {
           avgMatchScore: Math.round(avg * 100) / 100,
           failureRate: scores.length > 0 ? Math.round((failures / scores.length) * 100) / 100 : 0,
         },
+        personaSource,
       },
     })
   } catch {

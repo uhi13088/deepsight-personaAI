@@ -15,6 +15,8 @@ import { generateComment } from "./interactions/comment-engine"
 import { computeLikeProbability } from "./interactions/like-engine"
 import { updatePersonaState } from "./state-manager"
 import { buildVoiceAnchorFromProfile, parseVoiceProfile } from "./voice-anchor"
+import { computeInteractionProvenance } from "@/lib/security/data-provenance"
+import type { ProvenanceData } from "@/lib/security/data-provenance"
 
 // ── 타입 정의 ────────────────────────────────────────────────
 
@@ -47,10 +49,15 @@ export interface InteractionPipelineDataProvider {
   getParadoxScore(personaId: string): Promise<number>
 
   /** 좋아요 저장 */
-  saveLike(personaId: string, postId: string): Promise<void>
+  saveLike(personaId: string, postId: string, provenance?: ProvenanceData): Promise<void>
 
   /** 댓글 저장 */
-  saveComment(personaId: string, postId: string, content: string): Promise<{ id: string }>
+  saveComment(
+    personaId: string,
+    postId: string,
+    content: string,
+    provenance?: ProvenanceData
+  ): Promise<{ id: string }>
 
   /** 관계 업데이트 */
   updateRelationship(personaAId: string, personaBId: string, event: string): Promise<void>
@@ -130,9 +137,14 @@ export async function executeInteractions(
       relationship ?? DEFAULT_RELATIONSHIP
     )
 
-    // 좋아요 실행
+    // 좋아요 실행 (출처 태깅 포함)
     if (Math.random() < likeResult.probability) {
-      await dataProvider.saveLike(persona.id, post.id)
+      const likeProvenance = computeInteractionProvenance({
+        source: "SYSTEM",
+        propagationDepth: 0,
+      })
+
+      await dataProvider.saveLike(persona.id, post.id, likeProvenance)
       likes.push({ postId: post.id, authorId: post.authorId })
 
       await dataProvider.updateRelationship(persona.id, post.authorId, "like")
@@ -141,7 +153,11 @@ export async function executeInteractions(
         personaId: persona.id,
         activityType: "POST_LIKED",
         targetId: post.id,
-        metadata: { probability: likeResult.probability, matchScore },
+        metadata: {
+          probability: likeResult.probability,
+          matchScore,
+          provenance: likeProvenance,
+        },
       })
     }
 
@@ -190,7 +206,17 @@ export async function executeInteractions(
         commentLLMProvider
       )
 
-      const saved = await dataProvider.saveComment(persona.id, post.id, commentResult.content)
+      const commentProvenance = computeInteractionProvenance({
+        source: "SYSTEM",
+        propagationDepth: 0,
+      })
+
+      const saved = await dataProvider.saveComment(
+        persona.id,
+        post.id,
+        commentResult.content,
+        commentProvenance
+      )
       comments.push({ postId: post.id, authorId: post.authorId, commentId: saved.id })
 
       await dataProvider.updateRelationship(persona.id, post.authorId, "comment")
@@ -203,6 +229,7 @@ export async function executeInteractions(
           commentId: saved.id,
           tone: commentResult.tone.tone,
           expressApplied: commentResult.expressApplied,
+          provenance: commentProvenance,
         },
       })
     }

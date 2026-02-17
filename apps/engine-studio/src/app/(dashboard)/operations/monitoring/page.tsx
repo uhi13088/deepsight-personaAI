@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button"
 import {
   Activity,
   AlertTriangle,
-  Cpu,
-  HardDrive,
+  Users,
+  Zap,
+  DollarSign,
   Clock,
-  Server,
-  Wifi,
+  GitCompare,
   Search,
   CheckCircle,
   XCircle,
@@ -32,12 +32,12 @@ import type {
 
 const METRIC_CONFIG: Record<MetricType, { label: string; unit: string; icon: React.ElementType }> =
   {
-    cpu: { label: "CPU 사용률", unit: "%", icon: Cpu },
-    memory: { label: "메모리 사용률", unit: "%", icon: Server },
-    disk: { label: "디스크 사용률", unit: "%", icon: HardDrive },
-    network: { label: "네트워크", unit: "%", icon: Wifi },
-    api_latency: { label: "API 응답시간", unit: "ms", icon: Clock },
-    error_rate: { label: "에러율", unit: "%", icon: AlertTriangle },
+    active_personas: { label: "활성 페르소나", unit: "개", icon: Users },
+    llm_calls: { label: "LLM 호출 (24h)", unit: "회", icon: Zap },
+    llm_cost: { label: "LLM 비용 (24h)", unit: "USD", icon: DollarSign },
+    llm_error_rate: { label: "LLM 에러율", unit: "%", icon: AlertTriangle },
+    avg_latency: { label: "평균 응답시간", unit: "ms", icon: Clock },
+    matching_count: { label: "매칭 요청 (24h)", unit: "회", icon: GitCompare },
   }
 
 const LEVEL_COLORS: Record<LogEntry["level"], string> = {
@@ -240,34 +240,47 @@ export default function MonitoringPage() {
 
         {/* ── 6 Metric Cards Grid ───────────────────────────── */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-          {(["cpu", "memory", "disk", "network", "api_latency", "error_rate"] as MetricType[]).map(
-            (type) => {
-              const config = METRIC_CONFIG[type]
-              const value = getMetricValue(type)
-              const status = getMetricStatus(type)
-              const Icon = config.icon
+          {(
+            [
+              "active_personas",
+              "llm_calls",
+              "llm_cost",
+              "llm_error_rate",
+              "avg_latency",
+              "matching_count",
+            ] as MetricType[]
+          ).map((type) => {
+            const config = METRIC_CONFIG[type]
+            const value = getMetricValue(type)
+            const status = getMetricStatus(type)
+            const Icon = config.icon
 
-              return (
-                <div key={type} className="bg-card rounded-lg border p-4">
-                  <div className="mb-2 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Icon className="text-muted-foreground h-4 w-4" />
-                      <span className="text-muted-foreground text-xs">{config.label}</span>
-                    </div>
-                    {status === "critical" && <Badge variant="destructive">Critical</Badge>}
-                    {status === "warning" && <Badge variant="warning">Warning</Badge>}
-                    {status === "normal" && <Badge variant="success">Normal</Badge>}
+            return (
+              <div key={type} className="bg-card rounded-lg border p-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Icon className="text-muted-foreground h-4 w-4" />
+                    <span className="text-muted-foreground text-xs">{config.label}</span>
                   </div>
-                  <p className="text-2xl font-bold">
-                    {value}
-                    <span className="text-muted-foreground ml-1 text-sm font-normal">
-                      {config.unit}
-                    </span>
-                  </p>
+                  {status === "critical" && <Badge variant="destructive">Critical</Badge>}
+                  {status === "warning" && <Badge variant="warning">Warning</Badge>}
+                  {status === "normal" && <Badge variant="success">Normal</Badge>}
                 </div>
-              )
-            }
-          )}
+                <p className="text-2xl font-bold">
+                  {type === "llm_cost"
+                    ? `$${value.toFixed(2)}`
+                    : type === "llm_error_rate"
+                      ? value.toFixed(1)
+                      : type === "avg_latency"
+                        ? Math.round(value).toLocaleString()
+                        : value.toLocaleString()}
+                  <span className="text-muted-foreground ml-1 text-sm font-normal">
+                    {type === "llm_cost" ? "" : config.unit}
+                  </span>
+                </p>
+              </div>
+            )
+          })}
         </div>
 
         {/* ── Threshold Alerts ──────────────────────────────── */}

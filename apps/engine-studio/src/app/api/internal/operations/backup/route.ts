@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { ApiResponse } from "@/types"
+import { prisma } from "@/lib/prisma"
 import {
   DEFAULT_BACKUP_POLICIES,
   createBackupRecord,
@@ -21,86 +22,98 @@ import type {
   ResourceUsage,
   UsageSnapshot,
 } from "@/lib/operations"
+import { DEMO_DR_PLAN } from "@/lib/demo-fixtures"
+import { Prisma } from "@/generated/prisma"
+import type { BackupRecord as DbBackupRecord, DRDrill as DbDRDrill } from "@/generated/prisma"
 
-// ── In-memory store ─────────────────────────────────────────────
+// ── Conversion helpers ──────────────────────────────────────────
 
-interface BackupStore {
-  policies: BackupPolicy[]
-  records: BackupRecord[]
-  drPlan: DRPlan
-  drDrills: DRDrill[]
-  capacityReport: CapacityReport
-}
-
-function buildInitialRecords(): BackupRecord[] {
-  const records: BackupRecord[] = []
-  const now = Date.now()
-
-  for (const policy of DEFAULT_BACKUP_POLICIES) {
-    for (let i = 0; i < 3; i++) {
-      const startedAt = now - (i + 1) * 24 * 60 * 60 * 1000
-      const record = createBackupRecord(policy, `${policy.destinationPath}/${now}.bak`)
-      const completed = completeBackupRecord(
-        { ...record, startedAt },
-        1024 * 1024 * (50 + i * 100),
-        `sha256-sample-${policy.id}-${i}`
-      )
-      records.push(completed)
-    }
+function dbBackupToLib(row: DbBackupRecord): BackupRecord {
+  return {
+    id: row.id,
+    policyId: row.notes ?? "",
+    method: row.backupType.toLowerCase() as BackupRecord["method"],
+    target: "database",
+    status:
+      row.status === "IN_PROGRESS"
+        ? "running"
+        : (row.status.toLowerCase() as "completed" | "failed"),
+    startedAt: row.startedAt.getTime(),
+    completedAt: row.completedAt?.getTime() ?? null,
+    sizeBytes: row.size ? Number(row.size) : 0,
+    checksum: null,
+    storagePath: row.location ?? "",
+    error: null,
   }
-
-  return records
 }
 
-function buildInitialDRPlan(): DRPlan {
-  return createDRPlan(
-    "데이터베이스 장애 복구",
-    "database_failure",
-    30,
-    5,
-    [
-      {
-        description: "DB 페일오버 실행",
-        responsible: "DBA팀",
-        estimatedMinutes: 10,
-        prerequisites: [],
-        verificationCommand: "pg_isready",
-      },
-      {
-        description: "트래픽 리다이렉트",
-        responsible: "인프라팀",
-        estimatedMinutes: 5,
-        prerequisites: ["DB 페일오버 실행"],
-        verificationCommand: null,
-      },
-      {
-        description: "서비스 검증",
-        responsible: "QA팀",
-        estimatedMinutes: 15,
-        prerequisites: ["트래픽 리다이렉트"],
-        verificationCommand: "curl /health",
-      },
-    ],
-    [
-      {
-        name: "김DBA",
-        role: "DBA Lead",
-        phone: "010-1234-5678",
-        email: "dba@deepsight.ai",
-        isPrimary: true,
-      },
-      {
-        name: "박인프라",
-        role: "Infra Lead",
-        phone: "010-2345-6789",
-        email: "infra@deepsight.ai",
-        isPrimary: false,
-      },
-    ]
+function dbDrillToLib(row: DbDRDrill): DRDrill {
+  return {
+    id: row.id,
+    planId: row.planId,
+    scenario: row.scenario as DRDrill["scenario"],
+    scheduledAt: row.scheduledAt.getTime(),
+    executedAt: row.startedAt?.getTime() ?? null,
+    completedAt: row.completedAt?.getTime() ?? null,
+    status: row.status.toLowerCase().replace("_", "_") as DRDrill["status"],
+    actualRtoMinutes: row.actualRtoMinutes ?? null,
+    actualRpoMinutes: row.actualRpoMinutes ?? null,
+    findings: row.issues,
+    actionItems: row.improvements,
+  }
+}
+
+function backupMethodToDbType(method: string): "FULL" | "INCREMENTAL" | "DIFFERENTIAL" {
+  switch (method) {
+    case "incremental":
+      return "INCREMENTAL"
+    case "differential":
+      return "DIFFERENTIAL"
+    default:
+      return "FULL"
+  }
+}
+
+// ── Load helpers ────────────────────────────────────────────────
+
+async function loadBackupPolicies(): Promise<BackupPolicy[]> {
+  const row = await prisma.systemConfig.findUnique({
+    where: { category_key: { category: "BACKUP", key: "policies" } },
+  })
+  if (row) {
+    return row.value as unknown as BackupPolicy[]
+  }
+  return DEFAULT_BACKUP_POLICIES
+}
+
+async function loadDRPlan(): Promise<DRPlan> {
+  const row = await prisma.systemConfig.findUnique({
+    where: { category_key: { category: "BACKUP", key: "drPlan" } },
+  })
+  if (row) {
+    return row.value as unknown as DRPlan
+  }
+  // Create default from DEMO_DR_PLAN and persist it
+  const plan = createDRPlan(
+    DEMO_DR_PLAN.name,
+    DEMO_DR_PLAN.scenario,
+    DEMO_DR_PLAN.rtoMinutes,
+    DEMO_DR_PLAN.rpoMinutes,
+    DEMO_DR_PLAN.steps,
+    DEMO_DR_PLAN.contacts
   )
+  await prisma.systemConfig.create({
+    data: {
+      category: "BACKUP",
+      key: "drPlan",
+      value: plan as unknown as Prisma.InputJsonValue,
+      description: "DR 계획 (재해 복구)",
+    },
+  })
+  return plan
 }
 
-function buildInitialCapacityReport(): CapacityReport {
+function buildDefaultCapacityReport(): CapacityReport {
   const msPerDay = 86400000
   const now = Date.now()
   const baseTime = now - 30 * msPerDay
@@ -108,45 +121,26 @@ function buildInitialCapacityReport(): CapacityReport {
   const snapshots: UsageSnapshot[] = []
   for (let day = 0; day < 30; day++) {
     const resources: ResourceUsage[] = [
-      createResourceUsage("cpu", 45 + day * 0.5 + (day % 5), 100, "%"),
-      createResourceUsage("memory", 55 + day * 0.3 + (day % 3), 100, "%"),
-      createResourceUsage("disk", 40 + day * 0.8 + (day % 2), 100, "%"),
-      createResourceUsage("network", 30 + (day % 10), 100, "%"),
-      createResourceUsage("api_latency", 200 + (day % 100), 5000, "ms"),
-      createResourceUsage("error_rate", 0.5 + (day % 5) * 0.1, 100, "%"),
+      createResourceUsage("active_personas", 10 + day * 0.5, 100, "개"),
+      createResourceUsage("llm_calls", 200 + day * 10 + (day % 5), 10000, "회"),
+      createResourceUsage("llm_cost", 5 + day * 0.3 + (day % 3), 500, "USD"),
+      createResourceUsage("llm_error_rate", 1 + (day % 5) * 0.3, 100, "%"),
+      createResourceUsage("avg_latency", 800 + (day % 100) * 10, 15000, "ms"),
+      createResourceUsage("matching_count", 50 + day * 3 + (day % 10), 10000, "회"),
     ]
     snapshots.push({ timestamp: baseTime + day * msPerDay, resources })
   }
 
   const currentResources: ResourceUsage[] = [
-    createResourceUsage("cpu", 60, 100, "%"),
-    createResourceUsage("memory", 65, 100, "%"),
-    createResourceUsage("disk", 64, 100, "%"),
-    createResourceUsage("network", 35, 100, "%"),
-    createResourceUsage("api_latency", 250, 5000, "ms"),
-    createResourceUsage("error_rate", 0.8, 100, "%"),
+    createResourceUsage("active_personas", 25, 100, "개"),
+    createResourceUsage("llm_calls", 500, 10000, "회"),
+    createResourceUsage("llm_cost", 14, 500, "USD"),
+    createResourceUsage("llm_error_rate", 2.5, 100, "%"),
+    createResourceUsage("avg_latency", 1200, 15000, "ms"),
+    createResourceUsage("matching_count", 140, 10000, "회"),
   ]
 
   return buildCapacityReport(snapshots, currentResources, 90, 80)
-}
-
-function buildInitialStore(): BackupStore {
-  return {
-    policies: DEFAULT_BACKUP_POLICIES,
-    records: buildInitialRecords(),
-    drPlan: buildInitialDRPlan(),
-    drDrills: [],
-    capacityReport: buildInitialCapacityReport(),
-  }
-}
-
-let store: BackupStore | null = null
-
-function getStore(): BackupStore {
-  if (!store) {
-    store = buildInitialStore()
-  }
-  return store
 }
 
 // ── Response type ───────────────────────────────────────────────
@@ -172,24 +166,45 @@ interface BackupResponse {
 
 export async function GET() {
   try {
-    const s = getStore()
+    // 1. Load backup policies from SystemConfig (or use defaults)
+    const policies = await loadBackupPolicies()
 
-    const drillEvaluations = s.drDrills
+    // 2. Load backup records from DB (recent 50)
+    const dbRecords = await prisma.backupRecord.findMany({
+      orderBy: { startedAt: "desc" },
+      take: 50,
+    })
+    const records = dbRecords.map(dbBackupToLib)
+
+    // 3. Load DR plan from SystemConfig (or create default)
+    const drPlan = await loadDRPlan()
+
+    // 4. Load DR drills from DB
+    const dbDrills = await prisma.dRDrill.findMany({
+      orderBy: { createdAt: "desc" },
+    })
+    const drDrills = dbDrills.map(dbDrillToLib)
+
+    // 5. Compute drill evaluations
+    const drillEvaluations = drDrills
       .filter((d) => d.status === "completed")
       .map((d) => ({
         drillId: d.id,
-        evaluation: evaluateDRDrillResult(d, s.drPlan),
+        evaluation: evaluateDRDrillResult(d, drPlan),
       }))
+
+    // 6. Build capacity report (static defaults)
+    const capacityReport = buildDefaultCapacityReport()
 
     return NextResponse.json<ApiResponse<BackupResponse>>({
       success: true,
       data: {
-        policies: s.policies,
-        records: s.records,
-        drPlan: s.drPlan,
-        drDrills: s.drDrills,
+        policies,
+        records,
+        drPlan,
+        drDrills,
         drillEvaluations,
-        capacityReport: s.capacityReport,
+        capacityReport,
       },
     })
   } catch {
@@ -216,7 +231,6 @@ interface BackupPostRequest {
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as BackupPostRequest
-    const s = getStore()
 
     if (body.action === "create_backup") {
       if (!body.policyId) {
@@ -229,7 +243,8 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      const policy = s.policies.find((p) => p.id === body.policyId)
+      const policies = await loadBackupPolicies()
+      const policy = policies.find((p) => p.id === body.policyId)
       if (!policy) {
         return NextResponse.json<ApiResponse<never>>(
           {
@@ -240,27 +255,55 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      const record = createBackupRecord(policy, `${policy.destinationPath}/${Date.now()}.bak`)
+      // Create lib record for business logic
+      const libRecord = createBackupRecord(policy, `${policy.destinationPath}/${Date.now()}.bak`)
       const completed = completeBackupRecord(
-        record,
+        libRecord,
         1024 * 1024 * 150,
         `sha256-${Math.random().toString(36).slice(2, 10)}`
       )
-      s.records = [completed, ...s.records]
+
+      // Persist to DB
+      const dbRow = await prisma.backupRecord.create({
+        data: {
+          backupType: backupMethodToDbType(policy.method),
+          status: "COMPLETED",
+          size: BigInt(completed.sizeBytes),
+          location: completed.storagePath,
+          notes: policy.id,
+          startedAt: new Date(completed.startedAt),
+          completedAt: completed.completedAt ? new Date(completed.completedAt) : null,
+        },
+      })
+
+      // Return the DB-backed record converted to lib type
+      const result = dbBackupToLib(dbRow)
 
       return NextResponse.json<ApiResponse<BackupRecord>>({
         success: true,
-        data: completed,
+        data: result,
       })
     }
 
     if (body.action === "schedule_drill") {
-      const drill = scheduleDRDrill(s.drPlan.id, s.drPlan.scenario, Date.now() + 7 * 86400000)
-      s.drDrills = [...s.drDrills, drill]
+      const drPlan = await loadDRPlan()
+      const libDrill = scheduleDRDrill(drPlan.id, drPlan.scenario, Date.now() + 7 * 86400000)
+
+      // Persist to DB
+      const dbRow = await prisma.dRDrill.create({
+        data: {
+          planId: libDrill.planId,
+          scenario: libDrill.scenario,
+          status: "SCHEDULED",
+          scheduledAt: new Date(libDrill.scheduledAt),
+        },
+      })
+
+      const result = dbDrillToLib(dbRow)
 
       return NextResponse.json<ApiResponse<DRDrill>>({
         success: true,
-        data: drill,
+        data: result,
       })
     }
 
@@ -275,8 +318,10 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      const idx = s.drDrills.findIndex((d) => d.id === body.drillId)
-      if (idx === -1) {
+      const dbDrill = await prisma.dRDrill.findUnique({
+        where: { id: body.drillId },
+      })
+      if (!dbDrill) {
         return NextResponse.json<ApiResponse<never>>(
           {
             success: false,
@@ -286,12 +331,22 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      const updated = startDRDrill(s.drDrills[idx])
-      s.drDrills[idx] = updated
+      // Use lib function for validation
+      const libDrill = dbDrillToLib(dbDrill)
+      const updated = startDRDrill(libDrill)
+
+      // Persist state change to DB
+      const dbRow = await prisma.dRDrill.update({
+        where: { id: body.drillId },
+        data: {
+          status: "IN_PROGRESS",
+          startedAt: updated.executedAt ? new Date(updated.executedAt) : new Date(),
+        },
+      })
 
       return NextResponse.json<ApiResponse<DRDrill>>({
         success: true,
-        data: updated,
+        data: dbDrillToLib(dbRow),
       })
     }
 
@@ -306,8 +361,10 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      const idx = s.drDrills.findIndex((d) => d.id === body.drillId)
-      if (idx === -1) {
+      const dbDrill = await prisma.dRDrill.findUnique({
+        where: { id: body.drillId },
+      })
+      if (!dbDrill) {
         return NextResponse.json<ApiResponse<never>>(
           {
             success: false,
@@ -317,18 +374,30 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      const updated = completeDRDrill(
-        s.drDrills[idx],
-        25 + Math.floor(Math.random() * 15),
-        3 + Math.floor(Math.random() * 5),
-        ["페일오버 지연 확인됨"],
-        ["자동 페일오버 스크립트 개선"]
-      )
-      s.drDrills[idx] = updated
+      // Use lib function for validation and business logic
+      const libDrill = dbDrillToLib(dbDrill)
+      const actualRto = 25 + Math.floor(Math.random() * 15)
+      const actualRpo = 3 + Math.floor(Math.random() * 5)
+      const findings = ["페일오버 지연 확인됨"]
+      const improvements = ["자동 페일오버 스크립트 개선"]
+      const updated = completeDRDrill(libDrill, actualRto, actualRpo, findings, improvements)
+
+      // Persist to DB
+      const dbRow = await prisma.dRDrill.update({
+        where: { id: body.drillId },
+        data: {
+          status: "COMPLETED",
+          completedAt: updated.completedAt ? new Date(updated.completedAt) : new Date(),
+          actualRtoMinutes: actualRto,
+          actualRpoMinutes: actualRpo,
+          issues: findings,
+          improvements,
+        },
+      })
 
       return NextResponse.json<ApiResponse<DRDrill>>({
         success: true,
-        data: updated,
+        data: dbDrillToLib(dbRow),
       })
     }
 

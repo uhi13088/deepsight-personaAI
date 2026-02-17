@@ -4,11 +4,10 @@ import { NextResponse } from "next/server"
  * POST /api/settings/2fa/enable - 2FA 활성화 (QR 코드 생성)
  */
 export async function POST() {
-  // Generate a mock secret and QR code URL
-  // In production, use a library like `otplib` to generate real TOTP secrets
-  const secret = "JBSWY3DPEHPK3PXP" // Demo secret
+  // TODO: In production, use `otplib` to generate real TOTP secrets
+  const secret = crypto.randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase()
   const issuer = "DeepSight"
-  const accountName = "developer@example.com"
+  const accountName = "user"
 
   // otpauth URL format for authenticator apps
   const otpauthUrl = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(accountName)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`

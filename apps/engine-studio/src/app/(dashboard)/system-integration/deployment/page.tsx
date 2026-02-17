@@ -136,7 +136,7 @@ export default function DeploymentPage() {
           target: "algorithm",
           targetVersion: "v1.2.0",
           environment: selectedEnv,
-          createdBy: "admin@deepsight.ai",
+          createdBy: "admin",
         }),
       })
       const json = await res.json()

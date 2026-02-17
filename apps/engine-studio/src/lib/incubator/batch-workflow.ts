@@ -246,7 +246,7 @@ function selectTestSamples(gsConfig: GoldenSampleConfig): string[] {
   // 여기서는 설정에 따른 개수만 반환
   const ids: string[] = []
   for (let i = 0; i < gsConfig.samplesPerTest; i++) {
-    ids.push(`gs-sample-${i + 1}`)
+    ids.push(`gs-${crypto.randomUUID().slice(0, 8)}`)
   }
   return ids
 }

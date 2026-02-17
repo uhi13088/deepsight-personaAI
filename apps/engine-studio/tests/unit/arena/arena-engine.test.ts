@@ -8,6 +8,8 @@ import {
   getRemainingBudget,
   runSession,
   judgeSessionRuleBased,
+  judgeSessionLLM,
+  parseJudgmentResponse,
   buildJudgmentPrompt,
   computeOverallScore,
   DEFAULT_MAX_TURNS,
@@ -16,6 +18,7 @@ import {
   MAX_TURNS_LIMIT,
   PROFILE_TOKEN_ESTIMATES,
   JUDGMENT_WEIGHTS,
+  JUDGMENT_MODEL_MAP,
 } from "@/lib/arena/arena-engine"
 import type {
   ArenaSession,
@@ -685,5 +688,168 @@ describe("통합 시나리오", () => {
     const judgment = judgeSessionRuleBased(result.session)
     expect(judgment.overallScore).toBeGreaterThan(0)
     expect(judgment.issues.length).toBe(0) // 정상 턴이므로 이슈 없음
+  })
+})
+
+// ══════════════════════════════════════════════════════════════
+// T145: LLM 판정 + 모델 선택
+// ══════════════════════════════════════════════════════════════
+
+describe("JUDGMENT_MODEL_MAP", () => {
+  it("PRECISE는 Sonnet 모델이다", () => {
+    expect(JUDGMENT_MODEL_MAP.PRECISE).toContain("sonnet")
+  })
+
+  it("QUICK는 Haiku 모델이다", () => {
+    expect(JUDGMENT_MODEL_MAP.QUICK).toContain("haiku")
+  })
+})
+
+describe("parseJudgmentResponse", () => {
+  it("유효한 JSON을 파싱한다", () => {
+    const json = JSON.stringify({
+      scores: {
+        characterConsistency: 0.8,
+        l2Emergence: 0.6,
+        paradoxEmergence: 0.7,
+        triggerResponse: 0.9,
+      },
+      issues: [
+        {
+          turnNumber: 2,
+          personaId: "p-1",
+          category: "voice",
+          severity: "minor",
+          description: "말투 불일치",
+          suggestion: "보이스 참조",
+        },
+      ],
+    })
+
+    const result = parseJudgmentResponse(json)
+    expect(result).not.toBeNull()
+    expect(result!.scores.characterConsistency).toBe(0.8)
+    expect(result!.scores.l2Emergence).toBe(0.6)
+    expect(result!.issues).toHaveLength(1)
+    expect(result!.issues[0].category).toBe("voice")
+  })
+
+  it("scores를 0~1로 클램핑한다", () => {
+    const json = JSON.stringify({
+      scores: {
+        characterConsistency: 1.5,
+        l2Emergence: -0.3,
+        paradoxEmergence: 0.5,
+        triggerResponse: 2.0,
+      },
+      issues: [],
+    })
+
+    const result = parseJudgmentResponse(json)
+    expect(result!.scores.characterConsistency).toBe(1.0)
+    expect(result!.scores.l2Emergence).toBe(0)
+    expect(result!.scores.triggerResponse).toBe(1.0)
+  })
+
+  it("잘못된 category를 consistency로 보정한다", () => {
+    const json = JSON.stringify({
+      scores: {
+        characterConsistency: 0.5,
+        l2Emergence: 0.5,
+        paradoxEmergence: 0.5,
+        triggerResponse: 0.5,
+      },
+      issues: [
+        {
+          turnNumber: 1,
+          personaId: "p-1",
+          category: "invalid",
+          severity: "minor",
+          description: "test",
+          suggestion: "test",
+        },
+      ],
+    })
+
+    const result = parseJudgmentResponse(json)
+    expect(result!.issues[0].category).toBe("consistency")
+  })
+
+  it("JSON이 없으면 null을 반환한다", () => {
+    expect(parseJudgmentResponse("파싱 불가")).toBeNull()
+  })
+
+  it("scores가 없으면 null을 반환한다", () => {
+    expect(parseJudgmentResponse('{ "issues": [] }')).toBeNull()
+  })
+})
+
+describe("judgeSessionLLM", () => {
+  it("LLM 응답을 파싱하여 판정한다", async () => {
+    const session = makeRunningSession({ maxTurns: 2 })
+    const withTurns = addTurn(
+      addTurn(startSession(session), "persona-a", "영화 토론 시작합니다.", 100),
+      "persona-b",
+      "좋은 의견이네요!",
+      80
+    )
+
+    const mockLLM = makeMockLLM()
+    vi.mocked(mockLLM.generateJudgment).mockResolvedValueOnce({
+      content: JSON.stringify({
+        scores: {
+          characterConsistency: 0.85,
+          l2Emergence: 0.7,
+          paradoxEmergence: 0.6,
+          triggerResponse: 0.8,
+        },
+        issues: [],
+      }),
+      tokensUsed: 200,
+    })
+
+    const judgment = await judgeSessionLLM(withTurns, mockLLM)
+    expect(judgment.scores.characterConsistency).toBe(0.85)
+    expect(judgment.scores.l2Emergence).toBe(0.7)
+    expect(judgment.issues).toHaveLength(0)
+    expect(judgment.overallScore).toBeGreaterThan(0)
+  })
+
+  it("LLM 실패 시 룰 기반으로 폴백한다", async () => {
+    const session = makeRunningSession({ maxTurns: 2 })
+    const withTurns = addTurn(
+      startSession(session),
+      "persona-a",
+      "짧은 대화입니다. 충분히 긴 텍스트.",
+      100
+    )
+
+    const mockLLM = makeMockLLM()
+    vi.mocked(mockLLM.generateJudgment).mockRejectedValueOnce(new Error("API 실패"))
+
+    const judgment = await judgeSessionLLM(withTurns, mockLLM)
+    // 폴백이므로 기본값
+    expect(judgment.sessionId).toBe(withTurns.id)
+    expect(judgment.scores.l2Emergence).toBe(0.5)
+  })
+
+  it("파싱 실패 시 룰 기반으로 폴백한다", async () => {
+    const session = makeRunningSession({ maxTurns: 2 })
+    const withTurns = addTurn(
+      startSession(session),
+      "persona-a",
+      "파싱 실패 테스트. 충분히 긴 텍스트.",
+      100
+    )
+
+    const mockLLM = makeMockLLM()
+    vi.mocked(mockLLM.generateJudgment).mockResolvedValueOnce({
+      content: "파싱 불가능한 응답",
+      tokensUsed: 50,
+    })
+
+    const judgment = await judgeSessionLLM(withTurns, mockLLM)
+    expect(judgment.sessionId).toBe(withTurns.id)
+    expect(judgment.scores.l2Emergence).toBe(0.5)
   })
 })

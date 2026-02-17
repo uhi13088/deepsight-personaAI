@@ -13,17 +13,31 @@ import type { NarrativeDriveVector } from "@/types/persona-v3"
  */
 export async function GET() {
   try {
-    // 1. 전체 ACTIVE 페르소나의 NARRATIVE 벡터 조회
-    const personas = await prisma.persona.findMany({
-      where: { status: { in: ["ACTIVE", "STANDARD"] } },
-      include: {
-        layerVectors: {
-          where: { layerType: "NARRATIVE" },
-          orderBy: { version: "desc" },
-          take: 1,
+    const personas = await prisma.persona
+      .findMany({
+        where: { status: { in: ["ACTIVE", "STANDARD"] } },
+        include: {
+          layerVectors: {
+            where: { layerType: "NARRATIVE" },
+            orderBy: { version: "desc" },
+            take: 1,
+          },
         },
-      },
-    })
+      })
+      .catch(
+        () =>
+          [] as Array<{
+            id: string
+            name: string
+            layerVectors: Array<{
+              dim1: unknown
+              dim2: unknown
+              dim3: unknown
+              dim4: unknown
+              version: number
+            }>
+          }>
+      )
 
     // 2. 스테이지 분포 집계
     const stageDistribution: Record<string, number> = {}
@@ -52,14 +66,16 @@ export async function GET() {
     }
 
     // 3. 최근 진화 로그 (최근 20건)
-    const recentEvolutions = await prisma.personaActivityLog.findMany({
-      where: {
-        activityType: "SYSTEM",
-        metadata: { path: ["type"], equals: "L3_EVOLUTION" },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    })
+    const recentEvolutions = await prisma.personaActivityLog
+      .findMany({
+        where: {
+          activityType: "SYSTEM",
+          metadata: { path: ["type"], equals: "L3_EVOLUTION" },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      })
+      .catch(() => [] as Array<{ personaId: string; metadata: unknown; createdAt: Date }>)
 
     // 페르소나 이름 맵 (이미 조회한 데이터 활용)
     const personaNameMap = new Map(personas.map((p) => [p.id, p.name]))

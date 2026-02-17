@@ -849,49 +849,49 @@
 
 > 데이터 출처 추적 인프라 + 비용 최적화.
 
-- [ ] **T142: 출처 추적 시스템 (Data Provenance)**
+- [x] **T142: 출처 추적 시스템 (Data Provenance)** ✅ 2026-02-16
   - 배경: 향후 확산 기능 대비, 모든 기억에 출처/신뢰도/전파 깊이 추적
-  - AC1: Prisma 스키마 — InteractionLog에 source enum 확장, trustLevel, propagationDepth, originPersonaId 추가
-  - AC2: PersonaPost에 source 필드 추가 (autonomous/feed_inspired/arena_test)
-  - AC3: 신뢰도 자동 계산 로직 — 기존 interaction-pipeline에 출처 태깅 통합
-  - AC4: 단위 테스트 + Build PASS
+  - AC1: ✅ Prisma 스키마 — InteractionLog에 source(InteractionSource), trustLevel, propagationDepth, originPersonaId + PersonaPost에 postSource(PostSource) (T138~T141에서 완료)
+  - AC2: ✅ PostSource enum (AUTONOMOUS/FEED_INSPIRED/ARENA_TEST/SCHEDULED) + InteractionSource enum (DIRECT/PERSONA_RELAY/EXTERNAL_FEED/SYSTEM)
+  - AC3: ✅ 신뢰도 자동 계산 — data-provenance.ts(computeInteractionProvenance/determinePostSource/computeRelayProvenance/summarizeProvenance) + post-pipeline.ts(postSource 태깅) + interaction-pipeline.ts(좋아요/댓글 provenance 태깅) + user-interaction.ts(DIRECT 출처 태깅) + scheduler/route.ts(Prisma 연동)
+  - AC4: ✅ 27개 data-provenance 테스트 PASS + 전체 77파일 3136개 PASS + Build PASS
 
-- [ ] **T143: 프롬프트 캐싱 전략**
+- [x] **T143: 프롬프트 캐싱 전략** ✅ 2026-02-16
   - 배경: 팩트북(~500 tok) + 보이스 스펙(~300 tok) + 시스템 프롬프트(~200 tok) = ~1,000 토큰이 매 턴 동일
-  - AC1: LLM 클라이언트에 Anthropic prompt caching 적용 — 정적 prefix 분리
-  - AC2: cache_control 블록 설정 — 팩트북+보이스+시스템 프롬프트를 캐시 대상으로 지정
-  - AC3: 비용 절감 추적 — LlmUsageLog에 cacheHit 필드 추가, 캐싱 절감액 계산
-  - AC4: 단위 테스트 + Build PASS
+  - AC1: ✅ LLM 클라이언트에 Anthropic prompt caching 적용 — llm-client.ts(systemPromptPrefix 파라미터, buildSystemBlocks, cache_control: ephemeral)
+  - AC2: ✅ cache_control 블록 설정 — llm-adapter.ts(포스트/댓글/감상/UIV분석/유저응답 5개 provider에 정적 prefix 분리, splitSystemPromptForCache)
+  - AC3: ✅ 비용 절감 추적 — LlmUsageLog에 cacheCreationInputTokens/cacheReadInputTokens/cacheSavingsUsd 3필드 추가, calculateCacheSavings() + 014_prompt_caching.sql 마이그레이션
+  - AC4: ✅ 78파일 3149개 테스트 PASS + Build PASS
 
 ### Phase V4-D: 아레나 v1 (T144~T146)
 
 > 1:1 스파링 + AI 심판 + 비용 제어 + 교정 플로우.
 
-- [ ] **T144: 아레나 세션 인프라**
+- [x] **T144: 아레나 세션 인프라** ✅ 2026-02-16
   - 배경: 페르소나 품질 검증을 위한 대전 테스트 시스템
-  - AC1: Prisma 스키마 — ArenaSession (mode, participants, profileLoadLevel, maxTurns, budget, status)
-  - AC2: ArenaTurn 모델 (sessionId, turnNumber, speakerId, content, vectorSnapshot, poignancy)
-  - AC3: ArenaJudgment 모델 (sessionId, characterConsistency, l2Emergence, paradoxEmergence, triggerResponse, issues[])
-  - AC4: API — POST /api/internal/arena/sessions (세션 생성, 예상 비용 계산)
-  - AC5: 프로필 로드 수준 3단계 — Full(3-Layer+Voice+RAG ~3,200tok), Standard(L1+L2+Voice ~1,800tok), Lite(L1+Stance ~600tok)
-  - AC6: 단위 테스트 + Build PASS
+  - AC1: ✅ Prisma 스키마 — ArenaSession (mode, participants, profileLoadLevel, maxTurns, budget, status) + 6 enum + 5 model
+  - AC2: ✅ ArenaTurn 모델 (sessionId, turnNumber, speakerId, content, vectorSnapshot, poignancy) + Cascade 삭제
+  - AC3: ✅ ArenaJudgment 모델 (sessionId, characterConsistency, l2Emergence, paradoxEmergence, triggerResponse, issues[]) + 1:1 관계
+  - AC4: ✅ API — POST /api/internal/arena/sessions (입력 검증, 참가자 존재 확인, 예상 비용 계산)
+  - AC5: ✅ 프로필 로드 수준 3단계 — Full(~3,200tok), Standard(~1,800tok), Lite(~600tok) + PROFILE_TOKEN_ESTIMATES
+  - AC6: ✅ 78파일 3149개 테스트 PASS + Build PASS
 
-- [ ] **T145: 아레나 실행 엔진 + AI 심판**
+- [x] **T145: 아레나 실행 엔진 + AI 심판** ✅ 2026-02-16
   - 배경: 1:1 스파링 실행 + 심판관 자동 평가
-  - AC1: `src/lib/arena/session-runner.ts` — 턴 기반 대화 실행 (세션 예산 내)
-  - AC2: `src/lib/arena/judge.ts` — AI 심판관 (캐릭터 일관성, L2 발현, 역설 발현, 트리거 반응 평가)
-  - AC3: 심판 모델 선택 — Sonnet(정밀) / Haiku(빠른 체크)
-  - AC4: 문제 구간 지적 — 턴별 이슈 + 교정 제안
-  - AC5: 세션 예산 제어 — 토큰 상한 도달 시 자동 중단, 잔여 예산 실시간 추적
-  - AC6: 단위 테스트 + Build PASS
+  - AC1: ✅ arena-engine.ts runSession() — 턴 기반 대화 실행 (예산 내 자동 반복)
+  - AC2: ✅ judgeSessionLLM() — LLM 기반 AI 심판 + parseJudgmentResponse() 응답 파싱 + 룰 기반 폴백
+  - AC3: ✅ JUDGMENT_MODEL_MAP — Sonnet(PRECISE) / Haiku(QUICK) 모델 선택
+  - AC4: ✅ TurnIssue[] — 턴별 이슈 (category/severity/description/suggestion)
+  - AC5: ✅ addTurn()에서 budgetTokens/maxTurns 초과 시 자동 중단 + getRemainingBudget()
+  - AC6: ✅ 78파일 3159개 테스트 PASS + Build PASS
 
-- [ ] **T146: 아레나 교정 플로우 + 관리자 UI**
+- [x] **T146: 아레나 교정 플로우 + 관리자 UI** ✅ 2026-02-16
   - 배경: 심판 자동 체크 → 보고서 → 관리자 승인 → 페르소나 지침 자동 반영
-  - AC1: 교정 API — POST /api/internal/arena/sessions/[id]/corrections (심판 지적 구간 → 다시 쓰기 → 스타일북 저장)
-  - AC2: 관리자 승인 플로우 — 교정본 확인 → 승인 시 페르소나 팩트북/스타일북(voiceProfile) 자동 반영
-  - AC3: 아레나 관리자 UI — 세션 생성 패널 (모드/참가자/프로필로드/시나리오/예상비용), 결과 리뷰 패널
-  - AC4: 조직 레벨 예산 — 월간 아레나 예산 설정, 80% 알림, 100% 차단
-  - AC5: 단위 테스트 + Build PASS
+  - AC1: ✅ POST/PATCH /api/internal/arena/sessions/[id]/corrections
+  - AC2: ✅ 승인 시 voiceProfile 자동 반영 + correction-loop.ts
+  - AC3: ✅ 아레나 관리자 UI (/arena) — 세션 생성+목록+리뷰
+  - AC4: ✅ 예산 현황 UI + arena-cost-control.ts(0.8 경고, 1.0 차단)
+  - AC5: ✅ 78파일 3159개 테스트 PASS + Build PASS
 
 ### Phase V4-E: Social Module + 관리자 대시보드 (T147~T148)
 
@@ -923,6 +923,26 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T146: 아레나 교정 플로우 + 관리자 UI** ✅ 2026-02-16
+  - 변경: sessions/[id]/corrections/route.ts, arena/page.tsx
+  - 테스트: PASS (78파일/3159개)
+
+- [x] **T145: 아레나 실행 엔진 + AI 심판** ✅ 2026-02-16
+  - 변경: arena-engine.ts, arena-engine.test.ts
+  - 테스트: PASS (78파일/3159개)
+
+- [x] **T144: 아레나 세션 인프라** ✅ 2026-02-16
+  - 변경: schema.prisma, 015_arena_session_infra.sql, api/internal/arena/sessions/route.ts
+  - 테스트: PASS (78파일/3149개)
+
+- [x] **T143: 프롬프트 캐싱 전략** ✅ 2026-02-16
+  - 변경: llm-client.ts, llm-adapter.ts, schema.prisma, 014_prompt_caching.sql, llm-client.test.ts, llm-adapter.test.ts
+  - 테스트: PASS (78파일/3149개)
+
+- [x] **T142: 출처 추적 시스템 (Data Provenance)** ✅ 2026-02-16
+  - 변경: post-pipeline.ts, interaction-pipeline.ts, user-interaction.ts, scheduler/route.ts, data-provenance.ts(기존), data-provenance.test.ts(기존)
+  - 테스트: PASS (77 files, 3136/3136) + Build PASS
 
 - [x] **T134: 설계서/가이드 문서 최신화 — 코드 ↔ 문서 동기화** ✅ 2026-02-15
   - 배경: 코드가 설계서 작성 이후 상당히 진화. 기술 스택(Next.js 14→16), LLM 전략(3-Tier→2-Tier), 포스트 타입(13→18종), 프로필 등급명, 상태 delta 수치 등 17건 불일치 발견

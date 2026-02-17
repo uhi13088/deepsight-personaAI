@@ -14,6 +14,7 @@ import {
   createCommentLLMProvider,
   createConsumptionLLMProvider,
   createUserInteractionLLMProvider,
+  splitSystemPromptForCache,
 } from "@/lib/persona-world/llm-adapter"
 
 const mockGenerateText = vi.mocked(generateText)
@@ -29,6 +30,8 @@ const mockLLMResult = {
   outputTokens: 50,
   model: "claude-sonnet-4-5-20250929",
   stopReason: "end_turn",
+  cacheCreationInputTokens: 0,
+  cacheReadInputTokens: 0,
 }
 
 const testState: PersonaStateData = {
@@ -63,8 +66,10 @@ describe("createPostLLMProvider", () => {
       maxTokens: 500,
     })
 
+    // T143: 마커 없는 프롬프트 → prefix 없이 전부 suffix
     expect(mockGenerateText).toHaveBeenCalledWith({
       systemPrompt: "시스템 프롬프트",
+      systemPromptPrefix: undefined,
       userMessage: "유저 프롬프트",
       maxTokens: 500,
       temperature: 0.8,
@@ -74,6 +79,20 @@ describe("createPostLLMProvider", () => {
 
     expect(result.text).toBe("테스트 생성 텍스트")
     expect(result.tokensUsed).toBe(150) // 100 + 50
+  })
+
+  it("T143: [현재 상태] 마커가 있으면 prefix/suffix를 분리한다", async () => {
+    const provider = createPostLLMProvider(PERSONA_ID)
+
+    await provider.generateText({
+      systemPrompt: "당신은 페르소나입니다.\n\n[Voice]\n분석적\n\n[현재 상태]\n기분: 0.70",
+      userPrompt: "포스트 작성",
+      maxTokens: 500,
+    })
+
+    const callArgs = mockGenerateText.mock.calls[0][0]
+    expect(callArgs.systemPromptPrefix).toBe("당신은 페르소나입니다.\n\n[Voice]\n분석적")
+    expect(callArgs.systemPrompt).toBe("[현재 상태]\n기분: 0.70")
   })
 
   it("personaId를 올바르게 전달한다", async () => {
@@ -118,7 +137,7 @@ describe("createCommentLLMProvider", () => {
     )
   })
 
-  it("시스템 프롬프트에 톤 정보를 포함한다", async () => {
+  it("T143: 시스템 프롬프트를 prefix(역할정의)+suffix(동적상태)로 분리한다", async () => {
     const provider = createCommentLLMProvider(PERSONA_ID)
     await provider.generateComment({
       postContent: "테스트",
@@ -133,7 +152,11 @@ describe("createCommentLLMProvider", () => {
     })
 
     const callArgs = mockGenerateText.mock.calls[0][0]
+    // prefix: 정적 역할 정의
+    expect(callArgs.systemPromptPrefix).toContain("당신은 SNS에서 활동하는 페르소나입니다")
+    // suffix: 동적 톤/상태
     expect(callArgs.systemPrompt).toContain("deep_analysis")
+    expect(callArgs.systemPrompt).toContain("0.70") // mood
   })
 
   it("유저 프롬프트에 포스트 내용과 RAG 컨텍스트를 포함한다", async () => {
@@ -160,7 +183,7 @@ describe("createCommentLLMProvider", () => {
 // ── Consumption LLM Provider ──────────────────────────────────
 
 describe("createConsumptionLLMProvider", () => {
-  it("인상 생성을 호출한다", async () => {
+  it("인상 생성을 호출한다 (T143: prefix 분리)", async () => {
     const provider = createConsumptionLLMProvider(PERSONA_ID)
 
     const result = await provider.generateImpression({
@@ -170,13 +193,13 @@ describe("createConsumptionLLMProvider", () => {
     })
 
     expect(result).toBe("테스트 생성 텍스트")
-    expect(mockGenerateText).toHaveBeenCalledWith(
-      expect.objectContaining({
-        callType: "pw:impression",
-        personaId: PERSONA_ID,
-        maxTokens: 100,
-      })
-    )
+    const callArgs = mockGenerateText.mock.calls[0][0]
+    expect(callArgs.callType).toBe("pw:impression")
+    expect(callArgs.personaId).toBe(PERSONA_ID)
+    expect(callArgs.maxTokens).toBe(100)
+    // T143: prefix에 정적 역할, suffix에 동적 컨텍스트
+    expect(callArgs.systemPromptPrefix).toContain("한줄 감상을 작성하세요")
+    expect(callArgs.systemPrompt).toBe("SF와 우주 테마를 좋아하는 페르소나")
   })
 
   it("결과를 100자로 제한한다", async () => {
@@ -212,12 +235,12 @@ describe("createUserInteractionLLMProvider", () => {
       expect(uiv.politeness).toBe(0.8)
       expect(uiv.aggression).toBe(0.1)
       expect(uiv.intimacy).toBe(0.5)
-      expect(mockGenerateText).toHaveBeenCalledWith(
-        expect.objectContaining({
-          callType: "pw:user_response",
-          temperature: 0.3,
-        })
-      )
+      const callArgs = mockGenerateText.mock.calls[0][0]
+      expect(callArgs.callType).toBe("pw:user_response")
+      expect(callArgs.temperature).toBe(0.3)
+      // T143: UIV 분석은 전체 시스템 프롬프트가 정적 → prefix로 전달
+      expect(callArgs.systemPromptPrefix).toContain("태도를 분석하세요")
+      expect(callArgs.systemPrompt).toBe("")
     })
 
     it("JSON 파싱 실패 시 기본값을 반환한다", async () => {
@@ -296,7 +319,7 @@ describe("createUserInteractionLLMProvider", () => {
       )
     })
 
-    it("시스템 프롬프트에 톤과 UIV를 포함한다", async () => {
+    it("T143: prefix(역할정의)+suffix(동적톤/UIV)로 분리한다", async () => {
       const provider = createUserInteractionLLMProvider(PERSONA_ID)
       await provider.generateResponse({
         userComment: "테스트",
@@ -325,10 +348,48 @@ describe("createUserInteractionLLMProvider", () => {
       })
 
       const callArgs = mockGenerateText.mock.calls[0][0]
+      // prefix: 정적 역할 정의
+      expect(callArgs.systemPromptPrefix).toContain("유저 댓글에 답변합니다")
+      // suffix: 동적 톤/UIV
       expect(callArgs.systemPrompt).toContain("deep_analysis")
       expect(callArgs.systemPrompt).toContain("0.9")
       expect(callArgs.systemPrompt).toContain("테스트 맥락")
     })
+  })
+})
+
+// ── splitSystemPromptForCache (T143) ────────────────────────────
+
+describe("splitSystemPromptForCache", () => {
+  it("[현재 상태] 마커를 기준으로 분리한다", () => {
+    const prompt = "당신은 페르소나입니다.\n\n[Voice]\n분석적\n\n[현재 상태]\n기분: 0.70"
+    const { prefix, suffix } = splitSystemPromptForCache(prompt)
+
+    expect(prefix).toBe("당신은 페르소나입니다.\n\n[Voice]\n분석적")
+    expect(suffix).toBe("[현재 상태]\n기분: 0.70")
+  })
+
+  it("마커가 없으면 전체를 suffix로 반환한다", () => {
+    const prompt = "마커 없는 프롬프트"
+    const { prefix, suffix } = splitSystemPromptForCache(prompt)
+
+    expect(prefix).toBe("")
+    expect(suffix).toBe("마커 없는 프롬프트")
+  })
+
+  it("마커가 맨 앞이면 전체를 suffix로 반환한다", () => {
+    const prompt = "[현재 상태]\n기분: 0.50"
+    const { prefix, suffix } = splitSystemPromptForCache(prompt)
+
+    expect(prefix).toBe("")
+    expect(suffix).toBe("[현재 상태]\n기분: 0.50")
+  })
+
+  it("빈 문자열을 처리한다", () => {
+    const { prefix, suffix } = splitSystemPromptForCache("")
+
+    expect(prefix).toBe("")
+    expect(suffix).toBe("")
   })
 })
 

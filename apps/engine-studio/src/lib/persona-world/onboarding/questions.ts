@@ -6,7 +6,11 @@
 
 import type { SocialPersonaVector, SocialDimension } from "@/types/persona-v3"
 import type { CoreTemperamentVector, TemperamentDimension } from "@/types/persona-v3"
+import type { NarrativeDriveVector, NarrativeDimension } from "@/types/persona-v3"
+import type { ParadoxProfile } from "@/types"
 import type { OnboardingAnswer } from "../types"
+import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
+import { L1_L2_PARADOX_MAPPINGS } from "@/constants/v3"
 
 // ── 질문 구조 타입 ──────────────────────────────────────────
 
@@ -23,6 +27,8 @@ export interface OnboardingQuestionOption {
   l1Weights?: Partial<Record<SocialDimension, number>>
   /** L2 차원별 가중치: 선택 시 해당 차원에 더해질 값 */
   l2Weights?: Partial<Record<TemperamentDimension, number>>
+  /** L3 차원별 가중치: 선택 시 해당 차원에 더해질 값 */
+  l3Weights?: Partial<Record<NarrativeDimension, number>>
 }
 
 /**
@@ -62,6 +68,13 @@ const L2_BASE: CoreTemperamentVector = {
   neuroticism: 0.5,
 }
 
+const L3_BASE: NarrativeDriveVector = {
+  lack: 0.5,
+  moralCompass: 0.5,
+  volatility: 0.5,
+  growthArc: 0.5,
+}
+
 const L1_KEYS: SocialDimension[] = [
   "depth",
   "lens",
@@ -78,6 +91,7 @@ const L2_KEYS: TemperamentDimension[] = [
   "agreeableness",
   "neuroticism",
 ]
+const L3_KEYS: NarrativeDimension[] = ["lack", "moralCompass", "volatility", "growthArc"]
 
 // ── L1 벡터 산출 ────────────────────────────────────────────
 
@@ -153,6 +167,43 @@ export function computeL2Vector(
   return result
 }
 
+// ── L3 벡터 산출 ────────────────────────────────────────────
+
+/**
+ * Phase 2 답변으로 L3 NarrativeDriveVector 계산.
+ *
+ * L3는 Phase 2에서 l3Weights를 통해 간접 탐색.
+ * 기본값 0.5에서 시작 (DEFAULT_L3_VECTOR의 0.0 대신 측정 기준점으로 0.5 사용).
+ */
+export function computeL3Vector(
+  questions: OnboardingQuestion[],
+  answers: OnboardingAnswer[]
+): NarrativeDriveVector {
+  const answerMap = new Map(answers.map((a) => [a.questionId, a.value]))
+  const accumulated: Record<string, number> = {}
+
+  for (const q of questions) {
+    const selectedKey = answerMap.get(q.id)
+    if (selectedKey == null) continue
+
+    const option = q.options.find((o) => o.key === String(selectedKey))
+    if (!option?.l3Weights) continue
+
+    for (const [dim, weight] of Object.entries(option.l3Weights)) {
+      accumulated[dim] = (accumulated[dim] ?? 0) + weight
+    }
+  }
+
+  const result = { ...L3_BASE }
+  for (const key of L3_KEYS) {
+    if (accumulated[key] != null) {
+      result[key] = clamp(result[key] + accumulated[key])
+    }
+  }
+
+  return result
+}
+
 // ── 교차 검증 (Phase 3) ────────────────────────────────────
 
 /**
@@ -172,9 +223,93 @@ export function crossValidate(
   adjustedL2: CoreTemperamentVector
   paradoxDetected: boolean
 } {
-  // Phase 3 답변으로 추가 보정
+  const { adjustedL1, adjustedL2, adjustedL3 } = applyPhase3Deltas(
+    l1,
+    l2,
+    L3_BASE,
+    phase3Questions,
+    phase3Answers
+  )
+
+  // 7쌍 L1↔L2 역설 감지
+  const paradoxDetected = detectParadox(adjustedL1, adjustedL2)
+
+  return { adjustedL1, adjustedL2, paradoxDetected }
+}
+
+/**
+ * Phase 3 교차 검증 확장 — L3 + EPS 포함.
+ *
+ * 7쌍 L1↔L2 역설 검증 + L3 벡터 보정 + Extended Paradox Score 계산.
+ */
+export function crossValidateWithParadox(
+  l1: SocialPersonaVector,
+  l2: CoreTemperamentVector,
+  l3: NarrativeDriveVector,
+  phase3Questions: OnboardingQuestion[],
+  phase3Answers: OnboardingAnswer[]
+): {
+  adjustedL1: SocialPersonaVector
+  adjustedL2: CoreTemperamentVector
+  adjustedL3: NarrativeDriveVector
+  paradoxDetected: boolean
+  paradoxProfile: ParadoxProfile
+  paradoxPairs: ParadoxPairResult[]
+} {
+  const { adjustedL1, adjustedL2, adjustedL3 } = applyPhase3Deltas(
+    l1,
+    l2,
+    l3,
+    phase3Questions,
+    phase3Answers
+  )
+
+  // 7쌍 L1↔L2 역설 상세 분석
+  const paradoxPairs = analyzeParadoxPairs(adjustedL1, adjustedL2)
+  const paradoxDetected = paradoxPairs.some((p) => p.detected)
+
+  // EPS 계산 (L3 포함)
+  const paradoxProfile = calculateExtendedParadoxScore(adjustedL1, adjustedL2, adjustedL3)
+
+  return {
+    adjustedL1,
+    adjustedL2,
+    adjustedL3,
+    paradoxDetected,
+    paradoxProfile,
+    paradoxPairs,
+  }
+}
+
+// ── 역설 쌍 결과 타입 ──────────────────────────────────────
+
+export interface ParadoxPairResult {
+  l1Dim: SocialDimension
+  l2Dim: TemperamentDimension
+  l1Value: number
+  l2Value: number
+  gap: number
+  detected: boolean
+  label: string
+}
+
+// ── 내부 유틸 ──────────────────────────────────────────────
+
+/** Phase 3 답변의 L1/L2/L3 delta 적용 */
+function applyPhase3Deltas(
+  l1: SocialPersonaVector,
+  l2: CoreTemperamentVector,
+  l3: NarrativeDriveVector,
+  phase3Questions: OnboardingQuestion[],
+  phase3Answers: OnboardingAnswer[]
+): {
+  adjustedL1: SocialPersonaVector
+  adjustedL2: CoreTemperamentVector
+  adjustedL3: NarrativeDriveVector
+} {
   const l1Delta: Record<string, number> = {}
   const l2Delta: Record<string, number> = {}
+  const l3Delta: Record<string, number> = {}
   const answerMap = new Map(phase3Answers.map((a) => [a.questionId, a.value]))
 
   for (const q of phase3Questions) {
@@ -193,6 +328,11 @@ export function crossValidate(
         l2Delta[dim] = (l2Delta[dim] ?? 0) + w
       }
     }
+    if (option.l3Weights) {
+      for (const [dim, w] of Object.entries(option.l3Weights)) {
+        l3Delta[dim] = (l3Delta[dim] ?? 0) + w
+      }
+    }
   }
 
   const adjustedL1 = { ...l1 }
@@ -209,13 +349,44 @@ export function crossValidate(
     }
   }
 
-  // 교차 차원 Paradox 감지: sociability ↔ extraversion
-  const paradoxDetected =
-    Math.abs(adjustedL1.sociability - adjustedL2.extraversion) > 0.3 ||
-    Math.abs(adjustedL1.stance - (1 - adjustedL2.agreeableness)) > 0.3 ||
-    Math.abs(adjustedL1.taste - adjustedL2.openness) > 0.3
+  const adjustedL3 = { ...l3 }
+  for (const key of L3_KEYS) {
+    if (l3Delta[key] != null) {
+      adjustedL3[key] = clamp(adjustedL3[key] + l3Delta[key])
+    }
+  }
 
-  return { adjustedL1, adjustedL2, paradoxDetected }
+  return { adjustedL1, adjustedL2, adjustedL3 }
+}
+
+/** 7쌍 L1↔L2 역설 감지 (하나라도 gap > 0.3이면 true) */
+function detectParadox(l1: SocialPersonaVector, l2: CoreTemperamentVector): boolean {
+  return analyzeParadoxPairs(l1, l2).some((p) => p.detected)
+}
+
+/** 7쌍 L1↔L2 역설 상세 분석 */
+function analyzeParadoxPairs(
+  l1: SocialPersonaVector,
+  l2: CoreTemperamentVector
+): ParadoxPairResult[] {
+  const THRESHOLD = 0.3
+
+  return L1_L2_PARADOX_MAPPINGS.map((mapping) => {
+    const l1Value = l1[mapping.l1]
+    const l2Value = l2[mapping.l2]
+    const adjusted = mapping.direction === "inverse" ? 1 - l2Value : l2Value
+    const gap = Math.abs(l1Value - adjusted)
+
+    return {
+      l1Dim: mapping.l1,
+      l2Dim: mapping.l2,
+      l1Value,
+      l2Value,
+      gap: Math.round(gap * 100) / 100,
+      detected: gap > THRESHOLD,
+      label: mapping.label,
+    }
+  })
 }
 
 function clamp(v: number): number {

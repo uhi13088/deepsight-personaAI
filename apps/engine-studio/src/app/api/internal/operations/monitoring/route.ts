@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { ApiResponse } from "@/types"
+import { prisma } from "@/lib/prisma"
 import {
   createMetricDataPoint,
   evaluateThresholds,
@@ -11,131 +12,11 @@ import type {
   MetricDataPoint,
   LogEntry,
   ThresholdAlert,
-  DashboardLayout,
   MetricThreshold,
+  DashboardLayout,
 } from "@/lib/operations"
 
-// ── In-memory store ─────────────────────────────────────────────
-
-interface MonitoringStore {
-  metrics: MetricDataPoint[]
-  logs: LogEntry[]
-  alerts: ThresholdAlert[]
-  thresholds: MetricThreshold[]
-  layout: DashboardLayout
-}
-
-function buildInitialMetrics(): MetricDataPoint[] {
-  return [
-    createMetricDataPoint("cpu", 72.5, "server-1", { env: "prod" }),
-    createMetricDataPoint("memory", 68.3, "server-1", { env: "prod" }),
-    createMetricDataPoint("disk", 54.2, "server-1", { env: "prod" }),
-    createMetricDataPoint("network", 45.8, "server-1", { env: "prod" }),
-    createMetricDataPoint("api_latency", 320, "api-gateway", { env: "prod" }),
-    createMetricDataPoint("error_rate", 0.8, "api-gateway", { env: "prod" }),
-  ]
-}
-
-function buildInitialLogs(): LogEntry[] {
-  const now = Date.now()
-  return [
-    {
-      id: "log-1",
-      timestamp: now - 1000,
-      level: "error",
-      service: "api-gateway",
-      message: "Connection timeout to database pool",
-      metadata: { host: "db-primary" },
-      traceId: "trace-001",
-    },
-    {
-      id: "log-2",
-      timestamp: now - 5000,
-      level: "warn",
-      service: "worker",
-      message: "Queue depth exceeding threshold",
-      metadata: { queue: "persona-processing" },
-      traceId: "trace-002",
-    },
-    {
-      id: "log-3",
-      timestamp: now - 10000,
-      level: "info",
-      service: "api-gateway",
-      message: "Health check passed",
-      metadata: {},
-      traceId: null,
-    },
-    {
-      id: "log-4",
-      timestamp: now - 15000,
-      level: "error",
-      service: "matching-engine",
-      message: "Vector computation failed for persona batch",
-      metadata: { batchId: "batch-42" },
-      traceId: "trace-003",
-    },
-    {
-      id: "log-5",
-      timestamp: now - 20000,
-      level: "info",
-      service: "worker",
-      message: "Backup job completed successfully",
-      metadata: {},
-      traceId: null,
-    },
-    {
-      id: "log-6",
-      timestamp: now - 30000,
-      level: "debug",
-      service: "api-gateway",
-      message: "Request processed in 120ms",
-      metadata: {},
-      traceId: "trace-004",
-    },
-    {
-      id: "log-7",
-      timestamp: now - 45000,
-      level: "warn",
-      service: "matching-engine",
-      message: "Slow query detected: persona search took 2.3s",
-      metadata: { queryId: "q-789" },
-      traceId: "trace-005",
-    },
-    {
-      id: "log-8",
-      timestamp: now - 60000,
-      level: "fatal",
-      service: "worker",
-      message: "Out of memory error — process restarting",
-      metadata: { pid: "12345" },
-      traceId: null,
-    },
-  ]
-}
-
-function buildInitialStore(): MonitoringStore {
-  const metrics = buildInitialMetrics()
-  const alerts = evaluateThresholds(metrics, DEFAULT_METRIC_THRESHOLDS)
-  return {
-    metrics,
-    logs: buildInitialLogs(),
-    alerts,
-    thresholds: DEFAULT_METRIC_THRESHOLDS,
-    layout: { ...DEFAULT_DASHBOARD_LAYOUT, updatedAt: Date.now() },
-  }
-}
-
-let store: MonitoringStore | null = null
-
-function getStore(): MonitoringStore {
-  if (!store) {
-    store = buildInitialStore()
-  }
-  return store
-}
-
-// ── Response type ───────────────────────────────────────────────
+// ── Response / Request types ────────────────────────────────────
 
 interface MonitoringResponse {
   metrics: MetricDataPoint[]
@@ -145,65 +26,204 @@ interface MonitoringResponse {
   layout: DashboardLayout
 }
 
+interface MonitoringPostRequest {
+  action: "refresh_metrics" | "acknowledge_alert"
+  alertId?: string
+}
+
+// ── DB → LogEntry 변환 ─────────────────────────────────────────
+
+function systemLogToLogEntry(row: {
+  id: string
+  level: string
+  service: string
+  message: string
+  metadata: unknown
+  traceId: string | null
+  createdAt: Date
+}): LogEntry {
+  return {
+    id: row.id,
+    timestamp: row.createdAt.getTime(),
+    level: row.level as LogEntry["level"],
+    service: row.service,
+    message: row.message,
+    metadata: (row.metadata as Record<string, string>) ?? {},
+    traceId: row.traceId ?? null,
+  }
+}
+
+// ── 실제 애플리케이션 메트릭 조회 ───────────────────────────────
+
+async function loadMetrics(): Promise<MetricDataPoint[]> {
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+  const now = Date.now()
+
+  const [activePersonaCount, llmTotal, llmErrorCount, llmAgg, matchingCount] = await Promise.all([
+    // 활성 페르소나 수
+    prisma.persona.count({ where: { status: "ACTIVE" } }),
+
+    // LLM 호출 수 (24h)
+    prisma.llmUsageLog.count({ where: { createdAt: { gte: dayAgo } } }),
+
+    // LLM 에러 수 (24h)
+    prisma.llmUsageLog.count({
+      where: { createdAt: { gte: dayAgo }, status: "ERROR" },
+    }),
+
+    // LLM 집계: 비용 합계, 평균 응답시간
+    prisma.llmUsageLog.aggregate({
+      where: { createdAt: { gte: dayAgo } },
+      _sum: { estimatedCostUsd: true },
+      _avg: { durationMs: true },
+    }),
+
+    // 매칭 요청 수 (24h)
+    prisma.matchingLog.count({ where: { createdAt: { gte: dayAgo } } }),
+  ])
+
+  const llmCost = llmAgg._sum.estimatedCostUsd ? Number(llmAgg._sum.estimatedCostUsd) : 0
+  const avgLatency = llmAgg._avg.durationMs ?? 0
+  const llmErrorRate = llmTotal > 0 ? (llmErrorCount / llmTotal) * 100 : 0
+
+  return [
+    createMetricDataPoint("active_personas", activePersonaCount, "database", {
+      timestamp: String(now),
+    }),
+    createMetricDataPoint("llm_calls", llmTotal, "llm_usage_log", {
+      period: "24h",
+    }),
+    createMetricDataPoint("llm_cost", llmCost, "llm_usage_log", {
+      unit: "USD",
+      period: "24h",
+    }),
+    createMetricDataPoint("llm_error_rate", llmErrorRate, "llm_usage_log", {
+      period: "24h",
+    }),
+    createMetricDataPoint("avg_latency", avgLatency, "llm_usage_log", {
+      unit: "ms",
+      period: "24h",
+    }),
+    createMetricDataPoint("matching_count", matchingCount, "matching_log", {
+      period: "24h",
+    }),
+  ]
+}
+
+async function loadLogs(): Promise<LogEntry[]> {
+  const rows = await prisma.systemLog.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  })
+
+  return rows.map(systemLogToLogEntry)
+}
+
+async function loadThresholds(): Promise<MetricThreshold[]> {
+  const row = await prisma.systemConfig.findUnique({
+    where: { category_key: { category: "MONITORING", key: "thresholds" } },
+  })
+
+  if (!row) return DEFAULT_METRIC_THRESHOLDS
+
+  return row.value as unknown as MetricThreshold[]
+}
+
+async function loadLayout(): Promise<DashboardLayout> {
+  const row = await prisma.systemConfig.findUnique({
+    where: { category_key: { category: "MONITORING", key: "layout" } },
+  })
+
+  if (!row) return { ...DEFAULT_DASHBOARD_LAYOUT, updatedAt: Date.now() }
+
+  return row.value as unknown as DashboardLayout
+}
+
+async function loadAcknowledgedAlertIds(): Promise<Set<string>> {
+  const row = await prisma.systemConfig.findUnique({
+    where: {
+      category_key: { category: "MONITORING", key: "acknowledgedAlerts" },
+    },
+  })
+
+  if (!row) return new Set()
+
+  return new Set(row.value as unknown as string[])
+}
+
+async function saveAcknowledgedAlertIds(ids: string[]): Promise<void> {
+  await prisma.systemConfig.upsert({
+    where: {
+      category_key: { category: "MONITORING", key: "acknowledgedAlerts" },
+    },
+    update: { value: ids },
+    create: {
+      category: "MONITORING",
+      key: "acknowledgedAlerts",
+      value: ids,
+      description: "Acknowledged monitoring alert IDs",
+    },
+  })
+}
+
+function applyAcknowledgments(
+  alerts: ThresholdAlert[],
+  acknowledgedIds: Set<string>
+): ThresholdAlert[] {
+  return alerts.map((a) => (acknowledgedIds.has(a.id) ? acknowledgeThresholdAlert(a) : a))
+}
+
+async function buildFullResponse(): Promise<MonitoringResponse> {
+  const [metrics, logs, thresholds, layout, acknowledgedIds] = await Promise.all([
+    loadMetrics(),
+    loadLogs(),
+    loadThresholds(),
+    loadLayout(),
+    loadAcknowledgedAlertIds(),
+  ])
+
+  const rawAlerts = evaluateThresholds(metrics, thresholds)
+  const alerts = applyAcknowledgments(rawAlerts, acknowledgedIds)
+
+  return { metrics, logs, alerts, thresholds, layout }
+}
+
 // ── GET: Return full monitoring data ────────────────────────────
 
 export async function GET() {
   try {
-    const s = getStore()
+    const data = await buildFullResponse()
 
     return NextResponse.json<ApiResponse<MonitoringResponse>>({
       success: true,
-      data: {
-        metrics: s.metrics,
-        logs: s.logs,
-        alerts: s.alerts,
-        thresholds: s.thresholds,
-        layout: s.layout,
-      },
+      data,
     })
   } catch {
     return NextResponse.json<ApiResponse<never>>(
       {
         success: false,
-        error: { code: "INTERNAL_ERROR", message: "모니터링 데이터 조회 실패" },
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "모니터링 데이터 조회 실패",
+        },
       },
       { status: 500 }
     )
   }
 }
 
-// ── POST: Create alert or refresh metrics or acknowledge alert ──
-
-interface MonitoringPostRequest {
-  action: "create_alert" | "refresh_metrics" | "acknowledge_alert"
-  // For create_alert
-  metricType?: string
-  value?: number
-  source?: string
-  // For acknowledge_alert
-  alertId?: string
-}
+// ── POST: Refresh metrics or acknowledge alert ──────────────────
 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as MonitoringPostRequest
-    const s = getStore()
 
     if (body.action === "refresh_metrics") {
-      // Regenerate metrics with slightly different values
-      s.metrics = buildInitialMetrics()
-      s.alerts = evaluateThresholds(s.metrics, s.thresholds)
-      s.layout = { ...s.layout, updatedAt: Date.now() }
+      const data = await buildFullResponse()
 
       return NextResponse.json<ApiResponse<MonitoringResponse>>({
         success: true,
-        data: {
-          metrics: s.metrics,
-          logs: s.logs,
-          alerts: s.alerts,
-          thresholds: s.thresholds,
-          layout: s.layout,
-        },
+        data,
       })
     }
 
@@ -212,40 +232,26 @@ export async function POST(request: NextRequest) {
         return NextResponse.json<ApiResponse<never>>(
           {
             success: false,
-            error: { code: "INVALID_INPUT", message: "alertId가 필요합니다" },
-          },
-          { status: 400 }
-        )
-      }
-      s.alerts = s.alerts.map((a) => (a.id === body.alertId ? acknowledgeThresholdAlert(a) : a))
-
-      return NextResponse.json<ApiResponse<{ alerts: ThresholdAlert[] }>>({
-        success: true,
-        data: { alerts: s.alerts },
-      })
-    }
-
-    if (body.action === "create_alert") {
-      if (!body.metricType || body.value === undefined || !body.source) {
-        return NextResponse.json<ApiResponse<never>>(
-          {
-            success: false,
-            error: { code: "INVALID_INPUT", message: "metricType, value, source가 필요합니다" },
+            error: {
+              code: "INVALID_INPUT",
+              message: "alertId가 필요합니다",
+            },
           },
           { status: 400 }
         )
       }
 
-      const dataPoint = createMetricDataPoint(
-        body.metricType as Parameters<typeof createMetricDataPoint>[0],
-        body.value,
-        body.source
-      )
-      const newAlerts = evaluateThresholds([dataPoint], s.thresholds)
+      const existingIds = await loadAcknowledgedAlertIds()
+      existingIds.add(body.alertId)
+      await saveAcknowledgedAlertIds([...existingIds])
+
+      const [metrics, thresholds] = await Promise.all([loadMetrics(), loadThresholds()])
+      const rawAlerts = evaluateThresholds(metrics, thresholds)
+      const alerts = applyAcknowledgments(rawAlerts, existingIds)
 
       return NextResponse.json<ApiResponse<{ alerts: ThresholdAlert[] }>>({
         success: true,
-        data: { alerts: newAlerts },
+        data: { alerts },
       })
     }
 
@@ -254,7 +260,7 @@ export async function POST(request: NextRequest) {
         success: false,
         error: {
           code: "INVALID_INPUT",
-          message: "유효한 action이 필요합니다: create_alert, refresh_metrics, acknowledge_alert",
+          message: "유효한 action이 필요합니다: refresh_metrics, acknowledge_alert",
         },
       },
       { status: 400 }

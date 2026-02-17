@@ -220,6 +220,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
+    console.error("[public/explore] Error:", error)
     const message = error instanceof Error ? error.message : "Unknown error"
     return NextResponse.json(
       { success: false, error: { code: "EXPLORE_ERROR", message } },

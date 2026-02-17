@@ -221,13 +221,14 @@ export async function POST(request: NextRequest) {
 
 function createPostPipelineDataProvider(): PostPipelineDataProvider {
   return {
-    async savePost({ personaId, type, content, metadata }) {
+    async savePost({ personaId, type, content, metadata, postSource }) {
       const post = await prisma.personaPost.create({
         data: {
           personaId,
           type,
           content,
           metadata: metadata as Prisma.InputJsonValue,
+          postSource: postSource ?? "AUTONOMOUS",
         },
       })
       return { id: post.id }
@@ -366,17 +367,19 @@ function createInteractionDataProvider(): InteractionPipelineDataProvider {
       return Number(persona?.paradoxScore ?? 0)
     },
 
-    async saveLike(personaId, postId) {
+    async saveLike(personaId, postId, _provenance) {
       await prisma.personaPostLike.create({
         data: { personaId, postId },
       })
+      // provenance는 saveActivityLog metadata에서 추적
     },
 
-    async saveComment(personaId, postId, content) {
+    async saveComment(personaId, postId, content, _provenance) {
       const comment = await prisma.personaComment.create({
         data: { personaId, postId, content },
       })
       return { id: comment.id }
+      // provenance는 saveActivityLog metadata에서 추적
     },
 
     async updateRelationship(personaAId, personaBId, _event) {

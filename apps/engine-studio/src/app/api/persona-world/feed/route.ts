@@ -372,6 +372,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
+    console.error("[persona-world/feed] Error:", error)
     const message = error instanceof Error ? error.message : "Unknown error"
     return NextResponse.json(
       { success: false, error: { code: "FEED_ERROR", message } },

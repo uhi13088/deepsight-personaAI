@@ -21,6 +21,12 @@ import type {
   EventSubscription,
   SyncDelayReport,
 } from "@/lib/system-integration"
+import {
+  DEMO_EVENT_SUBSCRIPTIONS,
+  DEMO_SAMPLE_EVENTS,
+  DEMO_EVENT_SOURCE,
+  DEMO_EVENT_METADATA,
+} from "@/lib/demo-fixtures"
 
 // ── In-memory Store ────────────────────────────────────────────
 
@@ -32,45 +38,13 @@ function ensureSeedData(): EventBusState {
   bus = createEventBus(1000)
 
   // 구독자 추가
-  bus = subscribe(
-    bus,
-    "api-engine",
-    ["persona.created", "persona.updated", "persona.activated", "algorithm.deployed"],
-    "https://api.deepsight.ai/webhooks"
-  )
-  bus = subscribe(
-    bus,
-    "dev-console",
-    ["persona.created", "persona.activated", "algorithm.deployed", "algorithm.rollback"],
-    "https://console.deepsight.ai/webhooks"
-  )
-  bus = subscribe(
-    bus,
-    "monitoring",
-    ["system.health_check", "system.alert", "matching.failed"],
-    "https://monitor.deepsight.ai/webhooks"
-  )
+  for (const sub of DEMO_EVENT_SUBSCRIPTIONS) {
+    bus = subscribe(bus, sub.subscriberId, sub.eventTypes, sub.endpoint)
+  }
 
   // 샘플 이벤트 발행
-  const sampleEvents: Array<{ type: EventType; payload: Record<string, unknown> }> = [
-    { type: "persona.created", payload: { name: "분석가 페르소나", id: "p_001" } },
-    { type: "persona.activated", payload: { name: "큐레이터 페르소나", id: "p_002" } },
-    { type: "algorithm.deployed", payload: { version: "v1.2.0", environment: "staging" } },
-    { type: "matching.completed", payload: { userId: "u_100", matchCount: 5 } },
-    { type: "system.health_check", payload: { status: "healthy", uptime: 99.9 } },
-    { type: "persona.updated", payload: { name: "감성 공감러", id: "p_003", field: "vectors" } },
-    { type: "matching.failed", payload: { userId: "u_200", error: "timeout" } },
-    {
-      type: "algorithm.config_changed",
-      payload: { key: "threshold", oldValue: 0.5, newValue: 0.55 },
-    },
-  ]
-
-  const source = { service: "engine-studio", instance: "demo-001" }
-  const metadata = { userId: "admin", userRole: "engineer", environment: "development" as const }
-
-  for (const { type, payload } of sampleEvents) {
-    const event = createEvent(type, payload, source, metadata)
+  for (const { type, payload } of DEMO_SAMPLE_EVENTS) {
+    const event = createEvent(type, payload, DEMO_EVENT_SOURCE, DEMO_EVENT_METADATA)
     bus = publish(bus, event)
   }
 
@@ -167,17 +141,11 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           )
         }
-        const source = { service: "engine-studio", instance: "demo-001" }
-        const metadata = {
-          userId: "admin",
-          userRole: "engineer",
-          environment: "development" as const,
-        }
         const event = createEvent(
           body.eventType,
           body.payload ?? { manual: true, timestamp: Date.now() },
-          source,
-          metadata
+          DEMO_EVENT_SOURCE,
+          DEMO_EVENT_METADATA
         )
         bus = publish(currentBus, event)
         return NextResponse.json<ApiResponse<{ eventId: string }>>({
