@@ -258,8 +258,8 @@ export const FOLLOW_ANNOUNCEMENT = {
   minMood: 0.5,
 } as const
 
-// ── 댓글 톤 결정 매트릭스 ────────────────────────────────────
-// 설계서 §5.3 댓글 톤 결정 매트릭스
+// ── 댓글 톤 결정 매트릭스 (v4: 11종) ──────────────────────────
+// 설계서 §5.4 댓글 톤 매트릭스 — 우선순위 순서
 export interface CommentToneRule {
   conditions: Array<{
     source: "commenter" | "postAuthor" | "relationship" | "state"
@@ -273,61 +273,85 @@ export interface CommentToneRule {
 
 export const COMMENT_TONE_MATRIX: CommentToneRule[] = [
   {
-    // stance 높음 + lens 높음 → 논리적 반박
+    // P1: paradoxTension 높음 → 평소와 다른 톤
+    conditions: [{ source: "state", dimension: "paradoxTension", operator: ">", threshold: 0.7 }],
+    tone: "paradox_response",
+    weight: 1.2,
+  },
+  {
+    // P2: RIVAL 관계 + stance 높음 → 직접 반박
     conditions: [
+      { source: "relationship", dimension: "tension", operator: ">", threshold: 0.6 },
       { source: "commenter", dimension: "stance", operator: ">", threshold: 0.7 },
-      { source: "commenter", dimension: "lens", operator: ">", threshold: 0.7 },
     ],
-    tone: "counter_argument",
+    tone: "direct_rebuttal",
+    weight: 1.1,
+  },
+  {
+    // P3: CLOSE 관계 + mood 높음 → 친밀한 농담
+    conditions: [
+      { source: "relationship", dimension: "warmth", operator: ">", threshold: 0.7 },
+      { source: "state", dimension: "mood", operator: ">", threshold: 0.6 },
+    ],
+    tone: "intimate_joke",
     weight: 1.0,
   },
   {
-    // stance 높음 + agreeableness 높음 → 부드러운 반론 (Paradox)
-    conditions: [
-      { source: "commenter", dimension: "stance", operator: ">", threshold: 0.7 },
-      { source: "commenter", dimension: "agreeableness", operator: ">", threshold: 0.6 },
-    ],
-    tone: "vulnerable",
-    weight: 0.8,
-  },
-  {
-    // sociability 높음 + interactivity 높음 → 가벼운 리액션
-    conditions: [
-      { source: "commenter", dimension: "sociability", operator: ">", threshold: 0.6 },
-      { source: "commenter", dimension: "interactivity", operator: ">", threshold: 0.6 },
-    ],
-    tone: "playful",
+    // P4: STRANGER 관계 (warmth 낮음) → 정중한 분석
+    conditions: [{ source: "relationship", dimension: "warmth", operator: "<", threshold: 0.3 }],
+    tone: "formal_analysis",
     weight: 0.9,
   },
   {
-    // depth 높음 + purpose 높음 → 분석적
+    // P5: lens 높음 + stance 높음 → 부드러운 반론
     conditions: [
-      { source: "commenter", dimension: "depth", operator: ">", threshold: 0.6 },
-      { source: "commenter", dimension: "purpose", operator: ">", threshold: 0.6 },
+      { source: "commenter", dimension: "lens", operator: ">", threshold: 0.7 },
+      { source: "commenter", dimension: "stance", operator: ">", threshold: 0.6 },
     ],
-    tone: "analytical",
+    tone: "soft_rebuttal",
     weight: 1.0,
   },
   {
-    // lack 높음 + mood 낮음 → 방어적
+    // P6: depth 높음 + purpose 높음 → 깊은 분석
     conditions: [
-      { source: "commenter", dimension: "lack", operator: ">", threshold: 0.6 },
-      { source: "state", dimension: "mood", operator: "<", threshold: 0.4 },
+      { source: "commenter", dimension: "depth", operator: ">", threshold: 0.7 },
+      { source: "commenter", dimension: "purpose", operator: ">", threshold: 0.6 },
     ],
-    tone: "defensive",
-    weight: 0.7,
+    tone: "deep_analysis",
+    weight: 1.0,
   },
   {
-    // agreeableness 높음 + warmth 높음 → 공감
+    // P7: agreeableness 높음 + mood 높음 → 공감
     conditions: [
       { source: "commenter", dimension: "agreeableness", operator: ">", threshold: 0.6 },
-      { source: "relationship", dimension: "warmth", operator: ">", threshold: 0.5 },
+      { source: "state", dimension: "mood", operator: ">", threshold: 0.7 },
     ],
     tone: "empathetic",
     weight: 0.9,
   },
   {
-    // 기본 — 조건 없음 → 지지
+    // P8: sociability 높음 → 가벼운 리액션
+    conditions: [{ source: "commenter", dimension: "sociability", operator: ">", threshold: 0.6 }],
+    tone: "light_reaction",
+    weight: 0.8,
+  },
+  {
+    // P9: taste 높음 → 독특한 시각
+    conditions: [{ source: "commenter", dimension: "taste", operator: ">", threshold: 0.7 }],
+    tone: "unique_perspective",
+    weight: 0.8,
+  },
+  {
+    // P10: lack 높음 + mood 낮음 → 과잉 동의
+    conditions: [
+      { source: "commenter", dimension: "lack", operator: ">", threshold: 0.6 },
+      { source: "state", dimension: "mood", operator: "<", threshold: 0.3 },
+    ],
+    tone: "over_agreement",
+    weight: 0.7,
+  },
+  {
+    // P11: 기본 fallback → 지지
     conditions: [],
     tone: "supportive",
     weight: 0.3,

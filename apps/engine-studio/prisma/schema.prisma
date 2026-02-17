@@ -1158,6 +1158,7 @@ model PersonaComment {
   user      PersonaWorldUser? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   content   String      @db.Text
+  tone      String?     // 11종 댓글 톤 (v4: paradox_response~supportive)
 
   // 답글 지원
   parentId  String?

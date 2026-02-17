@@ -109,21 +109,56 @@ export const FEED_SOURCE_CONFIG: Record<string, { label: string; color: string }
   TRENDING: { label: "트렌딩", color: "bg-pink-50 text-pink-600" },
 }
 
-/** 댓글 톤 뱃지 설정 (8종) */
+/** 댓글 톤 뱃지 설정 (v4: 11종) */
 export const COMMENT_TONE_CONFIG: Record<string, { label: string; emoji: string; color: string }> =
   {
-    empathetic: { label: "공감", emoji: "\uD83E\uDD17", color: "bg-pink-50 text-pink-600" },
-    analytical: { label: "분석", emoji: "\uD83E\uDDD0", color: "bg-blue-50 text-blue-600" },
-    counter_argument: {
-      label: "반론",
+    paradox_response: {
+      label: "반전",
+      emoji: "\uD83C\uDFAD",
+      color: "bg-purple-50 text-purple-600",
+    },
+    direct_rebuttal: {
+      label: "반박",
       emoji: "\u2694\uFE0F",
       color: "bg-red-50 text-red-600",
     },
-    humorous: { label: "유머", emoji: "\uD83D\uDE04", color: "bg-amber-50 text-amber-600" },
+    intimate_joke: {
+      label: "친밀",
+      emoji: "\uD83D\uDE1C",
+      color: "bg-amber-50 text-amber-600",
+    },
+    formal_analysis: {
+      label: "정중",
+      emoji: "\uD83D\uDCDA",
+      color: "bg-slate-50 text-slate-600",
+    },
+    soft_rebuttal: {
+      label: "부드러운 반론",
+      emoji: "\uD83E\uDD14",
+      color: "bg-orange-50 text-orange-600",
+    },
+    deep_analysis: {
+      label: "분석",
+      emoji: "\uD83E\uDDD0",
+      color: "bg-blue-50 text-blue-600",
+    },
+    empathetic: { label: "공감", emoji: "\uD83E\uDD17", color: "bg-pink-50 text-pink-600" },
+    light_reaction: {
+      label: "리액션",
+      emoji: "\uD83D\uDE06",
+      color: "bg-yellow-50 text-yellow-600",
+    },
+    unique_perspective: {
+      label: "독특한 시각",
+      emoji: "\uD83D\uDCA1",
+      color: "bg-violet-50 text-violet-600",
+    },
+    over_agreement: {
+      label: "과잉동의",
+      emoji: "\uD83D\uDE4C",
+      color: "bg-cyan-50 text-cyan-600",
+    },
     supportive: { label: "지지", emoji: "\uD83D\uDC4F", color: "bg-green-50 text-green-600" },
-    questioning: { label: "질문", emoji: "\uD83E\uDD14", color: "bg-violet-50 text-violet-600" },
-    informative: { label: "정보", emoji: "\uD83D\uDCDA", color: "bg-cyan-50 text-cyan-600" },
-    provocative: { label: "도발", emoji: "\uD83D\uDD25", color: "bg-orange-50 text-orange-600" },
   }
 
 /** SNS 플랫폼 설정 (8개) */

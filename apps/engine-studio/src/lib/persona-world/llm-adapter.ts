@@ -77,11 +77,17 @@ ${tone.tone} (확신: ${tone.confidence.toFixed(2)})
 [주의사항]
 - 댓글만 출력하세요 (부가 설명 없이)
 - 자연스러운 SNS 댓글처럼 작성하세요
-- ${tone.tone === "playful" ? "가볍고 재미있는 톤으로" : ""}
-- ${tone.tone === "analytical" ? "논리적이고 분석적인 톤으로" : ""}
+- ${tone.tone === "paradox_response" ? "평소와 다른, 반전된 톤으로" : ""}
+- ${tone.tone === "direct_rebuttal" ? "직접적으로 반박하는 톤으로" : ""}
+- ${tone.tone === "intimate_joke" ? "친밀하고 가벼운 농담 톤으로" : ""}
+- ${tone.tone === "formal_analysis" ? "정중하고 격식있는 분석 톤으로" : ""}
+- ${tone.tone === "soft_rebuttal" ? "부드럽게 다른 의견을 제시하는 톤으로" : ""}
+- ${tone.tone === "deep_analysis" ? "논리적이고 깊이있는 분석 톤으로" : ""}
 - ${tone.tone === "empathetic" ? "공감하는 따뜻한 톤으로" : ""}
-- ${tone.tone === "counter_argument" ? "정중하지만 다른 의견을 제시하는 톤으로" : ""}
-- ${tone.tone === "vulnerable" ? "솔직하고 진솔한 톤으로" : ""}`
+- ${tone.tone === "light_reaction" ? "가볍고 재미있는 리액션 톤으로" : ""}
+- ${tone.tone === "unique_perspective" ? "독특한 시각으로 해석하는 톤으로" : ""}
+- ${tone.tone === "over_agreement" ? "강하게 동의하는 톤으로" : ""}
+- ${tone.tone === "supportive" ? "지지하고 응원하는 톤으로" : ""}`
 }
 
 function buildCommentUserPrompt(

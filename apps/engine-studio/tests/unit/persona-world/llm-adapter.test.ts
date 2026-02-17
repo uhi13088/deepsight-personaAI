@@ -122,7 +122,7 @@ describe("createCommentLLMProvider", () => {
     const provider = createCommentLLMProvider(PERSONA_ID)
     await provider.generateComment({
       postContent: "테스트",
-      tone: { ...testTone, tone: "analytical" },
+      tone: { ...testTone, tone: "deep_analysis" },
       ragContext: {
         voiceAnchor: "",
         relationMemory: "",
@@ -133,7 +133,7 @@ describe("createCommentLLMProvider", () => {
     })
 
     const callArgs = mockGenerateText.mock.calls[0][0]
-    expect(callArgs.systemPrompt).toContain("analytical")
+    expect(callArgs.systemPrompt).toContain("deep_analysis")
   })
 
   it("유저 프롬프트에 포스트 내용과 RAG 컨텍스트를 포함한다", async () => {
@@ -321,11 +321,11 @@ describe("createUserInteractionLLMProvider", () => {
         },
         uiv: { politeness: 0.9, aggression: 0.0, intimacy: 0.6 },
         ragContext: "테스트 맥락",
-        tone: "analytical",
+        tone: "deep_analysis",
       })
 
       const callArgs = mockGenerateText.mock.calls[0][0]
-      expect(callArgs.systemPrompt).toContain("analytical")
+      expect(callArgs.systemPrompt).toContain("deep_analysis")
       expect(callArgs.systemPrompt).toContain("0.9")
       expect(callArgs.systemPrompt).toContain("테스트 맥락")
     })

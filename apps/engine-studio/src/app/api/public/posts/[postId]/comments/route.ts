@@ -6,21 +6,25 @@ import { notifyNewComment } from "@/lib/persona-world/notification-service"
  * GET /api/public/posts/[postId]/comments
  *
  * 포스트 댓글 목록 API — 페르소나 댓글 + 유저 댓글 모두 반환.
- * tone은 현재 content 기반 간이 분류 (T162에서 벡터 기반으로 업그레이드 예정).
+ * tone: DB에 저장된 값 → 없으면 키워드 기반 fallback 분류 (11종).
  *
  * Query Parameters:
  * - limit: 조회 개수 (최대 50, 기본 20)
  * - cursor: 페이지네이션 커서 (마지막 댓글 ID)
  */
 
+// 키워드 기반 fallback 분류 (11종 대응)
 const TONE_KEYWORDS: Record<string, string[]> = {
-  empathetic: ["공감", "맞아", "그래", "이해", "느낌", "감동"],
-  analytical: ["분석", "데이터", "근거", "통계", "객관"],
-  counter_argument: ["반대", "그런데", "하지만", "반론", "다르게"],
-  humorous: ["ㅋㅋ", "ㅎㅎ", "재밌", "웃긴", "lol"],
-  supportive: ["응원", "좋아", "대단", "멋져", "최고"],
-  questioning: ["왜", "어떻게", "정말?", "진짜?", "?"],
-  provocative: ["솔직히", "과감하게", "도발", "제대로"],
+  direct_rebuttal: ["반대", "그건 아니지", "틀렸", "반박"],
+  soft_rebuttal: ["그런데", "하지만", "다르게 보면", "감정은 존중"],
+  deep_analysis: ["분석", "데이터", "근거", "통계", "객관", "구조적"],
+  empathetic: ["공감", "맞아", "그래", "이해", "느낌", "감동", "나도 그랬"],
+  light_reaction: ["ㅋㅋ", "ㅎㅎ", "재밌", "웃긴", "lol", "진짜?"],
+  intimate_joke: ["ㅋㅋㅋㅋ", "너답다", "역시"],
+  unique_perspective: ["다른 관점", "생각해보면", "흥미롭"],
+  over_agreement: ["그니까", "맞아맞아", "완전", "인정"],
+  formal_analysis: ["정리하면", "요약하면", "관점에서"],
+  paradox_response: ["솔직히", "사실은", "모순"],
 }
 
 function classifyTone(content: string): string {
@@ -29,7 +33,7 @@ function classifyTone(content: string): string {
       return tone
     }
   }
-  return "informative"
+  return "supportive"
 }
 
 export async function GET(
@@ -62,6 +66,7 @@ export async function GET(
       select: {
         id: true,
         content: true,
+        tone: true,
         createdAt: true,
         parentId: true,
         personaId: true,
@@ -106,7 +111,7 @@ export async function GET(
               : (c.user?.profileImageUrl ?? null),
             userId: c.userId,
             content: c.content,
-            tone: classifyTone(c.content),
+            tone: c.tone ?? classifyTone(c.content),
             parentId: c.parentId,
             likeCount: 0,
             createdAt: c.createdAt.toISOString(),
@@ -225,17 +230,21 @@ export async function POST(
     }
 
     // 댓글 생성 + commentCount 업데이트 (트랜잭션)
+    const userTone = classifyTone(trimmedContent)
+
     const [comment] = await prisma.$transaction([
       prisma.personaComment.create({
         data: {
           postId,
           userId,
           content: trimmedContent,
+          tone: userTone,
           parentId: parentId ?? null,
         },
         select: {
           id: true,
           content: true,
+          tone: true,
           parentId: true,
           createdAt: true,
         },
@@ -272,7 +281,7 @@ export async function POST(
         personaImageUrl: user.profileImageUrl,
         userId,
         content: comment.content,
-        tone: classifyTone(comment.content),
+        tone: comment.tone ?? classifyTone(comment.content),
         parentId: comment.parentId,
         likeCount: 0,
         createdAt: comment.createdAt.toISOString(),

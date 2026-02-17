@@ -198,15 +198,20 @@ export interface CommentGenerationInput {
   }
 }
 
-// ── 댓글 톤 ──────────────────────────────────────────────────
+// ── 댓글 톤 (v4: 11종) ───────────────────────────────────────
+// 설계서 §5.4 댓글 톤 매트릭스
 export type CommentTone =
+  | "paradox_response" // 평소와 다른 톤 (Paradox 발현)
+  | "direct_rebuttal" // 직접 반박
+  | "intimate_joke" // 친밀한 농담
+  | "formal_analysis" // 정중한 분석
+  | "soft_rebuttal" // 부드러운 반론
+  | "deep_analysis" // 깊은 분석
   | "empathetic" // 공감
-  | "analytical" // 분석
-  | "counter_argument" // 반론
-  | "supportive" // 지지
-  | "defensive" // 방어적
-  | "playful" // 가벼운 리액션
-  | "vulnerable" // 솔직한 감정 노출 (Paradox 발현)
+  | "light_reaction" // 가벼운 리액션
+  | "unique_perspective" // 독특한 시각
+  | "over_agreement" // 과잉 동의
+  | "supportive" // 지지 (fallback)
 
 export interface CommentToneDecision {
   tone: CommentTone

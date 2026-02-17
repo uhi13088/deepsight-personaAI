@@ -2,14 +2,17 @@ import { describe, it, expect } from "vitest"
 import { COMMENT_TONE_CONFIG, SNS_PROVIDER_CONFIG } from "../role-config"
 
 const ALL_TONES = [
+  "paradox_response",
+  "direct_rebuttal",
+  "intimate_joke",
+  "formal_analysis",
+  "soft_rebuttal",
+  "deep_analysis",
   "empathetic",
-  "analytical",
-  "counter_argument",
-  "humorous",
+  "light_reaction",
+  "unique_perspective",
+  "over_agreement",
   "supportive",
-  "questioning",
-  "informative",
-  "provocative",
 ] as const
 
 const ALL_PROVIDERS = [
@@ -23,22 +26,22 @@ const ALL_PROVIDERS = [
   "netflix",
 ] as const
 
-describe("comment-tone: 8종 댓글 톤 뱃지 설정", () => {
-  it("8종 톤 라벨 존재", () => {
+describe("comment-tone: 11종 댓글 톤 뱃지 설정", () => {
+  it("11종 톤 라벨 존재", () => {
     for (const tone of ALL_TONES) {
       expect(COMMENT_TONE_CONFIG[tone]).toBeDefined()
       expect(COMMENT_TONE_CONFIG[tone].label.length).toBeGreaterThan(0)
     }
   })
 
-  it("8종 톤 이모지 존재", () => {
+  it("11종 톤 이모지 존재", () => {
     for (const tone of ALL_TONES) {
       expect(COMMENT_TONE_CONFIG[tone].emoji).toBeDefined()
       expect(COMMENT_TONE_CONFIG[tone].emoji.length).toBeGreaterThan(0)
     }
   })
 
-  it("8종 톤 색상 클래스 존재", () => {
+  it("11종 톤 색상 클래스 존재", () => {
     for (const tone of ALL_TONES) {
       expect(COMMENT_TONE_CONFIG[tone].color).toBeDefined()
       expect(COMMENT_TONE_CONFIG[tone].color).toContain("bg-")
@@ -46,7 +49,7 @@ describe("comment-tone: 8종 댓글 톤 뱃지 설정", () => {
     }
   })
 
-  it("톤 설정 개수 8종", () => {
+  it("톤 설정 개수 11종", () => {
     expect(Object.keys(COMMENT_TONE_CONFIG)).toHaveLength(ALL_TONES.length)
   })
 })

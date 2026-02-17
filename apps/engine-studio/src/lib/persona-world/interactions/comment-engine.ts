@@ -70,8 +70,8 @@ export function applyExpress(
 ): { content: string; applied: string[] } {
   const applied: string[] = []
 
-  // 높은 에너지 + playful → 이모지/리액션 추가
-  if (state.energy > 0.7 && tone.tone === "playful" && !content.includes("ㅋ")) {
+  // 높은 에너지 + light_reaction → 이모지/리액션 추가
+  if (state.energy > 0.7 && tone.tone === "light_reaction" && !content.includes("ㅋ")) {
     applied.push("playful_reaction")
   }
 
