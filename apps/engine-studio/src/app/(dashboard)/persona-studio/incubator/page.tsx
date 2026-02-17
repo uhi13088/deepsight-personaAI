@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   AlertTriangle,
   Bell,
@@ -16,6 +17,10 @@ import {
   Shield,
   Skull,
   ArrowRight,
+  Play,
+  Settings,
+  Save,
+  X,
 } from "lucide-react"
 import type {
   IncubatorDashboard,
@@ -36,11 +41,23 @@ const TABS: Array<{ key: TabKey; label: string }> = [
   { key: "lifecycle", label: "라이프사이클" },
 ]
 
+interface IncubatorSettings {
+  generationCostKRW: number
+  testCostKRW: number
+  monthlyBudgetKRW: number
+  dailyLimit: number
+  passThreshold: number
+  strategyWeights: { userDriven: number; exploration: number; gapFilling: number }
+}
+
 export default function IncubatorPage() {
   const [data, setData] = useState<IncubatorDashboard | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabKey>("strategy")
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [batchTriggering, setBatchTriggering] = useState(false)
+  const [batchMessage, setBatchMessage] = useState<string | null>(null)
 
   const fetchData = useCallback(() => {
     setLoading(true)
@@ -71,6 +88,27 @@ export default function IncubatorPage() {
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  const triggerBatch = useCallback(async () => {
+    setBatchTriggering(true)
+    setBatchMessage(null)
+    try {
+      const res = await fetch("/api/internal/incubator/dashboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "trigger_batch" }),
+      })
+      const json = (await res.json()) as { success: boolean; data?: { message: string } }
+      if (json.success && json.data) {
+        setBatchMessage(json.data.message)
+        setTimeout(() => setBatchMessage(null), 5000)
+      }
+    } catch {
+      setBatchMessage("배치 트리거 실패")
+    } finally {
+      setBatchTriggering(false)
+    }
+  }, [])
 
   if (loading) {
     return (
@@ -105,6 +143,24 @@ export default function IncubatorPage() {
       <Header title="Incubator Dashboard" description="Daily Batch 워크플로우 및 자가발전 시스템" />
 
       <div className="space-y-6 p-6">
+        {/* 액션 바 */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={triggerBatch} disabled={batchTriggering}>
+              <Play className="mr-1 h-3.5 w-3.5" />
+              {batchTriggering ? "요청 중..." : "배치 실행"}
+            </Button>
+            {batchMessage && <span className="text-xs text-emerald-500">{batchMessage}</span>}
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
+            <Settings className="mr-1 h-3.5 w-3.5" />
+            설정
+          </Button>
+        </div>
+
+        {/* 설정 패널 */}
+        {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+
         {/* 핵심 지표 카드 */}
         <MetricCards data={data} />
 
@@ -614,6 +670,169 @@ function LifecycleTab({ lifecycle }: { lifecycle: LifecycleMetric }) {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ── 설정 패널 ──────────────────────────────────────────────────
+
+function SettingsPanel({ onClose }: { onClose: () => void }) {
+  const [settings, setSettings] = useState<IncubatorSettings | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    fetch("/api/internal/incubator/dashboard", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "get_settings" }),
+    })
+      .then((r) => r.json())
+      .then((json: { success: boolean; data?: IncubatorSettings }) => {
+        if (json.success && json.data) {
+          setSettings(json.data)
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function handleSave() {
+    if (!settings) return
+    setSaving(true)
+    try {
+      await fetch("/api/internal/incubator/dashboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save_settings", settings }),
+      })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch {
+      // ignore
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading || !settings) {
+    return (
+      <div className="bg-card text-muted-foreground rounded-lg border p-4 text-sm">
+        설정을 불러오는 중...
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-card rounded-lg border p-4">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-sm font-semibold">인큐베이터 설정</h3>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <SettingField
+          label="생성 비용 (KRW/개)"
+          value={settings.generationCostKRW}
+          onChange={(v) => setSettings({ ...settings, generationCostKRW: v })}
+        />
+        <SettingField
+          label="테스트 비용 (KRW/개)"
+          value={settings.testCostKRW}
+          onChange={(v) => setSettings({ ...settings, testCostKRW: v })}
+        />
+        <SettingField
+          label="월 예산 (KRW)"
+          value={settings.monthlyBudgetKRW}
+          onChange={(v) => setSettings({ ...settings, monthlyBudgetKRW: v })}
+        />
+        <SettingField
+          label="일일 생성 한도"
+          value={settings.dailyLimit}
+          onChange={(v) => setSettings({ ...settings, dailyLimit: v })}
+        />
+        <SettingField
+          label="합격 임계값"
+          value={settings.passThreshold}
+          onChange={(v) => setSettings({ ...settings, passThreshold: v })}
+          step={0.05}
+        />
+      </div>
+
+      <div className="mt-4">
+        <p className="mb-2 text-xs font-medium">전략 가중치</p>
+        <div className="grid grid-cols-3 gap-3">
+          <SettingField
+            label="유저 기반"
+            value={settings.strategyWeights.userDriven}
+            onChange={(v) =>
+              setSettings({
+                ...settings,
+                strategyWeights: { ...settings.strategyWeights, userDriven: v },
+              })
+            }
+            step={0.05}
+          />
+          <SettingField
+            label="탐험"
+            value={settings.strategyWeights.exploration}
+            onChange={(v) =>
+              setSettings({
+                ...settings,
+                strategyWeights: { ...settings.strategyWeights, exploration: v },
+              })
+            }
+            step={0.05}
+          />
+          <SettingField
+            label="GAP 충전"
+            value={settings.strategyWeights.gapFilling}
+            onChange={(v) =>
+              setSettings({
+                ...settings,
+                strategyWeights: { ...settings.strategyWeights, gapFilling: v },
+              })
+            }
+            step={0.05}
+          />
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center gap-2">
+        <Button size="sm" onClick={handleSave} disabled={saving}>
+          <Save className="mr-1 h-3.5 w-3.5" />
+          {saving ? "저장 중..." : "저장"}
+        </Button>
+        {saved && <span className="text-xs text-emerald-500">저장 완료</span>}
+      </div>
+    </div>
+  )
+}
+
+function SettingField({
+  label,
+  value,
+  onChange,
+  step = 1,
+}: {
+  label: string
+  value: number
+  onChange: (v: number) => void
+  step?: number
+}) {
+  return (
+    <div>
+      <label className="text-muted-foreground mb-1 block text-[11px]">{label}</label>
+      <input
+        type="number"
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="border-border bg-background w-full rounded-md border px-2 py-1 text-sm"
+      />
     </div>
   )
 }
