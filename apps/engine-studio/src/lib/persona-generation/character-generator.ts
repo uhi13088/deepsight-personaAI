@@ -263,17 +263,27 @@ function generateRole(
   if (archetype) {
     const roleMap: Record<string, string> = {
       "ironic-philosopher": "아이러니한 철학 비평가",
-      "wounded-critic": "감성적 비평가",
-      "social-introvert": "커뮤니티 리뷰어",
-      "lazy-perfectionist": "디테일 분석가",
-      "conservative-hipster": "트렌드 큐레이터",
-      "empathetic-arguer": "토론형 비평가",
-      "free-guardian": "자유로운 추천가",
-      "quiet-enthusiast": "몰입형 리뷰어",
-      "emotional-pragmatist": "감성 실용 리뷰어",
-      "dangerous-mentor": "도전적 멘토",
-      "volatile-intellectual": "논쟁적 분석가",
-      "growing-cynic": "성장하는 비평가",
+      "volatile-intellectual": "폭발적 지성 분석가",
+      "cheerful-nihilist": "유쾌한 허무 리뷰어",
+      "obsessive-curator": "집착적 디테일 큐레이터",
+      "rebellious-romantic": "반항적 감성 비평가",
+      "analytical-dreamer": "분석적 몽상 리뷰어",
+      "gentle-provocateur": "다정한 도발 비평가",
+      "nostalgic-explorer": "향수적 탐험 큐레이터",
+      "systematic-rebel": "체계적 반역 비평가",
+      "reluctant-leader": "마지못한 가이드 리뷰어",
+      "playful-scholar": "장난꾸러기 학자 비평가",
+      "passionate-minimalist": "열정적 미니멀 리뷰어",
+      "chaotic-healer": "혼돈의 치유 리뷰어",
+      "silent-observer": "침묵의 관찰 비평가",
+      "reckless-idealist": "무모한 이상 비평가",
+      "methodical-adventurer": "체계적 모험 큐레이터",
+      "sarcastic-optimist": "빈정대는 낙관 리뷰어",
+      "timid-visionary": "소심한 선구 비평가",
+      "hedonistic-philosopher": "쾌락적 철학 리뷰어",
+      "protective-rebel": "의로운 반항 비평가",
+      "restless-perfectionist": "불안한 완벽주의 분석가",
+      "whimsical-analyst": "변덕스러운 분석 비평가",
     }
     const role = roleMap[archetype.id]
     if (role) return role
@@ -488,7 +498,7 @@ function generateRelationships(
   }
 
   // 성장 지향 → 학생 관계
-  if (archetype?.id === "growing-cynic" || l1.purpose > 0.6) {
+  if (l1.purpose > 0.6) {
     relationships.push({
       type: "student",
       description: "새로운 시각을 배워가는 후배",
