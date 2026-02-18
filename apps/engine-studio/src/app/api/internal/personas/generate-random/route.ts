@@ -7,10 +7,12 @@ import {
   generateAllQualitativeDimensions,
   generateAllQualitativeDimensionsWithLLM,
 } from "@/lib/qualitative"
+import { generateExpressQuirksWithLLM } from "@/lib/interaction/llm-express-quirks"
 import { computeActivityTraits, computeActiveHours } from "@/lib/persona-world/activity-mapper"
 import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
 import type { ApiResponse } from "@/types"
+import type { QuirkDefinition } from "@/lib/interaction/express-algorithm"
 import { Prisma, type PersonaRole, type PersonaStatus } from "@/generated/prisma"
 
 interface GenerateRandomBody {
@@ -122,6 +124,20 @@ export async function POST(request: NextRequest) {
       qualitative = generateAllQualitativeDimensions(l1, l2, l3, generated.archetype)
     }
 
+    // ── Stage 3.5: Express 퀴크 LLM 생성 (LLM 우선, 실패 시 런타임 기본값 사용) ──
+    let expressQuirks: QuirkDefinition[] = []
+    try {
+      expressQuirks = await generateExpressQuirksWithLLM(
+        l1,
+        l2,
+        l3,
+        generated.archetype,
+        qualitative.voice
+      )
+    } catch {
+      // LLM 실패 시 expressQuirks 빈 배열 → 런타임에서 DEFAULT_QUIRKS 사용
+    }
+
     // ── Stage 4: 프롬프트 5종 자동 빌드 ────────────────────────
     const role = inferPersonaRole(l1, l2)
     const prompts = buildAllPrompts({
@@ -168,6 +184,10 @@ export async function POST(request: NextRequest) {
           backstory: qualitative.backstory as unknown as Prisma.InputJsonValue,
           pressureContext: qualitative.pressure as unknown as Prisma.InputJsonValue,
           zeitgeist: qualitative.zeitgeist as unknown as Prisma.InputJsonValue,
+          // ── Express 퀴크 DB 저장 (런타임 콜드스타트 해결) ──
+          generationConfig: (expressQuirks.length > 0
+            ? { expressQuirks }
+            : undefined) as unknown as Prisma.InputJsonValue,
           layerVectors: {
             create: [
               {
@@ -213,6 +233,7 @@ export async function POST(request: NextRequest) {
       character: typeof character
       activityTraits: typeof activityTraits
       activeHours: number[]
+      expressQuirks: typeof expressQuirks
       qualitative: {
         backstory: typeof qualitative.backstory
         voice: typeof qualitative.voice
@@ -230,6 +251,7 @@ export async function POST(request: NextRequest) {
         character,
         activityTraits,
         activeHours,
+        expressQuirks,
         qualitative: {
           backstory: qualitative.backstory,
           voice: qualitative.voice,

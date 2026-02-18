@@ -940,7 +940,7 @@
   - AC3: `voice-generator.ts` — calculateThresholds()에 sigmoid 적용 (현재 선형 0.3+x\*0.4 → sigmoid 기반 비선형 감도 곡선)
   - AC4: 테스트 + Build PASS
 
-- [ ] **T153: 캐릭터 생성기 LLM 업그레이드**
+- [x] **T153: 캐릭터 생성기 LLM 업그레이드**
   - 배경: character-generator.ts에 ~150개 하드코딩 패턴 (이름 64개, 전문분야 24개, 말버릇 29개, 습관 18개 등). T149 패턴(LLM-first + fallback) 적용
   - AC1: `llm-character-generator.ts` (신규) — 벡터+아키타입+정성적 프로필 기반 캐릭터 LLM 생성. 프롬프트 캐싱 적용
   - AC2: 이름/역할/전문분야/설명/배경/말버릇/퀴크/습관/관계를 벡터 역설에 맞게 일관된 캐릭터로 생성
@@ -948,7 +948,7 @@
   - AC4: 예상 비용: ~$0.01/페르소나 (1회성 생성 비용)
   - AC5: 테스트 + Build PASS
 
-- [ ] **T154: Express 퀴크 LLM 동적 생성**
+- [x] **T154: Express 퀴크 LLM 동적 생성**
   - 배경: 6개 고정 퀴크의 표현이 모든 페르소나에 동일. 페르소나별 고유 퀴크를 LLM으로 생성하면 캐릭터 일관성 대폭 향상
   - AC1: `llm-express-quirks.ts` (신규) — 벡터+아키타입+VoiceProfile 기반 페르소나 전용 퀴크 5~8개 LLM 생성
   - AC2: QuirkDefinition 스키마 준수 (condition/baseProbability/cooldownTurns/expression)
@@ -966,6 +966,10 @@
 
 ## ✅ DONE (완료)
 
+- [x] **T154: Express 퀴크 LLM 동적 생성** ✅ 2026-02-18
+  - 변경: llm-express-quirks.ts(신규, 벡터+역설+아키타입 기반 퀴크 5~8개 LLM 생성), generate-random/route.ts(Stage 3.5 퀴크 생성+generationConfig DB 저장), interaction/index.ts(re-export), llm-express-quirks.test.ts(신규 32개)
+- [x] **T153: 캐릭터 생성기 LLM 업그레이드** ✅ 2026-02-18
+  - 변경: llm-character-generator.ts(신규, 벡터+역설+아키타입 기반 캐릭터 LLM 생성), generate-random/route.ts(Stage 2.5 LLM 캐릭터+fallback), persona-generation/index.ts(re-export), llm-character.test.ts(신규 20개)
 - [x] **T152: Express 알고리즘 교차축 퀴크 + Voice sigmoid 개선** ✅ 2026-02-18
   - 변경: express-algorithm.ts(calculateDerivedStates L2/L3 통합, generateParadoxQuirks 4종), voice-generator.ts(sigmoid 기반 calculateThresholds), interaction/index.ts(re-export)
 - [x] **T151: 아키타입 22종 전체 매핑 + 이름 중복 방지** ✅ 2026-02-18

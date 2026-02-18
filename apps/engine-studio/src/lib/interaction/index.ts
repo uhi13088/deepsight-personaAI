@@ -321,6 +321,7 @@ export {
 export type { InitResult, SemanticCategory } from "./init-algorithm"
 export type { OverrideRule, ActiveOverride, OverrideResult } from "./override-algorithm"
 export type { AdaptState, AdaptConfig, UserInteractionVector } from "./adapt-algorithm"
+export { generateExpressQuirksWithLLM } from "./llm-express-quirks"
 export type {
   DerivedStates,
   QuirkState,
