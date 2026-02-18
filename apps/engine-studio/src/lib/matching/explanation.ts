@@ -9,7 +9,7 @@ import type { SocialPersonaVector, SocialDimension } from "@/types"
 
 export interface TraitLevel {
   dimension: SocialDimension
-  level: "high" | "low" | "neutral"
+  level: "very_high" | "high" | "neutral" | "low" | "very_low"
   value: number
 }
 
@@ -35,14 +35,53 @@ export interface UserExplanation {
 
 // ── 차원별 레이블 ────────────────────────────────────────────
 
-const DIM_LABELS: Record<SocialDimension, { name: string; high: string; low: string }> = {
-  depth: { name: "분석 깊이", high: "심층적", low: "직관적" },
-  lens: { name: "판단 렌즈", high: "논리적", low: "감성적" },
-  stance: { name: "비평 태도", high: "비판적", low: "수용적" },
-  scope: { name: "디테일 수준", high: "디테일", low: "핵심만" },
-  taste: { name: "취향 성향", high: "실험적", low: "클래식" },
-  purpose: { name: "목적 지향", high: "의미추구", low: "오락" },
-  sociability: { name: "소통 성향", high: "사교적", low: "독립적" },
+const DIM_LABELS: Record<
+  SocialDimension,
+  { name: string; veryHigh: string; high: string; low: string; veryLow: string }
+> = {
+  depth: {
+    name: "분석 깊이",
+    veryHigh: "극심층",
+    high: "심층적",
+    low: "직관적",
+    veryLow: "극직관",
+  },
+  lens: { name: "판단 렌즈", veryHigh: "극논리", high: "논리적", low: "감성적", veryLow: "극감성" },
+  stance: {
+    name: "비평 태도",
+    veryHigh: "극비판",
+    high: "비판적",
+    low: "수용적",
+    veryLow: "극수용",
+  },
+  scope: {
+    name: "디테일 수준",
+    veryHigh: "극세밀",
+    high: "디테일",
+    low: "핵심만",
+    veryLow: "극간결",
+  },
+  taste: {
+    name: "취향 성향",
+    veryHigh: "극전위",
+    high: "실험적",
+    low: "클래식",
+    veryLow: "극보수",
+  },
+  purpose: {
+    name: "목적 지향",
+    veryHigh: "극의미",
+    high: "의미추구",
+    low: "오락",
+    veryLow: "극오락",
+  },
+  sociability: {
+    name: "소통 성향",
+    veryHigh: "극사교",
+    high: "사교적",
+    low: "독립적",
+    veryLow: "극독립",
+  },
 }
 
 // ── 유저 상위 특성 추출 ──────────────────────────────────────
@@ -60,11 +99,17 @@ export function getTopTraits(vector: SocialPersonaVector, n: number = 3): TraitL
 
   const traits: TraitLevel[] = dims.map((dim) => {
     const value = vector[dim]
-    return {
-      dimension: dim,
-      level: value >= 0.6 ? "high" : value <= 0.4 ? "low" : "neutral",
-      value,
-    }
+    const level: TraitLevel["level"] =
+      value >= 0.8
+        ? "very_high"
+        : value >= 0.6
+          ? "high"
+          : value <= 0.2
+            ? "very_low"
+            : value <= 0.4
+              ? "low"
+              : "neutral"
+    return { dimension: dim, level, value }
   })
 
   // 극단값 우선 정렬 (|0.5 - value| 큰 순)
@@ -124,38 +169,66 @@ export function generateOperatorExplanation(
 
 // 특성별 자연어 표현 (말하듯이)
 const TRAIT_EXPRESSIONS: Record<string, string> = {
+  depth_very_high: "작품을 극도로 깊이 파고드는 분이시네요",
   depth_high: "작품을 깊이 파고드는 걸 좋아하시는군요",
   depth_low: "직관적으로 느끼시는 분이네요",
+  depth_very_low: "순간의 느낌을 가장 중요하게 여기시는 분이에요",
+  lens_very_high: "철저하게 데이터와 논리로 분석하시는 분이네요",
   lens_high: "분석적인 관점으로 보시네요",
   lens_low: "감성으로 먼저 반응하시는 분이에요",
+  lens_very_low: "순수한 감정과 직감으로 작품을 느끼시는 분이에요",
+  stance_very_high: "누구보다 솔직하고 날카로운 분이시네요",
   stance_high: "좋은 점만 말하는 건 싫으시죠",
   stance_low: "작품의 좋은 면을 먼저 보시는 분이네요",
+  stance_very_low: "모든 작품에서 가치를 찾으시는 포용적인 분이에요",
+  scope_very_high: "한 작품의 모든 것을 샅샅이 살피시는 분이네요",
   scope_high: "디테일을 꼼꼼히 살피시네요",
   scope_low: "핵심만 간결하게 보시는 스타일이에요",
+  scope_very_low: "한 줄 감상으로 핵심을 꿰뚫는 분이에요",
+  taste_very_high: "남들이 모르는 숨겨진 작품을 발굴하시는 분이에요",
   taste_high: "새로운 시도를 좋아하시는군요",
   taste_low: "검증된 작품을 선호하시네요",
+  taste_very_low: "시간이 검증한 명작을 가장 사랑하시는 분이에요",
+  purpose_very_high: "작품 속에서 존재의 의미를 탐구하시는 분이에요",
   purpose_high: "작품에서 의미를 찾으시는 분이에요",
   purpose_low: "가볍게 즐기시는 스타일이에요",
+  purpose_very_low: "순수하게 재미를 위해 작품을 즐기시는 분이에요",
+  sociability_very_high: "작품 경험을 모두와 나누는 걸 최고로 여기시네요",
   sociability_high: "다른 사람과 나누는 걸 좋아하시네요",
   sociability_low: "혼자만의 감상을 즐기시는 분이에요",
+  sociability_very_low: "완전히 자신만의 세계에서 작품을 경험하시는 분이에요",
 }
 
 // 페르소나 매칭 표현
 const PERSONA_MATCH_EXPRESSIONS: Record<string, string> = {
+  depth_very_high: "이 추천자는 작품의 가장 깊은 층위까지 파고드는 극심층 분석가예요",
   depth_high: "이 추천자도 작품의 숨겨진 의미와 연출 의도를 꼼꼼히 분석하는 스타일이에요",
   depth_low: "이 추천자도 머리보다 마음으로 먼저 느끼는 타입이라 잘 통할 거예요",
+  depth_very_low: "이 추천자도 직감의 힘을 믿는 타입이라 감이 통할 거예요",
+  lens_very_high: "이 추천자는 데이터와 근거로 작품을 정밀하게 해부하는 타입이에요",
   lens_high: "이 추천자도 논리적으로 작품을 해석하는 걸 좋아해요",
   lens_low: "이 추천자도 감성적인 공감을 중시하는 스타일이에요",
+  lens_very_low: "이 추천자도 순수한 감정의 파도를 타며 작품을 경험하는 타입이에요",
+  stance_very_high: "이 추천자는 거침없이 솔직한 평가를 해줄 거예요",
   stance_high: "이 추천자는 아쉬운 점도 솔직하게 말해주는 스타일이에요",
   stance_low: "이 추천자도 긍정적인 시선으로 작품을 바라봐요",
+  stance_very_low: "이 추천자는 모든 작품에서 빛나는 점을 찾아주는 따뜻한 타입이에요",
+  scope_very_high: "이 추천자는 작품의 모든 요소를 빠짐없이 분석하는 극세밀 타입이에요",
   scope_high: "이 추천자도 하나하나 꼼꼼하게 짚어주는 타입이에요",
   scope_low: "이 추천자도 핵심만 깔끔하게 정리해주는 스타일이에요",
+  scope_very_low: "이 추천자는 한 마디로 작품의 핵심을 짚어주는 타입이에요",
+  taste_very_high: "이 추천자는 아무도 모르는 숨겨진 보석을 발굴하는 전문가예요",
   taste_high: "이 추천자도 실험적인 작품을 발굴하는 걸 좋아해요",
   taste_low: "이 추천자도 명작의 가치를 알아보는 안목이 있어요",
+  taste_very_low: "이 추천자는 검증된 명작 중의 명작을 추천하는 안목이 있어요",
+  purpose_very_high: "이 추천자는 작품에서 삶의 깊은 의미를 탐구하는 타입이에요",
   purpose_high: "이 추천자도 작품 속 깊은 의미를 파고드는 타입이에요",
   purpose_low: "이 추천자도 편하게 즐길 수 있는 작품을 잘 골라요",
+  purpose_very_low: "이 추천자는 순수한 재미와 즐거움을 최우선으로 골라줘요",
+  sociability_very_high: "함께 열정적으로 이야기 나눌 수 있는 최고의 대화 상대예요",
   sociability_high: "함께 이야기 나눌 수 있는 추천자예요",
   sociability_low: "조용히 깊은 감상을 나눠줄 추천자예요",
+  sociability_very_low: "자신만의 깊은 세계에서 우러나온 감상을 전해줄 추천자예요",
 }
 
 export function generateUserExplanation(
@@ -194,10 +267,7 @@ export function generateUserExplanation(
 
   const body = bodyParts.join(". ") + "."
 
-  const traits = nonNeutralTraits.map((t) => {
-    const label = DIM_LABELS[t.dimension]
-    return t.level === "high" ? label.high : label.low
-  })
+  const traits = nonNeutralTraits.map((t) => getTraitLabel(t.dimension, t.level))
 
   return { headline, body, traits }
 }
@@ -214,10 +284,7 @@ export function generateCompoundExplanation(
     return `${personaName}은(는) 다양한 관점을 제공하는 추천자입니다.`
   }
 
-  const traitDescriptions = traits.map((t) => {
-    const label = DIM_LABELS[t.dimension]
-    return t.level === "high" ? label.high : label.low
-  })
+  const traitDescriptions = traits.map((t) => getTraitLabel(t.dimension, t.level))
 
   const traitStr = traitDescriptions.join(" + ")
   const headlineKey = `${traits[0].dimension}_${traits[0].level}`
@@ -229,6 +296,22 @@ export function generateCompoundExplanation(
 }
 
 // ── 유틸 ─────────────────────────────────────────────────────
+
+function getTraitLabel(dimension: SocialDimension, level: TraitLevel["level"]): string {
+  const label = DIM_LABELS[dimension]
+  switch (level) {
+    case "very_high":
+      return label.veryHigh
+    case "high":
+      return label.high
+    case "low":
+      return label.low
+    case "very_low":
+      return label.veryLow
+    default:
+      return "보통"
+  }
+}
 
 function round(v: number): number {
   return Math.round(v * 100) / 100

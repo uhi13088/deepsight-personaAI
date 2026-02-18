@@ -201,9 +201,10 @@ export function generateCharacter(
   l1: SocialPersonaVector,
   l2: CoreTemperamentVector,
   l3: NarrativeDriveVector,
-  archetype?: PersonaArchetype
+  archetype?: PersonaArchetype,
+  existingNames: string[] = []
 ): CharacterProfile {
-  const name = generateName(l1, l2)
+  const name = generateName(l1, l2, existingNames)
   const role = generateRole(l1, l2, archetype)
   const expertise = generateExpertise(l1)
   const description = generateDescription(l1, l2, l3, archetype)
@@ -228,7 +229,11 @@ export function generateCharacter(
 
 // ── 이름 생성 ─────────────────────────────────────────────────
 
-function generateName(l1: SocialPersonaVector, l2: CoreTemperamentVector): string {
+function generateName(
+  l1: SocialPersonaVector,
+  l2: CoreTemperamentVector,
+  existingNames: string[] = []
+): string {
   let pool: readonly string[]
 
   if (l1.lens > 0.6 && l1.depth > 0.6) {
@@ -240,7 +245,6 @@ function generateName(l1: SocialPersonaVector, l2: CoreTemperamentVector): strin
   } else if (l1.sociability > 0.6 || l2.extraversion > 0.6) {
     pool = NAME_POOLS.social
   } else {
-    // 모든 풀에서 랜덤
     const allNames = [
       ...NAME_POOLS.analytical,
       ...NAME_POOLS.emotional,
@@ -250,7 +254,29 @@ function generateName(l1: SocialPersonaVector, l2: CoreTemperamentVector): strin
     pool = allNames
   }
 
-  return pool[Math.floor(Math.random() * pool.length)]
+  // 중복 방지: 기존 이름과 겹치지 않도록 최대 10회 시도
+  const existingSet = new Set(existingNames)
+  const available = pool.filter((n) => !existingSet.has(n))
+
+  if (available.length > 0) {
+    return available[Math.floor(Math.random() * available.length)]
+  }
+
+  // 선호 풀이 모두 소진되면 전체 풀에서 재시도
+  const allNames = [
+    ...NAME_POOLS.analytical,
+    ...NAME_POOLS.emotional,
+    ...NAME_POOLS.critical,
+    ...NAME_POOLS.social,
+  ]
+  const allAvailable = allNames.filter((n) => !existingSet.has(n))
+
+  if (allAvailable.length > 0) {
+    return allAvailable[Math.floor(Math.random() * allAvailable.length)]
+  }
+
+  // 64개 전부 사용 시 접미사로 구분
+  return pool[Math.floor(Math.random() * pool.length)] + String(Math.floor(Math.random() * 100))
 }
 
 // ── 역할 생성 ─────────────────────────────────────────────────
@@ -263,17 +289,27 @@ function generateRole(
   if (archetype) {
     const roleMap: Record<string, string> = {
       "ironic-philosopher": "아이러니한 철학 비평가",
-      "wounded-critic": "감성적 비평가",
-      "social-introvert": "커뮤니티 리뷰어",
-      "lazy-perfectionist": "디테일 분석가",
-      "conservative-hipster": "트렌드 큐레이터",
-      "empathetic-arguer": "토론형 비평가",
-      "free-guardian": "자유로운 추천가",
-      "quiet-enthusiast": "몰입형 리뷰어",
-      "emotional-pragmatist": "감성 실용 리뷰어",
-      "dangerous-mentor": "도전적 멘토",
-      "volatile-intellectual": "논쟁적 분석가",
-      "growing-cynic": "성장하는 비평가",
+      "volatile-intellectual": "폭발적 지성 분석가",
+      "cheerful-nihilist": "유쾌한 허무 리뷰어",
+      "obsessive-curator": "집착적 디테일 큐레이터",
+      "rebellious-romantic": "반항적 감성 비평가",
+      "analytical-dreamer": "분석적 몽상 리뷰어",
+      "gentle-provocateur": "다정한 도발 비평가",
+      "nostalgic-explorer": "향수적 탐험 큐레이터",
+      "systematic-rebel": "체계적 반역 비평가",
+      "reluctant-leader": "마지못한 가이드 리뷰어",
+      "playful-scholar": "장난꾸러기 학자 비평가",
+      "passionate-minimalist": "열정적 미니멀 리뷰어",
+      "chaotic-healer": "혼돈의 치유 리뷰어",
+      "silent-observer": "침묵의 관찰 비평가",
+      "reckless-idealist": "무모한 이상 비평가",
+      "methodical-adventurer": "체계적 모험 큐레이터",
+      "sarcastic-optimist": "빈정대는 낙관 리뷰어",
+      "timid-visionary": "소심한 선구 비평가",
+      "hedonistic-philosopher": "쾌락적 철학 리뷰어",
+      "protective-rebel": "의로운 반항 비평가",
+      "restless-perfectionist": "불안한 완벽주의 분석가",
+      "whimsical-analyst": "변덕스러운 분석 비평가",
     }
     const role = roleMap[archetype.id]
     if (role) return role
@@ -488,7 +524,7 @@ function generateRelationships(
   }
 
   // 성장 지향 → 학생 관계
-  if (archetype?.id === "growing-cynic" || l1.purpose > 0.6) {
+  if (l1.purpose > 0.6) {
     relationships.push({
       type: "student",
       description: "새로운 시각을 배워가는 후배",

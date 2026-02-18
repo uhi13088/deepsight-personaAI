@@ -121,13 +121,13 @@ describe("buildPrompt", () => {
       l2: defaultL2,
       l3: defaultL3,
     })
-    expect(result).toContain("직관적이고 가벼운")
-    expect(result).toContain("감성적인")
-    expect(result).toContain("수용적이고 따뜻한")
-    expect(result).toContain("핵심만 간결하게 전달하는")
-    expect(result).toContain("클래식하고 검증된 것을 선호하는")
-    expect(result).toContain("순수한 오락과 즐거움을 추구하는")
-    expect(result).toContain("독립적이고 내향적인")
+    expect(result).toContain("매우 직관적이고 즉흥적인")
+    expect(result).toContain("순수하게 감성적인")
+    expect(result).toContain("매우 수용적이고 포용적인")
+    expect(result).toContain("극히 핵심만 추리는")
+    expect(result).toContain("매우 보수적이고 대중적인")
+    expect(result).toContain("순수하게 기분 전환과 오락만 추구하는")
+    expect(result).toContain("극도로 독립적이고 은둔적인")
   })
 
   it("describes high L1 values correctly", () => {
@@ -148,13 +148,13 @@ describe("buildPrompt", () => {
       l2: defaultL2,
       l3: defaultL3,
     })
-    expect(result).toContain("심층적이고 분석적인")
-    expect(result).toContain("논리적이고 체계적인")
-    expect(result).toContain("비판적이고 날카로운")
-    expect(result).toContain("세밀하고 디테일한")
-    expect(result).toContain("실험적이고 새로운 것을 추구하는")
-    expect(result).toContain("깊은 의미와 가치를 추구하는")
-    expect(result).toContain("사교적이고 외향적인")
+    expect(result).toContain("극도로 깊이 있고 학술적인")
+    expect(result).toContain("극도로 논리적이고 데이터 중심의")
+    expect(result).toContain("극도로 비판적이고 도전적인")
+    expect(result).toContain("극도로 포괄적이고 세밀한")
+    expect(result).toContain("극도로 전위적이고 언더그라운드 지향의")
+    expect(result).toContain("존재론적 의미와 예술적 가치에 몰두하는")
+    expect(result).toContain("극도로 사교적이고 소통 중심적인")
   })
 
   it("includes L2 OCEAN dimension labels", () => {
@@ -225,10 +225,10 @@ describe("buildPrompt", () => {
       l2: defaultL2,
       l3: highL3,
     })
-    expect(result).toContain("강한 결핍감을 가진")
-    expect(result).toContain("엄격한 도덕관")
-    expect(result).toContain("폭발적이고 예측 불가능한")
-    expect(result).toContain("적극적으로 성장하는")
+    expect(result).toContain("극도로 깊은 결핍에 시달리는")
+    expect(result).toContain("극도로 엄격한 도덕관")
+    expect(result).toContain("극도로 변덕스럽고 폭발적인")
+    expect(result).toContain("끊임없이 자기 변혁을 추구하는")
   })
 
   it("includes behavioral guidelines", () => {
