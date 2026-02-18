@@ -37,8 +37,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="ko">
-      <body className="antialiased">
+    <html lang="ko" suppressHydrationWarning>
+      <body className="antialiased" suppressHydrationWarning>
         <Header />
         <main className="pt-16">{children}</main>
         <Footer />
