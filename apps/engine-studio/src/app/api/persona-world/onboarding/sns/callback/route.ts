@@ -24,8 +24,9 @@ export async function GET(request: NextRequest) {
     const state = searchParams.get("state")
     const error = searchParams.get("error")
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? ""
-    const redirectBase = `${appUrl}/onboarding`
+    // 콜백 후 유저를 persona-world 프론트엔드로 리다이렉트
+    const frontendUrl = process.env.PERSONA_WORLD_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? ""
+    const redirectBase = `${frontendUrl}/onboarding`
 
     // OAuth 에러 (사용자가 거부 등)
     if (error) {
@@ -140,9 +141,11 @@ export async function GET(request: NextRequest) {
     )
   } catch (error) {
     console.error("[persona-world/sns/callback] Error:", error)
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? ""
+    const frontendUrl = process.env.PERSONA_WORLD_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? ""
     const message = error instanceof Error ? error.message : "Unknown error"
-    return NextResponse.redirect(`${appUrl}/onboarding?sns_error=${encodeURIComponent(message)}`)
+    return NextResponse.redirect(
+      `${frontendUrl}/onboarding?sns_error=${encodeURIComponent(message)}`
+    )
   }
 }
 
