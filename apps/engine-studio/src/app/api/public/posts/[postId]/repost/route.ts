@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { notifyPostReposted } from "@/lib/persona-world/notification-service"
 
 /**
  * POST /api/public/posts/[postId]/repost
@@ -89,6 +90,28 @@ export async function POST(
         data: { repostCount: { increment: 1 } },
       }),
     ])
+
+    // 리포스트 알림 (fire-and-forget) — 포스트 작성 페르소나 팔로워에게
+    const repostedPost = await prisma.personaPost.findUnique({
+      where: { id: postId },
+      select: { personaId: true },
+    })
+    if (repostedPost?.personaId) {
+      const reposterName = userId
+        ? ((
+            await prisma.personaWorldUser.findUnique({
+              where: { id: userId },
+              select: { name: true },
+            })
+          )?.name ?? "유저")
+        : ((await prisma.persona.findUnique({ where: { id: personaId! }, select: { name: true } }))
+            ?.name ?? "페르소나")
+      void notifyPostReposted({
+        postId,
+        reposterName,
+        postAuthorPersonaId: repostedPost.personaId,
+      })
+    }
 
     return NextResponse.json({
       success: true,

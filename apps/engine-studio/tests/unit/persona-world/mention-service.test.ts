@@ -3,6 +3,7 @@ import {
   extractMentionHandles,
   parseTextWithMentions,
   type MentionInfo,
+  type TextSegment,
 } from "@/lib/persona-world/mention-service"
 
 // ═══ extractMentionHandles ═══
@@ -129,5 +130,137 @@ describe("parseTextWithMentions", () => {
     expect(segments).toHaveLength(2)
     expect(segments[0]).toEqual({ type: "text", content: "hello" })
     expect(segments[1].type).toBe("mention")
+  })
+
+  it("멘션만 있는 텍스트 → 단일 mention 세그먼트", () => {
+    const mentions: MentionInfo[] = [
+      {
+        handle: "solo",
+        personaId: "p1",
+        personaName: "Solo",
+        startIndex: 0,
+        endIndex: 5,
+      },
+    ]
+    const segments = parseTextWithMentions("@solo", mentions)
+
+    expect(segments).toHaveLength(1)
+    expect(segments[0]).toEqual({
+      type: "mention",
+      content: "@solo",
+      personaId: "p1",
+      handle: "solo",
+    })
+  })
+
+  it("정렬되지 않은 멘션도 위치순으로 처리", () => {
+    const mentions: MentionInfo[] = [
+      {
+        handle: "second",
+        personaId: "p2",
+        personaName: "Second",
+        startIndex: 8,
+        endIndex: 15,
+      },
+      {
+        handle: "first",
+        personaId: "p1",
+        personaName: "First",
+        startIndex: 0,
+        endIndex: 6,
+      },
+    ]
+    const segments = parseTextWithMentions("@first @second 테스트", mentions)
+
+    expect(segments[0].type).toBe("mention")
+    expect(segments[0].handle).toBe("first")
+    expect(segments[2].type).toBe("mention")
+    expect(segments[2].handle).toBe("second")
+  })
+
+  it("TextSegment 타입 구조 검증", () => {
+    const textSeg: TextSegment = { type: "text", content: "hello" }
+    const mentionSeg: TextSegment = {
+      type: "mention",
+      content: "@yuna",
+      personaId: "p1",
+      handle: "yuna",
+    }
+
+    expect(textSeg.type).toBe("text")
+    expect(textSeg.personaId).toBeUndefined()
+    expect(mentionSeg.type).toBe("mention")
+    expect(mentionSeg.personaId).toBe("p1")
+    expect(mentionSeg.handle).toBe("yuna")
+  })
+})
+
+// ═══ extractMentionHandles — 추가 엣지 케이스 ═══
+
+describe("extractMentionHandles — edge cases", () => {
+  it("빈 문자열", () => {
+    expect(extractMentionHandles("")).toEqual([])
+  })
+
+  it("멘션 사이 줄바꿈", () => {
+    const handles = extractMentionHandles("@first\n@second 텍스트")
+    expect(handles).toEqual(["first", "second"])
+  })
+
+  it("연속 호출 시 regex 상태 초기화 (lastIndex)", () => {
+    // 같은 텍스트 2번 호출해도 결과 동일해야 함
+    const text = "@persona1 @persona2"
+    const first = extractMentionHandles(text)
+    const second = extractMentionHandles(text)
+    expect(first).toEqual(second)
+  })
+
+  it("멘션 5개 이상 추출", () => {
+    const text = "@a @b @c @d @e @f 많은 멘션"
+    const handles = extractMentionHandles(text)
+    expect(handles).toEqual(["a", "b", "c", "d", "e", "f"])
+    expect(handles).toHaveLength(6)
+  })
+
+  it("특수문자 뒤 멘션은 감지하지 않음 (마침표 뒤)", () => {
+    // 마침표 뒤에는 공백 없으면 감지 안 됨
+    const handles = extractMentionHandles("end.@test")
+    expect(handles).toEqual([])
+  })
+
+  it("탭 문자 뒤 멘션 감지", () => {
+    const handles = extractMentionHandles("탭\t@tabuser 테스트")
+    expect(handles).toEqual(["tabuser"])
+  })
+
+  it("숫자만으로 된 핸들", () => {
+    const handles = extractMentionHandles("@12345 숫자 핸들")
+    expect(handles).toEqual(["12345"])
+  })
+
+  it("한글+영문 혼합 핸들", () => {
+    const handles = extractMentionHandles("@유나yuna123 혼합 핸들")
+    expect(handles).toEqual(["유나yuna123"])
+  })
+})
+
+// ═══ MentionInfo 구조 검증 ═══
+
+describe("MentionInfo 구조", () => {
+  it("MentionInfo가 올바른 필드를 포함한다", () => {
+    const info: MentionInfo = {
+      handle: "test_handle",
+      personaId: "persona-123",
+      personaName: "테스트 페르소나",
+      startIndex: 0,
+      endIndex: 12,
+    }
+
+    expect(info.handle).toBe("test_handle")
+    expect(info.personaId).toBe("persona-123")
+    expect(info.personaName).toBe("테스트 페르소나")
+    expect(info.startIndex).toBe(0)
+    expect(info.endIndex).toBe(12)
+    expect(info.endIndex).toBeGreaterThan(info.startIndex)
   })
 })

@@ -70,6 +70,24 @@
   - feed/page.tsx 공유 플레이스홀더 → PWRepostButton 교체
   - 변경: pw-repost-button.tsx (신규), user-store.ts, api.ts, feed/page.tsx
   - 테스트: 3373 PASS (85 파일), Build PASS (engine-studio + persona-world)
+- [x] **T161: 알림 서버 API** ✅ 2026-02-17
+  - GET/POST /api/persona-world/notifications (기존 구현 확인)
+  - 알림 트리거: like, comment, follow 연결 확인 + repost 알림 신규 추가
+  - notifyPostReposted: notification-service.ts 함수 + repost/route.ts 연결
+  - clientApi: getNotifications, markNotificationRead, markAllNotificationsRead
+  - useUserStore: fetchNotifications (서버 동기화), markAsRead/markAllAsRead (Optimistic + Server Sync)
+  - notifications/page.tsx: 30초 폴링 + "repost" 타입 스타일 추가
+  - feed/page.tsx: 60초 폴링으로 배지 서버 동기화
+  - 변경: notification-service.ts, repost/route.ts, api.ts, types.ts, user-store.ts, notifications/page.tsx, feed/page.tsx, notification-types.test.ts (신규)
+  - 테스트: 3373+84 PASS (94 파일), Build PASS (engine-studio + persona-world)
+- [x] **T162: 댓글 톤 시스템 업그레이드 (키워드 → 11종 벡터 기반)** ✅ 2026-02-17
+  - comment-utils.ts: classifyToneWithVectors (유저 벡터 기반), buildUserThreeLayerVector, hasUserVectors
+  - comments/route.ts POST: 유저 벡터 조회 → classifyToneWithVectors (벡터 우선, 키워드 fallback)
+  - 설계서 11종 톤 매트릭스: comment-tone.ts + COMMENT_TONE_MATRIX (기존 구현 확인)
+  - 프론트엔드 11종: CommentTone 타입 + COMMENT_TONE_CONFIG 11종 (기존 구현 확인)
+  - 테스트: softThreshold, decideCommentTone (8종 톤 시나리오), hasUserVectors, buildUserThreeLayerVector, classifyToneWithVectors (+26 신규)
+  - 변경: comment-utils.ts, comments/route.ts, comment-utils.test.ts
+  - 테스트: 3399+84 PASS (94 파일), Build PASS
 
 ---
 
@@ -79,38 +97,60 @@
 
 ---
 
+## DONE (v4.0 — SNS 연동)
+
+- [x] **T169: SNS 연동 파이프라인 (OAuth + 데이터 수집 + UI)** ✅ 2026-02-17
+  - AC1: SNS OAuth 인증 — sns-oauth.ts (5 OAuth 플랫폼 + 2 업로드 플랫폼), 인증 URL 빌드, 토큰 교환, state 인코딩/검증
+  - AC2: SNS 데이터 수집 — sns-analyzer.ts (YouTube/Spotify/Instagram/Twitter/TikTok API 호출, 6종 ExtendedData 추출)
+  - AC3: 데이터 업로드 — Netflix/Letterboxd CSV/JSON 파싱 → SNSExtendedData 변환
+  - AC4: API 라우트 3개 — /sns/auth (OAuth 시작), /sns/callback (콜백 + DB 저장), /sns/upload (데이터 업로드)
+  - AC5: 프론트엔드 UI — PWSnsConnect 컴포넌트 (OAuth/업로드 분기), 온보딩 페이지 SNS 선택 섹션 통합
+  - AC6: 전체 파이프라인 연결 — OAuth → 분석기 → sns-processor → 벡터 생성/보정 → DB 저장
+  - 신규: sns-oauth.ts, sns-analyzer.ts, auth/route.ts, callback/route.ts, upload/route.ts, pw-sns-connect.tsx
+  - 변경: onboarding/index.ts, api.ts, onboarding/page.tsx, components/index.ts
+  - 테스트: 3537+23 PASS (86 파일), Build PASS (engine-studio + persona-world)
+
+---
+
+## DONE (v4.0 — PW 품질 측정)
+
+- [x] **T165: PW 품질 측정 (Phase 6-B)** ✅ 2026-02-17
+  - AC1: Auto-Interview PW 확장 — 20문항 Golden Sample (L1:7, L2:5, L3:4, Cross:4), 동적 문항, 적응적 스케줄링
+  - AC2: PIS 계산 — 3요소 가중합 (CR×0.35 + SC×0.35 + CS×0.30), 5등급 판정, 자동 조치 5종
+  - AC3: 품질 로깅 — PostQualityLog, CommentQualityLog, InteractionPatternLog, 4종 이상 감지, 집계
+  - AC4: Arena 피드백 루프 브릿지 — 6종 트리거 조건, 교정 추적, 결과 평가 (EFFECTIVE/PARTIAL/INEFFECTIVE/REGRESSED)
+  - 신규: quality-integration.ts (Auto-Interview → PIS → Logger → Arena 통합 파이프라인)
+  - 변경: quality-integration.ts (신규), quality-pw.test.ts (+66 테스트)
+  - 테스트: 3514+84 PASS (85 파일), Build PASS (engine-studio + persona-world)
+
+---
+
+## DONE (v4.0 — PW 유저 기능 계속)
+
+- [x] **T163: 멘션 시스템** ✅ 2026-02-17
+  - AC1: 멘션 감지 (@handle 파싱) — extractMentionHandles, resolveMentions (기존 구현 확인)
+  - AC2: 멘션 시 알림 생성 — scheduler/route.ts에 포스트 생성 후 resolveMentions+notifyMentions 연결
+  - AC3: 멘션된 포스트/댓글 하이라이트 — pw-post-type-card.tsx에 parseMentions 적용 (댓글은 기존 구현 확인)
+  - AC4: 단위 테스트 PASS — mention-service.test.ts +12 테스트 (엣지 케이스, 구조 검증)
+  - 변경: scheduler/route.ts, pw-post-type-card.tsx, mention-service.test.ts
+  - 테스트: 3411+84 PASS (94 파일), Build PASS (engine-studio + persona-world)
+
+---
+
+## DONE (v4.0 — PW 보안 확장)
+
+- [x] **T164: PW 보안 확장 (Phase 6-A)** ✅ 2026-02-17
+  - AC1: PW 특화 Gate Guard 규칙 6종 — pw-gate-rules.ts (패턴 4종 + 구조 4종 + Rate Limit 4종)
+  - AC2: 유저 Trust Score 관리 — user-trust.ts (5이벤트 Decay/Recovery, 4수준 Inspection)
+  - AC3: PW Kill Switch 8종 토글 + 4종 자동 트리거 — pw-kill-switch.ts (글로벌 프리즈, 기능별 토글)
+  - AC4: Quarantine 시스템 — quarantine.ts (CRUD, 심각도별 만료 72h/48h/24h/수동, 활동 제한)
+  - 신규: security-integration.ts (Gate Guard → Trust → Kill Switch → Quarantine 통합 파이프라인)
+  - 변경: security-integration.ts (신규), security.test.ts (+37 테스트)
+  - 테스트: 3448+84 PASS (94 파일), Build PASS
+
+---
+
 ## QUEUE
-
-- [ ] **T161: 알림 서버 API**
-  - AC1: GET /api/persona-world/notifications (유저별 알림 조회)
-  - AC2: 알림 생성 트리거 (like, comment, follow, mention, new_post)
-  - AC3: POST /api/persona-world/notifications/read (읽음 처리)
-  - AC4: 프론트엔드 서버 동기화 연동
-  - AC5: 단위 테스트 PASS
-
-- [ ] **T162: 댓글 톤 시스템 업그레이드 (키워드 → 11종 벡터 기반)**
-  - AC1: comments GET API에서 keyword 분류 → comment-tone.ts 벡터 기반으로 교체
-  - AC2: 설계서 11종 톤 매트릭스 반영 (paradox_response~supportive)
-  - AC3: 프론트엔드 8종 → 11종 톤 확장
-  - AC4: 단위 테스트 PASS
-
-- [ ] **T163: 멘션 시스템**
-  - AC1: 멘션 감지 (@handle 파싱)
-  - AC2: 멘션 시 알림 생성
-  - AC3: 멘션된 포스트/댓글 하이라이트
-  - AC4: 단위 테스트 PASS
-
-- [ ] **T164: PW 보안 확장 (Phase 6-A)**
-  - AC1: PW 특화 Gate Guard 규칙 6종
-  - AC2: 유저 Trust Score 관리
-  - AC3: PW Kill Switch 8종 토글 + 4종 자동 트리거
-  - AC4: Quarantine 시스템 (격리 CRUD, 심각도별 정책)
-
-- [ ] **T165: PW 품질 측정 (Phase 6-B)**
-  - AC1: Auto-Interview PW 확장 (20문항, 적응적 스케줄링)
-  - AC2: PIS 계산 (3요소 가중합, 등급 판정)
-  - AC3: 품질 로깅 (PostQualityLog, CommentQualityLog)
-  - AC4: Arena 피드백 루프 브릿지
 
 - [ ] **T166: 자동 모더레이션 (Phase 7-A)**
   - AC1: 3단계 파이프라인 (규칙 → Sentinel → 비동기 분석)

@@ -23,6 +23,24 @@ export type { OnboardingDataProvider } from "./onboarding-engine"
 export { processSnsData, extractCombinedText } from "./sns-processor"
 export type { SnsDataProvider } from "./sns-processor"
 
+// ── SNS OAuth ──
+export {
+  buildAuthUrl,
+  exchangeCodeForToken,
+  refreshAccessToken,
+  encodeState,
+  decodeState,
+  validateState,
+  isOAuthSupported,
+  OAUTH_SUPPORTED_PLATFORMS,
+  UPLOAD_ONLY_PLATFORMS,
+} from "./sns-oauth"
+export type { OAuthPlatformConfig, OAuthTokenResponse, OAuthCallbackParams } from "./sns-oauth"
+
+// ── SNS Analyzer ──
+export { analyzeSnsProfile, parseUploadedData } from "./sns-analyzer"
+export type { SnsAnalysisResult, SnsExtractedProfile } from "./sns-analyzer"
+
 // ── Activity Learner ──
 export { learnFromActivity, activityToUIV } from "./activity-learner"
 export type { ActivityLearnerProvider, ActivityLearnResult } from "./activity-learner"

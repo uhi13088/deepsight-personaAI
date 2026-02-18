@@ -16,6 +16,7 @@ import {
 } from "@/lib/persona-world/llm-adapter"
 import { getConsumptionContext } from "@/lib/persona-world/consumption-manager"
 import { getPersonaState } from "@/lib/persona-world/state-manager"
+import { resolveMentions, notifyMentions } from "@/lib/persona-world/mention-service"
 
 /**
  * POST /api/persona-world/scheduler
@@ -158,6 +159,17 @@ export async function POST(request: NextRequest) {
             personaId: decision.personaId,
             postId: postResult.postId,
             postType: postResult.postType,
+          })
+
+          // 멘션 알림 (fire-and-forget) — 포스트 내 @handle 감지 시
+          void resolveMentions(postResult.content).then((mentions) => {
+            if (mentions.length > 0) {
+              void notifyMentions({
+                mentions,
+                mentionerName: persona.name,
+                postId: postResult.postId,
+              })
+            }
           })
         } catch (err) {
           console.error(`[Scheduler] Post creation failed for ${decision.personaId}:`, err)

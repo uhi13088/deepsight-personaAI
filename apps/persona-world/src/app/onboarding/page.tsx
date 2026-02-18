@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, Suspense } from "react"
 import {
   PWLogoWithText,
   PWButton,
@@ -9,9 +9,10 @@ import {
   PWQuestionCard,
   PWMatchingPreview,
   PWProfileLevelBadge,
+  PWSnsConnect,
 } from "@/components/persona-world"
-import { ArrowRight, ArrowLeft, Sparkles, AlertTriangle, Coins } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { ArrowRight, ArrowLeft, Sparkles, AlertTriangle, Coins, Link2 } from "lucide-react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useUserStore } from "@/lib/user-store"
 import { clientApi } from "@/lib/api"
 import type { OnboardingQuestion, OnboardingAnswer } from "@/lib/types"
@@ -54,7 +55,22 @@ const PHASE_INFO = [
 type FlowStep = "intro" | "questions" | "preview" | "complete"
 
 export default function OnboardingPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <PWSpinner size="md" />
+        </div>
+      }
+    >
+      <OnboardingContent />
+    </Suspense>
+  )
+}
+
+function OnboardingContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const {
     onboarding,
     startPhase,
@@ -79,10 +95,26 @@ export default function OnboardingPage() {
   // 이탈 경고
   const [showExitWarning, setShowExitWarning] = useState(false)
 
+  // SNS 연결 상태
+  const [snsConnectedPlatform, setSnsConnectedPlatform] = useState<string | null>(null)
+  const [snsError, setSnsError] = useState<string | null>(null)
+
   // 게이미피케이션 피드백
   const [showMidpoint, setShowMidpoint] = useState(false)
   const [showCredits, setShowCredits] = useState(false)
   const [earnedCredits, setEarnedCredits] = useState(0)
+
+  // SNS OAuth 콜백 결과 처리
+  useEffect(() => {
+    const connected = searchParams.get("sns_connected")
+    const error = searchParams.get("sns_error")
+    if (connected) {
+      setSnsConnectedPlatform(connected)
+    }
+    if (error) {
+      setSnsError(decodeURIComponent(error))
+    }
+  }, [searchParams])
 
   // 재진입: 이전 Phase 완료 후 시작
   useEffect(() => {
@@ -308,7 +340,55 @@ export default function OnboardingPage() {
       <main className="flex flex-1 flex-col items-center justify-center px-6 py-8">
         {/* ── INTRO ── */}
         {flowStep === "intro" && (
-          <PhaseIntro info={PHASE_INFO[activePhase - 1]} onStart={handleStartPhase} />
+          <div className="w-full max-w-md">
+            {/* SNS 연결 성공/에러 알림 */}
+            {snsConnectedPlatform && (
+              <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 text-center text-sm text-green-700">
+                {snsConnectedPlatform} 연동 완료! 취향 분석이 반영되었어요
+              </div>
+            )}
+            {snsError && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-center text-sm text-red-600">
+                SNS 연동 실패: {snsError}
+              </div>
+            )}
+
+            <PhaseIntro info={PHASE_INFO[activePhase - 1]} onStart={handleStartPhase} />
+
+            {/* Phase 1일 때만 SNS 연동 옵션 표시 */}
+            {activePhase === 1 && (
+              <div className="mt-8">
+                <div className="relative mb-4 flex items-center">
+                  <div className="flex-grow border-t border-gray-200" />
+                  <span className="mx-3 flex-shrink-0 text-xs text-gray-400">또는</span>
+                  <div className="flex-grow border-t border-gray-200" />
+                </div>
+
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Link2 className="h-4 w-4 text-purple-500" />
+                    <span className="text-sm font-medium text-gray-900">SNS로 빠르게 시작</span>
+                    <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-600">
+                      10초
+                    </span>
+                  </div>
+                  <p className="mb-3 text-xs text-gray-500">
+                    SNS 데이터를 분석해서 취향을 자동으로 파악해요
+                  </p>
+                  <PWSnsConnect
+                    compact
+                    onConnected={(platform, level) => {
+                      setSnsConnectedPlatform(platform)
+                    }}
+                  />
+                </div>
+
+                <p className="mt-3 text-center text-xs text-gray-400">
+                  나중에 설정 &gt; 프로필 강화에서 추가할 수 있어요
+                </p>
+              </div>
+            )}
+          </div>
         )}
 
         {/* ── QUESTIONS ── */}
