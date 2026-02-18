@@ -60,11 +60,20 @@ export interface OnboardingState {
   creditsBalance: number
 }
 
+// NextAuth 세션 유저 타입 (next-auth/react)
+interface SessionUser {
+  id: string
+  email: string
+  name: string | null
+  image: string | null
+}
+
 // 스토어 상태
 interface UserState {
   // 프로필
   profile: UserProfile | null
   setProfile: (profile: UserProfile) => void
+  setProfileFromSession: (sessionUser: SessionUser) => void
   updateVector: (vector: ThreeLayerVector, confidence: number) => void
   completeOnboarding: () => void
 
@@ -163,6 +172,27 @@ export const useUserStore = create<UserState>()(
 
       // 프로필 관리
       setProfile: (profile) => set({ profile }),
+
+      setProfileFromSession: (sessionUser) =>
+        set((state) => {
+          // 이미 같은 ID의 프로필이 있으면 닉네임만 동기화
+          if (state.profile?.id === sessionUser.id) {
+            return {
+              profile: { ...state.profile, nickname: sessionUser.name ?? state.profile.nickname },
+            }
+          }
+          // 신규 생성
+          return {
+            profile: {
+              id: sessionUser.id,
+              nickname: sessionUser.name ?? "사용자",
+              vector: null,
+              vectorConfidence: null,
+              completedOnboarding: false,
+              createdAt: new Date().toISOString(),
+            },
+          }
+        }),
 
       updateVector: (vector, confidence) =>
         set((state) => ({

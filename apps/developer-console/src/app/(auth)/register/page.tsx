@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { signIn } from "next-auth/react"
 import {
   Eye,
   EyeOff,
@@ -74,19 +75,50 @@ export default function RegisterPage() {
     setIsLoading(true)
     setError(null)
 
-    // Simulate registration
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    try {
+      // 1. 회원가입 API 호출
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password, company: company || undefined }),
+      })
 
-    setIsLoading(false)
-    router.push("/dashboard")
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error?.message ?? "회원가입에 실패했습니다")
+        setIsLoading(false)
+        return
+      }
+
+      // 2. 자동 로그인
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      })
+
+      if (result?.error) {
+        router.push("/login")
+        return
+      }
+
+      router.push("/dashboard")
+      router.refresh()
+    } catch {
+      setError("회원가입 중 오류가 발생했습니다")
+      setIsLoading(false)
+    }
   }
 
   const handleOAuthRegister = async (provider: string) => {
     setIsLoading(true)
-    // Simulate OAuth registration
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsLoading(false)
-    router.push("/dashboard")
+    try {
+      await signIn(provider, { callbackUrl: "/dashboard" })
+    } catch {
+      setError("OAuth 가입 중 오류가 발생했습니다")
+      setIsLoading(false)
+    }
   }
 
   const passwordStrength = passwordRequirements.filter((req) => req.test(password)).length

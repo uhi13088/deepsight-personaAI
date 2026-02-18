@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import "./globals.css"
 import { PWGradientDefs } from "@/components/persona-world"
+import { AuthProvider } from "@/components/auth-provider"
 import { Toaster } from "sonner"
 
 export const metadata: Metadata = {
@@ -25,9 +26,11 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-white antialiased">
-        <PWGradientDefs />
-        {children}
-        <Toaster position="top-center" richColors />
+        <AuthProvider>
+          <PWGradientDefs />
+          {children}
+          <Toaster position="top-center" richColors />
+        </AuthProvider>
       </body>
     </html>
   )
