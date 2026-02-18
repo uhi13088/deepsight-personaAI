@@ -924,6 +924,10 @@
 
 ## ✅ DONE (완료)
 
+- [x] **T149: 정성적 차원(Qualitative) LLM 기반 생성기 업그레이드** ✅ 2026-02-18
+  - 변경: llm-qualitative.ts(신규), qualitative/index.ts, generate-random/route.ts, create/route.ts, llm-qualitative.test.ts(신규)
+  - 테스트: PASS (79파일/3182개)
+
 - [x] **T146: 아레나 교정 플로우 + 관리자 UI** ✅ 2026-02-16
   - 변경: sessions/[id]/corrections/route.ts, arena/page.tsx
   - 테스트: PASS (78파일/3159개)

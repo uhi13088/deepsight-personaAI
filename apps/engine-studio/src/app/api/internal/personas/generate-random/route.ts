@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { generatePersona } from "@/lib/persona-generation"
 import { buildAllPrompts } from "@/lib/prompt-builder"
-import { generateAllQualitativeDimensions } from "@/lib/qualitative"
+import {
+  generateAllQualitativeDimensions,
+  generateAllQualitativeDimensionsWithLLM,
+} from "@/lib/qualitative"
 import { computeActivityTraits, computeActiveHours } from "@/lib/persona-world/activity-mapper"
 import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
@@ -99,8 +102,13 @@ export async function POST(request: NextRequest) {
 
     const { l1, l2, l3 } = generated.vectors
 
-    // ── Stage 3: 정성적 4차원 생성 ─────────────────────────────
-    const qualitative = generateAllQualitativeDimensions(l1, l2, l3, generated.archetype)
+    // ── Stage 3: 정성적 4차원 생성 (LLM 우선, 실패 시 패턴매칭 fallback) ──
+    let qualitative
+    try {
+      qualitative = await generateAllQualitativeDimensionsWithLLM(l1, l2, l3, generated.archetype)
+    } catch {
+      qualitative = generateAllQualitativeDimensions(l1, l2, l3, generated.archetype)
+    }
 
     // ── Stage 4: 프롬프트 5종 자동 빌드 ────────────────────────
     const role = inferPersonaRole(l1, l2)
