@@ -94,10 +94,13 @@ export async function POST(request: NextRequest) {
       .filter((v): v is NonNullable<typeof v> => v !== null)
 
     // ── Stage 2: 페르소나 생성 파이프라인 ─────────────────────
+    const existingNames = existingPersonas.map((p) => p.name)
+
     const generated = generatePersona({
       archetypeId: body.archetypeId,
       existingPersonas: existingVectors,
       diversityWeight: 0.5,
+      existingNames,
     })
 
     const { l1, l2, l3 } = generated.vectors

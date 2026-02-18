@@ -114,18 +114,18 @@ describe("Prompt Builder v3", () => {
 
     it("should adapt review length based on scope", () => {
       const highScope = buildReviewPrompt({ ...DEFAULT_INPUT, l1: { ...L1, scope: 0.9 } })
-      expect(highScope).toContain("800자 이상")
+      expect(highScope).toContain("1000자 이상")
 
       const lowScope = buildReviewPrompt({ ...DEFAULT_INPUT, l1: { ...L1, scope: 0.1 } })
-      expect(lowScope).toContain("200~400자")
+      expect(lowScope).toContain("100~200자")
     })
 
     it("should adapt review tone based on stance", () => {
       const highStance = buildReviewPrompt({ ...DEFAULT_INPUT, l1: { ...L1, stance: 0.9 } })
-      expect(highStance).toContain("날카로운 분석")
+      expect(highStance).toContain("극도로 날카롭")
 
       const lowStance = buildReviewPrompt({ ...DEFAULT_INPUT, l1: { ...L1, stance: 0.1 } })
-      expect(lowStance).toContain("긍정적 요소를 부각")
+      expect(lowStance).toContain("매우 긍정적")
     })
   })
 
@@ -138,10 +138,10 @@ describe("Prompt Builder v3", () => {
 
     it("should adapt style based on sociability", () => {
       const highSoc = buildPostPrompt({ ...DEFAULT_INPUT, l1: { ...L1, sociability: 0.9 } })
-      expect(highSoc).toContain("대화체의 친근")
+      expect(highSoc).toContain("적극 소통")
 
       const lowSoc = buildPostPrompt({ ...DEFAULT_INPUT, l1: { ...L1, sociability: 0.1 } })
-      expect(lowSoc).toContain("독백적")
+      expect(lowSoc).toContain("내면 독백")
     })
   })
 
@@ -166,13 +166,13 @@ describe("Prompt Builder v3", () => {
         ...DEFAULT_INPUT,
         l2: { ...L2, extraversion: 0.9 },
       })
-      expect(highExt).toContain("적극적이고 주도적인")
+      expect(highExt).toContain("대화를 이끄는")
 
       const lowExt = buildInteractionPrompt({
         ...DEFAULT_INPUT,
         l2: { ...L2, extraversion: 0.1 },
       })
-      expect(lowExt).toContain("신중하고 경청")
+      expect(lowExt).toContain("과묵하고 관찰")
     })
   })
 

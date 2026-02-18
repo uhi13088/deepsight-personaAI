@@ -201,9 +201,10 @@ export function generateCharacter(
   l1: SocialPersonaVector,
   l2: CoreTemperamentVector,
   l3: NarrativeDriveVector,
-  archetype?: PersonaArchetype
+  archetype?: PersonaArchetype,
+  existingNames: string[] = []
 ): CharacterProfile {
-  const name = generateName(l1, l2)
+  const name = generateName(l1, l2, existingNames)
   const role = generateRole(l1, l2, archetype)
   const expertise = generateExpertise(l1)
   const description = generateDescription(l1, l2, l3, archetype)
@@ -228,7 +229,11 @@ export function generateCharacter(
 
 // ── 이름 생성 ─────────────────────────────────────────────────
 
-function generateName(l1: SocialPersonaVector, l2: CoreTemperamentVector): string {
+function generateName(
+  l1: SocialPersonaVector,
+  l2: CoreTemperamentVector,
+  existingNames: string[] = []
+): string {
   let pool: readonly string[]
 
   if (l1.lens > 0.6 && l1.depth > 0.6) {
@@ -240,7 +245,6 @@ function generateName(l1: SocialPersonaVector, l2: CoreTemperamentVector): strin
   } else if (l1.sociability > 0.6 || l2.extraversion > 0.6) {
     pool = NAME_POOLS.social
   } else {
-    // 모든 풀에서 랜덤
     const allNames = [
       ...NAME_POOLS.analytical,
       ...NAME_POOLS.emotional,
@@ -250,7 +254,29 @@ function generateName(l1: SocialPersonaVector, l2: CoreTemperamentVector): strin
     pool = allNames
   }
 
-  return pool[Math.floor(Math.random() * pool.length)]
+  // 중복 방지: 기존 이름과 겹치지 않도록 최대 10회 시도
+  const existingSet = new Set(existingNames)
+  const available = pool.filter((n) => !existingSet.has(n))
+
+  if (available.length > 0) {
+    return available[Math.floor(Math.random() * available.length)]
+  }
+
+  // 선호 풀이 모두 소진되면 전체 풀에서 재시도
+  const allNames = [
+    ...NAME_POOLS.analytical,
+    ...NAME_POOLS.emotional,
+    ...NAME_POOLS.critical,
+    ...NAME_POOLS.social,
+  ]
+  const allAvailable = allNames.filter((n) => !existingSet.has(n))
+
+  if (allAvailable.length > 0) {
+    return allAvailable[Math.floor(Math.random() * allAvailable.length)]
+  }
+
+  // 64개 전부 사용 시 접미사로 구분
+  return pool[Math.floor(Math.random() * pool.length)] + String(Math.floor(Math.random() * 100))
 }
 
 // ── 역할 생성 ─────────────────────────────────────────────────
