@@ -4,6 +4,7 @@
 
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
+import Google from "next-auth/providers/google"
 import { z } from "zod"
 import bcrypt from "bcryptjs"
 import prisma from "@/lib/prisma"
@@ -51,6 +52,10 @@ export async function verifyPassword(password: string, hashedPassword: string): 
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    }),
     Credentials({
       name: "Credentials",
       credentials: {
@@ -115,10 +120,82 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async signIn({ user, account }) {
+      // OAuth 로그인: User 자동 생성 + Account 연결
+      if (account?.provider === "google" && user.email) {
+        try {
+          const email = user.email.toLowerCase()
+          let dbUser = await prisma.user.findUnique({ where: { email } })
+
+          if (!dbUser) {
+            // 신규 사용자 생성
+            dbUser = await prisma.user.create({
+              data: {
+                email,
+                name: user.name ?? null,
+                image: user.image ?? null,
+                emailVerified: new Date(),
+                lastLoginAt: new Date(),
+              },
+            })
+            console.info(`[Auth] OAuth new user created: ${email.substring(0, 3)}***`)
+          } else {
+            // 기존 사용자 업데이트
+            await prisma.user.update({
+              where: { id: dbUser.id },
+              data: {
+                lastLoginAt: new Date(),
+                image: user.image ?? dbUser.image,
+                emailVerified: dbUser.emailVerified ?? new Date(),
+              },
+            })
+          }
+
+          // Account 연결 (없으면 생성)
+          const existingAccount = await prisma.account.findUnique({
+            where: {
+              provider_providerAccountId: {
+                provider: account.provider,
+                providerAccountId: account.providerAccountId,
+              },
+            },
+          })
+
+          if (!existingAccount) {
+            await prisma.account.create({
+              data: {
+                userId: dbUser.id,
+                type: account.type,
+                provider: account.provider,
+                providerAccountId: account.providerAccountId,
+                accessToken: account.access_token ?? null,
+                refreshToken: account.refresh_token ?? null,
+                expiresAt: account.expires_at ?? null,
+                tokenType: account.token_type ?? null,
+                scope: account.scope ?? null,
+                idToken: account.id_token ?? null,
+              },
+            })
+          }
+
+          // JWT에서 사용할 DB user ID 설정
+          user.id = dbUser.id
+        } catch (error) {
+          console.error("[Auth] OAuth signIn error:", error)
+          return false
+        }
+      }
+
+      return true
+    },
+    async jwt({ token, user, account }) {
       if (user) {
         token.id = user.id
         token.email = user.email
+      }
+      // OAuth 최초 로그인 시 provider 정보 저장
+      if (account) {
+        token.provider = account.provider
       }
       return token
     },
@@ -133,9 +210,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (url.startsWith(baseUrl)) return url
       if (url.startsWith("/")) return `${baseUrl}${url}`
       return `${baseUrl}/dashboard`
-    },
-    async signIn() {
-      return true
     },
   },
   pages: {
