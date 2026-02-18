@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { generatePersona } from "@/lib/persona-generation"
+import { generateCharacterWithLLM } from "@/lib/persona-generation/llm-character-generator"
 import { buildAllPrompts } from "@/lib/prompt-builder"
 import {
   generateAllQualitativeDimensions,
@@ -105,6 +106,14 @@ export async function POST(request: NextRequest) {
 
     const { l1, l2, l3 } = generated.vectors
 
+    // ── Stage 2.5: 캐릭터 LLM 생성 (LLM 우선, 실패 시 패턴매칭 fallback) ──
+    let character = generated.character
+    try {
+      character = await generateCharacterWithLLM(l1, l2, l3, generated.archetype, existingNames)
+    } catch {
+      // LLM 실패 시 기존 패턴매칭 결과 사용
+    }
+
     // ── Stage 3: 정성적 4차원 생성 (LLM 우선, 실패 시 패턴매칭 fallback) ──
     let qualitative
     try {
@@ -116,9 +125,9 @@ export async function POST(request: NextRequest) {
     // ── Stage 4: 프롬프트 5종 자동 빌드 ────────────────────────
     const role = inferPersonaRole(l1, l2)
     const prompts = buildAllPrompts({
-      name: generated.character.name,
-      role: generated.character.role,
-      expertise: generated.character.expertise,
+      name: character.name,
+      role: character.role,
+      expertise: character.expertise,
       l1,
       l2,
       l3,
@@ -140,10 +149,10 @@ export async function POST(request: NextRequest) {
 
       const created = await tx.persona.create({
         data: {
-          name: generated.character.name,
+          name: character.name,
           role,
-          expertise: generated.character.expertise,
-          description: generated.character.description,
+          expertise: character.expertise,
+          description: character.description,
           status: (body.status === "DRAFT" ? "DRAFT" : "ACTIVE") as PersonaStatus,
           source: "MANUAL",
           archetypeId: generated.archetype?.id ?? null,
@@ -201,7 +210,7 @@ export async function POST(request: NextRequest) {
       archetypeId: string | null
       paradoxScore: number
       dimensionalityScore: number
-      character: typeof generated.character
+      character: typeof character
       activityTraits: typeof activityTraits
       activeHours: number[]
       qualitative: {
@@ -218,7 +227,7 @@ export async function POST(request: NextRequest) {
         archetypeId: generated.archetype?.id ?? null,
         paradoxScore: paradoxProfile.overall,
         dimensionalityScore: paradoxProfile.dimensionality,
-        character: generated.character,
+        character,
         activityTraits,
         activeHours,
         qualitative: {

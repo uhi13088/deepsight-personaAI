@@ -168,6 +168,7 @@ export {
 } from "./vector-generator"
 export { designParadox, analyzeParadoxPatterns } from "./paradox-designer"
 export { generateCharacter } from "./character-generator"
+export { generateCharacterWithLLM } from "./llm-character-generator"
 export { inferActivitySettings, inferContentSettings } from "./activity-inference"
 export { validateConsistency } from "./consistency-validator"
 export type { ExistingPersonaVectors } from "./vector-generator"
