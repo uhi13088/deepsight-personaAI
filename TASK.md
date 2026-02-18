@@ -918,14 +918,14 @@
 
 > 하드코딩 패턴 품질 향상: 로직 개선(T150~T152) + LLM 업그레이드(T153~T154)
 
-- [ ] **T150: 5단계 벡터 묘사 시스템 확장**
+- [x] **T150: 5단계 벡터 묘사 시스템 확장**
   - 배경: 현재 3단계(high/mid/low) 묘사가 벡터 0.9와 0.7을 동일하게 "심층적"으로 표현. 5단계로 세분화하면 LLM 프롬프트 정교화 + 매칭 XAI 표현력 향상
   - AC1: `prompt-builder.ts` — describeLevel() 3단계→5단계 (veryLow/low/mid/high/veryHigh). L1 7D + L2 5D + L3 4D = 16D × 5 = 80개 묘사 문장
   - AC2: `matching/explanation.ts` — TraitLevel 3단계→5단계, DIM_LABELS에 veryHigh/veryLow 추가, TRAIT_EXPRESSIONS 14개→28개, PERSONA_MATCH_EXPRESSIONS 14개→28개
   - AC3: getTopTraits() 임계값 조정 (≥0.8→very_high, ≥0.6→high, ≤0.2→very_low, ≤0.4→low)
   - AC4: 기존 테스트 호환성 유지 + 추가 테스트 + Build PASS
 
-- [ ] **T151: 아키타입 22종 전체 매핑 + 이름 중복 방지**
+- [x] **T151: 아키타입 22종 전체 매핑 + 이름 중복 방지**
   - 배경: roleMap/archetypeStyleMap이 구버전 12종만 매핑. 이름 생성 시 기존 페르소나와 중복 가능
   - AC1: ✅ `character-generator.ts` — roleMap 22종 전체 매핑 (완료)
   - AC2: ✅ `voice-generator.ts` — archetypeStyleMap 22종 전체 매핑 (완료)
@@ -933,7 +933,7 @@
   - AC4: 호출부 (generate-random/route.ts, create/route.ts) 수정 — 기존 페르소나 이름 목록 전달
   - AC5: 테스트 + Build PASS
 
-- [ ] **T152: Express 알고리즘 교차축 퀴크 + Voice sigmoid 개선**
+- [x] **T152: Express 알고리즘 교차축 퀴크 + Voice sigmoid 개선**
   - 배경: calculateDerivedStates가 L1만 사용 (L2/L3 미반영). Voice activationThresholds가 단순 선형 공식. 6개 고정 퀴크로 다양성 부족
   - AC1: `express-algorithm.ts` — calculateDerivedStates()에 L2(OCEAN)/L3(NarrativeDrive) 벡터 반영. 교차축 역설 기반 파생 상태 계산
   - AC2: `express-algorithm.ts` — L1↔L2 역설 패턴 4종 기반 동적 퀴크 자동 생성 (기존 6개 + 벡터 기반 추가). 예: sociability↔extraversion 역설 시 "대화를 주도하다가 갑자기 침묵" 퀴크 자동 추가
@@ -960,12 +960,18 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-- **T151: 아키타입 22종 전체 매핑 + 이름 중복 방지** (AC1, AC2 완료. AC3~AC5 남음)
+(없음)
 
 ---
 
 ## ✅ DONE (완료)
 
+- [x] **T152: Express 알고리즘 교차축 퀴크 + Voice sigmoid 개선** ✅ 2026-02-18
+  - 변경: express-algorithm.ts(calculateDerivedStates L2/L3 통합, generateParadoxQuirks 4종), voice-generator.ts(sigmoid 기반 calculateThresholds), interaction/index.ts(re-export)
+- [x] **T151: 아키타입 22종 전체 매핑 + 이름 중복 방지** ✅ 2026-02-18
+  - 변경: character-generator.ts(roleMap 22종, generateName 중복방지), voice-generator.ts(archetypeStyleMap 22종), persona-generation/index.ts, generate-random/route.ts
+- [x] **T150: 5단계 벡터 묘사 시스템 확장** ✅ 2026-02-18
+  - 변경: prompt-builder.ts(describeLevel 5단계, L1/L2/L3 전체), matching/explanation.ts(TraitLevel 5단계, DIM_LABELS, expressions 28종)
 - [x] **T149: 정성적 차원(Qualitative) LLM 기반 생성기 업그레이드** ✅ 2026-02-18
   - 변경: llm-qualitative.ts(신규), qualitative/index.ts, generate-random/route.ts, create/route.ts, llm-qualitative.test.ts(신규)
   - 테스트: PASS (79파일/3182개)

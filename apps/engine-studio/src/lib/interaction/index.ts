@@ -311,7 +311,12 @@ export {
   sentimentToUIV,
   DEFAULT_ADAPT_CONFIG,
 } from "./adapt-algorithm"
-export { calculateDerivedStates, evaluateQuirks, DEFAULT_QUIRKS } from "./express-algorithm"
+export {
+  calculateDerivedStates,
+  evaluateQuirks,
+  generateParadoxQuirks,
+  DEFAULT_QUIRKS,
+} from "./express-algorithm"
 
 export type { InitResult, SemanticCategory } from "./init-algorithm"
 export type { OverrideRule, ActiveOverride, OverrideResult } from "./override-algorithm"
