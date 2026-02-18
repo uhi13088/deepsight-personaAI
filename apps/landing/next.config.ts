@@ -1,9 +1,30 @@
 import type { NextConfig } from "next"
 
+function getEngineStudioUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_ENGINE_STUDIO_URL?.trim()
+  if (!raw) return "http://localhost:3000"
+  if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    return raw.replace(/\/+$/, "")
+  }
+  return `https://${raw}`.replace(/\/+$/, "")
+}
+
+const ENGINE_STUDIO_URL = getEngineStudioUrl()
+
 /**
  * Next.js Configuration - 금융업계 수준 보안 설정
  */
 const nextConfig: NextConfig = {
+  // engine-studio API 프록시 (CORS 우회)
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${ENGINE_STUDIO_URL}/api/:path*`,
+      },
+    ]
+  },
+
   // 보안 헤더 (미들웨어와 함께 적용)
   headers: async () => [
     {

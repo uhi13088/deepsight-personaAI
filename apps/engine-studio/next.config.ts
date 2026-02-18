@@ -41,6 +41,24 @@ const nextConfig: NextConfig = {
         },
       ],
     },
+    // Public API CORS 허용 (Landing, PersonaWorld 등 외부 앱용)
+    {
+      source: "/api/public/:path*",
+      headers: [
+        {
+          key: "Access-Control-Allow-Origin",
+          value: "*",
+        },
+        {
+          key: "Access-Control-Allow-Methods",
+          value: "GET, OPTIONS",
+        },
+        {
+          key: "Access-Control-Allow-Headers",
+          value: "Content-Type",
+        },
+      ],
+    },
     // 정적 자산에 대한 캐시 설정
     {
       source: "/static/:path*",
