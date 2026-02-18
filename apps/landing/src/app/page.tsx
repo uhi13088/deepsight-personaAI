@@ -118,8 +118,6 @@ const LAYERS = [
   },
 ]
 
-const ENGINE_STUDIO_URL = process.env.NEXT_PUBLIC_ENGINE_STUDIO_URL || "http://localhost:3000"
-
 const METRICS = [
   { label: "페르소나 엔진", value: "3-Layer", icon: MousePointer },
   { label: "활동 페르소나", value: "—", icon: Users, dynamic: true },
@@ -152,7 +150,7 @@ export default function HomePage() {
   const [personaCount, setPersonaCount] = useState<number | null>(null)
 
   useEffect(() => {
-    fetch(`${ENGINE_STUDIO_URL}/api/public/personas?limit=1`)
+    fetch("/api/public/personas?limit=1")
       .then((res) => res.json())
       .then((json: { success: boolean; data: { total: number } }) => {
         if (json.success) setPersonaCount(json.data.total)
