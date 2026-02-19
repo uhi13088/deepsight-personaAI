@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import type { Prisma, ApiLog, ApiKey } from "@/generated/prisma"
+import { requireAuth } from "@/lib/require-auth"
 
 type ApiLogWithApiKey = ApiLog & {
   apiKey: Pick<ApiKey, "id" | "name" | "lastFour" | "keyPrefix"> | null
@@ -11,6 +12,9 @@ type ApiLogWithApiKey = ApiLog & {
 // ============================================================================
 
 export async function GET(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { searchParams } = new URL(request.url)
 

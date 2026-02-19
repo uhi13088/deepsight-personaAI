@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import prisma from "@/lib/prisma"
 import crypto from "crypto"
+import { requireAuth } from "@/lib/require-auth"
 
 const createWebhookSchema = z.object({
   url: z.string().url("올바른 URL 형식이 아닙니다"),
@@ -14,6 +15,9 @@ const createWebhookSchema = z.object({
 // ============================================================================
 
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const webhooks = await prisma.webhook.findMany({
       orderBy: { createdAt: "desc" },
@@ -119,6 +123,9 @@ export async function GET() {
 // ============================================================================
 
 export async function POST(request: NextRequest) {
+  const { session, response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = await request.json()
     const parsed = createWebhookSchema.safeParse(body)

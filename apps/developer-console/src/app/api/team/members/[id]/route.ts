@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { MemberRole } from "@/generated/prisma"
+import { requireAuth } from "@/lib/require-auth"
 
 // Role mapping (frontend → DB)
 const frontendToDbRole: Record<string, MemberRole> = {
@@ -23,6 +24,9 @@ const dbToFrontendRole: Record<MemberRole, string> = {
  * PATCH /api/team/members/:id - 멤버 역할 수정
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { response: authRes } = await requireAuth()
+  if (authRes) return authRes
+
   try {
     const { id } = await params
     const body = await request.json()
@@ -138,6 +142,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { response: authRes } = await requireAuth()
+  if (authRes) return authRes
+
   try {
     const { id } = await params
 

@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { requireAuth } from "@/lib/require-auth"
 
 // ============================================================================
 // GET /api/webhooks/deliveries - 웹훅 배달 로그 조회
 // ============================================================================
 
 export async function GET(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { searchParams } = new URL(request.url)
     const webhookId = searchParams.get("webhookId")

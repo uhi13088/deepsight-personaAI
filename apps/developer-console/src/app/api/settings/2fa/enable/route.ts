@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 
 /**
  * POST /api/settings/2fa/enable - 2FA 활성화 (QR 코드 생성)
  */
 export async function POST() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   // TODO: In production, use `otplib` to generate real TOTP secrets
   const secret = crypto.randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase()
   const issuer = "DeepSight"

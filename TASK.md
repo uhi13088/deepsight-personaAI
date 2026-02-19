@@ -960,7 +960,15 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-(없음)
+- [ ] **T155: [긴급/보안] Developer Console + PersonaWorld API 인증 강화**
+  - 배경: 보안 감사 결과 Developer Console API 라우트 24개 이상이 인증 없이 노출, PersonaWorld 미들웨어 부재
+  - AC1: `requireAuth()` 공통 헬퍼 (developer-console) — 세션 없으면 401 반환
+  - AC2: Developer Console 전체 API 라우트에 auth guard 적용 (api-keys, billing, logs, team, webhooks, settings, dashboard, search, usage)
+  - AC3: Developer Console auth middleware — 비인증 사용자 `/login`으로 리다이렉트 ✅
+  - AC4: PersonaWorld auth middleware — 비인증 사용자 보호 경로 차단
+  - AC5: PersonaWorld `/api/health` 환경정보 노출 제거
+  - AC6: `[...nextauth]` 에러 바운더리 — 500 시 빈 body 대신 JSON 반환 ✅
+  - AC7: 빌드 PASS + 검증
 
 ---
 

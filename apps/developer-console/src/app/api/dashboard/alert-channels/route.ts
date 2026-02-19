@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 
 // ============================================================================
 // GET /api/dashboard/alert-channels - Get alert channel configuration
 // ============================================================================
 
 export async function GET(_request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   // TODO: Implement real alert channel config from DB
   return NextResponse.json({
     success: true,
@@ -24,6 +28,9 @@ export async function GET(_request: NextRequest) {
 // ============================================================================
 
 export async function PUT(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const config = await request.json()
 

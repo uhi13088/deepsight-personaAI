@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import crypto from "crypto"
+import { requireAuth } from "@/lib/require-auth"
 
 // ============================================================================
 // POST /api/webhooks/[id]/test - 웹훅 테스트 전송
 // ============================================================================
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { id } = await params
 
