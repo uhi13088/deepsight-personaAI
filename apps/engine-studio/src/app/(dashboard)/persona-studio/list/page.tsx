@@ -11,11 +11,11 @@ import { PersonaFilters, DEFAULT_FILTERS } from "@/components/persona/persona-fi
 import type { PersonaFilterState } from "@/components/persona/persona-filters"
 import { PersonaPagination } from "@/components/persona/persona-pagination"
 import { usePersonas } from "@/hooks/use-personas"
-import { ARCHETYPE_LABELS } from "@/constants/v3/interpretation-tables"
+import { ARCHETYPE_LABELS, CURRENT_ARCHETYPE_IDS } from "@/constants/v3/interpretation-tables"
 
-const ARCHETYPE_OPTIONS = Object.entries(ARCHETYPE_LABELS).map(([id, label]) => ({
+const ARCHETYPE_OPTIONS = CURRENT_ARCHETYPE_IDS.map((id) => ({
   id,
-  label,
+  label: ARCHETYPE_LABELS[id] ?? id,
 }))
 
 export default function PersonaListPage() {

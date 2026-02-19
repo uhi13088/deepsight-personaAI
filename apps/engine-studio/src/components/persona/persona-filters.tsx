@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
-import { ARCHETYPE_LABELS } from "@/constants/v3/interpretation-tables"
+import { ARCHETYPE_LABELS, CURRENT_ARCHETYPE_IDS } from "@/constants/v3/interpretation-tables"
 import type { PersonaSortField, SortOrder, VectorRangeFilter, CrossAxisFilter } from "@/types"
 
 // ── Filter State Type ───────────────────────────────────────
@@ -262,9 +262,9 @@ export function PersonaFilters({ filters, onFiltersChange, totalCount }: Persona
         <div className="border-border bg-card/50 space-y-4 rounded-lg border p-4">
           {/* Archetype Filter */}
           <div>
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider">아키타입 (12종)</h4>
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider">아키타입 (22종)</h4>
             <div className="flex flex-wrap gap-1.5">
-              {Object.entries(ARCHETYPE_LABELS).map(([id, label]) => (
+              {CURRENT_ARCHETYPE_IDS.map((id) => (
                 <button
                   key={id}
                   className={`rounded-md px-2 py-1 text-xs transition-colors ${
@@ -274,7 +274,7 @@ export function PersonaFilters({ filters, onFiltersChange, totalCount }: Persona
                   }`}
                   onClick={() => toggleArchetype(id)}
                 >
-                  {label}
+                  {ARCHETYPE_LABELS[id] ?? id}
                 </button>
               ))}
             </div>

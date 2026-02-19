@@ -5,7 +5,7 @@ import { Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
-import { ARCHETYPE_LABELS } from "@/constants/v3/interpretation-tables"
+import { ARCHETYPE_LABELS, CURRENT_ARCHETYPE_IDS } from "@/constants/v3/interpretation-tables"
 import { calculateExtendedParadoxScore, calculateL1L2ParadoxScore } from "@/lib/vector/paradox"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
 import { calculateVFinal, vFinalToVector } from "@/lib/vector/v-final"
@@ -474,7 +474,7 @@ function ArchetypeSelector({
 }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-      {Object.entries(ARCHETYPE_LABELS).map(([id, label]) => (
+      {CURRENT_ARCHETYPE_IDS.map((id) => (
         <button
           key={id}
           className={`rounded-lg border p-3 text-left transition-all ${
@@ -487,7 +487,7 @@ function ArchetypeSelector({
           <Sparkles
             className={`mb-1 h-4 w-4 ${selectedId === id ? "text-primary" : "text-muted-foreground"}`}
           />
-          <p className="text-sm font-medium">{label}</p>
+          <p className="text-sm font-medium">{ARCHETYPE_LABELS[id] ?? id}</p>
           <p className="text-muted-foreground mt-0.5 text-[10px]">{id}</p>
         </button>
       ))}

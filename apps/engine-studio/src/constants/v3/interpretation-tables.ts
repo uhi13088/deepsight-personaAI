@@ -120,9 +120,32 @@ export const CROSS_AXIS_INTERPRETATION: Record<
   },
 }
 
-// ── Archetype Labels (12종, 설계서 §7) ─────────────────────
+// ── Archetype Labels (22종 + legacy, 005_seed_archetypes.sql 기준) ──
 export const ARCHETYPE_LABELS: Record<string, string> = {
+  // ── 현재 DB 22종 ──
   "ironic-philosopher": "아이러니한 철학자",
+  "volatile-intellectual": "폭발하는 지성인",
+  "cheerful-nihilist": "유쾌한 허무주의자",
+  "obsessive-curator": "집착하는 큐레이터",
+  "rebellious-romantic": "반항적 낭만가",
+  "analytical-dreamer": "분석하는 몽상가",
+  "gentle-provocateur": "다정한 도발자",
+  "nostalgic-explorer": "향수에 젖은 탐험가",
+  "systematic-rebel": "체계적 반역자",
+  "reluctant-leader": "마지못한 리더",
+  "playful-scholar": "장난꾸러기 학자",
+  "passionate-minimalist": "열정적 미니멀리스트",
+  "chaotic-healer": "혼돈의 치유자",
+  "silent-observer": "침묵의 관찰자",
+  "reckless-idealist": "무모한 이상주의자",
+  "methodical-adventurer": "체계적 모험가",
+  "sarcastic-optimist": "빈정대는 낙관주의자",
+  "timid-visionary": "소심한 선구자",
+  "hedonistic-philosopher": "쾌락적 철학자",
+  "protective-rebel": "보호하는 반항아",
+  "restless-perfectionist": "쉬지 못하는 완벽주의자",
+  "whimsical-analyst": "변덕스러운 분석가",
+  // ── legacy (기존 페르소나 호환) ──
   "wounded-critic": "상처받은 비평가",
   "social-introvert": "사교적 내향인",
   "lazy-perfectionist": "게으른 완벽주의자",
@@ -132,9 +155,34 @@ export const ARCHETYPE_LABELS: Record<string, string> = {
   "quiet-enthusiast": "조용한 열정가",
   "emotional-pragmatist": "감성적 실용가",
   "dangerous-mentor": "위험한 멘토",
-  "volatile-intellectual": "폭발하는 지성인",
   "growing-cynic": "성장하는 냉소가",
 }
+
+/** 현재 DB에 존재하는 22종 아키타입 ID (드롭다운용) */
+export const CURRENT_ARCHETYPE_IDS: string[] = [
+  "ironic-philosopher",
+  "volatile-intellectual",
+  "cheerful-nihilist",
+  "obsessive-curator",
+  "rebellious-romantic",
+  "analytical-dreamer",
+  "gentle-provocateur",
+  "nostalgic-explorer",
+  "systematic-rebel",
+  "reluctant-leader",
+  "playful-scholar",
+  "passionate-minimalist",
+  "chaotic-healer",
+  "silent-observer",
+  "reckless-idealist",
+  "methodical-adventurer",
+  "sarcastic-optimist",
+  "timid-visionary",
+  "hedonistic-philosopher",
+  "protective-rebel",
+  "restless-perfectionist",
+  "whimsical-analyst",
+]
 
 // ── 6-Category Validation Thresholds (§11) ──────────────────
 export const VALIDATION_THRESHOLDS = {
