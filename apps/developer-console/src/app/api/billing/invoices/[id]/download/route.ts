@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { requireAuth } from "@/lib/require-auth"
 
 /**
  * GET /api/billing/invoices/:id/download - Download invoice PDF
  */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { id } = await params
 

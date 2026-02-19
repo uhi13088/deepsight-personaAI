@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import type { ApiResponse } from "@/types"
 import type { TeamMember, Role, InviteResult } from "@/lib/team"
 import type { UserRole } from "@/generated/prisma"
@@ -68,6 +69,9 @@ interface MutationBody {
 }
 
 export async function GET(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { searchParams } = new URL(request.url)
     const role = searchParams.get("role") as Role | null
@@ -134,6 +138,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = (await request.json()) as MutationBody
 

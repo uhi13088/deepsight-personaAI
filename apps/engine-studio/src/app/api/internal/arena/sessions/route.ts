@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 import {
   DEFAULT_MAX_TURNS,
@@ -18,6 +19,9 @@ const VALID_PROFILE_LEVELS = new Set<string>(["FULL", "STANDARD", "LITE"])
 // 아레나 세션 생성 + 예상 비용 계산
 
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = await request.json().catch(() => null)
     if (!body) {

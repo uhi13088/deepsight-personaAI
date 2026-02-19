@@ -11,16 +11,20 @@ export const maxDuration = 300 // 5 min for processing many personas
  */
 export async function GET(request: NextRequest) {
   try {
-    // Auth check
+    // Auth check (fail-closed: CRON_SECRET 없으면 거부)
     const cronSecret = process.env.CRON_SECRET
-    if (cronSecret) {
-      const authHeader = request.headers.get("authorization")
-      if (authHeader !== `Bearer ${cronSecret}`) {
-        return NextResponse.json(
-          { success: false, error: { code: "UNAUTHORIZED", message: "Invalid cron secret" } },
-          { status: 401 }
-        )
-      }
+    if (!cronSecret) {
+      return NextResponse.json(
+        { success: false, error: { code: "CONFIG_ERROR", message: "CRON_SECRET not configured" } },
+        { status: 500 }
+      )
+    }
+    const authHeader = request.headers.get("authorization")
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json(
+        { success: false, error: { code: "UNAUTHORIZED", message: "Invalid cron secret" } },
+        { status: 401 }
+      )
     }
 
     // Call the scheduler endpoint internally

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import type { ApiResponse } from "@/types"
 import type { SocialDimension } from "@/types"
 import {
@@ -51,6 +52,9 @@ interface UpdateTuningRequest {
 // ── GET — 현재 튜닝 프로필 반환 ────────────────────────────────
 
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   const profile = getProfileStore()
 
   return NextResponse.json<ApiResponse<TuningResponse>>({
@@ -62,6 +66,9 @@ export async function GET() {
 // ── POST — 커스텀 튜닝 프로필 생성 ─────────────────────────────
 
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = (await request.json()) as CreateTuningRequest
 
@@ -105,6 +112,9 @@ export async function POST(request: NextRequest) {
 // ── PUT — 현재 프로필 업데이트 ──────────────────────────────────
 
 export async function PUT(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = (await request.json()) as UpdateTuningRequest
     let profile = getProfileStore()

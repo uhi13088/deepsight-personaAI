@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { requireAuth } from "@/lib/require-auth"
 
 // ============================================================================
 // Types
@@ -74,12 +75,15 @@ function formatDateForGroup(date: Date, groupBy: string): string {
 // ============================================================================
 
 export async function GET(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { searchParams } = new URL(request.url)
     const period = searchParams.get("period") || "7d"
     const groupBy = searchParams.get("groupBy") || "day"
 
-    // TODO: Get organizationId from session
+    // TODO: Scope to user's organization via session
     // const organizationId = await getOrganizationId(request)
 
     const { start, end } = getDateRangeForPeriod(period)

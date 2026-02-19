@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 
 /**
@@ -14,6 +15,9 @@ import { prisma } from "@/lib/prisma"
  * - reason: string (교정 사유)
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { id: sessionId } = await params
     const body = await request.json().catch(() => null)
@@ -160,6 +164,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  * - reviewedBy?: string
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { id: sessionId } = await params
     const body = await request.json().catch(() => null)

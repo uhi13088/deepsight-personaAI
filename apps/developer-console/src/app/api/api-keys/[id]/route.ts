@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 
 // GET /api/api-keys/[id] - Get a specific API key
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { id } = await params
 
@@ -37,6 +41,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 // PATCH /api/api-keys/[id] - Update an API key
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { id } = await params
     const body = await request.json()
@@ -69,6 +76,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { id } = await params
 

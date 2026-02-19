@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 import type { ApiResponse } from "@/types"
 
@@ -17,6 +18,9 @@ interface NotificationItem {
  * 시스템 상태 기반 알림 자동 생성 — DB 쿼리로 현재 상태 파악 후 알림 목록 반환
  */
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   const notifications: NotificationItem[] = []
   let counter = 0
 

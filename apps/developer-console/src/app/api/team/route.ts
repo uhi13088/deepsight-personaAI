@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { requireAuth } from "@/lib/require-auth"
 
 /**
  * GET /api/team - 팀 데이터 조회 (DB 연동)
  */
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
-    // TODO: Get organization from session
-    // For now, get the first organization
+    // TODO: Scope to user's organization via session
     const organization = await prisma.organization.findFirst({
       include: {
         members: {

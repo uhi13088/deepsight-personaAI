@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { requireAuth } from "@/lib/require-auth"
 
 interface SearchResult {
   type: "api_key" | "log" | "webhook" | "doc"
@@ -11,6 +12,9 @@ interface SearchResult {
 
 // GET /api/search?q=query
 export async function GET(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { searchParams } = new URL(request.url)
     const query = searchParams.get("q")?.trim().toLowerCase()

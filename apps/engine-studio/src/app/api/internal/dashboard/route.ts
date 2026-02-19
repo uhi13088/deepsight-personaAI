@@ -4,6 +4,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 import type { ApiResponse } from "@/types"
 
@@ -21,6 +22,9 @@ interface DashboardStats {
 // ── GET: 대시보드 통계 ────────────────────────────────────────
 
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const [activeCount, totalCount, statusGroups, matchingStats, latencyStats] = await Promise.all([
       // 활성 페르소나 수 (ACTIVE + STANDARD)

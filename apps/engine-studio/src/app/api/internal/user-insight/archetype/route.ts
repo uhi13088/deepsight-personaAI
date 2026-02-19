@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import type { ApiResponse } from "@/types"
 import type { SocialDimension } from "@/types"
 import { prisma } from "@/lib/prisma"
@@ -93,6 +94,9 @@ interface ArchetypeResponse {
 // ── GET: Return all archetypes ──────────────────────────────────
 
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const rows = await prisma.archetype.findMany({
       orderBy: { createdAt: "asc" },
@@ -137,6 +141,9 @@ interface ArchetypePostRequest {
 }
 
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = (await request.json()) as ArchetypePostRequest
 

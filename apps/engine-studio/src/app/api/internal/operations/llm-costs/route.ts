@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 import type { ApiResponse } from "@/types"
 
@@ -78,6 +79,9 @@ const EMPTY_RESPONSE: LlmCostsResponse = {
 }
 
 export async function GET(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { searchParams } = new URL(request.url)
     const days = Math.min(Number(searchParams.get("days") ?? "30"), 90)

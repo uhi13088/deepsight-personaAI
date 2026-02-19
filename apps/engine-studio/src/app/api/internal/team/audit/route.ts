@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import type { ApiResponse } from "@/types"
 import type { AuditLogEntry, AuditAction, AuditTargetType, AuditSummary } from "@/lib/team"
 import { prisma } from "@/lib/prisma"
@@ -48,6 +49,9 @@ function toAuditLogEntry(row: {
 // ── GET ─────────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { searchParams } = new URL(request.url)
     const actor = searchParams.get("actor")
@@ -168,6 +172,9 @@ export async function GET(request: NextRequest) {
 // ── POST ────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = (await request.json()) as RecordEntryBody
 

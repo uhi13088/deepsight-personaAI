@@ -4,6 +4,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 import type { ApiResponse } from "@/types"
 import {
@@ -21,6 +22,9 @@ import type { IncubatorStatus } from "@/lib/incubator/batch-workflow"
 // ── GET: 인큐베이터 대시보드 (DB 기반) ────────────────────────
 
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const now = new Date()
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
@@ -202,6 +206,9 @@ interface IncubatorSettings {
 }
 
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = await request.json()
     const { action } = body as { action: string }

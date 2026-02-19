@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 import type { ApiResponse } from "@/types"
 import type { SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector } from "@/types"
@@ -141,6 +142,9 @@ interface PersonaListResponse {
 // ── GET — 시뮬레이션용 페르소나 목록 반환 ───────────────────────
 
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     let personas = await loadPersonasFromDB()
     let source: "db" | "demo" = "db"
@@ -168,6 +172,9 @@ export async function GET() {
 // ── POST — 시뮬레이션 실행 ──────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = (await request.json()) as SimulateRequest
 

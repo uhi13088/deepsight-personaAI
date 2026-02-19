@@ -4,6 +4,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import { generateText, isLLMConfigured } from "@/lib/llm-client"
 import { L1_DIMENSIONS, L2_DIMENSIONS } from "@/constants/v3/dimensions"
 
@@ -18,6 +19,9 @@ interface SummarizeRequest {
 // ── POST /api/internal/user-insight/cold-start/summarize ──────
 
 export async function POST(request: Request) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     if (!isLLMConfigured()) {
       return NextResponse.json({

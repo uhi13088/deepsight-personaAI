@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import type { ApiResponse } from "@/types"
 import type { CoreTemperamentVector } from "@/types"
 import {
@@ -25,6 +26,9 @@ interface PsychometricConfigResponse {
 // ── GET: Return psychometric config (mappings + threshold) ──────
 
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     return NextResponse.json<ApiResponse<PsychometricConfigResponse>>({
       success: true,
@@ -68,6 +72,9 @@ interface LatentTraitsResponse {
 }
 
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = (await request.json()) as PsychometricPostRequest
 

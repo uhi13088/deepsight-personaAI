@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import type { ApiResponse } from "@/types"
 import {
   createDeployWorkflow,
@@ -40,6 +41,9 @@ interface DeployDataResponse {
 
 // GET — 배포 데이터 반환
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     // 가장 최근 워크플로우에 연결된 canary 찾기
     const latestWorkflow = store.workflows[store.workflows.length - 1] ?? null
@@ -90,6 +94,9 @@ type DeployAction =
 
 // POST — 배포 액션 처리
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = (await request.json()) as DeployAction
 

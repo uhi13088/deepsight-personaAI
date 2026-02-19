@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 
 /**
  * GET /api/settings - 사용자 설정 조회
  */
 export async function GET() {
-  // TODO: Replace with actual database query when auth is implemented
+  const { response } = await requireAuth()
+  if (response) return response
+
+  // TODO: Replace with actual database query
   const settingsData = {
     profile: {
       id: "pending-auth",

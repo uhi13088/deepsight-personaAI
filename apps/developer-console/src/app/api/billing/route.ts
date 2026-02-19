@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { requireAuth } from "@/lib/require-auth"
 
 // 플랜별 정보
 const PLAN_INFO: Record<
@@ -89,8 +90,11 @@ const PLAN_INFO: Record<
 // ============================================================================
 
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
-    // TODO: Get organization from session
+    // TODO: Scope to user's organization via session
     const organization = await prisma.organization.findFirst()
 
     const currentPlanKey = organization?.plan || "FREE"

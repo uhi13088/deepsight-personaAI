@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import type { ApiResponse } from "@/types"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@/generated/prisma"
@@ -256,6 +257,9 @@ function buildResponse(
 
 // GET — returns endpoint manager state from DB
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     await seedEndpointsIfEmpty()
 
@@ -285,6 +289,9 @@ type PostAction =
   | { action: "updateRateLimit"; endpointId: string; requestsPerMinute: number }
 
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = (await request.json()) as PostAction
 

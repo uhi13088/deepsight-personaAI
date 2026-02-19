@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 import { generatePersona } from "@/lib/persona-generation"
 import { generateCharacterWithLLM } from "@/lib/persona-generation/llm-character-generator"
@@ -53,6 +54,9 @@ function inferPersonaRole(
 // 전체 파이프라인: 벡터→Paradox→캐릭터→정성적→프롬프트→활동성→DB저장
 // ═══════════════════════════════════════════════════════════════
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body: GenerateRandomBody = await request.json().catch(() => ({}))
 

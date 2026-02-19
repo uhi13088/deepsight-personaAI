@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import type { ApiResponse } from "@/types"
 import { createModelConfig, recordSpend, getBudgetStatus } from "@/lib/global-config"
 import type { ModelConfig, RoutingRule, SupportedModel } from "@/lib/global-config"
@@ -50,6 +51,9 @@ function serialize(config: ModelConfig): ModelConfigResponse {
 
 // GET — returns model config with budget status
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const config = await loadModelConfig()
 
@@ -76,6 +80,9 @@ type PostAction =
   | { action: "recordSpend"; amountUsd: number }
 
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = (await request.json()) as PostAction
     const config = await loadModelConfig()

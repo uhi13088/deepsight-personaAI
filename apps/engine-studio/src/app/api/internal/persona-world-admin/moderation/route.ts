@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const reports = await prisma.personaWorldReport
       .findMany({
@@ -44,6 +48,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = await request.json()
     const { action, reportId } = body as { action: string; reportId?: string }

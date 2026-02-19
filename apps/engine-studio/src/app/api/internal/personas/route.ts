@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 import type {
   ApiResponse,
@@ -155,6 +156,9 @@ function layerVectorToRecord(
 // GET /api/internal/personas
 // ═══════════════════════════════════════════════════════════════
 export async function GET(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { searchParams } = request.nextUrl
 

@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 import type { ApiResponse } from "@/types"
 import {
@@ -63,6 +64,9 @@ async function saveConfig(config: SystemSafetyConfig): Promise<void> {
 // ── GET /api/internal/safety-config ─────────────────────────────
 
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const config = await loadConfig()
 
@@ -95,6 +99,9 @@ type PutAction =
     }
 
 export async function PUT(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = (await request.json()) as PutAction
     let config = await loadConfig()

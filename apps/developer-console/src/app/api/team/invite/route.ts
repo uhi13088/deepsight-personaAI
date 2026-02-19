@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import crypto from "crypto"
+import { requireAuth } from "@/lib/require-auth"
 
 const roleMapping: Record<string, "OWNER" | "ADMIN" | "DEVELOPER" | "VIEWER" | "BILLING"> = {
   owner: "OWNER",
@@ -13,6 +14,9 @@ const roleMapping: Record<string, "OWNER" | "ADMIN" | "DEVELOPER" | "VIEWER" | "
  * POST /api/team/invite - 팀원 초대 (DB + 이메일)
  */
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = await request.json()
     const { email, role } = body

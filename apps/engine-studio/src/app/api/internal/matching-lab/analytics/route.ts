@@ -4,6 +4,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 import type { ApiResponse } from "@/types"
 import {
@@ -182,6 +183,9 @@ const EMPTY_KPIS: MatchingKPIs = {
 // ── GET — 매칭 성과 대시보드 데이터 반환 ────────────────────────
 
 export async function GET(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { searchParams } = new URL(request.url)
     const timeRange = (searchParams.get("timeRange") ?? "7d") as TimeRange

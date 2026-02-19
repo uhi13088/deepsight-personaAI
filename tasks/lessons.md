@@ -32,3 +32,7 @@
 - [2026-02-19] 환경변수: 새 라이브러리/기능 추가 시 라이브러리 기본 컨벤션이 아닌 프로젝트 기존 환경변수명을 먼저 확인하고 통일할 것. 예: NextAuth v5 기본은 `AUTH_GOOGLE_ID`이지만, 프로젝트에서 이미 `GOOGLE_CLIENT_ID`를 쓰면 그걸 사용
 - [2026-02-19] 프로세스: 작업 전 다른 앱(engine-studio, developer-console)의 기존 설정/패턴을 반드시 확인하고, 동일 프로젝트 내 컨벤션을 통일할 것. Vercel 환경변수도 기존 것 확인 우선
 - [2026-02-19] SQL시드: 수동 SQL 시드 파일 작성 시 반드시 001_full_schema.sql(Prisma 마이그레이션)의 실제 컬럼명을 확인할 것. Prisma는 camelCase 컬럼명을 생성하므로 snake_case로 작성하면 불일치 발생. CREATE TABLE IF NOT EXISTS 대신 기존 테이블 전제로 INSERT만 작성
+- [2026-02-19] 보안: 새 API 라우트 생성 시 반드시 `requireAuth()` 가드를 추가할 것. 세션 없으면 401 반환. `auth()`만 호출하고 fallback으로 `findFirst()` 사용하는 것은 보호가 아님
+- [2026-02-19] 보안: 새 앱 생성 시 반드시 `middleware.ts`를 추가하여 보호 경로(dashboard, profile 등)에 대한 서버 측 인증 체크를 할 것. 클라이언트 측 `useSession` 체크만으로는 URL 직접 접근 차단 불가
+- [2026-02-19] 보안: `/api/health` 같은 공개 엔드포인트에서 환경변수 값, 내부 URL, VERCEL_ENV 등 인프라 정보를 절대 노출하지 않을 것. 설정 여부(configured/not set)만 반환
+- [2026-02-19] 프로세스: 보안/버그픽스 등 긴급 작업도 반드시 TASK.md에 티켓 등록 후 진행할 것

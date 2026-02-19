@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import type { Environment, ApiKeyStatus } from "@/generated/prisma"
+import { requireAuth } from "@/lib/require-auth"
 
 // ============================================================================
 // Helper Functions
@@ -23,10 +24,11 @@ function formatDate(date: Date): string {
 // ============================================================================
 
 export async function GET(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
-    // TODO: Get organization ID from session/auth
-    // const organizationId = await getOrganizationId(request)
-    // For now, aggregate all data
+    // TODO: Scope to user's organization via session
 
     const today = new Date()
     today.setHours(0, 0, 0, 0)
