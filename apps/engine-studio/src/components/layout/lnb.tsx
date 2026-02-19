@@ -18,10 +18,12 @@ import {
   PanelLeftOpen,
   Globe,
   Swords,
+  LogOut,
 } from "lucide-react"
 import { useTheme } from "next-themes"
+import { signOut } from "next-auth/react"
 import { cn } from "@/lib/utils"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 
 interface NavSection {
   label: string
@@ -152,6 +154,19 @@ export function LNB() {
       return next
     })
   }
+
+  const handleLogout = useCallback(async () => {
+    // 브라우저 캐시 초기화
+    if ("caches" in window) {
+      const cacheNames = await caches.keys()
+      await Promise.all(cacheNames.map((name) => caches.delete(name)))
+    }
+    // localStorage/sessionStorage 정리
+    localStorage.clear()
+    sessionStorage.clear()
+    // NextAuth signOut + 로그인 페이지로 이동
+    await signOut({ callbackUrl: "/login" })
+  }, [])
 
   const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
     const initial = new Set<string>()
@@ -322,20 +337,18 @@ export function LNB() {
           )}
         </button>
 
-        {!collapsed && (
-          <div className="flex items-center gap-2">
-            <div className="bg-muted h-7 w-7 shrink-0 rounded-full" />
-            <div className="flex-1 overflow-hidden">
-              <p className="text-sidebar-foreground truncate text-xs font-medium">Admin</p>
-              <p className="text-sidebar-muted truncate text-[10px]">DeepSight Internal</p>
-            </div>
-          </div>
-        )}
-        {collapsed && (
-          <div className="flex justify-center">
-            <div className="bg-muted h-7 w-7 rounded-full" title="Admin" />
-          </div>
-        )}
+        {/* 로그아웃 */}
+        <button
+          onClick={handleLogout}
+          className={cn(
+            "text-sidebar-muted flex w-full items-center rounded-md px-2 py-1.5 text-xs transition-colors hover:bg-red-500/10 hover:text-red-500",
+            collapsed ? "justify-center" : "gap-2"
+          )}
+          title="로그아웃"
+        >
+          <LogOut className="h-3.5 w-3.5 shrink-0" />
+          {!collapsed && <span>로그아웃</span>}
+        </button>
       </div>
     </aside>
   )
