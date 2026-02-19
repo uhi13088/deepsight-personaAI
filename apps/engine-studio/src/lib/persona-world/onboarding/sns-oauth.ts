@@ -119,7 +119,8 @@ function getClientCredentials(platform: SNSPlatform): {
   clientId: string
   clientSecret: string
 } {
-  const prefix = platform.toUpperCase()
+  // YouTube는 Google OAuth를 사용하므로 GOOGLE_ 환경변수 우선 사용
+  const prefix = platform === "YOUTUBE" ? "GOOGLE" : platform.toUpperCase()
   const clientId = process.env[`${prefix}_CLIENT_ID`] ?? ""
   const clientSecret = process.env[`${prefix}_CLIENT_SECRET`] ?? ""
   return { clientId, clientSecret }
