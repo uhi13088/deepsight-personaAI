@@ -31,6 +31,7 @@ export interface GenerationConfig {
   l3Override?: Partial<NarrativeDriveVector>
   existingPersonas?: ExistingPersonaVectors[]
   diversityWeight?: number
+  existingNames?: string[]
 }
 
 export interface GeneratedPersona {
@@ -85,7 +86,13 @@ export function generatePersona(config: GenerationConfig): GeneratedPersona {
   }
 
   // Stage 3: 캐릭터 생성
-  const character = generateCharacter(vectors.l1, vectors.l2, vectors.l3, archetype)
+  const character = generateCharacter(
+    vectors.l1,
+    vectors.l2,
+    vectors.l3,
+    archetype,
+    config.existingNames
+  )
 
   // Stage 4: 활동성/콘텐츠 설정 추론
   const activity = inferActivitySettings(vectors.l1, vectors.l2, vectors.l3)
@@ -161,6 +168,7 @@ export {
 } from "./vector-generator"
 export { designParadox, analyzeParadoxPatterns } from "./paradox-designer"
 export { generateCharacter } from "./character-generator"
+export { generateCharacterWithLLM } from "./llm-character-generator"
 export { inferActivitySettings, inferContentSettings } from "./activity-inference"
 export { validateConsistency } from "./consistency-validator"
 export type { ExistingPersonaVectors } from "./vector-generator"

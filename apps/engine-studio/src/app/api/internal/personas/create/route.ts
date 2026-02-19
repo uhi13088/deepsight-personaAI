@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
-import { generateAllQualitativeDimensions } from "@/lib/qualitative"
+import {
+  generateAllQualitativeDimensions,
+  generateAllQualitativeDimensionsWithLLM,
+} from "@/lib/qualitative"
 import type {
   ApiResponse,
   SocialPersonaVector,
@@ -72,11 +75,16 @@ export async function POST(request: NextRequest) {
     const crossAxisProfile = calculateCrossAxisProfile(l1, l2, l3)
     const paradoxProfile = calculateExtendedParadoxScore(l1, l2, l3, crossAxisProfile)
 
-    // ── 정성적 4차원 자동 생성 (Voice 콜드스타트 해결) ──────
+    // ── 정성적 4차원 자동 생성 (LLM 우선, 실패 시 패턴매칭 fallback) ──
     const archetype = body.archetypeId
       ? ARCHETYPES.find((a) => a.id === body.archetypeId)
       : undefined
-    const qualitative = generateAllQualitativeDimensions(l1, l2, l3, archetype)
+    let qualitative
+    try {
+      qualitative = await generateAllQualitativeDimensionsWithLLM(l1, l2, l3, archetype)
+    } catch {
+      qualitative = generateAllQualitativeDimensions(l1, l2, l3, archetype)
+    }
 
     // ── Create Persona + LayerVectors in transaction ─────────
     const persona = await prisma.$transaction(async (tx) => {

@@ -28,9 +28,11 @@ import {
 import { HeroOrbital } from "@/components/home/hero-orbital"
 
 const PERSONA_WORLD_URL =
-  process.env.NEXT_PUBLIC_PERSONA_WORLD_URL || "https://persona-world.vercel.app"
+  process.env.NEXT_PUBLIC_PERSONA_WORLD_URL ||
+  "https://deepsight-persona-ai-persona-world.vercel.app"
 const DEVELOPER_CONSOLE_URL =
-  process.env.NEXT_PUBLIC_DEVELOPER_CONSOLE_URL || "https://developer-console.vercel.app"
+  process.env.NEXT_PUBLIC_DEVELOPER_CONSOLE_URL ||
+  "https://deepsight-persona-ai-developer-cons.vercel.app"
 
 // v3 3-Layer 대표 차원 (HeroOrbital용: inner 3 + middle 3)
 const HERO_DIMENSIONS = [
@@ -118,8 +120,6 @@ const LAYERS = [
   },
 ]
 
-const ENGINE_STUDIO_URL = process.env.NEXT_PUBLIC_ENGINE_STUDIO_URL || "http://localhost:3000"
-
 const METRICS = [
   { label: "페르소나 엔진", value: "3-Layer", icon: MousePointer },
   { label: "활동 페르소나", value: "—", icon: Users, dynamic: true },
@@ -152,7 +152,7 @@ export default function HomePage() {
   const [personaCount, setPersonaCount] = useState<number | null>(null)
 
   useEffect(() => {
-    fetch(`${ENGINE_STUDIO_URL}/api/public/personas?limit=1`)
+    fetch("/api/public/personas?limit=1")
       .then((res) => res.json())
       .then((json: { success: boolean; data: { total: number } }) => {
         if (json.success) setPersonaCount(json.data.total)

@@ -2,9 +2,11 @@ import Link from "next/link"
 import { Layers } from "lucide-react"
 
 const PERSONA_WORLD_URL =
-  process.env.NEXT_PUBLIC_PERSONA_WORLD_URL || "https://persona-world.vercel.app"
+  process.env.NEXT_PUBLIC_PERSONA_WORLD_URL ||
+  "https://deepsight-persona-ai-persona-world.vercel.app"
 const DEVELOPER_CONSOLE_URL =
-  process.env.NEXT_PUBLIC_DEVELOPER_CONSOLE_URL || "https://developer-console.vercel.app"
+  process.env.NEXT_PUBLIC_DEVELOPER_CONSOLE_URL ||
+  "https://deepsight-persona-ai-developer-cons.vercel.app"
 const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "contact@deepsight.ai"
 
 export function Footer() {

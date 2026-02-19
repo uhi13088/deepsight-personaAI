@@ -332,7 +332,7 @@ describe("Explanation — getTopTraits", () => {
     expect(traits).toHaveLength(3)
     // purpose(0.9)이 가장 극단적 → 첫 번째
     expect(traits[0].dimension).toBe("purpose")
-    expect(traits[0].level).toBe("high")
+    expect(traits[0].level).toBe("very_high")
   })
 
   it("0.4~0.6 범위는 neutral로 분류한다", () => {
@@ -367,8 +367,8 @@ describe("Explanation — getTopTraits", () => {
     const traits = getTopTraits(vector, 2)
     const depthTrait = traits.find((t) => t.dimension === "depth")
     const lensTrait = traits.find((t) => t.dimension === "lens")
-    expect(depthTrait?.level).toBe("high")
-    expect(lensTrait?.level).toBe("low")
+    expect(depthTrait?.level).toBe("very_high")
+    expect(lensTrait?.level).toBe("very_low")
   })
 })
 

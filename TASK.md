@@ -914,15 +914,71 @@
   - AC5: Social Module Connectivity 시각화 — Hub/Isolate 표시, 관계 그래프 요약
   - AC6: 단위 테스트 + Build PASS
 
+### Phase QI: 페르소나 품질 개선 (T150~T154)
+
+> 하드코딩 패턴 품질 향상: 로직 개선(T150~T152) + LLM 업그레이드(T153~T154)
+
+- [x] **T150: 5단계 벡터 묘사 시스템 확장**
+  - 배경: 현재 3단계(high/mid/low) 묘사가 벡터 0.9와 0.7을 동일하게 "심층적"으로 표현. 5단계로 세분화하면 LLM 프롬프트 정교화 + 매칭 XAI 표현력 향상
+  - AC1: `prompt-builder.ts` — describeLevel() 3단계→5단계 (veryLow/low/mid/high/veryHigh). L1 7D + L2 5D + L3 4D = 16D × 5 = 80개 묘사 문장
+  - AC2: `matching/explanation.ts` — TraitLevel 3단계→5단계, DIM_LABELS에 veryHigh/veryLow 추가, TRAIT_EXPRESSIONS 14개→28개, PERSONA_MATCH_EXPRESSIONS 14개→28개
+  - AC3: getTopTraits() 임계값 조정 (≥0.8→very_high, ≥0.6→high, ≤0.2→very_low, ≤0.4→low)
+  - AC4: 기존 테스트 호환성 유지 + 추가 테스트 + Build PASS
+
+- [x] **T151: 아키타입 22종 전체 매핑 + 이름 중복 방지**
+  - 배경: roleMap/archetypeStyleMap이 구버전 12종만 매핑. 이름 생성 시 기존 페르소나와 중복 가능
+  - AC1: ✅ `character-generator.ts` — roleMap 22종 전체 매핑 (완료)
+  - AC2: ✅ `voice-generator.ts` — archetypeStyleMap 22종 전체 매핑 (완료)
+  - AC3: `character-generator.ts` — generateCharacter()에 existingNames 파라미터 추가, generateName()에서 중복 시 재선택 (최대 10회 시도)
+  - AC4: 호출부 (generate-random/route.ts, create/route.ts) 수정 — 기존 페르소나 이름 목록 전달
+  - AC5: 테스트 + Build PASS
+
+- [x] **T152: Express 알고리즘 교차축 퀴크 + Voice sigmoid 개선**
+  - 배경: calculateDerivedStates가 L1만 사용 (L2/L3 미반영). Voice activationThresholds가 단순 선형 공식. 6개 고정 퀴크로 다양성 부족
+  - AC1: `express-algorithm.ts` — calculateDerivedStates()에 L2(OCEAN)/L3(NarrativeDrive) 벡터 반영. 교차축 역설 기반 파생 상태 계산
+  - AC2: `express-algorithm.ts` — L1↔L2 역설 패턴 4종 기반 동적 퀴크 자동 생성 (기존 6개 + 벡터 기반 추가). 예: sociability↔extraversion 역설 시 "대화를 주도하다가 갑자기 침묵" 퀴크 자동 추가
+  - AC3: `voice-generator.ts` — calculateThresholds()에 sigmoid 적용 (현재 선형 0.3+x\*0.4 → sigmoid 기반 비선형 감도 곡선)
+  - AC4: 테스트 + Build PASS
+
+- [x] **T153: 캐릭터 생성기 LLM 업그레이드**
+  - 배경: character-generator.ts에 ~150개 하드코딩 패턴 (이름 64개, 전문분야 24개, 말버릇 29개, 습관 18개 등). T149 패턴(LLM-first + fallback) 적용
+  - AC1: `llm-character-generator.ts` (신규) — 벡터+아키타입+정성적 프로필 기반 캐릭터 LLM 생성. 프롬프트 캐싱 적용
+  - AC2: 이름/역할/전문분야/설명/배경/말버릇/퀴크/습관/관계를 벡터 역설에 맞게 일관된 캐릭터로 생성
+  - AC3: generate-random/route.ts, create/route.ts에 LLM-first + 기존 패턴매칭 fallback 적용
+  - AC4: 예상 비용: ~$0.01/페르소나 (1회성 생성 비용)
+  - AC5: 테스트 + Build PASS
+
+- [x] **T154: Express 퀴크 LLM 동적 생성**
+  - 배경: 6개 고정 퀴크의 표현이 모든 페르소나에 동일. 페르소나별 고유 퀴크를 LLM으로 생성하면 캐릭터 일관성 대폭 향상
+  - AC1: `llm-express-quirks.ts` (신규) — 벡터+아키타입+VoiceProfile 기반 페르소나 전용 퀴크 5~8개 LLM 생성
+  - AC2: QuirkDefinition 스키마 준수 (condition/baseProbability/cooldownTurns/expression)
+  - AC3: 생성된 퀴크를 PersonaLayerVector 또는 별도 필드에 저장. 런타임에서 DEFAULT_QUIRKS 대신 사용
+  - AC4: 예상 비용: ~$0.005/페르소나 (1회성)
+  - AC5: 테스트 + Build PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
 
-(비어 있음)
+(없음)
 
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T154: Express 퀴크 LLM 동적 생성** ✅ 2026-02-18
+  - 변경: llm-express-quirks.ts(신규, 벡터+역설+아키타입 기반 퀴크 5~8개 LLM 생성), generate-random/route.ts(Stage 3.5 퀴크 생성+generationConfig DB 저장), interaction/index.ts(re-export), llm-express-quirks.test.ts(신규 32개)
+- [x] **T153: 캐릭터 생성기 LLM 업그레이드** ✅ 2026-02-18
+  - 변경: llm-character-generator.ts(신규, 벡터+역설+아키타입 기반 캐릭터 LLM 생성), generate-random/route.ts(Stage 2.5 LLM 캐릭터+fallback), persona-generation/index.ts(re-export), llm-character.test.ts(신규 20개)
+- [x] **T152: Express 알고리즘 교차축 퀴크 + Voice sigmoid 개선** ✅ 2026-02-18
+  - 변경: express-algorithm.ts(calculateDerivedStates L2/L3 통합, generateParadoxQuirks 4종), voice-generator.ts(sigmoid 기반 calculateThresholds), interaction/index.ts(re-export)
+- [x] **T151: 아키타입 22종 전체 매핑 + 이름 중복 방지** ✅ 2026-02-18
+  - 변경: character-generator.ts(roleMap 22종, generateName 중복방지), voice-generator.ts(archetypeStyleMap 22종), persona-generation/index.ts, generate-random/route.ts
+- [x] **T150: 5단계 벡터 묘사 시스템 확장** ✅ 2026-02-18
+  - 변경: prompt-builder.ts(describeLevel 5단계, L1/L2/L3 전체), matching/explanation.ts(TraitLevel 5단계, DIM_LABELS, expressions 28종)
+- [x] **T149: 정성적 차원(Qualitative) LLM 기반 생성기 업그레이드** ✅ 2026-02-18
+  - 변경: llm-qualitative.ts(신규), qualitative/index.ts, generate-random/route.ts, create/route.ts, llm-qualitative.test.ts(신규)
+  - 테스트: PASS (79파일/3182개)
 
 - [x] **T146: 아레나 교정 플로우 + 관리자 UI** ✅ 2026-02-16
   - 변경: sessions/[id]/corrections/route.ts, arena/page.tsx

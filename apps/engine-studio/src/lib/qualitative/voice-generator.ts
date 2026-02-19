@@ -132,19 +132,44 @@ const UNCONSCIOUS_BEHAVIORS: Record<string, string[]> = {
   ],
 }
 
-// ── Activation Thresholds ─────────────────────────────────────
+// ── Sigmoid 함수 ────────────────────────────────────────────
+
+function sigmoid(x: number, midpoint: number = 0.5, steepness: number = 8): number {
+  return 1 / (1 + Math.exp(-steepness * (x - midpoint)))
+}
+
+// ── Activation Thresholds (sigmoid 기반 비선형 감도 곡선) ─────
 
 function calculateThresholds(
   l2: CoreTemperamentVector,
   l3: NarrativeDriveVector
 ): Record<string, number> {
+  // sigmoid를 통해 극단값에서 더 민감하게, 중간값에서는 완만하게 반응
   return {
-    anger: Math.round((0.3 + l2.neuroticism * 0.4 + l3.volatility * 0.3) * 100) / 100,
-    joy: Math.round((0.4 + l2.extraversion * 0.3 + (1 - l2.neuroticism) * 0.3) * 100) / 100,
-    sadness: Math.round((0.3 + l2.neuroticism * 0.3 + l3.lack * 0.4) * 100) / 100,
-    surprise: Math.round((0.4 + l2.openness * 0.3 + l3.volatility * 0.3) * 100) / 100,
-    disgust: Math.round((0.5 + l3.moralCompass * 0.3 + (1 - l2.agreeableness) * 0.2) * 100) / 100,
+    anger: round(
+      sigmoid(l2.neuroticism * 0.5 + l3.volatility * 0.3 + (1 - l2.agreeableness) * 0.2, 0.45, 8)
+    ),
+    joy: round(
+      sigmoid(l2.extraversion * 0.4 + (1 - l2.neuroticism) * 0.3 + l2.agreeableness * 0.3, 0.5, 8)
+    ),
+    sadness: round(
+      sigmoid(l2.neuroticism * 0.35 + l3.lack * 0.4 + (1 - l2.extraversion) * 0.25, 0.45, 8)
+    ),
+    surprise: round(
+      sigmoid(l2.openness * 0.4 + l3.volatility * 0.35 + (1 - l2.conscientiousness) * 0.25, 0.5, 8)
+    ),
+    disgust: round(
+      sigmoid(
+        l3.moralCompass * 0.4 + (1 - l2.agreeableness) * 0.3 + l2.conscientiousness * 0.3,
+        0.55,
+        8
+      )
+    ),
   }
+}
+
+function round(v: number): number {
+  return Math.round(v * 100) / 100
 }
 
 // ── 메인 생성 함수 ────────────────────────────────────────────
@@ -182,17 +207,27 @@ function determineSpeechStyle(
   if (archetype) {
     const archetypeStyleMap: Record<string, string> = {
       "ironic-philosopher": "ironic_witty",
-      "wounded-critic": "sharp_critical",
-      "social-introvert": "warm_supportive",
-      "lazy-perfectionist": "casual_emotional",
-      "conservative-hipster": "casual_emotional",
-      "empathetic-arguer": "formal_analytical",
-      "free-guardian": "warm_supportive",
-      "quiet-enthusiast": "quiet_reserved",
-      "emotional-pragmatist": "casual_emotional",
-      "dangerous-mentor": "sharp_critical",
       "volatile-intellectual": "formal_analytical",
-      "growing-cynic": "ironic_witty",
+      "cheerful-nihilist": "ironic_witty",
+      "obsessive-curator": "formal_analytical",
+      "rebellious-romantic": "casual_emotional",
+      "analytical-dreamer": "quiet_reserved",
+      "gentle-provocateur": "warm_supportive",
+      "nostalgic-explorer": "casual_emotional",
+      "systematic-rebel": "sharp_critical",
+      "reluctant-leader": "quiet_reserved",
+      "playful-scholar": "warm_supportive",
+      "passionate-minimalist": "formal_analytical",
+      "chaotic-healer": "casual_emotional",
+      "silent-observer": "quiet_reserved",
+      "reckless-idealist": "casual_emotional",
+      "methodical-adventurer": "formal_analytical",
+      "sarcastic-optimist": "ironic_witty",
+      "timid-visionary": "quiet_reserved",
+      "hedonistic-philosopher": "ironic_witty",
+      "protective-rebel": "sharp_critical",
+      "restless-perfectionist": "formal_analytical",
+      "whimsical-analyst": "ironic_witty",
     }
     const styleKey = archetypeStyleMap[archetype.id]
     if (styleKey && SPEECH_STYLES[styleKey]) {

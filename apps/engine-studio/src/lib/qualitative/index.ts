@@ -44,9 +44,19 @@ export function generateAllQualitativeDimensions(
   }
 }
 
-// ── Re-exports ────────────────────────────────────────────────
+// ── Re-exports (기존 패턴 매칭) ────────────────────────────────
 
 export { generateBackstory } from "./backstory-generator"
 export { generateVoiceProfile } from "./voice-generator"
 export { generatePressureContext } from "./pressure-generator"
 export { generateZeitgeistProfile } from "./zeitgeist-generator"
+
+// ── Re-exports (LLM 기반 — T149) ─────────────────────────────
+
+export {
+  generateAllQualitativeDimensionsWithLLM,
+  generateBackstoryWithLLM,
+  generateVoiceProfileWithLLM,
+  generatePressureContextWithLLM,
+  generateZeitgeistProfileWithLLM,
+} from "./llm-qualitative"

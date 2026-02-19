@@ -36,42 +36,80 @@ export interface PromptPreset {
 
 // ── Level 묘사 유틸 ──────────────────────────────────────────
 
-function describeLevel(value: number, low: string, mid: string, high: string): string {
-  if (value < 0.35) return low
-  if (value < 0.65) return mid
-  return high
+function describeLevel(
+  value: number,
+  veryLow: string,
+  low: string,
+  mid: string,
+  high: string,
+  veryHigh: string
+): string {
+  if (value < 0.2) return veryLow
+  if (value < 0.4) return low
+  if (value < 0.6) return mid
+  if (value < 0.8) return high
+  return veryHigh
 }
 
 // ── L1 묘사 생성 ─────────────────────────────────────────────
 
 function buildL1Descriptions(l1: SocialPersonaVector) {
   return {
-    depth: describeLevel(l1.depth, "직관적이고 가벼운", "적절한 깊이의", "심층적이고 분석적인"),
-    lens: describeLevel(l1.lens, "감성적인", "감성과 논리를 균형 잡힌", "논리적이고 체계적인"),
-    stance: describeLevel(l1.stance, "수용적이고 따뜻한", "균형 잡힌", "비판적이고 날카로운"),
+    depth: describeLevel(
+      l1.depth,
+      "매우 직관적이고 즉흥적인",
+      "직관적이고 가벼운",
+      "적절한 깊이의",
+      "심층적이고 분석적인",
+      "극도로 깊이 있고 학술적인"
+    ),
+    lens: describeLevel(
+      l1.lens,
+      "순수하게 감성적인",
+      "감성적인",
+      "감성과 논리를 균형 잡힌",
+      "논리적이고 체계적인",
+      "극도로 논리적이고 데이터 중심의"
+    ),
+    stance: describeLevel(
+      l1.stance,
+      "매우 수용적이고 포용적인",
+      "수용적이고 따뜻한",
+      "균형 잡힌",
+      "비판적이고 날카로운",
+      "극도로 비판적이고 도전적인"
+    ),
     scope: describeLevel(
       l1.scope,
+      "극히 핵심만 추리는",
       "핵심만 간결하게 전달하는",
       "적절한 범위의",
-      "세밀하고 디테일한"
+      "세밀하고 디테일한",
+      "극도로 포괄적이고 세밀한"
     ),
     taste: describeLevel(
       l1.taste,
+      "매우 보수적이고 대중적인",
       "클래식하고 검증된 것을 선호하는",
       "다양한 취향의",
-      "실험적이고 새로운 것을 추구하는"
+      "실험적이고 새로운 것을 추구하는",
+      "극도로 전위적이고 언더그라운드 지향의"
     ),
     purpose: describeLevel(
       l1.purpose,
+      "순수하게 기분 전환과 오락만 추구하는",
       "순수한 오락과 즐거움을 추구하는",
       "오락과 의미 사이를 오가는",
-      "깊은 의미와 가치를 추구하는"
+      "깊은 의미와 가치를 추구하는",
+      "존재론적 의미와 예술적 가치에 몰두하는"
     ),
     sociability: describeLevel(
       l1.sociability,
+      "극도로 독립적이고 은둔적인",
       "독립적이고 내향적인",
       "적절히 사교적인",
-      "사교적이고 외향적인"
+      "사교적이고 외향적인",
+      "극도로 사교적이고 소통 중심적인"
     ),
   }
 }
@@ -105,11 +143,11 @@ function buildL1Section(l1: SocialPersonaVector): string[] {
 function buildL2Section(l2: CoreTemperamentVector): string[] {
   return [
     `[내면 기질 — L2 OCEAN]`,
-    `- 개방성: ${l2.openness.toFixed(2)} (${describeLevel(l2.openness, "보수적", "보통", "개방적")})`,
-    `- 성실성: ${l2.conscientiousness.toFixed(2)} (${describeLevel(l2.conscientiousness, "즉흥적", "보통", "원칙적")})`,
-    `- 외향성: ${l2.extraversion.toFixed(2)} (${describeLevel(l2.extraversion, "내향적", "보통", "외향적")})`,
-    `- 친화성: ${l2.agreeableness.toFixed(2)} (${describeLevel(l2.agreeableness, "경쟁적", "보통", "협조적")})`,
-    `- 신경성: ${l2.neuroticism.toFixed(2)} (${describeLevel(l2.neuroticism, "안정적", "보통", "예민한")})`,
+    `- 개방성: ${l2.openness.toFixed(2)} (${describeLevel(l2.openness, "매우 보수적", "보수적", "보통", "개방적", "극도로 개방적")})`,
+    `- 성실성: ${l2.conscientiousness.toFixed(2)} (${describeLevel(l2.conscientiousness, "매우 즉흥적", "즉흥적", "보통", "원칙적", "극도로 원칙적")})`,
+    `- 외향성: ${l2.extraversion.toFixed(2)} (${describeLevel(l2.extraversion, "매우 내향적", "내향적", "보통", "외향적", "극도로 외향적")})`,
+    `- 친화성: ${l2.agreeableness.toFixed(2)} (${describeLevel(l2.agreeableness, "매우 경쟁적", "경쟁적", "보통", "협조적", "극도로 협조적")})`,
+    `- 신경성: ${l2.neuroticism.toFixed(2)} (${describeLevel(l2.neuroticism, "매우 안정적", "안정적", "보통", "예민한", "극도로 예민한")})`,
     ``,
   ]
 }
@@ -117,10 +155,10 @@ function buildL2Section(l2: CoreTemperamentVector): string[] {
 function buildL3Section(l3: NarrativeDriveVector): string[] {
   return [
     `[서사적 동기 — L3 Narrative Drive]`,
-    `- 결핍(${l3.lack.toFixed(2)}): ${describeLevel(l3.lack, "충족감을 느끼는", "약간의 갈망이 있는", "강한 결핍감을 가진")} 상태입니다.`,
-    `- 도덕 나침반(${l3.moralCompass.toFixed(2)}): ${describeLevel(l3.moralCompass, "유연한 도덕관", "균형 잡힌 도덕관", "엄격한 도덕관")}을 가졌습니다.`,
-    `- 변동성(${l3.volatility.toFixed(2)}): ${describeLevel(l3.volatility, "안정적이고 예측 가능한", "때때로 변동하는", "폭발적이고 예측 불가능한")} 성격입니다.`,
-    `- 성장 아크(${l3.growthArc.toFixed(2)}): ${describeLevel(l3.growthArc, "현재 상태에 안주하는", "서서히 변화하는", "적극적으로 성장하는")} 캐릭터입니다.`,
+    `- 결핍(${l3.lack.toFixed(2)}): ${describeLevel(l3.lack, "충분한 만족감을 가진", "충족감을 느끼는", "약간의 갈망이 있는", "강한 결핍감을 가진", "극도로 깊은 결핍에 시달리는")} 상태입니다.`,
+    `- 도덕 나침반(${l3.moralCompass.toFixed(2)}): ${describeLevel(l3.moralCompass, "매우 유연한 도덕관", "유연한 도덕관", "균형 잡힌 도덕관", "엄격한 도덕관", "극도로 엄격한 도덕관")}을 가졌습니다.`,
+    `- 변동성(${l3.volatility.toFixed(2)}): ${describeLevel(l3.volatility, "매우 안정적이고 일관된", "안정적이고 예측 가능한", "때때로 변동하는", "폭발적이고 예측 불가능한", "극도로 변덕스럽고 폭발적인")} 성격입니다.`,
+    `- 성장 아크(${l3.growthArc.toFixed(2)}): ${describeLevel(l3.growthArc, "변화를 강하게 거부하는", "현재 상태에 안주하는", "서서히 변화하는", "적극적으로 성장하는", "끊임없이 자기 변혁을 추구하는")} 캐릭터입니다.`,
     ``,
   ]
 }
@@ -173,19 +211,23 @@ export function buildReviewPrompt(input: PromptBuildInput): string {
   const expertiseText = expertise.length > 0 ? expertise.join(", ") : "전반적인 콘텐츠"
   const desc = buildL1Descriptions(l1)
 
-  const lengthGuide =
-    l1.scope < 0.35
-      ? "200~400자 내외의 간결한"
-      : l1.scope < 0.65
-        ? "400~800자의 적절한"
-        : "800자 이상의 상세한"
+  const lengthGuide = describeLevel(
+    l1.scope,
+    "100~200자의 극히 간결한",
+    "200~400자 내외의 간결한",
+    "400~800자의 적절한",
+    "800자 이상의 상세한",
+    "1000자 이상의 매우 상세하고 포괄적인"
+  )
 
-  const toneGuide =
-    l1.stance < 0.35
-      ? "긍정적 요소를 부각하고 격려하는 톤"
-      : l1.stance < 0.65
-        ? "장점과 단점을 균형 있게 다루는 톤"
-        : "날카로운 분석과 솔직한 비판을 아끼지 않는 톤"
+  const toneGuide = describeLevel(
+    l1.stance,
+    "매우 긍정적이고 격려 중심의 톤",
+    "긍정적 요소를 부각하고 격려하는 톤",
+    "장점과 단점을 균형 있게 다루는 톤",
+    "날카로운 분석과 솔직한 비판을 아끼지 않는 톤",
+    "극도로 날카롭고 타협 없는 비판 톤"
+  )
 
   const lines: string[] = [
     ...buildRoleSection(name, role, expertiseText),
@@ -220,12 +262,14 @@ export function buildPostPrompt(input: PromptBuildInput): string {
   const expertiseText = expertise.length > 0 ? expertise.join(", ") : "전반적인 콘텐츠"
   const desc = buildL1Descriptions(l1)
 
-  const styleGuide =
-    l1.sociability < 0.35
-      ? "독백적이고 내면 중심의 글쓰기"
-      : l1.sociability < 0.65
-        ? "균형 잡힌 개인 의견 공유"
-        : "대화체의 친근하고 사교적인 글쓰기"
+  const styleGuide = describeLevel(
+    l1.sociability,
+    "완전한 내면 독백 스타일의 글쓰기",
+    "독백적이고 내면 중심의 글쓰기",
+    "균형 잡힌 개인 의견 공유",
+    "대화체의 친근하고 사교적인 글쓰기",
+    "청중과 적극 소통하는 참여형 글쓰기"
+  )
 
   const lines: string[] = [
     ...buildRoleSection(name, role, expertiseText),
@@ -252,15 +296,23 @@ export function buildCommentPrompt(input: PromptBuildInput): string {
   const { name, role, expertise, l1, l2, l3 } = input
   const expertiseText = expertise.length > 0 ? expertise.join(", ") : "전반적인 콘텐츠"
 
-  const commentStyle =
-    l1.stance < 0.35
-      ? "공감하고 응원하는"
-      : l1.stance < 0.65
-        ? "건설적인 의견을 제시하는"
-        : "날카롭지만 근거 있는 비평을 하는"
+  const commentStyle = describeLevel(
+    l1.stance,
+    "무조건 공감하고 응원하는",
+    "공감하고 응원하는",
+    "건설적인 의견을 제시하는",
+    "날카롭지만 근거 있는 비평을 하는",
+    "거침없이 직설적인 비평을 하는"
+  )
 
-  const lengthGuide =
-    l1.scope < 0.35 ? "1~2줄의 간결한" : l1.scope < 0.65 ? "3~5줄의 적절한" : "상세한 분석이 담긴"
+  const lengthGuide = describeLevel(
+    l1.scope,
+    "한 줄의 극히 간결한",
+    "1~2줄의 간결한",
+    "3~5줄의 적절한",
+    "상세한 분석이 담긴",
+    "심층 분석과 근거가 풍부한"
+  )
 
   const lines: string[] = [
     ...buildRoleSection(name, role, expertiseText),
@@ -288,19 +340,23 @@ export function buildInteractionPrompt(input: PromptBuildInput): string {
   const expertiseText = expertise.length > 0 ? expertise.join(", ") : "전반적인 콘텐츠"
   const desc = buildL1Descriptions(l1)
 
-  const interactionStyle =
-    l2.extraversion < 0.35
-      ? "신중하고 경청 위주의 대화"
-      : l2.extraversion < 0.65
-        ? "적절히 반응하며 소통하는 대화"
-        : "적극적이고 주도적인 대화"
+  const interactionStyle = describeLevel(
+    l2.extraversion,
+    "극도로 과묵하고 관찰 위주의 대화",
+    "신중하고 경청 위주의 대화",
+    "적절히 반응하며 소통하는 대화",
+    "적극적이고 주도적인 대화",
+    "극도로 에너지 넘치고 대화를 이끄는 소통"
+  )
 
-  const emotionalStyle =
-    l2.agreeableness < 0.35
-      ? "직설적이고 도전적인"
-      : l2.agreeableness < 0.65
-        ? "균형 잡힌"
-        : "따뜻하고 공감적인"
+  const emotionalStyle = describeLevel(
+    l2.agreeableness,
+    "매우 직설적이고 대립을 두려워하지 않는",
+    "직설적이고 도전적인",
+    "균형 잡힌",
+    "따뜻하고 공감적인",
+    "극도로 따뜻하고 포용적인"
+  )
 
   const lines: string[] = [
     ...buildRoleSection(name, role, expertiseText),

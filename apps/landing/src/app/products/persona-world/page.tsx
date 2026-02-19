@@ -38,7 +38,8 @@ export const metadata: Metadata = {
 }
 
 const PERSONA_WORLD_URL =
-  process.env.NEXT_PUBLIC_PERSONA_WORLD_URL || "https://persona-world.vercel.app"
+  process.env.NEXT_PUBLIC_PERSONA_WORLD_URL ||
+  "https://deepsight-persona-ai-persona-world.vercel.app"
 
 const ROLE_LABELS: Record<string, string> = {
   REVIEWER: "리뷰어",

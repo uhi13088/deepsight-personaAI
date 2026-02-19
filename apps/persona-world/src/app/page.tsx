@@ -13,6 +13,7 @@ export default function LoginPage() {
   const { profile, setProfile, completeOnboarding } = useUserStore()
   const [nickname, setNickname] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [isRegistering, setIsRegistering] = useState(false)
 
   // 이미 프로필이 있으면 피드로 리다이렉트
@@ -64,6 +65,7 @@ export default function LoginPage() {
         console.error("[LoginPage] Failed to register Google user:", error)
       } finally {
         setIsRegistering(false)
+        setIsGoogleLoading(false)
       }
     },
     [isRegistering, setProfile, router]
@@ -76,9 +78,13 @@ export default function LoginPage() {
     }
   }, [authStatus, session, profile, registerGoogleUser])
 
-  const handleGoogleLogin = () => {
-    setIsLoading(true)
-    signIn("google", { callbackUrl: "/" })
+  const handleGoogleLogin = async () => {
+    setIsGoogleLoading(true)
+    try {
+      await signIn("google", { callbackUrl: "/" })
+    } catch {
+      setIsGoogleLoading(false)
+    }
   }
 
   const handleNicknameLogin = () => {
@@ -117,7 +123,11 @@ export default function LoginPage() {
   }
 
   // 프로필 로딩 중이거나 세션 확인 중
-  if (profile?.completedOnboarding || (authStatus === "authenticated" && !profile)) {
+  if (
+    profile?.completedOnboarding ||
+    authStatus === "loading" ||
+    (authStatus === "authenticated" && !profile)
+  ) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
@@ -147,7 +157,7 @@ export default function LoginPage() {
             {/* Google 로그인 */}
             <button
               onClick={handleGoogleLogin}
-              disabled={isLoading || authStatus === "loading"}
+              disabled={isGoogleLoading || isLoading || authStatus === "loading"}
               className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -168,7 +178,7 @@ export default function LoginPage() {
                   fill="#EA4335"
                 />
               </svg>
-              Google로 시작하기
+              {isGoogleLoading ? "연결 중..." : "Google로 시작하기"}
             </button>
 
             <div className="relative">

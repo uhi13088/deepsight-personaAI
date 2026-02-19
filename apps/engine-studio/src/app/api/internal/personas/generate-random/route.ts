@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { generatePersona } from "@/lib/persona-generation"
+import { generateCharacterWithLLM } from "@/lib/persona-generation/llm-character-generator"
 import { buildAllPrompts } from "@/lib/prompt-builder"
-import { generateAllQualitativeDimensions } from "@/lib/qualitative"
+import {
+  generateAllQualitativeDimensions,
+  generateAllQualitativeDimensionsWithLLM,
+} from "@/lib/qualitative"
+import { generateExpressQuirksWithLLM } from "@/lib/interaction/llm-express-quirks"
 import { computeActivityTraits, computeActiveHours } from "@/lib/persona-world/activity-mapper"
 import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
 import type { ApiResponse } from "@/types"
+import type { QuirkDefinition } from "@/lib/interaction/express-algorithm"
 import { Prisma, type PersonaRole, type PersonaStatus } from "@/generated/prisma"
 
 interface GenerateRandomBody {
@@ -91,23 +97,53 @@ export async function POST(request: NextRequest) {
       .filter((v): v is NonNullable<typeof v> => v !== null)
 
     // ── Stage 2: 페르소나 생성 파이프라인 ─────────────────────
+    const existingNames = existingPersonas.map((p) => p.name)
+
     const generated = generatePersona({
       archetypeId: body.archetypeId,
       existingPersonas: existingVectors,
       diversityWeight: 0.5,
+      existingNames,
     })
 
     const { l1, l2, l3 } = generated.vectors
 
-    // ── Stage 3: 정성적 4차원 생성 ─────────────────────────────
-    const qualitative = generateAllQualitativeDimensions(l1, l2, l3, generated.archetype)
+    // ── Stage 2.5: 캐릭터 LLM 생성 (LLM 우선, 실패 시 패턴매칭 fallback) ──
+    let character = generated.character
+    try {
+      character = await generateCharacterWithLLM(l1, l2, l3, generated.archetype, existingNames)
+    } catch {
+      // LLM 실패 시 기존 패턴매칭 결과 사용
+    }
+
+    // ── Stage 3: 정성적 4차원 생성 (LLM 우선, 실패 시 패턴매칭 fallback) ──
+    let qualitative
+    try {
+      qualitative = await generateAllQualitativeDimensionsWithLLM(l1, l2, l3, generated.archetype)
+    } catch {
+      qualitative = generateAllQualitativeDimensions(l1, l2, l3, generated.archetype)
+    }
+
+    // ── Stage 3.5: Express 퀴크 LLM 생성 (LLM 우선, 실패 시 런타임 기본값 사용) ──
+    let expressQuirks: QuirkDefinition[] = []
+    try {
+      expressQuirks = await generateExpressQuirksWithLLM(
+        l1,
+        l2,
+        l3,
+        generated.archetype,
+        qualitative.voice
+      )
+    } catch {
+      // LLM 실패 시 expressQuirks 빈 배열 → 런타임에서 DEFAULT_QUIRKS 사용
+    }
 
     // ── Stage 4: 프롬프트 5종 자동 빌드 ────────────────────────
     const role = inferPersonaRole(l1, l2)
     const prompts = buildAllPrompts({
-      name: generated.character.name,
-      role: generated.character.role,
-      expertise: generated.character.expertise,
+      name: character.name,
+      role: character.role,
+      expertise: character.expertise,
       l1,
       l2,
       l3,
@@ -129,10 +165,10 @@ export async function POST(request: NextRequest) {
 
       const created = await tx.persona.create({
         data: {
-          name: generated.character.name,
+          name: character.name,
           role,
-          expertise: generated.character.expertise,
-          description: generated.character.description,
+          expertise: character.expertise,
+          description: character.description,
           status: (body.status === "DRAFT" ? "DRAFT" : "ACTIVE") as PersonaStatus,
           source: "MANUAL",
           archetypeId: generated.archetype?.id ?? null,
@@ -148,6 +184,10 @@ export async function POST(request: NextRequest) {
           backstory: qualitative.backstory as unknown as Prisma.InputJsonValue,
           pressureContext: qualitative.pressure as unknown as Prisma.InputJsonValue,
           zeitgeist: qualitative.zeitgeist as unknown as Prisma.InputJsonValue,
+          // ── Express 퀴크 DB 저장 (런타임 콜드스타트 해결) ──
+          generationConfig: (expressQuirks.length > 0
+            ? { expressQuirks }
+            : undefined) as unknown as Prisma.InputJsonValue,
           layerVectors: {
             create: [
               {
@@ -190,9 +230,10 @@ export async function POST(request: NextRequest) {
       archetypeId: string | null
       paradoxScore: number
       dimensionalityScore: number
-      character: typeof generated.character
+      character: typeof character
       activityTraits: typeof activityTraits
       activeHours: number[]
+      expressQuirks: typeof expressQuirks
       qualitative: {
         backstory: typeof qualitative.backstory
         voice: typeof qualitative.voice
@@ -207,9 +248,10 @@ export async function POST(request: NextRequest) {
         archetypeId: generated.archetype?.id ?? null,
         paradoxScore: paradoxProfile.overall,
         dimensionalityScore: paradoxProfile.dimensionality,
-        character: generated.character,
+        character,
         activityTraits,
         activeHours,
+        expressQuirks,
         qualitative: {
           backstory: qualitative.backstory,
           voice: qualitative.voice,
