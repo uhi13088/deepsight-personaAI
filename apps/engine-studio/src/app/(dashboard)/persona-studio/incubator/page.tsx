@@ -98,17 +98,29 @@ export default function IncubatorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "trigger_batch" }),
       })
-      const json = (await res.json()) as { success: boolean; data?: { message: string } }
+      const json = (await res.json()) as {
+        success: boolean
+        data?: {
+          message: string
+          generated?: number
+          passed?: number
+          failed?: number
+          durationMs?: number
+        }
+      }
       if (json.success && json.data) {
         setBatchMessage(json.data.message)
-        setTimeout(() => setBatchMessage(null), 5000)
+        // 배치 완료 후 대시보드 데이터 새로고침
+        fetchData()
+      } else {
+        setBatchMessage("배치 실행 실패")
       }
     } catch {
       setBatchMessage("배치 트리거 실패")
     } finally {
       setBatchTriggering(false)
     }
-  }, [])
+  }, [fetchData])
 
   if (loading) {
     return (
@@ -148,9 +160,16 @@ export default function IncubatorPage() {
           <div className="flex items-center gap-2">
             <Button size="sm" onClick={triggerBatch} disabled={batchTriggering}>
               <Play className="mr-1 h-3.5 w-3.5" />
-              {batchTriggering ? "요청 중..." : "배치 실행"}
+              {batchTriggering ? "생성 중..." : "배치 실행"}
             </Button>
-            {batchMessage && <span className="text-xs text-emerald-500">{batchMessage}</span>}
+            {batchTriggering && (
+              <span className="text-muted-foreground animate-pulse text-xs">
+                페르소나 배치 생성 중 (LLM 호출 포함, 수 분 소요)...
+              </span>
+            )}
+            {batchMessage && !batchTriggering && (
+              <span className="text-xs text-emerald-500">{batchMessage}</span>
+            )}
           </div>
           <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
             <Settings className="mr-1 h-3.5 w-3.5" />

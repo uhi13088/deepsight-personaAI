@@ -5,7 +5,7 @@ import { Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
-import { ARCHETYPE_LABELS, CURRENT_ARCHETYPE_IDS } from "@/constants/v3/interpretation-tables"
+import { useArchetypes } from "@/hooks/use-archetypes"
 import { calculateExtendedParadoxScore, calculateL1L2ParadoxScore } from "@/lib/vector/paradox"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
 import { calculateVFinal, vFinalToVector } from "@/lib/vector/v-final"
@@ -291,6 +291,7 @@ interface Step2Props {
 type ActiveTab = "l1" | "l2" | "l3" | "archetype" | "preview" | "vfinal"
 
 export function Step2VectorEditor({ data, onChange, onPrev, onNext }: Step2Props) {
+  const { archetypes: archetypeOptions, archetypeMap } = useArchetypes()
   const [activeTab, setActiveTab] = useState<ActiveTab>("l1")
 
   // Computed scores
@@ -355,7 +356,7 @@ export function Step2VectorEditor({ data, onChange, onPrev, onNext }: Step2Props
         {data.archetypeId && (
           <Badge variant="info" className="ml-auto">
             <Sparkles className="mr-1 h-3 w-3" />
-            {ARCHETYPE_LABELS[data.archetypeId]}
+            {archetypeMap[data.archetypeId] ?? data.archetypeId}
           </Badge>
         )}
       </div>
@@ -401,7 +402,11 @@ export function Step2VectorEditor({ data, onChange, onPrev, onNext }: Step2Props
           />
         )}
         {activeTab === "archetype" && (
-          <ArchetypeSelector selectedId={data.archetypeId} onSelect={applyArchetype} />
+          <ArchetypeSelector
+            selectedId={data.archetypeId}
+            onSelect={applyArchetype}
+            options={archetypeOptions}
+          />
         )}
         {activeTab === "vfinal" && <VFinalSimulator l1={data.l1} l2={data.l2} l3={data.l3} />}
         {activeTab === "preview" && (
@@ -468,27 +473,29 @@ function VectorSliders({
 function ArchetypeSelector({
   selectedId,
   onSelect,
+  options,
 }: {
   selectedId: string | null
   onSelect: (id: string) => void
+  options: Array<{ id: string; label: string }>
 }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-      {CURRENT_ARCHETYPE_IDS.map((id) => (
+      {options.map((opt) => (
         <button
-          key={id}
+          key={opt.id}
           className={`rounded-lg border p-3 text-left transition-all ${
-            selectedId === id
+            selectedId === opt.id
               ? "border-primary bg-primary/5 ring-primary/30 ring-1"
               : "border-border hover:border-primary/40"
           }`}
-          onClick={() => onSelect(id)}
+          onClick={() => onSelect(opt.id)}
         >
           <Sparkles
-            className={`mb-1 h-4 w-4 ${selectedId === id ? "text-primary" : "text-muted-foreground"}`}
+            className={`mb-1 h-4 w-4 ${selectedId === opt.id ? "text-primary" : "text-muted-foreground"}`}
           />
-          <p className="text-sm font-medium">{ARCHETYPE_LABELS[id] ?? id}</p>
-          <p className="text-muted-foreground mt-0.5 text-[10px]">{id}</p>
+          <p className="text-sm font-medium">{opt.label}</p>
+          <p className="text-muted-foreground mt-0.5 text-[10px]">{opt.id}</p>
         </button>
       ))}
     </div>

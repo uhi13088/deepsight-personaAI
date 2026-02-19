@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
-import { ARCHETYPE_LABELS, CURRENT_ARCHETYPE_IDS } from "@/constants/v3/interpretation-tables"
+import { useArchetypes } from "@/hooks/use-archetypes"
 import type { PersonaSortField, SortOrder, VectorRangeFilter, CrossAxisFilter } from "@/types"
 
 // ── Filter State Type ───────────────────────────────────────
@@ -101,6 +101,7 @@ interface PersonaFiltersProps {
 }
 
 export function PersonaFilters({ filters, onFiltersChange, totalCount }: PersonaFiltersProps) {
+  const { archetypes: archetypeOptions, archetypeMap } = useArchetypes()
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [expandedLayers, setExpandedLayers] = useState<Record<string, boolean>>({})
 
@@ -234,7 +235,7 @@ export function PersonaFilters({ filters, onFiltersChange, totalCount }: Persona
         <div className="flex flex-wrap items-center gap-1.5">
           {filters.archetypeIds.map((id) => (
             <Badge key={id} variant="secondary" className="gap-1">
-              {ARCHETYPE_LABELS[id] ?? id}
+              {archetypeMap[id] ?? id}
               <button onClick={() => toggleArchetype(id)}>
                 <X className="h-3 w-3" />
               </button>
@@ -262,19 +263,21 @@ export function PersonaFilters({ filters, onFiltersChange, totalCount }: Persona
         <div className="border-border bg-card/50 space-y-4 rounded-lg border p-4">
           {/* Archetype Filter */}
           <div>
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider">아키타입 (22종)</h4>
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider">
+              아키타입 ({archetypeOptions.length}종)
+            </h4>
             <div className="flex flex-wrap gap-1.5">
-              {CURRENT_ARCHETYPE_IDS.map((id) => (
+              {archetypeOptions.map((opt) => (
                 <button
-                  key={id}
+                  key={opt.id}
                   className={`rounded-md px-2 py-1 text-xs transition-colors ${
-                    filters.archetypeIds.includes(id)
+                    filters.archetypeIds.includes(opt.id)
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted text-muted-foreground hover:bg-muted/80"
                   }`}
-                  onClick={() => toggleArchetype(id)}
+                  onClick={() => toggleArchetype(opt.id)}
                 >
-                  {ARCHETYPE_LABELS[id] ?? id}
+                  {opt.label}
                 </button>
               ))}
             </div>
