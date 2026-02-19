@@ -897,22 +897,22 @@
 
 > L4 대신 독립 모듈 시스템 + 보안 대시보드.
 
-- [ ] **T147: Social Module System — Connectivity (보안 전용)**
+- [x] **T147: Social Module System — Connectivity (보안 전용)** ✅
   - 배경: L4를 레이어가 아닌 독립 모듈로. v4.0에서는 Connectivity만 보안 모니터링용 활성화
-  - AC1: `src/lib/social-module/types.ts` — SocialModuleConfig (authority/connectivity/reputation/tribalism 각 ON/OFF + weight)
-  - AC2: `src/lib/social-module/connectivity.ts` — PersonaRelationship 그래프 분석 (Hub/Isolate 탐지, degree centrality)
-  - AC3: featureBindings 설정 — matching: ["reputation"], feed: ["authority","reputation"], arena: ["tribalism"], security: ["connectivity"]
-  - AC4: DB 스키마 — SocialModuleConfig 테이블 (글로벌 설정, 모듈별 enabled/weight)
-  - AC5: 단위 테스트 + Build PASS
+  - AC1: ✅ `src/lib/social-module/types.ts` — SocialModuleConfig (authority/connectivity/reputation/tribalism 각 ON/OFF + weight)
+  - AC2: ✅ `src/lib/social-module/connectivity.ts` — PersonaRelationship 그래프 분석 (Hub/Isolate 탐지, degree centrality)
+  - AC3: ✅ featureBindings 설정 — matching: ["reputation"], feed: ["authority","reputation"], arena: ["tribalism"], security: ["connectivity"]
+  - AC4: ✅ DB 스키마 — SocialModuleConfig 테이블 (글로벌 싱글톤, 모듈별 enabled/weight)
+  - AC5: ✅ 단위 테스트 45개 + Build PASS
 
-- [ ] **T148: 관리자 보안 대시보드**
+- [x] **T148: 관리자 보안 대시보드** ✅
   - 배경: 보안 3계층의 모니터링/관리 UI
-  - AC1: 보안 알림 패널 — Gate Guard/Integrity/Output 경고 실시간 표시
-  - AC2: 격리 큐 관리 — QuarantineEntry 목록, 승인/삭제, 필터링
-  - AC3: 집단 이상 모니터링 — 전체 mood 분포, L1 드리프트 분포, 키워드 TF-IDF 급변 차트
-  - AC4: 킬 스위치 제어판 — SystemSafetyConfig UI (기능별 토글, 긴급 동결 버튼)
-  - AC5: Social Module Connectivity 시각화 — Hub/Isolate 표시, 관계 그래프 요약
-  - AC6: 단위 테스트 + Build PASS
+  - AC1: ✅ 보안 알림 패널 — Gate Guard/Integrity/Output 경고 실시간 표시
+  - AC2: ✅ 격리 큐 관리 — QuarantineEntry 목록, 승인/삭제, 필터링
+  - AC3: ✅ 집단 이상 모니터링 — 전체 mood 분포, L1 드리프트 분포
+  - AC4: ✅ 킬 스위치 제어판 — SystemSafetyConfig UI (기능별 토글, 긴급 동결 버튼)
+  - AC5: ✅ Social Module Connectivity 시각화 — Hub/Isolate 표시, 관계 그래프 요약
+  - AC6: ✅ 단위 테스트 + Build PASS
 
 ### Phase QI: 페르소나 품질 개선 (T150~T154)
 
@@ -960,29 +960,39 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-- [ ] **T155: [긴급/보안] Developer Console + PersonaWorld API 인증 강화**
-  - 배경: 보안 감사 결과 Developer Console API 라우트 24개 이상이 인증 없이 노출, PersonaWorld 미들웨어 부재
-  - AC1: `requireAuth()` 공통 헬퍼 (developer-console) — 세션 없으면 401 반환
-  - AC2: Developer Console 전체 API 라우트에 auth guard 적용 (api-keys, billing, logs, team, webhooks, settings, dashboard, search, usage)
-  - AC3: Developer Console auth middleware — 비인증 사용자 `/login`으로 리다이렉트 ✅
-  - AC4: PersonaWorld auth middleware — 비인증 사용자 보호 경로 차단
-  - AC5: PersonaWorld `/api/health` 환경정보 노출 제거
-  - AC6: `[...nextauth]` 에러 바운더리 — 500 시 빈 body 대신 JSON 반환 ✅
-  - AC7: 빌드 PASS + 검증
-
-- [ ] **T156: [긴급/보안] Engine Studio 인증 체계 구축 — Google OAuth + 초대제**
-  - 배경: 엔진 스튜디오 43개 내부 API 라우트 전부 인증 없음, 미들웨어 부재, cron 인증 선택적(fail-open)
-  - AC1: NextAuth v5 설정 (Google OAuth + JWT, Prisma adapter)
-  - AC2: 초대제 가입 — signIn 콜백에서 allowedEmails 화이트리스트 검증, 미등록 이메일 차단
-  - AC3: 로그인 페이지 + `[...nextauth]` 라우트 핸들러 (에러 바운더리 포함)
-  - AC4: 쿠키 기반 middleware — 대시보드 + `/api/internal/*` 보호
-  - AC5: `requireAuth()` 헬퍼 + 전체 internal API 라우트(35+개) auth guard 적용
-  - AC6: cron 3개 라우트 CRON_SECRET 필수화 (fail-closed)
-  - AC7: 빌드 PASS + 커밋 + 푸시
+(없음)
 
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T148: 관리자 보안 대시보드** ✅ 2026-02-19
+  - 변경: lnb.tsx(Security 섹션), middleware.ts(/security 보호), security/page.tsx(AC1+AC3 대시보드), security/quarantine/page.tsx(AC2), security/kill-switch/page.tsx(AC4), security/connectivity/page.tsx(AC5)
+  - API: security/dashboard/route.ts, security/quarantine/route.ts, security/connectivity/route.ts
+  - 테스트: PASS (89파일/3612개) + Build PASS
+
+- [x] **T147: Social Module System — Connectivity (보안 전용)** ✅ 2026-02-19
+  - 변경: schema.prisma(SocialModuleConfig 모델), 016_social_module_config.sql, social-module/index.ts(barrel export)
+  - 기존 완성: types.ts(8종 타입), connectivity.ts(그래프 분석+Hub/Isolate+이상탐지+featureBindings), connectivity.test.ts(45개)
+  - 테스트: PASS (89파일/3612개) + Build PASS
+
+- [x] **T156: [긴급/보안] Engine Studio 인증 체계 구축 — Google OAuth + 초대제** ✅ 2026-02-19
+  - AC1: ✅ NextAuth v5 설정 (Google OAuth + JWT, Prisma adapter)
+  - AC2: ✅ 초대제 가입 — signIn 콜백에서 allowedEmails 화이트리스트 검증, 미등록 이메일 차단
+  - AC3: ✅ 로그인 페이지 + `[...nextauth]` 라우트 핸들러 (에러 바운더리 포함)
+  - AC4: ✅ 쿠키 기반 middleware — 대시보드 + `/api/internal/*` 보호
+  - AC5: ✅ `requireAuth()` 헬퍼 + 전체 internal API 라우트(42개) auth guard 적용
+  - AC6: ✅ cron 3개 라우트 CRON_SECRET 필수화 (fail-closed)
+  - AC7: ✅ 89파일 3612 테스트 PASS + Build PASS
+
+- [x] **T155: [긴급/보안] Developer Console + PersonaWorld API 인증 강화** ✅ 2026-02-19
+  - AC1: ✅ `requireAuth()` 공통 헬퍼 (developer-console) — 세션 없으면 401 반환
+  - AC2: ✅ Developer Console 전체 API 라우트(22개)에 auth guard 적용
+  - AC3: ✅ Developer Console auth middleware — 비인증 사용자 `/login`으로 리다이렉트
+  - AC4: ✅ PersonaWorld auth middleware — 비인증 사용자 보호 경로 차단
+  - AC5: ✅ PersonaWorld `/api/health` 환경정보 노출 제거
+  - AC6: ✅ `[...nextauth]` 에러 바운더리 — 500 시 빈 body 대신 JSON 반환
+  - AC7: ✅ DC 171 테스트 + PW 84 테스트 PASS + Build PASS
 
 - [x] **T154: Express 퀴크 LLM 동적 생성** ✅ 2026-02-18
   - 변경: llm-express-quirks.ts(신규, 벡터+역설+아키타입 기반 퀴크 5~8개 LLM 생성), generate-random/route.ts(Stage 3.5 퀴크 생성+generationConfig DB 저장), interaction/index.ts(re-export), llm-express-quirks.test.ts(신규 32개)

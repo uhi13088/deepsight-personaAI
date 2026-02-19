@@ -43,6 +43,7 @@ export const config = {
     "/team/:path*",
     "/user-insight/:path*",
     "/arena/:path*",
+    "/security/:path*",
     // Internal API 라우트
     "/api/internal/:path*",
   ],

@@ -45,9 +45,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       // 초대제: 허용된 이메일만 로그인 가능
       const allowedEmails = getAllowedEmails()
+      console.info(
+        `[Auth] Login attempt: ${email.substring(0, 3)}***, allowed list size: ${allowedEmails.size}`
+      )
       if (allowedEmails.size > 0 && !allowedEmails.has(email)) {
         console.warn(`[Auth] Blocked non-invited email: ${email.substring(0, 3)}***`)
-        return false
+        return "/login?error=AccessDenied"
       }
 
       try {
@@ -104,8 +107,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // JWT에서 사용할 DB user ID 설정
         user.id = dbUser.id
       } catch (error) {
-        console.error("[Auth] OAuth signIn error:", error)
-        return false
+        console.error("[Auth] OAuth signIn DB error:", error)
+        return "/login?error=DatabaseError"
       }
 
       return true

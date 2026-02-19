@@ -3,10 +3,8 @@
  * 초기 데이터 및 관리자 계정 생성
  */
 
-import { Prisma, PrismaClient } from "../src/generated/prisma"
+import { PrismaClient } from "../src/generated/prisma"
 import bcrypt from "bcryptjs"
-import { COLD_START_QUESTIONS } from "./seed-data/cold-start-questions"
-import { BLOG_POSTS } from "./seed-data/blog-posts"
 
 const prisma = new PrismaClient()
 
@@ -159,55 +157,9 @@ async function main() {
   })
   console.log(`✅ Algorithm created: ${algorithm.name}`)
 
-  // Cold Start 질문 시딩 (PsychProfileTemplate)
-  let questionCount = 0
-  for (const q of COLD_START_QUESTIONS) {
-    const id = `seed-q-${q.name}`
-    await prisma.psychProfileTemplate.upsert({
-      where: { id },
-      update: {},
-      create: {
-        id,
-        name: q.name,
-        onboardingLevel: q.onboardingLevel,
-        questionOrder: q.questionOrder,
-        questionText: q.questionText,
-        questionType: q.questionType,
-        options: q.options as unknown as Prisma.InputJsonValue,
-        targetDimensions: q.targetDimensions,
-        weightFormula: q.weightFormula as unknown as Prisma.InputJsonValue,
-        isRequired: q.isRequired,
-      },
-    })
-    questionCount++
-  }
-  console.log(
-    `✅ Cold Start questions created: ${questionCount}개 (LIGHT: 12, MEDIUM: 18, DEEP: 30)`
-  )
-
-  // 블로그 포스트 시딩
-  let blogCount = 0
-  for (const post of BLOG_POSTS) {
-    const id = `seed-blog-${post.slug}`
-    await prisma.blogPost.upsert({
-      where: { id },
-      update: {},
-      create: {
-        id,
-        slug: post.slug,
-        title: post.title,
-        excerpt: post.excerpt,
-        content: post.content,
-        category: post.category,
-        tags: post.tags,
-        authorId: admin.id,
-        published: true,
-        publishedAt: new Date(Date.now() - blogCount * 7 * 24 * 60 * 60 * 1000), // 1주 간격
-      },
-    })
-    blogCount++
-  }
-  console.log(`✅ Blog posts created: ${blogCount}개`)
+  // Cold Start 질문 및 블로그는 SQL 마이그레이션으로 관리
+  // → 004_seed_cold_start.sql (v3.1 24문항)
+  // → 006_seed_blog.sql (6개 블로그 포스트)
 
   console.log("🎉 Database seed completed!")
 }

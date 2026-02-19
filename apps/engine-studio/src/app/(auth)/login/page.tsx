@@ -21,7 +21,9 @@ function LoginContent() {
           <div className="bg-destructive/10 text-destructive rounded-md p-3 text-sm">
             {error === "AccessDenied"
               ? "접근 권한이 없습니다. 관리자에게 초대를 요청하세요."
-              : "로그인 중 오류가 발생했습니다. 다시 시도해주세요."}
+              : error === "DatabaseError"
+                ? "데이터베이스 연결에 실패했습니다. DB 설정을 확인하세요."
+                : "로그인 중 오류가 발생했습니다. 다시 시도해주세요."}
           </div>
         )}
 
