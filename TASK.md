@@ -960,29 +960,29 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-- [ ] **T155: [긴급/보안] Developer Console + PersonaWorld API 인증 강화**
-  - 배경: 보안 감사 결과 Developer Console API 라우트 24개 이상이 인증 없이 노출, PersonaWorld 미들웨어 부재
-  - AC1: `requireAuth()` 공통 헬퍼 (developer-console) — 세션 없으면 401 반환
-  - AC2: Developer Console 전체 API 라우트에 auth guard 적용 (api-keys, billing, logs, team, webhooks, settings, dashboard, search, usage)
-  - AC3: Developer Console auth middleware — 비인증 사용자 `/login`으로 리다이렉트 ✅
-  - AC4: PersonaWorld auth middleware — 비인증 사용자 보호 경로 차단
-  - AC5: PersonaWorld `/api/health` 환경정보 노출 제거
-  - AC6: `[...nextauth]` 에러 바운더리 — 500 시 빈 body 대신 JSON 반환 ✅
-  - AC7: 빌드 PASS + 검증
-
-- [ ] **T156: [긴급/보안] Engine Studio 인증 체계 구축 — Google OAuth + 초대제**
-  - 배경: 엔진 스튜디오 43개 내부 API 라우트 전부 인증 없음, 미들웨어 부재, cron 인증 선택적(fail-open)
-  - AC1: NextAuth v5 설정 (Google OAuth + JWT, Prisma adapter)
-  - AC2: 초대제 가입 — signIn 콜백에서 allowedEmails 화이트리스트 검증, 미등록 이메일 차단
-  - AC3: 로그인 페이지 + `[...nextauth]` 라우트 핸들러 (에러 바운더리 포함)
-  - AC4: 쿠키 기반 middleware — 대시보드 + `/api/internal/*` 보호
-  - AC5: `requireAuth()` 헬퍼 + 전체 internal API 라우트(35+개) auth guard 적용
-  - AC6: cron 3개 라우트 CRON_SECRET 필수화 (fail-closed)
-  - AC7: 빌드 PASS + 커밋 + 푸시
+(없음)
 
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T156: [긴급/보안] Engine Studio 인증 체계 구축 — Google OAuth + 초대제** ✅ 2026-02-19
+  - AC1: ✅ NextAuth v5 설정 (Google OAuth + JWT, Prisma adapter)
+  - AC2: ✅ 초대제 가입 — signIn 콜백에서 allowedEmails 화이트리스트 검증, 미등록 이메일 차단
+  - AC3: ✅ 로그인 페이지 + `[...nextauth]` 라우트 핸들러 (에러 바운더리 포함)
+  - AC4: ✅ 쿠키 기반 middleware — 대시보드 + `/api/internal/*` 보호
+  - AC5: ✅ `requireAuth()` 헬퍼 + 전체 internal API 라우트(42개) auth guard 적용
+  - AC6: ✅ cron 3개 라우트 CRON_SECRET 필수화 (fail-closed)
+  - AC7: ✅ 89파일 3612 테스트 PASS + Build PASS
+
+- [x] **T155: [긴급/보안] Developer Console + PersonaWorld API 인증 강화** ✅ 2026-02-19
+  - AC1: ✅ `requireAuth()` 공통 헬퍼 (developer-console) — 세션 없으면 401 반환
+  - AC2: ✅ Developer Console 전체 API 라우트(22개)에 auth guard 적용
+  - AC3: ✅ Developer Console auth middleware — 비인증 사용자 `/login`으로 리다이렉트
+  - AC4: ✅ PersonaWorld auth middleware — 비인증 사용자 보호 경로 차단
+  - AC5: ✅ PersonaWorld `/api/health` 환경정보 노출 제거
+  - AC6: ✅ `[...nextauth]` 에러 바운더리 — 500 시 빈 body 대신 JSON 반환
+  - AC7: ✅ DC 171 테스트 + PW 84 테스트 PASS + Build PASS
 
 - [x] **T154: Express 퀴크 LLM 동적 생성** ✅ 2026-02-18
   - 변경: llm-express-quirks.ts(신규, 벡터+역설+아키타입 기반 퀴크 5~8개 LLM 생성), generate-random/route.ts(Stage 3.5 퀴크 생성+generationConfig DB 저장), interaction/index.ts(re-export), llm-express-quirks.test.ts(신규 32개)
