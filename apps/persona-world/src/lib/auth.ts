@@ -14,7 +14,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user, account, profile }) {
+    async jwt({ token, account, profile }) {
       // 최초 로그인 시 Google 프로필 정보 토큰에 저장
       if (account && profile) {
         token.id = account.providerAccountId

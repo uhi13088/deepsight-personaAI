@@ -1,27 +1,20 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { signIn, useSession } from "next-auth/react"
+import { useSession, signIn } from "next-auth/react"
 import { PWLogoWithText, PWGradientDefs } from "@/components/persona-world"
-import { ArrowRight, Sparkles } from "lucide-react"
+import { ArrowRight, Sparkles, Loader2 } from "lucide-react"
 import { useUserStore } from "@/lib/user-store"
 
 export default function LoginPage() {
   const router = useRouter()
-  const { data: session, status } = useSession()
-  const { profile, setProfile, setProfileFromSession, completeOnboarding } = useUserStore()
+  const { data: session, status: authStatus } = useSession()
+  const { profile, setProfile, completeOnboarding } = useUserStore()
   const [nickname, setNickname] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
-
-  // Google 로그인 세션 → Zustand 프로필 동기화
-  useEffect(() => {
-    if (status === "authenticated" && session?.user) {
-      setProfileFromSession(session.user)
-      router.replace("/onboarding")
-    }
-  }, [status, session, setProfileFromSession, router])
+  const [isRegistering, setIsRegistering] = useState(false)
 
   // 이미 프로필이 있으면 피드로 리다이렉트
   useEffect(() => {
@@ -30,21 +23,75 @@ export default function LoginPage() {
     }
   }, [profile, router])
 
+  // Google 로그인 성공 후 PW 유저 등록
+  const registerGoogleUser = useCallback(
+    async (email: string, name: string | null | undefined, image: string | null | undefined) => {
+      if (isRegistering) return
+      setIsRegistering(true)
+
+      try {
+        const res = await fetch("/api/public/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            name: name ?? undefined,
+            profileImageUrl: image ?? undefined,
+          }),
+        })
+
+        const json = await res.json()
+
+        if (json.success && json.data) {
+          const data = json.data
+          setProfile({
+            id: data.id,
+            nickname: data.name || name || email.split("@")[0],
+            email: data.email,
+            profileImageUrl: data.profileImageUrl ?? undefined,
+            vector: null,
+            vectorConfidence: null,
+            completedOnboarding: data.completedOnboarding,
+            createdAt: data.createdAt,
+          })
+
+          if (data.completedOnboarding) {
+            router.push("/feed")
+          } else {
+            router.push("/onboarding")
+          }
+        }
+      } catch (error) {
+        console.error("[LoginPage] Failed to register Google user:", error)
+      } finally {
+        setIsRegistering(false)
+        setIsGoogleLoading(false)
+      }
+    },
+    [isRegistering, setProfile, router]
+  )
+
+  // NextAuth 세션이 있고 로컬 프로필이 없으면 등록
+  useEffect(() => {
+    if (authStatus === "authenticated" && session?.user?.email && !profile) {
+      registerGoogleUser(session.user.email, session.user.name, session.user.image)
+    }
+  }, [authStatus, session, profile, registerGoogleUser])
+
   const handleGoogleLogin = async () => {
     setIsGoogleLoading(true)
     try {
-      await signIn("google", { callbackUrl: "/onboarding" })
+      await signIn("google", { callbackUrl: "/" })
     } catch {
       setIsGoogleLoading(false)
     }
   }
 
-  const handleLogin = () => {
+  const handleNicknameLogin = () => {
     if (!nickname.trim()) return
 
     setIsLoading(true)
 
-    // 프로필 생성 후 온보딩으로 이동
     const id = crypto.randomUUID()
     setProfile({
       id,
@@ -61,7 +108,6 @@ export default function LoginPage() {
   const handleSkip = () => {
     setIsLoading(true)
 
-    // 관찰자 모드: 프로필 생성 + 온보딩 스킵
     const id = crypto.randomUUID()
     setProfile({
       id,
@@ -76,9 +122,17 @@ export default function LoginPage() {
     router.push("/feed")
   }
 
-  // 프로필 로딩 중일 때는 빈 화면 (리다이렉트 판단 중)
-  if (profile?.completedOnboarding || status === "loading") {
-    return null
+  // 프로필 로딩 중이거나 세션 확인 중
+  if (
+    profile?.completedOnboarding ||
+    authStatus === "loading" ||
+    (authStatus === "authenticated" && !profile)
+  ) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+      </div>
+    )
   }
 
   return (
@@ -103,7 +157,7 @@ export default function LoginPage() {
             {/* Google 로그인 */}
             <button
               onClick={handleGoogleLogin}
-              disabled={isGoogleLoading || isLoading}
+              disabled={isGoogleLoading || isLoading || authStatus === "loading"}
               className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -131,12 +185,12 @@ export default function LoginPage() {
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-200" />
               </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-gray-400">또는</span>
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-white px-3 text-gray-400">또는</span>
               </div>
             </div>
 
-            {/* 닉네임 입력 (관찰자 모드) */}
+            {/* 닉네임 로그인 */}
             <div>
               <label htmlFor="nickname" className="mb-1.5 block text-sm font-medium text-gray-700">
                 닉네임
@@ -146,15 +200,15 @@ export default function LoginPage() {
                 type="text"
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                placeholder="사용할 닉네임을 입력해주세요"
+                onKeyDown={(e) => e.key === "Enter" && handleNicknameLogin()}
+                placeholder="닉네임으로 빠르게 시작하기"
                 maxLength={20}
                 className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition-colors placeholder:text-gray-400 focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
               />
             </div>
 
             <button
-              onClick={handleLogin}
+              onClick={handleNicknameLogin}
               disabled={!nickname.trim() || isLoading}
               className="pw-button flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium text-white transition-opacity disabled:opacity-50"
             >
