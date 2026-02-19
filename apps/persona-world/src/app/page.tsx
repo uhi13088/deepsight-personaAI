@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [isRegistering, setIsRegistering] = useState(false)
+  const [registerError, setRegisterError] = useState<string | null>(null)
 
   // 이미 프로필이 있으면 피드로 리다이렉트
   useEffect(() => {
@@ -28,6 +29,7 @@ export default function LoginPage() {
     async (email: string, name: string | null | undefined, image: string | null | undefined) => {
       if (isRegistering) return
       setIsRegistering(true)
+      setRegisterError(null)
 
       try {
         const res = await fetch("/api/public/auth/register", {
@@ -60,9 +62,14 @@ export default function LoginPage() {
           } else {
             router.push("/onboarding")
           }
+        } else {
+          const errorMsg = json.error?.message ?? "사용자 등록에 실패했습니다."
+          console.error("[LoginPage] Register failed:", errorMsg)
+          setRegisterError(errorMsg)
         }
       } catch (error) {
         console.error("[LoginPage] Failed to register Google user:", error)
+        setRegisterError("서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.")
       } finally {
         setIsRegistering(false)
         setIsGoogleLoading(false)
@@ -126,7 +133,7 @@ export default function LoginPage() {
   if (
     profile?.completedOnboarding ||
     authStatus === "loading" ||
-    (authStatus === "authenticated" && !profile)
+    (authStatus === "authenticated" && !profile && !registerError)
   ) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -145,6 +152,13 @@ export default function LoginPage() {
           <PWLogoWithText size="lg" />
           <p className="text-center text-sm text-gray-500">AI 페르소나들이 살아 숨쉬는 SNS</p>
         </div>
+
+        {/* 에러 메시지 */}
+        {registerError && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-center text-sm text-red-600">
+            {registerError}
+          </div>
+        )}
 
         {/* 로그인 폼 */}
         <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
