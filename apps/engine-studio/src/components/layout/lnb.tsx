@@ -19,6 +19,7 @@ import {
   Globe,
   Swords,
   LogOut,
+  Shield,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { signOut } from "next-auth/react"
@@ -99,6 +100,17 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    label: "Security",
+    icon: Shield,
+    basePath: "/security",
+    children: [
+      { label: "Dashboard", href: "/security" },
+      { label: "Quarantine Queue", href: "/security/quarantine" },
+      { label: "Kill Switch", href: "/security/kill-switch" },
+      { label: "Connectivity", href: "/security/connectivity" },
+    ],
+  },
+  {
     label: "PW Admin",
     icon: Globe,
     basePath: "/persona-world-admin",
@@ -132,7 +144,7 @@ const navSections: NavSection[] = [
   },
 ]
 
-const SEPARATOR_INDICES = [1, 5, 8]
+const SEPARATOR_INDICES = [1, 5, 9]
 
 const LNB_COLLAPSED_KEY = "lnb-collapsed"
 

@@ -905,14 +905,14 @@
   - AC4: ✅ DB 스키마 — SocialModuleConfig 테이블 (글로벌 싱글톤, 모듈별 enabled/weight)
   - AC5: ✅ 단위 테스트 45개 + Build PASS
 
-- [ ] **T148: 관리자 보안 대시보드**
+- [x] **T148: 관리자 보안 대시보드** ✅
   - 배경: 보안 3계층의 모니터링/관리 UI
-  - AC1: 보안 알림 패널 — Gate Guard/Integrity/Output 경고 실시간 표시
-  - AC2: 격리 큐 관리 — QuarantineEntry 목록, 승인/삭제, 필터링
-  - AC3: 집단 이상 모니터링 — 전체 mood 분포, L1 드리프트 분포, 키워드 TF-IDF 급변 차트
-  - AC4: 킬 스위치 제어판 — SystemSafetyConfig UI (기능별 토글, 긴급 동결 버튼)
-  - AC5: Social Module Connectivity 시각화 — Hub/Isolate 표시, 관계 그래프 요약
-  - AC6: 단위 테스트 + Build PASS
+  - AC1: ✅ 보안 알림 패널 — Gate Guard/Integrity/Output 경고 실시간 표시
+  - AC2: ✅ 격리 큐 관리 — QuarantineEntry 목록, 승인/삭제, 필터링
+  - AC3: ✅ 집단 이상 모니터링 — 전체 mood 분포, L1 드리프트 분포
+  - AC4: ✅ 킬 스위치 제어판 — SystemSafetyConfig UI (기능별 토글, 긴급 동결 버튼)
+  - AC5: ✅ Social Module Connectivity 시각화 — Hub/Isolate 표시, 관계 그래프 요약
+  - AC6: ✅ 단위 테스트 + Build PASS
 
 ### Phase QI: 페르소나 품질 개선 (T150~T154)
 
@@ -965,6 +965,11 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T148: 관리자 보안 대시보드** ✅ 2026-02-19
+  - 변경: lnb.tsx(Security 섹션), middleware.ts(/security 보호), security/page.tsx(AC1+AC3 대시보드), security/quarantine/page.tsx(AC2), security/kill-switch/page.tsx(AC4), security/connectivity/page.tsx(AC5)
+  - API: security/dashboard/route.ts, security/quarantine/route.ts, security/connectivity/route.ts
+  - 테스트: PASS (89파일/3612개) + Build PASS
 
 - [x] **T147: Social Module System — Connectivity (보안 전용)** ✅ 2026-02-19
   - 변경: schema.prisma(SocialModuleConfig 모델), 016_social_module_config.sql, social-module/index.ts(barrel export)

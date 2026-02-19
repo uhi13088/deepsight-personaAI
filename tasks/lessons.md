@@ -36,3 +36,4 @@
 - [2026-02-19] 보안: 새 앱 생성 시 반드시 `middleware.ts`를 추가하여 보호 경로(dashboard, profile 등)에 대한 서버 측 인증 체크를 할 것. 클라이언트 측 `useSession` 체크만으로는 URL 직접 접근 차단 불가
 - [2026-02-19] 보안: `/api/health` 같은 공개 엔드포인트에서 환경변수 값, 내부 URL, VERCEL_ENV 등 인프라 정보를 절대 노출하지 않을 것. 설정 여부(configured/not set)만 반환
 - [2026-02-19] 프로세스: 보안/버그픽스 등 긴급 작업도 반드시 TASK.md에 티켓 등록 후 진행할 것
+- [2026-02-19] API: `requireAuth()` 사용 패턴 — 반드시 `const { response } = await requireAuth(); if (response) return response;` 형태로 사용. 반환 타입이 `AuthResult | AuthError`이므로 `const authError = await requireAuth(); if (authError) return authError`는 타입 에러 발생. 또한 핸들러 함수에 명시적 `Promise<NextResponse<...>>` 반환 타입을 붙이면 `NextResponse<unknown>`과 불일치하므로, 기존 컨벤션대로 반환 타입 생략
