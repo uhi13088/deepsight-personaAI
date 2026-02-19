@@ -29,7 +29,7 @@ export async function GET() {
         }),
         prisma.personaPost.count({ where: { createdAt: { gte: todayStart } } }),
         prisma.personaActivityLog.findMany({
-          where: { trigger: "SCHEDULED" },
+          where: { trigger: { in: ["SCHEDULED", "MANUAL"] } },
           orderBy: { createdAt: "desc" },
           take: 20,
         }),
@@ -74,11 +74,28 @@ export async function POST(request: NextRequest) {
     const { action, personaId } = body as { action: string; personaId?: string }
 
     switch (action) {
-      case "trigger_now":
-        return NextResponse.json({
-          success: true,
-          data: { message: "Scheduler triggered" },
+      case "trigger_now": {
+        // 실제 스케줄러 파이프라인 호출
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+        const schedulerRes = await fetch(`${baseUrl}/api/persona-world/scheduler`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ trigger: "MANUAL" }),
         })
+        const schedulerJson = (await schedulerRes.json()) as {
+          success: boolean
+          data?: Record<string, unknown>
+          error?: Record<string, unknown>
+        }
+
+        return NextResponse.json({
+          success: schedulerRes.ok,
+          data: {
+            message: schedulerRes.ok ? "Scheduler executed" : "Scheduler failed",
+            result: schedulerJson.data ?? schedulerJson.error,
+          },
+        })
+      }
 
       case "resume_persona":
         if (!personaId) {
