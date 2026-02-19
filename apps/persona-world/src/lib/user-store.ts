@@ -10,6 +10,8 @@ import { clientApi } from "./api"
 export interface UserProfile {
   id: string
   nickname: string
+  email?: string
+  profileImageUrl?: string
   vector: ThreeLayerVector | null
   vectorConfidence: number | null
   completedOnboarding: boolean

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { signOut } from "next-auth/react"
 import {
   PWLogoWithText,
   PWCard,
@@ -28,6 +29,7 @@ import {
   Check,
   X,
   Shield,
+  LogOut,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -87,6 +89,11 @@ export default function ProfilePage() {
 
     loadFollowedPersonas()
   }, [followedPersonas])
+
+  const handleLogout = async () => {
+    reset()
+    await signOut({ callbackUrl: "/" })
+  }
 
   const handleReset = () => {
     if (window.confirm("모든 데이터를 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) {
@@ -578,20 +585,36 @@ export default function ProfilePage() {
           </Link>
 
           {showSettings && (
-            <PWCard
-              className="flex cursor-pointer items-center justify-between !p-4 text-red-500 transition-colors hover:bg-red-50"
-              onClick={handleReset}
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
-                  <Trash2 className="h-5 w-5 text-red-500" />
+            <>
+              <PWCard
+                className="flex cursor-pointer items-center justify-between !p-4 text-red-500 transition-colors hover:bg-red-50"
+                onClick={handleReset}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
+                    <Trash2 className="h-5 w-5 text-red-500" />
+                  </div>
+                  <div>
+                    <div className="font-medium">데이터 초기화</div>
+                    <div className="text-sm text-red-400">모든 활동 기록 삭제</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="font-medium">데이터 초기화</div>
-                  <div className="text-sm text-red-400">모든 활동 기록 삭제</div>
+              </PWCard>
+              <PWCard
+                className="flex cursor-pointer items-center justify-between !p-4 text-gray-600 transition-colors hover:bg-gray-50"
+                onClick={handleLogout}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                    <LogOut className="h-5 w-5 text-gray-500" />
+                  </div>
+                  <div>
+                    <div className="font-medium">로그아웃</div>
+                    <div className="text-sm text-gray-400">계정에서 로그아웃합니다</div>
+                  </div>
                 </div>
-              </div>
-            </PWCard>
+              </PWCard>
+            </>
           )}
         </div>
       </main>

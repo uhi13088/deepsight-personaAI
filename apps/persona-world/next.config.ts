@@ -25,8 +25,12 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: "/api/:path*",
-        destination: `${ENGINE_API_URL}/api/:path*`,
+        source: "/api/persona-world/:path*",
+        destination: `${ENGINE_API_URL}/api/persona-world/:path*`,
+      },
+      {
+        source: "/api/public/:path*",
+        destination: `${ENGINE_API_URL}/api/public/:path*`,
       },
     ]
   },
