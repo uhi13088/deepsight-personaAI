@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import type { ApiResponse } from "@/types"
 import {
   createEventBus,
@@ -71,6 +72,9 @@ interface SerializableEventBusResponse {
 
 // GET — 이벤트 버스 데이터 반환
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const currentBus = ensureSeedData()
     const stats = getEventStats(currentBus)
@@ -126,6 +130,9 @@ type EventAction =
 
 // POST — 이벤트 액션 처리
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const currentBus = ensureSeedData()
     const body = (await request.json()) as EventAction

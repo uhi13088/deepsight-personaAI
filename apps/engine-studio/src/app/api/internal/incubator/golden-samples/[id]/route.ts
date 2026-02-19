@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 import type { ApiResponse } from "@/types"
 
@@ -57,6 +58,9 @@ function toDetail(item: {
 }
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { id } = await params
 
@@ -89,6 +93,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 }
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { id } = await params
     const body = await request.json()
@@ -182,6 +189,9 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { id } = await params
 

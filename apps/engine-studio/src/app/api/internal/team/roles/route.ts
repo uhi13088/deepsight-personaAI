@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import type { ApiResponse } from "@/types"
 import { ROLE_DEFINITIONS, getPermissionsForRole } from "@/lib/team"
 import type { Role, RoleDefinition, Permission } from "@/lib/team"
@@ -137,6 +138,9 @@ const SEED_MEMBER_COUNTS: Record<Role, number> = {
 }
 
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const roles = [...ROLE_DEFINITIONS]
     const permissionsByRole: Record<string, Permission[]> = {}

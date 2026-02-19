@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import { Prisma } from "@/generated/prisma"
 import { prisma } from "@/lib/prisma"
 import { runEvolutionBatch } from "@/lib/persona-world/evolution"
@@ -12,6 +13,9 @@ import type { NarrativeDriveVector } from "@/types/persona-v3"
  * 진화 현황 조회 — 전체 페르소나 스테이지 분포 + 최근 진화 로그
  */
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const personas = await prisma.persona
       .findMany({
@@ -109,6 +113,9 @@ export async function GET() {
  * 수동 진화 트리거 — 즉시 진화 배치 실행
  */
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = await request.json().catch(() => ({}))
     const periodDays = typeof body.periodDays === "number" ? body.periodDays : 7

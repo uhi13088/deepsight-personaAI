@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 import { executeTransition } from "@/lib/lifecycle"
 import type { ApiResponse, LifecycleTransitionBody, LifecycleTransitionResponse } from "@/types"
@@ -21,6 +22,9 @@ const VALID_ACTIONS = new Set<string>([
 ])
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const { id } = await params
     const body: LifecycleTransitionBody = await request.json()

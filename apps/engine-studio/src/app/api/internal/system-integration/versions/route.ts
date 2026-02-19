@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import type { ApiResponse } from "@/types"
 import {
   createVersion,
@@ -94,6 +95,9 @@ interface VersionListResponse {
 
 // GET — 알고리즘 버전 목록 반환
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const versions = await ensureSeedData()
 
@@ -151,6 +155,9 @@ type VersionAction =
 
 // POST — 버전 액션 처리
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const versions = await ensureSeedData()
     const body = (await request.json()) as VersionAction

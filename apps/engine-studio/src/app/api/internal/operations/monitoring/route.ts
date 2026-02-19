@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import type { ApiResponse } from "@/types"
 import { prisma } from "@/lib/prisma"
 import {
@@ -191,6 +192,9 @@ async function buildFullResponse(): Promise<MonitoringResponse> {
 // ── GET: Return full monitoring data ────────────────────────────
 
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const data = await buildFullResponse()
 
@@ -215,6 +219,9 @@ export async function GET() {
 // ── POST: Refresh metrics or acknowledge alert ──────────────────
 
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = (await request.json()) as MonitoringPostRequest
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 import { runPeriodicQualityCheck } from "@/lib/persona-world/quality-runner"
 import type { QualityRunnerDataProvider } from "@/lib/persona-world/quality-runner"
@@ -13,6 +14,9 @@ interface PersonaQualityRow {
 }
 
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const activePersonas = (await prisma.persona
       .findMany({
@@ -91,6 +95,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = await request.json()
     const { action } = body as { action: string }

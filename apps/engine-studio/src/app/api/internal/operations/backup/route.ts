@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import type { ApiResponse } from "@/types"
 import { prisma } from "@/lib/prisma"
 import {
@@ -165,6 +166,9 @@ interface BackupResponse {
 // ── GET: Return backup data ─────────────────────────────────────
 
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     // 1. Load backup policies from SystemConfig (or use defaults)
     const policies = await loadBackupPolicies()
@@ -229,6 +233,9 @@ interface BackupPostRequest {
 }
 
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = (await request.json()) as BackupPostRequest
 

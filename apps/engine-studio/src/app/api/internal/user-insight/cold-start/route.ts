@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 import type { ApiResponse } from "@/types"
 import {
@@ -163,6 +164,9 @@ interface ColdStartResponse {
 // ── GET: Return all question sets ───────────────────────────────
 
 export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const s = await getStore()
 
@@ -206,6 +210,9 @@ interface ColdStartPostRequest {
 }
 
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuth()
+  if (response) return response
+
   try {
     const body = (await request.json()) as ColdStartPostRequest
     const s = await getStore()
