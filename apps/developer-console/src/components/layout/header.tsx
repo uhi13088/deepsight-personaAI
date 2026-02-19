@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { signOut } from "next-auth/react"
 import {
   Bell,
   ChevronDown,
@@ -380,7 +381,16 @@ export function Header() {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive focus:text-destructive cursor-pointer gap-2"
-              onClick={logout}
+              onClick={async () => {
+                logout()
+                if ("caches" in window) {
+                  const cacheNames = await caches.keys()
+                  await Promise.all(cacheNames.map((name) => caches.delete(name)))
+                }
+                localStorage.clear()
+                sessionStorage.clear()
+                await signOut({ callbackUrl: "/login" })
+              }}
             >
               <LogOut className="h-4 w-4" />
               Log out
