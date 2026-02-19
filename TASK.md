@@ -897,13 +897,13 @@
 
 > L4 대신 독립 모듈 시스템 + 보안 대시보드.
 
-- [ ] **T147: Social Module System — Connectivity (보안 전용)**
+- [x] **T147: Social Module System — Connectivity (보안 전용)** ✅
   - 배경: L4를 레이어가 아닌 독립 모듈로. v4.0에서는 Connectivity만 보안 모니터링용 활성화
-  - AC1: `src/lib/social-module/types.ts` — SocialModuleConfig (authority/connectivity/reputation/tribalism 각 ON/OFF + weight)
-  - AC2: `src/lib/social-module/connectivity.ts` — PersonaRelationship 그래프 분석 (Hub/Isolate 탐지, degree centrality)
-  - AC3: featureBindings 설정 — matching: ["reputation"], feed: ["authority","reputation"], arena: ["tribalism"], security: ["connectivity"]
-  - AC4: DB 스키마 — SocialModuleConfig 테이블 (글로벌 설정, 모듈별 enabled/weight)
-  - AC5: 단위 테스트 + Build PASS
+  - AC1: ✅ `src/lib/social-module/types.ts` — SocialModuleConfig (authority/connectivity/reputation/tribalism 각 ON/OFF + weight)
+  - AC2: ✅ `src/lib/social-module/connectivity.ts` — PersonaRelationship 그래프 분석 (Hub/Isolate 탐지, degree centrality)
+  - AC3: ✅ featureBindings 설정 — matching: ["reputation"], feed: ["authority","reputation"], arena: ["tribalism"], security: ["connectivity"]
+  - AC4: ✅ DB 스키마 — SocialModuleConfig 테이블 (글로벌 싱글톤, 모듈별 enabled/weight)
+  - AC5: ✅ 단위 테스트 45개 + Build PASS
 
 - [ ] **T148: 관리자 보안 대시보드**
   - 배경: 보안 3계층의 모니터링/관리 UI
@@ -965,6 +965,11 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T147: Social Module System — Connectivity (보안 전용)** ✅ 2026-02-19
+  - 변경: schema.prisma(SocialModuleConfig 모델), 016_social_module_config.sql, social-module/index.ts(barrel export)
+  - 기존 완성: types.ts(8종 타입), connectivity.ts(그래프 분석+Hub/Isolate+이상탐지+featureBindings), connectivity.test.ts(45개)
+  - 테스트: PASS (89파일/3612개) + Build PASS
 
 - [x] **T156: [긴급/보안] Engine Studio 인증 체계 구축 — Google OAuth + 초대제** ✅ 2026-02-19
   - AC1: ✅ NextAuth v5 설정 (Google OAuth + JWT, Prisma adapter)

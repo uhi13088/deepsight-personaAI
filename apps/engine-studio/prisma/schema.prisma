@@ -2114,3 +2114,23 @@ enum DRDrillStatus {
   COMPLETED
   CANCELLED
 }
+
+// ============================================
+// v4.0: Social Module 설정 (T147)
+// 글로벌 싱글톤 — 4개 소셜 모듈(authority/connectivity/reputation/tribalism)의 ON/OFF + 가중치
+// ============================================
+
+model SocialModuleConfig {
+  id              String   @id @default("singleton")
+
+  // 각 모듈 설정 (Json: { enabled: boolean, weight: number })
+  authority       Json     @default("{\"enabled\":false,\"weight\":0.2}")
+  connectivity    Json     @default("{\"enabled\":true,\"weight\":0.3}")
+  reputation      Json     @default("{\"enabled\":true,\"weight\":0.3}")
+  tribalism       Json     @default("{\"enabled\":false,\"weight\":0.2}")
+
+  updatedAt       DateTime @updatedAt
+  updatedBy       String   @default("system")
+
+  @@map("social_module_config")
+}
