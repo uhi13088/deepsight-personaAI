@@ -10,19 +10,26 @@ import { useUserStore } from "@/lib/user-store"
 export default function LoginPage() {
   const router = useRouter()
   const { data: session, status: authStatus } = useSession()
-  const { profile, setProfile, completeOnboarding } = useUserStore()
+  const { profile, setProfile, completeOnboarding, reset } = useUserStore()
   const [nickname, setNickname] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [isRegistering, setIsRegistering] = useState(false)
   const [registerError, setRegisterError] = useState<string | null>(null)
 
+  // 세션 만료 + stale localStorage → 스토어 초기화 (redirect loop 방지)
+  useEffect(() => {
+    if (authStatus === "unauthenticated" && profile) {
+      reset()
+    }
+  }, [authStatus, profile, reset])
+
   // 이미 프로필이 있으면 피드로 리다이렉트
   useEffect(() => {
-    if (profile?.completedOnboarding) {
+    if (authStatus === "authenticated" && profile?.completedOnboarding) {
       router.replace("/feed")
     }
-  }, [profile, router])
+  }, [authStatus, profile, router])
 
   // Google 로그인 성공 후 PW 유저 등록
   const registerGoogleUser = useCallback(
@@ -131,7 +138,7 @@ export default function LoginPage() {
 
   // 프로필 로딩 중이거나 세션 확인 중
   if (
-    profile?.completedOnboarding ||
+    (authStatus === "authenticated" && profile?.completedOnboarding) ||
     authStatus === "loading" ||
     (authStatus === "authenticated" && !profile && !registerError)
   ) {

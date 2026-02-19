@@ -91,7 +91,16 @@ export default function ProfilePage() {
   }, [followedPersonas])
 
   const handleLogout = async () => {
+    // Zustand 스토어 초기화
     reset()
+    // 브라우저 캐시 정리 (stale 데이터로 인한 redirect loop 방지)
+    if ("caches" in window) {
+      const cacheNames = await caches.keys()
+      await Promise.all(cacheNames.map((name) => caches.delete(name)))
+    }
+    localStorage.clear()
+    sessionStorage.clear()
+    // NextAuth 로그아웃
     await signOut({ callbackUrl: "/" })
   }
 
