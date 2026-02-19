@@ -16,6 +16,14 @@ interface SummarizeRequest {
   confidence: Record<string, number>
 }
 
+export interface ProfileAnalysis {
+  typeName: string
+  oneLiner: string
+  traits: string[]
+  examples: string[]
+  exploring: string[]
+}
+
 // ── POST /api/internal/user-insight/cold-start/summarize ──────
 
 export async function POST(request: Request) {
@@ -44,16 +52,24 @@ export async function POST(request: Request) {
 
     const systemPrompt = `당신은 DeepSight 페르소나 엔진의 AI 프로필 분석가입니다.
 사용자의 콘텐츠 소비 성향 벡터(L1 Social Persona 7D + L2 OCEAN 5D)를 분석하여,
-이 사용자가 어떤 유형의 콘텐츠 소비자인지 자연어로 설명하세요.
+구조화된 JSON으로 응답하세요.
+
+출력 형식 (반드시 valid JSON만 출력):
+{
+  "typeName": "소비자 유형 이름 (4~8자, 예: 감성 탐험가)",
+  "oneLiner": "이 사용자를 한 줄로 설명 (15~25자)",
+  "traits": ["핵심 성향 키워드 3~5개 (각 2~6자)"],
+  "examples": ["이 사용자가 좋아할 콘텐츠 예시 3~4개 (구체적으로)"],
+  "exploring": ["신뢰도 낮은 차원 설명 0~3개 (각 10~20자, 없으면 빈 배열)"]
+}
 
 규칙:
 - 한국어로 작성
-- 친근하면서도 전문적인 톤
-- 3~5 문장으로 간결하게
-- 구체적인 콘텐츠 소비 예시를 포함 (예: "넷플릭스 다큐멘터리", "실험적인 인디 영화" 등)
 - 수치를 직접 언급하지 말고, 의미만 전달
-- 신뢰도가 낮은 차원(50% 미만)은 "아직 파악 중"이라고 표현
-- 마크다운이나 특수 서식 없이 순수 텍스트만 사용`
+- 신뢰도 50% 미만인 차원은 exploring에 "~은 아직 파악 중" 형태로 포함
+- traits는 형용사+명사 조합 (예: "깊이 있는 분석", "감성적 몰입")
+- examples는 구체적 콘텐츠명 포함 (예: "넷플릭스 다큐 시리즈", "인디 감성 영화")
+- JSON 외 다른 텍스트 절대 출력 금지`
 
     const result = await generateText({
       systemPrompt,
@@ -63,9 +79,18 @@ export async function POST(request: Request) {
       callType: "cold_start_summary",
     })
 
+    // JSON 파싱 시도, 실패하면 기존 텍스트 형태로 fallback
+    let structured: ProfileAnalysis | null = null
+    try {
+      const cleaned = result.text.replace(/```json?\n?|\n?```/g, "").trim()
+      structured = JSON.parse(cleaned) as ProfileAnalysis
+    } catch {
+      // JSON 파싱 실패 — 텍스트 그대로 반환
+    }
+
     return NextResponse.json({
       success: true,
-      data: { summary: result.text },
+      data: structured ? { summary: null, structured } : { summary: result.text, structured: null },
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : "AI 요약 생성 중 오류"
