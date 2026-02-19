@@ -105,8 +105,10 @@ export function HeroOrbital({ dimensions }: HeroOrbitalProps) {
               {ring.dims.map((dim, i) => {
                 const angle = (360 / ring.dims.length) * i - 90
                 const rad = (angle * Math.PI) / 180
-                const x = Math.cos(rad) * ring.radius
-                const y = Math.sin(rad) * ring.radius
+                // 부동소수점 반올림: 서버/클라이언트 간 Math.cos/sin 미세 차이로
+                // style 문자열 불일치 → React hydration #418 방지
+                const x = Math.round(Math.cos(rad) * ring.radius * 100) / 100
+                const y = Math.round(Math.sin(rad) * ring.radius * 100) / 100
                 return (
                   <div
                     key={dim}
