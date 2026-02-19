@@ -38,6 +38,7 @@ import { clientApi } from "@/lib/api"
 import { L1_DIMENSIONS, L2_DIMENSIONS, L3_DIMENSIONS, LAYER_COLORS } from "@/lib/trait-colors"
 import { PROFILE_LEVELS } from "@/lib/profile-level"
 import { SNS_PROVIDER_CONFIG } from "@/lib/role-config"
+import { isBadgeItem, isFrameItem, getShopItemById } from "@/lib/shop"
 import type { PersonaDetail, SnsProvider } from "@/lib/types"
 
 export default function ProfilePage() {
@@ -55,6 +56,7 @@ export default function ProfilePage() {
     connectSns,
     disconnectSns,
     setSnsAnalyzing,
+    purchasedItems,
   } = useUserStore()
 
   const [followedPersonaDetails, setFollowedPersonaDetails] = useState<PersonaDetail[]>([])
@@ -146,6 +148,15 @@ export default function ProfilePage() {
     ? Math.round(profile.vectorConfidence * 100)
     : levelConfig.confidence * 100
 
+  // 구매 아이템 파생 상태
+  const uniquePurchased = [...new Set(purchasedItems)]
+  const hasNicknameGradient = uniquePurchased.includes("nickname_gradient")
+  const activeFrame = uniquePurchased.find((id) => isFrameItem(id))
+  const ownedBadges = uniquePurchased
+    .filter((id) => isBadgeItem(id))
+    .map((id) => getShopItemById(id))
+    .filter(Boolean)
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -166,17 +177,46 @@ export default function ProfilePage() {
         {/* ── AC1: Profile Header + Level Badge ───────────────── */}
         <div className="mb-6 text-center">
           <div className="mx-auto mb-4 h-24 w-24">
-            <div className="pw-profile-ring h-full w-full">
-              <div className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-pink-400">
-                <User className="h-12 w-12 text-white" />
+            <div
+              className={`h-full w-full rounded-full p-[3px] ${
+                activeFrame === "frame_hologram"
+                  ? "animate-pulse bg-gradient-to-br from-cyan-400 via-purple-500 to-pink-500"
+                  : activeFrame === "frame_gold"
+                    ? "bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-500"
+                    : ""
+              }`}
+            >
+              <div
+                className={`h-full w-full ${activeFrame ? "rounded-full bg-white p-[2px]" : ""}`}
+              >
+                <div className="pw-profile-ring h-full w-full">
+                  <div className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-pink-400">
+                    <User className="h-12 w-12 text-white" />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-          <h2 className="text-xl font-bold text-gray-900">{profile?.nickname || "관찰자"}</h2>
+          <h2
+            className={`text-xl font-bold ${hasNicknameGradient ? "pw-text-gradient" : "text-gray-900"}`}
+          >
+            {profile?.nickname || "관찰자"}
+          </h2>
 
-          {/* 프로필 등급 뱃지 */}
-          <div className="mt-2 flex items-center justify-center gap-2">
+          {/* 프로필 등급 뱃지 + 상점 배지 */}
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
             <PWProfileLevelBadge level={onboarding.profileLevel} />
+            {ownedBadges.map(
+              (badge) =>
+                badge && (
+                  <span
+                    key={badge.id}
+                    className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-1 text-xs font-medium text-purple-700"
+                  >
+                    {badge.emoji} {badge.name.replace("배지: ", "")}
+                  </span>
+                )
+            )}
           </div>
 
           {/* 매칭 정밀도 바 */}
@@ -206,10 +246,14 @@ export default function ProfilePage() {
                 <span className="font-medium">{dailyQuestion.streak}일 연속</span>
               </div>
             )}
-            <div className="flex items-center gap-1 text-sm text-amber-600">
+            <Link
+              href="/shop"
+              className="flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-sm text-amber-600 transition-colors hover:bg-amber-100"
+            >
               <Coins className="h-4 w-4" />
               <span className="font-medium">{onboarding.creditsBalance} 코인</span>
-            </div>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
 
           <p className="mt-2 text-sm text-gray-500">

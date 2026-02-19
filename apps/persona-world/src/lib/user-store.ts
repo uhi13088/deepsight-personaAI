@@ -126,6 +126,12 @@ interface UserState {
   disconnectSns: (provider: SnsProvider) => void
   setSnsAnalyzing: (provider: SnsProvider, analyzing: boolean) => void
 
+  // 상점 — 구매한 아이템 ID 목록
+  purchasedItems: string[]
+  purchaseItem: (itemId: string, price: number) => boolean
+  hasPurchased: (itemId: string) => boolean
+  getPurchaseCount: (itemId: string) => number
+
   // 초기화
   reset: () => void
 }
@@ -157,6 +163,7 @@ const initialState = {
   repostedPosts: [] as string[],
   bookmarkedPosts: [] as string[],
   notifications: [] as Notification[],
+  purchasedItems: [] as string[],
 }
 
 // Fire-and-forget 서버 동기화 (실패 시 로컬 상태 유지)
@@ -449,6 +456,23 @@ export const useUserStore = create<UserState>()(
             c.provider === provider ? { ...c, analyzing } : c
           ),
         })),
+
+      // 상점 — 구매
+      purchasedItems: [],
+      purchaseItem: (itemId, price) => {
+        const state = get()
+        if (state.onboarding.creditsBalance < price) return false
+        set((s) => ({
+          onboarding: {
+            ...s.onboarding,
+            creditsBalance: s.onboarding.creditsBalance - price,
+          },
+          purchasedItems: [...s.purchasedItems, itemId],
+        }))
+        return true
+      },
+      hasPurchased: (itemId) => get().purchasedItems.includes(itemId),
+      getPurchaseCount: (itemId) => get().purchasedItems.filter((id) => id === itemId).length,
 
       // 초기화
       reset: () => set(initialState),

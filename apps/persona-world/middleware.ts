@@ -31,5 +31,6 @@ export const config = {
     "/persona/:path*",
     "/notifications/:path*",
     "/onboarding/:path*",
+    "/shop/:path*",
   ],
 }
