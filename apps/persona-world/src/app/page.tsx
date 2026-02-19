@@ -157,7 +157,7 @@ export default function LoginPage() {
             {/* Google 로그인 */}
             <button
               onClick={handleGoogleLogin}
-              disabled={isGoogleLoading || isLoading || authStatus === "loading"}
+              disabled={isGoogleLoading || isLoading}
               className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24">
