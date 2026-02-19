@@ -115,6 +115,7 @@ export interface ActivityDecision {
 // ── 스케줄러 트리거 ──────────────────────────────────────────
 export type SchedulerTrigger =
   | "SCHEDULED"
+  | "MANUAL"
   | "CONTENT_RELEASE"
   | "USER_INTERACTION"
   | "SOCIAL_EVENT"

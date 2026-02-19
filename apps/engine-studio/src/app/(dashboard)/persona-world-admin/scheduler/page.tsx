@@ -19,11 +19,29 @@ interface SchedulerData {
   }>
 }
 
+interface TriggerResult {
+  message: string
+  result?: {
+    decisions?: Array<{
+      personaId: string
+      shouldPost: boolean
+      shouldInteract: boolean
+      postType?: string
+    }>
+    execution?: {
+      postsCreated: Array<{ personaId: string; postId: string; postType: string }>
+      interactions: Array<{ personaId: string; likes: number; comments: number }>
+      llmAvailable: boolean
+    }
+  }
+}
+
 export default function SchedulerControlPage() {
   const [data, setData] = useState<SchedulerData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [triggering, setTriggering] = useState(false)
+  const [lastTriggerResult, setLastTriggerResult] = useState<TriggerResult | null>(null)
 
   const fetchData = useCallback(async () => {
     try {
@@ -52,13 +70,20 @@ export default function SchedulerControlPage() {
 
   async function triggerNow() {
     setTriggering(true)
+    setLastTriggerResult(null)
     try {
-      await fetch("/api/internal/persona-world-admin/scheduler", {
+      const res = await fetch("/api/internal/persona-world-admin/scheduler", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "trigger_now" }),
       })
+      const json = (await res.json()) as { success: boolean; data?: TriggerResult }
+      if (json.data) {
+        setLastTriggerResult(json.data)
+      }
       void fetchData()
+    } catch {
+      setLastTriggerResult({ message: "Network error — 스케줄러 호출 실패" })
     } finally {
       setTriggering(false)
     }
@@ -81,6 +106,9 @@ export default function SchedulerControlPage() {
       </div>
     )
   }
+
+  const execution = lastTriggerResult?.result?.execution
+  const decisions = lastTriggerResult?.result?.decisions
 
   return (
     <div className="space-y-6 p-6">
@@ -115,11 +143,73 @@ export default function SchedulerControlPage() {
       </div>
 
       {/* Controls */}
-      <div className="flex gap-3">
+      <div className="flex items-center gap-3">
         <Button onClick={triggerNow} disabled={triggering}>
           {triggering ? "실행 중..." : "지금 실행"}
         </Button>
+        {triggering && (
+          <span className="text-muted-foreground animate-pulse text-sm">
+            스케줄러 파이프라인 실행 중 (LLM 호출 포함, 최대 수십 초 소요)...
+          </span>
+        )}
       </div>
+
+      {/* Trigger Result */}
+      {lastTriggerResult && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4">
+          <h3 className="mb-2 text-sm font-semibold">실행 결과</h3>
+          <p className="text-sm">{lastTriggerResult.message}</p>
+
+          {execution && (
+            <div className="mt-3 space-y-2">
+              <div className="flex gap-4 text-sm">
+                <span>
+                  LLM:{" "}
+                  <Badge variant={execution.llmAvailable ? "default" : "destructive"}>
+                    {execution.llmAvailable ? "OK" : "미설정"}
+                  </Badge>
+                </span>
+                <span>포스트 생성: {execution.postsCreated.length}개</span>
+                <span>인터랙션: {execution.interactions.length}건</span>
+              </div>
+
+              {execution.postsCreated.length > 0 && (
+                <div className="text-xs text-gray-600">
+                  {execution.postsCreated.map((p, i) => (
+                    <div key={i}>
+                      [{p.postType}] {p.personaId.slice(0, 8)}... → {p.postId.slice(0, 8)}...
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {execution.interactions.length > 0 && (
+                <div className="text-xs text-gray-600">
+                  {execution.interactions.map((int, i) => (
+                    <div key={i}>
+                      {int.personaId.slice(0, 8)}... → 좋아요 {int.likes}, 댓글 {int.comments}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {decisions && decisions.length > 0 && !execution && (
+            <div className="mt-2 text-xs text-gray-600">
+              결정: {decisions.length}개 페르소나 (포스트:{" "}
+              {decisions.filter((d) => d.shouldPost).length}, 인터랙션:{" "}
+              {decisions.filter((d) => d.shouldInteract).length})
+            </div>
+          )}
+
+          {decisions && decisions.length === 0 && (
+            <p className="text-muted-foreground mt-2 text-xs">
+              이 시간대에 활동할 페르소나가 없습니다 (활성 시간 또는 에너지 부족)
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Paused Personas */}
       {data?.pausedPersonas && data.pausedPersonas.length > 0 && (

@@ -506,6 +506,22 @@
 
 ---
 
+### Phase PW-E: PersonaWorld 크레딧 상점 (T157)
+
+> 온보딩/데일리 질문으로 획득한 코인을 사용할 수 있는 상점 시스템
+> 카테고리: 페르소나 관련 + 프로필 꾸미기
+
+- [ ] **T157: 크레딧 상점 페이지 + 구매 시스템**
+  - 배경: 현재 코인이 쌓이기만 하고 사용처가 없음. 상점을 통해 코인 소비 경로 제공
+  - AC1: `shop.ts` — ShopItem 타입 + SHOP_ITEMS 정적 데이터 (페르소나 4종 + 프로필 7종, 반복구매 플래그)
+  - AC2: `user-store.ts` — purchasedItems 상태 + purchaseItem(크레딧 차감+아이템 추가) + hasPurchased 헬퍼
+  - AC3: `/shop` 페이지 — 코인 잔액 표시 + 카테고리 탭(페르소나/프로필) + 아이템 그리드 + 구매 확인 다이얼로그
+  - AC4: 프로필 페이지 연동 — 코인 옆 "상점" 링크 + 구매한 배지/프레임/닉네임 그라데이션 렌더링
+  - AC5: middleware.ts `/shop` 라우트 추가
+  - AC6: Build PASS + 테스트 PASS
+
+---
+
 ### 별도 작업 (설계 문서 + 데이터)
 
 - [x] **T42: 매칭 설명 + 유저↔페르소나 일치도 시스템** (설계 문서) ✅ T57+T58에서 구현 완료
@@ -965,6 +981,15 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T157: 크레딧 상점 페이지 + 구매 시스템** ✅ 2026-02-19
+  - AC1: ✅ `shop.ts` — ShopItem 타입 + SHOP_ITEMS 정적 데이터 (페르소나 4종 + 프로필 7종, repeatable 플래그, SOON 태그)
+  - AC2: ✅ `user-store.ts` — purchasedItems[] + purchaseItem(크레딧 차감) + hasPurchased + getPurchaseCount
+  - AC3: ✅ `/shop` 페이지 — Hero 코인 잔액 + 카테고리 탭(페르소나/프로필) + 아이템 카드 그리드 + 구매 확인 다이얼로그
+  - AC4: ✅ 프로필 연동 — 코인→상점 링크, 구매 배지 렌더링, 닉네임 그라데이션, 프로필 프레임(골드/홀로그램)
+  - AC5: ✅ middleware.ts `/shop` 라우트 추가
+  - AC6: ✅ Build PASS (PW + ES) + 84 테스트 PASS
+  - 변경: shop.ts, user-store.ts, shop/page.tsx, profile/page.tsx, middleware.ts
 
 - [x] **T148: 관리자 보안 대시보드** ✅ 2026-02-19
   - 변경: lnb.tsx(Security 섹션), middleware.ts(/security 보호), security/page.tsx(AC1+AC3 대시보드), security/quarantine/page.tsx(AC2), security/kill-switch/page.tsx(AC4), security/connectivity/page.tsx(AC5)

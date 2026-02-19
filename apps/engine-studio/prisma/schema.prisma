@@ -1250,6 +1250,7 @@ enum PersonaPostType {
 
 enum ActivityTrigger {
   SCHEDULED       // 정기 스케줄
+  MANUAL          // 관리자 수동 실행
   CONTENT_RELEASE // 새 콘텐츠 출시
   SOCIAL_EVENT    // 다른 페르소나 활동
   USER_INTERACTION // 유저 인터랙션

@@ -288,10 +288,25 @@ function CoverageChart({
   )
 }
 
+// ── AI 프로필 분석 타입 ───────────────────────────────────────
+
+interface ProfileAnalysis {
+  typeName: string
+  oneLiner: string
+  traits: string[]
+  examples: string[]
+  exploring: string[]
+}
+
+interface AiSummaryResult {
+  summary: string | null
+  structured: ProfileAnalysis | null
+}
+
 // ── AI 프로필 요약 훅 ─────────────────────────────────────────
 
 function useAiSummary() {
-  const [summary, setSummary] = useState<string | null>(null)
+  const [result, setResult] = useState<AiSummaryResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -303,7 +318,7 @@ function useAiSummary() {
     ) => {
       setLoading(true)
       setError(null)
-      setSummary(null)
+      setResult(null)
       try {
         const res = await fetch("/api/internal/user-insight/cold-start/summarize", {
           method: "POST",
@@ -312,11 +327,11 @@ function useAiSummary() {
         })
         const json = (await res.json()) as {
           success: boolean
-          data?: { summary: string }
+          data?: { summary: string | null; structured: ProfileAnalysis | null }
           error?: { code: string; message: string }
         }
         if (json.success && json.data) {
-          setSummary(json.data.summary)
+          setResult(json.data)
         } else {
           setError(json.error?.message ?? "AI 요약 생성에 실패했습니다")
         }
@@ -330,12 +345,12 @@ function useAiSummary() {
   )
 
   const reset = useCallback(() => {
-    setSummary(null)
+    setResult(null)
     setError(null)
     setLoading(false)
   }, [])
 
-  return { summary, loading, error, requestSummary, reset }
+  return { result, loading, error, requestSummary, reset }
 }
 
 // ── 테스트 결과 패널 ──────────────────────────────────────────
@@ -365,7 +380,7 @@ function TestResultPanel({
     : null
 
   // AI 요약
-  const { summary, loading: aiLoading, error: aiError, requestSummary } = useAiSummary()
+  const { result: aiResult, loading: aiLoading, error: aiError, requestSummary } = useAiSummary()
 
   const handleRequestSummary = useCallback(() => {
     const l1Map: Record<string, number> = {}
@@ -387,7 +402,7 @@ function TestResultPanel({
             <Sparkles className="h-4 w-4 text-amber-400" />
             AI 프로필 분석
           </h3>
-          {!summary && !aiLoading && (
+          {!aiResult && !aiLoading && (
             <Button variant="outline" size="sm" onClick={handleRequestSummary}>
               <Sparkles className="mr-1 h-3 w-3" />
               분석 요청
@@ -396,7 +411,7 @@ function TestResultPanel({
         </div>
 
         {/* 초기 상태 */}
-        {!summary && !aiLoading && !aiError && (
+        {!aiResult && !aiLoading && !aiError && (
           <p className="text-muted-foreground text-sm leading-relaxed">
             벡터 결과를 AI가 자연어로 분석합니다. &quot;분석 요청&quot; 버튼을 눌러주세요.
           </p>
@@ -420,10 +435,81 @@ function TestResultPanel({
           </div>
         )}
 
-        {/* 요약 결과 */}
-        {summary && (
+        {/* 구조화된 분석 결과 */}
+        {aiResult?.structured && (
           <div className="space-y-3">
-            <p className="text-sm leading-relaxed">{summary}</p>
+            {/* 유형 배지 + 한줄 요약 */}
+            <div className="flex items-start gap-2">
+              <Badge className="shrink-0 bg-amber-500/15 text-amber-400 hover:bg-amber-500/25">
+                {aiResult.structured.typeName}
+              </Badge>
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                {aiResult.structured.oneLiner}
+              </p>
+            </div>
+
+            {/* 핵심 성향 */}
+            <div>
+              <p className="text-muted-foreground mb-1.5 text-[11px] font-medium uppercase tracking-wider">
+                핵심 성향
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {aiResult.structured.traits.map((trait) => (
+                  <span key={trait} className="bg-muted rounded-md px-2 py-0.5 text-xs">
+                    {trait}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* 추천 콘텐츠 */}
+            <div>
+              <p className="text-muted-foreground mb-1.5 text-[11px] font-medium uppercase tracking-wider">
+                이런 콘텐츠를 좋아해요
+              </p>
+              <ul className="space-y-1">
+                {aiResult.structured.examples.map((example) => (
+                  <li
+                    key={example}
+                    className="text-muted-foreground flex items-center gap-1.5 text-xs"
+                  >
+                    <span className="h-1 w-1 shrink-0 rounded-full bg-amber-400" />
+                    {example}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* 파악 중인 영역 */}
+            {aiResult.structured.exploring.length > 0 && (
+              <div className="border-t pt-2">
+                <p className="text-muted-foreground mb-1 text-[11px]">아직 파악 중</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {aiResult.structured.exploring.map((item) => (
+                    <span
+                      key={item}
+                      className="bg-muted/50 text-muted-foreground rounded-md px-2 py-0.5 text-[11px]"
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={handleRequestSummary}
+              className="text-muted-foreground hover:text-foreground text-xs transition-colors"
+            >
+              다시 분석
+            </button>
+          </div>
+        )}
+
+        {/* fallback: 텍스트 요약 (structured 파싱 실패 시) */}
+        {aiResult && !aiResult.structured && aiResult.summary && (
+          <div className="space-y-3">
+            <p className="text-sm leading-relaxed">{aiResult.summary}</p>
             <button
               onClick={handleRequestSummary}
               className="text-muted-foreground hover:text-foreground text-xs transition-colors"

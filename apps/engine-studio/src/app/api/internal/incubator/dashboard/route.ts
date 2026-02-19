@@ -214,13 +214,123 @@ export async function POST(request: NextRequest) {
     const { action } = body as { action: string }
 
     if (action === "trigger_batch") {
-      // 수동 배치 트리거 — 인큐베이터 로그에 기록만 (실제 LLM 호출은 스케줄러)
+      // 설정에서 dailyLimit, passThreshold 조회
+      const configRows = await prisma.systemConfig
+        .findMany({ where: { category: "INCUBATOR" } })
+        .catch(() => [])
+      const configMap = Object.fromEntries(configRows.map((r) => [r.key, r.value]))
+      const dailyLimit = (configMap.dailyLimit as number) ?? 10
+      const passThreshold = (configMap.passThreshold as number) ?? 0.9
+
       const batchId = `batch-manual-${Date.now()}`
-      return NextResponse.json<ApiResponse<{ batchId: string; message: string }>>({
+      const startTime = Date.now()
+      const results: Array<{
+        personaId: string
+        name: string
+        archetypeId: string | null
+        paradoxScore: number
+        status: string
+      }> = []
+      const errors: string[] = []
+
+      // generate-random 파이프라인을 N회 호출
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
+      const cookie = request.headers.get("cookie") ?? ""
+
+      for (let i = 0; i < dailyLimit; i++) {
+        try {
+          const res = await fetch(`${baseUrl}/api/internal/personas/generate-random`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Cookie: cookie,
+            },
+            body: JSON.stringify({ status: "DRAFT" }),
+          })
+          const json = (await res.json()) as {
+            success: boolean
+            data?: {
+              id: string
+              name: string
+              archetypeId: string | null
+              paradoxScore: number
+            }
+            error?: { message: string }
+          }
+
+          if (json.success && json.data) {
+            // paradoxScore 기반 합격/불합격 판정
+            // dimensionality = exp(-(paradox - 0.35)² / (2 × 0.2²))  → 0.35 근방이 최적
+            const p = json.data.paradoxScore
+            const dimensionality = Math.exp(-((p - 0.35) ** 2) / (2 * 0.2 ** 2))
+            const passed = dimensionality >= passThreshold
+
+            const status = passed ? "PASSED" : "FAILED"
+            results.push({
+              personaId: json.data.id,
+              name: json.data.name,
+              archetypeId: json.data.archetypeId,
+              paradoxScore: json.data.paradoxScore,
+              status,
+            })
+
+            // PASSED → ACTIVE 승격, FAILED → DRAFT 유지
+            if (passed) {
+              await prisma.persona.update({
+                where: { id: json.data.id },
+                data: { status: "ACTIVE" },
+              })
+            }
+
+            // IncubatorLog 기록
+            await prisma.incubatorLog.create({
+              data: {
+                batchId,
+                batchDate: new Date(),
+                personaConfig: { archetypeId: json.data.archetypeId },
+                generatedPrompt: json.data.name,
+                testSampleIds: [],
+                consistencyScore: dimensionality,
+                vectorAlignmentScore: dimensionality,
+                toneMatchScore: p,
+                reasoningQualityScore: dimensionality,
+                status,
+              },
+            })
+          } else {
+            errors.push(json.error?.message ?? `Slot ${i} failed`)
+          }
+        } catch (err) {
+          errors.push(err instanceof Error ? err.message : `Slot ${i} error`)
+        }
+      }
+
+      const passedCount = results.filter((r) => r.status === "PASSED").length
+      const failedCount = results.filter((r) => r.status === "FAILED").length
+      const durationMs = Date.now() - startTime
+
+      return NextResponse.json<
+        ApiResponse<{
+          batchId: string
+          message: string
+          generated: number
+          passed: number
+          failed: number
+          errors: number
+          durationMs: number
+          results: typeof results
+        }>
+      >({
         success: true,
         data: {
           batchId,
-          message: "수동 배치가 요청되었습니다. 스케줄러가 다음 사이클에서 실행합니다.",
+          message: `배치 완료: ${results.length}개 생성, ${passedCount}개 합격, ${failedCount}개 불합격`,
+          generated: results.length,
+          passed: passedCount,
+          failed: failedCount,
+          errors: errors.length,
+          durationMs,
+          results,
         },
       })
     }

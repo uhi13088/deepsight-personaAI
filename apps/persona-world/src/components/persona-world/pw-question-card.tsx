@@ -10,6 +10,12 @@ interface PWQuestionCardProps {
   onSelect: (value: string) => void
 }
 
+// v3.0: { id, label, value }, v3.1: { key, label, l1Weights, ... }
+// 둘 다 지원하기 위해 optionId를 추출하는 헬퍼
+function getOptionId(option: Record<string, unknown>): string {
+  return String(option.id ?? option.key ?? "")
+}
+
 export function PWQuestionCard({ question, selectedValue, onSelect }: PWQuestionCardProps) {
   const [justSelected, setJustSelected] = useState<string | null>(null)
 
@@ -26,23 +32,20 @@ export function PWQuestionCard({ question, selectedValue, onSelect }: PWQuestion
   }
 
   // MULTIPLE_CHOICE (4지선다)
-  const options = (question.options ?? []) as Array<{
-    id: string
-    label: string
-    value: string
-    weights?: Record<string, number>
-  }>
+  const rawOptions = (question.options ?? []) as unknown as Array<Record<string, unknown>>
 
   return (
     <div className="space-y-3">
-      {options.map((option) => {
-        const isSelected = selectedValue === option.id
-        const isJust = justSelected === option.id
+      {rawOptions.map((option) => {
+        const optionId = getOptionId(option)
+        const label = String(option.label ?? "")
+        const isSelected = selectedValue === optionId
+        const isJust = justSelected === optionId
 
         return (
           <button
-            key={option.id}
-            onClick={() => handleSelect(option.id)}
+            key={optionId}
+            onClick={() => handleSelect(optionId)}
             className={`w-full rounded-xl border-2 p-4 text-left transition-all duration-200 ${
               isSelected
                 ? "pw-border-gradient border-transparent bg-purple-50"
@@ -55,7 +58,7 @@ export function PWQuestionCard({ question, selectedValue, onSelect }: PWQuestion
                   isSelected ? "pw-text-gradient" : "text-gray-700"
                 }`}
               >
-                {option.label}
+                {label}
               </span>
               {isSelected && (
                 <div className="pw-gradient flex h-6 w-6 shrink-0 items-center justify-center rounded-full">
@@ -79,14 +82,12 @@ interface PWSliderQuestionProps {
 }
 
 function PWSliderQuestion({ question, selectedValue, onSelect }: PWSliderQuestionProps) {
-  const options = (question.options ?? []) as Array<{
-    id: string
-    label: string
-    value: number
-  }>
+  const rawOptions = (question.options ?? []) as unknown as Array<Record<string, unknown>>
 
-  const minLabel = options.find((o) => o.id === "min")?.label ?? ""
-  const maxLabel = options.find((o) => o.id === "max")?.label ?? ""
+  const minOption = rawOptions.find((o) => (o.id ?? o.key) === "min")
+  const maxOption = rawOptions.find((o) => (o.id ?? o.key) === "max")
+  const minLabel = String(minOption?.label ?? "")
+  const maxLabel = String(maxOption?.label ?? "")
 
   const value = selectedValue ? Number(selectedValue) : 0.5
 
