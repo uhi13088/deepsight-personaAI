@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 import type { ApiResponse } from "@/types"
+import { executePersonaGenerationPipeline } from "@/lib/persona-generation/pipeline"
 import {
   buildDashboard,
   type IncubatorDashboard,
@@ -14,7 +15,11 @@ import {
   type BatchResult,
   type IncubatorLogEntry,
 } from "@/lib/incubator"
-import { calculateMonthlyCost } from "@/lib/incubator/cost-control"
+import {
+  calculateMonthlyCostFromDB,
+  getDailyCostsFromDB,
+  getCostForPeriod,
+} from "@/lib/incubator/cost-control"
 import { calculateGoldenSampleMetrics } from "@/lib/incubator/golden-sample"
 import type { GoldenSample } from "@/lib/incubator/golden-sample"
 import type { IncubatorStatus } from "@/lib/incubator/batch-workflow"
@@ -29,9 +34,8 @@ export async function GET() {
     const now = new Date()
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
-    const [recentLogs, goldenSamplesRaw, statusCounts, monthlyLogCount] = await Promise.all([
+    const [recentLogs, goldenSamplesRaw, statusCounts, costUsage, dailyCosts] = await Promise.all([
       // 최근 7일 인큐베이터 로그
       prisma.incubatorLog.findMany({
         where: { batchDate: { gte: sevenDaysAgo } },
@@ -49,10 +53,11 @@ export async function GET() {
         _count: { status: true },
       }),
 
-      // 이번 달 총 생성/테스트 수
-      prisma.incubatorLog.count({
-        where: { createdAt: { gte: monthStart } },
-      }),
+      // 이번 달 실제 LLM 비용 (LlmUsageLog 기반)
+      calculateMonthlyCostFromDB(),
+
+      // 7일간 일별 실제 LLM 비용
+      getDailyCostsFromDB(7),
     ])
 
     // 상태별 카운트 맵
@@ -91,6 +96,13 @@ export async function GET() {
       const total = logs.length
       const batchDate = logs[0].batchDate
 
+      // 배치 시간 범위의 실제 LLM 비용 조회
+      const batchStart = new Date(batchDate)
+      batchStart.setHours(0, 0, 0, 0)
+      const batchEnd = new Date(batchDate)
+      batchEnd.setHours(23, 59, 59, 999)
+      const batchCost = await getCostForPeriod(batchStart, batchEnd)
+
       const batchLogs: IncubatorLogEntry[] = logs.map((l) => ({
         id: l.id,
         batchId: l.batchId,
@@ -123,7 +135,7 @@ export async function GET() {
         passedCount,
         failedCount,
         passRate: total > 0 ? Math.round((passedCount / total) * 100) / 100 : 0,
-        estimatedCost: total * 7,
+        estimatedCost: batchCost.totalCostKRW,
         logs: batchLogs,
         durationMs: 0,
       })
@@ -135,8 +147,7 @@ export async function GET() {
     // 오늘 배치
     const todayBatch = recentBatches.find((b) => b.batchDate >= todayStart) ?? null
 
-    // 비용 계산
-    const costUsage = calculateMonthlyCost(monthlyLogCount, monthlyLogCount)
+    // costUsage는 이미 calculateMonthlyCostFromDB()로 조회됨 (실제 LLM 비용)
 
     // 골든 샘플 메트릭
     const goldenSamples: GoldenSample[] = goldenSamplesRaw.map((gs) => ({
@@ -175,6 +186,7 @@ export async function GET() {
       cumulativeActive,
       strategy,
       goldenSamples: gsMetrics,
+      dailyCosts,
       lifecycle,
     })
 
@@ -233,73 +245,49 @@ export async function POST(request: NextRequest) {
       }> = []
       const errors: string[] = []
 
-      // generate-random 파이프라인을 N회 호출
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
-      const cookie = request.headers.get("cookie") ?? ""
-
+      // 내부 함수 직접 호출로 페르소나 생성 (self-fetch 제거)
       for (let i = 0; i < dailyLimit; i++) {
         try {
-          const res = await fetch(`${baseUrl}/api/internal/personas/generate-random`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Cookie: cookie,
-            },
-            body: JSON.stringify({ status: "DRAFT" }),
+          const generated = await executePersonaGenerationPipeline({ status: "DRAFT" })
+
+          // paradoxScore 기반 합격/불합격 판정
+          // dimensionality = exp(-(paradox - 0.35)² / (2 × 0.2²))  → 0.35 근방이 최적
+          const p = generated.paradoxScore
+          const dimensionality = Math.exp(-((p - 0.35) ** 2) / (2 * 0.2 ** 2))
+          const passed = dimensionality >= passThreshold
+
+          const status = passed ? "PASSED" : "FAILED"
+          results.push({
+            personaId: generated.id,
+            name: generated.name,
+            archetypeId: generated.archetypeId,
+            paradoxScore: generated.paradoxScore,
+            status,
           })
-          const json = (await res.json()) as {
-            success: boolean
-            data?: {
-              id: string
-              name: string
-              archetypeId: string | null
-              paradoxScore: number
-            }
-            error?: { message: string }
+
+          // PASSED → ACTIVE 승격, FAILED → DRAFT 유지
+          if (passed) {
+            await prisma.persona.update({
+              where: { id: generated.id },
+              data: { status: "ACTIVE" },
+            })
           }
 
-          if (json.success && json.data) {
-            // paradoxScore 기반 합격/불합격 판정
-            // dimensionality = exp(-(paradox - 0.35)² / (2 × 0.2²))  → 0.35 근방이 최적
-            const p = json.data.paradoxScore
-            const dimensionality = Math.exp(-((p - 0.35) ** 2) / (2 * 0.2 ** 2))
-            const passed = dimensionality >= passThreshold
-
-            const status = passed ? "PASSED" : "FAILED"
-            results.push({
-              personaId: json.data.id,
-              name: json.data.name,
-              archetypeId: json.data.archetypeId,
-              paradoxScore: json.data.paradoxScore,
+          // IncubatorLog 기록
+          await prisma.incubatorLog.create({
+            data: {
+              batchId,
+              batchDate: new Date(),
+              personaConfig: { archetypeId: generated.archetypeId },
+              generatedPrompt: generated.name,
+              testSampleIds: [],
+              consistencyScore: dimensionality,
+              vectorAlignmentScore: dimensionality,
+              toneMatchScore: p,
+              reasoningQualityScore: dimensionality,
               status,
-            })
-
-            // PASSED → ACTIVE 승격, FAILED → DRAFT 유지
-            if (passed) {
-              await prisma.persona.update({
-                where: { id: json.data.id },
-                data: { status: "ACTIVE" },
-              })
-            }
-
-            // IncubatorLog 기록
-            await prisma.incubatorLog.create({
-              data: {
-                batchId,
-                batchDate: new Date(),
-                personaConfig: { archetypeId: json.data.archetypeId },
-                generatedPrompt: json.data.name,
-                testSampleIds: [],
-                consistencyScore: dimensionality,
-                vectorAlignmentScore: dimensionality,
-                toneMatchScore: p,
-                reasoningQualityScore: dimensionality,
-                status,
-              },
-            })
-          } else {
-            errors.push(json.error?.message ?? `Slot ${i} failed`)
-          }
+            },
+          })
         } catch (err) {
           errors.push(err instanceof Error ? err.message : `Slot ${i} error`)
         }

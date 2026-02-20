@@ -7,6 +7,7 @@ import {
   checkToneBoundaries,
   buildVoiceSpec,
   summarizeVoiceSpec,
+  computeVoiceStyleParams,
   DEFAULT_CONSISTENCY_CONFIG,
 } from "@/lib/qualitative/voice-spec"
 import type {
@@ -55,11 +56,13 @@ const volatileL3: NarrativeDriveVector = {
   lack: 0.4,
   volatility: 0.7,
   moralCompass: 0.5,
+  growthArc: 0.5,
 }
 const stableL3: NarrativeDriveVector = {
   lack: 0.3,
   volatility: 0.2,
   moralCompass: 0.8,
+  growthArc: 0.6,
 }
 
 const baseProfile: VoiceProfile = {
@@ -361,6 +364,116 @@ describe("summarizeVoiceSpec", () => {
     const spec = buildVoiceSpec(baseProfile, baseStyleParams, formalL1, introvertL2, stableL3)
     const summary = summarizeVoiceSpec(spec)
     expect(summary).toContain("[금지]")
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// computeVoiceStyleParams
+// ═══════════════════════════════════════════════════════════════
+
+describe("computeVoiceStyleParams", () => {
+  it("모든 6개 파라미터 생성", () => {
+    const params = computeVoiceStyleParams(formalL1, introvertL2, stableL3)
+    expect(params.formality).toBeDefined()
+    expect(params.humor).toBeDefined()
+    expect(params.sentenceLength).toBeDefined()
+    expect(params.emotionExpression).toBeDefined()
+    expect(params.assertiveness).toBeDefined()
+    expect(params.vocabularyLevel).toBeDefined()
+  })
+
+  it("모든 값 0~1 범위", () => {
+    const params = computeVoiceStyleParams(formalL1, introvertL2, stableL3)
+    for (const val of Object.values(params)) {
+      expect(val).toBeGreaterThanOrEqual(0)
+      expect(val).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it("격식적 벡터 → 높은 formality", () => {
+    const formal = computeVoiceStyleParams(formalL1, introvertL2, stableL3)
+    const casual = computeVoiceStyleParams(casualL1, extrovertL2, volatileL3)
+    expect(formal.formality).toBeGreaterThan(casual.formality)
+  })
+
+  it("외향적 벡터 → 높은 humor", () => {
+    const introvert = computeVoiceStyleParams(formalL1, introvertL2, stableL3)
+    const extrovert = computeVoiceStyleParams(casualL1, extrovertL2, volatileL3)
+    expect(extrovert.humor).toBeGreaterThan(introvert.humor)
+  })
+
+  it("깊이 높은 벡터 → 높은 vocabularyLevel", () => {
+    const deep = computeVoiceStyleParams(formalL1, introvertL2, stableL3)
+    const shallow = computeVoiceStyleParams(casualL1, extrovertL2, volatileL3)
+    expect(deep.vocabularyLevel).toBeGreaterThan(shallow.vocabularyLevel)
+  })
+
+  it("stance 높은 벡터 → 높은 assertiveness", () => {
+    const highStance: SocialPersonaVector = { ...formalL1, stance: 0.9 }
+    const lowStance: SocialPersonaVector = { ...casualL1, stance: 0.1 }
+    const high = computeVoiceStyleParams(highStance, introvertL2, stableL3)
+    const low = computeVoiceStyleParams(lowStance, introvertL2, stableL3)
+    expect(high.assertiveness).toBeGreaterThan(low.assertiveness)
+  })
+
+  it("극단 벡터에서도 범위 유지", () => {
+    const extremeL1: SocialPersonaVector = {
+      depth: 1,
+      lens: 1,
+      stance: 1,
+      scope: 1,
+      taste: 1,
+      purpose: 1,
+      sociability: 1,
+    }
+    const extremeL2: CoreTemperamentVector = {
+      openness: 1,
+      conscientiousness: 1,
+      extraversion: 1,
+      agreeableness: 1,
+      neuroticism: 1,
+    }
+    const extremeL3: NarrativeDriveVector = {
+      lack: 1,
+      moralCompass: 1,
+      volatility: 1,
+      growthArc: 1,
+    }
+    const params = computeVoiceStyleParams(extremeL1, extremeL2, extremeL3)
+    for (const val of Object.values(params)) {
+      expect(val).toBeGreaterThanOrEqual(0)
+      expect(val).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it("제로 벡터에서도 범위 유지", () => {
+    const zeroL1: SocialPersonaVector = {
+      depth: 0,
+      lens: 0,
+      stance: 0,
+      scope: 0,
+      taste: 0,
+      purpose: 0,
+      sociability: 0,
+    }
+    const zeroL2: CoreTemperamentVector = {
+      openness: 0,
+      conscientiousness: 0,
+      extraversion: 0,
+      agreeableness: 0,
+      neuroticism: 0,
+    }
+    const zeroL3: NarrativeDriveVector = {
+      lack: 0,
+      moralCompass: 0,
+      volatility: 0,
+      growthArc: 0,
+    }
+    const params = computeVoiceStyleParams(zeroL1, zeroL2, zeroL3)
+    for (const val of Object.values(params)) {
+      expect(val).toBeGreaterThanOrEqual(0)
+      expect(val).toBeLessThanOrEqual(1)
+    }
   })
 })
 

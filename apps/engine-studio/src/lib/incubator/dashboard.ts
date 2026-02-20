@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import type { BatchResult } from "./batch-workflow"
-import type { CostUsage } from "./cost-control"
+import type { CostUsage, DailyCostEntry } from "./cost-control"
 import type { GoldenSampleMetrics } from "./golden-sample"
 import type { RevalidationBatchResult } from "./revalidation"
 
@@ -166,20 +166,33 @@ export function buildDashboard(params: {
   strategy: StrategyMetric
   goldenSamples: GoldenSampleMetrics
   lifecycle: LifecycleMetric
+  /** 실제 일별 LLM 비용 (LlmUsageLog 기반) */
+  dailyCosts?: DailyCostEntry[]
 }): IncubatorDashboard {
   const todayGenerated = params.todayBatch?.generatedCount ?? 0
   const todayPassed = params.todayBatch?.passedCount ?? 0
   const passRate = todayGenerated > 0 ? todayPassed / todayGenerated : 0
 
-  // 7일 추이
-  const dailyTrend: DailyMetric[] = params.recentBatches.map((b) => ({
-    date: b.batchDate.toISOString().slice(0, 10),
-    generated: b.generatedCount,
-    passed: b.passedCount,
-    failed: b.failedCount,
-    passRate: b.passRate,
-    costKRW: b.estimatedCost,
-  }))
+  // 7일 추이 — 배치 데이터 + 실제 LLM 비용 매핑
+  const dailyCostMap = new Map<string, number>()
+  if (params.dailyCosts) {
+    for (const dc of params.dailyCosts) {
+      dailyCostMap.set(dc.date, dc.totalCostKRW)
+    }
+  }
+
+  const dailyTrend: DailyMetric[] = params.recentBatches.map((b) => {
+    const dateStr = b.batchDate.toISOString().slice(0, 10)
+    return {
+      date: dateStr,
+      generated: b.generatedCount,
+      passed: b.passedCount,
+      failed: b.failedCount,
+      passRate: b.passRate,
+      // 실제 일별 LLM 비용이 있으면 사용, 없으면 배치 비용 사용
+      costKRW: dailyCostMap.get(dateStr) ?? b.estimatedCost,
+    }
+  })
 
   // 품질 메트릭 계산 (최근 배치의 평균)
   const allLogs = params.recentBatches.flatMap((b) => b.logs)

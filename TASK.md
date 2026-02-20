@@ -972,6 +972,26 @@
   - AC4: 예상 비용: ~$0.005/페르소나 (1회성)
   - AC5: 테스트 + Build PASS
 
+### Phase V4-F: 생성 파이프라인 v4 통합 (T158)
+
+> v4 빌딩 블록(VoiceSpec, Factbook, TriggerMap)을 생성 파이프라인에 통합.
+
+- [x] **T158: 페르소나 생성 파이프라인 v4 통합 — VoiceSpec + Factbook + TriggerMap** ✅ 2026-02-20
+  - AC1: ✅ Prisma 스키마 — `voiceSpec`, `factbook`, `triggerMap` Json? 필드 + 019 마이그레이션
+  - AC2: ✅ `computeVoiceStyleParams(l1, l2, l3)` — 6D 스타일 파라미터 벡터 기반 계산
+  - AC3: ✅ `generateInitialTriggerRules(l1, l2, l3)` — 3~6개 트리거 규칙 자동 생성
+  - AC4: ✅ `buildInstructionLayer()` 공유 함수 추출 → pipeline.ts + create/route.ts 공통 사용
+  - AC5: ✅ 기존 `voiceProfile`/`backstory` 필드 유지 (하위 호환성)
+  - AC6: ✅ 3629 테스트 PASS + Build PASS
+  - 추가 수정: 마이그레이션 컬럼명 camelCase 수정, 복제 API v4 필드 누락 수정
+
+- [ ] **T159: 페르소나 생성 전체 모듈화 — create/route.ts → 공유 파이프라인 통합**
+  - 배경: `create/route.ts`가 `pipeline.ts`와 정성적 4차원 생성 + DB 저장 로직이 중복. v4 Instruction Layer는 T158에서 `buildInstructionLayer()` 추출 완료. 나머지 중복(정성적 생성, DB 트랜잭션) 통합 필요
+  - AC1: `pipeline.ts` — manual 모드 지원 (`mode: "auto" | "manual"`, manual 시 벡터/이름/프롬프트 직접 입력)
+  - AC2: `create/route.ts` — validation만 유지, 생성 로직은 공유 파이프라인 호출
+  - AC3: 기존 동작 변경 없음 (API 응답 동일)
+  - AC4: 테스트 + Build PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)

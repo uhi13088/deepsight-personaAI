@@ -7,6 +7,7 @@ import {
   generateAllQualitativeDimensions,
   generateAllQualitativeDimensionsWithLLM,
 } from "@/lib/qualitative"
+import { buildInstructionLayer } from "@/lib/persona-generation/pipeline"
 import type {
   ApiResponse,
   SocialPersonaVector,
@@ -90,6 +91,15 @@ export async function POST(request: NextRequest) {
       qualitative = generateAllQualitativeDimensions(l1, l2, l3, archetype)
     }
 
+    // ── v4 Instruction Layer ─────────────────────────────────
+    const { voiceSpec, factbook, triggerRules } = await buildInstructionLayer(
+      qualitative.voice,
+      qualitative.backstory,
+      l1,
+      l2,
+      l3
+    )
+
     // ── Create Persona + LayerVectors in transaction ─────────
     const persona = await prisma.$transaction(async (tx) => {
       // Get a system user ID (first user available)
@@ -110,17 +120,25 @@ export async function POST(request: NextRequest) {
           archetypeId: body.archetypeId,
           paradoxScore: paradoxProfile.overall,
           dimensionalityScore: paradoxProfile.dimensionality,
-          engineVersion: "3.0",
+          engineVersion: "4.0",
           promptTemplate: body.basePrompt,
           promptVersion: body.promptVersion || "1.0",
           basePrompt: body.basePrompt,
           createdById: systemUser.id,
-          // ── 정성적 4차원 DB 저장 (Voice 콜드스타트 해결) ──
+
+          // v3 호환: 기존 소비자가 직접 접근하는 필드 유지
           voiceProfile: qualitative.voice as unknown as Prisma.InputJsonValue,
           backstory: qualitative.backstory as unknown as Prisma.InputJsonValue,
           pressureContext: qualitative.pressure as unknown as Prisma.InputJsonValue,
           zeitgeist: qualitative.zeitgeist as unknown as Prisma.InputJsonValue,
-          // L1 vectors stored in PersonaLayerVector
+
+          // v4 Instruction Layer
+          voiceSpec: voiceSpec as unknown as Prisma.InputJsonValue,
+          factbook: factbook as unknown as Prisma.InputJsonValue,
+          triggerMap: (triggerRules.length > 0
+            ? triggerRules
+            : undefined) as unknown as Prisma.InputJsonValue,
+
           layerVectors: {
             create: [
               {

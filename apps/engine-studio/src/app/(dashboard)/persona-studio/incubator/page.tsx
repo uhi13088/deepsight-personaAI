@@ -248,14 +248,18 @@ function MetricCards({ data }: { data: IncubatorDashboard }) {
       <MetricCard
         label="월 비용"
         value={`₩${data.monthlyBudget.totalCostKRW.toLocaleString()}`}
-        sub={`예산 ${budgetPct}% 사용`}
+        sub={
+          data.monthlyBudget.totalCostUsd != null
+            ? `$${data.monthlyBudget.totalCostUsd.toFixed(2)} · ${data.monthlyBudget.totalCalls ?? 0}회 호출`
+            : `예산 ${budgetPct}% 사용`
+        }
         icon={<Beaker className="h-4 w-4 text-amber-400" />}
         color={data.monthlyBudget.isOverBudget ? "red" : budgetPct > 80 ? "amber" : "emerald"}
       />
       <MetricCard
         label="예산 잔여"
         value={`₩${data.monthlyBudget.budgetRemaining.toLocaleString()}`}
-        sub={data.monthlyBudget.isOverBudget ? "초과!" : "남은 금액"}
+        sub={data.monthlyBudget.isOverBudget ? "초과!" : `${budgetPct}% 사용`}
         icon={<Shield className="h-4 w-4 text-cyan-400" />}
         color={data.monthlyBudget.isOverBudget ? "red" : "cyan"}
       />
