@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 import type { ApiResponse } from "@/types"
+import { executePersonaGenerationPipeline } from "@/lib/persona-generation/pipeline"
 import {
   buildDashboard,
   type IncubatorDashboard,
@@ -233,73 +234,49 @@ export async function POST(request: NextRequest) {
       }> = []
       const errors: string[] = []
 
-      // generate-random 파이프라인을 N회 호출
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
-      const cookie = request.headers.get("cookie") ?? ""
-
+      // 내부 함수 직접 호출로 페르소나 생성 (self-fetch 제거)
       for (let i = 0; i < dailyLimit; i++) {
         try {
-          const res = await fetch(`${baseUrl}/api/internal/personas/generate-random`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Cookie: cookie,
-            },
-            body: JSON.stringify({ status: "DRAFT" }),
+          const generated = await executePersonaGenerationPipeline({ status: "DRAFT" })
+
+          // paradoxScore 기반 합격/불합격 판정
+          // dimensionality = exp(-(paradox - 0.35)² / (2 × 0.2²))  → 0.35 근방이 최적
+          const p = generated.paradoxScore
+          const dimensionality = Math.exp(-((p - 0.35) ** 2) / (2 * 0.2 ** 2))
+          const passed = dimensionality >= passThreshold
+
+          const status = passed ? "PASSED" : "FAILED"
+          results.push({
+            personaId: generated.id,
+            name: generated.name,
+            archetypeId: generated.archetypeId,
+            paradoxScore: generated.paradoxScore,
+            status,
           })
-          const json = (await res.json()) as {
-            success: boolean
-            data?: {
-              id: string
-              name: string
-              archetypeId: string | null
-              paradoxScore: number
-            }
-            error?: { message: string }
+
+          // PASSED → ACTIVE 승격, FAILED → DRAFT 유지
+          if (passed) {
+            await prisma.persona.update({
+              where: { id: generated.id },
+              data: { status: "ACTIVE" },
+            })
           }
 
-          if (json.success && json.data) {
-            // paradoxScore 기반 합격/불합격 판정
-            // dimensionality = exp(-(paradox - 0.35)² / (2 × 0.2²))  → 0.35 근방이 최적
-            const p = json.data.paradoxScore
-            const dimensionality = Math.exp(-((p - 0.35) ** 2) / (2 * 0.2 ** 2))
-            const passed = dimensionality >= passThreshold
-
-            const status = passed ? "PASSED" : "FAILED"
-            results.push({
-              personaId: json.data.id,
-              name: json.data.name,
-              archetypeId: json.data.archetypeId,
-              paradoxScore: json.data.paradoxScore,
+          // IncubatorLog 기록
+          await prisma.incubatorLog.create({
+            data: {
+              batchId,
+              batchDate: new Date(),
+              personaConfig: { archetypeId: generated.archetypeId },
+              generatedPrompt: generated.name,
+              testSampleIds: [],
+              consistencyScore: dimensionality,
+              vectorAlignmentScore: dimensionality,
+              toneMatchScore: p,
+              reasoningQualityScore: dimensionality,
               status,
-            })
-
-            // PASSED → ACTIVE 승격, FAILED → DRAFT 유지
-            if (passed) {
-              await prisma.persona.update({
-                where: { id: json.data.id },
-                data: { status: "ACTIVE" },
-              })
-            }
-
-            // IncubatorLog 기록
-            await prisma.incubatorLog.create({
-              data: {
-                batchId,
-                batchDate: new Date(),
-                personaConfig: { archetypeId: json.data.archetypeId },
-                generatedPrompt: json.data.name,
-                testSampleIds: [],
-                consistencyScore: dimensionality,
-                vectorAlignmentScore: dimensionality,
-                toneMatchScore: p,
-                reasoningQualityScore: dimensionality,
-                status,
-              },
-            })
-          } else {
-            errors.push(json.error?.message ?? `Slot ${i} failed`)
-          }
+            },
+          })
         } catch (err) {
           errors.push(err instanceof Error ? err.message : `Slot ${i} error`)
         }
