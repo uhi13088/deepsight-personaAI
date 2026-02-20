@@ -992,6 +992,43 @@
   - AC3: 기존 동작 변경 없음 (API 응답 동일)
   - AC4: 테스트 + Build PASS
 
+### Phase V4-G: 프롬프트 v4 + 다양성 강화 + 구조화 필드 (T160~T163)
+
+> 생성 파이프라인 v4 품질 강화 — 프롬프트 v4 전환, 다양성 개선, 구조화 필드 자동생성, 기억 저장소 런타임 연동.
+
+- [ ] **T160: 시스템 프롬프트 v4 전환 — VoiceSpec/Factbook 기반 프롬프트 빌더**
+  - 배경: `prompt-builder.ts`가 여전히 v3 형식 (L1/L2/L3 수치 직접 노출). v4 Instruction Layer(voiceSpec, factbook, triggerMap)는 DB 저장 완료(T158)이나 프롬프트 빌드에 미반영.
+  - AC1: `buildBasePrompt` — voiceSpec의 6D 스타일 파라미터 기반 프롬프트로 전환 (L1/L2/L3 수치 제거, 자연어 서술)
+  - AC2: factbook.immutableFacts를 [출생/형성경험/내면갈등/핵심정체성] 섹션으로 프롬프트에 반영
+  - AC3: triggerMap 규칙을 [행동 트리거] 섹션으로 프롬프트에 반영
+  - AC4: 5종 프롬프트(base/review/post/comment/interaction) 전체 v4 전환
+  - AC5: v3→v4 프롬프트 비교 로깅 (마이그레이션 기간 동안 A/B 비교 가능)
+  - AC6: 테스트 + Build PASS
+
+- [ ] **T161: 페르소나 랜덤생성 다양성 강화 — 벡터 클러스터링 방지**
+  - 배경: 아키타입 미지정 랜덤 생성 시 L1/L2 범위 [0.1,0.9]에서 중앙값(0.5) 근처에 몰리는 경향. diversityWeight 0.5는 확률적으로만 작동하여 근접 벡터 생성이 가능함
+  - AC1: `generateDiverseVectors` — 아키타입 미지정 시 극단값 포함 전략 (범위를 [0.05, 0.95]로 확대 + beta distribution 적용)
+  - AC2: 최소 거리 보장 — 생성 후 기존 페르소나 대비 `checkMinDistance(minDistance=0.3)` 미달 시 최대 5회 재생성
+  - AC3: 아키타입 자동 추천 — 기존 페르소나 아키타입 분포 분석 → 부족한 아키타입 우선 제안
+  - AC4: `analyzeCoverage` 결과를 생성 응답에 포함 (커버리지 리포트)
+  - AC5: 테스트 + Build PASS
+
+- [ ] **T162: 페르소나 구조화 필드 자동생성 — birthDate/region/activeHours**
+  - 배경: 파이프라인에서 handle/tagline/background/quirks 저장은 완료. 그러나 birthDate, region, activeHours 등 구조화 필드는 character/backstory 서사에만 포함되고 DB 필드로 미저장
+  - AC1: `pipeline.ts` — character.background 서사에서 birthDate 추론 (LLM 또는 규칙 기반)
+  - AC2: `pipeline.ts` — l1/l2 벡터 기반 region 자동 매핑 (아키타입별 기본 지역 풀)
+  - AC3: `pipeline.ts` — 활동시간 `computeActiveHours(l1, l2)` 연동 (기존 dynamics-defaults 활용)
+  - AC4: 기존 필드 null → 자동 채워짐, 기존 값 있으면 덮어쓰지 않음
+  - AC5: 테스트 + Build PASS
+
+- [ ] **T163: Factbook 런타임 연동 — mutableContext 업데이트 파이프라인**
+  - 배경: factbook.immutableFacts는 생성 시 설정 완료. mutableContext(현재 목표/최근 경험/진화된 관점)는 상호작용 후 자동 업데이트가 필요하나 런타임 로직 미구현
+  - AC1: `updateMutableContext(personaId, interaction)` — 상호작용 후 mutableContext 자동 업데이트
+  - AC2: changeCount 추적 + 과도한 변경 경고 (5회 초과 시 로그)
+  - AC3: integrityHash 갱신 (SHA256, immutableFacts 변조 감지)
+  - AC4: PersonaState(mood/energy/socialBattery) 연동 — 상호작용 후 자동 갱신
+  - AC5: 테스트 + Build PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
