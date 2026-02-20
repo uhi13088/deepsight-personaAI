@@ -985,12 +985,7 @@
   - AC6: ✅ 3629 테스트 PASS + Build PASS
   - 추가 수정: 마이그레이션 컬럼명 camelCase 수정, 복제 API v4 필드 누락 수정
 
-- [ ] **T159: 페르소나 생성 전체 모듈화 — create/route.ts → 공유 파이프라인 통합**
-  - 배경: `create/route.ts`가 `pipeline.ts`와 정성적 4차원 생성 + DB 저장 로직이 중복. v4 Instruction Layer는 T158에서 `buildInstructionLayer()` 추출 완료. 나머지 중복(정성적 생성, DB 트랜잭션) 통합 필요
-  - AC1: `pipeline.ts` — manual 모드 지원 (`mode: "auto" | "manual"`, manual 시 벡터/이름/프롬프트 직접 입력)
-  - AC2: `create/route.ts` — validation만 유지, 생성 로직은 공유 파이프라인 호출
-  - AC3: 기존 동작 변경 없음 (API 응답 동일)
-  - AC4: 테스트 + Build PASS
+- [x] **T159: 페르소나 생성 전체 모듈화 — create/route.ts → 공유 파이프라인 통합** ✅ 2026-02-20
 
 ### Phase V4-G: 프롬프트 v4 + 다양성 강화 + 구조화 필드 (T160~T163)
 
@@ -1033,16 +1028,18 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-- [ ] **T159: 페르소나 생성 전체 모듈화 — create/route.ts → 공유 파이프라인 통합**
-  - 배경: `create/route.ts`가 `pipeline.ts`와 정성적 4차원 생성 + DB 저장 로직이 중복. v4 Instruction Layer는 T158에서 `buildInstructionLayer()` 추출 완료. 나머지 중복(정성적 생성, DB 트랜잭션) 통합 필요
-  - AC1: `pipeline.ts` — manual 모드 지원 (`mode: "auto" | "manual"`, manual 시 벡터/이름/프롬프트 직접 입력)
-  - AC2: `create/route.ts` — validation만 유지, 생성 로직은 공유 파이프라인 호출
-  - AC3: 기존 동작 변경 없음 (API 응답 동일)
-  - AC4: 테스트 + Build PASS
+(없음)
 
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T159: 페르소나 생성 전체 모듈화 — create/route.ts → 공유 파이프라인 통합** ✅ 2026-02-20
+  - AC1: ✅ `pipeline.ts` — manual/auto 모드 분기 + `savePersonaToDb()` 공통 함수 + `generateQualitativeAndInstructionLayer()` 공통 함수
+  - AC2: ✅ `create/route.ts` — 195줄→103줄 (47% 삭감), validation만 유지
+  - AC3: ✅ 기존 API 응답 동일 (`{ success: true, data: { id } }`)
+  - AC4: ✅ 89파일 3631 테스트 PASS + Build PASS
+  - 변경: pipeline.ts, create/route.ts
 
 - [x] **T157: 크레딧 상점 페이지 + 구매 시스템** ✅ 2026-02-19
   - AC1: ✅ `shop.ts` — ShopItem 타입 + SHOP_ITEMS 정적 데이터 (페르소나 4종 + 프로필 7종, repeatable 플래그, SOON 태그)
