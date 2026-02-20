@@ -51,6 +51,8 @@ export interface GeneratedPersona {
     dimensionality: number
     consistencyScore: number
   }
+  /** T161: 벡터 생성 시 최소 거리 재생성 횟수 (0 = 첫 시도 성공) */
+  retryCount: number
 }
 
 // ── 메인 파이프라인 ───────────────────────────────────────────
@@ -58,13 +60,19 @@ export interface GeneratedPersona {
 export function generatePersona(config: GenerationConfig): GeneratedPersona {
   const archetype = config.archetypeId ? getArchetypeById(config.archetypeId) : undefined
 
-  // Stage 1: 벡터 생성
-  let vectors = archetype
-    ? generateVectorsFromArchetype(archetype)
-    : generateDiverseVectors({
-        existingPersonas: config.existingPersonas,
-        diversityWeight: config.diversityWeight,
-      })
+  // Stage 1: 벡터 생성 (T161: 아키타입 미지정 시 Beta 분포 + 최소 거리 재생성)
+  let retryCount = 0
+  let vectors: { l1: SocialPersonaVector; l2: CoreTemperamentVector; l3: NarrativeDriveVector }
+  if (archetype) {
+    vectors = generateVectorsFromArchetype(archetype)
+  } else {
+    const result = generateDiverseVectors({
+      existingPersonas: config.existingPersonas,
+      diversityWeight: config.diversityWeight,
+    })
+    vectors = { l1: result.l1, l2: result.l2, l3: result.l3 }
+    retryCount = result.retryCount
+  }
 
   // Override 적용
   if (config.l1Override) {
@@ -120,6 +128,7 @@ export function generatePersona(config: GenerationConfig): GeneratedPersona {
     content,
     validation,
     quality,
+    retryCount,
   }
 }
 
@@ -165,13 +174,20 @@ export {
   analyzeCoverage,
   calculateVectorDistance,
   checkMinDistance,
+  suggestUnderrepresentedArchetypes,
+  buildCoverageReport,
+  sampleBeta,
 } from "./vector-generator"
 export { designParadox, analyzeParadoxPatterns } from "./paradox-designer"
 export { generateCharacter } from "./character-generator"
 export { generateCharacterWithLLM } from "./llm-character-generator"
 export { inferActivitySettings, inferContentSettings } from "./activity-inference"
 export { validateConsistency } from "./consistency-validator"
-export type { ExistingPersonaVectors } from "./vector-generator"
+export type {
+  ExistingPersonaVectors,
+  CoverageReport,
+  ArchetypeSuggestion,
+} from "./vector-generator"
 export type { ParadoxDesignResult } from "./paradox-designer"
 export type { CharacterProfile, RelationshipSeed } from "./character-generator"
 export type { ActivitySettings, ContentSettings, PostFrequency } from "./activity-inference"

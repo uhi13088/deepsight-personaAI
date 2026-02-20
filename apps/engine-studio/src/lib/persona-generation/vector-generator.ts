@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // 3-Layer 벡터 생성기
 // T52-AC2: 다양성 분석, 빈 영역 우선, L1+L2+L3 동시 생성
+// T161: 극단값 포함 + Beta 분포 + 최소 거리 재생성 + 아키타입 추천
 // ═══════════════════════════════════════════════════════════════
 
 import type {
@@ -43,6 +44,23 @@ export interface GenerationConfig {
   seed?: number
 }
 
+/** T161-AC3: 아키타입 추천 결과 */
+export interface ArchetypeSuggestion {
+  archetypeId: string
+  name: string
+  currentCount: number
+  score: number // 높을수록 추천도 높음 (0~1)
+}
+
+/** T161-AC4: 커버리지 리포트 */
+export interface CoverageReport {
+  overallCoverage: number
+  totalPersonas: number
+  emptyRegionCount: number
+  archetypeSuggestions: ArchetypeSuggestion[]
+  retryCount: number
+}
+
 const L1_KEYS: SocialDimension[] = [
   "depth",
   "lens",
@@ -60,6 +78,52 @@ const L2_KEYS: TemperamentDimension[] = [
   "neuroticism",
 ]
 const L3_KEYS: NarrativeDimension[] = ["lack", "moralCompass", "volatility", "growthArc"]
+
+// ── T161-AC1: Beta 분포 (극단값 분산 향상) ───────────────────
+
+/**
+ * Beta 분포 샘플링 (Jöhnk's algorithm)
+ * alpha=beta=1 → Uniform, alpha=beta<1 → U자형(극단값 쏠림), alpha=beta>1 → 종형(중앙 쏠림)
+ * T161: alpha=0.7, beta=0.7 → 극단값 포함 확률 대폭 증가
+ */
+export function sampleBeta(alpha: number, beta: number): number {
+  // Box-Muller 대신 gamma 기반 beta 샘플링
+  const gammaA = sampleGamma(alpha)
+  const gammaB = sampleGamma(beta)
+  if (gammaA + gammaB === 0) return 0.5
+  return gammaA / (gammaA + gammaB)
+}
+
+/** Gamma 분포 샘플링 (Marsaglia & Tsang, shape>=1 보정) */
+function sampleGamma(shape: number): number {
+  if (shape < 1) {
+    // shape<1이면 보정: Gamma(shape) = Gamma(shape+1) * U^(1/shape)
+    const u = Math.random()
+    return sampleGamma(shape + 1) * u ** (1 / shape)
+  }
+  // Marsaglia & Tsang's method for shape >= 1
+  const d = shape - 1 / 3
+  const c = 1 / Math.sqrt(9 * d)
+  for (;;) {
+    let x: number
+    let v: number
+    do {
+      x = randn()
+      v = 1 + c * x
+    } while (v <= 0)
+    v = v * v * v
+    const u = Math.random()
+    if (u < 1 - 0.0331 * (x * x) * (x * x)) return d * v
+    if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v
+  }
+}
+
+/** 표준 정규 분포 (Box-Muller) */
+function randn(): number {
+  const u1 = Math.random()
+  const u2 = Math.random()
+  return Math.sqrt(-2 * Math.log(u1 || 1e-10)) * Math.cos(2 * Math.PI * u2)
+}
 
 // ── 다양성 분석 ───────────────────────────────────────────────
 
@@ -181,45 +245,80 @@ function findEmptyBuckets(
   }
 }
 
-// ── 다양성 기반 벡터 생성 ─────────────────────────────────────
+// ── 다양성 기반 벡터 생성 (T161: Beta 분포 + 최소 거리 재생성) ─
+
+const MAX_RETRY = 5
+const MIN_DISTANCE_THRESHOLD = 0.3
+
+/** Beta 분포 파라미터: <1이면 극단값 쏠림 */
+const BETA_ALPHA = 0.7
+const BETA_BETA = 0.7
 
 export function generateDiverseVectors(config: GenerationConfig): {
   l1: SocialPersonaVector
   l2: CoreTemperamentVector
   l3: NarrativeDriveVector
+  retryCount: number
 } {
   const { archetype, existingPersonas = [], diversityWeight = 0.3 } = config
 
-  // 아키타입이 있으면 범위 내에서, 없으면 전체 범위에서 생성
+  // T161-AC1: 아키타입 미지정 시 범위 확대 [0.05, 0.95] (기존 [0.1, 0.9])
   const l1Ranges = archetype
     ? L1_KEYS.map((k) => ({ key: k, range: archetype.layer1[k] }))
-    : L1_KEYS.map((k) => ({ key: k, range: [0.1, 0.9] as [number, number] }))
+    : L1_KEYS.map((k) => ({ key: k, range: [0.05, 0.95] as [number, number] }))
   const l2Ranges = archetype
     ? L2_KEYS.map((k) => ({ key: k, range: archetype.layer2[k] }))
-    : L2_KEYS.map((k) => ({ key: k, range: [0.1, 0.9] as [number, number] }))
+    : L2_KEYS.map((k) => ({ key: k, range: [0.05, 0.95] as [number, number] }))
   const l3Ranges = archetype
     ? L3_KEYS.map((k) => ({ key: k, range: archetype.layer3[k] }))
-    : L3_KEYS.map((k) => ({ key: k, range: [0.0, 0.8] as [number, number] }))
+    : L3_KEYS.map((k) => ({ key: k, range: [0.0, 0.85] as [number, number] }))
 
   // Diversity bias: 기존 페르소나가 있으면 빈 영역 우선
   const coverage = existingPersonas.length > 0 ? analyzeCoverage(existingPersonas) : undefined
 
+  // T161-AC1: 아키타입 미지정 시 Beta 분포 사용
+  const useBeta = !archetype
+
+  // T161-AC2: 최소 거리 미달 시 최대 5회 재생성
+  for (let retry = 0; retry <= MAX_RETRY; retry++) {
+    const l1 = {} as SocialPersonaVector
+    for (const { key, range } of l1Ranges) {
+      l1[key] = generateDimensionValue(range, "L1", key, coverage, diversityWeight, useBeta)
+    }
+
+    const l2 = {} as CoreTemperamentVector
+    for (const { key, range } of l2Ranges) {
+      l2[key] = generateDimensionValue(range, "L2", key, coverage, diversityWeight, useBeta)
+    }
+
+    const l3 = {} as NarrativeDriveVector
+    for (const { key, range } of l3Ranges) {
+      l3[key] = generateDimensionValue(range, "L3", key, coverage, diversityWeight, useBeta)
+    }
+
+    const candidate = { l1, l2, l3 }
+
+    // 기존 페르소나가 없거나, 최소 거리 통과 시 반환
+    if (checkMinDistance(candidate, existingPersonas, MIN_DISTANCE_THRESHOLD)) {
+      return { ...candidate, retryCount: retry }
+    }
+    // 마지막 시도에서도 미달이면 그대로 반환 (무한 루프 방지)
+  }
+
+  // Fallback: 마지막 생성 결과 그대로 사용
   const l1 = {} as SocialPersonaVector
   for (const { key, range } of l1Ranges) {
-    l1[key] = generateDimensionValue(range, "L1", key, coverage, diversityWeight)
+    l1[key] = generateDimensionValue(range, "L1", key, coverage, diversityWeight, useBeta)
   }
-
   const l2 = {} as CoreTemperamentVector
   for (const { key, range } of l2Ranges) {
-    l2[key] = generateDimensionValue(range, "L2", key, coverage, diversityWeight)
+    l2[key] = generateDimensionValue(range, "L2", key, coverage, diversityWeight, useBeta)
   }
-
   const l3 = {} as NarrativeDriveVector
   for (const { key, range } of l3Ranges) {
-    l3[key] = generateDimensionValue(range, "L3", key, coverage, diversityWeight)
+    l3[key] = generateDimensionValue(range, "L3", key, coverage, diversityWeight, useBeta)
   }
-
-  return { l1, l2, l3 }
+  return { l1, l2, l3, retryCount: MAX_RETRY + 1 }
 }
 
 function generateDimensionValue(
@@ -227,12 +326,13 @@ function generateDimensionValue(
   layer: "L1" | "L2" | "L3",
   dimension: string,
   coverage: VectorCoverage | undefined,
-  diversityWeight: number
+  diversityWeight: number,
+  useBeta: boolean
 ): number {
   const [min, max] = range
 
   if (!coverage || diversityWeight === 0) {
-    return randomClamp(min, max)
+    return useBeta ? betaClamp(min, max) : randomClamp(min, max)
   }
 
   // 빈 영역이 있으면 해당 영역으로 bias
@@ -247,15 +347,22 @@ function generateDimensionValue(
       const target = overlapping[Math.floor(Math.random() * overlapping.length)]
       const lo = Math.max(min, target.range[0])
       const hi = Math.min(max, target.range[1])
-      return randomClamp(lo, hi)
+      return useBeta ? betaClamp(lo, hi) : randomClamp(lo, hi)
     }
   }
 
-  return randomClamp(min, max)
+  return useBeta ? betaClamp(min, max) : randomClamp(min, max)
 }
 
 function randomClamp(min: number, max: number): number {
   const v = min + Math.random() * (max - min)
+  return Math.round(Math.max(0, Math.min(1, v)) * 100) / 100
+}
+
+/** T161-AC1: Beta 분포 기반 랜덤 — 극단값 포함 확률 증가 */
+function betaClamp(min: number, max: number): number {
+  const beta = sampleBeta(BETA_ALPHA, BETA_BETA)
+  const v = min + beta * (max - min)
   return Math.round(Math.max(0, Math.min(1, v)) * 100) / 100
 }
 
@@ -287,4 +394,59 @@ export function checkMinDistance(
 ): boolean {
   if (existing.length === 0) return true
   return existing.every((e) => calculateVectorDistance(candidate, e) >= minDistance)
+}
+
+// ── T161-AC3: 아키타입 분포 분석 + 부족한 아키타입 추천 ──────
+
+export function suggestUnderrepresentedArchetypes(
+  existingArchetypeIds: (string | null)[],
+  allArchetypes: PersonaArchetype[]
+): ArchetypeSuggestion[] {
+  const countMap = new Map<string, number>()
+  for (const a of allArchetypes) {
+    countMap.set(a.id, 0)
+  }
+  for (const id of existingArchetypeIds) {
+    if (id && countMap.has(id)) {
+      countMap.set(id, (countMap.get(id) ?? 0) + 1)
+    }
+  }
+
+  const totalPersonas = existingArchetypeIds.length
+  const totalArchetypes = allArchetypes.length
+  // 이상적 균등 분포: 페르소나 수 / 아키타입 수
+  const idealCount = totalPersonas > 0 ? totalPersonas / totalArchetypes : 0
+
+  return allArchetypes
+    .map((a) => {
+      const current = countMap.get(a.id) ?? 0
+      // score: 0에 가까울수록 많이 있음, 1에 가까울수록 부족함
+      const score =
+        idealCount > 0 ? Math.min(1, Math.max(0, 1 - current / idealCount)) : current === 0 ? 1 : 0
+      return {
+        archetypeId: a.id,
+        name: a.name,
+        currentCount: current,
+        score,
+      }
+    })
+    .sort((a, b) => b.score - a.score)
+}
+
+// ── T161-AC4: 커버리지 리포트 빌더 ──────────────────────────
+
+export function buildCoverageReport(
+  existingPersonas: ExistingPersonaVectors[],
+  existingArchetypeIds: (string | null)[],
+  allArchetypes: PersonaArchetype[],
+  retryCount: number
+): CoverageReport {
+  const coverage = existingPersonas.length > 0 ? analyzeCoverage(existingPersonas) : null
+  return {
+    overallCoverage: coverage?.overallCoverage ?? 0,
+    totalPersonas: existingPersonas.length,
+    emptyRegionCount: coverage?.emptyRegions.length ?? 0,
+    archetypeSuggestions: suggestUnderrepresentedArchetypes(existingArchetypeIds, allArchetypes),
+    retryCount,
+  }
 }

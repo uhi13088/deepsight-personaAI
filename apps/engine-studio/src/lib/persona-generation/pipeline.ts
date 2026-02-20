@@ -6,6 +6,7 @@
 
 import { prisma } from "@/lib/prisma"
 import { generatePersona } from "@/lib/persona-generation"
+import { buildCoverageReport, type CoverageReport } from "@/lib/persona-generation/vector-generator"
 import { generateCharacterWithLLM } from "@/lib/persona-generation/llm-character-generator"
 import { buildAllPrompts } from "@/lib/prompt-builder"
 import {
@@ -115,6 +116,7 @@ export interface GeneratedPersonaResult {
   archetypeId: string | null
   paradoxScore: number
   dimensionalityScore: number
+  coverageReport?: CoverageReport
 }
 
 // ── DB 저장 공통 함수 ────────────────────────────────────────
@@ -396,6 +398,15 @@ async function executeAutoPipeline(options?: AutoPipelineInput): Promise<Generat
     l3,
   })
 
+  // T161-AC4: 커버리지 리포트
+  const existingArchetypeIds = existingPersonas.map((p) => p.archetypeId)
+  const coverageReport = buildCoverageReport(
+    existingVectors,
+    existingArchetypeIds,
+    ARCHETYPES,
+    generated.retryCount
+  )
+
   return {
     id: persona.id,
     name: persona.name,
@@ -403,6 +414,7 @@ async function executeAutoPipeline(options?: AutoPipelineInput): Promise<Generat
     archetypeId: archetype?.id ?? null,
     paradoxScore: paradoxProfile.overall,
     dimensionalityScore: paradoxProfile.dimensionality,
+    coverageReport,
   }
 }
 

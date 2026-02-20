@@ -999,14 +999,6 @@
   - AC5: v3 fallback 유지로 A/B 비교 가능 (voiceSpec 없으면 v3, 있으면 v4)
   - AC6: ✅ 89파일 3649 테스트 PASS + Build PASS
 
-- [ ] **T161: 페르소나 랜덤생성 다양성 강화 — 벡터 클러스터링 방지**
-  - 배경: 아키타입 미지정 랜덤 생성 시 L1/L2 범위 [0.1,0.9]에서 중앙값(0.5) 근처에 몰리는 경향. diversityWeight 0.5는 확률적으로만 작동하여 근접 벡터 생성이 가능함
-  - AC1: `generateDiverseVectors` — 아키타입 미지정 시 극단값 포함 전략 (범위를 [0.05, 0.95]로 확대 + beta distribution 적용)
-  - AC2: 최소 거리 보장 — 생성 후 기존 페르소나 대비 `checkMinDistance(minDistance=0.3)` 미달 시 최대 5회 재생성
-  - AC3: 아키타입 자동 추천 — 기존 페르소나 아키타입 분포 분석 → 부족한 아키타입 우선 제안
-  - AC4: `analyzeCoverage` 결과를 생성 응답에 포함 (커버리지 리포트)
-  - AC5: 테스트 + Build PASS
-
 - [ ] **T162: 페르소나 구조화 필드 자동생성 — birthDate/region/activeHours**
   - 배경: 파이프라인에서 handle/tagline/background/quirks 저장은 완료. 그러나 birthDate, region, activeHours 등 구조화 필드는 character/backstory 서사에만 포함되고 DB 필드로 미저장
   - AC1: `pipeline.ts` — character.background 서사에서 birthDate 추론 (LLM 또는 규칙 기반)
@@ -1032,6 +1024,14 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T161: 페르소나 랜덤생성 다양성 강화 — 벡터 클러스터링 방지** ✅ 2026-02-20
+  - AC1: ✅ `generateDiverseVectors` — 범위 [0.05, 0.95] 확대 + Beta(0.7, 0.7) U자형 분포 (극단값 포함률 30%+)
+  - AC2: ✅ 최소 거리 재생성 — `checkMinDistance(0.3)` 미달 시 최대 5회 retry, retryCount 반환
+  - AC3: ✅ `suggestUnderrepresentedArchetypes` — 균등분포 대비 부족한 아키타입 score(0~1) 순위
+  - AC4: ✅ `buildCoverageReport` → pipeline.ts `GeneratedPersonaResult.coverageReport` 포함
+  - AC5: ✅ 89파일 3666 테스트 PASS + Build PASS
+  - 변경: vector-generator.ts, index.ts, pipeline.ts, persona-generation.test.ts
 
 - [x] **T160: 시스템 프롬프트 v4 전환 — VoiceSpec/Factbook 기반 프롬프트 빌더** ✅ 2026-02-20
   - 변경: prompt-builder.ts, pipeline.ts, prompt-builder.test.ts
