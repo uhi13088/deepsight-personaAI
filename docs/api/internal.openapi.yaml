@@ -1,0 +1,2101 @@
+openapi: 3.1.0
+
+info:
+  title: DeepSight Internal Admin API
+  version: "1.0.0"
+  description: |
+    엔진스튜디오 내부 관리자 API — 페르소나 관리 · 매칭 랩 · 보안 · 운영
+
+    > **주의**: 이 API는 내부 운영 도구입니다. 세션 기반 인증이 필요합니다.
+
+  contact:
+    name: DeepSight Internal Team
+
+servers:
+  - url: https://engine.deepsight.ai/api/internal
+    description: Production (engine-studio)
+
+tags:
+  - name: Dashboard
+    description: 실시간 시스템 대시보드
+  - name: Personas
+    description: 페르소나 CRUD · 생애주기 관리
+  - name: Arena
+    description: AI 토론 세션
+  - name: MatchingLab
+    description: 매칭 시뮬레이션 · 튜닝 · 분석
+  - name: GlobalConfig
+    description: LLM 모델 · 안전 필터 전역 설정
+  - name: Security
+    description: 보안 대시보드 · 격리 큐
+  - name: Operations
+    description: 모니터링 · 인시던트 관리
+  - name: Team
+    description: 팀 멤버 관리
+  - name: UserInsight
+    description: 유저 온보딩 질문 관리
+  - name: Incubator
+    description: 골든 샘플 품질 관리
+  - name: IncubatorDashboard
+    description: 인큐베이터 대시보드 · 배치 트리거
+  - name: PersonaWorldScheduler
+    description: PersonaWorld 스케줄러 운영
+
+# ============================================================
+# Paths
+# ============================================================
+
+paths:
+  # -----------------------------------------------------------
+  # Dashboard
+  # -----------------------------------------------------------
+
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [Dashboard]
+      summary: 실시간 대시보드 통계 조회
+      responses:
+        "200":
+          description: 대시보드 데이터 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # -----------------------------------------------------------
+  # Personas
+  # -----------------------------------------------------------
+
+  /personas:
+    get:
+      operationId: listInternalPersonas
+      tags: [Personas]
+      summary: 페르소나 목록 조회
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [DRAFT, REVIEW, ACTIVE, STANDARD, LEGACY, DEPRECATED, PAUSED, ARCHIVED]
+        - name: source
+          in: query
+          schema:
+            type: string
+            enum: [MANUAL, INCUBATOR, MUTATION, AUTO_GENERATED, USER_REQUEST]
+        - { name: search, in: query, schema: { type: string } }
+        - {
+            name: archetype,
+            in: query,
+            description: "쉼표 구분 아키타입 ID",
+            schema: { type: string },
+          }
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [createdAt, name, paradoxScore, validationScore, qualityScore]
+            default: createdAt
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - { name: paradoxMin, in: query, schema: { type: number, minimum: 0, maximum: 1 } }
+        - { name: paradoxMax, in: query, schema: { type: number, minimum: 0, maximum: 1 } }
+        - {
+            name: vectorFilters,
+            in: query,
+            description: "JSON: {l1: {depth: {min,max}}, ...}",
+            schema: { type: string },
+          }
+        - {
+            name: crossAxisFilters,
+            in: query,
+            description: "JSON: [{axisId, minScore?, maxScore?}]",
+            schema: { type: string },
+          }
+      responses:
+        "200":
+          description: 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonaListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /personas/create:
+    post:
+      operationId: createPersona
+      tags: [Personas]
+      summary: 페르소나 생성
+      description: 벡터를 입력하면 역설 점수가 자동 계산됩니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PersonaCreateRequest"
+      responses:
+        "201":
+          description: 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /personas/generate-random:
+    post:
+      operationId: generateRandomPersona
+      tags: [Personas]
+      summary: 랜덤 페르소나 자동 생성
+      description: |
+        AI가 전 과정(벡터→역설→캐릭터→정성→프롬프트→저장)을 자동 수행합니다.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                archetypeId:
+                  type: string
+                  description: 지정 시 해당 아키타입 방향으로 생성
+                status:
+                  type: string
+                  enum: [DRAFT, ACTIVE]
+                  default: ACTIVE
+      responses:
+        "201":
+          description: 자동 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerateRandomResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          description: LLM 서비스 불가
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /personas/{id}:
+    get:
+      operationId: getPersonaDetail
+      tags: [Personas]
+      summary: 페르소나 상세 조회
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonaDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    put:
+      operationId: updatePersona
+      tags: [Personas]
+      summary: 페르소나 업데이트
+      description: 벡터 변경 시 역설 점수가 재계산됩니다.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PersonaUpdateRequest"
+      responses:
+        "200":
+          description: 업데이트 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: "수정 불가 상태 (예: ARCHIVED)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      operationId: deletePersona
+      tags: [Personas]
+      summary: 페르소나 삭제
+      description: 페르소나와 연관 레이어 벡터를 트랜잭션으로 삭제합니다.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: 삭제 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /personas/{id}/test-generate:
+    post:
+      operationId: testGeneratePersona
+      tags: [Personas]
+      summary: LLM 출력 테스트
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestGenerateRequest"
+      responses:
+        "200":
+          description: 테스트 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestGenerateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          description: LLM 서비스 불가
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /personas/{id}/lifecycle:
+    post:
+      operationId: transitionLifecycle
+      tags: [Personas]
+      summary: 페르소나 생애주기 전이
+      description: |
+        유효한 상태 전이:
+        - DRAFT → SUBMIT_REVIEW → REVIEW
+        - REVIEW → APPROVE → ACTIVE | REJECT → DRAFT
+        - ACTIVE → PAUSE → PAUSED | DEPRECATE → DEPRECATED
+        - PAUSED → RESUME → ACTIVE | ARCHIVE → ARCHIVED
+        - ARCHIVED → RESTORE → DRAFT
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [SUBMIT_REVIEW, APPROVE, REJECT, PAUSE, RESUME, ARCHIVE, RESTORE, DEPRECATE]
+      responses:
+        "200":
+          description: 상태 전이 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LifecycleResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # -----------------------------------------------------------
+  # Arena
+  # -----------------------------------------------------------
+
+  /arena/sessions:
+    post:
+      operationId: createArenaSession
+      tags: [Arena]
+      summary: 아레나 세션 생성
+      description: 두 페르소나 간의 AI 토론 세션을 생성합니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArenaSessionRequest"
+            example:
+              participantA: "persona_xyz789"
+              participantB: "persona_def456"
+              topic: "AI가 인간의 창의성을 대체할 수 있는가"
+              maxTurns: 6
+              profileLoadLevel: STANDARD
+      responses:
+        "201":
+          description: 세션 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArenaSessionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /arena/sessions/{id}/corrections:
+    post:
+      operationId: createCorrection
+      tags: [Arena]
+      summary: 수정 요청 생성
+      parameters:
+        - {
+            name: id,
+            in: path,
+            required: true,
+            description: 아레나 세션 ID,
+            schema: { type: string },
+          }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CorrectionCreateRequest"
+      responses:
+        "201":
+          description: 수정 요청 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CorrectionCreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    patch:
+      operationId: reviewCorrection
+      tags: [Arena]
+      summary: 수정 요청 승인/거부
+      description: 승인 시 보이스 프로파일이 업데이트될 수 있습니다.
+      parameters:
+        - {
+            name: id,
+            in: path,
+            required: true,
+            description: 아레나 세션 ID,
+            schema: { type: string },
+          }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CorrectionReviewRequest"
+      responses:
+        "200":
+          description: 검토 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CorrectionReviewResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # -----------------------------------------------------------
+  # Matching Lab
+  # -----------------------------------------------------------
+
+  /matching-lab/simulate:
+    get:
+      operationId: getSimulatePersonas
+      tags: [MatchingLab]
+      summary: 시뮬레이션용 페르소나 목록 조회
+      responses:
+        "200":
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      personas: { type: array, items: { type: object } }
+                      source: { type: string, enum: [db, demo] }
+
+    post:
+      operationId: runSimulate
+      tags: [MatchingLab]
+      summary: 매칭 시뮬레이션 실행
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SimulateRequest"
+      responses:
+        "200":
+          description: 시뮬레이션 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimulateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /matching-lab/tuning:
+    get:
+      operationId: getTuningProfile
+      tags: [MatchingLab]
+      summary: 현재 튜닝 프로파일 조회
+      responses:
+        "200":
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TuningProfileResponse"
+
+    put:
+      operationId: updateTuningProfile
+      tags: [MatchingLab]
+      summary: 튜닝 파라미터 업데이트
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TuningUpdateRequest"
+      responses:
+        "200":
+          description: 업데이트 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TuningProfileResponse"
+
+  /matching-lab/analytics:
+    get:
+      operationId: getMatchingAnalytics
+      tags: [MatchingLab]
+      summary: 매칭 성능 분석 및 KPI 조회
+      parameters:
+        - name: timeRange
+          in: query
+          schema:
+            type: string
+            enum: [realtime, today, 7d, 30d, 90d]
+            default: 7d
+      responses:
+        "200":
+          description: 분석 데이터 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsResponse"
+
+  # -----------------------------------------------------------
+  # Global Config
+  # -----------------------------------------------------------
+
+  /global-config/models:
+    get:
+      operationId: getModelConfig
+      tags: [GlobalConfig]
+      summary: LLM 모델 설정 조회
+      responses:
+        "200":
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelConfigResponse"
+
+    post:
+      operationId: updateModelConfig
+      tags: [GlobalConfig]
+      summary: LLM 모델 설정 변경
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModelConfigUpdateRequest"
+      responses:
+        "200":
+          description: 변경 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelConfigResponse"
+
+  /global-config/safety:
+    get:
+      operationId: getSafetyConfig
+      tags: [GlobalConfig]
+      summary: 안전 필터 설정 조회
+      responses:
+        "200":
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SafetyConfigResponse"
+
+    post:
+      operationId: updateSafetyConfig
+      tags: [GlobalConfig]
+      summary: 안전 필터 수정
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SafetyConfigUpdateRequest"
+      responses:
+        "200":
+          description: 수정 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SafetyConfigResponse"
+
+  # -----------------------------------------------------------
+  # Security
+  # -----------------------------------------------------------
+
+  /security/dashboard:
+    get:
+      operationId: getSecurityDashboard
+      tags: [Security]
+      summary: 보안 통합 대시보드 조회
+      description: GateGuard · IntegrityMonitor · OutputSentinel · KillSwitch · DataProvenance 통합 뷰
+      responses:
+        "200":
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecurityDashboardResponse"
+
+  /security/quarantine:
+    get:
+      operationId: getQuarantine
+      tags: [Security]
+      summary: 격리 큐 조회
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, APPROVED, REJECTED, DELETED]
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+      responses:
+        "200":
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuarantineListResponse"
+
+    post:
+      operationId: reviewQuarantine
+      tags: [Security]
+      summary: 격리 항목 처리
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, entryId]
+              properties:
+                action:
+                  type: string
+                  enum: [approve, reject, delete]
+                entryId:
+                  type: string
+                reviewedBy:
+                  type: string
+                  default: admin
+      responses:
+        "200":
+          description: 처리 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data: { type: object }
+
+  # -----------------------------------------------------------
+  # Operations
+  # -----------------------------------------------------------
+
+  /operations/monitoring:
+    get:
+      operationId: getMonitoring
+      tags: [Operations]
+      summary: 실시간 시스템 모니터링 조회
+      responses:
+        "200":
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MonitoringResponse"
+
+    post:
+      operationId: updateMonitoring
+      tags: [Operations]
+      summary: 메트릭 새로고침 또는 알림 확인
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [refresh_metrics, acknowledge_alert]
+                alertId:
+                  type: string
+                  description: acknowledge_alert 시 필요
+      responses:
+        "200":
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /operations/incidents:
+    get:
+      operationId: getIncidents
+      tags: [Operations]
+      summary: 인시던트 목록 조회
+      responses:
+        "200":
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentsResponse"
+
+    post:
+      operationId: manageIncident
+      tags: [Operations]
+      summary: 인시던트 생성 또는 상태 전이
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IncidentActionRequest"
+      responses:
+        "200":
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # -----------------------------------------------------------
+  # Team
+  # -----------------------------------------------------------
+
+  /team/members:
+    get:
+      operationId: getTeamMembers
+      tags: [Team]
+      summary: 팀 멤버 목록 조회
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [admin, ai_engineer, content_manager, analyst]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, invited, deactivated]
+        - { name: keyword, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamMembersResponse"
+
+    post:
+      operationId: manageTeamMember
+      tags: [Team]
+      summary: 팀 멤버 관리 (초대·비활성화·역할 변경)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamMemberActionRequest"
+      responses:
+        "200":
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+        "409":
+          description: 중복 이메일
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # -----------------------------------------------------------
+  # User Insight
+  # -----------------------------------------------------------
+
+  /user-insight/cold-start:
+    get:
+      operationId: getColdStartSets
+      tags: [UserInsight]
+      summary: 온보딩 질문 세트 조회
+      responses:
+        "200":
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ColdStartSetsResponse"
+
+    post:
+      operationId: manageColdStart
+      tags: [UserInsight]
+      summary: 온보딩 질문 추가·삭제·재정렬
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ColdStartActionRequest"
+      responses:
+        "200":
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+
+  # -----------------------------------------------------------
+  # Incubator
+  # -----------------------------------------------------------
+
+  /incubator/golden-samples:
+    get:
+      operationId: listGoldenSamples
+      tags: [Incubator]
+      summary: 골든 샘플 목록 조회
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, default: 50, maximum: 100 } }
+        - name: difficulty
+          in: query
+          schema: { type: string, enum: [EASY, MEDIUM, HARD] }
+        - { name: activeOnly, in: query, schema: { type: boolean } }
+        - { name: search, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoldenSamplesResponse"
+
+    post:
+      operationId: createGoldenSample
+      tags: [Incubator]
+      summary: 골든 샘플 생성
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoldenSampleCreateRequest"
+      responses:
+        "201":
+          description: 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdResponse"
+
+  # -----------------------------------------------------------
+  # Incubator Dashboard
+  # -----------------------------------------------------------
+
+  /incubator/dashboard:
+    get:
+      operationId: getIncubatorDashboard
+      tags: [IncubatorDashboard]
+      summary: 인큐베이터 대시보드 통계 조회
+      description: |
+        DB 기반 실시간 인큐베이터 통계를 반환합니다.
+        최근 7일 배치 이력, 페르소나 상태별 카운트, LLM 비용, 골든 샘플 메트릭,
+        대기 중인 사용자 요청 수, 일일 생성 한도 등을 포함합니다.
+      responses:
+        "200":
+          description: 대시보드 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncubatorDashboardResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: 서버 내부 오류
+
+    post:
+      operationId: incubatorDashboardAction
+      tags: [IncubatorDashboard]
+      summary: 인큐베이터 액션 실행 (배치 트리거 / 설정 조회·저장)
+      description: |
+        `action` 필드에 따라 동작이 달라집니다:
+        - `trigger_batch`: 수동 배치 실행 (Phase 1: 사용자 요청 처리, Phase 2: 자동 생성)
+        - `get_settings`: 인큐베이터 설정 조회
+        - `save_settings`: 인큐베이터 설정 저장
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/IncubatorTriggerBatchRequest"
+                - $ref: "#/components/schemas/IncubatorGetSettingsRequest"
+                - $ref: "#/components/schemas/IncubatorSaveSettingsRequest"
+      responses:
+        "200":
+          description: 액션 실행 성공
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/IncubatorBatchResponse"
+                  - $ref: "#/components/schemas/IncubatorSettingsResponse"
+                  - $ref: "#/components/schemas/IncubatorSaveSettingsResponseWrapper"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: 서버 내부 오류
+
+  # -----------------------------------------------------------
+  # PersonaWorld Admin — Scheduler
+  # -----------------------------------------------------------
+
+  /persona-world-admin/scheduler:
+    get:
+      operationId: getSchedulerStatus
+      tags: [PersonaWorldScheduler]
+      summary: 스케줄러 상태 조회
+      description: |
+        PersonaWorld 스케줄러의 현재 상태를 반환합니다.
+        활성 페르소나 수, 일시정지 페르소나, 오늘 포스트 수, 최근 실행 이력 등을 포함합니다.
+      responses:
+        "200":
+          description: 스케줄러 상태 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchedulerStatusResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: 서버 내부 오류
+
+    post:
+      operationId: schedulerAction
+      tags: [PersonaWorldScheduler]
+      summary: 스케줄러 액션 실행
+      description: |
+        `action` 필드에 따라 동작이 달라집니다:
+        - `trigger_now`: 스케줄러 즉시 실행 (포스트 생성 + 인터랙션)
+        - `resume_persona`: 일시정지된 페르소나 활성화
+        - `pause_persona`: 페르소나 일시정지
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/SchedulerTriggerNowRequest"
+                - $ref: "#/components/schemas/SchedulerResumePersonaRequest"
+                - $ref: "#/components/schemas/SchedulerPausePersonaRequest"
+      responses:
+        "200":
+          description: 액션 실행 성공
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/SchedulerTriggerNowResponse"
+                  - $ref: "#/components/schemas/SchedulerPersonaActionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: 서버 내부 오류
+
+# ============================================================
+# Components
+# ============================================================
+
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [false] }
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+
+    IdResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            id: { type: string }
+
+    PersonaVectors:
+      type: object
+      properties:
+        l1:
+          type: object
+          properties:
+            depth: { type: number }
+            lens: { type: number }
+            stance: { type: number }
+            scope: { type: number }
+            taste: { type: number }
+            purpose: { type: number }
+            sociability: { type: number }
+        l2:
+          type: object
+          nullable: true
+          properties:
+            openness: { type: number }
+            conscientiousness: { type: number }
+            extraversion: { type: number }
+            agreeableness: { type: number }
+            neuroticism: { type: number }
+        l3:
+          type: object
+          nullable: true
+          properties:
+            lack: { type: number }
+            moralCompass: { type: number }
+            volatility: { type: number }
+            growthArc: { type: number }
+
+    PersonaListItem:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        role: { type: string }
+        expertise: { type: array, items: { type: string } }
+        description: { type: string, nullable: true }
+        profileImageUrl: { type: string, nullable: true }
+        status:
+          type: string
+          enum: [DRAFT, REVIEW, ACTIVE, STANDARD, LEGACY, DEPRECATED, PAUSED, ARCHIVED]
+        source:
+          type: string
+          enum: [MANUAL, INCUBATOR, MUTATION, AUTO_GENERATED, USER_REQUEST]
+        archetypeId: { type: string, nullable: true }
+        paradoxScore: { type: number, nullable: true }
+        dimensionalityScore: { type: number, nullable: true }
+        qualityScore: { type: number, nullable: true }
+        validationScore: { type: number, nullable: true }
+        vectors:
+          $ref: "#/components/schemas/PersonaVectors"
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    # Dashboard
+    DashboardResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            activePersonas: { type: integer }
+            totalPersonas: { type: integer }
+            matchingRate: { type: string, example: "87.3%" }
+            apiLatency: { type: string, example: "145ms" }
+            systemHealth:
+              type: string
+              enum: [정상, 주의, 경고, 초기화]
+            statusDistribution:
+              type: object
+              additionalProperties: { type: integer }
+
+    # Persona List
+    PersonaListResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            personas:
+              type: array
+              items:
+                $ref: "#/components/schemas/PersonaListItem"
+            pagination:
+              type: object
+              properties:
+                currentPage: { type: integer }
+                totalPages: { type: integer }
+                totalCount: { type: integer }
+                hasNext: { type: boolean }
+                hasPrev: { type: boolean }
+            filterStats:
+              type: object
+              properties:
+                totalMatched: { type: integer }
+                statusDistribution:
+                  type: object
+                  additionalProperties: { type: integer }
+
+    # Persona Create
+    PersonaCreateRequest:
+      type: object
+      required: [name, role, expertise, vectors, basePrompt]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 30
+        role: { type: string }
+        expertise:
+          type: array
+          items: { type: string }
+        description: { type: string, nullable: true }
+        profileImageUrl: { type: string, nullable: true }
+        archetypeId: { type: string, nullable: true }
+        vectors:
+          $ref: "#/components/schemas/PersonaVectors"
+        basePrompt:
+          type: string
+          minLength: 50
+        promptVersion:
+          type: string
+          default: "1.0"
+        status:
+          type: string
+          enum: [DRAFT, ACTIVE]
+          default: DRAFT
+
+    PersonaDetailResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          allOf:
+            - $ref: "#/components/schemas/PersonaListItem"
+            - type: object
+              properties:
+                basePrompt: { type: string }
+                promptVersion: { type: string }
+                activatedAt: { type: string, format: date-time, nullable: true }
+                archivedAt: { type: string, format: date-time, nullable: true }
+
+    PersonaUpdateRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 2, maxLength: 30 }
+        role: { type: string }
+        expertise: { type: array, items: { type: string } }
+        description: { type: string }
+        profileImageUrl: { type: string, nullable: true }
+        archetypeId: { type: string }
+        basePrompt: { type: string, minLength: 50 }
+        vectors:
+          $ref: "#/components/schemas/PersonaVectors"
+
+    # Generate Random
+    GenerateRandomResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }
+            role: { type: string }
+            archetypeId: { type: string, nullable: true }
+            paradoxScore: { type: number }
+            dimensionalityScore: { type: number }
+            character:
+              type: object
+              properties:
+                name: { type: string }
+                role: { type: string }
+                expertise: { type: array, items: { type: string } }
+                description: { type: string }
+            activityTraits:
+              type: object
+              additionalProperties: { type: number }
+            activeHours:
+              type: array
+              items: { type: integer }
+              minItems: 24
+              maxItems: 24
+            expressQuirks:
+              type: array
+              items: { type: string }
+            qualitative:
+              type: object
+              properties:
+                backstory: { type: string }
+                voice: { type: string }
+            quality:
+              type: object
+              additionalProperties: { type: number }
+
+    # Test Generate
+    TestGenerateRequest:
+      type: object
+      required: [type, scenario]
+      properties:
+        type:
+          type: string
+          enum: [review, post, comment, interaction]
+        scenario:
+          type: string
+          minLength: 5
+        maxTokens:
+          type: integer
+          default: 1024
+
+    TestGenerateResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            output: { type: string }
+            type: { type: string }
+            inputTokens: { type: integer }
+            outputTokens: { type: integer }
+            model: { type: string }
+
+    # Lifecycle
+    LifecycleResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            id: { type: string }
+            previousStatus: { type: string }
+            newStatus: { type: string }
+
+    # Arena
+    ArenaSessionRequest:
+      type: object
+      required: [participantA, participantB, topic]
+      properties:
+        participantA: { type: string }
+        participantB: { type: string }
+        topic: { type: string }
+        maxTurns:
+          type: integer
+          minimum: 2
+          maximum: 50
+          default: 10
+        budgetTokens: { type: integer }
+        profileLoadLevel:
+          type: string
+          enum: [FULL, STANDARD, LITE]
+          default: STANDARD
+
+    ArenaSessionResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            session:
+              type: object
+              properties:
+                id: { type: string }
+                mode: { type: string }
+                participantA: { type: string }
+                participantB: { type: string }
+                topic: { type: string }
+                maxTurns: { type: integer }
+                budgetTokens: { type: integer }
+                profileLoadLevel: { type: string }
+                status: { type: string }
+                createdAt: { type: string, format: date-time }
+            costEstimate:
+              type: object
+              properties:
+                profileTokens: { type: integer }
+                turnTokens: { type: integer }
+                judgmentTokens: { type: integer }
+                totalEstimatedTokens: { type: integer }
+                profileLoadDescription: { type: string }
+            participants:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+                  status: { type: string }
+
+    CorrectionCreateRequest:
+      type: object
+      required: [personaId, category, originalContent, correctedContent, reason]
+      properties:
+        personaId: { type: string }
+        category:
+          type: string
+          enum: [consistency, l2, paradox, trigger, voice]
+        originalContent: { type: string }
+        correctedContent: { type: string }
+        reason: { type: string }
+
+    CorrectionCreateResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            correction:
+              type: object
+              properties:
+                id: { type: string }
+                sessionId: { type: string }
+                personaId: { type: string }
+                category: { type: string }
+                status: { type: string }
+                createdAt: { type: string, format: date-time }
+
+    CorrectionReviewRequest:
+      type: object
+      required: [correctionId, action]
+      properties:
+        correctionId: { type: string }
+        action:
+          type: string
+          enum: [approve, reject]
+        reviewedBy: { type: string }
+
+    CorrectionReviewResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            correction:
+              type: object
+              properties:
+                id: { type: string }
+                status: { type: string }
+                reviewedAt: { type: string, format: date-time }
+                reviewedBy: { type: string }
+            voiceProfileUpdated: { type: boolean }
+
+    # Matching Lab
+    SimulateRequest:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum: [single, batch]
+        user:
+          type: object
+          description: 단일 모드 사용자 벡터
+        personas:
+          type: array
+          items: { type: object }
+        config: { type: object }
+        batchSize:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 20
+
+    SimulateResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            mode: { type: string }
+            personaSource: { type: string, enum: [db, demo] }
+            results:
+              type: array
+              nullable: true
+              items: { type: object }
+            stats:
+              type: object
+              nullable: true
+              properties:
+                totalUsers: { type: integer }
+                avgMatchScore: { type: number }
+                failureRate: { type: number }
+
+    TuningProfileResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            profile:
+              type: object
+              properties:
+                name: { type: string }
+                hyperparameters:
+                  type: object
+                  additionalProperties: { type: number }
+                genreWeights:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    additionalProperties: { type: number }
+
+    TuningUpdateRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [update_parameter, update_genre_weight, add_genre, remove_genre]
+        key: { type: string }
+        value: { type: number }
+        genre: { type: string }
+        dimension: { type: string }
+        weight: { type: number }
+
+    AnalyticsResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            kpis:
+              type: object
+              properties:
+                matchAccuracy: { type: string }
+                avgMatchScore: { type: number }
+                top1Accuracy: { type: string }
+                diversityIndex: { type: number }
+                ctr: { type: string }
+                avgDwellTime: { type: string }
+                returnRate: { type: string }
+                nps: { type: integer }
+            anomalies:
+              type: array
+              items: { type: object }
+            recommendations:
+              type: array
+              items: { type: string }
+            trends:
+              type: array
+              items: { type: object }
+            filter: { type: object }
+            diversityInfo: { type: object }
+            dataSource: { type: string, enum: [db, empty] }
+
+    # Global Config
+    ModelConfigResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            models:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+                  enabled: { type: boolean }
+            routingRules:
+              type: array
+              items: { type: object }
+            defaultModel: { type: string }
+            budget:
+              type: object
+              properties:
+                limitUsd: { type: number }
+                spentUsd: { type: number }
+                remainingUsd: { type: number }
+            budgetStatus: { type: string }
+
+    ModelConfigUpdateRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [toggleModel, updateRoutingRules, updateBudgetLimit, recordSpend]
+        modelId: { type: string }
+        routingRules: { type: array, items: { type: object } }
+        limitUsd: { type: number }
+        amountUsd: { type: number }
+
+    SafetyConfigResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            config:
+              type: object
+              properties:
+                level:
+                  type: string
+                  enum: [STRICT, MODERATE, PERMISSIVE]
+                forbiddenWords:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      word: { type: string }
+                      category: { type: string }
+            logs:
+              type: array
+              items: { type: object }
+            logSummary:
+              type: object
+              properties:
+                total: { type: integer }
+                blocked: { type: integer }
+                flagged: { type: integer }
+
+    SafetyConfigUpdateRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [addWord, removeWord, changeLevel, evaluate]
+        word:
+          type: object
+          properties:
+            word: { type: string }
+            category: { type: string }
+        level:
+          type: string
+          enum: [STRICT, MODERATE, PERMISSIVE]
+        input: { type: string }
+
+    # Security
+    SecurityDashboardResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            overallStatus:
+              type: string
+              enum: [ok, warning, critical]
+            gateGuard: { type: object }
+            integrity: { type: object }
+            outputSentinel: { type: object }
+            killSwitch: { type: object }
+            provenance: { type: object }
+            alerts:
+              type: array
+              items:
+                type: object
+                properties:
+                  severity: { type: string }
+                  type: { type: string }
+                  message: { type: string }
+                  detectedAt: { type: string, format: date-time }
+            summary: { type: string }
+
+    QuarantineListResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            entries:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  content: { type: string }
+                  source: { type: string }
+                  personaId: { type: string, nullable: true }
+                  reason: { type: string }
+                  violations: { type: array, items: { type: string } }
+                  status: { type: string, enum: [PENDING, APPROVED, REJECTED, DELETED] }
+                  reviewedBy: { type: string, nullable: true }
+                  reviewedAt: { type: string, format: date-time, nullable: true }
+                  createdAt: { type: string, format: date-time }
+            total: { type: integer }
+            pendingCount: { type: integer }
+
+    # Operations
+    MonitoringResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            metrics:
+              type: array
+              items:
+                type: object
+                properties:
+                  name: { type: string }
+                  value: { type: number }
+                  unit: { type: string }
+            logs:
+              type: array
+              items: { type: object }
+            alerts:
+              type: array
+              items: { type: object }
+            thresholds:
+              type: array
+              items: { type: object }
+
+    IncidentsResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            incidents:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  title: { type: string }
+                  severity: { type: string, enum: [P0, P1, P2, P3] }
+                  status: { type: string }
+                  timeline: { type: array, items: { type: object } }
+            postMortems: { type: array, items: { type: object } }
+            detectionRules: { type: array, items: { type: object } }
+            stats:
+              type: object
+              properties:
+                totalIncidents: { type: integer }
+                mttrMinutes: { type: integer }
+                incidentsBySeverity:
+                  type: object
+                  properties:
+                    P0: { type: integer }
+                    P1: { type: integer }
+                    P2: { type: integer }
+                    P3: { type: integer }
+
+    IncidentActionRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [create_incident, advance_phase, create_postmortem]
+        title: { type: string }
+        severity: { type: string, enum: [P0, P1, P2, P3] }
+        affectedServices: { type: array, items: { type: string } }
+        incidentId: { type: string }
+        nextPhase: { type: string }
+        actor: { type: string }
+        description: { type: string }
+        rootCause: { type: string }
+        affectedUsers: { type: integer }
+        downtimeMinutes: { type: integer }
+
+    # Team
+    TeamMembersResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            members:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+                  email: { type: string }
+                  role: { type: string, enum: [admin, ai_engineer, content_manager, analyst] }
+                  status: { type: string, enum: [active, invited, deactivated] }
+                  joinedAt: { type: string, format: date-time, nullable: true }
+                  lastActiveAt: { type: string, format: date-time, nullable: true }
+            total: { type: integer }
+            totalByStatus:
+              type: object
+              properties:
+                active: { type: integer }
+                invited: { type: integer }
+                deactivated: { type: integer }
+
+    TeamMemberActionRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [invite, deactivate, reactivate, change_role]
+        email: { type: string, format: email }
+        name: { type: string }
+        role: { type: string, enum: [admin, ai_engineer, content_manager, analyst] }
+        memberId: { type: string }
+
+    # User Insight
+    ColdStartSetsResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            sets:
+              type: object
+              properties:
+                quick:
+                  type: object
+                  properties:
+                    mode: { type: string }
+                    totalQuestions: { type: integer }
+                    questions: { type: array, items: { type: object } }
+                standard:
+                  type: object
+                standard_with_questions:
+                  type: object
+                deep:
+                  type: object
+
+    ColdStartActionRequest:
+      type: object
+      required: [action, mode]
+      properties:
+        action:
+          type: string
+          enum: [add_question, remove_question, reorder_questions]
+        mode:
+          type: string
+          enum: [quick, standard, deep]
+        question:
+          type: object
+          properties:
+            text: { type: string }
+            type: { type: string, enum: [SLIDER, MULTIPLE_CHOICE] }
+            targetDimensions: { type: array, items: { type: string } }
+            targetLayers: { type: array, items: { type: string } }
+            options: { type: array, items: { type: string } }
+        questionId: { type: string }
+        questionIds: { type: array, items: { type: string } }
+
+    # Incubator
+    GoldenSamplesResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  contentTitle: { type: string }
+                  contentType: { type: string, nullable: true }
+                  genre: { type: string, nullable: true }
+                  description: { type: string, nullable: true }
+                  testQuestion: { type: string }
+                  expectedReactions: { type: object, nullable: true }
+                  difficultyLevel: { type: string, enum: [EASY, MEDIUM, HARD] }
+                  validationDimensions: { type: array, items: { type: string } }
+                  version: { type: string }
+                  isActive: { type: boolean }
+                  createdAt: { type: string, format: date-time }
+                  updatedAt: { type: string, format: date-time }
+            total: { type: integer }
+            page: { type: integer }
+            pageSize: { type: integer }
+
+    GoldenSampleCreateRequest:
+      type: object
+      required: [contentTitle, testQuestion]
+      properties:
+        contentTitle: { type: string }
+        testQuestion: { type: string }
+        contentType: { type: string }
+        genre: { type: string }
+        description: { type: string }
+        expectedReactions:
+          type: object
+          additionalProperties: { type: string }
+        difficultyLevel:
+          type: string
+          enum: [EASY, MEDIUM, HARD]
+          default: MEDIUM
+        validationDimensions:
+          type: array
+          items:
+            type: string
+            enum: [depth, lens, purpose, stance, scope, taste]
+
+    # -- Incubator Dashboard Schemas ---
+
+    IncubatorDashboardResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            todayBatch:
+              type: object
+              nullable: true
+              properties:
+                batchId: { type: string }
+                batchDate: { type: string, format: date-time }
+                generatedCount: { type: integer }
+                passedCount: { type: integer }
+                failedCount: { type: integer }
+                passRate: { type: number }
+                estimatedCost: { type: number }
+                durationMs: { type: integer }
+            recentBatches:
+              type: array
+              items:
+                type: object
+                properties:
+                  batchId: { type: string }
+                  batchDate: { type: string, format: date-time }
+                  generatedCount: { type: integer }
+                  passedCount: { type: integer }
+                  failedCount: { type: integer }
+                  passRate: { type: number }
+                  estimatedCost: { type: number }
+                  durationMs: { type: integer }
+            lifecycle:
+              type: object
+              properties:
+                active: { type: integer }
+                standard: { type: integer }
+                legacy: { type: integer }
+                deprecated: { type: integer }
+                archived: { type: integer }
+                zombieCount: { type: integer }
+            costUsage:
+              type: object
+              properties:
+                totalCostKRW: { type: number }
+                monthlyBudgetKRW: { type: number }
+            dailyLimit: { type: integer }
+            pendingRequestCount: { type: integer }
+            lastBatchAt: { type: string, format: date-time, nullable: true }
+
+    IncubatorTriggerBatchRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [trigger_batch]
+
+    IncubatorGetSettingsRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [get_settings]
+
+    IncubatorSaveSettingsRequest:
+      type: object
+      required: [action, settings]
+      properties:
+        action:
+          type: string
+          enum: [save_settings]
+        settings:
+          type: object
+          properties:
+            generationCostKRW: { type: number }
+            testCostKRW: { type: number }
+            monthlyBudgetKRW: { type: number }
+            dailyLimit: { type: integer }
+            passThreshold: { type: number }
+            strategyWeights:
+              type: object
+              properties:
+                userDriven: { type: number }
+                exploration: { type: number }
+                gapFilling: { type: number }
+
+    IncubatorBatchResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            batchId: { type: string }
+            message: { type: string }
+            generated: { type: integer }
+            passed: { type: integer }
+            failed: { type: integer }
+            errors: { type: integer }
+            userRequestsProcessed: { type: integer }
+            durationMs: { type: integer }
+            results:
+              type: array
+              items:
+                type: object
+                properties:
+                  personaId: { type: string }
+                  name: { type: string }
+                  archetypeId: { type: string, nullable: true }
+                  paradoxScore: { type: number }
+                  status: { type: string, enum: [PASSED, FAILED] }
+                  source: { type: string, enum: [user_request, auto] }
+
+    IncubatorSettingsResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            generationCostKRW: { type: number }
+            testCostKRW: { type: number }
+            monthlyBudgetKRW: { type: number }
+            dailyLimit: { type: integer }
+            passThreshold: { type: number }
+            strategyWeights:
+              type: object
+              properties:
+                userDriven: { type: number }
+                exploration: { type: number }
+                gapFilling: { type: number }
+
+    IncubatorSaveSettingsResponseWrapper:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            saved:
+              type: array
+              items: { type: string }
+
+    # -- PersonaWorld Scheduler Schemas ---
+
+    SchedulerStatusResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            isActive: { type: boolean }
+            activePersonaCount: { type: integer }
+            pausedPersonas:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+            todayPostCount: { type: integer }
+            lastRunAt: { type: string, format: date-time, nullable: true }
+            recentRuns:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  personaId: { type: string }
+                  activityType: { type: string }
+                  createdAt: { type: string, format: date-time }
+
+    SchedulerTriggerNowRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [trigger_now]
+
+    SchedulerResumePersonaRequest:
+      type: object
+      required: [action, personaId]
+      properties:
+        action:
+          type: string
+          enum: [resume_persona]
+        personaId: { type: string }
+
+    SchedulerPausePersonaRequest:
+      type: object
+      required: [action, personaId]
+      properties:
+        action:
+          type: string
+          enum: [pause_persona]
+        personaId: { type: string }
+
+    SchedulerTriggerNowResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            message: { type: string }
+            result:
+              type: object
+              properties:
+                decisions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      personaId: { type: string }
+                      shouldPost: { type: boolean }
+                      shouldInteract: { type: boolean }
+                      postType: { type: string, nullable: true }
+                execution:
+                  type: object
+                  properties:
+                    postsCreated:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          personaId: { type: string }
+                          postId: { type: string }
+                          postType: { type: string }
+                    interactions:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          personaId: { type: string }
+                          likes: { type: integer }
+                          comments: { type: integer }
+                    llmAvailable: { type: boolean }
+
+    SchedulerPersonaActionResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            action: { type: string, enum: [resume_persona, pause_persona] }
+            personaId: { type: string }
+
+  responses:
+    Unauthorized:
+      description: 인증 실패
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: UNAUTHORIZED
+              message: Authentication required
+
+    BadRequest:
+      description: 잘못된 요청
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    NotFound:
+      description: 리소스 없음
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
