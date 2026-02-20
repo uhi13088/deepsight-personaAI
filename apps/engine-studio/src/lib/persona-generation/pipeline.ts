@@ -16,9 +16,14 @@ import { generateExpressQuirksWithLLM } from "@/lib/interaction/llm-express-quir
 import { computeActivityTraits, computeActiveHours } from "@/lib/persona-world/activity-mapper"
 import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
-import { buildVoiceSpec, computeVoiceStyleParams } from "@/lib/qualitative/voice-spec"
+import {
+  buildVoiceSpec,
+  computeVoiceStyleParams,
+  type VoiceSpec,
+} from "@/lib/qualitative/voice-spec"
 import { convertBackstoryToFactbook } from "@/lib/persona-world/factbook"
-import { generateInitialTriggerRules } from "@/lib/trigger/rule-dsl"
+import { generateInitialTriggerRules, type TriggerRuleDSL } from "@/lib/trigger/rule-dsl"
+import type { BackstoryDimension, Factbook, VoiceProfile } from "@/types"
 import type { QuirkDefinition } from "@/lib/interaction/express-algorithm"
 import { Prisma, type PersonaRole, type PersonaStatus } from "@/generated/prisma"
 
@@ -47,6 +52,50 @@ function inferPersonaRole(
     ANALYST: l1.depth * 0.4 + l1.lens * 0.4 + l1.scope * 0.2,
   }
   return Object.entries(scores).sort((a, b) => b[1] - a[1])[0][0] as PersonaRole
+}
+
+// ── v4 Instruction Layer 공유 빌더 ───────────────────────────
+
+export interface InstructionLayerResult {
+  voiceSpec: VoiceSpec
+  factbook: Factbook | null
+  triggerRules: TriggerRuleDSL[]
+}
+
+export async function buildInstructionLayer(
+  voice: VoiceProfile,
+  backstory: BackstoryDimension,
+  l1: {
+    depth: number
+    lens: number
+    stance: number
+    scope: number
+    taste: number
+    purpose: number
+    sociability: number
+  },
+  l2: {
+    openness: number
+    conscientiousness: number
+    extraversion: number
+    agreeableness: number
+    neuroticism: number
+  },
+  l3: { lack: number; moralCompass: number; volatility: number; growthArc: number }
+): Promise<InstructionLayerResult> {
+  const styleParams = computeVoiceStyleParams(l1, l2, l3)
+  const voiceSpec = buildVoiceSpec(voice, styleParams, l1, l2, l3)
+
+  let factbook: Factbook | null
+  try {
+    factbook = await convertBackstoryToFactbook(backstory)
+  } catch {
+    factbook = null
+  }
+
+  const triggerRules = generateInitialTriggerRules(l1, l2, l3)
+
+  return { voiceSpec, factbook, triggerRules }
 }
 
 // ── 결과 타입 ────────────────────────────────────────────────
@@ -151,18 +200,13 @@ export async function executePersonaGenerationPipeline(options?: {
   }
 
   // Stage 4: v4 Instruction Layer — VoiceSpec + Factbook + TriggerMap
-  const styleParams = computeVoiceStyleParams(l1, l2, l3)
-  const voiceSpec = buildVoiceSpec(qualitative.voice, styleParams, l1, l2, l3)
-
-  let factbook
-  try {
-    factbook = await convertBackstoryToFactbook(qualitative.backstory)
-  } catch {
-    // Factbook 변환 실패 시 null (SHA256 미지원 환경 등)
-    factbook = null
-  }
-
-  const triggerRules = generateInitialTriggerRules(l1, l2, l3)
+  const { voiceSpec, factbook, triggerRules } = await buildInstructionLayer(
+    qualitative.voice,
+    qualitative.backstory,
+    l1,
+    l2,
+    l3
+  )
 
   // Stage 5: 프롬프트 5종 자동 빌드
   const role = inferPersonaRole(l1, l2)

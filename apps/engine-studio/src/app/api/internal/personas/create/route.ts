@@ -7,9 +7,7 @@ import {
   generateAllQualitativeDimensions,
   generateAllQualitativeDimensionsWithLLM,
 } from "@/lib/qualitative"
-import { buildVoiceSpec, computeVoiceStyleParams } from "@/lib/qualitative/voice-spec"
-import { convertBackstoryToFactbook } from "@/lib/persona-world/factbook"
-import { generateInitialTriggerRules } from "@/lib/trigger/rule-dsl"
+import { buildInstructionLayer } from "@/lib/persona-generation/pipeline"
 import type {
   ApiResponse,
   SocialPersonaVector,
@@ -94,17 +92,13 @@ export async function POST(request: NextRequest) {
     }
 
     // ── v4 Instruction Layer ─────────────────────────────────
-    const styleParams = computeVoiceStyleParams(l1, l2, l3)
-    const voiceSpec = buildVoiceSpec(qualitative.voice, styleParams, l1, l2, l3)
-
-    let factbook
-    try {
-      factbook = await convertBackstoryToFactbook(qualitative.backstory)
-    } catch {
-      factbook = null
-    }
-
-    const triggerRules = generateInitialTriggerRules(l1, l2, l3)
+    const { voiceSpec, factbook, triggerRules } = await buildInstructionLayer(
+      qualitative.voice,
+      qualitative.backstory,
+      l1,
+      l2,
+      l3
+    )
 
     // ── Create Persona + LayerVectors in transaction ─────────
     const persona = await prisma.$transaction(async (tx) => {
