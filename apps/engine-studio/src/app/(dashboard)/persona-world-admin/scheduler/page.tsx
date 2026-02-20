@@ -77,9 +77,17 @@ export default function SchedulerControlPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "trigger_now" }),
       })
-      const json = (await res.json()) as { success: boolean; data?: TriggerResult }
-      if (json.data) {
+      const json = (await res.json()) as {
+        success: boolean
+        data?: TriggerResult
+        error?: { code: string; message: string }
+      }
+      if (json.success && json.data) {
         setLastTriggerResult(json.data)
+      } else if (json.error) {
+        setLastTriggerResult({
+          message: `오류: [${json.error.code}] ${json.error.message}`,
+        })
       }
       void fetchData()
     } catch {
