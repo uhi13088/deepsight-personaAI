@@ -261,7 +261,13 @@ function createSchedulerDataProvider(): SchedulerDataProvider {
     async getActiveStatusPersonas(): Promise<SchedulerPersona[]> {
       const personas = await prisma.persona.findMany({
         where: { status: { in: ["ACTIVE", "STANDARD"] } },
-        include: { layerVectors: true },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          paradoxScore: true,
+          layerVectors: true,
+        },
       })
 
       return personas.flatMap((p): SchedulerPersona[] => {
