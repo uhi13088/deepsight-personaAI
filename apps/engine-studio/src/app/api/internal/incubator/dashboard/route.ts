@@ -268,16 +268,122 @@ export async function POST(request: NextRequest) {
         archetypeId: string | null
         paradoxScore: number
         status: string
+        source: "user_request" | "auto"
       }> = []
       const errors: string[] = []
 
-      // 내부 함수 직접 호출로 페르소나 생성 (self-fetch 제거)
-      for (let i = 0; i < dailyLimit; i++) {
+      // ── Phase 1: 사용자 페르소나 생성 요청 처리 (우선) ──────
+      const todayEnd = new Date()
+      todayEnd.setHours(23, 59, 59, 999)
+
+      const pendingRequests = await prisma.personaGenerationRequest
+        .findMany({
+          where: {
+            status: { in: ["PENDING", "SCHEDULED"] },
+            scheduledDate: { lte: todayEnd },
+          },
+          orderBy: { createdAt: "asc" },
+          take: dailyLimit,
+        })
+        .catch(() => [])
+
+      let userRequestsProcessed = 0
+
+      for (const req of pendingRequests) {
+        if (userRequestsProcessed >= dailyLimit) break
+
+        try {
+          // GENERATING 상태로 업데이트
+          await prisma.personaGenerationRequest.update({
+            where: { id: req.id },
+            data: { status: "GENERATING" },
+          })
+
+          const generated = await executePersonaGenerationPipeline({ status: "DRAFT" })
+
+          const p = generated.paradoxScore
+          const dimensionality = Math.exp(-((p - 0.35) ** 2) / (2 * 0.2 ** 2))
+          const passed = dimensionality >= passThreshold
+          const status = passed ? "PASSED" : "FAILED"
+
+          results.push({
+            personaId: generated.id,
+            name: generated.name,
+            archetypeId: generated.archetypeId,
+            paradoxScore: generated.paradoxScore,
+            status,
+            source: "user_request",
+          })
+
+          if (passed) {
+            await prisma.persona.update({
+              where: { id: generated.id },
+              data: { status: "ACTIVE", source: "USER_REQUEST" },
+            })
+
+            // 요청 완료 처리 — 생성된 페르소나 연결
+            await prisma.personaGenerationRequest.update({
+              where: { id: req.id },
+              data: {
+                status: "COMPLETED",
+                generatedPersonaId: generated.id,
+                completedAt: new Date(),
+              },
+            })
+          } else {
+            // 불합격 → 실패 처리
+            await prisma.personaGenerationRequest.update({
+              where: { id: req.id },
+              data: {
+                status: "FAILED",
+                failReason: `품질 미달 (dimensionality: ${dimensionality.toFixed(3)}, threshold: ${passThreshold})`,
+                completedAt: new Date(),
+              },
+            })
+          }
+
+          // IncubatorLog 기록
+          await prisma.incubatorLog.create({
+            data: {
+              batchId,
+              batchDate: new Date(),
+              personaConfig: { archetypeId: generated.archetypeId, userRequestId: req.id },
+              generatedPrompt: generated.name,
+              testSampleIds: [],
+              consistencyScore: dimensionality,
+              vectorAlignmentScore: dimensionality,
+              toneMatchScore: p,
+              reasoningQualityScore: dimensionality,
+              status,
+            },
+          })
+
+          userRequestsProcessed++
+        } catch (err) {
+          errors.push(err instanceof Error ? err.message : `UserRequest ${req.id} error`)
+          // 요청 실패 처리
+          await prisma.personaGenerationRequest
+            .update({
+              where: { id: req.id },
+              data: {
+                status: "FAILED",
+                failReason: err instanceof Error ? err.message : "Unknown pipeline error",
+                completedAt: new Date(),
+              },
+            })
+            .catch(() => {
+              /* ignore */
+            })
+        }
+      }
+
+      // ── Phase 2: 남은 슬롯에 자동 생성 ────────────────────
+      const remainingSlots = dailyLimit - userRequestsProcessed
+
+      for (let i = 0; i < remainingSlots; i++) {
         try {
           const generated = await executePersonaGenerationPipeline({ status: "DRAFT" })
 
-          // paradoxScore 기반 합격/불합격 판정
-          // dimensionality = exp(-(paradox - 0.35)² / (2 × 0.2²))  → 0.35 근방이 최적
           const p = generated.paradoxScore
           const dimensionality = Math.exp(-((p - 0.35) ** 2) / (2 * 0.2 ** 2))
           const passed = dimensionality >= passThreshold
@@ -289,9 +395,9 @@ export async function POST(request: NextRequest) {
             archetypeId: generated.archetypeId,
             paradoxScore: generated.paradoxScore,
             status,
+            source: "auto",
           })
 
-          // PASSED → ACTIVE 승격, FAILED → DRAFT 유지
           if (passed) {
             await prisma.persona.update({
               where: { id: generated.id },
@@ -299,7 +405,6 @@ export async function POST(request: NextRequest) {
             })
           }
 
-          // IncubatorLog 기록
           await prisma.incubatorLog.create({
             data: {
               batchId,
@@ -331,6 +436,7 @@ export async function POST(request: NextRequest) {
           passed: number
           failed: number
           errors: number
+          userRequestsProcessed: number
           durationMs: number
           results: typeof results
         }>
@@ -338,11 +444,12 @@ export async function POST(request: NextRequest) {
         success: true,
         data: {
           batchId,
-          message: `배치 완료: ${results.length}개 생성, ${passedCount}개 합격, ${failedCount}개 불합격`,
+          message: `배치 완료: ${results.length}개 생성 (사용자 요청 ${userRequestsProcessed}건 처리), ${passedCount}개 합격, ${failedCount}개 불합격`,
           generated: results.length,
           passed: passedCount,
           failed: failedCount,
           errors: errors.length,
+          userRequestsProcessed,
           durationMs,
           results,
         },
