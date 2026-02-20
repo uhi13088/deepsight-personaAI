@@ -1,0 +1,1612 @@
+openapi: 3.1.0
+
+info:
+  title: DeepSight External API
+  version: "1.0.0"
+  description: |
+    DeepSight AI 페르소나 기반 콘텐츠 추천 B2B API.
+
+    ## 인증
+    모든 요청에 `Authorization: Bearer {API_KEY}` 헤더가 필요합니다.
+
+    ## Rate Limiting
+    응답 헤더 `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` 으로 확인하세요.
+
+    | 플랜 | 분당 요청 | 월 한도 |
+    |------|---------|--------|
+    | Free | 10 | 1,000 |
+    | Starter | 50 | 10,000 |
+    | Pro | 200 | 100,000 |
+    | Enterprise | 무제한 | 무제한 |
+
+  contact:
+    name: DeepSight Developer Support
+    url: https://console.deepsight.ai
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://api.deepsight.ai
+    description: Production
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Matching
+    description: 페르소나 매칭 API
+  - name: Personas
+    description: 페르소나 조회 및 필터 API
+  - name: Feedback
+    description: 매칭 결과 피드백 API
+  - name: Users
+    description: 사용자 프로필 · 온보딩 · 동의 API
+
+# ============================================================
+# Paths
+# ============================================================
+
+paths:
+
+  /v1/match:
+    post:
+      operationId: matchPersonas
+      tags: [Matching]
+      summary: 단일 사용자 페르소나 매칭
+      description: |
+        특정 사용자에게 가장 적합한 페르소나를 반환합니다.
+
+        ### 매칭 티어
+        | 티어 | 사용 레이어 | 가중치 |
+        |------|-----------|--------|
+        | `basic` | L1 only | L1 100% |
+        | `advanced` | L1 + L2 + EPS | L1 70% + L2 20% + EPS 10% |
+        | `exploration` | L1 + L2 + L3 + EPS | L1 50% + L2 20% + L3 20% + EPS 10% |
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MatchRequest"
+            examples:
+              basic:
+                summary: 기본 매칭
+                value:
+                  user_id: "user_abc123"
+                  options:
+                    top_n: 5
+                    matching_tier: "basic"
+              advanced:
+                summary: 고급 매칭 (컨텍스트 포함)
+                value:
+                  user_id: "user_abc123"
+                  context:
+                    category: "lifestyle"
+                    device: "mobile"
+                  options:
+                    top_n: 5
+                    matching_tier: "advanced"
+                    include_score: true
+                    include_explanation: true
+      responses:
+        "200":
+          description: 매칭 성공
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/X-RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/batch-match:
+    post:
+      operationId: batchMatchPersonas
+      tags: [Matching]
+      summary: 배치 페르소나 매칭
+      description: |
+        여러 사용자에 대한 매칭을 한 번의 요청으로 처리합니다.
+        최대 **100건** 까지 처리 가능합니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchMatchRequest"
+            examples:
+              example:
+                summary: 2명 배치 매칭
+                value:
+                  items:
+                    - user_id: "user_001"
+                      options:
+                        top_n: 3
+                        matching_tier: "basic"
+                    - user_id: "user_002"
+                      context:
+                        category: "tech"
+                      options:
+                        top_n: 5
+                        matching_tier: "advanced"
+      responses:
+        "200":
+          description: 배치 매칭 성공
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/X-RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchMatchResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/personas:
+    get:
+      operationId: listPersonas
+      tags: [Personas]
+      summary: 페르소나 목록 조회
+      description: 활성 페르소나 목록을 페이지네이션하여 반환합니다.
+      parameters:
+        - name: page
+          in: query
+          description: 페이지 번호 (기본 1)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: 페이지당 항목 수 (기본 20, 최대 100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: role
+          in: query
+          description: 역할 필터 (대소문자 무관)
+          schema:
+            type: string
+            example: "ANALYST"
+        - name: expertise
+          in: query
+          description: 전문 분야 필터
+          schema:
+            type: string
+            example: "철학"
+      responses:
+        "200":
+          description: 조회 성공
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/X-RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonaListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/personas/filter:
+    post:
+      operationId: filterPersonas
+      tags: [Personas]
+      summary: 다차원 조건 페르소나 필터
+      description: |
+        벡터 범위·아키타입·역설 점수 등 복합 조건으로 페르소나를 필터링합니다.
+
+        ### 유효한 아키타입 ID
+        `ironic-philosopher`, `wounded-critic`, `social-introvert`, `lazy-perfectionist`,
+        `conservative-hipster`, `empathetic-arguer`, `free-guardian`, `quiet-enthusiast`,
+        `emotional-pragmatist`, `dangerous-mentor`, `volatile-intellectual`, `growing-cynic`
+
+        ### 벡터 범위
+        모든 벡터 값은 `0.0 ~ 1.0` 범위여야 합니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PersonaFilterRequest"
+            examples:
+              vectorFilter:
+                summary: 벡터 범위 + 아키타입 필터
+                value:
+                  filters:
+                    archetype:
+                      include: ["ironic-philosopher", "wounded-critic"]
+                    vectors:
+                      l1:
+                        depth: { min: 0.6, max: 1.0 }
+                        sociability: { max: 0.4 }
+                      l2:
+                        openness: { min: 0.7 }
+                    paradox:
+                      extendedScore: { min: 0.5 }
+                  sort:
+                    field: "paradox.extendedScore"
+                    order: "desc"
+                  pagination:
+                    page: 1
+                    limit: 20
+      responses:
+        "200":
+          description: 필터링 성공
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/X-RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonaFilterResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/personas/{id}:
+    get:
+      operationId: getPersona
+      tags: [Personas]
+      summary: 페르소나 상세 조회
+      description: 특정 페르소나의 전체 정보 (벡터·역설·캐릭터)를 반환합니다.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 페르소나 ID
+          schema:
+            type: string
+            example: "persona_xyz789"
+      responses:
+        "200":
+          description: 조회 성공
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/X-RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonaDetailResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/feedback:
+    post:
+      operationId: submitFeedback
+      tags: [Feedback]
+      summary: 피드백 제출
+      description: |
+        매칭 결과에 대한 사용자 피드백을 제출합니다.
+        피드백은 페르소나 진화 알고리즘의 학습 데이터로 활용됩니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackRequest"
+            examples:
+              like:
+                summary: 긍정 피드백
+                value:
+                  user_id: "user_abc123"
+                  persona_id: "persona_xyz789"
+                  feedback_type: "LIKE"
+                  content_id: "content_001"
+                  comment: "이 페르소나의 관점이 제 취향과 잘 맞았어요."
+              dislike:
+                summary: 부정 피드백
+                value:
+                  user_id: "user_abc123"
+                  persona_id: "persona_xyz789"
+                  feedback_type: "DISLIKE"
+      responses:
+        "200":
+          description: 피드백 제출 성공
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/X-RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/users/{id}/profile:
+    get:
+      operationId: getUserProfile
+      tags: [Users]
+      summary: 사용자 프로필 조회
+      description: |
+        사용자의 벡터 프로필을 반환합니다.
+
+        > **주의**: `third_party_sharing` 동의가 필요합니다.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 사용자 ID
+          schema:
+            type: string
+            example: "user_abc123"
+      responses:
+        "200":
+          description: 조회 성공
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/X-RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfileResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: 동의 미완료
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error:
+                  code: "CONSENT_REQUIRED"
+                  message: "User has not consented to third-party data sharing"
+                meta:
+                  request_id: "req_abc123"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/users/{id}/onboarding:
+    post:
+      operationId: submitOnboarding
+      tags: [Users]
+      summary: 사용자 온보딩 제출
+      description: |
+        온보딩 응답을 제출하고 유저 벡터 프로필을 생성합니다.
+
+        ### 온보딩 레벨별 최소 응답 수
+        | 레벨 | 최소 응답 | 프로파일 품질 | 정밀도 추정 |
+        |------|---------|------------|----------|
+        | `QUICK` | 12개 | BASIC | ~45% |
+        | `STANDARD` | 30개 | STANDARD | ~62% |
+        | `DEEP` | 60개 | ADVANCED | ~75% |
+
+        > 이미 온보딩을 완료한 사용자에게 호출하면 `CONFLICT` (409) 에러가 반환됩니다.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 사용자 ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardingRequest"
+            examples:
+              standard:
+                summary: STANDARD 레벨 온보딩
+                value:
+                  level: "STANDARD"
+                  responses:
+                    - question_id: "q_001"
+                      answer: "A"
+                      target_dimensions: ["depth", "lens"]
+                    - question_id: "q_002"
+                      answer: 0.7
+                      target_dimensions: ["sociability"]
+                  consent:
+                    data_collection: true
+                    sns_analysis: false
+                    third_party_sharing: true
+                    marketing: false
+      responses:
+        "200":
+          description: 온보딩 성공
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/X-RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: 이미 온보딩 완료
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error:
+                  code: "CONFLICT"
+                  message: "User already completed onboarding. Use daily check instead"
+                meta:
+                  request_id: "req_abc123"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/users/{id}/consent:
+    get:
+      operationId: getUserConsent
+      tags: [Users]
+      summary: 동의 상태 조회
+      description: 사용자의 현재 동의 상태 (4가지 타입 모두)를 반환합니다.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 사용자 ID
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 조회 성공
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/X-RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentGetResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      operationId: updateUserConsent
+      tags: [Users]
+      summary: 동의 상태 변경
+      description: |
+        사용자의 동의 상태를 생성하거나 변경합니다.
+
+        > `data_collection`을 `granted: false`로 설정할 수 없습니다.
+        > 탈퇴 처리는 `DELETE /v1/users/:id`를 사용하세요.
+
+        ### 동의 변경 부수 효과
+        | 타입 | 동의 시 | 철회 시 |
+        |------|--------|--------|
+        | `sns_analysis` | L2 벡터 생성 큐 등록 | L2 벡터 삭제 |
+        | `third_party_sharing` | External API 접근 허용 | External API 접근 차단 |
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 사용자 ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsentUpdateRequest"
+            examples:
+              revokeSnS:
+                summary: SNS 분석 동의 철회
+                value:
+                  consent_version: "v2.0"
+                  consents:
+                    - type: "sns_analysis"
+                      granted: false
+              grantMarketing:
+                summary: 마케팅 동의
+                value:
+                  consent_version: "v2.0"
+                  consents:
+                    - type: "marketing"
+                      granted: true
+      responses:
+        "200":
+          description: 동의 변경 성공
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/X-RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentUpdateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+# ============================================================
+# Components
+# ============================================================
+
+components:
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Developer Console에서 발급받은 API 키
+
+  headers:
+    X-RateLimit-Limit:
+      description: 분당 허용 요청 수
+      schema:
+        type: string
+        example: "200"
+    X-RateLimit-Remaining:
+      description: 현재 분에 남은 요청 수
+      schema:
+        type: string
+        example: "199"
+    X-RateLimit-Reset:
+      description: Rate Limit 초기화 시각 (Unix timestamp)
+      schema:
+        type: string
+        example: "1708416060"
+
+  # ----------------------------------------------------------
+  # Common Schemas
+  # ----------------------------------------------------------
+
+  schemas:
+
+    Meta:
+      type: object
+      properties:
+        request_id:
+          type: string
+          description: 요청 고유 ID
+          example: "req_8f3a2b1c4d5e"
+        processing_time_ms:
+          type: integer
+          description: 서버 처리 시간 (ms)
+          example: 42
+
+    MetaWithPagination:
+      allOf:
+        - $ref: "#/components/schemas/Meta"
+        - type: object
+          properties:
+            pagination:
+              type: object
+              properties:
+                current_page:
+                  type: integer
+                  example: 1
+                total_pages:
+                  type: integer
+                  example: 5
+                total_count:
+                  type: integer
+                  example: 97
+
+    ErrorResponse:
+      type: object
+      required: [success, error, meta]
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: "INVALID_USER_ID"
+            message:
+              type: string
+              example: "user_id is required and must be a string"
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    VectorRange:
+      type: object
+      description: 벡터 차원 필터 범위 (0.0 ~ 1.0)
+      properties:
+        min:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          example: 0.6
+        max:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          example: 1.0
+
+    L1Vector:
+      type: object
+      description: L1 Social 벡터 (7차원)
+      properties:
+        depth:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: 깊이 (표면적 ↔ 심층적)
+        lens:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: 렌즈 (객관적 ↔ 주관적)
+        stance:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: 입장 (보수적 ↔ 진보적)
+        scope:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: 범위 (개인적 ↔ 사회적)
+        taste:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: 취향 (대중적 ↔ 마니아)
+        purpose:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: 목적 (정보 ↔ 감성)
+        sociability:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: 사회성
+
+    L2Vector:
+      type: object
+      description: L2 Temperament 벡터 (5차원, OCEAN)
+      properties:
+        openness:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+        conscientiousness:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+        extraversion:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+        agreeableness:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+        neuroticism:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+
+    L3Vector:
+      type: object
+      description: L3 Depth 벡터 (4차원)
+      properties:
+        lack:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+        moralCompass:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+        volatility:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+        growthArc:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+
+    PersonaVectors:
+      type: object
+      properties:
+        l1:
+          $ref: "#/components/schemas/L1Vector"
+        l2:
+          $ref: "#/components/schemas/L2Vector"
+        l3:
+          $ref: "#/components/schemas/L3Vector"
+
+    ParadoxProfile:
+      type: object
+      properties:
+        archetype_id:
+          type: string
+          nullable: true
+          example: "ironic-philosopher"
+        extended_score:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          example: 0.78
+        l1_l2_score:
+          type: number
+          nullable: true
+          example: 0.65
+        l1_l3_score:
+          type: number
+          nullable: true
+          example: 0.71
+        l2_l3_score:
+          type: number
+          nullable: true
+          example: 0.59
+
+    MatchContext:
+      type: object
+      properties:
+        category:
+          type: string
+          description: 페르소나 카테고리 필터
+          example: "lifestyle"
+        time_of_day:
+          type: string
+          example: "morning"
+        device:
+          type: string
+          example: "mobile"
+        custom:
+          type: object
+          additionalProperties: true
+
+    MatchOptions:
+      type: object
+      properties:
+        top_n:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 5
+          description: 반환 페르소나 수
+        matching_tier:
+          type: string
+          enum: [basic, advanced, exploration]
+          default: basic
+          description: 매칭 티어
+        include_score:
+          type: boolean
+          default: true
+          description: 점수 포함 여부
+        include_explanation:
+          type: boolean
+          default: false
+          description: 설명 포함 여부
+
+    MatchItem:
+      type: object
+      properties:
+        persona_id:
+          type: string
+          example: "persona_xyz789"
+        persona_name:
+          type: string
+          example: "아이러니한 철학자"
+        score:
+          type: number
+          description: 종합 매칭 점수 (0~100)
+          example: 87.4
+        explanation:
+          type: string
+          nullable: true
+          example: "advanced tier matching — similarity 82.1%"
+        details:
+          type: object
+          nullable: true
+          properties:
+            similarity_score:
+              type: number
+              example: 82.1
+            paradox_compatibility:
+              type: number
+              nullable: true
+              example: 74.3
+
+    # ----------------------------------------------------------
+    # Match
+    # ----------------------------------------------------------
+
+    MatchRequest:
+      type: object
+      required: [user_id]
+      properties:
+        user_id:
+          type: string
+          description: 매칭 대상 사용자 ID
+          example: "user_abc123"
+        context:
+          $ref: "#/components/schemas/MatchContext"
+        options:
+          $ref: "#/components/schemas/MatchOptions"
+
+    MatchResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          properties:
+            matches:
+              type: array
+              items:
+                $ref: "#/components/schemas/MatchItem"
+            user_archetype:
+              type: string
+              nullable: true
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/Meta"
+            - type: object
+              properties:
+                matching_tier:
+                  type: string
+                  example: "advanced"
+
+    BatchMatchRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: object
+            required: [user_id]
+            properties:
+              user_id:
+                type: string
+                example: "user_001"
+              context:
+                $ref: "#/components/schemas/MatchContext"
+              options:
+                type: object
+                properties:
+                  top_n:
+                    type: integer
+                    minimum: 1
+                    maximum: 20
+                    default: 5
+                  matching_tier:
+                    type: string
+                    enum: [basic, advanced, exploration]
+                    default: basic
+                  include_score:
+                    type: boolean
+                    default: true
+
+    BatchMatchResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          properties:
+            results:
+              type: array
+              items:
+                type: object
+                properties:
+                  user_id:
+                    type: string
+                  matching_tier:
+                    type: string
+                  matches:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MatchItem"
+        meta:
+          allOf:
+            - $ref: "#/components/schemas/Meta"
+            - type: object
+              properties:
+                total_items:
+                  type: integer
+                  example: 2
+
+    # ----------------------------------------------------------
+    # Personas
+    # ----------------------------------------------------------
+
+    PersonaBase:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "persona_xyz789"
+        name:
+          type: string
+          example: "아이러니한 철학자"
+        role:
+          type: string
+          example: "ANALYST"
+        expertise:
+          type: array
+          items:
+            type: string
+          example: ["철학", "인문학", "비평"]
+        description:
+          type: string
+          example: "역설적 사유로 세상을 바라보는 분석가"
+
+    PersonaListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          properties:
+            personas:
+              type: array
+              items:
+                allOf:
+                  - $ref: "#/components/schemas/PersonaBase"
+                  - type: object
+                    properties:
+                      vectors:
+                        $ref: "#/components/schemas/PersonaVectors"
+        meta:
+          $ref: "#/components/schemas/MetaWithPagination"
+
+    PersonaDetailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          allOf:
+            - $ref: "#/components/schemas/PersonaBase"
+            - type: object
+              properties:
+                category:
+                  type: string
+                  example: "Humanities"
+                active:
+                  type: boolean
+                status:
+                  type: string
+                  enum: [DRAFT, ACTIVE, LEGACY, DEPRECATED, ARCHIVED]
+                vector:
+                  $ref: "#/components/schemas/PersonaVectors"
+                paradox:
+                  $ref: "#/components/schemas/ParadoxProfile"
+                character:
+                  type: object
+                  properties:
+                    handle:
+                      type: string
+                      example: "@ironic_phil"
+                    tagline:
+                      type: string
+                      example: "진리는 역설 속에 있다"
+                    warmth:
+                      type: number
+                      nullable: true
+                    expertise_level:
+                      type: string
+                created_at:
+                  type: string
+                  format: date-time
+                updated_at:
+                  type: string
+                  format: date-time
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    PersonaFilterRequest:
+      type: object
+      properties:
+        filters:
+          type: object
+          properties:
+            archetype:
+              type: object
+              properties:
+                include:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - ironic-philosopher
+                      - wounded-critic
+                      - social-introvert
+                      - lazy-perfectionist
+                      - conservative-hipster
+                      - empathetic-arguer
+                      - free-guardian
+                      - quiet-enthusiast
+                      - emotional-pragmatist
+                      - dangerous-mentor
+                      - volatile-intellectual
+                      - growing-cynic
+                exclude:
+                  type: array
+                  items:
+                    type: string
+            vectors:
+              type: object
+              properties:
+                l1:
+                  type: object
+                  properties:
+                    depth:
+                      $ref: "#/components/schemas/VectorRange"
+                    lens:
+                      $ref: "#/components/schemas/VectorRange"
+                    stance:
+                      $ref: "#/components/schemas/VectorRange"
+                    scope:
+                      $ref: "#/components/schemas/VectorRange"
+                    taste:
+                      $ref: "#/components/schemas/VectorRange"
+                    purpose:
+                      $ref: "#/components/schemas/VectorRange"
+                    sociability:
+                      $ref: "#/components/schemas/VectorRange"
+                l2:
+                  type: object
+                  properties:
+                    openness:
+                      $ref: "#/components/schemas/VectorRange"
+                    conscientiousness:
+                      $ref: "#/components/schemas/VectorRange"
+                    extraversion:
+                      $ref: "#/components/schemas/VectorRange"
+                    agreeableness:
+                      $ref: "#/components/schemas/VectorRange"
+                    neuroticism:
+                      $ref: "#/components/schemas/VectorRange"
+                l3:
+                  type: object
+                  properties:
+                    lack:
+                      $ref: "#/components/schemas/VectorRange"
+                    moralCompass:
+                      $ref: "#/components/schemas/VectorRange"
+                    volatility:
+                      $ref: "#/components/schemas/VectorRange"
+                    growthArc:
+                      $ref: "#/components/schemas/VectorRange"
+            paradox:
+              type: object
+              properties:
+                extendedScore:
+                  $ref: "#/components/schemas/VectorRange"
+                l1l2Score:
+                  $ref: "#/components/schemas/VectorRange"
+                l1l3Score:
+                  $ref: "#/components/schemas/VectorRange"
+                l2l3Score:
+                  $ref: "#/components/schemas/VectorRange"
+            role:
+              type: string
+            expertise:
+              type: array
+              items:
+                type: string
+            status:
+              type: string
+        sort:
+          type: object
+          properties:
+            field:
+              type: string
+              enum:
+                - paradox.extendedScore
+                - paradox.l1l2Score
+                - createdAt
+                - name
+              example: "paradox.extendedScore"
+            order:
+              type: string
+              enum: [asc, desc]
+              default: desc
+        pagination:
+          type: object
+          properties:
+            page:
+              type: integer
+              minimum: 1
+              default: 1
+            limit:
+              type: integer
+              minimum: 1
+              maximum: 100
+              default: 20
+
+    PersonaFilterResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          properties:
+            personas:
+              type: array
+              items:
+                type: object
+            appliedFilters:
+              type: object
+              properties:
+                archetype:
+                  nullable: true
+                vectorRanges:
+                  type: integer
+                paradoxRange:
+                  type: boolean
+                crossAxisPatterns:
+                  type: integer
+            filterStats:
+              type: object
+              properties:
+                totalMatched:
+                  type: integer
+                archetypeDistribution:
+                  type: object
+                  additionalProperties:
+                    type: integer
+        meta:
+          $ref: "#/components/schemas/MetaWithPagination"
+
+    # ----------------------------------------------------------
+    # Feedback
+    # ----------------------------------------------------------
+
+    FeedbackRequest:
+      type: object
+      required: [user_id, persona_id, feedback_type]
+      properties:
+        user_id:
+          type: string
+          example: "user_abc123"
+        persona_id:
+          type: string
+          example: "persona_xyz789"
+        feedback_type:
+          type: string
+          enum: [LIKE, DISLIKE]
+        content_id:
+          type: string
+          description: 연관 콘텐츠 ID (선택)
+          example: "content_001"
+        comment:
+          type: string
+          maxLength: 1000
+          description: 피드백 코멘트 (선택)
+          example: "이 페르소나의 관점이 제 취향과 잘 맞았어요."
+
+    FeedbackResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          properties:
+            feedback_id:
+              type: string
+              example: "fb_1a2b3c4d"
+            processed:
+              type: boolean
+              example: true
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    # ----------------------------------------------------------
+    # Users
+    # ----------------------------------------------------------
+
+    UserProfileResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          properties:
+            user_id:
+              type: string
+            archetype:
+              type: string
+              nullable: true
+            onboarding_level:
+              type: string
+              enum: [QUICK, STANDARD, DEEP]
+            profile_quality:
+              type: string
+              enum: [BASIC, STANDARD, ADVANCED]
+            vector:
+              type: object
+              properties:
+                l1_social:
+                  $ref: "#/components/schemas/L1Vector"
+                l2_temperament:
+                  allOf:
+                    - $ref: "#/components/schemas/L2Vector"
+                  nullable: true
+                has_l2:
+                  type: boolean
+            consent:
+              type: object
+              properties:
+                data_collection:
+                  type: boolean
+                sns_analysis:
+                  type: boolean
+                third_party_sharing:
+                  type: boolean
+                marketing:
+                  type: boolean
+                last_updated:
+                  type: string
+                  format: date-time
+                  nullable: true
+            feedback_count:
+              type: integer
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    OnboardingResponse_item:
+      type: object
+      required: [question_id, answer]
+      properties:
+        question_id:
+          type: string
+          example: "q_001"
+        answer:
+          oneOf:
+            - type: string
+            - type: number
+          example: "A"
+        target_dimensions:
+          type: array
+          items:
+            type: string
+          example: ["depth", "lens"]
+
+    OnboardingRequest:
+      type: object
+      required: [level, responses, consent]
+      properties:
+        level:
+          type: string
+          enum: [QUICK, STANDARD, DEEP]
+          description: |
+            QUICK: 최소 12개 응답, STANDARD: 최소 30개, DEEP: 최소 60개
+        responses:
+          type: array
+          items:
+            $ref: "#/components/schemas/OnboardingResponse_item"
+        consent:
+          type: object
+          required: [data_collection]
+          properties:
+            data_collection:
+              type: boolean
+              enum: [true]
+              description: 필수 동의
+            sns_analysis:
+              type: boolean
+            third_party_sharing:
+              type: boolean
+            marketing:
+              type: boolean
+
+    OnboardingResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          properties:
+            user_id:
+              type: string
+            archetype:
+              type: string
+              nullable: true
+            vector_updated:
+              type: boolean
+            profile_quality:
+              type: string
+              enum: [BASIC, STANDARD, ADVANCED]
+            vector:
+              type: object
+              properties:
+                l1_social:
+                  $ref: "#/components/schemas/L1Vector"
+                l2_temperament:
+                  nullable: true
+            precision_estimate:
+              type: number
+              example: 0.62
+            next_steps:
+              type: object
+              properties:
+                daily_check_available:
+                  type: boolean
+                sns_connection_suggested:
+                  type: boolean
+                suggested_sns:
+                  type: array
+                  items:
+                    type: string
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    ConsentItem:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [data_collection, sns_analysis, third_party_sharing, marketing]
+        label:
+          type: string
+        description:
+          type: string
+        required:
+          type: boolean
+        granted:
+          type: boolean
+        granted_at:
+          type: string
+          format: date-time
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    ConsentGetResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          properties:
+            user_id:
+              type: string
+            consents:
+              type: array
+              items:
+                $ref: "#/components/schemas/ConsentItem"
+            consent_version:
+              type: string
+              example: "v2.0"
+            last_updated:
+              type: string
+              format: date-time
+              nullable: true
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+    ConsentUpdateRequest:
+      type: object
+      required: [consent_version, consents]
+      properties:
+        consent_version:
+          type: string
+          enum: ["v2.0"]
+          description: 현재 동의 버전
+        consents:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [type, granted]
+            properties:
+              type:
+                type: string
+                enum: [data_collection, sns_analysis, third_party_sharing, marketing]
+              granted:
+                type: boolean
+
+    ConsentUpdateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          properties:
+            user_id:
+              type: string
+            updated:
+              type: array
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                  granted:
+                    type: boolean
+                  granted_at:
+                    type: string
+                    format: date-time
+            consent_version:
+              type: string
+            side_effects:
+              type: object
+              nullable: true
+              additionalProperties: true
+        meta:
+          $ref: "#/components/schemas/Meta"
+
+  # ----------------------------------------------------------
+  # Common Responses
+  # ----------------------------------------------------------
+
+  responses:
+    BadRequest:
+      description: 잘못된 요청
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            invalidUserId:
+              value:
+                success: false
+                error:
+                  code: "INVALID_USER_ID"
+                  message: "user_id is required and must be a string"
+                meta:
+                  request_id: "req_abc123"
+
+    Unauthorized:
+      description: 인증 실패
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: "UNAUTHORIZED"
+              message: "Invalid API key"
+            meta:
+              request_id: "req_abc123"
+
+    NotFound:
+      description: 리소스 없음
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: "NOT_FOUND"
+              message: "Resource not found"
+            meta:
+              request_id: "req_abc123"
+
+    RateLimited:
+      description: Rate Limit 초과
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: "RATE_LIMITED"
+              message: "Too many requests. Retry after the reset time."
+            meta:
+              request_id: "req_abc123"
+
+    InternalError:
+      description: 서버 내부 오류
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            success: false
+            error:
+              code: "INTERNAL_ERROR"
+              message: "An internal error occurred"
+            meta:
+              request_id: "req_abc123"
