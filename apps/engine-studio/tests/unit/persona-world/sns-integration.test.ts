@@ -88,8 +88,8 @@ describe("SNS OAuth", () => {
 
   describe("buildAuthUrl", () => {
     beforeEach(() => {
-      vi.stubEnv("YOUTUBE_CLIENT_ID", "test-youtube-id")
-      vi.stubEnv("YOUTUBE_CLIENT_SECRET", "test-youtube-secret")
+      vi.stubEnv("GOOGLE_CLIENT_ID", "test-youtube-id")
+      vi.stubEnv("GOOGLE_CLIENT_SECRET", "test-youtube-secret")
       vi.stubEnv("SPOTIFY_CLIENT_ID", "test-spotify-id")
       vi.stubEnv("SPOTIFY_CLIENT_SECRET", "test-spotify-secret")
       vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://example.com")
