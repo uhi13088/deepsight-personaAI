@@ -236,10 +236,15 @@ export async function executePersonaGenerationPipeline(options?: {
     const created = await tx.persona.create({
       data: {
         name: character.name,
+        handle: `@${character.name.replace(/\s+/g, "_").toLowerCase()}`,
+        tagline: character.description,
         role,
         expertise: character.expertise,
         description: character.description,
         warmth,
+        background: character.background,
+        speechPatterns: character.speechPatterns,
+        quirks: character.quirks,
         status: targetStatus,
         source: "MANUAL",
         archetypeId: generated.archetype?.id ?? null,
