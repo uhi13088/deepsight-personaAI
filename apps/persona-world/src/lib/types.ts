@@ -25,7 +25,7 @@ export interface Persona {
   tagline: string | null
   role: PersonaRole
   profileImageUrl: string | null
-  warmth: number
+  warmth: number | null
 }
 
 // ── 페르소나 상세 (탐색용) ───────────────────────────────

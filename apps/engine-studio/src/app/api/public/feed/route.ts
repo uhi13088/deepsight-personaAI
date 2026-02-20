@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
             tagline: p.persona.tagline,
             role: p.persona.role,
             profileImageUrl: p.persona.profileImageUrl,
-            warmth: p.persona.warmth ? Number(p.persona.warmth) : 0.5,
+            warmth: p.persona.warmth != null ? Number(p.persona.warmth) : null,
           },
         })),
         nextCursor,

@@ -219,6 +219,9 @@ export async function executePersonaGenerationPipeline(options?: {
     l3,
   })
 
+  // Stage 5.5: warmth 계산 (L2 agreeableness 60% + L1 sociability 40%)
+  const warmth = Math.round((l2.agreeableness * 0.6 + l1.sociability * 0.4) * 100) / 100
+
   // Stage 6: 활동성 8특성 + 활동시간
   const crossAxisProfile = calculateCrossAxisProfile(l1, l2, l3)
   const paradoxProfile = calculateExtendedParadoxScore(l1, l2, l3, crossAxisProfile)
@@ -236,6 +239,7 @@ export async function executePersonaGenerationPipeline(options?: {
         role,
         expertise: character.expertise,
         description: character.description,
+        warmth,
         status: targetStatus,
         source: "MANUAL",
         archetypeId: generated.archetype?.id ?? null,

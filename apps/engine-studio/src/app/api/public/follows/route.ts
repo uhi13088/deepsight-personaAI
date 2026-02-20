@@ -54,6 +54,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // followerUserId가 있으면 PersonaWorldUser 존재 보장 (없으면 생성)
+    if (followerUserId) {
+      await prisma.personaWorldUser.upsert({
+        where: { id: followerUserId },
+        update: {},
+        create: { id: followerUserId, email: `${followerUserId}@anonymous.local` },
+      })
+    }
+
     // 기존 팔로우 확인
     const existing = followerPersonaId
       ? await prisma.personaFollow.findUnique({
