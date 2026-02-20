@@ -7,6 +7,8 @@
 import { prisma } from "@/lib/prisma"
 import { generatePersona } from "@/lib/persona-generation"
 import { buildCoverageReport, type CoverageReport } from "@/lib/persona-generation/vector-generator"
+import { generateStructuredFields } from "@/lib/persona-generation/structured-fields"
+import { inferActivitySettings } from "@/lib/persona-generation/activity-inference"
 import { generateCharacterWithLLM } from "@/lib/persona-generation/llm-character-generator"
 import { buildAllPrompts } from "@/lib/prompt-builder"
 import {
@@ -33,7 +35,12 @@ import type {
   VoiceProfile,
 } from "@/types"
 import type { QuirkDefinition } from "@/lib/interaction/express-algorithm"
-import { Prisma, type PersonaRole, type PersonaStatus } from "@/generated/prisma"
+import {
+  Prisma,
+  type PersonaRole,
+  type PersonaStatus,
+  type PostFrequency as PrismaPostFrequency,
+} from "@/generated/prisma"
 import { ARCHETYPES } from "@/lib/persona-generation/archetypes"
 
 // ── 벡터 기반 PersonaRole 추론 ──────────────────────────────
@@ -152,6 +159,13 @@ interface SavePersonaParams {
   l1: SocialPersonaVector
   l2: CoreTemperamentVector
   l3: NarrativeDriveVector
+  // T162: 구조화 필드
+  birthDate?: Date
+  region?: string
+  activeHours?: number[]
+  peakHours?: number[]
+  timezone?: string
+  postFrequency?: PrismaPostFrequency
 }
 
 async function savePersonaToDb(params: SavePersonaParams) {
@@ -186,6 +200,14 @@ async function savePersonaToDb(params: SavePersonaParams) {
         promptVersion: params.promptVersion,
         basePrompt: params.basePrompt,
         createdById: systemUser.id,
+
+        // T162: 구조화 필드
+        birthDate: params.birthDate ?? undefined,
+        region: params.region ?? undefined,
+        activeHours: params.activeHours ?? [],
+        peakHours: params.peakHours ?? [],
+        timezone: params.timezone ?? "Asia/Seoul",
+        postFrequency: params.postFrequency ?? "MODERATE",
 
         // v3 호환: 기존 소비자가 직접 접근하는 필드 유지
         voiceProfile: params.qualitative.voice as unknown as Prisma.InputJsonValue,
@@ -366,6 +388,10 @@ async function executeAutoPipeline(options?: AutoPipelineInput): Promise<Generat
   // Stage 5.5: warmth 계산
   const warmth = Math.round((l2.agreeableness * 0.6 + l1.sociability * 0.4) * 100) / 100
 
+  // Stage 5.6: T162 구조화 필드 생성 (birthDate, region, activeHours, peakHours)
+  const activity = inferActivitySettings(l1, l2, l3)
+  const structured = generateStructuredFields(l1, l2, l3, activity.activeHours, activity.peakHours)
+
   // Stage 6: Paradox Score
   const crossAxisProfile = calculateCrossAxisProfile(l1, l2, l3)
   const paradoxProfile = calculateExtendedParadoxScore(l1, l2, l3, crossAxisProfile)
@@ -396,6 +422,12 @@ async function executeAutoPipeline(options?: AutoPipelineInput): Promise<Generat
     l1,
     l2,
     l3,
+    birthDate: structured.birthDate,
+    region: structured.region,
+    activeHours: structured.activeHours,
+    peakHours: structured.peakHours,
+    timezone: structured.timezone,
+    postFrequency: activity.postFrequency as PrismaPostFrequency,
   })
 
   // T161-AC4: 커버리지 리포트
@@ -449,6 +481,10 @@ async function executeManualPipeline(input: ManualPipelineInput): Promise<Genera
   // Warmth 계산
   const warmth = Math.round((l2.agreeableness * 0.6 + l1.sociability * 0.4) * 100) / 100
 
+  // T162: 구조화 필드 생성
+  const activity = inferActivitySettings(l1, l2, l3)
+  const structured = generateStructuredFields(l1, l2, l3, activity.activeHours, activity.peakHours)
+
   // Paradox Score
   const crossAxisProfile = calculateCrossAxisProfile(l1, l2, l3)
   const paradoxProfile = calculateExtendedParadoxScore(l1, l2, l3, crossAxisProfile)
@@ -480,6 +516,12 @@ async function executeManualPipeline(input: ManualPipelineInput): Promise<Genera
     l1,
     l2,
     l3,
+    birthDate: structured.birthDate,
+    region: structured.region,
+    activeHours: structured.activeHours,
+    peakHours: structured.peakHours,
+    timezone: structured.timezone,
+    postFrequency: activity.postFrequency as PrismaPostFrequency,
   })
 
   return {

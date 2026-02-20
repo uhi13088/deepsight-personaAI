@@ -999,13 +999,7 @@
   - AC5: v3 fallback 유지로 A/B 비교 가능 (voiceSpec 없으면 v3, 있으면 v4)
   - AC6: ✅ 89파일 3649 테스트 PASS + Build PASS
 
-- [ ] **T162: 페르소나 구조화 필드 자동생성 — birthDate/region/activeHours**
-  - 배경: 파이프라인에서 handle/tagline/background/quirks 저장은 완료. 그러나 birthDate, region, activeHours 등 구조화 필드는 character/backstory 서사에만 포함되고 DB 필드로 미저장
-  - AC1: `pipeline.ts` — character.background 서사에서 birthDate 추론 (LLM 또는 규칙 기반)
-  - AC2: `pipeline.ts` — l1/l2 벡터 기반 region 자동 매핑 (아키타입별 기본 지역 풀)
-  - AC3: `pipeline.ts` — 활동시간 `computeActiveHours(l1, l2)` 연동 (기존 dynamics-defaults 활용)
-  - AC4: 기존 필드 null → 자동 채워짐, 기존 값 있으면 덮어쓰지 않음
-  - AC5: 테스트 + Build PASS
+- [ ] **T163: Factbook 런타임 연동 — mutableContext 업데이트 파이프라인**
 
 - [ ] **T163: Factbook 런타임 연동 — mutableContext 업데이트 파이프라인**
   - 배경: factbook.immutableFacts는 생성 시 설정 완료. mutableContext(현재 목표/최근 경험/진화된 관점)는 상호작용 후 자동 업데이트가 필요하나 런타임 로직 미구현
@@ -1024,6 +1018,14 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T162: 페르소나 구조화 필드 자동생성 — birthDate/region/activeHours** ✅ 2026-02-20
+  - AC1: ✅ `inferBirthDate` — purpose/conscientiousness/depth/lens 기반 나이대 추론 → 랜덤 생년월일
+  - AC2: ✅ `inferRegion` — sociability/extraversion/taste/openness 점수로 5개 지역풀(대도시/문화/전통/계획/일반) 매핑
+  - AC3: ✅ `expandActiveHours/expandPeakHours` — [start, end] 범위 → Int[] 배열 변환 (자정 넘김 대응)
+  - AC4: ✅ pipeline.ts에서 `savePersonaToDb`에 birthDate/region/activeHours/peakHours/timezone/postFrequency 전달
+  - AC5: ✅ 90파일 3683 테스트 PASS + Build PASS
+  - 변경: structured-fields.ts(신규), pipeline.ts, index.ts, structured-fields.test.ts(신규)
 
 - [x] **T161: 페르소나 랜덤생성 다양성 강화 — 벡터 클러스터링 방지** ✅ 2026-02-20
   - AC1: ✅ `generateDiverseVectors` — 범위 [0.05, 0.95] 확대 + Beta(0.7, 0.7) U자형 분포 (극단값 포함률 30%+)

@@ -182,6 +182,14 @@ export { designParadox, analyzeParadoxPatterns } from "./paradox-designer"
 export { generateCharacter } from "./character-generator"
 export { generateCharacterWithLLM } from "./llm-character-generator"
 export { inferActivitySettings, inferContentSettings } from "./activity-inference"
+export {
+  inferBirthDate,
+  inferAgeRange,
+  inferRegion,
+  expandActiveHours,
+  expandPeakHours,
+  generateStructuredFields,
+} from "./structured-fields"
 export { validateConsistency } from "./consistency-validator"
 export type {
   ExistingPersonaVectors,
@@ -191,6 +199,7 @@ export type {
 export type { ParadoxDesignResult } from "./paradox-designer"
 export type { CharacterProfile, RelationshipSeed } from "./character-generator"
 export type { ActivitySettings, ContentSettings, PostFrequency } from "./activity-inference"
+export type { StructuredFields } from "./structured-fields"
 export type {
   ValidationResult,
   ValidationIssue,
