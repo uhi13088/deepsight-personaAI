@@ -976,20 +976,27 @@
 
 > v4 빌딩 블록(VoiceSpec, Factbook, TriggerMap)을 생성 파이프라인에 통합.
 
-- [ ] **T158: 페르소나 생성 파이프라인 v4 통합 — VoiceSpec + Factbook + TriggerMap**
-  - 배경: v4 컴포넌트(VoiceSpec 4모듈, Factbook, TriggerMap DSL)가 개별 구현 완료(T136/T142/T144)되었으나 생성 파이프라인(pipeline.ts)에 미통합. engineVersion "3.0" 하드코딩 상태
-  - AC1: Prisma 스키마 — Persona 모델에 `voiceSpec`, `factbook`, `triggerMap` Json? 필드 추가 + 마이그레이션
-  - AC2: `voice-spec.ts` — `computeVoiceStyleParams(l1, l2, l3)` 벡터 기반 스타일 파라미터 계산 함수 추가
-  - AC3: `rule-dsl.ts` — `generateInitialTriggerRules(l1, l2, l3, archetype?)` 벡터 기반 초기 트리거 규칙 생성 함수 추가
-  - AC4: `pipeline.ts` — v4 컴포넌트 통합 (buildVoiceSpec → voiceSpec, convertBackstoryToFactbook → factbook, generateInitialTriggerRules → triggerMap, engineVersion "4.0")
-  - AC5: 기존 `voiceProfile`/`backstory` 필드 유지 (하위 호환성). 기존 소비자 코드 변경 불필요
-  - AC6: 테스트 + Build PASS
+- [x] **T158: 페르소나 생성 파이프라인 v4 통합 — VoiceSpec + Factbook + TriggerMap** ✅ 2026-02-20
+  - AC1: ✅ Prisma 스키마 — `voiceSpec`, `factbook`, `triggerMap` Json? 필드 + 019 마이그레이션
+  - AC2: ✅ `computeVoiceStyleParams(l1, l2, l3)` — 6D 스타일 파라미터 벡터 기반 계산
+  - AC3: ✅ `generateInitialTriggerRules(l1, l2, l3)` — 3~6개 트리거 규칙 자동 생성
+  - AC4: ✅ `buildInstructionLayer()` 공유 함수 추출 → pipeline.ts + create/route.ts 공통 사용
+  - AC5: ✅ 기존 `voiceProfile`/`backstory` 필드 유지 (하위 호환성)
+  - AC6: ✅ 3629 테스트 PASS + Build PASS
+  - 추가 수정: 마이그레이션 컬럼명 camelCase 수정, 복제 API v4 필드 누락 수정
+
+- [ ] **T159: 페르소나 생성 전체 모듈화 — create/route.ts → 공유 파이프라인 통합**
+  - 배경: `create/route.ts`가 `pipeline.ts`와 정성적 4차원 생성 + DB 저장 로직이 중복. v4 Instruction Layer는 T158에서 `buildInstructionLayer()` 추출 완료. 나머지 중복(정성적 생성, DB 트랜잭션) 통합 필요
+  - AC1: `pipeline.ts` — manual 모드 지원 (`mode: "auto" | "manual"`, manual 시 벡터/이름/프롬프트 직접 입력)
+  - AC2: `create/route.ts` — validation만 유지, 생성 로직은 공유 파이프라인 호출
+  - AC3: 기존 동작 변경 없음 (API 응답 동일)
+  - AC4: 테스트 + Build PASS
 
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
 
-- **T158: 페르소나 생성 파이프라인 v4 통합**
+(없음)
 
 ---
 
