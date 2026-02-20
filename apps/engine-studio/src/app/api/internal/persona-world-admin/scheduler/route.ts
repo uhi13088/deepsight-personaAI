@@ -99,7 +99,22 @@ export async function POST(request: NextRequest) {
         }
 
         const schedulerProvider = createSchedulerDataProvider()
-        const schedulerResult = await runScheduler(context, schedulerProvider)
+
+        let schedulerResult
+        try {
+          schedulerResult = await runScheduler(context, schedulerProvider)
+        } catch (schedulerError) {
+          const msg =
+            schedulerError instanceof Error ? schedulerError.message : "Unknown scheduler error"
+          console.error("[Scheduler] runScheduler failed:", schedulerError)
+          return NextResponse.json(
+            {
+              success: false,
+              error: { code: "SCHEDULER_RUN_ERROR", message: msg },
+            },
+            { status: 500 }
+          )
+        }
 
         // 실행: 포스트 생성 + 인터랙션
         const postResults: Array<{ personaId: string; postId: string; postType: string }> = []
