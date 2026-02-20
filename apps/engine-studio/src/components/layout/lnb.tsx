@@ -315,6 +315,17 @@ export function LNB() {
 
       {/* Footer */}
       <div className="border-sidebar-border space-y-2 border-t p-2">
+        {/* Version */}
+        <div
+          className={cn(
+            "text-sidebar-muted flex items-center px-2 py-1 text-[10px]",
+            collapsed ? "justify-center" : "gap-1.5"
+          )}
+        >
+          <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+          {!collapsed && <span>Engine Studio v0.1.0-dev</span>}
+        </div>
+
         {mounted && (
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}

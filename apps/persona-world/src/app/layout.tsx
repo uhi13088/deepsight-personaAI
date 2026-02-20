@@ -30,6 +30,13 @@ export default function RootLayout({
           <PWGradientDefs />
           {children}
           <Toaster position="top-center" richColors />
+          {/* Dev version badge */}
+          {process.env.NODE_ENV === "development" && (
+            <div className="fixed bottom-16 left-2 z-[60] flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white/70 backdrop-blur-sm">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              <span>PW v0.1.0-dev</span>
+            </div>
+          )}
         </AuthProvider>
       </body>
     </html>
