@@ -68,7 +68,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           interactionPrompt: source.interactionPrompt,
           contentSettings: source.contentSettings ?? undefined,
           relationshipSettings: source.relationshipSettings ?? undefined,
+          generationConfig: source.generationConfig ?? undefined,
           createdById: source.createdById,
+
+          // v3 정성적 4차원
+          voiceProfile: source.voiceProfile ?? undefined,
+          backstory: source.backstory ?? undefined,
+          pressureContext: source.pressureContext ?? undefined,
+          zeitgeist: source.zeitgeist ?? undefined,
+
+          // v4 Instruction Layer
+          voiceSpec: source.voiceSpec ?? undefined,
+          factbook: source.factbook ?? undefined,
+          triggerMap: source.triggerMap ?? undefined,
           layerVectors: {
             create: source.layerVectors.map((lv) => ({
               layerType: lv.layerType,
