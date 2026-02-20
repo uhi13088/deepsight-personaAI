@@ -400,9 +400,12 @@ describe("Cost Control", () => {
     expect(policy.modelTier).toBe("economy")
   })
 
-  it("월간 비용을 계산한다", () => {
+  it("월간 비용을 계산한다 (동기 호환용 — 실제 비용은 calculateMonthlyCostFromDB 사용)", () => {
     const usage = calculateMonthlyCost(100, 100, "economy")
-    expect(usage.totalCostKRW).toBe(700) // 100*5 + 100*2
+    // 동기 함수는 더 이상 고정 단가 계산을 하지 않음 (실제 비용은 DB 기반)
+    expect(usage.totalCostKRW).toBe(0)
+    expect(usage.generationCount).toBe(100)
+    expect(usage.testCount).toBe(100)
     expect(usage.currentMonth).toMatch(/^\d{4}-\d{2}$/)
   })
 

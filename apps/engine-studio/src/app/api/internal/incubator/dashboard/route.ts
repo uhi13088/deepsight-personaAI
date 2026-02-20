@@ -15,7 +15,11 @@ import {
   type BatchResult,
   type IncubatorLogEntry,
 } from "@/lib/incubator"
-import { calculateMonthlyCost } from "@/lib/incubator/cost-control"
+import {
+  calculateMonthlyCostFromDB,
+  getDailyCostsFromDB,
+  getCostForPeriod,
+} from "@/lib/incubator/cost-control"
 import { calculateGoldenSampleMetrics } from "@/lib/incubator/golden-sample"
 import type { GoldenSample } from "@/lib/incubator/golden-sample"
 import type { IncubatorStatus } from "@/lib/incubator/batch-workflow"
@@ -30,9 +34,8 @@ export async function GET() {
     const now = new Date()
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
-    const [recentLogs, goldenSamplesRaw, statusCounts, monthlyLogCount] = await Promise.all([
+    const [recentLogs, goldenSamplesRaw, statusCounts, costUsage, dailyCosts] = await Promise.all([
       // 최근 7일 인큐베이터 로그
       prisma.incubatorLog.findMany({
         where: { batchDate: { gte: sevenDaysAgo } },
@@ -50,10 +53,11 @@ export async function GET() {
         _count: { status: true },
       }),
 
-      // 이번 달 총 생성/테스트 수
-      prisma.incubatorLog.count({
-        where: { createdAt: { gte: monthStart } },
-      }),
+      // 이번 달 실제 LLM 비용 (LlmUsageLog 기반)
+      calculateMonthlyCostFromDB(),
+
+      // 7일간 일별 실제 LLM 비용
+      getDailyCostsFromDB(7),
     ])
 
     // 상태별 카운트 맵
@@ -92,6 +96,13 @@ export async function GET() {
       const total = logs.length
       const batchDate = logs[0].batchDate
 
+      // 배치 시간 범위의 실제 LLM 비용 조회
+      const batchStart = new Date(batchDate)
+      batchStart.setHours(0, 0, 0, 0)
+      const batchEnd = new Date(batchDate)
+      batchEnd.setHours(23, 59, 59, 999)
+      const batchCost = await getCostForPeriod(batchStart, batchEnd)
+
       const batchLogs: IncubatorLogEntry[] = logs.map((l) => ({
         id: l.id,
         batchId: l.batchId,
@@ -124,7 +135,7 @@ export async function GET() {
         passedCount,
         failedCount,
         passRate: total > 0 ? Math.round((passedCount / total) * 100) / 100 : 0,
-        estimatedCost: total * 7,
+        estimatedCost: batchCost.totalCostKRW,
         logs: batchLogs,
         durationMs: 0,
       })
@@ -136,8 +147,7 @@ export async function GET() {
     // 오늘 배치
     const todayBatch = recentBatches.find((b) => b.batchDate >= todayStart) ?? null
 
-    // 비용 계산
-    const costUsage = calculateMonthlyCost(monthlyLogCount, monthlyLogCount)
+    // costUsage는 이미 calculateMonthlyCostFromDB()로 조회됨 (실제 LLM 비용)
 
     // 골든 샘플 메트릭
     const goldenSamples: GoldenSample[] = goldenSamplesRaw.map((gs) => ({
@@ -176,6 +186,7 @@ export async function GET() {
       cumulativeActive,
       strategy,
       goldenSamples: gsMetrics,
+      dailyCosts,
       lifecycle,
     })
 

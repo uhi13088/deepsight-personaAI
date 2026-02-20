@@ -1,7 +1,15 @@
 // ═══════════════════════════════════════════════════════════════
 // 비용 통제 정책
 // T62-AC4: LLM 호출 예산, 일일 상한, Zombie GC
+// 실제 LlmUsageLog 기반 비용 추적 (고정 단가 추정 → 실사용량)
 // ═══════════════════════════════════════════════════════════════
+
+import { prisma } from "@/lib/prisma"
+
+// ── 환율 상수 ─────────────────────────────────────────────────
+
+/** USD→KRW 환율 (SystemConfig에서 오버라이드 가능) */
+export const DEFAULT_USD_TO_KRW = 1400
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
@@ -35,6 +43,20 @@ export interface CostUsage {
   budgetRemaining: number
   budgetUtilization: number // 0.0~1.0
   isOverBudget: boolean
+  // 실제 LLM 사용량 (LlmUsageLog 기반)
+  totalCostUsd?: number
+  totalInputTokens?: number
+  totalOutputTokens?: number
+  totalCalls?: number
+}
+
+/** 일별 실제 LLM 비용 데이터 */
+export interface DailyCostEntry {
+  date: string // "2026-02-20"
+  totalCostUsd: number
+  totalCostKRW: number
+  totalCalls: number
+  totalTokens: number
 }
 
 export interface ZombieGCConfig {
@@ -86,31 +108,159 @@ export function getCostPolicy(activeUserCount: number): CostPolicy {
   }
 }
 
-// ── 비용 추적 ──────────────────────────────────────────────────
+// ── 비용 추적 (실제 LlmUsageLog 기반) ──────────────────────────
 
-const UNIT_COST_KRW = {
-  economy: { generation: 5, test: 2 },
-  standard: { generation: 25, test: 10 },
-} as const
+/**
+ * 이번 달 실제 LLM 사용량을 DB에서 조회하여 CostUsage를 반환.
+ * LlmUsageLog 테이블의 실제 토큰 수 / USD 비용을 기반으로 계산.
+ */
+export async function calculateMonthlyCostFromDB(
+  usdToKrw: number = DEFAULT_USD_TO_KRW
+): Promise<CostUsage> {
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const policy = getCostPolicy(0)
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
 
+  try {
+    const [aggregates, costAgg] = await Promise.all([
+      prisma.llmUsageLog.aggregate({
+        where: { createdAt: { gte: monthStart } },
+        _sum: {
+          inputTokens: true,
+          outputTokens: true,
+          totalTokens: true,
+        },
+        _count: true,
+      }),
+      prisma.llmUsageLog.aggregate({
+        where: { createdAt: { gte: monthStart } },
+        _sum: { estimatedCostUsd: true },
+      }),
+    ])
+
+    const totalCalls = aggregates._count
+    const totalCostUsd = Number(costAgg._sum.estimatedCostUsd ?? 0)
+    const totalCostKRW = Math.round(totalCostUsd * usdToKrw)
+    const totalInputTokens = aggregates._sum.inputTokens ?? 0
+    const totalOutputTokens = aggregates._sum.outputTokens ?? 0
+
+    return {
+      currentMonth,
+      generationCount: totalCalls,
+      testCount: 0,
+      totalCostKRW,
+      budgetRemaining: Math.max(0, policy.monthlyBudgetKRW - totalCostKRW),
+      budgetUtilization: policy.monthlyBudgetKRW > 0 ? totalCostKRW / policy.monthlyBudgetKRW : 0,
+      isOverBudget: totalCostKRW > policy.monthlyBudgetKRW,
+      totalCostUsd,
+      totalInputTokens,
+      totalOutputTokens,
+      totalCalls,
+    }
+  } catch {
+    // DB 미준비 시 빈 데이터 반환
+    return {
+      currentMonth,
+      generationCount: 0,
+      testCount: 0,
+      totalCostKRW: 0,
+      budgetRemaining: policy.monthlyBudgetKRW,
+      budgetUtilization: 0,
+      isOverBudget: false,
+      totalCostUsd: 0,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      totalCalls: 0,
+    }
+  }
+}
+
+/**
+ * 최근 N일간 일별 실제 LLM 비용을 DB에서 조회.
+ */
+export async function getDailyCostsFromDB(
+  days: number = 7,
+  usdToKrw: number = DEFAULT_USD_TO_KRW
+): Promise<DailyCostEntry[]> {
+  const since = new Date()
+  since.setDate(since.getDate() - days)
+
+  try {
+    const dailyRaw = await prisma.$queryRaw<
+      { date: Date; total_cost: string; total_calls: bigint; total_tokens: bigint }[]
+    >`
+      SELECT
+        DATE(created_at) as date,
+        COALESCE(SUM(estimated_cost_usd), 0) as total_cost,
+        COUNT(*) as total_calls,
+        COALESCE(SUM(total_tokens), 0) as total_tokens
+      FROM llm_usage_logs
+      WHERE created_at >= ${since}
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `
+
+    return dailyRaw.map((row) => {
+      const costUsd = Number(row.total_cost)
+      return {
+        date: new Date(row.date).toISOString().split("T")[0],
+        totalCostUsd: costUsd,
+        totalCostKRW: Math.round(costUsd * usdToKrw),
+        totalCalls: Number(row.total_calls),
+        totalTokens: Number(row.total_tokens),
+      }
+    })
+  } catch {
+    return []
+  }
+}
+
+/**
+ * 특정 기간의 실제 LLM 비용 합계를 조회.
+ */
+export async function getCostForPeriod(
+  since: Date,
+  until: Date,
+  usdToKrw: number = DEFAULT_USD_TO_KRW
+): Promise<{ totalCostUsd: number; totalCostKRW: number; totalCalls: number }> {
+  try {
+    const agg = await prisma.llmUsageLog.aggregate({
+      where: { createdAt: { gte: since, lte: until } },
+      _sum: { estimatedCostUsd: true },
+      _count: true,
+    })
+    const costUsd = Number(agg._sum.estimatedCostUsd ?? 0)
+    return {
+      totalCostUsd: costUsd,
+      totalCostKRW: Math.round(costUsd * usdToKrw),
+      totalCalls: agg._count,
+    }
+  } catch {
+    return { totalCostUsd: 0, totalCostKRW: 0, totalCalls: 0 }
+  }
+}
+
+/**
+ * 동기 계산용 (테스트 / 호환성).
+ * 실제 비용이 아닌 전달된 값으로 CostUsage 구성.
+ */
 export function calculateMonthlyCost(
   generationCount: number,
   testCount: number,
-  modelTier: "economy" | "standard" = "economy"
+  _modelTier: "economy" | "standard" = "economy"
 ): CostUsage {
-  const costs = UNIT_COST_KRW[modelTier]
-  const totalCost = generationCount * costs.generation + testCount * costs.test
-  const policy = getCostPolicy(0) // 현재 정책 기준
-
+  // 더 이상 고정 단가 추정 X — 전달된 카운트만 구조화
+  const policy = getCostPolicy(0)
   const now = new Date()
   return {
     currentMonth: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
     generationCount,
     testCount,
-    totalCostKRW: totalCost,
-    budgetRemaining: Math.max(0, policy.monthlyBudgetKRW - totalCost),
-    budgetUtilization: policy.monthlyBudgetKRW > 0 ? totalCost / policy.monthlyBudgetKRW : 0,
-    isOverBudget: totalCost > policy.monthlyBudgetKRW,
+    totalCostKRW: 0,
+    budgetRemaining: policy.monthlyBudgetKRW,
+    budgetUtilization: 0,
+    isOverBudget: false,
   }
 }
 
