@@ -436,6 +436,62 @@ export const clientApi = {
     return json.data!
   },
 
+  // ── 페르소나 생성 요청 ──────────────────────────────────────
+  async requestPersonaGeneration(
+    userId: string,
+    userVector: Record<string, unknown>,
+    topSimilarity: number
+  ) {
+    const res = await fetch(`/api/public/persona-requests`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, userVector, topSimilarity }),
+    })
+    if (!res.ok) {
+      const json = await res.json().catch(() => null)
+      throw new Error(
+        (json as { error?: { message?: string } })?.error?.message ?? "페르소나 생성 요청 실패"
+      )
+    }
+
+    const json: ApiResponse<{
+      id: string
+      status: string
+      scheduledDate: string
+      message: string
+    }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── 페르소나 생성 요청 상태 조회 ──────────────────────────────
+  async getPersonaRequests(userId: string) {
+    const params = new URLSearchParams({ userId })
+    const res = await fetch(`/api/public/persona-requests?${params}`)
+    if (!res.ok) throw new Error("페르소나 요청 목록 조회 실패")
+
+    const json: ApiResponse<{
+      requests: Array<{
+        id: string
+        status: string
+        topSimilarity: number
+        scheduledDate: string
+        completedAt: string | null
+        failReason: string | null
+        generatedPersona: {
+          id: string
+          name: string
+          handle: string | null
+          role: string
+          profileImageUrl: string | null
+        } | null
+        createdAt: string
+      }>
+    }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
   // ── 알림 전체 읽음 ────────────────────────────────────────
   async markAllNotificationsRead(userId: string) {
     const res = await fetch(`/api/persona-world/notifications`, {

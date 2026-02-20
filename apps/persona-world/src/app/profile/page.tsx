@@ -8,11 +8,9 @@ import {
   PWButton,
   PWIcon,
   PWProfileLevelBadge,
+  PWBottomNav,
 } from "@/components/persona-world"
 import {
-  Home,
-  Search,
-  Bell,
   User,
   Settings,
   ChevronRight,
@@ -51,7 +49,6 @@ export default function ProfilePage() {
     likedPosts,
     bookmarkedPosts,
     reset,
-    notifications,
     answerDailyQuestion,
     connectSns,
     disconnectSns,
@@ -142,7 +139,6 @@ export default function ProfilePage() {
     [disconnectSns]
   )
 
-  const unreadNotifications = notifications.filter((n) => !n.read).length
   const levelConfig = PROFILE_LEVELS[onboarding.profileLevel]
   const confidence = profile?.vectorConfidence
     ? Math.round(profile.vectorConfidence * 100)
@@ -163,12 +159,42 @@ export default function ProfilePage() {
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-gray-100 bg-white">
         <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-4">
           <PWLogoWithText size="sm" />
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="rounded-full p-2 hover:bg-gray-100"
-          >
-            <Settings className="h-5 w-5 text-gray-600" />
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="rounded-full p-2 hover:bg-gray-100"
+            >
+              <Settings className="h-5 w-5 text-gray-600" />
+            </button>
+            {/* Settings dropdown */}
+            {showSettings && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowSettings(false)} />
+                <div className="absolute right-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
+                  <button
+                    onClick={() => {
+                      setShowSettings(false)
+                      handleReset()
+                    }}
+                    className="flex w-full items-center gap-2 px-4 py-3 text-sm text-red-500 transition-colors hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    데이터 초기화
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSettings(false)
+                      handleLogout()
+                    }}
+                    className="flex w-full items-center gap-2 border-t border-gray-100 px-4 py-3 text-sm text-gray-600 transition-colors hover:bg-gray-50"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    로그아웃
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -636,74 +662,10 @@ export default function ProfilePage() {
               <ChevronRight className="h-5 w-5 text-gray-400" />
             </PWCard>
           </Link>
-
-          {showSettings && (
-            <>
-              <PWCard
-                className="flex cursor-pointer items-center justify-between !p-4 text-red-500 transition-colors hover:bg-red-50"
-                onClick={handleReset}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
-                    <Trash2 className="h-5 w-5 text-red-500" />
-                  </div>
-                  <div>
-                    <div className="font-medium">데이터 초기화</div>
-                    <div className="text-sm text-red-400">모든 활동 기록 삭제</div>
-                  </div>
-                </div>
-              </PWCard>
-              <PWCard
-                className="flex cursor-pointer items-center justify-between !p-4 text-gray-600 transition-colors hover:bg-gray-50"
-                onClick={handleLogout}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
-                    <LogOut className="h-5 w-5 text-gray-500" />
-                  </div>
-                  <div>
-                    <div className="font-medium">로그아웃</div>
-                    <div className="text-sm text-gray-400">계정에서 로그아웃합니다</div>
-                  </div>
-                </div>
-              </PWCard>
-            </>
-          )}
         </div>
       </main>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 border-t border-gray-100 bg-white">
-        <div className="mx-auto flex h-14 max-w-2xl items-center justify-around">
-          <Link href="/feed" className="flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400">
-            <Home className="h-5 w-5" />
-            <span className="text-xs">홈</span>
-          </Link>
-          <Link
-            href="/explore"
-            className="flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400"
-          >
-            <Search className="h-5 w-5" />
-            <span className="text-xs">탐색</span>
-          </Link>
-          <Link
-            href="/notifications"
-            className="relative flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400"
-          >
-            <Bell className="h-5 w-5" />
-            {unreadNotifications > 0 && (
-              <span className="absolute right-2 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                {unreadNotifications > 9 ? "9+" : unreadNotifications}
-              </span>
-            )}
-            <span className="text-xs">알림</span>
-          </Link>
-          <Link href="/profile" className="flex flex-col items-center gap-0.5 px-4 py-2">
-            <User className="h-5 w-5" style={{ stroke: "url(#pw-gradient)" }} />
-            <span className="pw-text-gradient text-xs font-medium">프로필</span>
-          </Link>
-        </div>
-      </nav>
+      <PWBottomNav />
     </div>
   )
 }

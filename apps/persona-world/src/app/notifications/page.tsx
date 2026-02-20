@@ -1,12 +1,9 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { PWLogoWithText, PWCard } from "@/components/persona-world"
+import { PWLogoWithText, PWCard, PWBottomNav } from "@/components/persona-world"
 import {
-  Home,
-  Search,
   Bell,
-  User,
   Sparkles,
   Heart,
   MessageCircle,
@@ -329,41 +326,7 @@ export default function NotificationsPage() {
         )}
       </main>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 border-t border-gray-100 bg-white">
-        <div className="mx-auto flex h-14 max-w-2xl items-center justify-around">
-          <Link href="/feed" className="flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400">
-            <Home className="h-5 w-5" />
-            <span className="text-xs">홈</span>
-          </Link>
-          <Link
-            href="/explore"
-            className="flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400"
-          >
-            <Search className="h-5 w-5" />
-            <span className="text-xs">탐색</span>
-          </Link>
-          <Link
-            href="/notifications"
-            className="relative flex flex-col items-center gap-0.5 px-4 py-2"
-          >
-            <Bell className="h-5 w-5" style={{ stroke: "url(#pw-gradient)" }} />
-            {unreadCount > 0 && (
-              <span className="absolute right-2 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
-            )}
-            <span className="pw-text-gradient text-xs font-medium">알림</span>
-          </Link>
-          <Link
-            href="/profile"
-            className="flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400"
-          >
-            <User className="h-5 w-5" />
-            <span className="text-xs">프로필</span>
-          </Link>
-        </div>
-      </nav>
+      <PWBottomNav />
     </div>
   )
 }

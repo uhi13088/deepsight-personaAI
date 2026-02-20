@@ -3,8 +3,8 @@
 import { useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { Home, Search, Bell, User, ArrowLeft, Coins, Check, Lock } from "lucide-react"
-import { PWLogoWithText, PWCard, PWButton } from "@/components/persona-world"
+import { ArrowLeft, Coins, Check, Lock } from "lucide-react"
+import { PWLogoWithText, PWCard, PWButton, PWBottomNav } from "@/components/persona-world"
 import { useUserStore } from "@/lib/user-store"
 import {
   getShopItemsByCategory,
@@ -16,14 +16,12 @@ import {
 type ConfirmState = { item: ShopItem } | null
 
 export default function ShopPage() {
-  const { onboarding, purchaseItem, hasPurchased, getPurchaseCount, notifications } = useUserStore()
+  const { onboarding, purchaseItem, hasPurchased, getPurchaseCount } = useUserStore()
   const [activeTab, setActiveTab] = useState<ShopCategory>("persona")
   const [confirm, setConfirm] = useState<ConfirmState>(null)
 
   const balance = onboarding.creditsBalance
   const items = getShopItemsByCategory(activeTab)
-  const unreadNotifications = notifications.filter((n) => !n.read).length
-
   const handlePurchase = (item: ShopItem) => {
     if (item.tag === "SOON") {
       toast.info("곧 출시됩니다!")
@@ -246,41 +244,7 @@ export default function ShopPage() {
         </div>
       )}
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 border-t border-gray-100 bg-white">
-        <div className="mx-auto flex h-14 max-w-2xl items-center justify-around">
-          <Link href="/feed" className="flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400">
-            <Home className="h-5 w-5" />
-            <span className="text-xs">홈</span>
-          </Link>
-          <Link
-            href="/explore"
-            className="flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400"
-          >
-            <Search className="h-5 w-5" />
-            <span className="text-xs">탐색</span>
-          </Link>
-          <Link
-            href="/notifications"
-            className="relative flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400"
-          >
-            <Bell className="h-5 w-5" />
-            {unreadNotifications > 0 && (
-              <span className="absolute right-2 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                {unreadNotifications > 9 ? "9+" : unreadNotifications}
-              </span>
-            )}
-            <span className="text-xs">알림</span>
-          </Link>
-          <Link
-            href="/profile"
-            className="flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400"
-          >
-            <User className="h-5 w-5" />
-            <span className="text-xs">프로필</span>
-          </Link>
-        </div>
-      </nav>
+      <PWBottomNav />
     </div>
   )
 }
