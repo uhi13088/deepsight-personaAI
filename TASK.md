@@ -999,15 +999,7 @@
   - AC5: v3 fallback 유지로 A/B 비교 가능 (voiceSpec 없으면 v3, 있으면 v4)
   - AC6: ✅ 89파일 3649 테스트 PASS + Build PASS
 
-- [ ] **T163: Factbook 런타임 연동 — mutableContext 업데이트 파이프라인**
-
-- [ ] **T163: Factbook 런타임 연동 — mutableContext 업데이트 파이프라인**
-  - 배경: factbook.immutableFacts는 생성 시 설정 완료. mutableContext(현재 목표/최근 경험/진화된 관점)는 상호작용 후 자동 업데이트가 필요하나 런타임 로직 미구현
-  - AC1: `updateMutableContext(personaId, interaction)` — 상호작용 후 mutableContext 자동 업데이트
-  - AC2: changeCount 추적 + 과도한 변경 경고 (5회 초과 시 로그)
-  - AC3: integrityHash 갱신 (SHA256, immutableFacts 변조 감지)
-  - AC4: PersonaState(mood/energy/socialBattery) 연동 — 상호작용 후 자동 갱신
-  - AC5: 테스트 + Build PASS
+- [x] **T163: Factbook 런타임 연동 — mutableContext 업데이트 파이프라인** ✅ 2026-02-20
 
 ---
 
@@ -1018,6 +1010,14 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T163: Factbook 런타임 연동 — mutableContext 업데이트 파이프라인** ✅ 2026-02-20
+  - AC1: ✅ `updateMutableContextRuntime(personaId, interaction, dataProvider)` — 상호작용 타입→카테고리 매핑 + 콘텐츠 요약 생성 + DB 영속화
+  - AC2: ✅ changeCount 추적 + `detectExcessiveChanges()` (5회 초과 시 `console.warn` 경고)
+  - AC3: ✅ `verifyFactbookIntegrity()` — mutableContext 업데이트 시 immutableFacts 변조 감지 (SHA256)
+  - AC4: ✅ `processInteraction()` — factbook mutableContext + PersonaState(mood/energy/socialBattery) 통합 갱신
+  - AC5: ✅ 91파일 3713 테스트 PASS + Build PASS
+  - 변경: factbook-runtime.ts(신규), index.ts, factbook-runtime.test.ts(신규, 30 tests)
 
 - [x] **T162: 페르소나 구조화 필드 자동생성 — birthDate/region/activeHours** ✅ 2026-02-20
   - AC1: ✅ `inferBirthDate` — purpose/conscientiousness/depth/lens 기반 나이대 추론 → 랜덤 생년월일

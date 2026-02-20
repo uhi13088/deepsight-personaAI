@@ -203,6 +203,22 @@ export {
   FACTBOOK_CATEGORIES,
 } from "./factbook"
 
+// v4.0: Factbook Runtime (T163 — mutableContext 런타임 업데이트)
+export {
+  inferContextCategory,
+  summarizeInteraction,
+  applyMutableContextUpdate,
+  updateMutableContextRuntime,
+  toStateEvent,
+  processInteraction,
+} from "./factbook-runtime"
+export type {
+  InteractionInput,
+  MutableContextUpdateResult,
+  InteractionProcessResult,
+  FactbookDataProvider,
+} from "./factbook-runtime"
+
 // v4.0: Forgetting Curve (자연 망각 시스템)
 export {
   computeStability,
