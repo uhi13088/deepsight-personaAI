@@ -51,6 +51,17 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if echo \"$TOOL_INPUT\" | grep -qE \"git commit\"; then if [ -f tasks/lessons.md ] && ! grep -q \"^- \\[\" tasks/lessons.md 2>/dev/null; then echo \"[reminder] tasks/lessons.md is empty. If you learned something during this task, record it before committing.\"; fi; fi; exit 0'"
+          }
+        ]
+      }
     ]
   }
 }

@@ -56,6 +56,8 @@
 - `.env`, `.env.*`, `secrets/` 읽기/수정 금지
 - 대규모 리팩토링 금지 (필요시 티켓 분리)
 - 테스트 없이 완료 처리 금지
+- **API 작업 시 `docs/api/` 문서 확인 없이 진행 금지**
+- **API 변경 후 `docs/api/*.md` 및 `*.openapi.yaml` 최신화 없이 완료 처리 금지**
 
 ## 검증 명령
 
@@ -65,14 +67,19 @@ pnpm test              # 테스트만
 pnpm --filter engine-studio build  # 앱별 빌드
 ```
 
-## 슬래시 명령어
+## 스킬 (Skills)
 
-| 명령어      | 설명                                        |
-| ----------- | ------------------------------------------- |
-| `/next`     | 다음 작업 진행 (QUEUE → IN_PROGRESS → DONE) |
-| `/status`   | 현재 프로젝트 상태 요약                     |
-| `/validate` | 전체 검증 (typecheck + lint + test + build) |
-| `/pr`       | PR 설명 자동 생성                           |
+반복적인 워크플로우는 `skills/` 디렉터리에 독립 스킬로 분리되어 있습니다.
+각 스킬은 `references/` 폴더에 체크리스트 등 참조 자료를 포함할 수 있습니다.
+
+| 스킬          | 경로                         | 설명                                                   |
+| ------------- | ---------------------------- | ------------------------------------------------------ |
+| `/next`       | `skills/next/SKILL.md`       | 다음 작업 진행 (lessons.md 자동 참조 + 티켓 품질 검증) |
+| `/validate`   | `skills/validate/SKILL.md`   | 전체 검증 + 품질 체크리스트 + lessons.md 교차 확인     |
+| `/status`     | `skills/status/SKILL.md`     | 프로젝트 상태 요약                                     |
+| `/pr`         | `skills/pr/SKILL.md`         | PR 설명 자동 생성                                      |
+| `/debug`      | `skills/debug/SKILL.md`      | 구조적 디버깅 (가설 수립 → 검증 → 근본 해결)           |
+| `/sync-check` | `skills/sync-check/SKILL.md` | API 문서 / DB 스키마 불일치 감지                       |
 
 ## 참조 문서
 
@@ -90,8 +97,16 @@ pnpm --filter engine-studio build  # 앱별 빌드
 - 페르소나월드: `docs/specs/persona-world.md`
 - PW UI 디자인시스템: `docs/specs/persona-world-ui.md`
 
+### API 문서 (API 작업 전 필독)
+
+- External API v1: `docs/api/external-v1.md` + `docs/api/external-v1.openapi.yaml`
+- Internal Admin API: `docs/api/internal.md` + `docs/api/internal.openapi.yaml`
+- Public API: `docs/api/public.md` + `docs/api/public.openapi.yaml`
+- **API 추가/변경/삭제 시 → 해당 md + openapi.yaml 동시 최신화 필수**
+
 ### 기타
 
 - 개발 가이드: `docs/guides/development.md`
-- DB 스키마: `apps/engine-studio/prisma/schema.prisma`
+- DB 스키마 (SSoT): `apps/engine-studio/prisma/schema.prisma`
+- 스키마 변경 이력: `docs/CHANGELOG_SCHEMA.md`
 - 교훈 기록: `tasks/lessons.md`
