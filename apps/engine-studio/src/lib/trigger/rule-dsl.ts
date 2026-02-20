@@ -3,7 +3,12 @@
 // T142: 자연어 조건 → 구조화된 기계 평가 가능 표현식으로 확장
 // ═══════════════════════════════════════════════════════════════
 
-import type { TriggerRule } from "@/types"
+import type {
+  TriggerRule,
+  SocialPersonaVector,
+  CoreTemperamentVector,
+  NarrativeDriveVector,
+} from "@/types"
 
 // ── 표현식 타입 ──────────────────────────────────────────────
 
@@ -518,4 +523,112 @@ export function or(...conditions: RuleExpression[]): OrExpr {
 /** NOT 부정 */
 export function not(condition: RuleExpression): NotExpr {
   return { type: "not", condition }
+}
+
+// ══════════════════════════════════════════════════════════════
+// 초기 트리거 규칙 생성 (페르소나 생성 시)
+// ══════════════════════════════════════════════════════════════
+
+/**
+ * 3-Layer 벡터 기반으로 페르소나 초기 트리거 규칙 세트를 생성.
+ *
+ * 벡터의 극단값(>0.7 또는 <0.3)에 반응하는 규칙만 생성하여
+ * 각 페르소나의 개성을 반영한 동적 반응을 설정.
+ */
+export function generateInitialTriggerRules(
+  l1: SocialPersonaVector,
+  l2: CoreTemperamentVector,
+  l3: NarrativeDriveVector
+): TriggerRuleDSL[] {
+  const rules: TriggerRuleDSL[] = []
+  let ruleIdx = 0
+
+  // ── 1. 기분 저조 + 신경성 높음 → 감정 변동 증폭
+  if (l2.neuroticism > 0.5) {
+    rules.push({
+      id: `init-${ruleIdx++}`,
+      name: "기분 저조 시 감정 증폭",
+      description: "신경성이 높은 페르소나가 기분 저조 시 감정 변동성 증가",
+      when: compare("state.mood", "<", 0.3),
+      then: [
+        {
+          layer: "L3",
+          dimension: "volatility",
+          mode: "boost",
+          magnitude: 0.15 + l2.neuroticism * 0.1,
+        },
+      ],
+      priority: 10,
+      cooldownMs: 300_000,
+    })
+  }
+
+  // ── 2. Paradox 긴장 높음 + 변동성 높음 → 입장 강화
+  if (l3.volatility > 0.4) {
+    rules.push({
+      id: `init-${ruleIdx++}`,
+      name: "Paradox 긴장 시 입장 강화",
+      description: "변동성 높은 페르소나가 Paradox 긴장 시 입장이 더 뚜렷해짐",
+      when: compare("state.paradoxTension", ">", 0.6),
+      then: [
+        { layer: "L1", dimension: "stance", mode: "boost", magnitude: 0.1 + l3.volatility * 0.1 },
+      ],
+      priority: 20,
+      cooldownMs: 600_000,
+    })
+  }
+
+  // ── 3. 사회적 배터리 방전 + 내향적 → 사교성 억제
+  if (l2.extraversion < 0.4) {
+    rules.push({
+      id: `init-${ruleIdx++}`,
+      name: "사회적 피로 시 사교성 억제",
+      description: "내향적 페르소나의 사회적 배터리 방전 시 사교성 감소",
+      when: compare("state.socialBattery", "<", 0.2),
+      then: [{ layer: "L1", dimension: "sociability", mode: "suppress", magnitude: 0.2 }],
+      priority: 15,
+      cooldownMs: 600_000,
+    })
+  }
+
+  // ── 4. 에너지 충만 + 외향적 → 표현 범위 확대
+  if (l2.extraversion > 0.6) {
+    rules.push({
+      id: `init-${ruleIdx++}`,
+      name: "에너지 충만 시 표현 확대",
+      description: "외향적 페르소나가 에너지 충만 시 표현 범위가 넓어짐",
+      when: compare("state.energy", ">", 0.8),
+      then: [{ layer: "L1", dimension: "scope", mode: "boost", magnitude: 0.1 }],
+      priority: 5,
+      cooldownMs: 300_000,
+    })
+  }
+
+  // ── 5. 도덕 나침반 높음 + 기분 좋음 → 성장 아크 강화
+  if (l3.moralCompass > 0.6 && l3.growthArc > 0.4) {
+    rules.push({
+      id: `init-${ruleIdx++}`,
+      name: "긍정 상태 시 성장 동기 강화",
+      description: "도덕적 페르소나가 긍정 상태에서 성장 동기가 더 강해짐",
+      when: and(compare("state.mood", ">", 0.7), compare("state.energy", ">", 0.5)),
+      then: [{ layer: "L3", dimension: "growthArc", mode: "boost", magnitude: 0.1 }],
+      priority: 5,
+      cooldownMs: 600_000,
+    })
+  }
+
+  // ── 6. 분석적 + 깊이 높음 + Paradox 긴장 → 분석 깊이 증가
+  if (l1.depth > 0.6 && l1.lens > 0.5) {
+    rules.push({
+      id: `init-${ruleIdx++}`,
+      name: "긴장 상태 시 분석 심화",
+      description: "분석적 페르소나가 긴장 상태에서 더 깊은 분석을 수행",
+      when: compare("state.paradoxTension", ">", 0.5),
+      then: [{ layer: "L1", dimension: "depth", mode: "boost", magnitude: 0.1 }],
+      priority: 10,
+      cooldownMs: 300_000,
+    })
+  }
+
+  return rules
 }

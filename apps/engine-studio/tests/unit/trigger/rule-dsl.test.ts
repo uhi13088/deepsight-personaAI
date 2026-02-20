@@ -14,8 +14,10 @@ import {
   and,
   or,
   not,
+  generateInitialTriggerRules,
 } from "@/lib/trigger/rule-dsl"
 import type { RuleContext, TriggerRuleDSL, RuleExpression } from "@/lib/trigger/rule-dsl"
+import type { SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector } from "@/types"
 
 // ═══════════════════════════════════════════════════════════════
 // resolveField
@@ -694,5 +696,139 @@ describe("실제 시나리오", () => {
       L2: { neuroticism: 0.8, agreeableness: 0.3 },
     }
     expect(evaluateRules(rules, ctx2).matches).toHaveLength(1)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// generateInitialTriggerRules
+// ═══════════════════════════════════════════════════════════════
+
+describe("generateInitialTriggerRules", () => {
+  const analyticL1: SocialPersonaVector = {
+    depth: 0.8,
+    lens: 0.7,
+    stance: 0.5,
+    scope: 0.6,
+    taste: 0.5,
+    purpose: 0.7,
+    sociability: 0.4,
+  }
+  const introvertL2: CoreTemperamentVector = {
+    openness: 0.5,
+    conscientiousness: 0.6,
+    extraversion: 0.25,
+    agreeableness: 0.5,
+    neuroticism: 0.7,
+  }
+  const volatileL3: NarrativeDriveVector = {
+    lack: 0.4,
+    moralCompass: 0.7,
+    volatility: 0.6,
+    growthArc: 0.5,
+  }
+
+  it("벡터 기반으로 규칙 생성", () => {
+    const rules = generateInitialTriggerRules(analyticL1, introvertL2, volatileL3)
+    expect(rules.length).toBeGreaterThan(0)
+  })
+
+  it("모든 규칙이 유효함", () => {
+    const rules = generateInitialTriggerRules(analyticL1, introvertL2, volatileL3)
+    const result = validateRuleSet(rules)
+    expect(result.valid).toBe(true)
+  })
+
+  it("신경성 높음 → 기분 저조 규칙 포함", () => {
+    const rules = generateInitialTriggerRules(analyticL1, introvertL2, volatileL3)
+    const moodRule = rules.find((r) => r.name.includes("기분 저조"))
+    expect(moodRule).toBeDefined()
+  })
+
+  it("변동성 높음 → Paradox 긴장 규칙 포함", () => {
+    const rules = generateInitialTriggerRules(analyticL1, introvertL2, volatileL3)
+    const paradoxRule = rules.find((r) => r.name.includes("Paradox"))
+    expect(paradoxRule).toBeDefined()
+  })
+
+  it("내향적 → 사회적 피로 규칙 포함", () => {
+    const rules = generateInitialTriggerRules(analyticL1, introvertL2, volatileL3)
+    const socialRule = rules.find((r) => r.name.includes("사회적 피로"))
+    expect(socialRule).toBeDefined()
+  })
+
+  it("분석적 → 긴장 시 분석 심화 규칙 포함", () => {
+    const rules = generateInitialTriggerRules(analyticL1, introvertL2, volatileL3)
+    const analysisRule = rules.find((r) => r.name.includes("분석 심화"))
+    expect(analysisRule).toBeDefined()
+  })
+
+  it("외향적 벡터 → 사회적 피로 규칙 없음", () => {
+    const extrovertL2: CoreTemperamentVector = {
+      openness: 0.6,
+      conscientiousness: 0.4,
+      extraversion: 0.8,
+      agreeableness: 0.5,
+      neuroticism: 0.3,
+    }
+    const rules = generateInitialTriggerRules(analyticL1, extrovertL2, volatileL3)
+    const socialRule = rules.find((r) => r.name.includes("사회적 피로"))
+    expect(socialRule).toBeUndefined()
+  })
+
+  it("외향적 벡터 → 에너지 충만 규칙 포함", () => {
+    const extrovertL2: CoreTemperamentVector = {
+      openness: 0.6,
+      conscientiousness: 0.4,
+      extraversion: 0.8,
+      agreeableness: 0.5,
+      neuroticism: 0.3,
+    }
+    const rules = generateInitialTriggerRules(analyticL1, extrovertL2, volatileL3)
+    const energyRule = rules.find((r) => r.name.includes("에너지 충만"))
+    expect(energyRule).toBeDefined()
+  })
+
+  it("고유 ID 보장", () => {
+    const rules = generateInitialTriggerRules(analyticL1, introvertL2, volatileL3)
+    const ids = rules.map((r) => r.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it("생성된 규칙이 실제 평가 가능", () => {
+    const rules = generateInitialTriggerRules(analyticL1, introvertL2, volatileL3)
+    const ctx: RuleContext = {
+      state: { mood: 0.2, energy: 0.5, socialBattery: 0.1, paradoxTension: 0.8 },
+    }
+    const result = evaluateRules(rules, ctx)
+    expect(result.totalEvaluated).toBe(rules.length)
+    expect(result.matches.length).toBeGreaterThan(0)
+  })
+
+  it("중립 벡터 → 최소 규칙만 생성", () => {
+    const neutralL1: SocialPersonaVector = {
+      depth: 0.5,
+      lens: 0.5,
+      stance: 0.5,
+      scope: 0.5,
+      taste: 0.5,
+      purpose: 0.5,
+      sociability: 0.5,
+    }
+    const neutralL2: CoreTemperamentVector = {
+      openness: 0.5,
+      conscientiousness: 0.5,
+      extraversion: 0.5,
+      agreeableness: 0.5,
+      neuroticism: 0.5,
+    }
+    const neutralL3: NarrativeDriveVector = {
+      lack: 0.5,
+      moralCompass: 0.5,
+      volatility: 0.5,
+      growthArc: 0.5,
+    }
+    const rules = generateInitialTriggerRules(neutralL1, neutralL2, neutralL3)
+    // 중립 벡터: neuroticism=0.5 (경계), volatility=0.5>0.4, extraversion=0.5 (>=0.4이므로 사교성 없음)
+    expect(rules.length).toBeGreaterThanOrEqual(1)
   })
 })

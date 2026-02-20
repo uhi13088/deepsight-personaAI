@@ -175,11 +175,16 @@ model Persona {
   // === v3.0 NEW: Interaction Rules (JSON) ===
   interactionRules    Json?           // InteractionRules (Init/Override/Adapt/Express)
 
+  // === v4.0 NEW: Instruction Layer ===
+  voiceSpec           Json?           // VoiceSpec (profile + styleParams + guardrails + adaptations + consistency)
+  factbook            Json?           // Factbook (immutableFacts + mutableContext + integrityHash)
+  triggerMap          Json?           // TriggerRuleDSL[] (structured rule engine)
+
   // === v3.0 NEW: Archetype & Scores ===
   archetypeId         String?
   paradoxScore        Decimal?        @db.Decimal(4, 3) // 0.000~1.000
   dimensionalityScore Decimal?        @db.Decimal(4, 3) // 0.000~1.000
-  engineVersion       String?         @default("3.0")
+  engineVersion       String?         @default("4.0")
 
   // === 타임스탬프 ===
   createdById     String

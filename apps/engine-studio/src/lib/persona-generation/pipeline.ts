@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
-// 페르소나 생성 파이프라인 — 공유 함수
+// 페르소나 생성 파이프라인 v4.0 — 공유 함수
 // generate-random API, 인큐베이터 배치에서 공통으로 사용
+// T158: VoiceSpec + Factbook + TriggerMap 통합
 // ═══════════════════════════════════════════════════════════════
 
 import { prisma } from "@/lib/prisma"
@@ -15,6 +16,9 @@ import { generateExpressQuirksWithLLM } from "@/lib/interaction/llm-express-quir
 import { computeActivityTraits, computeActiveHours } from "@/lib/persona-world/activity-mapper"
 import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
+import { buildVoiceSpec, computeVoiceStyleParams } from "@/lib/qualitative/voice-spec"
+import { convertBackstoryToFactbook } from "@/lib/persona-world/factbook"
+import { generateInitialTriggerRules } from "@/lib/trigger/rule-dsl"
 import type { QuirkDefinition } from "@/lib/interaction/express-algorithm"
 import { Prisma, type PersonaRole, type PersonaStatus } from "@/generated/prisma"
 
@@ -146,7 +150,21 @@ export async function executePersonaGenerationPipeline(options?: {
     // LLM 실패 시 빈 배열 → 런타임에서 DEFAULT_QUIRKS 사용
   }
 
-  // Stage 4: 프롬프트 5종 자동 빌드
+  // Stage 4: v4 Instruction Layer — VoiceSpec + Factbook + TriggerMap
+  const styleParams = computeVoiceStyleParams(l1, l2, l3)
+  const voiceSpec = buildVoiceSpec(qualitative.voice, styleParams, l1, l2, l3)
+
+  let factbook
+  try {
+    factbook = await convertBackstoryToFactbook(qualitative.backstory)
+  } catch {
+    // Factbook 변환 실패 시 null (SHA256 미지원 환경 등)
+    factbook = null
+  }
+
+  const triggerRules = generateInitialTriggerRules(l1, l2, l3)
+
+  // Stage 5: 프롬프트 5종 자동 빌드
   const role = inferPersonaRole(l1, l2)
   const prompts = buildAllPrompts({
     name: character.name,
@@ -157,11 +175,11 @@ export async function executePersonaGenerationPipeline(options?: {
     l3,
   })
 
-  // Stage 5: 활동성 8특성 + 활동시간
+  // Stage 6: 활동성 8특성 + 활동시간
   const crossAxisProfile = calculateCrossAxisProfile(l1, l2, l3)
   const paradoxProfile = calculateExtendedParadoxScore(l1, l2, l3, crossAxisProfile)
 
-  // Stage 6: DB 저장 (트랜잭션)
+  // Stage 7: DB 저장 (트랜잭션)
   const persona = await prisma.$transaction(async (tx) => {
     const systemUser = await tx.user.findFirst({ select: { id: true } })
     if (!systemUser) {
@@ -179,15 +197,25 @@ export async function executePersonaGenerationPipeline(options?: {
         archetypeId: generated.archetype?.id ?? null,
         paradoxScore: paradoxProfile.overall,
         dimensionalityScore: paradoxProfile.dimensionality,
-        engineVersion: "3.0",
+        engineVersion: "4.0",
         promptTemplate: prompts.base,
         promptVersion: "1.0",
         basePrompt: prompts.base,
         createdById: systemUser.id,
+
+        // v3 호환: 기존 소비자가 직접 접근하는 필드 유지
         voiceProfile: qualitative.voice as unknown as Prisma.InputJsonValue,
         backstory: qualitative.backstory as unknown as Prisma.InputJsonValue,
         pressureContext: qualitative.pressure as unknown as Prisma.InputJsonValue,
         zeitgeist: qualitative.zeitgeist as unknown as Prisma.InputJsonValue,
+
+        // v4 Instruction Layer: 구조화된 전체 스펙
+        voiceSpec: voiceSpec as unknown as Prisma.InputJsonValue,
+        factbook: factbook as unknown as Prisma.InputJsonValue,
+        triggerMap: (triggerRules.length > 0
+          ? triggerRules
+          : undefined) as unknown as Prisma.InputJsonValue,
+
         generationConfig: (expressQuirks.length > 0
           ? { expressQuirks }
           : undefined) as unknown as Prisma.InputJsonValue,
