@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // 페르소나 생성 파이프라인 v4.0 — 공유 함수
-// generate-random API, 인큐베이터 배치에서 공통으로 사용
 // T158: VoiceSpec + Factbook + TriggerMap 통합
+// T159: manual/auto 모드 통합 — create/route.ts 중복 제거
 // ═══════════════════════════════════════════════════════════════
 
 import { prisma } from "@/lib/prisma"
@@ -13,7 +13,6 @@ import {
   generateAllQualitativeDimensionsWithLLM,
 } from "@/lib/qualitative"
 import { generateExpressQuirksWithLLM } from "@/lib/interaction/llm-express-quirks"
-import { computeActivityTraits, computeActiveHours } from "@/lib/persona-world/activity-mapper"
 import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
 import {
@@ -23,9 +22,18 @@ import {
 } from "@/lib/qualitative/voice-spec"
 import { convertBackstoryToFactbook } from "@/lib/persona-world/factbook"
 import { generateInitialTriggerRules, type TriggerRuleDSL } from "@/lib/trigger/rule-dsl"
-import type { BackstoryDimension, Factbook, VoiceProfile } from "@/types"
+import type {
+  BackstoryDimension,
+  Factbook,
+  PersonaArchetype,
+  SocialPersonaVector,
+  CoreTemperamentVector,
+  NarrativeDriveVector,
+  VoiceProfile,
+} from "@/types"
 import type { QuirkDefinition } from "@/lib/interaction/express-algorithm"
 import { Prisma, type PersonaRole, type PersonaStatus } from "@/generated/prisma"
+import { ARCHETYPES } from "@/lib/persona-generation/archetypes"
 
 // ── 벡터 기반 PersonaRole 추론 ──────────────────────────────
 function inferPersonaRole(
@@ -109,12 +117,169 @@ export interface GeneratedPersonaResult {
   dimensionalityScore: number
 }
 
-// ── 파이프라인 실행 ──────────────────────────────────────────
+// ── DB 저장 공통 함수 ────────────────────────────────────────
 
-export async function executePersonaGenerationPipeline(options?: {
+interface SavePersonaParams {
+  name: string
+  handle: string | null
+  tagline: string | null
+  role: PersonaRole
+  expertise: string[]
+  profileImageUrl?: string | null
+  description: string | null
+  warmth: number
+  background: string | null
+  speechPatterns: string[]
+  quirks: string[]
+  status: PersonaStatus
+  archetypeId: string | null
+  paradoxScore: number
+  dimensionalityScore: number
+  basePrompt: string
+  promptVersion: string
+  qualitative: {
+    voice: VoiceProfile
+    backstory: BackstoryDimension
+    pressure: unknown
+    zeitgeist: unknown
+  }
+  voiceSpec: VoiceSpec
+  factbook: Factbook | null
+  triggerRules: TriggerRuleDSL[]
+  expressQuirks: QuirkDefinition[]
+  l1: SocialPersonaVector
+  l2: CoreTemperamentVector
+  l3: NarrativeDriveVector
+}
+
+async function savePersonaToDb(params: SavePersonaParams) {
+  return prisma.$transaction(async (tx) => {
+    const systemUser = await tx.user.findFirst({ select: { id: true } })
+    if (!systemUser) {
+      throw new Error("시스템 사용자가 없습니다. 초기 사용자를 생성해주세요.")
+    }
+
+    const { l1, l2, l3 } = params
+
+    const created = await tx.persona.create({
+      data: {
+        name: params.name,
+        handle: params.handle,
+        tagline: params.tagline,
+        role: params.role,
+        expertise: params.expertise,
+        profileImageUrl: params.profileImageUrl ?? null,
+        description: params.description,
+        warmth: params.warmth,
+        background: params.background,
+        speechPatterns: params.speechPatterns,
+        quirks: params.quirks,
+        status: params.status,
+        source: "MANUAL",
+        archetypeId: params.archetypeId,
+        paradoxScore: params.paradoxScore,
+        dimensionalityScore: params.dimensionalityScore,
+        engineVersion: "4.0",
+        promptTemplate: params.basePrompt,
+        promptVersion: params.promptVersion,
+        basePrompt: params.basePrompt,
+        createdById: systemUser.id,
+
+        // v3 호환: 기존 소비자가 직접 접근하는 필드 유지
+        voiceProfile: params.qualitative.voice as unknown as Prisma.InputJsonValue,
+        backstory: params.qualitative.backstory as unknown as Prisma.InputJsonValue,
+        pressureContext: params.qualitative.pressure as unknown as Prisma.InputJsonValue,
+        zeitgeist: params.qualitative.zeitgeist as unknown as Prisma.InputJsonValue,
+
+        // v4 Instruction Layer
+        voiceSpec: params.voiceSpec as unknown as Prisma.InputJsonValue,
+        factbook: params.factbook as unknown as Prisma.InputJsonValue,
+        triggerMap: (params.triggerRules.length > 0
+          ? params.triggerRules
+          : undefined) as unknown as Prisma.InputJsonValue,
+
+        generationConfig: (params.expressQuirks.length > 0
+          ? { expressQuirks: params.expressQuirks }
+          : undefined) as unknown as Prisma.InputJsonValue,
+
+        layerVectors: {
+          create: [
+            {
+              layerType: "SOCIAL",
+              dim1: l1.depth,
+              dim2: l1.lens,
+              dim3: l1.stance,
+              dim4: l1.scope,
+              dim5: l1.taste,
+              dim6: l1.purpose,
+              dim7: l1.sociability,
+            },
+            {
+              layerType: "TEMPERAMENT",
+              dim1: l2.openness,
+              dim2: l2.conscientiousness,
+              dim3: l2.extraversion,
+              dim4: l2.agreeableness,
+              dim5: l2.neuroticism,
+            },
+            {
+              layerType: "NARRATIVE",
+              dim1: l3.lack,
+              dim2: l3.moralCompass,
+              dim3: l3.volatility,
+              dim4: l3.growthArc,
+            },
+          ],
+        },
+      },
+    })
+
+    return created
+  })
+}
+
+// ── Manual 모드 입력 타입 ────────────────────────────────────
+
+export interface ManualPipelineInput {
+  mode: "manual"
+  name: string
+  role: PersonaRole
+  expertise: string[]
+  description: string | null
+  profileImageUrl?: string | null
+  basePrompt: string
+  promptVersion?: string
+  vectors: {
+    l1: SocialPersonaVector
+    l2: CoreTemperamentVector
+    l3: NarrativeDriveVector
+  }
+  archetypeId?: string | null
+  status?: PersonaStatus
+}
+
+// ── Auto 모드 입력 타입 ─────────────────────────────────────
+
+export interface AutoPipelineInput {
+  mode?: "auto"
   archetypeId?: string
   status?: PersonaStatus
-}): Promise<GeneratedPersonaResult> {
+}
+
+// ── 파이프라인 실행 (통합) ───────────────────────────────────
+
+export async function executePersonaGenerationPipeline(
+  options?: AutoPipelineInput | ManualPipelineInput
+): Promise<GeneratedPersonaResult> {
+  if (options?.mode === "manual") {
+    return executeManualPipeline(options)
+  }
+  return executeAutoPipeline(options)
+}
+
+// ── Auto 모드: 벡터 + 캐릭터 + 프롬프트 전체 자동 생성 ─────
+
+async function executeAutoPipeline(options?: AutoPipelineInput): Promise<GeneratedPersonaResult> {
   const targetStatus = options?.status ?? "ACTIVE"
 
   // Stage 1: 기존 페르소나 벡터 조회 (다양성 보장)
@@ -177,36 +342,10 @@ export async function executePersonaGenerationPipeline(options?: {
     // LLM 실패 시 기존 패턴매칭 결과 사용
   }
 
-  // Stage 3: 정성적 4차원 생성 (LLM 우선, 실패 시 패턴매칭 fallback)
-  let qualitative
-  try {
-    qualitative = await generateAllQualitativeDimensionsWithLLM(l1, l2, l3, generated.archetype)
-  } catch {
-    qualitative = generateAllQualitativeDimensions(l1, l2, l3, generated.archetype)
-  }
-
-  // Stage 3.5: Express 퀴크 LLM 생성
-  let expressQuirks: QuirkDefinition[] = []
-  try {
-    expressQuirks = await generateExpressQuirksWithLLM(
-      l1,
-      l2,
-      l3,
-      generated.archetype,
-      qualitative.voice
-    )
-  } catch {
-    // LLM 실패 시 빈 배열 → 런타임에서 DEFAULT_QUIRKS 사용
-  }
-
-  // Stage 4: v4 Instruction Layer — VoiceSpec + Factbook + TriggerMap
-  const { voiceSpec, factbook, triggerRules } = await buildInstructionLayer(
-    qualitative.voice,
-    qualitative.backstory,
-    l1,
-    l2,
-    l3
-  )
+  // Stage 3~4: 공통 처리
+  const archetype = generated.archetype
+  const { qualitative, expressQuirks, voiceSpec, factbook, triggerRules } =
+    await generateQualitativeAndInstructionLayer(l1, l2, l3, archetype)
 
   // Stage 5: 프롬프트 5종 자동 빌드
   const role = inferPersonaRole(l1, l2)
@@ -219,100 +358,144 @@ export async function executePersonaGenerationPipeline(options?: {
     l3,
   })
 
-  // Stage 5.5: warmth 계산 (L2 agreeableness 60% + L1 sociability 40%)
+  // Stage 5.5: warmth 계산
   const warmth = Math.round((l2.agreeableness * 0.6 + l1.sociability * 0.4) * 100) / 100
 
-  // Stage 6: 활동성 8특성 + 활동시간
+  // Stage 6: Paradox Score
   const crossAxisProfile = calculateCrossAxisProfile(l1, l2, l3)
   const paradoxProfile = calculateExtendedParadoxScore(l1, l2, l3, crossAxisProfile)
 
-  // Stage 7: DB 저장 (트랜잭션)
-  const persona = await prisma.$transaction(async (tx) => {
-    const systemUser = await tx.user.findFirst({ select: { id: true } })
-    if (!systemUser) {
-      throw new Error("시스템 사용자가 없습니다. 초기 사용자를 생성해주세요.")
-    }
-
-    const created = await tx.persona.create({
-      data: {
-        name: character.name,
-        handle: `@${character.name.replace(/\s+/g, "_").toLowerCase()}`,
-        tagline: character.description,
-        role,
-        expertise: character.expertise,
-        description: character.description,
-        warmth,
-        background: character.background,
-        speechPatterns: character.speechPatterns,
-        quirks: character.quirks,
-        status: targetStatus,
-        source: "MANUAL",
-        archetypeId: generated.archetype?.id ?? null,
-        paradoxScore: paradoxProfile.overall,
-        dimensionalityScore: paradoxProfile.dimensionality,
-        engineVersion: "4.0",
-        promptTemplate: prompts.base,
-        promptVersion: "1.0",
-        basePrompt: prompts.base,
-        createdById: systemUser.id,
-
-        // v3 호환: 기존 소비자가 직접 접근하는 필드 유지
-        voiceProfile: qualitative.voice as unknown as Prisma.InputJsonValue,
-        backstory: qualitative.backstory as unknown as Prisma.InputJsonValue,
-        pressureContext: qualitative.pressure as unknown as Prisma.InputJsonValue,
-        zeitgeist: qualitative.zeitgeist as unknown as Prisma.InputJsonValue,
-
-        // v4 Instruction Layer: 구조화된 전체 스펙
-        voiceSpec: voiceSpec as unknown as Prisma.InputJsonValue,
-        factbook: factbook as unknown as Prisma.InputJsonValue,
-        triggerMap: (triggerRules.length > 0
-          ? triggerRules
-          : undefined) as unknown as Prisma.InputJsonValue,
-
-        generationConfig: (expressQuirks.length > 0
-          ? { expressQuirks }
-          : undefined) as unknown as Prisma.InputJsonValue,
-        layerVectors: {
-          create: [
-            {
-              layerType: "SOCIAL",
-              dim1: l1.depth,
-              dim2: l1.lens,
-              dim3: l1.stance,
-              dim4: l1.scope,
-              dim5: l1.taste,
-              dim6: l1.purpose,
-              dim7: l1.sociability,
-            },
-            {
-              layerType: "TEMPERAMENT",
-              dim1: l2.openness,
-              dim2: l2.conscientiousness,
-              dim3: l2.extraversion,
-              dim4: l2.agreeableness,
-              dim5: l2.neuroticism,
-            },
-            {
-              layerType: "NARRATIVE",
-              dim1: l3.lack,
-              dim2: l3.moralCompass,
-              dim3: l3.volatility,
-              dim4: l3.growthArc,
-            },
-          ],
-        },
-      },
-    })
-
-    return created
+  // Stage 7: DB 저장
+  const persona = await savePersonaToDb({
+    name: character.name,
+    handle: `@${character.name.replace(/\s+/g, "_").toLowerCase()}`,
+    tagline: character.description,
+    role,
+    expertise: character.expertise,
+    description: character.description,
+    warmth,
+    background: character.background,
+    speechPatterns: character.speechPatterns,
+    quirks: character.quirks,
+    status: targetStatus,
+    archetypeId: archetype?.id ?? null,
+    paradoxScore: paradoxProfile.overall,
+    dimensionalityScore: paradoxProfile.dimensionality,
+    basePrompt: prompts.base,
+    promptVersion: "1.0",
+    qualitative,
+    voiceSpec,
+    factbook,
+    triggerRules,
+    expressQuirks,
+    l1,
+    l2,
+    l3,
   })
 
   return {
     id: persona.id,
     name: persona.name,
     role: persona.role,
-    archetypeId: generated.archetype?.id ?? null,
+    archetypeId: archetype?.id ?? null,
     paradoxScore: paradoxProfile.overall,
     dimensionalityScore: paradoxProfile.dimensionality,
   }
+}
+
+// ── Manual 모드: 벡터/이름/프롬프트를 외부에서 제공 ─────────
+
+async function executeManualPipeline(input: ManualPipelineInput): Promise<GeneratedPersonaResult> {
+  const { l1, l2, l3 } = input.vectors
+  const targetStatus = input.status ?? "DRAFT"
+
+  // 아키타입 조회
+  const archetype = input.archetypeId
+    ? ARCHETYPES.find((a) => a.id === input.archetypeId)
+    : undefined
+
+  // Stage 3~4: 정성적 4차원 + Instruction Layer (자동 생성)
+  const { qualitative, voiceSpec, factbook, triggerRules } =
+    await generateQualitativeAndInstructionLayer(l1, l2, l3, archetype)
+
+  // Warmth 계산
+  const warmth = Math.round((l2.agreeableness * 0.6 + l1.sociability * 0.4) * 100) / 100
+
+  // Paradox Score
+  const crossAxisProfile = calculateCrossAxisProfile(l1, l2, l3)
+  const paradoxProfile = calculateExtendedParadoxScore(l1, l2, l3, crossAxisProfile)
+
+  // DB 저장
+  const persona = await savePersonaToDb({
+    name: input.name,
+    handle: `@${input.name.replace(/\s+/g, "_").toLowerCase()}`,
+    tagline: input.description,
+    role: input.role,
+    expertise: input.expertise,
+    profileImageUrl: input.profileImageUrl,
+    description: input.description,
+    warmth,
+    background: null,
+    speechPatterns: [],
+    quirks: [],
+    status: targetStatus,
+    archetypeId: input.archetypeId ?? null,
+    paradoxScore: paradoxProfile.overall,
+    dimensionalityScore: paradoxProfile.dimensionality,
+    basePrompt: input.basePrompt,
+    promptVersion: input.promptVersion ?? "1.0",
+    qualitative,
+    voiceSpec,
+    factbook,
+    triggerRules,
+    expressQuirks: [],
+    l1,
+    l2,
+    l3,
+  })
+
+  return {
+    id: persona.id,
+    name: persona.name,
+    role: persona.role,
+    archetypeId: input.archetypeId ?? null,
+    paradoxScore: paradoxProfile.overall,
+    dimensionalityScore: paradoxProfile.dimensionality,
+  }
+}
+
+// ── 정성적 + Instruction Layer 공통 처리 ────────────────────
+
+async function generateQualitativeAndInstructionLayer(
+  l1: SocialPersonaVector,
+  l2: CoreTemperamentVector,
+  l3: NarrativeDriveVector,
+  archetype?: PersonaArchetype
+) {
+  // 정성적 4차원 생성 (LLM 우선, 실패 시 패턴매칭 fallback)
+  let qualitative
+  try {
+    qualitative = await generateAllQualitativeDimensionsWithLLM(l1, l2, l3, archetype)
+  } catch {
+    qualitative = generateAllQualitativeDimensions(l1, l2, l3, archetype)
+  }
+
+  // Express 퀴크 LLM 생성
+  let expressQuirks: QuirkDefinition[] = []
+  try {
+    expressQuirks = await generateExpressQuirksWithLLM(l1, l2, l3, archetype, qualitative.voice)
+  } catch {
+    // LLM 실패 시 빈 배열 → 런타임에서 DEFAULT_QUIRKS 사용
+  }
+
+  // v4 Instruction Layer
+  const { voiceSpec, factbook, triggerRules } = await buildInstructionLayer(
+    qualitative.voice,
+    qualitative.backstory,
+    l1,
+    l2,
+    l3
+  )
+
+  return { qualitative, expressQuirks, voiceSpec, factbook, triggerRules }
 }

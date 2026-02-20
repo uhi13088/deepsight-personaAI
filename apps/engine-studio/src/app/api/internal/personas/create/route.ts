@@ -1,21 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/require-auth"
-import { prisma } from "@/lib/prisma"
-import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
-import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
-import {
-  generateAllQualitativeDimensions,
-  generateAllQualitativeDimensionsWithLLM,
-} from "@/lib/qualitative"
-import { buildInstructionLayer } from "@/lib/persona-generation/pipeline"
+import { executePersonaGenerationPipeline } from "@/lib/persona-generation/pipeline"
 import type {
   ApiResponse,
   SocialPersonaVector,
   CoreTemperamentVector,
   NarrativeDriveVector,
 } from "@/types"
-import { Prisma, type PersonaRole, type PersonaStatus } from "@/generated/prisma"
-import { ARCHETYPES } from "@/lib/persona-generation/archetypes"
+import type { PersonaRole, PersonaStatus } from "@/generated/prisma"
 
 interface CreatePersonaBody {
   name: string
@@ -36,6 +28,7 @@ interface CreatePersonaBody {
 
 // ═══════════════════════════════════════════════════════════════
 // POST /api/internal/personas/create
+// T159: validation만 유지, 생성 로직은 공유 파이프라인 호출
 // ═══════════════════════════════════════════════════════════════
 export async function POST(request: NextRequest) {
   const { response } = await requireAuth()
@@ -75,120 +68,36 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // ── Compute Paradox Score ─────────────────────────────────
-    const { l1, l2, l3 } = body.vectors
-    const crossAxisProfile = calculateCrossAxisProfile(l1, l2, l3)
-    const paradoxProfile = calculateExtendedParadoxScore(l1, l2, l3, crossAxisProfile)
-
-    // ── 정성적 4차원 자동 생성 (LLM 우선, 실패 시 패턴매칭 fallback) ──
-    const archetype = body.archetypeId
-      ? ARCHETYPES.find((a) => a.id === body.archetypeId)
-      : undefined
-    let qualitative
-    try {
-      qualitative = await generateAllQualitativeDimensionsWithLLM(l1, l2, l3, archetype)
-    } catch {
-      qualitative = generateAllQualitativeDimensions(l1, l2, l3, archetype)
-    }
-
-    // ── v4 Instruction Layer ─────────────────────────────────
-    const { voiceSpec, factbook, triggerRules } = await buildInstructionLayer(
-      qualitative.voice,
-      qualitative.backstory,
-      l1,
-      l2,
-      l3
-    )
-
-    // ── Create Persona + LayerVectors in transaction ─────────
-    const persona = await prisma.$transaction(async (tx) => {
-      // Get a system user ID (first user available)
-      const systemUser = await tx.user.findFirst({ select: { id: true } })
-      if (!systemUser) {
-        throw new Error("시스템 사용자가 없습니다. 초기 사용자를 생성해주세요.")
-      }
-
-      const created = await tx.persona.create({
-        data: {
-          name: body.name.trim(),
-          role: body.role as PersonaRole,
-          expertise: body.expertise,
-          profileImageUrl: body.profileImageUrl,
-          description: body.description,
-          status: (body.status === "ACTIVE" ? "ACTIVE" : "DRAFT") as PersonaStatus,
-          source: "MANUAL",
-          archetypeId: body.archetypeId,
-          paradoxScore: paradoxProfile.overall,
-          dimensionalityScore: paradoxProfile.dimensionality,
-          engineVersion: "4.0",
-          promptTemplate: body.basePrompt,
-          promptVersion: body.promptVersion || "1.0",
-          basePrompt: body.basePrompt,
-          createdById: systemUser.id,
-
-          // v3 호환: 기존 소비자가 직접 접근하는 필드 유지
-          voiceProfile: qualitative.voice as unknown as Prisma.InputJsonValue,
-          backstory: qualitative.backstory as unknown as Prisma.InputJsonValue,
-          pressureContext: qualitative.pressure as unknown as Prisma.InputJsonValue,
-          zeitgeist: qualitative.zeitgeist as unknown as Prisma.InputJsonValue,
-
-          // v4 Instruction Layer
-          voiceSpec: voiceSpec as unknown as Prisma.InputJsonValue,
-          factbook: factbook as unknown as Prisma.InputJsonValue,
-          triggerMap: (triggerRules.length > 0
-            ? triggerRules
-            : undefined) as unknown as Prisma.InputJsonValue,
-
-          layerVectors: {
-            create: [
-              {
-                layerType: "SOCIAL",
-                dim1: l1.depth,
-                dim2: l1.lens,
-                dim3: l1.stance,
-                dim4: l1.scope,
-                dim5: l1.taste,
-                dim6: l1.purpose,
-                dim7: l1.sociability,
-              },
-              {
-                layerType: "TEMPERAMENT",
-                dim1: l2.openness,
-                dim2: l2.conscientiousness,
-                dim3: l2.extraversion,
-                dim4: l2.agreeableness,
-                dim5: l2.neuroticism,
-              },
-              {
-                layerType: "NARRATIVE",
-                dim1: l3.lack,
-                dim2: l3.moralCompass,
-                dim3: l3.volatility,
-                dim4: l3.growthArc,
-              },
-            ],
-          },
-        },
-      })
-
-      return created
+    // ── 공유 파이프라인 호출 (manual 모드) ───────────────────
+    const result = await executePersonaGenerationPipeline({
+      mode: "manual",
+      name: body.name.trim(),
+      role: body.role as PersonaRole,
+      expertise: body.expertise,
+      description: body.description,
+      profileImageUrl: body.profileImageUrl,
+      basePrompt: body.basePrompt,
+      promptVersion: body.promptVersion || "1.0",
+      vectors: body.vectors,
+      archetypeId: body.archetypeId,
+      status: (body.status === "ACTIVE" ? "ACTIVE" : "DRAFT") as PersonaStatus,
     })
 
-    const response: ApiResponse<{ id: string }> = {
+    const apiResponse: ApiResponse<{ id: string }> = {
       success: true,
-      data: { id: persona.id },
+      data: { id: result.id },
     }
 
-    return NextResponse.json(response, { status: 201 })
+    return NextResponse.json(apiResponse, { status: 201 })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error"
-    const response: ApiResponse<never> = {
+    const apiResponse: ApiResponse<never> = {
       success: false,
       error: {
         code: "INTERNAL_ERROR",
         message: `페르소나 생성 실패: ${message}`,
       },
     }
-    return NextResponse.json(response, { status: 500 })
+    return NextResponse.json(apiResponse, { status: 500 })
   }
 }

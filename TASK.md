@@ -1033,7 +1033,12 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-(없음)
+- [ ] **T159: 페르소나 생성 전체 모듈화 — create/route.ts → 공유 파이프라인 통합**
+  - 배경: `create/route.ts`가 `pipeline.ts`와 정성적 4차원 생성 + DB 저장 로직이 중복. v4 Instruction Layer는 T158에서 `buildInstructionLayer()` 추출 완료. 나머지 중복(정성적 생성, DB 트랜잭션) 통합 필요
+  - AC1: `pipeline.ts` — manual 모드 지원 (`mode: "auto" | "manual"`, manual 시 벡터/이름/프롬프트 직접 입력)
+  - AC2: `create/route.ts` — validation만 유지, 생성 로직은 공유 파이프라인 호출
+  - AC3: 기존 동작 변경 없음 (API 응답 동일)
+  - AC4: 테스트 + Build PASS
 
 ---
 
