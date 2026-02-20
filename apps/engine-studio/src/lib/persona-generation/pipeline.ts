@@ -347,7 +347,7 @@ async function executeAutoPipeline(options?: AutoPipelineInput): Promise<Generat
   const { qualitative, expressQuirks, voiceSpec, factbook, triggerRules } =
     await generateQualitativeAndInstructionLayer(l1, l2, l3, archetype)
 
-  // Stage 5: 프롬프트 5종 자동 빌드
+  // Stage 5: 프롬프트 5종 자동 빌드 (v4: VoiceSpec/Factbook/TriggerRules 포함)
   const role = inferPersonaRole(l1, l2)
   const prompts = buildAllPrompts({
     name: character.name,
@@ -356,6 +356,9 @@ async function executeAutoPipeline(options?: AutoPipelineInput): Promise<Generat
     l1,
     l2,
     l3,
+    voiceSpec,
+    factbook,
+    triggerRules,
   })
 
   // Stage 5.5: warmth 계산
@@ -382,7 +385,7 @@ async function executeAutoPipeline(options?: AutoPipelineInput): Promise<Generat
     paradoxScore: paradoxProfile.overall,
     dimensionalityScore: paradoxProfile.dimensionality,
     basePrompt: prompts.base,
-    promptVersion: "1.0",
+    promptVersion: "4.0",
     qualitative,
     voiceSpec,
     factbook,
@@ -418,6 +421,19 @@ async function executeManualPipeline(input: ManualPipelineInput): Promise<Genera
   const { qualitative, voiceSpec, factbook, triggerRules } =
     await generateQualitativeAndInstructionLayer(l1, l2, l3, archetype)
 
+  // Stage 5: v4 프롬프트 자동 빌드 (외부 basePrompt 대신 v4 생성)
+  const prompts = buildAllPrompts({
+    name: input.name,
+    role: input.role,
+    expertise: input.expertise,
+    l1,
+    l2,
+    l3,
+    voiceSpec,
+    factbook,
+    triggerRules,
+  })
+
   // Warmth 계산
   const warmth = Math.round((l2.agreeableness * 0.6 + l1.sociability * 0.4) * 100) / 100
 
@@ -442,8 +458,8 @@ async function executeManualPipeline(input: ManualPipelineInput): Promise<Genera
     archetypeId: input.archetypeId ?? null,
     paradoxScore: paradoxProfile.overall,
     dimensionalityScore: paradoxProfile.dimensionality,
-    basePrompt: input.basePrompt,
-    promptVersion: input.promptVersion ?? "1.0",
+    basePrompt: prompts.base,
+    promptVersion: "4.0",
     qualitative,
     voiceSpec,
     factbook,

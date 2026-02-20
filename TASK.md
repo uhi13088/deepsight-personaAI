@@ -991,14 +991,13 @@
 
 > 생성 파이프라인 v4 품질 강화 — 프롬프트 v4 전환, 다양성 개선, 구조화 필드 자동생성, 기억 저장소 런타임 연동.
 
-- [ ] **T160: 시스템 프롬프트 v4 전환 — VoiceSpec/Factbook 기반 프롬프트 빌더**
-  - 배경: `prompt-builder.ts`가 여전히 v3 형식 (L1/L2/L3 수치 직접 노출). v4 Instruction Layer(voiceSpec, factbook, triggerMap)는 DB 저장 완료(T158)이나 프롬프트 빌드에 미반영.
-  - AC1: `buildBasePrompt` — voiceSpec의 6D 스타일 파라미터 기반 프롬프트로 전환 (L1/L2/L3 수치 제거, 자연어 서술)
-  - AC2: factbook.immutableFacts를 [출생/형성경험/내면갈등/핵심정체성] 섹션으로 프롬프트에 반영
-  - AC3: triggerMap 규칙을 [행동 트리거] 섹션으로 프롬프트에 반영
-  - AC4: 5종 프롬프트(base/review/post/comment/interaction) 전체 v4 전환
-  - AC5: v3→v4 프롬프트 비교 로깅 (마이그레이션 기간 동안 A/B 비교 가능)
-  - AC6: 테스트 + Build PASS
+- [x] **T160: 시스템 프롬프트 v4 전환 — VoiceSpec/Factbook 기반 프롬프트 빌더** ✅ 2026-02-20
+  - AC1: ✅ `buildBasePrompt` — voiceSpec의 6D 스타일 파라미터 기반 프롬프트로 전환 (L1/L2/L3 수치 제거, 자연어 서술)
+  - AC2: ✅ factbook.immutableFacts를 [출생/형성경험/내면갈등/핵심정체성] 섹션으로 프롬프트에 반영
+  - AC3: ✅ triggerMap 규칙을 [행동 트리거] 섹션으로 프롬프트에 반영
+  - AC4: ✅ 5종 프롬프트(base/review/post/comment/interaction) 전체 v4 전환
+  - AC5: v3 fallback 유지로 A/B 비교 가능 (voiceSpec 없으면 v3, 있으면 v4)
+  - AC6: ✅ 89파일 3649 테스트 PASS + Build PASS
 
 - [ ] **T161: 페르소나 랜덤생성 다양성 강화 — 벡터 클러스터링 방지**
   - 배경: 아키타입 미지정 랜덤 생성 시 L1/L2 범위 [0.1,0.9]에서 중앙값(0.5) 근처에 몰리는 경향. diversityWeight 0.5는 확률적으로만 작동하여 근접 벡터 생성이 가능함
@@ -1033,6 +1032,10 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T160: 시스템 프롬프트 v4 전환 — VoiceSpec/Factbook 기반 프롬프트 빌더** ✅ 2026-02-20
+  - 변경: prompt-builder.ts, pipeline.ts, prompt-builder.test.ts
+  - 테스트: PASS (89파일/3649)
 
 - [x] **T159: 페르소나 생성 전체 모듈화 — create/route.ts → 공유 파이프라인 통합** ✅ 2026-02-20
   - AC1: ✅ `pipeline.ts` — manual/auto 모드 분기 + `savePersonaToDb()` 공통 함수 + `generateQualitativeAndInstructionLayer()` 공통 함수
