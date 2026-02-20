@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -21,6 +21,10 @@ import {
   Settings,
   Save,
   X,
+  Clock,
+  Power,
+  Inbox,
+  Timer,
 } from "lucide-react"
 import type {
   IncubatorDashboard,
@@ -50,6 +54,16 @@ interface IncubatorSettings {
   strategyWeights: { userDriven: number; exploration: number; gapFilling: number }
 }
 
+const AUTO_RUN_KEY = "incubator-auto-run"
+const AUTO_INTERVAL_KEY = "incubator-auto-interval"
+
+const INTERVAL_OPTIONS = [
+  { label: "5분", value: 5 * 60 * 1000 },
+  { label: "15분", value: 15 * 60 * 1000 },
+  { label: "30분", value: 30 * 60 * 1000 },
+  { label: "1시간", value: 60 * 60 * 1000 },
+]
+
 export default function IncubatorPage() {
   const [data, setData] = useState<IncubatorDashboard | null>(null)
   const [loading, setLoading] = useState(true)
@@ -58,6 +72,26 @@ export default function IncubatorPage() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [batchTriggering, setBatchTriggering] = useState(false)
   const [batchMessage, setBatchMessage] = useState<string | null>(null)
+
+  // Auto-run state
+  const [autoRun, setAutoRun] = useState(false)
+  const [autoInterval, setAutoInterval] = useState(15 * 60 * 1000)
+  const [countdown, setCountdown] = useState(0)
+  const nextRunRef = useRef<number>(0)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // localStorage에서 auto-run 설정 복원
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(AUTO_RUN_KEY)
+      const savedInterval = localStorage.getItem(AUTO_INTERVAL_KEY)
+      if (saved === "true") setAutoRun(true)
+      if (savedInterval) setAutoInterval(Number(savedInterval))
+    } catch {
+      /* ignore */
+    }
+  }, [])
 
   const fetchData = useCallback(() => {
     setLoading(true)
@@ -110,7 +144,6 @@ export default function IncubatorPage() {
       }
       if (json.success && json.data) {
         setBatchMessage(json.data.message)
-        // 배치 완료 후 대시보드 데이터 새로고침
         fetchData()
       } else {
         setBatchMessage("배치 실행 실패")
@@ -121,6 +154,58 @@ export default function IncubatorPage() {
       setBatchTriggering(false)
     }
   }, [fetchData])
+
+  // Auto-run effect
+  useEffect(() => {
+    // Clear previous timers
+    if (intervalRef.current) clearInterval(intervalRef.current)
+    if (countdownRef.current) clearInterval(countdownRef.current)
+
+    if (!autoRun) {
+      setCountdown(0)
+      return
+    }
+
+    // Save to localStorage
+    try {
+      localStorage.setItem(AUTO_RUN_KEY, "true")
+      localStorage.setItem(AUTO_INTERVAL_KEY, String(autoInterval))
+    } catch {
+      /* ignore */
+    }
+
+    // Set next run time
+    nextRunRef.current = Date.now() + autoInterval
+
+    // Auto-trigger interval
+    intervalRef.current = setInterval(() => {
+      nextRunRef.current = Date.now() + autoInterval
+      void triggerBatch()
+    }, autoInterval)
+
+    // Countdown ticker (every second)
+    countdownRef.current = setInterval(() => {
+      const remaining = Math.max(0, nextRunRef.current - Date.now())
+      setCountdown(remaining)
+    }, 1000)
+
+    setCountdown(autoInterval)
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      if (countdownRef.current) clearInterval(countdownRef.current)
+    }
+  }, [autoRun, autoInterval, triggerBatch])
+
+  function toggleAutoRun() {
+    const next = !autoRun
+    setAutoRun(next)
+    try {
+      localStorage.setItem(AUTO_RUN_KEY, String(next))
+    } catch {
+      /* ignore */
+    }
+  }
 
   if (loading) {
     return (
@@ -155,27 +240,19 @@ export default function IncubatorPage() {
       <Header title="Incubator Dashboard" description="Daily Batch 워크플로우 및 자가발전 시스템" />
 
       <div className="space-y-6 p-6">
-        {/* 액션 바 */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={triggerBatch} disabled={batchTriggering}>
-              <Play className="mr-1 h-3.5 w-3.5" />
-              {batchTriggering ? "생성 중..." : "배치 실행"}
-            </Button>
-            {batchTriggering && (
-              <span className="text-muted-foreground animate-pulse text-xs">
-                페르소나 배치 생성 중 (LLM 호출 포함, 수 분 소요)...
-              </span>
-            )}
-            {batchMessage && !batchTriggering && (
-              <span className="text-xs text-emerald-500">{batchMessage}</span>
-            )}
-          </div>
-          <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
-            <Settings className="mr-1 h-3.5 w-3.5" />
-            설정
-          </Button>
-        </div>
+        {/* 운영 상태 히어로 */}
+        <OperationStatus
+          data={data}
+          autoRun={autoRun}
+          autoInterval={autoInterval}
+          countdown={countdown}
+          batchTriggering={batchTriggering}
+          batchMessage={batchMessage}
+          onToggleAutoRun={toggleAutoRun}
+          onChangeInterval={setAutoInterval}
+          onTriggerBatch={triggerBatch}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
 
         {/* 설정 패널 */}
         {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
@@ -288,6 +365,174 @@ function MetricCard({
       </div>
       <p className={`mt-1 text-2xl font-bold text-${color}-400`}>{value}</p>
       <p className="text-muted-foreground mt-0.5 text-[10px]">{sub}</p>
+    </div>
+  )
+}
+
+// ── 운영 상태 히어로 ──────────────────────────────────────────
+
+function formatCountdown(ms: number): string {
+  const totalSec = Math.floor(ms / 1000)
+  const min = Math.floor(totalSec / 60)
+  const sec = totalSec % 60
+  return `${min}:${String(sec).padStart(2, "0")}`
+}
+
+function OperationStatus({
+  data,
+  autoRun,
+  autoInterval,
+  countdown,
+  batchTriggering,
+  batchMessage,
+  onToggleAutoRun,
+  onChangeInterval,
+  onTriggerBatch,
+  onOpenSettings,
+}: {
+  data: IncubatorDashboard
+  autoRun: boolean
+  autoInterval: number
+  countdown: number
+  batchTriggering: boolean
+  batchMessage: string | null
+  onToggleAutoRun: () => void
+  onChangeInterval: (ms: number) => void
+  onTriggerBatch: () => void
+  onOpenSettings: () => void
+}) {
+  const isRunning = batchTriggering
+  const statusColor = isRunning ? "bg-blue-500" : autoRun ? "bg-emerald-500" : "bg-gray-400"
+  const statusLabel = isRunning ? "배치 실행 중" : autoRun ? "자동 실행 중" : "대기 중 (수동)"
+
+  return (
+    <div className="rounded-xl border-2 border-dashed border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 p-5 dark:border-gray-700 dark:from-gray-900 dark:to-gray-800">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        {/* 왼쪽: 상태 + 지표 */}
+        <div className="flex items-center gap-6">
+          {/* 상태 표시 */}
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className={`h-4 w-4 rounded-full ${statusColor}`} />
+              {(isRunning || autoRun) && (
+                <div
+                  className={`absolute inset-0 h-4 w-4 animate-ping rounded-full ${statusColor} opacity-50`}
+                />
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-bold">{statusLabel}</p>
+              {data.lastBatchAt && (
+                <p className="text-muted-foreground text-[10px]">
+                  마지막 실행: {new Date(data.lastBatchAt).toLocaleString("ko-KR")}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* 진행도 */}
+          <div className="hidden items-center gap-4 md:flex">
+            <div className="text-center">
+              <p className="text-muted-foreground text-[10px]">오늘 생성</p>
+              <p className="text-lg font-bold">
+                {data.todayGenerated}
+                <span className="text-muted-foreground text-xs font-normal">
+                  /{data.dailyLimit}
+                </span>
+              </p>
+            </div>
+            <div className="bg-border h-8 w-px" />
+            <div className="text-center">
+              <p className="text-muted-foreground text-[10px]">대기 요청</p>
+              <p className="text-lg font-bold">
+                {data.pendingRequestCount > 0 ? (
+                  <span className="text-amber-500">{data.pendingRequestCount}</span>
+                ) : (
+                  <span>0</span>
+                )}
+              </p>
+            </div>
+            {autoRun && countdown > 0 && !isRunning && (
+              <>
+                <div className="bg-border h-8 w-px" />
+                <div className="text-center">
+                  <p className="text-muted-foreground text-[10px]">다음 실행</p>
+                  <p className="font-mono text-lg font-bold text-blue-500">
+                    {formatCountdown(countdown)}
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* 오른쪽: 컨트롤 */}
+        <div className="flex items-center gap-3">
+          {/* 자동 실행 토글 */}
+          <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
+            <Power
+              className={`h-4 w-4 ${autoRun ? "text-emerald-500" : "text-muted-foreground"}`}
+            />
+            <button
+              onClick={onToggleAutoRun}
+              className={`relative h-5 w-9 rounded-full transition-colors ${
+                autoRun ? "bg-emerald-500" : "bg-gray-300 dark:bg-gray-600"
+              }`}
+            >
+              <div
+                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                  autoRun ? "translate-x-4" : "translate-x-0.5"
+                }`}
+              />
+            </button>
+            <select
+              value={autoInterval}
+              onChange={(e) => onChangeInterval(Number(e.target.value))}
+              className="border-border bg-background rounded-md border px-1.5 py-0.5 text-xs"
+              disabled={!autoRun}
+            >
+              {INTERVAL_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 수동 실행 */}
+          <Button size="sm" onClick={onTriggerBatch} disabled={batchTriggering}>
+            <Play className="mr-1 h-3.5 w-3.5" />
+            {batchTriggering ? "생성 중..." : "배치 실행"}
+          </Button>
+
+          <Button variant="outline" size="sm" onClick={onOpenSettings}>
+            <Settings className="mr-1 h-3.5 w-3.5" />
+            설정
+          </Button>
+        </div>
+      </div>
+
+      {/* 실행 중 메시지 */}
+      {batchTriggering && (
+        <div className="mt-3 flex items-center gap-2 text-sm text-blue-500">
+          <Timer className="h-4 w-4 animate-spin" />
+          페르소나 배치 생성 중 (LLM 호출 포함, 수 분 소요)...
+        </div>
+      )}
+      {batchMessage && !batchTriggering && (
+        <div className="mt-3 flex items-center gap-2 text-sm text-emerald-500">
+          <CheckCircle className="h-4 w-4" />
+          {batchMessage}
+        </div>
+      )}
+
+      {/* 대기 요청 안내 */}
+      {data.pendingRequestCount > 0 && (
+        <div className="mt-3 flex items-center gap-2 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+          <Inbox className="h-4 w-4 shrink-0" />
+          사용자 페르소나 생성 요청 {data.pendingRequestCount}건 대기 중 — 다음 배치에서 처리됩니다
+        </div>
+      )}
     </div>
   )
 }

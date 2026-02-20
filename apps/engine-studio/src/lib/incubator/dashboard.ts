@@ -69,6 +69,11 @@ export interface IncubatorDashboard {
   monthlyBudget: CostUsage
   cumulativeActive: number
 
+  // 운영 상태
+  dailyLimit: number
+  pendingRequestCount: number
+  lastBatchAt: string | null
+
   // 7일 추이
   dailyTrend: DailyMetric[]
 
@@ -168,6 +173,12 @@ export function buildDashboard(params: {
   lifecycle: LifecycleMetric
   /** 실제 일별 LLM 비용 (LlmUsageLog 기반) */
   dailyCosts?: DailyCostEntry[]
+  /** 일일 생성 한도 */
+  dailyLimit?: number
+  /** 대기 중인 사용자 요청 수 */
+  pendingRequestCount?: number
+  /** 마지막 배치 실행 시각 */
+  lastBatchAt?: string | null
 }): IncubatorDashboard {
   const todayGenerated = params.todayBatch?.generatedCount ?? 0
   const todayPassed = params.todayBatch?.passedCount ?? 0
@@ -219,6 +230,9 @@ export function buildDashboard(params: {
     passRate: Math.round(passRate * 100) / 100,
     monthlyBudget: params.costUsage,
     cumulativeActive: params.cumulativeActive,
+    dailyLimit: params.dailyLimit ?? 10,
+    pendingRequestCount: params.pendingRequestCount ?? 0,
+    lastBatchAt: params.lastBatchAt ?? null,
     dailyTrend,
     strategy: params.strategy,
     quality,

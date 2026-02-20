@@ -1,9 +1,20 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { CheckCircle, Clock, Power, Timer } from "lucide-react"
+
+const SCHEDULER_AUTO_KEY = "scheduler-auto-run"
+const SCHEDULER_INTERVAL_KEY = "scheduler-auto-interval"
+
+const INTERVAL_OPTIONS = [
+  { label: "5분", value: 5 * 60 * 1000 },
+  { label: "15분", value: 15 * 60 * 1000 },
+  { label: "30분", value: 30 * 60 * 1000 },
+  { label: "1시간", value: 60 * 60 * 1000 },
+]
 
 interface SchedulerData {
   isActive: boolean
@@ -36,12 +47,39 @@ interface TriggerResult {
   }
 }
 
+function formatCountdown(ms: number): string {
+  const totalSec = Math.floor(ms / 1000)
+  const min = Math.floor(totalSec / 60)
+  const sec = totalSec % 60
+  return `${min}:${String(sec).padStart(2, "0")}`
+}
+
 export default function SchedulerControlPage() {
   const [data, setData] = useState<SchedulerData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [triggering, setTriggering] = useState(false)
   const [lastTriggerResult, setLastTriggerResult] = useState<TriggerResult | null>(null)
+
+  // Auto-run state
+  const [autoRun, setAutoRun] = useState(false)
+  const [autoInterval, setAutoInterval] = useState(15 * 60 * 1000)
+  const [countdown, setCountdown] = useState(0)
+  const nextRunRef = useRef<number>(0)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // localStorage에서 auto-run 설정 복원
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SCHEDULER_AUTO_KEY)
+      const savedInterval = localStorage.getItem(SCHEDULER_INTERVAL_KEY)
+      if (saved === "true") setAutoRun(true)
+      if (savedInterval) setAutoInterval(Number(savedInterval))
+    } catch {
+      /* ignore */
+    }
+  }, [])
 
   const fetchData = useCallback(async () => {
     try {
@@ -68,7 +106,7 @@ export default function SchedulerControlPage() {
     void fetchData()
   }, [fetchData])
 
-  async function triggerNow() {
+  const triggerNow = useCallback(async () => {
     setTriggering(true)
     setLastTriggerResult(null)
     try {
@@ -95,7 +133,7 @@ export default function SchedulerControlPage() {
     } finally {
       setTriggering(false)
     }
-  }
+  }, [fetchData])
 
   async function handlePersonaAction(personaId: string, action: string) {
     await fetch("/api/internal/persona-world-admin/scheduler", {
@@ -104,6 +142,53 @@ export default function SchedulerControlPage() {
       body: JSON.stringify({ action, personaId }),
     })
     void fetchData()
+  }
+
+  // Auto-run effect
+  useEffect(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current)
+    if (countdownRef.current) clearInterval(countdownRef.current)
+
+    if (!autoRun) {
+      setCountdown(0)
+      return
+    }
+
+    try {
+      localStorage.setItem(SCHEDULER_AUTO_KEY, "true")
+      localStorage.setItem(SCHEDULER_INTERVAL_KEY, String(autoInterval))
+    } catch {
+      /* ignore */
+    }
+
+    nextRunRef.current = Date.now() + autoInterval
+
+    intervalRef.current = setInterval(() => {
+      nextRunRef.current = Date.now() + autoInterval
+      void triggerNow()
+    }, autoInterval)
+
+    countdownRef.current = setInterval(() => {
+      const remaining = Math.max(0, nextRunRef.current - Date.now())
+      setCountdown(remaining)
+    }, 1000)
+
+    setCountdown(autoInterval)
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      if (countdownRef.current) clearInterval(countdownRef.current)
+    }
+  }, [autoRun, autoInterval, triggerNow])
+
+  function toggleAutoRun() {
+    const next = !autoRun
+    setAutoRun(next)
+    try {
+      localStorage.setItem(SCHEDULER_AUTO_KEY, String(next))
+    } catch {
+      /* ignore */
+    }
   }
 
   if (loading) {
@@ -124,7 +209,115 @@ export default function SchedulerControlPage() {
 
       {error && <div className="text-destructive">{error}</div>}
 
-      {/* Status Cards */}
+      {/* 운영 상태 히어로 */}
+      <div className="rounded-xl border-2 border-dashed border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 p-5 dark:border-gray-700 dark:from-gray-900 dark:to-gray-800">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          {/* 왼쪽: 상태 */}
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div
+                  className={`h-4 w-4 rounded-full ${
+                    triggering
+                      ? "bg-blue-500"
+                      : autoRun
+                        ? "bg-emerald-500"
+                        : data?.isActive
+                          ? "bg-amber-500"
+                          : "bg-gray-400"
+                  }`}
+                />
+                {(triggering || autoRun) && (
+                  <div
+                    className={`absolute inset-0 h-4 w-4 animate-ping rounded-full opacity-50 ${
+                      triggering ? "bg-blue-500" : "bg-emerald-500"
+                    }`}
+                  />
+                )}
+              </div>
+              <div>
+                <p className="text-sm font-bold">
+                  {triggering ? "스케줄러 실행 중" : autoRun ? "자동 실행 중" : "대기 중 (수동)"}
+                </p>
+                {data?.lastRunAt && (
+                  <p className="text-muted-foreground text-[10px]">
+                    마지막 실행: {new Date(data.lastRunAt).toLocaleString("ko-KR")}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="hidden items-center gap-4 md:flex">
+              <div className="text-center">
+                <p className="text-muted-foreground text-[10px]">활성 페르소나</p>
+                <p className="text-lg font-bold">{data?.activePersonaCount ?? 0}</p>
+              </div>
+              <div className="bg-border h-8 w-px" />
+              <div className="text-center">
+                <p className="text-muted-foreground text-[10px]">오늘 포스트</p>
+                <p className="text-lg font-bold">{data?.todayPostCount ?? 0}</p>
+              </div>
+              {autoRun && countdown > 0 && !triggering && (
+                <>
+                  <div className="bg-border h-8 w-px" />
+                  <div className="text-center">
+                    <p className="text-muted-foreground text-[10px]">다음 실행</p>
+                    <p className="font-mono text-lg font-bold text-blue-500">
+                      {formatCountdown(countdown)}
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* 오른쪽: 컨트롤 */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
+              <Power
+                className={`h-4 w-4 ${autoRun ? "text-emerald-500" : "text-muted-foreground"}`}
+              />
+              <button
+                onClick={toggleAutoRun}
+                className={`relative h-5 w-9 rounded-full transition-colors ${
+                  autoRun ? "bg-emerald-500" : "bg-gray-300 dark:bg-gray-600"
+                }`}
+              >
+                <div
+                  className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                    autoRun ? "translate-x-4" : "translate-x-0.5"
+                  }`}
+                />
+              </button>
+              <select
+                value={autoInterval}
+                onChange={(e) => setAutoInterval(Number(e.target.value))}
+                className="border-border bg-background rounded-md border px-1.5 py-0.5 text-xs"
+                disabled={!autoRun}
+              >
+                {INTERVAL_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <Button onClick={() => void triggerNow()} disabled={triggering}>
+              {triggering ? "실행 중..." : "지금 실행"}
+            </Button>
+          </div>
+        </div>
+
+        {triggering && (
+          <div className="mt-3 flex items-center gap-2 text-sm text-blue-500">
+            <Timer className="h-4 w-4 animate-spin" />
+            스케줄러 파이프라인 실행 중 (LLM 호출 포함, 최대 수십 초 소요)...
+          </div>
+        )}
+      </div>
+
+      {/* Status Cards — 간소화 (히어로에 주요 지표 이동) */}
       <div className="grid grid-cols-4 gap-4">
         <div className="rounded-lg border p-4">
           <p className="text-muted-foreground text-xs">스케줄러 상태</p>
@@ -148,18 +341,6 @@ export default function SchedulerControlPage() {
             {data?.lastRunAt ? new Date(data.lastRunAt).toLocaleString("ko-KR") : "—"}
           </p>
         </div>
-      </div>
-
-      {/* Controls */}
-      <div className="flex items-center gap-3">
-        <Button onClick={triggerNow} disabled={triggering}>
-          {triggering ? "실행 중..." : "지금 실행"}
-        </Button>
-        {triggering && (
-          <span className="text-muted-foreground animate-pulse text-sm">
-            스케줄러 파이프라인 실행 중 (LLM 호출 포함, 최대 수십 초 소요)...
-          </span>
-        )}
       </div>
 
       {/* Trigger Result */}

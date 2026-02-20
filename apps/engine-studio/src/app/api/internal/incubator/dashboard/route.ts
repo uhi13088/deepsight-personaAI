@@ -35,7 +35,15 @@ export async function GET() {
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
-    const [recentLogs, goldenSamplesRaw, statusCounts, costUsage, dailyCosts] = await Promise.all([
+    const [
+      recentLogs,
+      goldenSamplesRaw,
+      statusCounts,
+      costUsage,
+      dailyCosts,
+      pendingRequestCount,
+      dailyLimitConfig,
+    ] = await Promise.all([
       // 최근 7일 인큐베이터 로그
       prisma.incubatorLog.findMany({
         where: { batchDate: { gte: sevenDaysAgo } },
@@ -58,6 +66,18 @@ export async function GET() {
 
       // 7일간 일별 실제 LLM 비용
       getDailyCostsFromDB(7),
+
+      // 대기 중인 사용자 페르소나 생성 요청
+      prisma.personaGenerationRequest
+        .count({
+          where: { status: { in: ["PENDING", "SCHEDULED"] } },
+        })
+        .catch(() => 0),
+
+      // 일일 생성 한도
+      prisma.systemConfig
+        .findUnique({ where: { category_key: { category: "INCUBATOR", key: "dailyLimit" } } })
+        .catch(() => null),
     ])
 
     // 상태별 카운트 맵
@@ -179,6 +199,9 @@ export async function GET() {
     // 누적 활성 페르소나
     const cumulativeActive = (statusMap["ACTIVE"] ?? 0) + (statusMap["STANDARD"] ?? 0)
 
+    const dailyLimit = (dailyLimitConfig?.value as number) ?? 10
+    const lastBatchAt = recentLogs.length > 0 ? recentLogs[0].createdAt.toISOString() : null
+
     const dashboard = buildDashboard({
       todayBatch,
       recentBatches,
@@ -188,6 +211,9 @@ export async function GET() {
       goldenSamples: gsMetrics,
       dailyCosts,
       lifecycle,
+      dailyLimit,
+      pendingRequestCount,
+      lastBatchAt,
     })
 
     return NextResponse.json<ApiResponse<IncubatorDashboard>>({
