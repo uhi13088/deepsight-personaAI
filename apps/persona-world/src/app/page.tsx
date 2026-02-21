@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useSession, signIn, signOut } from "next-auth/react"
 import { PWLogoWithText } from "@/components/persona-world"
@@ -17,12 +17,22 @@ export default function LoginPage() {
   const [isRegistering, setIsRegistering] = useState(false)
   const [registerError, setRegisterError] = useState<string | null>(null)
 
+  // OAuth 복귀 여부를 마운트 시 1회 캡처 (useEffect 재실행에 안전)
+  const isOAuthReturnRef = useRef<boolean | null>(null)
+
   // 로그인 페이지 진입 시 인증 상태 초기화
-  // Google OAuth 콜백에서 돌아올 때는 sessionStorage 플래그로 구분
+  // OAuth 콜백 복귀 시에는 초기화 스킵 (세션 유지 필요)
   useEffect(() => {
-    const isOAuthReturn = sessionStorage.getItem("pw-oauth-pending")
-    if (isOAuthReturn) {
+    if (authStatus === "loading") return // 세션 확인 완료까지 대기
+
+    // 마운트 후 첫 실행 시 sessionStorage에서 OAuth 플래그 캡처
+    if (isOAuthReturnRef.current === null) {
+      isOAuthReturnRef.current = !!sessionStorage.getItem("pw-oauth-pending")
+    }
+
+    if (isOAuthReturnRef.current) {
       sessionStorage.removeItem("pw-oauth-pending")
+      isOAuthReturnRef.current = false
       return // OAuth 콜백 복귀 → 초기화 스킵
     }
     // 일반 진입 (뒤로가기, 직접 접근 등) → 모든 인증 상태 초기화
