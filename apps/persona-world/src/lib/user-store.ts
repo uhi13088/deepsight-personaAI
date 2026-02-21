@@ -132,6 +132,12 @@ interface UserState {
   hasPurchased: (itemId: string) => boolean
   getPurchaseCount: (itemId: string) => number
 
+  // 페르소나 생성 요청
+  personaRequests: PersonaRequest[]
+  requestPersona: (topSimilarity: number) => Promise<PersonaRequest | null>
+  fetchPersonaRequests: () => Promise<void>
+  hasActiveRequest: () => boolean
+
   // 초기화
   reset: () => void
 }
@@ -152,6 +158,16 @@ const initialDailyQuestion: DailyQuestionState = {
   totalAnswered: 0,
 }
 
+// 페르소나 요청 상태
+export interface PersonaRequest {
+  id: string
+  status: "pending" | "generating" | "completed"
+  requestedAt: string
+  scheduledDate: string // 생성 예정일
+  topSimilarity: number // 요청 시점 최고 유사도
+  completedPersonaId?: string
+}
+
 // 초기 상태
 const initialState = {
   profile: null,
@@ -164,6 +180,7 @@ const initialState = {
   bookmarkedPosts: [] as string[],
   notifications: [] as Notification[],
   purchasedItems: [] as string[],
+  personaRequests: [] as PersonaRequest[],
 }
 
 // Fire-and-forget 서버 동기화 (실패 시 로컬 상태 유지)
@@ -473,6 +490,60 @@ export const useUserStore = create<UserState>()(
       },
       hasPurchased: (itemId) => get().purchasedItems.includes(itemId),
       getPurchaseCount: (itemId) => get().purchasedItems.filter((id) => id === itemId).length,
+
+      // 페르소나 생성 요청
+      personaRequests: [],
+      requestPersona: async (topSimilarity) => {
+        const state = get()
+        const userId = state.profile?.id
+        const userVector = state.profile?.vector
+        if (!userId || !userVector) return null
+
+        try {
+          const result = await clientApi.requestPersonaGeneration(
+            userId,
+            userVector as unknown as Record<string, unknown>,
+            topSimilarity
+          )
+          const newRequest: PersonaRequest = {
+            id: result.id,
+            status: result.status as PersonaRequest["status"],
+            requestedAt: new Date().toISOString(),
+            scheduledDate: result.scheduledDate,
+            topSimilarity,
+          }
+          set((s) => ({
+            personaRequests: [newRequest, ...s.personaRequests],
+          }))
+          return newRequest
+        } catch (err) {
+          console.warn("[user-store] Persona request failed:", err)
+          return null
+        }
+      },
+
+      fetchPersonaRequests: async () => {
+        const userId = get().profile?.id
+        if (!userId) return
+        try {
+          const data = await clientApi.getPersonaRequests(userId)
+          set({
+            personaRequests: data.requests.map((r) => ({
+              id: r.id,
+              status: r.status as PersonaRequest["status"],
+              requestedAt: r.createdAt,
+              scheduledDate: r.scheduledDate,
+              topSimilarity: r.topSimilarity,
+              completedPersonaId: r.generatedPersona?.id,
+            })),
+          })
+        } catch (err) {
+          console.warn("[user-store] Failed to fetch persona requests:", err)
+        }
+      },
+
+      hasActiveRequest: () =>
+        get().personaRequests.some((r) => r.status === "pending" || r.status === "generating"),
 
       // 초기화
       reset: () => set(initialState),

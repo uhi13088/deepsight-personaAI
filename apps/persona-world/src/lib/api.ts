@@ -12,13 +12,14 @@ import type {
   ExploreResponse,
   CommentsResponse,
   NotificationsResponse,
+  NotificationPreferenceData,
 } from "./types"
 
 // Engine Studio API 베이스 URL
 // Server-side (RSC/SSR): 절대 URL 필수 → 환경변수 or localhost:3000
 // Client-side: 상대 경로 → next.config.ts rewrites가 engine-studio로 프록시
 function resolveServerApiBaseUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_ENGINE_API_URL || "http://localhost:3000"
+  const raw = process.env.NEXT_PUBLIC_ENGINE_STUDIO_URL || "http://localhost:3000"
   if (raw && !raw.startsWith("http://") && !raw.startsWith("https://")) {
     return `https://${raw}`
   }
@@ -436,6 +437,62 @@ export const clientApi = {
     return json.data!
   },
 
+  // ── 페르소나 생성 요청 ──────────────────────────────────────
+  async requestPersonaGeneration(
+    userId: string,
+    userVector: Record<string, unknown>,
+    topSimilarity: number
+  ) {
+    const res = await fetch(`/api/public/persona-requests`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, userVector, topSimilarity }),
+    })
+    if (!res.ok) {
+      const json = await res.json().catch(() => null)
+      throw new Error(
+        (json as { error?: { message?: string } })?.error?.message ?? "페르소나 생성 요청 실패"
+      )
+    }
+
+    const json: ApiResponse<{
+      id: string
+      status: string
+      scheduledDate: string
+      message: string
+    }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── 페르소나 생성 요청 상태 조회 ──────────────────────────────
+  async getPersonaRequests(userId: string) {
+    const params = new URLSearchParams({ userId })
+    const res = await fetch(`/api/public/persona-requests?${params}`)
+    if (!res.ok) throw new Error("페르소나 요청 목록 조회 실패")
+
+    const json: ApiResponse<{
+      requests: Array<{
+        id: string
+        status: string
+        topSimilarity: number
+        scheduledDate: string
+        completedAt: string | null
+        failReason: string | null
+        generatedPersona: {
+          id: string
+          name: string
+          handle: string | null
+          role: string
+          profileImageUrl: string | null
+        } | null
+        createdAt: string
+      }>
+    }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
   // ── 알림 전체 읽음 ────────────────────────────────────────
   async markAllNotificationsRead(userId: string) {
     const res = await fetch(`/api/persona-world/notifications`, {
@@ -446,6 +503,96 @@ export const clientApi = {
     if (!res.ok) throw new Error("Failed to mark all notifications read")
 
     const json: ApiResponse<{ updatedCount: number }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── 알림 환경설정 조회 ────────────────────────────────────
+  async getNotificationPreferences(userId: string) {
+    const params = new URLSearchParams({ userId })
+    const res = await fetch(`/api/persona-world/notification-preferences?${params}`)
+    if (!res.ok) throw new Error("Failed to fetch notification preferences")
+
+    const json: ApiResponse<NotificationPreferenceData> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── 알림 환경설정 업데이트 ────────────────────────────────
+  async updateNotificationPreferences(
+    userId: string,
+    updates: Partial<NotificationPreferenceData>
+  ) {
+    const res = await fetch(`/api/persona-world/notification-preferences`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, ...updates }),
+    })
+    if (!res.ok) throw new Error("Failed to update notification preferences")
+
+    const json: ApiResponse<NotificationPreferenceData> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── 코인 잔액 + 거래 내역 조회 ────────────────────────────
+  async getCredits(userId: string, options?: { limit?: number; offset?: number }) {
+    const params = new URLSearchParams({ userId })
+    if (options?.limit) params.set("limit", String(options.limit))
+    if (options?.offset) params.set("offset", String(options.offset))
+
+    const res = await fetch(`/api/persona-world/credits?${params}`)
+    if (!res.ok) throw new Error("Failed to fetch credits")
+
+    const json: ApiResponse<{
+      balance: number
+      transactions: Array<{
+        id: string
+        type: "EARN" | "PURCHASE" | "SPEND"
+        amount: number
+        balanceAfter: number
+        reason: string | null
+        status: string
+        createdAt: string
+      }>
+    }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── 코인 충전 요청 (Toss 결제 시작) ────────────────────────
+  async requestCoinPurchase(userId: string, packageId: string) {
+    const res = await fetch(`/api/persona-world/credits`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, packageId }),
+    })
+    if (!res.ok) throw new Error("Failed to request coin purchase")
+
+    const json: ApiResponse<{
+      paymentInfo: {
+        clientKey: string
+        orderId: string
+        orderName: string
+        amount: number
+        totalCoins: number
+      }
+      packageId: string
+    }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── Toss 결제 승인 확인 ────────────────────────────────────
+  async confirmCoinPayment(paymentKey: string, orderId: string, amount: number) {
+    const res = await fetch(`/api/persona-world/credits/toss-confirm`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paymentKey, orderId, amount }),
+    })
+    if (!res.ok) throw new Error("Failed to confirm payment")
+
+    const json: ApiResponse<{ balance: number; coins: number }> = await res.json()
     if (!json.success) throw new Error(json.error?.message || "Unknown error")
     return json.data!
   },

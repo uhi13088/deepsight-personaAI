@@ -47,7 +47,6 @@ tags:
 # ============================================================
 
 paths:
-
   /v1/match:
     post:
       operationId: matchPersonas
@@ -598,7 +597,6 @@ paths:
 # ============================================================
 
 components:
-
   securitySchemes:
     BearerAuth:
       type: http
@@ -627,7 +625,6 @@ components:
   # ----------------------------------------------------------
 
   schemas:
-
     Meta:
       type: object
       properties:

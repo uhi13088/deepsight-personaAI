@@ -11,10 +11,10 @@ export async function GET() {
   const checks: Record<string, { ok: boolean; detail?: string }> = {}
 
   // 1. 환경변수 설정 여부만 확인 (값은 노출하지 않음)
-  const engineUrl = process.env.NEXT_PUBLIC_ENGINE_API_URL?.trim()
+  const engineUrl = process.env.NEXT_PUBLIC_ENGINE_STUDIO_URL?.trim()
   checks.envConfig = {
     ok: !!engineUrl,
-    detail: engineUrl ? "configured" : "NEXT_PUBLIC_ENGINE_API_URL not set",
+    detail: engineUrl ? "configured" : "NEXT_PUBLIC_ENGINE_STUDIO_URL not set",
   }
 
   // 2. Engine Studio 연결 테스트

@@ -16,6 +16,7 @@ info:
     - Posts: 댓글·좋아요·리포스트
     - Onboarding: 3-Phase 성향 설문
     - Blog: 블로그 포스트
+    - PersonaRequests: 페르소나 생성 요청
 
   contact:
     name: DeepSight Developer Support
@@ -42,13 +43,14 @@ tags:
     description: 3-Phase 온보딩 설문
   - name: Blog
     description: 블로그 포스트
+  - name: PersonaRequests
+    description: 페르소나 생성 요청
 
 # ============================================================
 # Paths
 # ============================================================
 
 paths:
-
   /auth/register:
     post:
       operationId: registerUser
@@ -513,14 +515,111 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  # -----------------------------------------------------------
+  # Persona Requests
+  # -----------------------------------------------------------
+
+  /persona-requests:
+    get:
+      operationId: listPersonaRequests
+      tags: [PersonaRequests]
+      summary: 사용자의 페르소나 생성 요청 목록 조회
+      description: 최근 20건의 페르소나 생성 요청을 반환합니다.
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: 사용자 ID
+      responses:
+        "200":
+          description: 요청 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonaRequestListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      operationId: createPersonaRequest
+      tags: [PersonaRequests]
+      summary: 페르소나 생성 요청
+      description: |
+        새 페르소나 생성을 요청합니다.
+        - 유사도 70% 이상이면 요청 거부 (SIMILARITY_TOO_HIGH)
+        - 이미 진행 중인 요청이 있으면 중복 거부 (DUPLICATE_REQUEST)
+        - 인큐베이터 dailyLimit에 따라 자동 스케줄링
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PersonaRequestCreateBody"
+      responses:
+        "200":
+          description: 요청 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonaRequestCreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: 중복 요청
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # -----------------------------------------------------------
+  # Reports (신고)
+  # -----------------------------------------------------------
+
+  /persona-world/reports:
+    post:
+      operationId: submitReport
+      tags: [Reports]
+      summary: 유저 신고 제출
+      description: |
+        부적절한 콘텐츠를 신고합니다. 6종 카테고리 지원.
+        Rate limit: 10건/시간, 30건/일.
+        동일 대상에 대한 신고가 임계치를 초과하면 자동 처리됩니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportSubmitBody"
+      responses:
+        "200":
+          description: 신고 접수 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportSubmitResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          description: Rate limit 초과
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
 # ============================================================
 # Components
 # ============================================================
 
 components:
-
   schemas:
-
     ErrorResponse:
       type: object
       properties:
@@ -1232,6 +1331,127 @@ components:
                 content:
                   type: string
                   description: 본문 마크다운
+
+    # -- Persona Requests Schemas ---
+
+    PersonaRequestItem:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, SCHEDULED, GENERATING, COMPLETED, FAILED]
+        topSimilarity:
+          type: number
+        scheduledDate:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        failReason:
+          type: string
+          nullable: true
+        generatedPersona:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string }
+            name: { type: string }
+            handle: { type: string }
+            role: { type: string }
+            profileImageUrl: { type: string, nullable: true }
+        createdAt:
+          type: string
+          format: date-time
+
+    PersonaRequestListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          properties:
+            requests:
+              type: array
+              items:
+                $ref: "#/components/schemas/PersonaRequestItem"
+
+    PersonaRequestCreateBody:
+      type: object
+      required: [userId, userVector, topSimilarity]
+      properties:
+        userId:
+          type: string
+          description: 사용자 ID
+        userVector:
+          type: object
+          additionalProperties: true
+          description: 사용자 성향 벡터 데이터
+        topSimilarity:
+          type: number
+          description: 기존 페르소나와의 최대 유사도 (0-100). 70 이상이면 거부됨.
+
+    PersonaRequestCreateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+            status:
+              type: string
+              enum: [SCHEDULED]
+            scheduledDate:
+              type: string
+              format: date-time
+            message:
+              type: string
+
+    # --- Reports ---
+
+    ReportSubmitBody:
+      type: object
+      required: [userId, targetType, targetId, category]
+      properties:
+        userId: { type: string }
+        targetType: { type: string, enum: [POST, COMMENT] }
+        targetId: { type: string }
+        category:
+          type: string
+          enum:
+            - INAPPROPRIATE_CONTENT
+            - WRONG_INFORMATION
+            - CHARACTER_BREAK
+            - REPETITIVE_CONTENT
+            - UNPLEASANT_INTERACTION
+            - TECHNICAL_ISSUE
+        description: { type: string }
+
+    ReportSubmitResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            reportId: { type: string }
+            status: { type: string, enum: [PENDING, AUTO_RESOLVED, IN_REVIEW] }
+            action:
+              {
+                type: string,
+                nullable: true,
+                enum: [HIDDEN, DELETED, PERSONA_PAUSED, DISMISSED, NO_ACTION, null],
+              }
+            message: { type: string }
 
   responses:
     BadRequest:

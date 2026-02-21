@@ -3,9 +3,10 @@
 import { useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { Home, Search, Bell, User, ArrowLeft, Coins, Check, Lock } from "lucide-react"
-import { PWLogoWithText, PWCard, PWButton } from "@/components/persona-world"
+import { ArrowLeft, Coins, Check, Lock, Zap } from "lucide-react"
+import { PWLogoWithText, PWCard, PWButton, PWBottomNav } from "@/components/persona-world"
 import { useUserStore } from "@/lib/user-store"
+import { clientApi } from "@/lib/api"
 import {
   getShopItemsByCategory,
   SHOP_CATEGORY_LABELS,
@@ -13,16 +14,82 @@ import {
   type ShopItem,
 } from "@/lib/shop"
 
+// 코인 충전 패키지 (서버의 coin-packages.ts와 동기화)
+const COIN_PACKAGES = [
+  { id: "coin_100", coins: 100, bonus: 0, price: 1100, label: "100 코인" },
+  { id: "coin_500", coins: 500, bonus: 50, price: 4900, label: "500+50 코인", tag: "HOT" as const },
+  {
+    id: "coin_1000",
+    coins: 1000,
+    bonus: 150,
+    price: 8900,
+    label: "1,000+150 코인",
+    tag: "BEST" as const,
+  },
+  { id: "coin_3000", coins: 3000, bonus: 600, price: 23900, label: "3,000+600 코인" },
+] as const
+
 type ConfirmState = { item: ShopItem } | null
 
 export default function ShopPage() {
-  const { onboarding, purchaseItem, hasPurchased, getPurchaseCount, notifications } = useUserStore()
+  const { profile, onboarding, purchaseItem, hasPurchased, getPurchaseCount } = useUserStore()
   const [activeTab, setActiveTab] = useState<ShopCategory>("persona")
   const [confirm, setConfirm] = useState<ConfirmState>(null)
+  const [coinLoading, setCoinLoading] = useState<string | null>(null)
 
   const balance = onboarding.creditsBalance
   const items = getShopItemsByCategory(activeTab)
-  const unreadNotifications = notifications.filter((n) => !n.read).length
+  const handleCoinPurchase = async (packageId: string) => {
+    const userId = profile?.id
+    if (!userId) {
+      toast.error("로그인이 필요합니다")
+      return
+    }
+
+    setCoinLoading(packageId)
+    try {
+      const { paymentInfo } = await clientApi.requestCoinPurchase(userId, packageId)
+
+      // Toss Payments 위젯 호출
+      type TossWidget = (clientKey: string) => {
+        requestPayment: (
+          method: string,
+          params: Record<string, unknown>
+        ) => Promise<{ paymentKey: string }>
+      }
+      const tossPayments = (window as unknown as Record<string, unknown>).TossPayments as
+        | TossWidget
+        | undefined
+      if (!tossPayments) {
+        toast.error("결제 모듈을 로드하는 중입니다. 잠시 후 다시 시도해주세요.")
+        return
+      }
+
+      const widget = tossPayments(paymentInfo.clientKey)
+      const result = await widget.requestPayment("카드", {
+        amount: paymentInfo.amount,
+        orderId: paymentInfo.orderId,
+        orderName: paymentInfo.orderName,
+        successUrl: `${window.location.origin}/shop?payment=success`,
+        failUrl: `${window.location.origin}/shop?payment=fail`,
+      })
+
+      // 결제 승인
+      const confirmed = await clientApi.confirmCoinPayment(
+        result.paymentKey,
+        paymentInfo.orderId,
+        paymentInfo.amount
+      )
+      toast.success(`${confirmed.coins} 코인이 충전되었습니다!`)
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "결제 실패"
+      if (!msg.includes("cancel") && !msg.includes("취소")) {
+        toast.error(msg)
+      }
+    } finally {
+      setCoinLoading(null)
+    }
+  }
 
   const handlePurchase = (item: ShopItem) => {
     if (item.tag === "SOON") {
@@ -79,6 +146,51 @@ export default function ShopPage() {
             <Coins className="h-6 w-6 text-amber-300" />
             <span className="text-3xl font-bold">{balance}</span>
             <span className="text-sm text-white/70">코인 보유</span>
+          </div>
+        </div>
+
+        {/* 코인 충전 섹션 */}
+        <div className="mb-6">
+          <h2 className="mb-3 flex items-center gap-2 font-semibold text-gray-900">
+            <Zap className="h-5 w-5 text-amber-500" />
+            코인 충전
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            {COIN_PACKAGES.map((pkg) => (
+              <button
+                key={pkg.id}
+                onClick={() => handleCoinPurchase(pkg.id)}
+                disabled={coinLoading !== null}
+                className={`relative rounded-xl border-2 bg-white p-4 text-left transition-all hover:border-purple-300 hover:shadow-md ${
+                  coinLoading === pkg.id ? "opacity-70" : ""
+                } ${"tag" in pkg && pkg.tag === "BEST" ? "border-purple-400" : "border-gray-200"}`}
+              >
+                {"tag" in pkg && pkg.tag && (
+                  <span
+                    className={`absolute -top-2 right-3 rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${
+                      pkg.tag === "BEST" ? "bg-purple-500" : "bg-orange-500"
+                    }`}
+                  >
+                    {pkg.tag}
+                  </span>
+                )}
+                <div className="flex items-center gap-1.5">
+                  <Coins className="h-4 w-4 text-amber-500" />
+                  <span className="font-bold text-gray-900">{pkg.coins.toLocaleString()}</span>
+                  {pkg.bonus > 0 && (
+                    <span className="text-xs font-medium text-green-600">+{pkg.bonus}</span>
+                  )}
+                </div>
+                <div className="mt-1 text-sm font-semibold text-purple-600">
+                  ₩{pkg.price.toLocaleString()}
+                </div>
+                {coinLoading === pkg.id && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white/80">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
+                  </div>
+                )}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -246,41 +358,7 @@ export default function ShopPage() {
         </div>
       )}
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 border-t border-gray-100 bg-white">
-        <div className="mx-auto flex h-14 max-w-2xl items-center justify-around">
-          <Link href="/feed" className="flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400">
-            <Home className="h-5 w-5" />
-            <span className="text-xs">홈</span>
-          </Link>
-          <Link
-            href="/explore"
-            className="flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400"
-          >
-            <Search className="h-5 w-5" />
-            <span className="text-xs">탐색</span>
-          </Link>
-          <Link
-            href="/notifications"
-            className="relative flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400"
-          >
-            <Bell className="h-5 w-5" />
-            {unreadNotifications > 0 && (
-              <span className="absolute right-2 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                {unreadNotifications > 9 ? "9+" : unreadNotifications}
-              </span>
-            )}
-            <span className="text-xs">알림</span>
-          </Link>
-          <Link
-            href="/profile"
-            className="flex flex-col items-center gap-0.5 px-4 py-2 text-gray-400"
-          >
-            <User className="h-5 w-5" />
-            <span className="text-xs">프로필</span>
-          </Link>
-        </div>
-      </nav>
+      <PWBottomNav />
     </div>
   )
 }

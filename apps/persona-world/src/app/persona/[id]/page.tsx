@@ -14,19 +14,10 @@ import {
   Loader2,
   UserPlus,
   UserMinus,
-  Zap,
-  Layers,
 } from "lucide-react"
 import { toast } from "sonner"
 import { clientApi } from "@/lib/api"
 import { useUserStore } from "@/lib/user-store"
-import {
-  L1_DIMENSIONS,
-  L2_DIMENSIONS,
-  L3_DIMENSIONS,
-  LAYER_COLORS,
-  type TraitDimensionConfig,
-} from "@/lib/trait-colors"
 import {
   ROLE_NAMES,
   ROLE_EMOJI,
@@ -37,132 +28,6 @@ import {
 import { formatTimeAgo } from "@/lib/format"
 import { PWCard, PWProfileRing } from "@/components/persona-world"
 import type { PersonaFullDetail } from "@/lib/types"
-
-// ── 레이어 토글 상태 ─────────────────────────────────────
-
-type LayerKey = "L1" | "L2" | "L3"
-
-const LAYER_CONFIG: {
-  key: LayerKey
-  dims: TraitDimensionConfig[]
-  vectorKey: "social" | "temperament" | "narrative"
-}[] = [
-  { key: "L1", dims: L1_DIMENSIONS, vectorKey: "social" },
-  { key: "L2", dims: L2_DIMENSIONS, vectorKey: "temperament" },
-  { key: "L3", dims: L3_DIMENSIONS, vectorKey: "narrative" },
-]
-
-// ── 게이지 바 ──────────────────────────────────────────────
-
-function GaugeBar({
-  value,
-  color,
-  label,
-  lowLabel,
-  highLabel,
-}: {
-  value: number
-  color: string
-  label: string
-  lowLabel: string
-  highLabel: string
-}) {
-  return (
-    <div>
-      <div className="mb-1 flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-600">{label}</span>
-        <span className="text-xs text-gray-400">{Math.round(value * 100)}%</span>
-      </div>
-      <div className="h-2 overflow-hidden rounded-full bg-gray-100">
-        <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${value * 100}%`, backgroundColor: color }}
-        />
-      </div>
-      <div className="mt-0.5 flex justify-between text-[10px] text-gray-400">
-        <span>{lowLabel}</span>
-        <span>{highLabel}</span>
-      </div>
-    </div>
-  )
-}
-
-// ── Paradox Score 시각화 ──────────────────────────────────
-
-function ParadoxScoreCard({
-  paradoxScore,
-  dimensionalityScore,
-}: {
-  paradoxScore: number | null
-  dimensionalityScore: number | null
-}) {
-  if (paradoxScore == null && dimensionalityScore == null) return null
-
-  return (
-    <PWCard className="!p-4">
-      <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-800">
-        <Zap className="h-4 w-4 text-amber-500" />
-        역설 프로필
-      </h3>
-      <div className="grid grid-cols-2 gap-4">
-        {paradoxScore != null && (
-          <div className="text-center">
-            <div className="relative mx-auto mb-2 h-16 w-16">
-              <svg viewBox="0 0 36 36" className="h-16 w-16">
-                <path
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  stroke="#E5E7EB"
-                  strokeWidth="3"
-                />
-                <path
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  stroke="#F59E0B"
-                  strokeWidth="3"
-                  strokeDasharray={`${paradoxScore * 100}, 100`}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-amber-600">
-                {Math.round(paradoxScore * 100)}
-              </span>
-            </div>
-            <div className="text-xs font-medium text-gray-600">Paradox Score</div>
-            <div className="text-[10px] text-gray-400">내면 모순 수치</div>
-          </div>
-        )}
-        {dimensionalityScore != null && (
-          <div className="text-center">
-            <div className="relative mx-auto mb-2 h-16 w-16">
-              <svg viewBox="0 0 36 36" className="h-16 w-16">
-                <path
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  stroke="#E5E7EB"
-                  strokeWidth="3"
-                />
-                <path
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none"
-                  stroke="#8B5CF6"
-                  strokeWidth="3"
-                  strokeDasharray={`${dimensionalityScore * 100}, 100`}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-violet-600">
-                {Math.round(dimensionalityScore * 100)}
-              </span>
-            </div>
-            <div className="text-xs font-medium text-gray-600">Dimensionality</div>
-            <div className="text-[10px] text-gray-400">입체성 지수</div>
-          </div>
-        )}
-      </div>
-    </PWCard>
-  )
-}
 
 // ── 포스트 카드 ───────────────────────────────────────────
 
@@ -211,7 +76,6 @@ export default function PersonaDetailPage() {
   const [persona, setPersona] = useState<PersonaFullDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeLayers, setActiveLayers] = useState<Set<LayerKey>>(new Set(["L1", "L2", "L3"]))
 
   const isFollowing = followedPersonas.some((f) => f.personaId === personaId)
 
@@ -250,18 +114,6 @@ export default function PersonaDetailPage() {
         personaName: persona.name,
       })
     }
-  }
-
-  const toggleLayer = (layer: LayerKey) => {
-    setActiveLayers((prev) => {
-      const next = new Set(prev)
-      if (next.has(layer)) {
-        if (next.size > 1) next.delete(layer) // 최소 1개 유지
-      } else {
-        next.add(layer)
-      }
-      return next
-    })
   }
 
   // 로딩 상태
@@ -392,97 +244,16 @@ export default function PersonaDetailPage() {
               <p className="text-lg font-bold text-gray-900">{persona.followingCount}</p>
               <p className="text-xs text-gray-500">팔로잉</p>
             </div>
-            <div className="text-center">
-              <p className="text-lg font-bold text-gray-900">{Math.round(persona.warmth * 100)}%</p>
-              <p className="text-xs text-gray-500">따뜻함</p>
-            </div>
+            {persona.warmth != null && (
+              <div className="text-center">
+                <p className="text-lg font-bold text-gray-900">
+                  {Math.round(persona.warmth * 100)}%
+                </p>
+                <p className="text-xs text-gray-500">따뜻함</p>
+              </div>
+            )}
           </div>
         </PWCard>
-
-        {/* Paradox Score (AC3) */}
-        <ParadoxScoreCard
-          paradoxScore={persona.paradoxScore}
-          dimensionalityScore={persona.dimensionalityScore}
-        />
-
-        {/* 3-Layer 성향 프로필 (AC1) */}
-        {persona.vector && (
-          <PWCard className="!p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-                <Layers className="h-4 w-4 text-violet-500" />
-                3-Layer 성향 프로필
-              </h3>
-              {/* 레이어 토글 버튼 */}
-              <div className="flex gap-1">
-                {(["L1", "L2", "L3"] as const).map((layer) => (
-                  <button
-                    key={layer}
-                    onClick={() => toggleLayer(layer)}
-                    className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition-all ${
-                      activeLayers.has(layer) ? "text-white" : "bg-gray-100 text-gray-400"
-                    }`}
-                    style={
-                      activeLayers.has(layer)
-                        ? { backgroundColor: LAYER_COLORS[layer].primary }
-                        : undefined
-                    }
-                  >
-                    {layer}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {LAYER_CONFIG.filter(({ key }) => activeLayers.has(key)).map(
-                ({ key, dims, vectorKey }) => {
-                  const data = persona.vector![vectorKey]
-                  if (!data || Object.keys(data).length === 0) return null
-
-                  return (
-                    <div
-                      key={key}
-                      className="rounded-xl border p-4"
-                      style={{
-                        borderColor: LAYER_COLORS[key].border,
-                        backgroundColor: LAYER_COLORS[key].bg,
-                      }}
-                    >
-                      <div className="mb-3 flex items-center gap-2">
-                        <span
-                          className="rounded-full px-2 py-0.5 text-xs font-bold text-white"
-                          style={{ backgroundColor: LAYER_COLORS[key].primary }}
-                        >
-                          {key}
-                        </span>
-                        <span className="text-sm font-medium text-gray-700">
-                          {LAYER_COLORS[key].label}
-                        </span>
-                      </div>
-                      <div className="space-y-3">
-                        {dims.map((dim) => {
-                          const value = data[dim.key as keyof typeof data]
-                          if (value == null) return null
-                          return (
-                            <GaugeBar
-                              key={dim.key}
-                              value={value}
-                              color={dim.color.primary}
-                              label={dim.label}
-                              lowLabel={dim.low}
-                              highLabel={dim.high}
-                            />
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                }
-              )}
-            </div>
-          </PWCard>
-        )}
 
         {/* 최근 포스트 (AC5) */}
         <PWCard className="!p-5">

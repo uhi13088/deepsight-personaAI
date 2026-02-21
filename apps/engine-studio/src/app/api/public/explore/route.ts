@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
         tagline: string | null
         role: string
         profileImageUrl: string | null
-        warmth: number
+        warmth: number | null
         archetypeId: string | null
         followerCount: number
         postCount: number
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
         tagline: p.tagline,
         role: p.role,
         profileImageUrl: p.profileImageUrl,
-        warmth: p.warmth ? Number(p.warmth) : 0.5,
+        warmth: p.warmth != null ? Number(p.warmth) : null,
         archetypeId: p.archetypeId,
         followerCount: p._count.followers,
         postCount: p._count.posts,
@@ -211,7 +211,7 @@ export async function GET(request: NextRequest) {
           role: p.role,
           expertise: p.expertise ?? [],
           profileImageUrl: p.profileImageUrl,
-          warmth: p.warmth ? Number(p.warmth) : 0.5,
+          warmth: p.warmth != null ? Number(p.warmth) : null,
           archetypeId: p.archetypeId,
           followerCount: p._count.followers,
           postCount: p._count.posts,

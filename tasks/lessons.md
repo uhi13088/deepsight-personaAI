@@ -35,7 +35,8 @@
 
 ## Architecture
 
-(없음)
+- [2026-02-20] **버전업 시 전체 연쇄 업데이트 체크리스트 필수.** 예: 엔진 v3→v4 전환 시, 파이프라인만 v4로 올리고 프롬프트 빌더(prompt-builder.ts)는 v3 형식 그대로 남겨두면 안 됨. 버전업 영향 범위 체크리스트: ① DB 스키마 ② 파이프라인(pipeline.ts) ③ 프롬프트 빌더(prompt-builder.ts) ④ API 라우트 ⑤ 프론트엔드 UI 표시 텍스트 ⑥ 온보딩/콜드스타트 문구 ⑦ API 문서(docs/api/) — 하나라도 빠지면 구버전/신버전 혼재 발생
+- [2026-02-20] **유저에게 노출되는 UI 텍스트에 내부 기술 용어(L1/L2/L3, 벡터, 역설 감지, 교차축 등)를 절대 직접 노출하지 않을 것.** Phase subtitle, description 등 사용자 대면 문구는 반드시 자연어로 작성
 
 ## Process
 
@@ -55,6 +56,7 @@
 ## Environment
 
 - [2026-02-19] 새 라이브러리/기능 추가 시 라이브러리 기본 컨벤션이 아닌 프로젝트 기존 환경변수명을 먼저 확인하고 통일할 것. 예: NextAuth v5 기본은 `AUTH_GOOGLE_ID`이지만, 프로젝트에서 이미 `GOOGLE_CLIENT_ID`를 쓰면 그걸 사용
+- [2026-02-21] 동일 대상(Engine Studio URL)을 가리키는 환경변수명은 앱 간 통일할 것. `NEXT_PUBLIC_ENGINE_API_URL`(PW)과 `NEXT_PUBLIC_ENGINE_STUDIO_URL`(Landing)이 혼재 → `NEXT_PUBLIC_ENGINE_STUDIO_URL`로 통일 완료
 
 ## Database
 

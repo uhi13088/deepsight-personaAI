@@ -433,3 +433,209 @@ describe("Optimizer", () => {
     expect(optimized).toHaveLength(0)
   })
 })
+
+// ═══ Cost Integration ═══
+
+import { vi } from "vitest"
+import type { CostDataProvider } from "@/lib/persona-world/cost/cost-integration"
+import { buildCostDashboard, changeCostMode } from "@/lib/persona-world/cost/cost-integration"
+import type { CostMode } from "@/lib/persona-world/cost/cost-mode"
+
+function createMockCostDataProvider(overrides?: Partial<CostDataProvider>): CostDataProvider {
+  const mockLogs: LlmUsageLog[] = [
+    {
+      id: "log-1",
+      personaId: "p-1",
+      callType: "POST",
+      tokens: { inputTotal: 4100, inputCached: 3900, output: 300 },
+      cost: { inputCost: 0.0006, cacheCost: 0.00117, outputCost: 0.0045, totalCost: 0.00627 },
+      latencyMs: 500,
+      model: "claude-sonnet",
+      cacheHit: true,
+      timestamp: new Date("2026-02-21T10:00:00Z"),
+    },
+    {
+      id: "log-2",
+      personaId: "p-1",
+      callType: "COMMENT",
+      tokens: { inputTotal: 2800, inputCached: 2500, output: 150 },
+      cost: { inputCost: 0.0009, cacheCost: 0.00075, outputCost: 0.00225, totalCost: 0.0039 },
+      latencyMs: 300,
+      model: "claude-sonnet",
+      cacheHit: true,
+      timestamp: new Date("2026-02-21T10:30:00Z"),
+    },
+    {
+      id: "log-3",
+      personaId: "p-2",
+      callType: "INTERVIEW",
+      tokens: { inputTotal: 2500, inputCached: 2000, output: 200 },
+      cost: { inputCost: 0.0015, cacheCost: 0.0006, outputCost: 0.003, totalCost: 0.0051 },
+      latencyMs: 800,
+      model: "claude-sonnet",
+      cacheHit: true,
+      timestamp: new Date("2026-02-21T11:00:00Z"),
+    },
+  ]
+
+  let currentMode: CostMode = "QUALITY"
+
+  return {
+    getTodayUsageLogs: vi.fn().mockResolvedValue(mockLogs),
+    getMonthDailyReports: vi.fn().mockResolvedValue([]),
+    getCurrentCostMode: vi.fn().mockImplementation(() => Promise.resolve(currentMode)),
+    setCostMode: vi.fn().mockImplementation((mode: CostMode) => {
+      currentMode = mode
+      return Promise.resolve()
+    }),
+    getDailyBudget: vi.fn().mockResolvedValue(8),
+    getMonthlyBudget: vi.fn().mockResolvedValue(240),
+    getMonthlySpending: vi.fn().mockResolvedValue(95),
+    getActivePersonaCount: vi.fn().mockResolvedValue(100),
+    getPersonaPISDistribution: vi.fn().mockResolvedValue(
+      Array.from({ length: 100 }, (_, i) => ({
+        personaId: `p-${i}`,
+        grade: i < 45 ? "EXCELLENT" : i < 83 ? "GOOD" : i < 95 ? "WARNING" : "CRITICAL",
+      }))
+    ),
+    getDailyCommentCount: vi.fn().mockResolvedValue(500),
+    getDailyPostCount: vi.fn().mockResolvedValue(200),
+    ...overrides,
+  }
+}
+
+describe("Cost Integration", () => {
+  it("대시보드 빌드 — 전체 데이터 수집", async () => {
+    const provider = createMockCostDataProvider()
+    const dashboard = await buildCostDashboard(provider)
+
+    // 일간 리포트
+    expect(dashboard.dailyReport.totalCalls).toBe(3)
+    expect(dashboard.dailyReport.totalCost).toBeGreaterThan(0)
+    expect(dashboard.dailyReport.byCallType.length).toBeGreaterThanOrEqual(2)
+    expect(dashboard.dailyReport.budgetUsage).toBeDefined()
+
+    // 월간 리포트
+    expect(dashboard.monthlyReport).toBeDefined()
+    expect(dashboard.monthlyReport.month).toBeDefined()
+
+    // 비용 모드
+    expect(dashboard.currentMode.mode).toBe("QUALITY")
+    expect(dashboard.currentMode.frequencies.postsPerDay).toBe(2)
+
+    // 모드 적용
+    expect(dashboard.modeApplication.mode).toBe("QUALITY")
+    expect(dashboard.modeApplication.estimatedBudget.monthlyBudget).toBeGreaterThan(0)
+
+    // 모드 비교
+    expect(dashboard.modeComparison).toHaveLength(3)
+
+    // 최적화
+    expect(dashboard.optimization.strategies).toHaveLength(3)
+    expect(dashboard.optimization.totalSavings).toBeGreaterThanOrEqual(0)
+  })
+
+  it("대시보드 — 예산 알림 생성", async () => {
+    const provider = createMockCostDataProvider({
+      // 일일 예산의 80% 이상 사용 시 WARNING 발생하도록
+      getTodayUsageLogs: vi.fn().mockResolvedValue(
+        Array.from({ length: 200 }, (_, i) => ({
+          id: `log-${i}`,
+          personaId: "p-1",
+          callType: "POST" as LLMCallType,
+          tokens: { inputTotal: 4000, inputCached: 3000, output: 300 },
+          cost: { inputCost: 0.003, cacheCost: 0.0009, outputCost: 0.0045, totalCost: 0.05 },
+          latencyMs: 300,
+          model: "claude-sonnet",
+          cacheHit: true,
+          timestamp: new Date("2026-02-21T10:00:00Z"),
+        }))
+      ),
+    })
+
+    const dashboard = await buildCostDashboard(provider)
+
+    // 200 * $0.05 = $10 → 일일 예산 $8 기준 125% → CRITICAL
+    expect(dashboard.alerts.length).toBeGreaterThan(0)
+    const dailyAlert = dashboard.alerts.find((a) => a.period === "DAILY")
+    expect(dailyAlert).toBeDefined()
+    expect(dailyAlert!.level).toBe("CRITICAL")
+  })
+
+  it("비용 모드 변경 — QUALITY → BALANCE", async () => {
+    const provider = createMockCostDataProvider()
+    const result = await changeCostMode(provider, "BALANCE")
+
+    expect(result.mode).toBe("BALANCE")
+    expect(result.schedulerUpdates.postFrequency).toBe(1.5)
+    expect(result.schedulerUpdates.commentFrequency).toBe(3)
+    expect(result.interviewSampling).toBe(0.1)
+    expect(result.estimatedBudget.monthlyBudget).toBe(120) // 100명 × $1.2
+    expect(provider.setCostMode).toHaveBeenCalledWith("BALANCE")
+  })
+
+  it("비용 모드 변경 — COST_PRIORITY", async () => {
+    const provider = createMockCostDataProvider()
+    const result = await changeCostMode(provider, "COST_PRIORITY")
+
+    expect(result.mode).toBe("COST_PRIORITY")
+    expect(result.schedulerUpdates.postFrequency).toBe(1)
+    expect(result.schedulerUpdates.commentFrequency).toBe(2)
+    expect(result.interviewSampling).toBe(0.05)
+    expect(result.estimatedBudget.monthlyBudget).toBe(70) // 100명 × $0.7
+  })
+
+  it("대시보드 — 빈 사용 로그", async () => {
+    const provider = createMockCostDataProvider({
+      getTodayUsageLogs: vi.fn().mockResolvedValue([]),
+    })
+
+    const dashboard = await buildCostDashboard(provider)
+
+    expect(dashboard.dailyReport.totalCalls).toBe(0)
+    expect(dashboard.dailyReport.totalCost).toBe(0)
+    expect(dashboard.alerts).toHaveLength(0) // 지출 없으면 알림 없음
+  })
+
+  it("대시보드 — 모든 provider 메서드 호출됨", async () => {
+    const provider = createMockCostDataProvider()
+    await buildCostDashboard(provider)
+
+    expect(provider.getTodayUsageLogs).toHaveBeenCalled()
+    expect(provider.getMonthDailyReports).toHaveBeenCalled()
+    expect(provider.getCurrentCostMode).toHaveBeenCalled()
+    expect(provider.getDailyBudget).toHaveBeenCalled()
+    expect(provider.getMonthlyBudget).toHaveBeenCalled()
+    expect(provider.getMonthlySpending).toHaveBeenCalled()
+    expect(provider.getActivePersonaCount).toHaveBeenCalled()
+    expect(provider.getPersonaPISDistribution).toHaveBeenCalled()
+    expect(provider.getDailyCommentCount).toHaveBeenCalled()
+    expect(provider.getDailyPostCount).toHaveBeenCalled()
+  })
+
+  it("대시보드 — 캐시 효율 집계", async () => {
+    const provider = createMockCostDataProvider()
+    const dashboard = await buildCostDashboard(provider)
+
+    const cache = dashboard.dailyReport.cacheEfficiency
+    expect(cache.totalInputTokens).toBe(4100 + 2800 + 2500) // 9400
+    expect(cache.cachedTokens).toBe(3900 + 2500 + 2000) // 8400
+    expect(cache.cacheHitRate).toBeGreaterThan(0.85) // 8400/9400 ≈ 0.894
+    expect(cache.estimatedSavings).toBeGreaterThan(0)
+  })
+
+  it("대시보드 — 최적화 전략 절감액", async () => {
+    const provider = createMockCostDataProvider()
+    const dashboard = await buildCostDashboard(provider)
+
+    const strategies = dashboard.optimization.strategies
+    expect(strategies).toHaveLength(3)
+
+    // 적응적 인터뷰 전략 존재
+    expect(strategies.some((s) => s.strategy.includes("인터뷰"))).toBe(true)
+    // 배치 처리 전략 존재
+    expect(strategies.some((s) => s.strategy.includes("배치"))).toBe(true)
+    // 캐시 최적화 전략 존재
+    expect(strategies.some((s) => s.strategy.includes("캐시"))).toBe(true)
+  })
+})

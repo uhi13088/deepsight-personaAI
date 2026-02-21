@@ -203,6 +203,22 @@ export {
   FACTBOOK_CATEGORIES,
 } from "./factbook"
 
+// v4.0: Factbook Runtime (T163 — mutableContext 런타임 업데이트)
+export {
+  inferContextCategory,
+  summarizeInteraction,
+  applyMutableContextUpdate,
+  updateMutableContextRuntime,
+  toStateEvent,
+  processInteraction,
+} from "./factbook-runtime"
+export type {
+  InteractionInput,
+  MutableContextUpdateResult,
+  InteractionProcessResult,
+  FactbookDataProvider,
+} from "./factbook-runtime"
+
 // v4.0: Forgetting Curve (자연 망각 시스템)
 export {
   computeStability,
@@ -277,3 +293,138 @@ export type {
   EvolutionRunnerDataProvider,
   EvolutionBatchResult,
 } from "./evolution"
+
+// PW-F: 알림 환경설정
+export {
+  DEFAULT_PREFERENCES,
+  getPreferences,
+  updatePreferences,
+  shouldDeliver,
+} from "./notification-preference"
+export type {
+  NotificationType,
+  NotificationPreferenceData,
+  NotificationPreferenceProvider,
+} from "./notification-preference"
+
+// PW-F: 코인 패키지
+export { COIN_PACKAGES, getCoinPackageById, formatPrice } from "./coin-packages"
+export type { CoinPackage } from "./coin-packages"
+
+// PW-F: 크레딧 서비스
+export {
+  getBalance,
+  addCredits,
+  spendCredits,
+  purchaseCredits,
+  getTransactionHistory,
+} from "./credit-service"
+export type {
+  TransactionType,
+  TransactionStatus,
+  TransactionRecord,
+  CreditDataProvider,
+} from "./credit-service"
+
+// Phase 7-A: 모더레이션
+export {
+  // Auto-Moderator
+  runStage1,
+  runStage2,
+  runStage3,
+  runModerationPipeline,
+  sanitizePII,
+  getEscalationAction,
+  // Report Handler
+  submitReport,
+  getReportStats,
+  getCategorySeverity,
+  REPORT_CATEGORY_CONFIG,
+  // Moderation Actions
+  executeAction,
+  // Dashboard
+  buildDashboard,
+  checkKPIAlerts,
+} from "./moderation"
+export type {
+  ModerationAction,
+  DetectionType,
+  ModerationResult,
+  ModerationDetection,
+  EscalationAction,
+  AsyncAnalysisInput,
+  ReportCategory,
+  ReportResolution,
+  ReportCategoryConfig,
+  ReportInput,
+  ReportResult,
+  ReportStats,
+  ReportDataProvider,
+  ActionType,
+  ActionResult,
+  AuditLogEntry,
+  ModerationActionProvider,
+  DashboardOverview,
+  ActivityStats,
+  QualityStats,
+  SecurityStats,
+  ReportOverview,
+  DashboardAlert,
+  DashboardDataProvider,
+} from "./moderation"
+
+// Phase 8: 비용 모니터링 & 제어
+export {
+  // Usage Tracker
+  createUsageLog,
+  computeDailyCostReport,
+  computeMonthlyCostReport,
+  // Budget Alert
+  checkDailyBudget,
+  checkMonthlyBudget,
+  checkBudgetAlerts,
+  getCostOverrunAction,
+  DAILY_THRESHOLDS,
+  MONTHLY_THRESHOLDS,
+  // Cost Mode
+  getCostModeConfig,
+  getAllCostModes,
+  applyCostMode,
+  estimateCost,
+  compareModes,
+  // Optimizer
+  getInterviewRateByGrade,
+  computeAdaptiveInterviewCost,
+  computeBatchCommentCost,
+  computeCacheOptimizationCost,
+  computeFullOptimization,
+  optimizeLlmCallOrdering,
+  DEFAULT_BATCH_CONFIG,
+  // Integration
+  buildCostDashboard,
+  changeCostMode,
+} from "./cost"
+export type {
+  LLMCallType,
+  LlmUsageLog,
+  CallTypeBreakdown,
+  PersonaCostBreakdown,
+  CacheEfficiency,
+  DailyCostReport,
+  MonthlyCostReport,
+  AlertLevel,
+  BudgetPeriod,
+  BudgetAlert,
+  CostOverrunAction,
+  BudgetThresholds,
+  CostMode,
+  CostModeConfig,
+  CostModeApplication,
+  CostEstimate,
+  OptimizationResult,
+  OptimizationSummary,
+  PendingLLMCall,
+  BatchConfig,
+  CostDataProvider,
+  CostDashboard,
+} from "./cost"

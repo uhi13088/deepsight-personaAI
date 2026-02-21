@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
         role: p.role,
         expertise: p.expertise ?? [],
         profileImageUrl: p.profileImageUrl,
-        warmth: p.warmth ? Number(p.warmth) : 0.5,
+        warmth: p.warmth != null ? Number(p.warmth) : null,
         vector: null,
         postCount: 0,
         followerCount: p._count.followers,

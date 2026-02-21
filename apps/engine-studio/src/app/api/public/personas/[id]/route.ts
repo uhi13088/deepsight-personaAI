@@ -133,7 +133,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         expertise: persona.expertise ?? [],
         description: persona.description,
         profileImageUrl: persona.profileImageUrl,
-        warmth: persona.warmth ? Number(persona.warmth) : 0.5,
+        warmth: persona.warmth != null ? Number(persona.warmth) : null,
         archetypeId: persona.archetypeId,
         paradoxScore: persona.paradoxScore ? Number(persona.paradoxScore) : null,
         dimensionalityScore: persona.dimensionalityScore

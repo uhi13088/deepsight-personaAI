@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { Prisma, type PersonaActivityType } from "@/generated/prisma"
 import { runScheduler } from "@/lib/persona-world/scheduler"
 import type { SchedulerPersona, SchedulerDataProvider } from "@/lib/persona-world/scheduler"
-import type { SchedulerContext, PersonaPostType } from "@/lib/persona-world/types"
+import type { SchedulerContext, SchedulerTrigger, PersonaPostType } from "@/lib/persona-world/types"
 import type { ThreeLayerVector } from "@/types/persona-v3"
 import { executePostCreation } from "@/lib/persona-world/post-pipeline"
 import type { PostPipelineDataProvider } from "@/lib/persona-world/post-pipeline"
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
 
               const state = await getPersonaState(persona.id)
               const llmProvider = createPostLLMProvider(persona.id)
-              const postDataProvider = createPostPipelineProvider()
+              const postDataProvider = createPostPipelineProvider(context.trigger)
 
               const postResult = await executePostCreation(
                 persona,
@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
               if (!persona) continue
 
               const state = await getPersonaState(persona.id)
-              const interactionDP = createInteractionProvider()
+              const interactionDP = createInteractionProvider(context.trigger)
               const commentLLM = llmAvailable ? createCommentLLMProvider(persona.id) : undefined
 
               const result = await executeInteractions(persona, state, interactionDP, commentLLM)
@@ -261,7 +261,13 @@ function createSchedulerDataProvider(): SchedulerDataProvider {
     async getActiveStatusPersonas(): Promise<SchedulerPersona[]> {
       const personas = await prisma.persona.findMany({
         where: { status: { in: ["ACTIVE", "STANDARD"] } },
-        include: { layerVectors: true },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          paradoxScore: true,
+          layerVectors: true,
+        },
       })
 
       return personas.flatMap((p): SchedulerPersona[] => {
@@ -325,7 +331,9 @@ function createSchedulerDataProvider(): SchedulerDataProvider {
   }
 }
 
-function createPostPipelineProvider(): PostPipelineDataProvider {
+function createPostPipelineProvider(
+  trigger: SchedulerTrigger = "MANUAL"
+): PostPipelineDataProvider {
   return {
     async savePost({ personaId, type, content, metadata, postSource }) {
       const post = await prisma.personaPost.create({
@@ -359,7 +367,7 @@ function createPostPipelineProvider(): PostPipelineDataProvider {
         data: {
           personaId,
           activityType: activityType as PersonaActivityType,
-          trigger: "MANUAL",
+          trigger,
           metadata: metadata as Prisma.InputJsonValue,
         },
       })
@@ -379,7 +387,9 @@ function createPostPipelineProvider(): PostPipelineDataProvider {
   }
 }
 
-function createInteractionProvider(): InteractionPipelineDataProvider {
+function createInteractionProvider(
+  trigger: SchedulerTrigger = "MANUAL"
+): InteractionPipelineDataProvider {
   return {
     async getRecentFeedPosts(_personaId, limit) {
       const posts = await prisma.personaPost.findMany({
@@ -508,7 +518,7 @@ function createInteractionProvider(): InteractionPipelineDataProvider {
         data: {
           personaId,
           activityType: activityType as PersonaActivityType,
-          trigger: "MANUAL",
+          trigger,
           targetId: targetId ?? undefined,
           metadata: metadata as Prisma.InputJsonValue,
         },

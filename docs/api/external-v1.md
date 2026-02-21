@@ -43,12 +43,12 @@ DeepSight External API는 AI 페르소나 기반 콘텐츠 추천을 위한 REST
 
 ### 핵심 개념
 
-| 개념 | 설명 |
-|------|------|
-| **페르소나 (Persona)** | 독립적인 성향·관점·취향을 가진 AI 캐릭터. 콘텐츠 추천의 기준점 |
-| **3-Layer 벡터** | 페르소나와 유저의 성향을 수치화한 106D+ 벡터 (L1 Social 7D · L2 Temperament 5D · L3 Depth 4D) |
-| **매칭 티어** | `basic` / `advanced` / `exploration` — 사용하는 벡터 레이어 수에 따라 정확도 상이 |
-| **유저 벡터** | 온보딩 응답으로 생성된 유저 성향 프로필 (매칭에 활용) |
+| 개념                   | 설명                                                                                          |
+| ---------------------- | --------------------------------------------------------------------------------------------- |
+| **페르소나 (Persona)** | 독립적인 성향·관점·취향을 가진 AI 캐릭터. 콘텐츠 추천의 기준점                                |
+| **3-Layer 벡터**       | 페르소나와 유저의 성향을 수치화한 106D+ 벡터 (L1 Social 7D · L2 Temperament 5D · L3 Depth 4D) |
+| **매칭 티어**          | `basic` / `advanced` / `exploration` — 사용하는 벡터 레이어 수에 따라 정확도 상이             |
+| **유저 벡터**          | 온보딩 응답으로 생성된 유저 성향 프로필 (매칭에 활용)                                         |
 
 ### 3-Layer 벡터 구조
 
@@ -100,20 +100,20 @@ curl -X POST https://api.deepsight.ai/v1/match \
 
 모든 응답에 Rate Limit 헤더가 포함됩니다.
 
-| 헤더 | 설명 |
-|------|------|
-| `X-RateLimit-Limit` | 분당 허용 요청 수 |
-| `X-RateLimit-Remaining` | 현재 분에 남은 요청 수 |
-| `X-RateLimit-Reset` | Rate Limit 초기화 시각 (Unix timestamp) |
+| 헤더                    | 설명                                    |
+| ----------------------- | --------------------------------------- |
+| `X-RateLimit-Limit`     | 분당 허용 요청 수                       |
+| `X-RateLimit-Remaining` | 현재 분에 남은 요청 수                  |
+| `X-RateLimit-Reset`     | Rate Limit 초기화 시각 (Unix timestamp) |
 
 ### 플랜별 Rate Limit
 
-| 플랜 | 분당 요청 수 | 월 API 호출 한도 |
-|------|------------|----------------|
-| Free | 10 | 1,000 |
-| Starter | 50 | 10,000 |
-| Pro | 200 | 100,000 |
-| Enterprise | 무제한 | 무제한 |
+| 플랜       | 분당 요청 수 | 월 API 호출 한도 |
+| ---------- | ------------ | ---------------- |
+| Free       | 10           | 1,000            |
+| Starter    | 50           | 10,000           |
+| Pro        | 200          | 100,000          |
+| Enterprise | 무제한       | 무제한           |
 
 ### Rate Limit 초과 응답 (HTTP 429)
 
@@ -162,34 +162,34 @@ curl -X POST https://api.deepsight.ai/v1/match \
 
 ### `meta` 필드
 
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| `request_id` | `string` | 요청 고유 ID (디버깅·지원 문의 시 사용) |
-| `processing_time_ms` | `number` | 서버 처리 시간 (ms) |
-| `pagination` | `object` | 목록 조회 시 페이지네이션 정보 |
+| 필드                 | 타입     | 설명                                    |
+| -------------------- | -------- | --------------------------------------- |
+| `request_id`         | `string` | 요청 고유 ID (디버깅·지원 문의 시 사용) |
+| `processing_time_ms` | `number` | 서버 처리 시간 (ms)                     |
+| `pagination`         | `object` | 목록 조회 시 페이지네이션 정보          |
 
 ---
 
 ## 5. 에러 코드
 
-| 코드 | HTTP 상태 | 설명 |
-|------|----------|------|
-| `UNAUTHORIZED` | 401 | API 키가 없거나 유효하지 않음 |
-| `FORBIDDEN` | 403 | 권한 없음 (예: 동의 미완료) |
-| `NOT_FOUND` | 404 | 리소스를 찾을 수 없음 |
-| `INVALID_USER_ID` | 400 | user_id 형식 오류 |
-| `INVALID_PERSONA_ID` | 400 | persona_id 형식 오류 |
-| `INVALID_MATCHING_TIER` | 400 | matching_tier 값 오류 |
-| `INVALID_FEEDBACK_TYPE` | 400 | feedback_type 값 오류 |
-| `INVALID_FIELD` | 400 | 요청 필드 유효성 오류 |
-| `MISSING_FIELD` | 400 | 필수 필드 누락 |
-| `CONFLICT` | 409 | 이미 존재하는 리소스 (예: 중복 온보딩) |
-| `TOO_MANY_ITEMS` | 400 | 배치 요청 한도 초과 (최대 100건) |
-| `EMPTY_ITEMS` | 400 | 빈 배열 입력 |
-| `COMMENT_TOO_LONG` | 400 | 코멘트 1000자 초과 |
-| `CONSENT_REQUIRED` | 403 | third_party_sharing 동의 필요 |
-| `RATE_LIMITED` | 429 | Rate Limit 초과 |
-| `INTERNAL_ERROR` | 500 | 서버 내부 오류 |
+| 코드                    | HTTP 상태 | 설명                                   |
+| ----------------------- | --------- | -------------------------------------- |
+| `UNAUTHORIZED`          | 401       | API 키가 없거나 유효하지 않음          |
+| `FORBIDDEN`             | 403       | 권한 없음 (예: 동의 미완료)            |
+| `NOT_FOUND`             | 404       | 리소스를 찾을 수 없음                  |
+| `INVALID_USER_ID`       | 400       | user_id 형식 오류                      |
+| `INVALID_PERSONA_ID`    | 400       | persona_id 형식 오류                   |
+| `INVALID_MATCHING_TIER` | 400       | matching_tier 값 오류                  |
+| `INVALID_FEEDBACK_TYPE` | 400       | feedback_type 값 오류                  |
+| `INVALID_FIELD`         | 400       | 요청 필드 유효성 오류                  |
+| `MISSING_FIELD`         | 400       | 필수 필드 누락                         |
+| `CONFLICT`              | 409       | 이미 존재하는 리소스 (예: 중복 온보딩) |
+| `TOO_MANY_ITEMS`        | 400       | 배치 요청 한도 초과 (최대 100건)       |
+| `EMPTY_ITEMS`           | 400       | 빈 배열 입력                           |
+| `COMMENT_TOO_LONG`      | 400       | 코멘트 1000자 초과                     |
+| `CONSENT_REQUIRED`      | 403       | third_party_sharing 동의 필요          |
+| `RATE_LIMITED`          | 429       | Rate Limit 초과                        |
+| `INTERNAL_ERROR`        | 500       | 서버 내부 오류                         |
 
 ---
 
@@ -199,11 +199,11 @@ curl -X POST https://api.deepsight.ai/v1/match \
 
 ### 매칭 티어 비교
 
-| 티어 | 사용 레이어 | 가중치 | 정확도 |
-|------|-----------|--------|-------|
-| `basic` | L1 only | L1 100% | 낮음 |
-| `advanced` | L1 + L2 + EPS | L1 70% + L2 20% + EPS 10% | 중간 |
-| `exploration` | L1 + L2 + L3 + EPS | L1 50% + L2 20% + L3 20% + EPS 10% | 높음 |
+| 티어          | 사용 레이어        | 가중치                             | 정확도 |
+| ------------- | ------------------ | ---------------------------------- | ------ |
+| `basic`       | L1 only            | L1 100%                            | 낮음   |
+| `advanced`    | L1 + L2 + EPS      | L1 70% + L2 20% + EPS 10%          | 중간   |
+| `exploration` | L1 + L2 + L3 + EPS | L1 50% + L2 20% + L3 20% + EPS 10% | 높음   |
 
 > **EPS (Extended Paradox Score)**: 페르소나의 내적 모순·복잡성 점수. 사용자의 역설적 성향과의 궁합을 반영합니다.
 
@@ -223,17 +223,17 @@ Content-Type: application/json
 
 **Request Body**
 
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| `user_id` | `string` | ✅ | 매칭 대상 사용자 ID |
-| `context.category` | `string` | - | 페르소나 카테고리 필터 |
-| `context.time_of_day` | `string` | - | 시간대 (아침/낮/밤 등) |
-| `context.device` | `string` | - | 기기 종류 |
-| `context.custom` | `object` | - | 임의 컨텍스트 데이터 |
-| `options.top_n` | `number` | - | 반환 페르소나 수 (기본 5, 최대 20) |
-| `options.matching_tier` | `string` | - | `basic` \| `advanced` \| `exploration` (기본 `basic`) |
-| `options.include_score` | `boolean` | - | 점수 포함 여부 (기본 `true`) |
-| `options.include_explanation` | `boolean` | - | 설명 포함 여부 (기본 `false`) |
+| 필드                          | 타입      | 필수 | 설명                                                  |
+| ----------------------------- | --------- | ---- | ----------------------------------------------------- |
+| `user_id`                     | `string`  | ✅   | 매칭 대상 사용자 ID                                   |
+| `context.category`            | `string`  | -    | 페르소나 카테고리 필터                                |
+| `context.time_of_day`         | `string`  | -    | 시간대 (아침/낮/밤 등)                                |
+| `context.device`              | `string`  | -    | 기기 종류                                             |
+| `context.custom`              | `object`  | -    | 임의 컨텍스트 데이터                                  |
+| `options.top_n`               | `number`  | -    | 반환 페르소나 수 (기본 5, 최대 20)                    |
+| `options.matching_tier`       | `string`  | -    | `basic` \| `advanced` \| `exploration` (기본 `basic`) |
+| `options.include_score`       | `boolean` | -    | 점수 포함 여부 (기본 `true`)                          |
+| `options.include_explanation` | `boolean` | -    | 설명 포함 여부 (기본 `false`)                         |
 
 **요청 예시**
 
@@ -293,16 +293,16 @@ Content-Type: application/json
 
 **응답 필드 설명**
 
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| `data.matches[].persona_id` | `string` | 페르소나 ID |
-| `data.matches[].persona_name` | `string` | 페르소나 이름 |
-| `data.matches[].score` | `number` | 종합 매칭 점수 (0~100) |
-| `data.matches[].explanation` | `string` | 매칭 설명 (`include_explanation: true` 시) |
-| `data.matches[].details.similarity_score` | `number` | L1 벡터 유사도 점수 (`advanced`/`exploration` 시) |
-| `data.matches[].details.paradox_compatibility` | `number` | 역설 호환성 점수 (`advanced`/`exploration` 시) |
-| `data.user_archetype` | `string \| null` | 유저 아키타입 (UserVector 존재 시 반환) |
-| `meta.matching_tier` | `string` | 적용된 매칭 티어 |
+| 필드                                           | 타입             | 설명                                              |
+| ---------------------------------------------- | ---------------- | ------------------------------------------------- |
+| `data.matches[].persona_id`                    | `string`         | 페르소나 ID                                       |
+| `data.matches[].persona_name`                  | `string`         | 페르소나 이름                                     |
+| `data.matches[].score`                         | `number`         | 종합 매칭 점수 (0~100)                            |
+| `data.matches[].explanation`                   | `string`         | 매칭 설명 (`include_explanation: true` 시)        |
+| `data.matches[].details.similarity_score`      | `number`         | L1 벡터 유사도 점수 (`advanced`/`exploration` 시) |
+| `data.matches[].details.paradox_compatibility` | `number`         | 역설 호환성 점수 (`advanced`/`exploration` 시)    |
+| `data.user_archetype`                          | `string \| null` | 유저 아키타입 (UserVector 존재 시 반환)           |
+| `meta.matching_tier`                           | `string`         | 적용된 매칭 티어                                  |
 
 ---
 
@@ -320,14 +320,14 @@ Content-Type: application/json
 
 **Request Body**
 
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| `items` | `array` | ✅ | 매칭 요청 목록 (1~100개) |
-| `items[].user_id` | `string` | ✅ | 매칭 대상 사용자 ID |
-| `items[].context` | `object` | - | 단일 매칭과 동일한 컨텍스트 |
-| `items[].options.top_n` | `number` | - | 반환 페르소나 수 (기본 5, 최대 20) |
-| `items[].options.matching_tier` | `string` | - | `basic` \| `advanced` \| `exploration` |
-| `items[].options.include_score` | `boolean` | - | 점수 포함 여부 (기본 `true`) |
+| 필드                            | 타입      | 필수 | 설명                                   |
+| ------------------------------- | --------- | ---- | -------------------------------------- |
+| `items`                         | `array`   | ✅   | 매칭 요청 목록 (1~100개)               |
+| `items[].user_id`               | `string`  | ✅   | 매칭 대상 사용자 ID                    |
+| `items[].context`               | `object`  | -    | 단일 매칭과 동일한 컨텍스트            |
+| `items[].options.top_n`         | `number`  | -    | 반환 페르소나 수 (기본 5, 최대 20)     |
+| `items[].options.matching_tier` | `string`  | -    | `basic` \| `advanced` \| `exploration` |
+| `items[].options.include_score` | `boolean` | -    | 점수 포함 여부 (기본 `true`)           |
 
 **요청 예시**
 
@@ -406,12 +406,12 @@ Authorization: Bearer {API_KEY}
 
 **Query Parameters**
 
-| 파라미터 | 타입 | 필수 | 설명 |
-|---------|------|------|------|
-| `page` | `number` | - | 페이지 번호 (기본 1) |
-| `limit` | `number` | - | 페이지당 항목 수 (기본 20, 최대 100) |
-| `role` | `string` | - | 역할 필터 (대소문자 무관) |
-| `expertise` | `string` | - | 전문 분야 필터 |
+| 파라미터    | 타입     | 필수 | 설명                                 |
+| ----------- | -------- | ---- | ------------------------------------ |
+| `page`      | `number` | -    | 페이지 번호 (기본 1)                 |
+| `limit`     | `number` | -    | 페이지당 항목 수 (기본 20, 최대 100) |
+| `role`      | `string` | -    | 역할 필터 (대소문자 무관)            |
+| `expertise` | `string` | -    | 전문 분야 필터                       |
 
 **응답 (200 OK)**
 
@@ -461,11 +461,11 @@ Authorization: Bearer {API_KEY}
 
 **페르소나 벡터 구조**
 
-| 필드 | 설명 |
-|------|------|
-| `vectors.l1` | L1 Social 벡터 (7차원, 항상 포함) |
+| 필드         | 설명                                                     |
+| ------------ | -------------------------------------------------------- |
+| `vectors.l1` | L1 Social 벡터 (7차원, 항상 포함)                        |
 | `vectors.l2` | L2 Temperament 벡터 (5차원, OCEAN 프로파일 보유 시 포함) |
-| `vectors.l3` | L3 Depth 벡터 (4차원, 심층 프로파일 보유 시 포함) |
+| `vectors.l3` | L3 Depth 벡터 (4차원, 심층 프로파일 보유 시 포함)        |
 
 ---
 
@@ -482,9 +482,9 @@ Authorization: Bearer {API_KEY}
 
 **Path Parameters**
 
-| 파라미터 | 타입 | 필수 | 설명 |
-|---------|------|------|------|
-| `id` | `string` | ✅ | 페르소나 ID |
+| 파라미터 | 타입     | 필수 | 설명        |
+| -------- | -------- | ---- | ----------- |
+| `id`     | `string` | ✅   | 페르소나 ID |
 
 **응답 (200 OK)**
 
@@ -549,18 +549,18 @@ Authorization: Bearer {API_KEY}
 
 **추가 응답 필드 (상세 조회 전용)**
 
-| 필드 | 설명 |
-|------|------|
-| `paradox` | 역설 프로파일 (EPS 보유 시) |
-| `paradox.archetype_id` | 아키타입 ID |
-| `paradox.extended_score` | 종합 역설 점수 (0~1) |
-| `paradox.l1_l2_score` | L1↔L2 역설 점수 |
-| `paradox.l1_l3_score` | L1↔L3 역설 점수 |
-| `paradox.l2_l3_score` | L2↔L3 역설 점수 |
-| `character.handle` | 페르소나 SNS 핸들 |
-| `character.tagline` | 대표 문구 |
-| `character.warmth` | 따뜻함 지수 (0~1) |
-| `character.expertise_level` | 전문성 수준 |
+| 필드                        | 설명                        |
+| --------------------------- | --------------------------- |
+| `paradox`                   | 역설 프로파일 (EPS 보유 시) |
+| `paradox.archetype_id`      | 아키타입 ID                 |
+| `paradox.extended_score`    | 종합 역설 점수 (0~1)        |
+| `paradox.l1_l2_score`       | L1↔L2 역설 점수             |
+| `paradox.l1_l3_score`       | L1↔L3 역설 점수             |
+| `paradox.l2_l3_score`       | L2↔L3 역설 점수             |
+| `character.handle`          | 페르소나 SNS 핸들           |
+| `character.tagline`         | 대표 문구                   |
+| `character.warmth`          | 따뜻함 지수 (0~1)           |
+| `character.expertise_level` | 전문성 수준                 |
 
 **에러 응답 (404)**
 
@@ -626,21 +626,21 @@ Content-Type: application/json
 
 **filters 필드 상세**
 
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| `filters.archetype.include` | `string[]` | 포함할 아키타입 ID 목록 |
-| `filters.archetype.exclude` | `string[]` | 제외할 아키타입 ID 목록 |
-| `filters.vectors.l1` | `object` | L1 차원별 범위 (`{ min?, max? }`) |
-| `filters.vectors.l2` | `object` | L2 차원별 범위 |
-| `filters.vectors.l3` | `object` | L3 차원별 범위 |
-| `filters.paradox.extendedScore` | `{ min?, max? }` | EPS 범위 |
-| `filters.paradox.l1l2Score` | `{ min?, max? }` | L1↔L2 역설 점수 범위 |
-| `filters.role` | `string` | 역할 필터 |
-| `filters.expertise` | `string[]` | 전문 분야 필터 (OR 조건) |
-| `sort.field` | `string` | 정렬 기준: `paradox.extendedScore` \| `paradox.l1l2Score` \| `createdAt` \| `name` \| `vectors.l1.{dim}` |
-| `sort.order` | `string` | `asc` \| `desc` (기본 `desc`) |
-| `pagination.page` | `number` | 페이지 번호 (기본 1) |
-| `pagination.limit` | `number` | 페이지당 항목 수 (기본 20, 최대 100) |
+| 필드                            | 타입             | 설명                                                                                                     |
+| ------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------- |
+| `filters.archetype.include`     | `string[]`       | 포함할 아키타입 ID 목록                                                                                  |
+| `filters.archetype.exclude`     | `string[]`       | 제외할 아키타입 ID 목록                                                                                  |
+| `filters.vectors.l1`            | `object`         | L1 차원별 범위 (`{ min?, max? }`)                                                                        |
+| `filters.vectors.l2`            | `object`         | L2 차원별 범위                                                                                           |
+| `filters.vectors.l3`            | `object`         | L3 차원별 범위                                                                                           |
+| `filters.paradox.extendedScore` | `{ min?, max? }` | EPS 범위                                                                                                 |
+| `filters.paradox.l1l2Score`     | `{ min?, max? }` | L1↔L2 역설 점수 범위                                                                                     |
+| `filters.role`                  | `string`         | 역할 필터                                                                                                |
+| `filters.expertise`             | `string[]`       | 전문 분야 필터 (OR 조건)                                                                                 |
+| `sort.field`                    | `string`         | 정렬 기준: `paradox.extendedScore` \| `paradox.l1l2Score` \| `createdAt` \| `name` \| `vectors.l1.{dim}` |
+| `sort.order`                    | `string`         | `asc` \| `desc` (기본 `desc`)                                                                            |
+| `pagination.page`               | `number`         | 페이지 번호 (기본 1)                                                                                     |
+| `pagination.limit`              | `number`         | 페이지당 항목 수 (기본 20, 최대 100)                                                                     |
 
 **유효한 아키타입 ID**
 
@@ -652,11 +652,11 @@ emotional-pragmatist, dangerous-mentor, volatile-intellectual, growing-cynic
 
 **유효한 벡터 차원**
 
-| 레이어 | 차원 |
-|--------|------|
-| L1 | `depth`, `lens`, `stance`, `scope`, `taste`, `purpose`, `sociability` |
-| L2 | `openness`, `conscientiousness`, `extraversion`, `agreeableness`, `neuroticism` |
-| L3 | `lack`, `moralCompass`, `volatility`, `growthArc` |
+| 레이어 | 차원                                                                            |
+| ------ | ------------------------------------------------------------------------------- |
+| L1     | `depth`, `lens`, `stance`, `scope`, `taste`, `purpose`, `sociability`           |
+| L2     | `openness`, `conscientiousness`, `extraversion`, `agreeableness`, `neuroticism` |
+| L3     | `lack`, `moralCompass`, `volatility`, `growthArc`                               |
 
 > 모든 벡터 범위 값은 `0.0 ~ 1.0` 이어야 합니다.
 
@@ -674,7 +674,7 @@ emotional-pragmatist, dangerous-mentor, volatile-intellectual, growing-cynic
         "expertise": ["철학", "인문학"],
         "description": "...",
         "vectors": {
-          "l1": { "depth": 0.87, "lens": 0.34, "..." : "..." },
+          "l1": { "depth": 0.87, "lens": 0.34, "...": "..." },
           "l2": { "openness": 0.91, "...": "..." }
         },
         "archetype": { "id": "ironic-philosopher" },
@@ -736,13 +736,13 @@ Content-Type: application/json
 
 **Request Body**
 
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| `user_id` | `string` | ✅ | 피드백 제출 사용자 ID |
-| `persona_id` | `string` | ✅ | 평가 대상 페르소나 ID |
-| `feedback_type` | `string` | ✅ | `LIKE` \| `DISLIKE` |
-| `content_id` | `string` | - | 연관 콘텐츠 ID |
-| `comment` | `string` | - | 피드백 코멘트 (최대 1000자) |
+| 필드            | 타입     | 필수 | 설명                        |
+| --------------- | -------- | ---- | --------------------------- |
+| `user_id`       | `string` | ✅   | 피드백 제출 사용자 ID       |
+| `persona_id`    | `string` | ✅   | 평가 대상 페르소나 ID       |
+| `feedback_type` | `string` | ✅   | `LIKE` \| `DISLIKE`         |
+| `content_id`    | `string` | -    | 연관 콘텐츠 ID              |
+| `comment`       | `string` | -    | 피드백 코멘트 (최대 1000자) |
 
 **요청 예시**
 
@@ -858,15 +858,15 @@ Authorization: Bearer {API_KEY}
 
 **응답 필드 설명**
 
-| 필드 | 설명 |
-|------|------|
-| `archetype` | 유저 아키타입 ID (`null` = 미분류) |
-| `onboarding_level` | `QUICK` \| `STANDARD` \| `DEEP` |
-| `profile_quality` | `BASIC` \| `STANDARD` \| `ADVANCED` |
-| `vector.l1_social` | L1 소셜 벡터 (7차원) |
-| `vector.l2_temperament` | L2 기질 벡터 (SNS 분석 동의 시) |
-| `vector.has_l2` | L2 프로파일 보유 여부 |
-| `feedback_count` | 누적 피드백 수 |
+| 필드                    | 설명                                |
+| ----------------------- | ----------------------------------- |
+| `archetype`             | 유저 아키타입 ID (`null` = 미분류)  |
+| `onboarding_level`      | `QUICK` \| `STANDARD` \| `DEEP`     |
+| `profile_quality`       | `BASIC` \| `STANDARD` \| `ADVANCED` |
+| `vector.l1_social`      | L1 소셜 벡터 (7차원)                |
+| `vector.l2_temperament` | L2 기질 벡터 (SNS 분석 동의 시)     |
+| `vector.has_l2`         | L2 프로파일 보유 여부               |
+| `feedback_count`        | 누적 피드백 수                      |
 
 ---
 
@@ -886,25 +886,25 @@ Content-Type: application/json
 
 **Request Body**
 
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| `level` | `string` | ✅ | `QUICK` \| `STANDARD` \| `DEEP` |
-| `responses` | `array` | ✅ | 질문 응답 목록 (최소 응답 수: QUICK 12 / STANDARD 30 / DEEP 60) |
-| `responses[].question_id` | `string` | ✅ | 질문 ID |
-| `responses[].answer` | `string \| number` | ✅ | 응답 값 |
-| `responses[].target_dimensions` | `string[]` | - | 이 응답이 반영되는 벡터 차원 |
-| `consent.data_collection` | `boolean` | ✅ | 데이터 수집 동의 (필수) |
-| `consent.sns_analysis` | `boolean` | - | SNS 분석 동의 |
-| `consent.third_party_sharing` | `boolean` | - | 제3자 공유 동의 |
-| `consent.marketing` | `boolean` | - | 마케팅 활용 동의 |
+| 필드                            | 타입               | 필수 | 설명                                                            |
+| ------------------------------- | ------------------ | ---- | --------------------------------------------------------------- |
+| `level`                         | `string`           | ✅   | `QUICK` \| `STANDARD` \| `DEEP`                                 |
+| `responses`                     | `array`            | ✅   | 질문 응답 목록 (최소 응답 수: QUICK 12 / STANDARD 30 / DEEP 60) |
+| `responses[].question_id`       | `string`           | ✅   | 질문 ID                                                         |
+| `responses[].answer`            | `string \| number` | ✅   | 응답 값                                                         |
+| `responses[].target_dimensions` | `string[]`         | -    | 이 응답이 반영되는 벡터 차원                                    |
+| `consent.data_collection`       | `boolean`          | ✅   | 데이터 수집 동의 (필수)                                         |
+| `consent.sns_analysis`          | `boolean`          | -    | SNS 분석 동의                                                   |
+| `consent.third_party_sharing`   | `boolean`          | -    | 제3자 공유 동의                                                 |
+| `consent.marketing`             | `boolean`          | -    | 마케팅 활용 동의                                                |
 
 **온보딩 레벨별 최소 응답 수**
 
-| 레벨 | 최소 응답 | 프로파일 품질 | 정밀도 추정 |
-|------|---------|------------|----------|
-| `QUICK` | 12개 | BASIC | ~45% |
-| `STANDARD` | 30개 | STANDARD | ~62% |
-| `DEEP` | 60개 | ADVANCED | ~75% |
+| 레벨       | 최소 응답 | 프로파일 품질 | 정밀도 추정 |
+| ---------- | --------- | ------------- | ----------- |
+| `QUICK`    | 12개      | BASIC         | ~45%        |
+| `STANDARD` | 30개      | STANDARD      | ~62%        |
+| `DEEP`     | 60개      | ADVANCED      | ~75%        |
 
 **요청 예시**
 
@@ -1038,12 +1038,12 @@ Authorization: Bearer {API_KEY}
 
 **동의 타입별 설명**
 
-| 타입 | 필수 | 설명 |
-|------|------|------|
-| `data_collection` | ✅ | 서비스 이용에 필수. 철회 불가 (탈퇴 시 삭제) |
-| `sns_analysis` | - | 동의 시 L2 벡터 생성, 철회 시 L2 벡터 삭제 |
-| `third_party_sharing` | - | 파트너 API를 통한 프로필 접근에 필요 |
-| `marketing` | - | 마케팅 목적 데이터 활용 |
+| 타입                  | 필수 | 설명                                         |
+| --------------------- | ---- | -------------------------------------------- |
+| `data_collection`     | ✅   | 서비스 이용에 필수. 철회 불가 (탈퇴 시 삭제) |
+| `sns_analysis`        | -    | 동의 시 L2 벡터 생성, 철회 시 L2 벡터 삭제   |
+| `third_party_sharing` | -    | 파트너 API를 통한 프로필 접근에 필요         |
+| `marketing`           | -    | 마케팅 목적 데이터 활용                      |
 
 ---
 
@@ -1061,12 +1061,12 @@ Content-Type: application/json
 
 **Request Body**
 
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| `consent_version` | `string` | ✅ | 현재 동의 버전 (`v2.0`) |
-| `consents` | `array` | ✅ | 변경할 동의 목록 (1개 이상) |
-| `consents[].type` | `string` | ✅ | 동의 타입 |
-| `consents[].granted` | `boolean` | ✅ | 동의 여부 |
+| 필드                 | 타입      | 필수 | 설명                        |
+| -------------------- | --------- | ---- | --------------------------- |
+| `consent_version`    | `string`  | ✅   | 현재 동의 버전 (`v2.0`)     |
+| `consents`           | `array`   | ✅   | 변경할 동의 목록 (1개 이상) |
+| `consents[].type`    | `string`  | ✅   | 동의 타입                   |
+| `consents[].granted` | `boolean` | ✅   | 동의 여부                   |
 
 > **주의**: `data_collection`을 `granted: false`로 설정할 수 없습니다. 탈퇴 처리는 `DELETE /v1/users/:id`를 사용하세요.
 
@@ -1075,9 +1075,7 @@ Content-Type: application/json
 ```json
 {
   "consent_version": "v2.0",
-  "consents": [
-    { "type": "sns_analysis", "granted": false }
-  ]
+  "consents": [{ "type": "sns_analysis", "granted": false }]
 }
 ```
 
@@ -1110,10 +1108,10 @@ Content-Type: application/json
 
 **동의 변경 부수 효과 (side_effects)**
 
-| 동의 타입 | 동의 시 | 철회 시 |
-|---------|--------|--------|
-| `sns_analysis` | L2 벡터 생성 큐에 등록 / 프로파일 품질 STANDARD→ADVANCED | L2 벡터 삭제 |
-| `third_party_sharing` | External API 접근 허용 | External API 접근 차단 |
+| 동의 타입             | 동의 시                                                  | 철회 시                |
+| --------------------- | -------------------------------------------------------- | ---------------------- |
+| `sns_analysis`        | L2 벡터 생성 큐에 등록 / 프로파일 품질 STANDARD→ADVANCED | L2 벡터 삭제           |
+| `third_party_sharing` | External API 접근 허용                                   | External API 접근 차단 |
 
 ---
 
@@ -1149,6 +1147,6 @@ await client.feedback.submit({
 
 ### Changelog
 
-| 날짜 | 버전 | 변경 내용 |
-|------|------|---------|
+| 날짜       | 버전 | 변경 내용                                   |
+| ---------- | ---- | ------------------------------------------- |
 | 2026-02-20 | v1.0 | 초기 릴리스 — 매칭·페르소나·피드백·유저 API |

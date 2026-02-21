@@ -213,6 +213,7 @@ model Persona {
   relationshipsAsA    PersonaRelationship[] @relation("RelationshipA")
   relationshipsAsB    PersonaRelationship[] @relation("RelationshipB")
   consumptionLogs     ConsumptionLog[]
+  generationRequests  PersonaGenerationRequest[]
 
   @@map("personas")
 }
@@ -302,6 +303,7 @@ enum PersonaSource {
   INCUBATOR
   MUTATION
   AUTO_GENERATED  // 자동 생성
+  USER_REQUEST    // PersonaWorld 사용자 요청
 }
 
 enum ExpertiseLevel {
@@ -1318,6 +1320,9 @@ model PersonaWorldUser {
   bookmarks       PersonaPostBookmark[]
   notifications   PWNotification[]
   surveyResponses PWUserSurveyResponse[]
+  personaRequests PersonaGenerationRequest[]
+  notificationPreference PWNotificationPreference?
+  coinTransactions CoinTransaction[]
 
   @@map("persona_world_users")
 }
@@ -2139,4 +2144,103 @@ model SocialModuleConfig {
   updatedBy       String   @default("system")
 
   @@map("social_module_config")
+}
+
+// ============================================
+// PersonaWorld 사용자 페르소나 생성 요청
+// 콜드스타트 매칭 유사도 < 70% → 인큐베이터 큐에 추가
+// ============================================
+
+model PersonaGenerationRequest {
+  id                  String                    @id @default(cuid())
+  userId              String                    // PersonaWorldUser ID
+  user                PersonaWorldUser          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  userVector          Json                      // 요청 시점의 사용자 벡터 (ThreeLayerVector)
+  topSimilarity       Decimal                   @db.Decimal(5, 2) // 요청 시점 최고 유사도 (%)
+  status              PersonaRequestStatus      @default(PENDING)
+  scheduledDate       DateTime                  // 생성 예정일
+
+  generatedPersonaId  String?                   // 생성 완료 시 페르소나 ID
+  generatedPersona    Persona?                  @relation(fields: [generatedPersonaId], references: [id])
+  completedAt         DateTime?
+  failReason          String?
+
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+
+  @@index([userId])
+  @@index([status, scheduledDate])
+  @@map("persona_generation_requests")
+}
+
+enum PersonaRequestStatus {
+  PENDING       // 큐 대기 중
+  SCHEDULED     // 생성 예정일 확정
+  GENERATING    // 생성 중
+  COMPLETED     // 완료 (generatedPersonaId 설정됨)
+  FAILED        // 생성 실패
+}
+
+// ============================================
+// PersonaWorld 알림 환경설정
+// ============================================
+
+model PWNotificationPreference {
+  id              String           @id @default(cuid())
+  userId          String           @unique
+  user            PersonaWorldUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  likeEnabled           Boolean @default(true)
+  commentEnabled        Boolean @default(true)
+  followEnabled         Boolean @default(true)
+  mentionEnabled        Boolean @default(true)
+  repostEnabled         Boolean @default(true)
+  recommendationEnabled Boolean @default(true)
+  newPostEnabled        Boolean @default(true)
+  systemEnabled         Boolean @default(true)
+
+  quietHoursStart Int?
+  quietHoursEnd   Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("pw_notification_preferences")
+}
+
+// ============================================
+// PersonaWorld 코인 거래 기록
+// ============================================
+
+model CoinTransaction {
+  id           String              @id @default(cuid())
+  userId       String
+  user         PersonaWorldUser    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         CoinTransactionType
+  amount       Int
+  balanceAfter Int
+  reason       String?
+  orderId      String?
+  paymentKey   String?
+  status       CoinTransactionStatus @default(COMPLETED)
+
+  createdAt    DateTime            @default(now())
+
+  @@index([userId, createdAt])
+  @@index([orderId])
+  @@map("coin_transactions")
+}
+
+enum CoinTransactionType {
+  EARN
+  PURCHASE
+  SPEND
+}
+
+enum CoinTransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
 }

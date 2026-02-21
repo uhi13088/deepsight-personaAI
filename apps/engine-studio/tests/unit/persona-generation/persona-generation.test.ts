@@ -14,6 +14,9 @@ import {
   analyzeCoverage,
   calculateVectorDistance,
   checkMinDistance,
+  sampleBeta,
+  suggestUnderrepresentedArchetypes,
+  buildCoverageReport,
 } from "@/lib/persona-generation/vector-generator"
 import { designParadox, analyzeParadoxPatterns } from "@/lib/persona-generation/paradox-designer"
 import { generateCharacter } from "@/lib/persona-generation/character-generator"
@@ -506,5 +509,208 @@ describe("Generation Pipeline (Integration)", () => {
       expect(persona.quality.dimensionality).toBeGreaterThanOrEqual(0)
       expect(persona.quality.consistencyScore).toBeGreaterThan(0)
     }
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// T161: 다양성 강화 — Beta 분포 + 최소 거리 + 아키타입 추천
+// ═══════════════════════════════════════════════════════════════
+
+describe("T161-AC1: Beta Distribution + 범위 확대", () => {
+  it("sampleBeta should return values in [0, 1]", () => {
+    for (let i = 0; i < 100; i++) {
+      const v = sampleBeta(0.7, 0.7)
+      expect(v).toBeGreaterThanOrEqual(0)
+      expect(v).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it("sampleBeta(0.7, 0.7) — U자형 분포: 극단값 비율이 균등분포보다 높아야 함", () => {
+    const N = 2000
+    let extremeCount = 0
+    for (let i = 0; i < N; i++) {
+      const v = sampleBeta(0.7, 0.7)
+      if (v < 0.15 || v > 0.85) extremeCount++
+    }
+    // 균등분포의 극단값(0~0.15 + 0.85~1) 비율 ≈ 30%
+    // Beta(0.7,0.7) U자형은 극단값 비율이 30%를 초과해야 함
+    const ratio = extremeCount / N
+    expect(ratio).toBeGreaterThan(0.3)
+  })
+
+  it("sampleBeta(1, 1) should approximate uniform distribution", () => {
+    const N = 2000
+    let sum = 0
+    for (let i = 0; i < N; i++) {
+      sum += sampleBeta(1, 1)
+    }
+    // 평균 ≈ 0.5 (±0.05 허용)
+    expect(sum / N).toBeGreaterThan(0.4)
+    expect(sum / N).toBeLessThan(0.6)
+  })
+
+  it("아키타입 미지정 시 범위가 [0.05, 0.95]로 확대되어야 함", () => {
+    // 100번 생성 후 0.05~0.1 또는 0.9~0.95 값이 한 번이라도 나오면 성공
+    let foundExtreme = false
+    for (let i = 0; i < 100; i++) {
+      const result = generateDiverseVectors({})
+      const allVals = [
+        ...Object.values(result.l1),
+        ...Object.values(result.l2),
+        ...Object.values(result.l3),
+      ]
+      if (allVals.some((v) => v < 0.1 || v > 0.9)) {
+        foundExtreme = true
+        break
+      }
+    }
+    expect(foundExtreme).toBe(true)
+  })
+
+  it("generateDiverseVectors should return retryCount", () => {
+    const result = generateDiverseVectors({})
+    expect(typeof result.retryCount).toBe("number")
+    expect(result.retryCount).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe("T161-AC2: 최소 거리 재생성", () => {
+  it("근접 기존 벡터가 있으면 재생성 시도해야 함 (retryCount > 0 가능)", () => {
+    // 벡터 공간을 밀집하게 채워서 재생성 유도
+    const dense: {
+      l1: SocialPersonaVector
+      l2: CoreTemperamentVector
+      l3: NarrativeDriveVector
+    }[] = []
+    for (let i = 0; i < 20; i++) {
+      const base = 0.4 + i * 0.01
+      dense.push({
+        l1: {
+          depth: base,
+          lens: base,
+          stance: base,
+          scope: base,
+          taste: base,
+          purpose: base,
+          sociability: base,
+        },
+        l2: {
+          openness: base,
+          conscientiousness: base,
+          extraversion: base,
+          agreeableness: base,
+          neuroticism: base,
+        },
+        l3: { lack: base, moralCompass: base, volatility: base, growthArc: base },
+      })
+    }
+
+    const result = generateDiverseVectors({
+      existingPersonas: dense,
+      diversityWeight: 0.5,
+    })
+
+    // 생성은 항상 성공해야 함
+    expect(result.l1.depth).toBeGreaterThanOrEqual(0)
+    expect(result.retryCount).toBeGreaterThanOrEqual(0)
+    expect(result.retryCount).toBeLessThanOrEqual(6) // MAX_RETRY + 1
+  })
+
+  it("기존 페르소나가 없으면 retryCount는 0이어야 함", () => {
+    const result = generateDiverseVectors({ existingPersonas: [] })
+    expect(result.retryCount).toBe(0)
+  })
+
+  it("checkMinDistance should reject near-identical vectors", () => {
+    const a = { l1: IRONIC_L1, l2: IRONIC_L2, l3: IRONIC_L3 }
+    // 미세한 차이만 있는 벡터
+    const b = {
+      l1: { ...IRONIC_L1, depth: IRONIC_L1.depth + 0.01 },
+      l2: IRONIC_L2,
+      l3: IRONIC_L3,
+    }
+    expect(checkMinDistance(b, [a], 0.3)).toBe(false)
+  })
+})
+
+describe("T161-AC3: 아키타입 자동 추천", () => {
+  it("모든 아키타입이 없는 경우 전부 score=1이어야 함", () => {
+    const suggestions = suggestUnderrepresentedArchetypes([], ARCHETYPES)
+    expect(suggestions).toHaveLength(22)
+    for (const s of suggestions) {
+      expect(s.score).toBe(1)
+      expect(s.currentCount).toBe(0)
+    }
+  })
+
+  it("하나의 아키타입만 있으면 나머지가 높은 score를 가져야 함", () => {
+    const ids = ["ironic-philosopher"]
+    const suggestions = suggestUnderrepresentedArchetypes(ids, ARCHETYPES)
+
+    // ironic-philosopher는 count=1
+    const ip = suggestions.find((s) => s.archetypeId === "ironic-philosopher")
+    expect(ip).toBeDefined()
+    expect(ip!.currentCount).toBe(1)
+
+    // 없는 아키타입이 더 높은 score를 가져야 함
+    const others = suggestions.filter((s) => s.archetypeId !== "ironic-philosopher")
+    for (const o of others) {
+      expect(o.score).toBeGreaterThan(ip!.score)
+    }
+  })
+
+  it("균등 분포면 모든 score가 동일해야 함", () => {
+    const ids = ARCHETYPES.map((a) => a.id) // 각 1개씩
+    const suggestions = suggestUnderrepresentedArchetypes(ids, ARCHETYPES)
+    // 모두 count=1, idealCount=1, score=0
+    for (const s of suggestions) {
+      expect(s.currentCount).toBe(1)
+      expect(s.score).toBe(0)
+    }
+  })
+
+  it("과대 대표된 아키타입의 score는 0이어야 함", () => {
+    const ids = Array(10).fill("ironic-philosopher") as string[]
+    const suggestions = suggestUnderrepresentedArchetypes(ids, ARCHETYPES)
+
+    const ip = suggestions.find((s) => s.archetypeId === "ironic-philosopher")
+    expect(ip!.currentCount).toBe(10)
+    expect(ip!.score).toBe(0)
+  })
+})
+
+describe("T161-AC4: 커버리지 리포트", () => {
+  it("빈 상태에서 커버리지 리포트가 정상 생성되어야 함", () => {
+    const report = buildCoverageReport([], [], ARCHETYPES, 0)
+    expect(report.overallCoverage).toBe(0)
+    expect(report.totalPersonas).toBe(0)
+    expect(report.retryCount).toBe(0)
+    expect(report.archetypeSuggestions).toHaveLength(22)
+  })
+
+  it("기존 페르소나가 있으면 커버리지가 0보다 커야 함", () => {
+    const personas = [{ l1: IRONIC_L1, l2: IRONIC_L2, l3: IRONIC_L3 }]
+    const report = buildCoverageReport(personas, ["ironic-philosopher"], ARCHETYPES, 0)
+    expect(report.overallCoverage).toBeGreaterThan(0)
+    expect(report.totalPersonas).toBe(1)
+    expect(report.emptyRegionCount).toBeGreaterThan(0)
+  })
+
+  it("retryCount가 리포트에 포함되어야 함", () => {
+    const report = buildCoverageReport([], [], ARCHETYPES, 3)
+    expect(report.retryCount).toBe(3)
+  })
+})
+
+describe("T161: generatePersona — retryCount 포함", () => {
+  it("아키타입 지정 시 retryCount는 0이어야 함", () => {
+    const persona = generatePersona({ archetypeId: "ironic-philosopher" })
+    expect(persona.retryCount).toBe(0)
+  })
+
+  it("아키타입 미지정 시 retryCount를 반환해야 함", () => {
+    const persona = generatePersona({})
+    expect(typeof persona.retryCount).toBe("number")
+    expect(persona.retryCount).toBeGreaterThanOrEqual(0)
   })
 })

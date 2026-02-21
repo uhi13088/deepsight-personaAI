@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react"
 import { PWCard, PWButton, PWProfileRing, PWSpinner } from "@/components/persona-world"
 import { clientApi } from "@/lib/api"
+import { useUserStore } from "@/lib/user-store"
 import type { MatchingPreviewResponse, MatchingPreviewPersona } from "@/lib/types"
-import { ArrowRight, Play, Trophy, Star, Medal } from "lucide-react"
+import { ArrowRight, Play, Trophy, Star, Medal, Sparkles } from "lucide-react"
 
 interface PWMatchingPreviewProps {
   phase: number
@@ -17,6 +18,13 @@ export function PWMatchingPreview({ phase, userId, onContinue, onFinish }: PWMat
   const [data, setData] = useState<MatchingPreviewResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [requesting, setRequesting] = useState(false)
+  const [requestResult, setRequestResult] = useState<{
+    success: boolean
+    message: string
+  } | null>(null)
+  const requestPersona = useUserStore((s) => s.requestPersona)
+  const hasActiveRequest = useUserStore((s) => s.hasActiveRequest)
 
   useEffect(() => {
     let cancelled = false
@@ -60,6 +68,36 @@ export function PWMatchingPreview({ phase, userId, onContinue, onFinish }: PWMat
   }
 
   const isLastPhase = phase === 3
+  const topSimilarity = data.topPersonas[0]?.similarity ?? 0
+  const showRequestButton = topSimilarity < 70
+
+  async function handleRequestPersona() {
+    setRequesting(true)
+    try {
+      const result = await requestPersona(topSimilarity)
+      if (result) {
+        setRequestResult({
+          success: true,
+          message:
+            result.scheduledDate.slice(0, 10) === new Date().toISOString().slice(0, 10)
+              ? "오늘 중으로 당신만의 페르소나가 생성됩니다!"
+              : `${result.scheduledDate.slice(0, 10)}에 페르소나가 생성될 예정입니다.`,
+        })
+      } else {
+        setRequestResult({
+          success: false,
+          message: "요청에 실패했습니다. 다시 시도해주세요.",
+        })
+      }
+    } catch {
+      setRequestResult({
+        success: false,
+        message: "요청에 실패했습니다. 다시 시도해주세요.",
+      })
+    } finally {
+      setRequesting(false)
+    }
+  }
 
   return (
     <div className="mx-auto w-full max-w-md space-y-6">
@@ -106,6 +144,43 @@ export function PWMatchingPreview({ phase, userId, onContinue, onFinish }: PWMat
             <span className="flex items-center gap-1">
               <span className="h-2 w-2 rounded-full bg-orange-400" /> {data.topPersonas[0].name}
             </span>
+          </div>
+        </PWCard>
+      )}
+
+      {/* 페르소나 요청 (유사도 < 70%) */}
+      {showRequestButton && (
+        <PWCard className="border-dashed border-purple-200 bg-purple-50/50 p-4">
+          <div className="text-center">
+            <Sparkles className="mx-auto mb-2 h-6 w-6 text-purple-500" />
+            <p className="mb-1 text-sm font-semibold text-gray-800">
+              아직 딱 맞는 페르소나가 없나요?
+            </p>
+            <p className="mb-3 text-xs text-gray-500">
+              당신의 취향 벡터 기반으로 새로운 페르소나를 만들어 드립니다
+            </p>
+            {requestResult ? (
+              <div
+                className={`rounded-lg p-3 text-sm ${
+                  requestResult.success ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"
+                }`}
+              >
+                {requestResult.message}
+              </div>
+            ) : (
+              <PWButton
+                onClick={handleRequestPersona}
+                disabled={requesting || hasActiveRequest()}
+                icon={Sparkles}
+                className="w-full"
+              >
+                {requesting
+                  ? "요청 중..."
+                  : hasActiveRequest()
+                    ? "이미 요청이 진행 중입니다"
+                    : "페르소나 요청하기"}
+              </PWButton>
+            )}
           </div>
         </PWCard>
       )}

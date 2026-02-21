@@ -309,6 +309,10 @@ export function Sidebar() {
               Upgrade to Pro →
             </Link>
           </div>
+          <div className="text-muted-foreground mt-3 flex items-center gap-1.5 px-1 text-[10px]">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <span>Developer Console v0.1.0-dev</span>
+          </div>
         </div>
       )}
     </div>

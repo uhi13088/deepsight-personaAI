@@ -25,7 +25,7 @@ export interface Persona {
   tagline: string | null
   role: PersonaRole
   profileImageUrl: string | null
-  warmth: number
+  warmth: number | null
 }
 
 // ── 페르소나 상세 (탐색용) ───────────────────────────────
@@ -333,4 +333,18 @@ export interface NotificationsResponse {
   unreadCount: number
   nextCursor: string | null
   hasMore: boolean
+}
+
+// ── 알림 환경설정 ────────────────────────────────────────
+export interface NotificationPreferenceData {
+  likeEnabled: boolean
+  commentEnabled: boolean
+  followEnabled: boolean
+  mentionEnabled: boolean
+  repostEnabled: boolean
+  recommendationEnabled: boolean
+  newPostEnabled: boolean
+  systemEnabled: boolean
+  quietHoursStart: number | null
+  quietHoursEnd: number | null
 }

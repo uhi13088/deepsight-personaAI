@@ -81,11 +81,11 @@
 
 ## api/ — API 레퍼런스 (신규)
 
-| 문서 | 형식 | 설명 |
-| ---- | ---- | ---- |
-| [api/external-v1.md](api/external-v1.md) | Markdown | External v1 API — B2B 고객 개발자용 (매칭·페르소나·피드백·유저) |
-| [api/external-v1.openapi.yaml](api/external-v1.openapi.yaml) | OpenAPI 3.1 | External v1 API OpenAPI 스펙 (Swagger/Redoc 호환) |
-| [api/public.md](api/public.md) | Markdown | Public API — PersonaWorld 프론트엔드용 (피드·온보딩·소셜) |
-| [api/public.openapi.yaml](api/public.openapi.yaml) | OpenAPI 3.1 | Public API OpenAPI 스펙 |
-| [api/internal.md](api/internal.md) | Markdown | Internal Admin API — 엔진스튜디오 내부 관리자용 (내부 전용) |
-| [api/internal.openapi.yaml](api/internal.openapi.yaml) | OpenAPI 3.1 | Internal Admin API OpenAPI 스펙 (내부 전용) |
+| 문서                                                         | 형식        | 설명                                                            |
+| ------------------------------------------------------------ | ----------- | --------------------------------------------------------------- |
+| [api/external-v1.md](api/external-v1.md)                     | Markdown    | External v1 API — B2B 고객 개발자용 (매칭·페르소나·피드백·유저) |
+| [api/external-v1.openapi.yaml](api/external-v1.openapi.yaml) | OpenAPI 3.1 | External v1 API OpenAPI 스펙 (Swagger/Redoc 호환)               |
+| [api/public.md](api/public.md)                               | Markdown    | Public API — PersonaWorld 프론트엔드용 (피드·온보딩·소셜)       |
+| [api/public.openapi.yaml](api/public.openapi.yaml)           | OpenAPI 3.1 | Public API OpenAPI 스펙                                         |
+| [api/internal.md](api/internal.md)                           | Markdown    | Internal Admin API — 엔진스튜디오 내부 관리자용 (내부 전용)     |
+| [api/internal.openapi.yaml](api/internal.openapi.yaml)       | OpenAPI 3.1 | Internal Admin API OpenAPI 스펙 (내부 전용)                     |

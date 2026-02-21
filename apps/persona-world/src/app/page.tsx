@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { useSession, signIn } from "next-auth/react"
-import { PWLogoWithText, PWGradientDefs } from "@/components/persona-world"
+import { useSession, signIn, signOut } from "next-auth/react"
+import { PWLogoWithText } from "@/components/persona-world"
 import { ArrowRight, Sparkles, Loader2 } from "lucide-react"
 import { useUserStore } from "@/lib/user-store"
 
@@ -17,12 +17,23 @@ export default function LoginPage() {
   const [isRegistering, setIsRegistering] = useState(false)
   const [registerError, setRegisterError] = useState<string | null>(null)
 
-  // 세션 만료 + stale localStorage → 스토어 초기화 (redirect loop 방지)
+  // 로그인 페이지 진입 시 인증 상태 초기화
+  // Google OAuth 콜백에서 돌아올 때는 sessionStorage 플래그로 구분
   useEffect(() => {
-    if (authStatus === "unauthenticated" && profile) {
+    const isOAuthReturn = sessionStorage.getItem("pw-oauth-pending")
+    if (isOAuthReturn) {
+      sessionStorage.removeItem("pw-oauth-pending")
+      return // OAuth 콜백 복귀 → 초기화 스킵
+    }
+    // 일반 진입 (뒤로가기, 직접 접근 등) → 모든 인증 상태 초기화
+    if (profile) {
       reset()
     }
-  }, [authStatus, profile, reset])
+    if (authStatus === "authenticated") {
+      void signOut({ redirect: false })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authStatus])
 
   // 이미 프로필이 있으면 피드로 리다이렉트
   useEffect(() => {
@@ -94,9 +105,11 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     setIsGoogleLoading(true)
+    sessionStorage.setItem("pw-oauth-pending", "1")
     try {
       await signIn("google", { callbackUrl: "/" })
     } catch {
+      sessionStorage.removeItem("pw-oauth-pending")
       setIsGoogleLoading(false)
     }
   }
@@ -151,8 +164,6 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4">
-      <PWGradientDefs />
-
       <div className="w-full max-w-sm space-y-8">
         {/* 로고 */}
         <div className="flex flex-col items-center gap-4">

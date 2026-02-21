@@ -520,6 +520,40 @@
   - AC5: middleware.ts `/shop` 라우트 추가
   - AC6: Build PASS + 테스트 PASS
 
+### Phase PW-F: PersonaWorld 설정 + 실결제 시스템 (T164~T166)
+
+> 알림 제어 + 코인 실결제 + 설정 페이지 통합
+> Toss Payments 연동 (developer-console 패턴 재사용)
+
+- [ ] **T164: 알림 환경설정 — 유형별 ON/OFF + 방해금지 모드**
+  - 배경: 현재 8종 알림이 모두 자동 전송되며 유저가 제어할 수 없음
+  - AC1: Prisma `PWNotificationPreference` 모델 (userId 1:1, 8종 boolean, quietHoursStart/End Int?) + SQL 마이그레이션
+  - AC2: `notification-preference.ts` — getPreferences, updatePreferences, shouldDeliver(type, userId) 체크 로직
+  - AC3: API — `GET/PUT /api/persona-world/notification-preferences` (userId 기반)
+  - AC4: `/settings/notifications` 페이지 — 8종 토글 스위치 + 방해금지 시간대 선택 (시작/종료 시간)
+  - AC5: middleware.ts `/settings` 라우트 추가
+  - AC6: Build PASS + 테스트 PASS
+
+- [ ] **T165: 크레딧 실결제 — Toss Payments 연동 코인 충전**
+  - 배경: 현재 코인이 온보딩/데일리로만 획득. 실결제로 추가 구매 필요
+  - AC1: Prisma `CoinTransaction` 모델 (userId, type: EARN/PURCHASE/SPEND, amount, balanceAfter, orderId?, paymentKey?, status) + SQL 마이그레이션
+  - AC2: `coin-packages.ts` — 코인 패키지 4종 (100코인 ₩1,100 / 500코인 ₩4,900 / 1,000코인 ₩8,900 / 3,000코인 ₩23,900) + 보너스율
+  - AC3: `credit-service.ts` — getBalance(userId), addCredits(userId, amount, type), spendCredits(userId, amount, reason), getTransactionHistory(userId)
+  - AC4: API — `POST /api/persona-world/credits/purchase` (Toss 결제 요청) + `POST /api/persona-world/credits/toss-confirm` (결제 확인 + 코인 충전)
+  - AC5: `/shop` 페이지에 "코인 충전" 섹션 추가 — 패키지 카드 4종 + Toss 결제 위젯 연동
+  - AC6: `user-store.ts` — creditsBalance DB 동기화 (fetchBalance, 구매 후 갱신)
+  - AC7: 환경변수: `NEXT_PUBLIC_TOSS_CLIENT_KEY` (PW), `TOSS_CLIENT_KEY` + `TOSS_SECRET_KEY` (ES)
+  - AC8: Build PASS + 테스트 PASS
+
+- [ ] **T166: 프로필 설정 페이지 — 계정/알림/결제 통합**
+  - 배경: 현재 프로필에 "데이터 초기화"와 "로그아웃"만 있음. 설정 전용 페이지 필요
+  - AC1: `/settings` 페이지 라우트 — 3탭 (계정, 알림, 결제)
+  - AC2: 계정 탭 — 닉네임 변경, 데이터 초기화, 로그아웃
+  - AC3: 알림 탭 — T164 알림 설정 컴포넌트 임베드
+  - AC4: 결제 탭 — 코인 잔액, 충전 내역 (CoinTransaction 목록), 상점 바로가기
+  - AC5: 프로필 페이지 톱니바퀴 → `/settings` 링크로 변경
+  - AC6: Build PASS + 테스트 PASS
+
 ---
 
 ### 별도 작업 (설계 문서 + 데이터)
@@ -985,12 +1019,21 @@
   - AC6: ✅ 3629 테스트 PASS + Build PASS
   - 추가 수정: 마이그레이션 컬럼명 camelCase 수정, 복제 API v4 필드 누락 수정
 
-- [ ] **T159: 페르소나 생성 전체 모듈화 — create/route.ts → 공유 파이프라인 통합**
-  - 배경: `create/route.ts`가 `pipeline.ts`와 정성적 4차원 생성 + DB 저장 로직이 중복. v4 Instruction Layer는 T158에서 `buildInstructionLayer()` 추출 완료. 나머지 중복(정성적 생성, DB 트랜잭션) 통합 필요
-  - AC1: `pipeline.ts` — manual 모드 지원 (`mode: "auto" | "manual"`, manual 시 벡터/이름/프롬프트 직접 입력)
-  - AC2: `create/route.ts` — validation만 유지, 생성 로직은 공유 파이프라인 호출
-  - AC3: 기존 동작 변경 없음 (API 응답 동일)
-  - AC4: 테스트 + Build PASS
+- [x] **T159: 페르소나 생성 전체 모듈화 — create/route.ts → 공유 파이프라인 통합** ✅ 2026-02-20
+
+### Phase V4-G: 프롬프트 v4 + 다양성 강화 + 구조화 필드 (T160~T163)
+
+> 생성 파이프라인 v4 품질 강화 — 프롬프트 v4 전환, 다양성 개선, 구조화 필드 자동생성, 기억 저장소 런타임 연동.
+
+- [x] **T160: 시스템 프롬프트 v4 전환 — VoiceSpec/Factbook 기반 프롬프트 빌더** ✅ 2026-02-20
+  - AC1: ✅ `buildBasePrompt` — voiceSpec의 6D 스타일 파라미터 기반 프롬프트로 전환 (L1/L2/L3 수치 제거, 자연어 서술)
+  - AC2: ✅ factbook.immutableFacts를 [출생/형성경험/내면갈등/핵심정체성] 섹션으로 프롬프트에 반영
+  - AC3: ✅ triggerMap 규칙을 [행동 트리거] 섹션으로 프롬프트에 반영
+  - AC4: ✅ 5종 프롬프트(base/review/post/comment/interaction) 전체 v4 전환
+  - AC5: v3 fallback 유지로 A/B 비교 가능 (voiceSpec 없으면 v3, 있으면 v4)
+  - AC6: ✅ 89파일 3649 테스트 PASS + Build PASS
+
+- [x] **T163: Factbook 런타임 연동 — mutableContext 업데이트 파이프라인** ✅ 2026-02-20
 
 ---
 
@@ -1001,6 +1044,41 @@
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T163: Factbook 런타임 연동 — mutableContext 업데이트 파이프라인** ✅ 2026-02-20
+  - AC1: ✅ `updateMutableContextRuntime(personaId, interaction, dataProvider)` — 상호작용 타입→카테고리 매핑 + 콘텐츠 요약 생성 + DB 영속화
+  - AC2: ✅ changeCount 추적 + `detectExcessiveChanges()` (5회 초과 시 `console.warn` 경고)
+  - AC3: ✅ `verifyFactbookIntegrity()` — mutableContext 업데이트 시 immutableFacts 변조 감지 (SHA256)
+  - AC4: ✅ `processInteraction()` — factbook mutableContext + PersonaState(mood/energy/socialBattery) 통합 갱신
+  - AC5: ✅ 91파일 3713 테스트 PASS + Build PASS
+  - 변경: factbook-runtime.ts(신규), index.ts, factbook-runtime.test.ts(신규, 30 tests)
+
+- [x] **T162: 페르소나 구조화 필드 자동생성 — birthDate/region/activeHours** ✅ 2026-02-20
+  - AC1: ✅ `inferBirthDate` — purpose/conscientiousness/depth/lens 기반 나이대 추론 → 랜덤 생년월일
+  - AC2: ✅ `inferRegion` — sociability/extraversion/taste/openness 점수로 5개 지역풀(대도시/문화/전통/계획/일반) 매핑
+  - AC3: ✅ `expandActiveHours/expandPeakHours` — [start, end] 범위 → Int[] 배열 변환 (자정 넘김 대응)
+  - AC4: ✅ pipeline.ts에서 `savePersonaToDb`에 birthDate/region/activeHours/peakHours/timezone/postFrequency 전달
+  - AC5: ✅ 90파일 3683 테스트 PASS + Build PASS
+  - 변경: structured-fields.ts(신규), pipeline.ts, index.ts, structured-fields.test.ts(신규)
+
+- [x] **T161: 페르소나 랜덤생성 다양성 강화 — 벡터 클러스터링 방지** ✅ 2026-02-20
+  - AC1: ✅ `generateDiverseVectors` — 범위 [0.05, 0.95] 확대 + Beta(0.7, 0.7) U자형 분포 (극단값 포함률 30%+)
+  - AC2: ✅ 최소 거리 재생성 — `checkMinDistance(0.3)` 미달 시 최대 5회 retry, retryCount 반환
+  - AC3: ✅ `suggestUnderrepresentedArchetypes` — 균등분포 대비 부족한 아키타입 score(0~1) 순위
+  - AC4: ✅ `buildCoverageReport` → pipeline.ts `GeneratedPersonaResult.coverageReport` 포함
+  - AC5: ✅ 89파일 3666 테스트 PASS + Build PASS
+  - 변경: vector-generator.ts, index.ts, pipeline.ts, persona-generation.test.ts
+
+- [x] **T160: 시스템 프롬프트 v4 전환 — VoiceSpec/Factbook 기반 프롬프트 빌더** ✅ 2026-02-20
+  - 변경: prompt-builder.ts, pipeline.ts, prompt-builder.test.ts
+  - 테스트: PASS (89파일/3649)
+
+- [x] **T159: 페르소나 생성 전체 모듈화 — create/route.ts → 공유 파이프라인 통합** ✅ 2026-02-20
+  - AC1: ✅ `pipeline.ts` — manual/auto 모드 분기 + `savePersonaToDb()` 공통 함수 + `generateQualitativeAndInstructionLayer()` 공통 함수
+  - AC2: ✅ `create/route.ts` — 195줄→103줄 (47% 삭감), validation만 유지
+  - AC3: ✅ 기존 API 응답 동일 (`{ success: true, data: { id } }`)
+  - AC4: ✅ 89파일 3631 테스트 PASS + Build PASS
+  - 변경: pipeline.ts, create/route.ts
 
 - [x] **T157: 크레딧 상점 페이지 + 구매 시스템** ✅ 2026-02-19
   - AC1: ✅ `shop.ts` — ShopItem 타입 + SHOP_ITEMS 정적 데이터 (페르소나 4종 + 프로필 7종, repeatable 플래그, SOON 태그)
