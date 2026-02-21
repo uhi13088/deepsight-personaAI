@@ -372,3 +372,59 @@ export type {
   DashboardAlert,
   DashboardDataProvider,
 } from "./moderation"
+
+// Phase 8: 비용 모니터링 & 제어
+export {
+  // Usage Tracker
+  createUsageLog,
+  computeDailyCostReport,
+  computeMonthlyCostReport,
+  // Budget Alert
+  checkDailyBudget,
+  checkMonthlyBudget,
+  checkBudgetAlerts,
+  getCostOverrunAction,
+  DAILY_THRESHOLDS,
+  MONTHLY_THRESHOLDS,
+  // Cost Mode
+  getCostModeConfig,
+  getAllCostModes,
+  applyCostMode,
+  estimateCost,
+  compareModes,
+  // Optimizer
+  getInterviewRateByGrade,
+  computeAdaptiveInterviewCost,
+  computeBatchCommentCost,
+  computeCacheOptimizationCost,
+  computeFullOptimization,
+  optimizeLlmCallOrdering,
+  DEFAULT_BATCH_CONFIG,
+  // Integration
+  buildCostDashboard,
+  changeCostMode,
+} from "./cost"
+export type {
+  LLMCallType,
+  LlmUsageLog,
+  CallTypeBreakdown,
+  PersonaCostBreakdown,
+  CacheEfficiency,
+  DailyCostReport,
+  MonthlyCostReport,
+  AlertLevel,
+  BudgetPeriod,
+  BudgetAlert,
+  CostOverrunAction,
+  BudgetThresholds,
+  CostMode,
+  CostModeConfig,
+  CostModeApplication,
+  CostEstimate,
+  OptimizationResult,
+  OptimizationSummary,
+  PendingLLMCall,
+  BatchConfig,
+  CostDataProvider,
+  CostDashboard,
+} from "./cost"

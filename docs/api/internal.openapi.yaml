@@ -1115,6 +1115,53 @@ paths:
         "500":
           description: 서버 내부 오류
 
+  /persona-world-admin/operations/cost:
+    get:
+      operationId: getCostDashboard
+      tags: [PersonaWorldCost]
+      summary: 비용 대시보드 (일간/월간/알림/모드/최적화)
+      description: LLM 비용 추적, 예산 알림, 비용 모드, 최적화 분석 데이터를 반환합니다.
+      responses:
+        "200":
+          description: 비용 대시보드 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CostDashboardResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: 서버 내부 오류
+
+    post:
+      operationId: setCostMode
+      tags: [PersonaWorldCost]
+      summary: 비용 모드 변경
+      description: 비용 모드를 QUALITY/BALANCE/COST_PRIORITY 중 하나로 변경합니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, mode]
+              properties:
+                action: { type: string, enum: [set_mode] }
+                mode: { type: string, enum: [QUALITY, BALANCE, COST_PRIORITY] }
+      responses:
+        "200":
+          description: 비용 모드 변경 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CostModeApplicationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: 서버 내부 오류
+
 # ============================================================
 # Components
 # ============================================================
@@ -2383,6 +2430,145 @@ components:
             uxKPIs:
               type: object
               description: UX 6종 KPI (각 KPIMetric 객체)
+
+    CostDashboardResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            daily:
+              type: object
+              properties:
+                date: { type: string }
+                totalCost: { type: number }
+                totalCalls: { type: integer }
+                byCallType:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      callType:
+                        { type: string, enum: [POST, COMMENT, INTERVIEW, JUDGE, ARENA, OTHER] }
+                      count: { type: integer }
+                      totalCost: { type: number }
+                      avgCostPerCall: { type: number }
+                      totalTokens: { type: integer }
+                cacheEfficiency:
+                  type: object
+                  properties:
+                    totalInputTokens: { type: integer }
+                    cachedTokens: { type: integer }
+                    cacheHitRate: { type: number }
+                    estimatedSavings: { type: number }
+                budgetUsage:
+                  type: object
+                  nullable: true
+                  properties:
+                    budget: { type: number }
+                    usagePercentage: { type: number }
+            monthly:
+              type: object
+              properties:
+                month: { type: string }
+                totalCost: { type: number }
+                totalCalls: { type: integer }
+                dailyTrend:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      date: { type: string }
+                      cost: { type: number }
+                projectedEndOfMonth: { type: number }
+                budgetUsage:
+                  type: object
+                  nullable: true
+                  properties:
+                    budget: { type: number }
+                    usagePercentage: { type: number }
+            alerts:
+              type: array
+              items:
+                type: object
+                properties:
+                  level: { type: string, enum: [INFO, WARNING, CRITICAL, EMERGENCY] }
+                  period: { type: string, enum: [DAILY, MONTHLY] }
+                  usagePercentage: { type: number }
+                  message: { type: string }
+                  autoAction:
+                    type: object
+                    nullable: true
+                    properties:
+                      type: { type: string }
+                  triggeredAt: { type: string, format: date-time }
+            currentMode:
+              type: object
+              properties:
+                mode: { type: string, enum: [QUALITY, BALANCE, COST_PRIORITY] }
+                label: { type: string }
+                description: { type: string }
+                frequencies:
+                  type: object
+                  properties:
+                    postsPerDay: { type: number }
+                    commentsPerDay: { type: number }
+                    interviewSampleRate: { type: number }
+                    arenaFrequency: { type: string }
+                estimates:
+                  type: object
+                  properties:
+                    monthlyLlmCostPer100: { type: number }
+                    perPersonaMonthly: { type: number }
+                    expectedMinPIS: { type: number }
+            modeComparison:
+              type: array
+              items:
+                type: object
+                properties:
+                  mode: { type: string }
+                  personaCount: { type: integer }
+                  monthlyLlmCost: { type: number }
+                  monthlyInfra: { type: number }
+                  monthlyTotal: { type: number }
+                  perPersonaCost: { type: number }
+            optimization:
+              type: object
+              properties:
+                strategies:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      strategy: { type: string }
+                      beforeCost: { type: number }
+                      afterCost: { type: number }
+                      savings: { type: number }
+                      savingsPercentage: { type: number }
+                totalSavings: { type: number }
+                totalSavingsPercentage: { type: number }
+
+    CostModeApplicationResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            mode: { type: string, enum: [QUALITY, BALANCE, COST_PRIORITY] }
+            schedulerUpdates:
+              type: object
+              properties:
+                postFrequency: { type: number }
+                commentFrequency: { type: number }
+            interviewSampling: { type: number }
+            arenaFrequency: { type: string }
+            estimatedBudget:
+              type: object
+              properties:
+                dailyBudget: { type: number }
+                monthlyBudget: { type: number }
 
   responses:
     Unauthorized:

@@ -200,13 +200,24 @@
 
 ---
 
-## QUEUE
+## DONE (v4.0 — PW 비용 관리)
 
-- [ ] **T168: 비용 모니터링 & 제어 (Phase 8)**
-  - AC1: 비용 추적 확장 (활동 유형별 LLM 로깅)
-  - AC2: 예산 알림 체계 4단계
-  - AC3: 비용 모드 3종 (QUALITY / BALANCE / COST_PRIORITY)
-  - AC4: 비용 최적화 (적응적 스케줄링, 배치, 캐시)
+- [x] **T168: 비용 모니터링 & 제어 (Phase 8)** ✅ 2026-02-21
+  - AC1: 비용 추적 확장 — usage-tracker.ts (6종 LLMCallType, 비용 정수 기반 로깅, 일간/월간 리포트)
+  - AC2: 예산 알림 체계 — budget-alert.ts (4단계 일일/월간 임계값, 4종 CostOverrunAction 자동 조치)
+  - AC3: 비용 모드 3종 — cost-mode.ts (QUALITY/BALANCE/COST_PRIORITY, 활동 빈도 + 예산 + PIS 목표)
+  - AC4: 비용 최적화 — optimizer.ts (PIS 적응적 인터뷰, 댓글 배치, 캐시 적중률, 호출 순서 최적화)
+  - AC5: 통합 서비스 — cost-integration.ts (DI 기반 CostDataProvider, 대시보드 빌드 + 모드 변경)
+  - AC6: API — GET/POST /operations/cost (비용 대시보드 + 모드 변경)
+  - AC7: API 문서 — internal.md/openapi 최신화
+  - 기존: usage-tracker.ts, budget-alert.ts, cost-mode.ts, optimizer.ts (4개 모듈 구현 완료)
+  - 신규: cost-integration.ts, cost/index.ts, operations/cost/route.ts
+  - 변경: persona-world/index.ts, cost.test.ts (+8 테스트), internal.md, internal.openapi.yaml
+  - 테스트: 3738 PASS (91 파일), Build PASS
+
+---
+
+## QUEUE
 
 - [x] **T142: 트리거 맵 Rule DSL 확장** ✅ 2026-02-16
   - 구조화된 표현식 (Compare/Range/Contains/AND/OR/NOT)
