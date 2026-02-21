@@ -703,6 +703,7 @@ model IncubatorLog {
   toneMatchScore  Decimal? @db.Decimal(3, 2)
   reasoningQualityScore Decimal? @db.Decimal(3, 2)
   status          IncubatorStatus @default(PENDING)
+  failReason      String?
 
   createdAt       DateTime @default(now())
 

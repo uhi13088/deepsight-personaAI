@@ -1400,12 +1400,24 @@ GET /api/internal/incubator/dashboard
       "totalCostKRW": 8500,
       "monthlyBudgetKRW": 100000
     },
+    "quality": {
+      "avgConsistency": 0.82,
+      "avgVectorAlignment": 0.78,
+      "avgToneMatch": 0.65,
+      "avgReasoningQuality": 0.81,
+      "topFailureReasons": [
+        { "reason": "차원성 미달", "count": 5 },
+        { "reason": "모순 점수 과소", "count": 3 }
+      ]
+    },
     "dailyLimit": 10,
     "pendingRequestCount": 3,
     "lastBatchAt": "2026-02-20T09:30:00.000Z"
   }
 }
 ```
+
+> `quality.topFailureReasons`는 최근 7일 배치에서 불합격 사유를 집계한 결과입니다. 각 `IncubatorLog`의 `failReason` 필드를 기반으로 카테고리별 건수를 상위 5개까지 반환합니다.
 
 ---
 
@@ -1451,6 +1463,7 @@ GET /api/internal/incubator/dashboard
         "archetypeId": "arch_analyst",
         "paradoxScore": 0.35,
         "status": "PASSED",
+        "failReason": null,
         "source": "user_request"
       },
       {
@@ -1459,6 +1472,7 @@ GET /api/internal/incubator/dashboard
         "archetypeId": null,
         "paradoxScore": 0.22,
         "status": "FAILED",
+        "failReason": "모순 점수 과소 (0.220), 차원성 크게 미달 (0.621 < 0.9)",
         "source": "auto"
       }
     ]

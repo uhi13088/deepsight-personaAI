@@ -145,6 +145,7 @@ export async function GET() {
             }
           : null,
         status: l.status as IncubatorStatus,
+        failReason: l.failReason ?? null,
         createdAt: l.createdAt,
       }))
 
@@ -268,6 +269,7 @@ export async function POST(request: NextRequest) {
         archetypeId: string | null
         paradoxScore: number
         status: string
+        failReason: string | null
         source: "user_request" | "auto"
       }> = []
       const errors: string[] = []
@@ -305,6 +307,7 @@ export async function POST(request: NextRequest) {
           const dimensionality = Math.exp(-((p - 0.35) ** 2) / (2 * 0.2 ** 2))
           const passed = dimensionality >= passThreshold
           const status = passed ? "PASSED" : "FAILED"
+          const failReason = passed ? null : computeFailReason(dimensionality, p, passThreshold)
 
           results.push({
             personaId: generated.id,
@@ -312,6 +315,7 @@ export async function POST(request: NextRequest) {
             archetypeId: generated.archetypeId,
             paradoxScore: generated.paradoxScore,
             status,
+            failReason,
             source: "user_request",
           })
 
@@ -336,7 +340,8 @@ export async function POST(request: NextRequest) {
               where: { id: req.id },
               data: {
                 status: "FAILED",
-                failReason: `품질 미달 (dimensionality: ${dimensionality.toFixed(3)}, threshold: ${passThreshold})`,
+                failReason:
+                  failReason ?? `품질 미달 (dimensionality: ${dimensionality.toFixed(3)})`,
                 completedAt: new Date(),
               },
             })
@@ -355,6 +360,7 @@ export async function POST(request: NextRequest) {
               toneMatchScore: p,
               reasoningQualityScore: dimensionality,
               status,
+              failReason,
             },
           })
 
@@ -389,12 +395,15 @@ export async function POST(request: NextRequest) {
           const passed = dimensionality >= passThreshold
 
           const status = passed ? "PASSED" : "FAILED"
+          const failReason = passed ? null : computeFailReason(dimensionality, p, passThreshold)
+
           results.push({
             personaId: generated.id,
             name: generated.name,
             archetypeId: generated.archetypeId,
             paradoxScore: generated.paradoxScore,
             status,
+            failReason,
             source: "auto",
           })
 
@@ -417,6 +426,7 @@ export async function POST(request: NextRequest) {
               toneMatchScore: p,
               reasoningQualityScore: dimensionality,
               status,
+              failReason,
             },
           })
         } catch (err) {
@@ -518,4 +528,31 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+// ── 불합격 사유 계산 ────────────────────────────────────────
+
+function computeFailReason(
+  dimensionality: number,
+  paradoxScore: number,
+  passThreshold: number
+): string {
+  const reasons: string[] = []
+
+  // paradoxScore 기반 분석 (이상적 범위: 0.2 ~ 0.5)
+  if (paradoxScore < 0.15) {
+    reasons.push(`모순 점수 과소 (${paradoxScore.toFixed(3)})`)
+  } else if (paradoxScore > 0.6) {
+    reasons.push(`모순 점수 과다 (${paradoxScore.toFixed(3)})`)
+  }
+
+  // dimensionality 기반 분석
+  const gap = passThreshold - dimensionality
+  if (gap > 0.3) {
+    reasons.push(`차원성 크게 미달 (${dimensionality.toFixed(3)} < ${passThreshold})`)
+  } else if (gap > 0) {
+    reasons.push(`차원성 미달 (${dimensionality.toFixed(3)} < ${passThreshold})`)
+  }
+
+  return reasons.length > 0 ? reasons.join(", ") : `품질 미달 (${dimensionality.toFixed(3)})`
 }

@@ -72,6 +72,11 @@ export default function IncubatorPage() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [batchTriggering, setBatchTriggering] = useState(false)
   const [batchMessage, setBatchMessage] = useState<string | null>(null)
+  const [batchResults, setBatchResults] = useState<Array<{
+    name: string
+    status: string
+    failReason: string | null
+  }> | null>(null)
 
   // Auto-run state
   const [autoRun, setAutoRun] = useState(false)
@@ -126,6 +131,7 @@ export default function IncubatorPage() {
   const triggerBatch = useCallback(async () => {
     setBatchTriggering(true)
     setBatchMessage(null)
+    setBatchResults(null)
     try {
       const res = await fetch("/api/internal/incubator/dashboard", {
         method: "POST",
@@ -140,10 +146,18 @@ export default function IncubatorPage() {
           passed?: number
           failed?: number
           durationMs?: number
+          results?: Array<{
+            name: string
+            status: string
+            failReason: string | null
+          }>
         }
       }
       if (json.success && json.data) {
         setBatchMessage(json.data.message)
+        if (json.data.results) {
+          setBatchResults(json.data.results)
+        }
         fetchData()
       } else {
         setBatchMessage("배치 실행 실패")
@@ -248,6 +262,7 @@ export default function IncubatorPage() {
           countdown={countdown}
           batchTriggering={batchTriggering}
           batchMessage={batchMessage}
+          batchResults={batchResults}
           onToggleAutoRun={toggleAutoRun}
           onChangeInterval={setAutoInterval}
           onTriggerBatch={triggerBatch}
@@ -385,6 +400,7 @@ function OperationStatus({
   countdown,
   batchTriggering,
   batchMessage,
+  batchResults,
   onToggleAutoRun,
   onChangeInterval,
   onTriggerBatch,
@@ -396,6 +412,7 @@ function OperationStatus({
   countdown: number
   batchTriggering: boolean
   batchMessage: string | null
+  batchResults: Array<{ name: string; status: string; failReason: string | null }> | null
   onToggleAutoRun: () => void
   onChangeInterval: (ms: number) => void
   onTriggerBatch: () => void
@@ -523,6 +540,34 @@ function OperationStatus({
         <div className="mt-3 flex items-center gap-2 text-sm text-emerald-500">
           <CheckCircle className="h-4 w-4" />
           {batchMessage}
+        </div>
+      )}
+
+      {/* 개별 결과 (불합격 사유 포함) */}
+      {batchResults && batchResults.length > 0 && !batchTriggering && (
+        <div className="mt-3 space-y-1.5">
+          {batchResults.map((r, i) => (
+            <div
+              key={i}
+              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs ${
+                r.status === "PASSED"
+                  ? "bg-emerald-500/10 text-emerald-500"
+                  : "bg-red-500/10 text-red-400"
+              }`}
+            >
+              <span className="font-medium">{r.name}</span>
+              <span className="text-[10px] opacity-70">—</span>
+              <Badge
+                variant={r.status === "PASSED" ? "success" : "destructive"}
+                className="text-[10px]"
+              >
+                {r.status === "PASSED" ? "PASSED ✓" : "FAILED ✗"}
+              </Badge>
+              {r.failReason && (
+                <span className="text-muted-foreground ml-1 text-[10px]">{r.failReason}</span>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
