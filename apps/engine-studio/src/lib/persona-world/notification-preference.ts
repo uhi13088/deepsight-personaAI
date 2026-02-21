@@ -1,12 +1,11 @@
 /**
- * PersonaWorld - 알림 설정 서비스
+ * PersonaWorld 알림 환경설정 서비스
  *
- * 유저별 알림 유형 ON/OFF + 방해금지 시간대 관리
+ * 8종 알림 유형별 ON/OFF + 방해금지 시간대 관리
  */
 
-// ── 타입 ─────────────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────
 
-/** 알림 유형 (PWNotification.type과 동일) */
 export type NotificationType =
   | "like"
   | "comment"
@@ -17,7 +16,6 @@ export type NotificationType =
   | "new_post"
   | "system"
 
-/** 알림 설정 데이터 */
 export interface NotificationPreferenceData {
   likeEnabled: boolean
   commentEnabled: boolean
@@ -30,20 +28,6 @@ export interface NotificationPreferenceData {
   quietHoursStart: number | null
   quietHoursEnd: number | null
 }
-
-/** 알림 유형 → 설정 필드 매핑 */
-const TYPE_TO_FIELD: Record<NotificationType, keyof NotificationPreferenceData> = {
-  like: "likeEnabled",
-  comment: "commentEnabled",
-  follow: "followEnabled",
-  mention: "mentionEnabled",
-  repost: "repostEnabled",
-  recommendation: "recommendationEnabled",
-  new_post: "newPostEnabled",
-  system: "systemEnabled",
-}
-
-// ── 기본값 ───────────────────────────────────────────────────
 
 export const DEFAULT_PREFERENCES: NotificationPreferenceData = {
   likeEnabled: true,
@@ -58,84 +42,70 @@ export const DEFAULT_PREFERENCES: NotificationPreferenceData = {
   quietHoursEnd: null,
 }
 
-// ── DI Provider ──────────────────────────────────────────────
+// ── DI Provider ──────────────────────────────────────────
 
 export interface NotificationPreferenceProvider {
-  getPreference(userId: string): Promise<NotificationPreferenceData | null>
-  upsertPreference(
+  findByUserId(userId: string): Promise<NotificationPreferenceData | null>
+  upsert(
     userId: string,
     data: Partial<NotificationPreferenceData>
   ): Promise<NotificationPreferenceData>
 }
 
-// ── 핵심 로직 ────────────────────────────────────────────────
+// ── Service ──────────────────────────────────────────────
 
-/**
- * 유저의 알림 설정 조회 (없으면 기본값 반환)
- */
+const TYPE_TO_FIELD: Record<NotificationType, keyof NotificationPreferenceData> = {
+  like: "likeEnabled",
+  comment: "commentEnabled",
+  follow: "followEnabled",
+  mention: "mentionEnabled",
+  repost: "repostEnabled",
+  recommendation: "recommendationEnabled",
+  new_post: "newPostEnabled",
+  system: "systemEnabled",
+}
+
 export async function getPreferences(
   provider: NotificationPreferenceProvider,
   userId: string
 ): Promise<NotificationPreferenceData> {
-  const pref = await provider.getPreference(userId)
-  return pref ?? { ...DEFAULT_PREFERENCES }
+  const prefs = await provider.findByUserId(userId)
+  return prefs ?? { ...DEFAULT_PREFERENCES }
 }
 
-/**
- * 유저의 알림 설정 업데이트 (upsert)
- */
 export async function updatePreferences(
   provider: NotificationPreferenceProvider,
   userId: string,
   updates: Partial<NotificationPreferenceData>
 ): Promise<NotificationPreferenceData> {
-  // quietHours 유효성 검증
-  if (updates.quietHoursStart !== undefined || updates.quietHoursEnd !== undefined) {
-    const start = updates.quietHoursStart ?? null
-    const end = updates.quietHoursEnd ?? null
-
-    if (start !== null && (start < 0 || start > 23)) {
-      throw new Error("quietHoursStart must be 0-23")
-    }
-    if (end !== null && (end < 0 || end > 23)) {
-      throw new Error("quietHoursEnd must be 0-23")
-    }
-  }
-
-  return provider.upsertPreference(userId, updates)
+  return provider.upsert(userId, updates)
 }
 
 /**
- * 특정 알림을 이 유저에게 전송해야 하는지 판정
+ * 특정 알림 유형이 현재 시점에 전달 가능한지 판단
+ * - 유형 토글 OFF → false
+ * - 방해금지 시간대 내 → false
  */
-export async function shouldDeliver(
-  provider: NotificationPreferenceProvider,
-  userId: string,
+export function shouldDeliver(
+  prefs: NotificationPreferenceData,
   type: NotificationType,
-  currentHour?: number
-): Promise<boolean> {
-  const pref = await getPreferences(provider, userId)
-
-  // 1) 유형별 ON/OFF 체크
+  now?: Date
+): boolean {
   const field = TYPE_TO_FIELD[type]
-  if (field && !pref[field]) {
-    return false
-  }
+  if (!field || !prefs[field]) return false
 
-  // 2) 방해금지 시간대 체크
-  if (pref.quietHoursStart !== null && pref.quietHoursEnd !== null) {
-    const hour = currentHour ?? new Date().getHours()
+  // 방해금지 시간대 확인
+  if (prefs.quietHoursStart !== null && prefs.quietHoursEnd !== null) {
+    const hour = (now ?? new Date()).getHours()
+    const start = prefs.quietHoursStart
+    const end = prefs.quietHoursEnd
 
-    if (pref.quietHoursStart <= pref.quietHoursEnd) {
-      // 예: 22~06이 아닌, 09~18 같은 정상 범위
-      if (hour >= pref.quietHoursStart && hour < pref.quietHoursEnd) {
-        return false
-      }
+    if (start <= end) {
+      // e.g. 09:00 ~ 18:00
+      if (hour >= start && hour < end) return false
     } else {
-      // 자정 넘김: 예: 22~06 → 22,23,0,1,2,3,4,5
-      if (hour >= pref.quietHoursStart || hour < pref.quietHoursEnd) {
-        return false
-      }
+      // 자정 넘김 e.g. 22:00 ~ 07:00
+      if (hour >= start || hour < end) return false
     }
   }
 

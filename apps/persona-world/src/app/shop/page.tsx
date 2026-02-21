@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
-import { ArrowLeft, Coins, Check, Lock, CreditCard, Sparkles } from "lucide-react"
+import { ArrowLeft, Coins, Check, Lock, Zap } from "lucide-react"
 import { PWLogoWithText, PWCard, PWButton, PWBottomNav } from "@/components/persona-world"
 import { useUserStore } from "@/lib/user-store"
 import { clientApi } from "@/lib/api"
@@ -14,20 +14,20 @@ import {
   type ShopItem,
 } from "@/lib/shop"
 
-// 코인 패키지 (서버와 동일)
+// 코인 충전 패키지 (서버의 coin-packages.ts와 동기화)
 const COIN_PACKAGES = [
   { id: "coin_100", coins: 100, bonus: 0, price: 1100, label: "100 코인" },
-  { id: "coin_500", coins: 500, bonus: 50, price: 4900, label: "550 코인", tag: "HOT" as const },
+  { id: "coin_500", coins: 500, bonus: 50, price: 4900, label: "500+50 코인", tag: "HOT" as const },
   {
     id: "coin_1000",
     coins: 1000,
     bonus: 150,
     price: 8900,
-    label: "1,150 코인",
+    label: "1,000+150 코인",
     tag: "BEST" as const,
   },
-  { id: "coin_3000", coins: 3000, bonus: 600, price: 23900, label: "3,600 코인" },
-]
+  { id: "coin_3000", coins: 3000, bonus: 600, price: 23900, label: "3,000+600 코인" },
+] as const
 
 type ConfirmState = { item: ShopItem } | null
 
@@ -35,47 +35,62 @@ export default function ShopPage() {
   const { profile, onboarding, purchaseItem, hasPurchased, getPurchaseCount } = useUserStore()
   const [activeTab, setActiveTab] = useState<ShopCategory>("persona")
   const [confirm, setConfirm] = useState<ConfirmState>(null)
-  const [purchasingPkg, setPurchasingPkg] = useState<string | null>(null)
+  const [coinLoading, setCoinLoading] = useState<string | null>(null)
 
   const balance = onboarding.creditsBalance
-  const userId = profile?.id
-
-  // 코인 충전 핸들러
-  const handleCoinPurchase = async (pkgId: string) => {
+  const items = getShopItemsByCategory(activeTab)
+  const handleCoinPurchase = async (packageId: string) => {
+    const userId = profile?.id
     if (!userId) {
       toast.error("로그인이 필요합니다")
       return
     }
-    setPurchasingPkg(pkgId)
-    try {
-      const { paymentInfo } = await clientApi.requestCoinPurchase(userId, pkgId)
 
-      // Toss 결제 위젯 호출 (window.TossPayments)
-      const tossClientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || paymentInfo.clientKey
-      if (typeof window !== "undefined" && tossClientKey) {
-        // @ts-expect-error Toss SDK global
-        const tossPayments = window.TossPayments?.(tossClientKey)
-        if (tossPayments) {
-          await tossPayments.requestPayment("카드", {
-            amount: paymentInfo.amount,
-            orderId: paymentInfo.orderId,
-            orderName: paymentInfo.orderName,
-            successUrl: `${window.location.origin}/shop?toss=success`,
-            failUrl: `${window.location.origin}/shop?toss=fail`,
-          })
-        } else {
-          // Toss SDK 미로드 시 → 직접 confirm (테스트용)
-          toast.info("Toss SDK 로드 대기 중... 잠시 후 다시 시도해주세요")
-        }
+    setCoinLoading(packageId)
+    try {
+      const { paymentInfo } = await clientApi.requestCoinPurchase(userId, packageId)
+
+      // Toss Payments 위젯 호출
+      type TossWidget = (clientKey: string) => {
+        requestPayment: (
+          method: string,
+          params: Record<string, unknown>
+        ) => Promise<{ paymentKey: string }>
       }
+      const tossPayments = (window as unknown as Record<string, unknown>).TossPayments as
+        | TossWidget
+        | undefined
+      if (!tossPayments) {
+        toast.error("결제 모듈을 로드하는 중입니다. 잠시 후 다시 시도해주세요.")
+        return
+      }
+
+      const widget = tossPayments(paymentInfo.clientKey)
+      const result = await widget.requestPayment("카드", {
+        amount: paymentInfo.amount,
+        orderId: paymentInfo.orderId,
+        orderName: paymentInfo.orderName,
+        successUrl: `${window.location.origin}/shop?payment=success`,
+        failUrl: `${window.location.origin}/shop?payment=fail`,
+      })
+
+      // 결제 승인
+      const confirmed = await clientApi.confirmCoinPayment(
+        result.paymentKey,
+        paymentInfo.orderId,
+        paymentInfo.amount
+      )
+      toast.success(`${confirmed.coins} 코인이 충전되었습니다!`)
     } catch (error) {
-      const msg = error instanceof Error ? error.message : "결제 요청 실패"
-      toast.error(msg)
+      const msg = error instanceof Error ? error.message : "결제 실패"
+      if (!msg.includes("cancel") && !msg.includes("취소")) {
+        toast.error(msg)
+      }
     } finally {
-      setPurchasingPkg(null)
+      setCoinLoading(null)
     }
   }
-  const items = getShopItemsByCategory(activeTab)
+
   const handlePurchase = (item: ShopItem) => {
     if (item.tag === "SOON") {
       toast.info("곧 출시됩니다!")
@@ -136,22 +151,24 @@ export default function ShopPage() {
 
         {/* 코인 충전 섹션 */}
         <div className="mb-6">
-          <h2 className="mb-3 flex items-center gap-2 text-base font-bold text-gray-900">
-            <CreditCard className="h-4 w-4 text-purple-500" />
+          <h2 className="mb-3 flex items-center gap-2 font-semibold text-gray-900">
+            <Zap className="h-5 w-5 text-amber-500" />
             코인 충전
           </h2>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             {COIN_PACKAGES.map((pkg) => (
               <button
                 key={pkg.id}
                 onClick={() => handleCoinPurchase(pkg.id)}
-                disabled={purchasingPkg === pkg.id}
-                className="relative rounded-xl border border-gray-200 bg-white p-3 text-left transition-all hover:border-purple-300 hover:shadow-md disabled:opacity-50"
+                disabled={coinLoading !== null}
+                className={`relative rounded-xl border-2 bg-white p-4 text-left transition-all hover:border-purple-300 hover:shadow-md ${
+                  coinLoading === pkg.id ? "opacity-70" : ""
+                } ${"tag" in pkg && pkg.tag === "BEST" ? "border-purple-400" : "border-gray-200"}`}
               >
-                {pkg.tag && (
+                {"tag" in pkg && pkg.tag && (
                   <span
-                    className={`absolute -top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${
-                      pkg.tag === "BEST" ? "bg-purple-500" : "bg-red-500"
+                    className={`absolute -top-2 right-3 rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${
+                      pkg.tag === "BEST" ? "bg-purple-500" : "bg-orange-500"
                     }`}
                   >
                     {pkg.tag}
@@ -159,19 +176,18 @@ export default function ShopPage() {
                 )}
                 <div className="flex items-center gap-1.5">
                   <Coins className="h-4 w-4 text-amber-500" />
-                  <span className="text-sm font-bold text-gray-900">{pkg.label}</span>
+                  <span className="font-bold text-gray-900">{pkg.coins.toLocaleString()}</span>
+                  {pkg.bonus > 0 && (
+                    <span className="text-xs font-medium text-green-600">+{pkg.bonus}</span>
+                  )}
                 </div>
-                {pkg.bonus > 0 && (
-                  <div className="mt-1 flex items-center gap-1 text-[11px] text-purple-600">
-                    <Sparkles className="h-3 w-3" />
-                    보너스 +{pkg.bonus}
-                  </div>
-                )}
-                <div className="mt-2 text-sm font-semibold text-gray-700">
+                <div className="mt-1 text-sm font-semibold text-purple-600">
                   ₩{pkg.price.toLocaleString()}
                 </div>
-                {purchasingPkg === pkg.id && (
-                  <div className="mt-1 text-[11px] text-purple-500">결제 중...</div>
+                {coinLoading === pkg.id && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white/80">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
+                  </div>
                 )}
               </button>
             ))}

@@ -335,8 +335,7 @@ export interface NotificationsResponse {
   hasMore: boolean
 }
 
-// ── 알림 설정 ─────────────────────────────────────────────────
-
+// ── 알림 환경설정 ────────────────────────────────────────
 export interface NotificationPreferenceData {
   likeEnabled: boolean
   commentEnabled: boolean

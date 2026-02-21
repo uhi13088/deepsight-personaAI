@@ -294,7 +294,24 @@ export type {
   EvolutionBatchResult,
 } from "./evolution"
 
-// Credits / Coin Service
+// PW-F: 알림 환경설정
+export {
+  DEFAULT_PREFERENCES,
+  getPreferences,
+  updatePreferences,
+  shouldDeliver,
+} from "./notification-preference"
+export type {
+  NotificationType,
+  NotificationPreferenceData,
+  NotificationPreferenceProvider,
+} from "./notification-preference"
+
+// PW-F: 코인 패키지
+export { COIN_PACKAGES, getCoinPackageById, formatPrice } from "./coin-packages"
+export type { CoinPackage } from "./coin-packages"
+
+// PW-F: 크레딧 서비스
 export {
   getBalance,
   addCredits,
@@ -302,19 +319,9 @@ export {
   purchaseCredits,
   getTransactionHistory,
 } from "./credit-service"
-export type { CreditDataProvider } from "./credit-service"
-export { COIN_PACKAGES, getCoinPackageById, formatPrice } from "./coin-packages"
-export type { CoinPackage } from "./coin-packages"
-
-// Notification Preferences
-export {
-  getPreferences as getNotificationPreferences,
-  updatePreferences as updateNotificationPreferences,
-  shouldDeliver as shouldDeliverNotification,
-  DEFAULT_PREFERENCES as DEFAULT_NOTIFICATION_PREFERENCES,
-} from "./notification-preference"
 export type {
-  NotificationType,
-  NotificationPreferenceData,
-  NotificationPreferenceProvider,
-} from "./notification-preference"
+  TransactionType,
+  TransactionStatus,
+  TransactionRecord,
+  CreditDataProvider,
+} from "./credit-service"

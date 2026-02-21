@@ -176,6 +176,33 @@
 
 ---
 
+## DONE (v4.0 — PW 상점/결제/설정)
+
+- [x] **T170: 알림 환경설정 (PW-F1)** ✅ 2026-02-21
+  - AC1: PWNotificationPreference 모델 + 021 마이그레이션
+  - AC2: notification-preference.ts 서비스 (getPreferences, updatePreferences, shouldDeliver)
+  - AC3: API GET/PUT /api/persona-world/notification-preferences
+  - AC4: /settings/notifications 페이지 (8종 토글 + 방해금지 시간대)
+  - 테스트: 3713+84 PASS, Build PASS
+
+- [x] **T171: 크레딧 실결제 — Toss Payments 연동 (PW-F2)** ✅ 2026-02-21
+  - AC1: CoinTransaction 모델 + 022 마이그레이션
+  - AC2: coin-packages.ts (4종 패키지: 100/500/1000/3000 코인)
+  - AC3: credit-service.ts (getBalance, addCredits, spendCredits, purchaseCredits, getTransactionHistory)
+  - AC4: API GET/POST /credits + POST /credits/toss-confirm
+  - AC5: Shop 페이지 코인 충전 섹션 (Toss 위젯 연동)
+  - 테스트: 3713+84 PASS, Build PASS
+
+- [x] **T172: 프로필 설정 페이지 (PW-F3)** ✅ 2026-02-21
+  - AC1: /settings 메인 페이지 (계정/알림/결제 3탭)
+  - AC2: 계정 설정 탭 (프로필 카드 + 취향 분석 링크 + 데이터 초기화/로그아웃)
+  - AC3: 알림 탭 (/settings/notifications 연결)
+  - AC4: 결제 탭 (코인 잔액 카드 + 거래 내역 리스트 + 충전 링크)
+  - AC5: 프로필 페이지 Settings 아이콘 → /settings 링크로 교체
+  - 테스트: 84 PASS, Build PASS
+
+---
+
 ## QUEUE
 
 - [ ] **T166: 자동 모더레이션 (Phase 7-A)**

@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { signOut } from "next-auth/react"
 import {
   PWLogoWithText,
   PWCard,
@@ -21,13 +20,11 @@ import {
   Link2,
   Users,
   Loader2,
-  Trash2,
   Flame,
   Coins,
   Check,
   X,
   Shield,
-  LogOut,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -48,7 +45,6 @@ export default function ProfilePage() {
     followedPersonas,
     likedPosts,
     bookmarkedPosts,
-    reset,
     answerDailyQuestion,
     connectSns,
     disconnectSns,
@@ -58,7 +54,6 @@ export default function ProfilePage() {
 
   const [followedPersonaDetails, setFollowedPersonaDetails] = useState<PersonaDetail[]>([])
   const [loadingFollowed, setLoadingFollowed] = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
   const [showSnsConnect, setShowSnsConnect] = useState(false)
   const [dailyAnswered, setDailyAnswered] = useState(false)
   const [consentProvider, setConsentProvider] = useState<SnsProvider | null>(null)
@@ -88,27 +83,6 @@ export default function ProfilePage() {
 
     loadFollowedPersonas()
   }, [followedPersonas])
-
-  const handleLogout = async () => {
-    // Zustand 스토어 초기화
-    reset()
-    // 브라우저 캐시 정리 (stale 데이터로 인한 redirect loop 방지)
-    if ("caches" in window) {
-      const cacheNames = await caches.keys()
-      await Promise.all(cacheNames.map((name) => caches.delete(name)))
-    }
-    localStorage.clear()
-    sessionStorage.clear()
-    // NextAuth 로그아웃
-    await signOut({ callbackUrl: "/" })
-  }
-
-  const handleReset = () => {
-    if (window.confirm("모든 데이터를 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) {
-      reset()
-      toast.success("데이터가 초기화되었습니다")
-    }
-  }
 
   const handleDailyAnswer = useCallback(() => {
     answerDailyQuestion(10)
@@ -159,42 +133,9 @@ export default function ProfilePage() {
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-gray-100 bg-white">
         <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-4">
           <PWLogoWithText size="sm" />
-          <div className="relative">
-            <button
-              onClick={() => setShowSettings(!showSettings)}
-              className="rounded-full p-2 hover:bg-gray-100"
-            >
-              <Settings className="h-5 w-5 text-gray-600" />
-            </button>
-            {/* Settings dropdown */}
-            {showSettings && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowSettings(false)} />
-                <div className="absolute right-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg">
-                  <button
-                    onClick={() => {
-                      setShowSettings(false)
-                      handleReset()
-                    }}
-                    className="flex w-full items-center gap-2 px-4 py-3 text-sm text-red-500 transition-colors hover:bg-red-50"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    데이터 초기화
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSettings(false)
-                      handleLogout()
-                    }}
-                    className="flex w-full items-center gap-2 border-t border-gray-100 px-4 py-3 text-sm text-gray-600 transition-colors hover:bg-gray-50"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    로그아웃
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          <Link href="/settings" className="rounded-full p-2 hover:bg-gray-100">
+            <Settings className="h-5 w-5 text-gray-600" />
+          </Link>
         </div>
       </header>
 

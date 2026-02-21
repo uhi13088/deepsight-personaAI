@@ -1318,10 +1318,11 @@ model PersonaWorldUser {
   reposts         PersonaRepost[]
   following       PersonaFollow[] @relation("UserFollowing")
   bookmarks       PersonaPostBookmark[]
-  notifications           PWNotification[]
-  notificationPreference  PWNotificationPreference?
-  surveyResponses         PWUserSurveyResponse[]
-  personaRequests         PersonaGenerationRequest[]
+  notifications   PWNotification[]
+  surveyResponses PWUserSurveyResponse[]
+  personaRequests PersonaGenerationRequest[]
+  notificationPreference PWNotificationPreference?
+  coinTransactions CoinTransaction[]
 
   @@map("persona_world_users")
 }
@@ -1410,69 +1411,6 @@ model PWNotification {
   @@index([userId, read])
   @@index([userId, createdAt])
   @@map("pw_notifications")
-}
-
-// ============================================
-// PersonaWorld - 알림 설정
-// ============================================
-
-model PWNotificationPreference {
-  id              String           @id @default(cuid())
-  userId          String           @unique
-  user            PersonaWorldUser @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // 알림 유형별 ON/OFF (기본: 전부 ON)
-  likeEnabled           Boolean @default(true)
-  commentEnabled        Boolean @default(true)
-  followEnabled         Boolean @default(true)
-  mentionEnabled        Boolean @default(true)
-  repostEnabled         Boolean @default(true)
-  recommendationEnabled Boolean @default(true)
-  newPostEnabled        Boolean @default(true)
-  systemEnabled         Boolean @default(true)
-
-  // 방해금지 시간대 (0~23, null이면 비활성)
-  quietHoursStart Int?
-  quietHoursEnd   Int?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("pw_notification_preferences")
-}
-
-// ============================================
-// PersonaWorld - 코인 거래 내역
-// ============================================
-
-model CoinTransaction {
-  id           String              @id @default(cuid())
-  userId       String
-  type         CoinTransactionType // EARN, PURCHASE, SPEND
-  amount       Int                 // 코인 수량 (양수)
-  balanceAfter Int                 // 거래 후 잔액
-  reason       String?             // "온보딩 Phase 1", "500코인 패키지", "follow_slot_expand" 등
-  orderId      String?             // Toss 결제 주문 ID (PURCHASE만)
-  paymentKey   String?             // Toss paymentKey (PURCHASE만)
-  status       CoinTransactionStatus @default(COMPLETED)
-  createdAt    DateTime            @default(now())
-
-  @@index([userId, createdAt])
-  @@index([orderId])
-  @@map("coin_transactions")
-}
-
-enum CoinTransactionType {
-  EARN     // 온보딩, 데일리 질문 등
-  PURCHASE // 실결제
-  SPEND    // 상점 구매
-}
-
-enum CoinTransactionStatus {
-  PENDING
-  COMPLETED
-  FAILED
-  REFUNDED
 }
 
 // ============================================
@@ -2242,4 +2180,67 @@ enum PersonaRequestStatus {
   GENERATING    // 생성 중
   COMPLETED     // 완료 (generatedPersonaId 설정됨)
   FAILED        // 생성 실패
+}
+
+// ============================================
+// PersonaWorld 알림 환경설정
+// ============================================
+
+model PWNotificationPreference {
+  id              String           @id @default(cuid())
+  userId          String           @unique
+  user            PersonaWorldUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  likeEnabled           Boolean @default(true)
+  commentEnabled        Boolean @default(true)
+  followEnabled         Boolean @default(true)
+  mentionEnabled        Boolean @default(true)
+  repostEnabled         Boolean @default(true)
+  recommendationEnabled Boolean @default(true)
+  newPostEnabled        Boolean @default(true)
+  systemEnabled         Boolean @default(true)
+
+  quietHoursStart Int?
+  quietHoursEnd   Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("pw_notification_preferences")
+}
+
+// ============================================
+// PersonaWorld 코인 거래 기록
+// ============================================
+
+model CoinTransaction {
+  id           String              @id @default(cuid())
+  userId       String
+  user         PersonaWorldUser    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         CoinTransactionType
+  amount       Int
+  balanceAfter Int
+  reason       String?
+  orderId      String?
+  paymentKey   String?
+  status       CoinTransactionStatus @default(COMPLETED)
+
+  createdAt    DateTime            @default(now())
+
+  @@index([userId, createdAt])
+  @@index([orderId])
+  @@map("coin_transactions")
+}
+
+enum CoinTransactionType {
+  EARN
+  PURCHASE
+  SPEND
+}
+
+enum CoinTransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
 }

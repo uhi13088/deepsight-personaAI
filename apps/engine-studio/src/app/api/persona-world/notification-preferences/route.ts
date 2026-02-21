@@ -1,24 +1,24 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import type { NotificationPreferenceData } from "@/lib/persona-world/notification-preference"
-import { DEFAULT_PREFERENCES } from "@/lib/persona-world/notification-preference"
+import {
+  DEFAULT_PREFERENCES,
+  type NotificationPreferenceData,
+} from "@/lib/persona-world/notification-preference"
 
 /**
  * GET /api/persona-world/notification-preferences?userId=xxx
- *
- * 유저의 알림 설정 조회 (없으면 기본값)
+ * 알림 환경설정 조회
  */
 export async function GET(request: NextRequest) {
+  const userId = request.nextUrl.searchParams.get("userId")
+  if (!userId) {
+    return NextResponse.json(
+      { success: false, error: { code: "MISSING_PARAM", message: "userId required" } },
+      { status: 400 }
+    )
+  }
+
   try {
-    const userId = request.nextUrl.searchParams.get("userId")
-
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: { code: "INVALID_REQUEST", message: "userId 필요" } },
-        { status: 400 }
-      )
-    }
-
     const pref = await prisma.pWNotificationPreference.findUnique({
       where: { userId },
     })
@@ -40,9 +40,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, data })
   } catch (error) {
-    console.error("[notification-preferences] GET error:", error)
+    console.error("[notification-preferences GET]", error)
     return NextResponse.json(
-      { success: false, error: { code: "INTERNAL_ERROR", message: "알림 설정 조회 실패" } },
+      { success: false, error: { code: "INTERNAL", message: "Failed to fetch preferences" } },
       { status: 500 }
     )
   }
@@ -50,42 +50,21 @@ export async function GET(request: NextRequest) {
 
 /**
  * PUT /api/persona-world/notification-preferences
- *
- * 유저의 알림 설정 업데이트 (upsert)
- *
- * Body: { userId: string, ...partialPreferences }
+ * 알림 환경설정 업데이트 (upsert)
  */
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { userId, ...updates } = body as { userId: string } & Partial<NotificationPreferenceData>
+    const { userId, ...updates } = body
 
     if (!userId) {
       return NextResponse.json(
-        { success: false, error: { code: "INVALID_REQUEST", message: "userId 필요" } },
+        { success: false, error: { code: "MISSING_PARAM", message: "userId required" } },
         { status: 400 }
       )
     }
 
-    // quietHours 유효성 검증
-    if (updates.quietHoursStart !== undefined && updates.quietHoursStart !== null) {
-      if (updates.quietHoursStart < 0 || updates.quietHoursStart > 23) {
-        return NextResponse.json(
-          { success: false, error: { code: "INVALID_REQUEST", message: "quietHoursStart는 0~23" } },
-          { status: 400 }
-        )
-      }
-    }
-    if (updates.quietHoursEnd !== undefined && updates.quietHoursEnd !== null) {
-      if (updates.quietHoursEnd < 0 || updates.quietHoursEnd > 23) {
-        return NextResponse.json(
-          { success: false, error: { code: "INVALID_REQUEST", message: "quietHoursEnd는 0~23" } },
-          { status: 400 }
-        )
-      }
-    }
-
-    // boolean 필드만 허용
+    // 허용 필드만 필터링
     const allowedFields = [
       "likeEnabled",
       "commentEnabled",
@@ -97,12 +76,24 @@ export async function PUT(request: NextRequest) {
       "systemEnabled",
       "quietHoursStart",
       "quietHoursEnd",
-    ] as const
-
-    const safeUpdates: Record<string, unknown> = {}
-    for (const field of allowedFields) {
-      if (updates[field] !== undefined) {
-        safeUpdates[field] = updates[field]
+    ]
+    const filtered: Record<string, unknown> = {}
+    for (const key of allowedFields) {
+      if (key in updates) {
+        // quietHours 유효성 검사
+        if (key === "quietHoursStart" || key === "quietHoursEnd") {
+          const val = updates[key]
+          if (val !== null && (typeof val !== "number" || val < 0 || val > 23)) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: { code: "INVALID_PARAM", message: `${key} must be 0-23 or null` },
+              },
+              { status: 400 }
+            )
+          }
+        }
+        filtered[key] = updates[key]
       }
     }
 
@@ -111,9 +102,9 @@ export async function PUT(request: NextRequest) {
       create: {
         userId,
         ...DEFAULT_PREFERENCES,
-        ...safeUpdates,
+        ...filtered,
       },
-      update: safeUpdates,
+      update: filtered,
     })
 
     const data: NotificationPreferenceData = {
@@ -131,9 +122,9 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true, data })
   } catch (error) {
-    console.error("[notification-preferences] PUT error:", error)
+    console.error("[notification-preferences PUT]", error)
     return NextResponse.json(
-      { success: false, error: { code: "INTERNAL_ERROR", message: "알림 설정 저장 실패" } },
+      { success: false, error: { code: "INTERNAL", message: "Failed to update preferences" } },
       { status: 500 }
     )
   }

@@ -507,9 +507,10 @@ export const clientApi = {
     return json.data!
   },
 
-  // ── 알림 설정 조회 ──────────────────────────────────────────
+  // ── 알림 환경설정 조회 ────────────────────────────────────
   async getNotificationPreferences(userId: string) {
-    const res = await fetch(`/api/persona-world/notification-preferences?userId=${userId}`)
+    const params = new URLSearchParams({ userId })
+    const res = await fetch(`/api/persona-world/notification-preferences?${params}`)
     if (!res.ok) throw new Error("Failed to fetch notification preferences")
 
     const json: ApiResponse<NotificationPreferenceData> = await res.json()
@@ -517,7 +518,7 @@ export const clientApi = {
     return json.data!
   },
 
-  // ── 알림 설정 저장 ──────────────────────────────────────────
+  // ── 알림 환경설정 업데이트 ────────────────────────────────
   async updateNotificationPreferences(
     userId: string,
     updates: Partial<NotificationPreferenceData>
@@ -534,7 +535,7 @@ export const clientApi = {
     return json.data!
   },
 
-  // ── 크레딧(코인) 잔액 + 내역 조회 ─────────────────────────
+  // ── 코인 잔액 + 거래 내역 조회 ────────────────────────────
   async getCredits(userId: string, options?: { limit?: number; offset?: number }) {
     const params = new URLSearchParams({ userId })
     if (options?.limit) params.set("limit", String(options.limit))
@@ -559,7 +560,7 @@ export const clientApi = {
     return json.data!
   },
 
-  // ── 코인 충전 결제 요청 ─────────────────────────────────────
+  // ── 코인 충전 요청 (Toss 결제 시작) ────────────────────────
   async requestCoinPurchase(userId: string, packageId: string) {
     const res = await fetch(`/api/persona-world/credits`, {
       method: "POST",
@@ -582,7 +583,7 @@ export const clientApi = {
     return json.data!
   },
 
-  // ── Toss 결제 확인 ──────────────────────────────────────────
+  // ── Toss 결제 승인 확인 ────────────────────────────────────
   async confirmCoinPayment(paymentKey: string, orderId: string, amount: number) {
     const res = await fetch(`/api/persona-world/credits/toss-confirm`, {
       method: "POST",

@@ -1,153 +1,119 @@
 /**
- * PersonaWorld - 크레딧(코인) 서비스
+ * PersonaWorld 크레딧 서비스
  *
- * DB 기반 잔액 관리 + 거래 내역 기록
+ * 코인 잔액 조회, 획득, 사용, 충전(Toss), 거래 내역
  */
 
-// ── DI Provider ──────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────
+
+export type TransactionType = "EARN" | "PURCHASE" | "SPEND"
+export type TransactionStatus = "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED"
+
+export interface TransactionRecord {
+  id: string
+  userId: string
+  type: TransactionType
+  amount: number
+  balanceAfter: number
+  reason: string | null
+  orderId: string | null
+  paymentKey: string | null
+  status: TransactionStatus
+  createdAt: Date
+}
+
+// ── DI Provider ──────────────────────────────────────────
 
 export interface CreditDataProvider {
-  /** 유저의 최근 거래에서 잔액 조회 (없으면 0) */
-  getLastBalance(userId: string): Promise<number>
-  /** 거래 기록 추가 */
+  getLatestTransaction(userId: string): Promise<TransactionRecord | null>
   createTransaction(data: {
     userId: string
-    type: "EARN" | "PURCHASE" | "SPEND"
+    type: TransactionType
     amount: number
     balanceAfter: number
     reason?: string
     orderId?: string
     paymentKey?: string
-    status?: "PENDING" | "COMPLETED" | "FAILED" | "REFUNDED"
-  }): Promise<{ id: string; balanceAfter: number }>
-  /** 거래 내역 조회 */
+    status?: TransactionStatus
+  }): Promise<TransactionRecord>
+  findByOrderId(orderId: string): Promise<TransactionRecord | null>
+  updateTransaction(id: string, data: Partial<TransactionRecord>): Promise<TransactionRecord>
   getTransactions(
     userId: string,
     options?: { limit?: number; offset?: number }
-  ): Promise<
-    Array<{
-      id: string
-      type: "EARN" | "PURCHASE" | "SPEND"
-      amount: number
-      balanceAfter: number
-      reason: string | null
-      orderId: string | null
-      status: string
-      createdAt: Date
-    }>
-  >
-  /** orderId로 거래 조회 */
-  findByOrderId(orderId: string): Promise<{ id: string; status: string } | null>
-  /** 거래 상태 업데이트 */
-  updateTransactionStatus(id: string, status: "COMPLETED" | "FAILED" | "REFUNDED"): Promise<void>
+  ): Promise<TransactionRecord[]>
 }
 
-// ── 핵심 로직 ────────────────────────────────────────────────
+// ── Service ──────────────────────────────────────────────
 
-/**
- * 유저 코인 잔액 조회
- */
 export async function getBalance(provider: CreditDataProvider, userId: string): Promise<number> {
-  return provider.getLastBalance(userId)
+  const latest = await provider.getLatestTransaction(userId)
+  return latest?.balanceAfter ?? 0
 }
 
-/**
- * 코인 적립 (온보딩, 데일리 등)
- */
 export async function addCredits(
   provider: CreditDataProvider,
   userId: string,
   amount: number,
-  reason: string
-): Promise<{ balance: number; transactionId: string }> {
-  if (amount <= 0) throw new Error("amount must be positive")
-
-  const currentBalance = await provider.getLastBalance(userId)
-  const newBalance = currentBalance + amount
-
-  const tx = await provider.createTransaction({
+  reason?: string
+): Promise<TransactionRecord> {
+  const currentBalance = await getBalance(provider, userId)
+  return provider.createTransaction({
     userId,
     type: "EARN",
     amount,
-    balanceAfter: newBalance,
+    balanceAfter: currentBalance + amount,
     reason,
   })
-
-  return { balance: tx.balanceAfter, transactionId: tx.id }
 }
 
-/**
- * 코인 소비 (상점 구매)
- */
 export async function spendCredits(
   provider: CreditDataProvider,
   userId: string,
   amount: number,
-  reason: string
-): Promise<{ balance: number; transactionId: string }> {
-  if (amount <= 0) throw new Error("amount must be positive")
-
-  const currentBalance = await provider.getLastBalance(userId)
+  reason?: string
+): Promise<TransactionRecord> {
+  const currentBalance = await getBalance(provider, userId)
   if (currentBalance < amount) {
     throw new Error("INSUFFICIENT_BALANCE")
   }
-
-  const newBalance = currentBalance - amount
-
-  const tx = await provider.createTransaction({
+  return provider.createTransaction({
     userId,
     type: "SPEND",
     amount,
-    balanceAfter: newBalance,
+    balanceAfter: currentBalance - amount,
     reason,
   })
-
-  return { balance: tx.balanceAfter, transactionId: tx.id }
 }
 
 /**
- * 실결제 코인 충전 (Toss 결제 확인 후 호출)
+ * Toss 결제 요청 시 PENDING 거래 생성
  */
 export async function purchaseCredits(
   provider: CreditDataProvider,
   userId: string,
-  amount: number,
-  orderId: string,
-  paymentKey: string,
-  reason: string
-): Promise<{ balance: number; transactionId: string }> {
-  if (amount <= 0) throw new Error("amount must be positive")
-
-  // 중복 결제 방지
+  totalCoins: number,
+  orderId: string
+): Promise<TransactionRecord> {
+  // 중복 주문 방지
   const existing = await provider.findByOrderId(orderId)
-  if (existing && existing.status === "COMPLETED") {
-    throw new Error("DUPLICATE_ORDER")
-  }
+  if (existing) throw new Error("DUPLICATE_ORDER")
 
-  const currentBalance = await provider.getLastBalance(userId)
-  const newBalance = currentBalance + amount
-
-  const tx = await provider.createTransaction({
+  const currentBalance = await getBalance(provider, userId)
+  return provider.createTransaction({
     userId,
     type: "PURCHASE",
-    amount,
-    balanceAfter: newBalance,
-    reason,
+    amount: totalCoins,
+    balanceAfter: currentBalance + totalCoins,
     orderId,
-    paymentKey,
-    status: "COMPLETED",
+    status: "PENDING",
   })
-
-  return { balance: tx.balanceAfter, transactionId: tx.id }
 }
 
-/**
- * 거래 내역 조회
- */
 export async function getTransactionHistory(
   provider: CreditDataProvider,
   userId: string,
   options?: { limit?: number; offset?: number }
-) {
+): Promise<TransactionRecord[]> {
   return provider.getTransactions(userId, options)
 }

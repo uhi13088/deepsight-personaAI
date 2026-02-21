@@ -176,7 +176,7 @@ export default function NotificationSettingsPage() {
       <header className="sticky top-0 z-20 border-b border-white/10 bg-gray-950/80 px-4 py-3 backdrop-blur-xl">
         <div className="mx-auto flex max-w-lg items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/profile" className="rounded-lg p-1.5 transition hover:bg-white/10">
+            <Link href="/settings" className="rounded-lg p-1.5 transition hover:bg-white/10">
               <ArrowLeft className="h-5 w-5 text-gray-400" />
             </Link>
             <PWLogoWithText size="sm" />
