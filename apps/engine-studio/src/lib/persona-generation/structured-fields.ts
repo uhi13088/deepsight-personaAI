@@ -55,25 +55,158 @@ export function inferAgeRange(
 
 /**
  * 벡터 기반 지역 추론.
- * 한국 도시 중심 — 페르소나 성격에 따라 지역 분배.
+ * 글로벌 도시 풀 — 페르소나 성격에 따라 지역 분배.
  *
- * sociability 높음 + extraversion 높음 → 대도시 (서울 강남/홍대)
- * depth 높음 + taste 낮음 → 전통 도시 (경주, 전주)
- * taste 높음 + openness 높음 → 문화 도시 (서울 성수/연남)
- * conscientiousness 높음 → 계획도시 (세종, 분당)
- * 기본 → 서울 일반
+ * sociability 높음 + extraversion 높음 → 대도시 (서울, 도쿄, 뉴욕 등)
+ * depth 높음 + taste 낮음 → 전통/역사 도시 (경주, 교토, 피렌체 등)
+ * taste 높음 + openness 높음 → 문화 도시 (베를린, 포틀랜드 등)
+ * conscientiousness 높음 → 계획/체계적 도시 (싱가포르, 세종 등)
+ * 기본 → 다양한 일반 도시
  */
 const REGION_POOLS: Record<string, string[]> = {
-  metropolitan: ["서울 강남", "서울 마포", "서울 성동", "부산 해운대", "인천 송도"],
-  cultural: ["서울 성수", "서울 연남", "서울 이태원", "부산 전포", "제주시"],
-  traditional: ["경주", "전주", "강릉", "여수", "통영"],
-  planned: ["세종", "성남 분당", "수원 영통", "대전 유성", "고양 일산"],
-  general: ["서울 종로", "서울 영등포", "서울 관악", "대구 중구", "광주 동구"],
+  metropolitan: [
+    "서울 강남",
+    "서울 마포",
+    "부산 해운대",
+    "Tokyo, Shibuya",
+    "Tokyo, Minato",
+    "Osaka, Umeda",
+    "New York, Manhattan",
+    "London, Soho",
+    "Shanghai, Pudong",
+    "Singapore, Central",
+    "Sydney, CBD",
+  ],
+  cultural: [
+    "서울 성수",
+    "서울 연남",
+    "제주시",
+    "Berlin, Kreuzberg",
+    "Portland, OR",
+    "Melbourne, Fitzroy",
+    "Amsterdam, Jordaan",
+    "Barcelona, El Born",
+    "Taipei, Da'an",
+    "Bangkok, Ari",
+  ],
+  traditional: [
+    "경주",
+    "전주",
+    "강릉",
+    "Kyoto",
+    "Florence",
+    "Prague",
+    "Istanbul",
+    "Jaipur",
+    "Marrakech",
+    "Edinburgh",
+    "Cusco",
+  ],
+  planned: [
+    "세종",
+    "성남 분당",
+    "대전 유성",
+    "Singapore, Jurong",
+    "Dubai, Downtown",
+    "Zurich",
+    "Copenhagen",
+    "Helsinki",
+    "Canberra",
+    "Abu Dhabi",
+    "Songdo, Incheon",
+  ],
+  general: [
+    "서울 종로",
+    "대구 중구",
+    "광주 동구",
+    "Toronto",
+    "Vancouver",
+    "Paris, Le Marais",
+    "Mumbai, Bandra",
+    "São Paulo, Vila Madalena",
+    "Lagos, Ikoyi",
+    "Nairobi, Westlands",
+    "Cairo, Zamalek",
+    "Ho Chi Minh City, District 1",
+  ],
+}
+
+/** 지역 → 타임존 매핑 */
+const REGION_TIMEZONE_MAP: Record<string, string> = {
+  // 한국
+  서울: "Asia/Seoul",
+  부산: "Asia/Seoul",
+  경주: "Asia/Seoul",
+  전주: "Asia/Seoul",
+  강릉: "Asia/Seoul",
+  제주: "Asia/Seoul",
+  세종: "Asia/Seoul",
+  성남: "Asia/Seoul",
+  대전: "Asia/Seoul",
+  대구: "Asia/Seoul",
+  광주: "Asia/Seoul",
+  인천: "Asia/Seoul",
+  Songdo: "Asia/Seoul",
+  // 일본
+  Tokyo: "Asia/Tokyo",
+  Osaka: "Asia/Tokyo",
+  Kyoto: "Asia/Tokyo",
+  // 중국/대만
+  Shanghai: "Asia/Shanghai",
+  Taipei: "Asia/Taipei",
+  // 동남아
+  Singapore: "Asia/Singapore",
+  Bangkok: "Asia/Bangkok",
+  "Ho Chi Minh": "Asia/Ho_Chi_Minh",
+  // 남아시아
+  Mumbai: "Asia/Kolkata",
+  Jaipur: "Asia/Kolkata",
+  // 중동
+  Dubai: "Asia/Dubai",
+  "Abu Dhabi": "Asia/Dubai",
+  Istanbul: "Europe/Istanbul",
+  Cairo: "Africa/Cairo",
+  // 유럽
+  London: "Europe/London",
+  Paris: "Europe/Paris",
+  Berlin: "Europe/Berlin",
+  Amsterdam: "Europe/Amsterdam",
+  Barcelona: "Europe/Madrid",
+  Prague: "Europe/Prague",
+  Zurich: "Europe/Zurich",
+  Copenhagen: "Europe/Copenhagen",
+  Helsinki: "Europe/Helsinki",
+  Edinburgh: "Europe/London",
+  Florence: "Europe/Rome",
+  // 북미
+  "New York": "America/New_York",
+  Portland: "America/Los_Angeles",
+  Toronto: "America/Toronto",
+  Vancouver: "America/Vancouver",
+  // 남미
+  "São Paulo": "America/Sao_Paulo",
+  Cusco: "America/Lima",
+  // 오세아니아
+  Sydney: "Australia/Sydney",
+  Melbourne: "Australia/Melbourne",
+  Canberra: "Australia/Sydney",
+  // 아프리카
+  Lagos: "Africa/Lagos",
+  Nairobi: "Africa/Nairobi",
+  Marrakech: "Africa/Casablanca",
 }
 
 export function inferRegion(l1: SocialPersonaVector, l2: CoreTemperamentVector): string {
   const pool = selectRegionPool(l1, l2)
   return pool[Math.floor(Math.random() * pool.length)]
+}
+
+/** 지역 문자열에서 타임존을 추론. 첫 번째 매칭 키 사용, fallback: UTC */
+export function inferTimezone(region: string): string {
+  for (const [key, tz] of Object.entries(REGION_TIMEZONE_MAP)) {
+    if (region.includes(key)) return tz
+  }
+  return "UTC"
 }
 
 function selectRegionPool(l1: SocialPersonaVector, l2: CoreTemperamentVector): string[] {
@@ -158,11 +291,12 @@ export function generateStructuredFields(
   activityRange: [number, number],
   peakRange: [number, number]
 ): StructuredFields {
+  const region = inferRegion(l1, l2)
   return {
     birthDate: inferBirthDate(l1, l2),
-    region: inferRegion(l1, l2),
+    region,
     activeHours: expandActiveHours(activityRange),
     peakHours: expandPeakHours(peakRange),
-    timezone: "Asia/Seoul",
+    timezone: inferTimezone(region),
   }
 }

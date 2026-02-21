@@ -337,9 +337,31 @@
 
 ---
 
+## DONE (v4.0 — 생성 다양성)
+
+- [x] **T173: 페르소나 생성 다양성 확장 + 풀네임** ✅ 2026-02-21
+  - AC1: 이름 풀 국제화 — NAME_POOLS 92개 다국적 풀네임 (한국 60% + 글로벌 40%)
+  - AC2: LLM 프롬프트 다양성 — "한국어 이름 2~4글자" 제약 제거, 다국적 풀네임 지시
+  - AC3: 지역/타임존 국제화 — REGION_POOLS 55개 글로벌 도시, inferTimezone() 동적 타임존
+  - AC4: 아키타입 균등 분배 — suggestUnderrepresentedArchetypes 연동, 저사용 우선 배정
+  - 변경: character-generator.ts, llm-character-generator.ts, structured-fields.ts, index.ts, structured-fields.test.ts
+  - 테스트: 3738 PASS (91 파일), Build PASS
+
+---
+
 ## IN_PROGRESS
 
-(없음)
+- [ ] **T174: 페르소나 기본 프로필 확장 (인구통계)**
+  - AC1: 스키마 확장 — gender, educationLevel, nationality, languages, knowledgeAreas 필드 추가 + 마이그레이션
+  - AC2: structured-fields.ts 확장 — 벡터 기반 성별/교육수준/지식영역/국적 추론 로직
+  - AC3: LLM 프롬프트 확장 — 캐릭터 생성 시 새 필드(성별 포함) 생성 지시 추가
+  - AC4: 페르소나 상세 페이지에 기본 프로필 정보 표시 UI
+
+- [ ] **T175: 페르소나 기억 뷰어 (관리자)**
+  - AC1: API — GET /api/internal/personas/[id]/memories (활동로그/소비기록/대화이력/관계 통합 조회)
+  - AC2: 페르소나 상세 페이지 탭 추가 — 기억 탭 (활동/소비/대화/관계 서브탭)
+  - AC3: 기본정보에 현재 상태 표시 — mood/energy/socialBattery/paradoxTension 게이지
+  - AC4: 기억 통계 — 활성/핵심/망각 기억 수, 평균 보존율 표시
 
 ---
 
