@@ -329,7 +329,7 @@ export default function ArenaAdminPage() {
       : 0
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 p-6">
       <Header title="아레나 관리" description="1:1 스파링 세션 생성 및 결과 리뷰" />
 
       {/* 통계 카드 */}

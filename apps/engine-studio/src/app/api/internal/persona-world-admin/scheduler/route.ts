@@ -312,22 +312,6 @@ function createSchedulerDataProvider(): SchedulerDataProvider {
         ]
       })
     },
-
-    async saveActivityLog({ personaId, decision, context: ctx, stateSnapshot }) {
-      if (!decision.shouldPost && !decision.shouldInteract) return
-
-      await prisma.personaActivityLog.create({
-        data: {
-          personaId,
-          activityType: decision.shouldPost ? "POST_CREATED" : "POST_COMMENTED",
-          trigger: ctx.trigger,
-          postTypeReason: (decision.postTypeReason ?? undefined) as
-            | Prisma.InputJsonValue
-            | undefined,
-          stateSnapshot: stateSnapshot as unknown as Prisma.InputJsonValue,
-        },
-      })
-    },
   }
 }
 
