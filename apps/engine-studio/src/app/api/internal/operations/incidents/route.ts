@@ -303,7 +303,7 @@ export async function POST(request: NextRequest) {
       const created = await prisma.incident.create({
         data: {
           title: body.title,
-          description: `${body.title} - 자동 생성`,
+          description: body.description?.trim() || `${body.title} - 수동 등록`,
           severity: dbSeverity as Prisma.IncidentCreateInput["severity"],
           status: "REPORTED" as Prisma.IncidentCreateInput["status"],
           affectedSystems: body.affectedServices ?? [],

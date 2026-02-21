@@ -39,4 +39,47 @@
 - 새로운 사용 방법
 -->
 
-(없음 — 이후 스키마 변경 시 위 형식으로 기록)
+## [2026-02-21] IncubatorLog failReason 추가
+
+### Added
+
+- IncubatorLog.failReason: 불합격 사유 텍스트 (nullable)
+
+### Migration
+
+```sql
+ALTER TABLE "incubator_logs" ADD COLUMN IF NOT EXISTS "failReason" TEXT;
+```
+
+### Claude에게
+
+- 배치 실행 시 FAILED 상태의 IncubatorLog에 failReason이 자동 기록됨
+- buildDashboard()에서 topFailureReasons를 failReason 기반으로 집계
+- 기존 데이터의 failReason은 NULL (영향 없음)
+
+---
+
+## [2026-02-21] Persona 인구통계 필드 추가
+
+### Added
+
+- Persona.gender: 성별 (nullable)
+- Persona.nationality: 국적 (nullable)
+- Persona.educationLevel: 교육 수준 (nullable)
+- Persona.languages: 언어 목록 (String[], default [])
+- Persona.knowledgeAreas: 지식 분야 (String[], default [])
+
+### Migration
+
+```sql
+ALTER TABLE "Persona" ADD COLUMN IF NOT EXISTS "gender" TEXT;
+ALTER TABLE "Persona" ADD COLUMN IF NOT EXISTS "nationality" TEXT;
+ALTER TABLE "Persona" ADD COLUMN IF NOT EXISTS "educationLevel" TEXT;
+ALTER TABLE "Persona" ADD COLUMN IF NOT EXISTS "languages" TEXT[] DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE "Persona" ADD COLUMN IF NOT EXISTS "knowledgeAreas" TEXT[] DEFAULT ARRAY[]::TEXT[];
+```
+
+### Claude에게
+
+- 생성 파이프라인에서 벡터 기반으로 자동 추론하여 채움
+- 기존 페르소나의 해당 필드는 NULL/빈배열 (영향 없음)

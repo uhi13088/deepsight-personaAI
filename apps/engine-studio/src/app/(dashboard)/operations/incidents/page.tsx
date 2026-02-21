@@ -14,6 +14,7 @@ import {
   Play,
   FileText,
   BarChart3,
+  X,
 } from "lucide-react"
 import { INCIDENT_SEVERITY_DEFINITIONS } from "@/lib/operations"
 import type { Incident, IncidentSeverity, IncidentPhase, PostMortem } from "@/lib/operations"
@@ -47,6 +48,76 @@ const PHASE_LABELS: Record<IncidentPhase, string> = {
   postmortem: "사후분석",
 }
 
+// ── 영향 서비스 선택지 ──────────────────────────────────────────
+
+const AFFECTED_SERVICE_OPTIONS = [
+  { id: "api-gateway", label: "API Gateway" },
+  { id: "matching-engine", label: "Matching Engine" },
+  { id: "engine-studio", label: "Engine Studio" },
+  { id: "persona-world", label: "Persona World" },
+  { id: "developer-console", label: "Developer Console" },
+  { id: "worker", label: "Background Worker" },
+  { id: "llm-service", label: "LLM Service" },
+  { id: "database", label: "Database" },
+  { id: "cache", label: "Cache (Redis)" },
+  { id: "auth-service", label: "Auth Service" },
+  { id: "cdn-storage", label: "CDN / Storage" },
+  { id: "log-collector", label: "Log Collector" },
+  { id: "backup-service", label: "Backup Service" },
+] as const
+
+// ── MTTR 포맷 ───────────────────────────────────────────────────
+
+function formatMTTR(minutes: number): React.ReactNode {
+  if (minutes <= 0) {
+    return (
+      <>
+        -<span className="text-muted-foreground ml-1 text-sm font-normal">분</span>
+      </>
+    )
+  }
+  if (minutes < 60) {
+    return (
+      <>
+        {Math.round(minutes)}
+        <span className="text-muted-foreground ml-1 text-sm font-normal">분</span>
+      </>
+    )
+  }
+  if (minutes < 1440) {
+    const hours = Math.floor(minutes / 60)
+    const mins = Math.round(minutes % 60)
+    return (
+      <>
+        {hours}
+        <span className="text-muted-foreground ml-0.5 text-sm font-normal">시간</span>
+        {mins > 0 && (
+          <>
+            {" "}
+            {mins}
+            <span className="text-muted-foreground ml-0.5 text-sm font-normal">분</span>
+          </>
+        )}
+      </>
+    )
+  }
+  const days = Math.floor(minutes / 1440)
+  const hours = Math.round((minutes % 1440) / 60)
+  return (
+    <>
+      {days}
+      <span className="text-muted-foreground ml-0.5 text-sm font-normal">일</span>
+      {hours > 0 && (
+        <>
+          {" "}
+          {hours}
+          <span className="text-muted-foreground ml-0.5 text-sm font-normal">시간</span>
+        </>
+      )}
+    </>
+  )
+}
+
 // ── API response type ──────────────────────────────────────────
 
 interface IncidentData {
@@ -72,7 +143,14 @@ export default function IncidentsPage() {
   // Create form state
   const [newTitle, setNewTitle] = useState("")
   const [newSeverity, setNewSeverity] = useState<IncidentSeverity>("P2")
-  const [newServices, setNewServices] = useState("")
+  const [newDescription, setNewDescription] = useState("")
+  const [selectedServices, setSelectedServices] = useState<string[]>([])
+
+  function toggleService(serviceId: string) {
+    setSelectedServices((prev) =>
+      prev.includes(serviceId) ? prev.filter((s) => s !== serviceId) : [...prev, serviceId]
+    )
+  }
 
   // Post-mortem form state
   const [pmRootCause, setPmRootCause] = useState("")
@@ -128,10 +206,6 @@ export default function IncidentsPage() {
 
   const handleCreateIncident = useCallback(async () => {
     if (!newTitle.trim()) return
-    const services = newServices
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean)
 
     try {
       const res = await fetch("/api/internal/operations/incidents", {
@@ -140,22 +214,24 @@ export default function IncidentsPage() {
         body: JSON.stringify({
           action: "create_incident",
           title: newTitle,
+          description: newDescription,
           severity: newSeverity,
-          affectedServices: services,
+          affectedServices: selectedServices,
         }),
       })
       const json = (await res.json()) as { success: boolean }
       if (json.success) {
         setNewTitle("")
+        setNewDescription("")
         setNewSeverity("P2")
-        setNewServices("")
+        setSelectedServices([])
         setShowCreateForm(false)
         await fetchData()
       }
     } catch {
       // silent fail
     }
-  }, [newTitle, newSeverity, newServices, fetchData])
+  }, [newTitle, newDescription, newSeverity, selectedServices, fetchData])
 
   const handleAdvancePhase = useCallback(
     async (incidentId: string) => {
@@ -268,10 +344,7 @@ export default function IncidentsPage() {
               <Clock className="text-muted-foreground h-4 w-4" />
               <span className="text-muted-foreground text-xs">평균 복구시간 (MTTR)</span>
             </div>
-            <p className="text-2xl font-bold">
-              {mttr}
-              <span className="text-muted-foreground ml-1 text-sm font-normal">분</span>
-            </p>
+            <p className="text-2xl font-bold">{formatMTTR(mttr)}</p>
           </div>
           <div className="bg-card rounded-lg border p-4">
             <div className="mb-1 flex items-center gap-2">
@@ -315,35 +388,112 @@ export default function IncidentsPage() {
         </div>
 
         {showCreateForm && (
-          <div className="bg-card rounded-lg border p-4">
-            <h4 className="mb-3 text-sm font-medium">새 장애 생성</h4>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <input
-                type="text"
-                placeholder="장애 제목"
-                className="border-border bg-background rounded-md border px-3 py-1.5 text-sm"
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-              />
-              <select
-                className="border-border bg-background rounded-md border px-3 py-1.5 text-sm"
-                value={newSeverity}
-                onChange={(e) => setNewSeverity(e.target.value as IncidentSeverity)}
+          <div className="bg-card rounded-lg border p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h4 className="text-sm font-semibold">새 장애 등록</h4>
+              <button
+                onClick={() => setShowCreateForm(false)}
+                className="text-muted-foreground hover:text-foreground"
               >
-                {INCIDENT_SEVERITY_DEFINITIONS.map((def) => (
-                  <option key={def.level} value={def.level}>
-                    {def.level} - {def.label}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="text"
-                placeholder="영향 서비스 (쉼표 구분)"
-                className="border-border bg-background rounded-md border px-3 py-1.5 text-sm"
-                value={newServices}
-                onChange={(e) => setNewServices(e.target.value)}
-              />
-              <Button onClick={handleCreateIncident}>생성</Button>
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* 제목 + 심각도 */}
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="sm:col-span-2">
+                  <label className="text-muted-foreground mb-1.5 block text-xs font-medium">
+                    장애 제목 <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="예: API Gateway 타임아웃 급증"
+                    className="border-border bg-background w-full rounded-md border px-3 py-2 text-sm"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-muted-foreground mb-1.5 block text-xs font-medium">
+                    심각도 <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    className="border-border bg-background w-full rounded-md border px-3 py-2 text-sm"
+                    value={newSeverity}
+                    onChange={(e) => setNewSeverity(e.target.value as IncidentSeverity)}
+                  >
+                    {INCIDENT_SEVERITY_DEFINITIONS.map((def) => (
+                      <option key={def.level} value={def.level}>
+                        {def.level} — {def.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-muted-foreground mt-1 text-[10px]">
+                    {
+                      INCIDENT_SEVERITY_DEFINITIONS.find((d) => d.level === newSeverity)
+                        ?.description
+                    }
+                  </p>
+                </div>
+              </div>
+
+              {/* 설명 */}
+              <div>
+                <label className="text-muted-foreground mb-1.5 block text-xs font-medium">
+                  상세 설명
+                </label>
+                <textarea
+                  placeholder="장애 증상, 발견 경위 등을 기술하세요"
+                  rows={2}
+                  className="border-border bg-background w-full rounded-md border px-3 py-2 text-sm"
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                />
+              </div>
+
+              {/* 영향 서비스 — 칩 선택 */}
+              <div>
+                <label className="text-muted-foreground mb-1.5 block text-xs font-medium">
+                  영향 서비스
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {AFFECTED_SERVICE_OPTIONS.map((svc) => {
+                    const isSelected = selectedServices.includes(svc.id)
+                    return (
+                      <button
+                        key={svc.id}
+                        type="button"
+                        onClick={() => toggleService(svc.id)}
+                        className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                          isSelected
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                        }`}
+                      >
+                        {isSelected && "✓ "}
+                        {svc.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                {selectedServices.length > 0 && (
+                  <p className="text-muted-foreground mt-1.5 text-[10px]">
+                    {selectedServices.length}개 서비스 선택됨
+                  </p>
+                )}
+              </div>
+
+              {/* 하단 버튼 */}
+              <div className="flex items-center justify-end gap-2 border-t pt-4">
+                <Button variant="outline" size="sm" onClick={() => setShowCreateForm(false)}>
+                  취소
+                </Button>
+                <Button size="sm" onClick={handleCreateIncident} disabled={!newTitle.trim()}>
+                  <AlertTriangle className="mr-1.5 h-3.5 w-3.5" />
+                  장애 등록
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -370,9 +520,23 @@ export default function IncidentsPage() {
                     </Badge>
                     <div>
                       <p className="text-sm font-medium">{incident.title}</p>
-                      <p className="text-muted-foreground text-xs">
-                        {incident.id} | {incident.affectedServices.join(", ")}
-                      </p>
+                      <div className="mt-0.5 flex items-center gap-1.5">
+                        {incident.affectedServices.length > 0 ? (
+                          incident.affectedServices.map((svc) => {
+                            const svcDef = AFFECTED_SERVICE_OPTIONS.find((o) => o.id === svc)
+                            return (
+                              <span
+                                key={svc}
+                                className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-[10px]"
+                              >
+                                {svcDef?.label ?? svc}
+                              </span>
+                            )
+                          })
+                        ) : (
+                          <span className="text-muted-foreground text-[10px]">서비스 미지정</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -483,33 +647,66 @@ export default function IncidentsPage() {
 
                     {/* Post-Mortem Form */}
                     {showPostMortemForm === incident.id && (
-                      <div className="rounded-md border p-3">
-                        <h4 className="mb-2 text-xs font-medium">Post-Mortem 작성</h4>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <input
-                            type="text"
-                            placeholder="근본 원인"
-                            className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
-                            value={pmRootCause}
-                            onChange={(e) => setPmRootCause(e.target.value)}
-                          />
-                          <input
-                            type="number"
-                            placeholder="영향 사용자 수"
-                            className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
-                            value={pmAffectedUsers}
-                            onChange={(e) => setPmAffectedUsers(Number(e.target.value))}
-                          />
-                          <input
-                            type="number"
-                            placeholder="다운타임 (분)"
-                            className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
-                            value={pmDowntime}
-                            onChange={(e) => setPmDowntime(Number(e.target.value))}
-                          />
-                          <Button size="sm" onClick={() => handleCreatePostMortem(incident.id)}>
-                            Post-Mortem 생성
-                          </Button>
+                      <div className="rounded-lg border p-4">
+                        <h4 className="mb-3 text-xs font-semibold">Post-Mortem 작성</h4>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="text-muted-foreground mb-1 block text-[11px] font-medium">
+                              근본 원인 <span className="text-red-400">*</span>
+                            </label>
+                            <textarea
+                              placeholder="장애가 발생한 근본적인 원인을 기술하세요"
+                              rows={2}
+                              className="border-border bg-background w-full rounded-md border px-3 py-1.5 text-xs"
+                              value={pmRootCause}
+                              onChange={(e) => setPmRootCause(e.target.value)}
+                            />
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <label className="text-muted-foreground mb-1 block text-[11px] font-medium">
+                                영향 사용자 수
+                              </label>
+                              <input
+                                type="number"
+                                min={0}
+                                placeholder="0"
+                                className="border-border bg-background w-full rounded-md border px-3 py-1.5 text-xs"
+                                value={pmAffectedUsers || ""}
+                                onChange={(e) => setPmAffectedUsers(Number(e.target.value))}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-muted-foreground mb-1 block text-[11px] font-medium">
+                                다운타임 (분)
+                              </label>
+                              <input
+                                type="number"
+                                min={0}
+                                placeholder="0"
+                                className="border-border bg-background w-full rounded-md border px-3 py-1.5 text-xs"
+                                value={pmDowntime || ""}
+                                onChange={(e) => setPmDowntime(Number(e.target.value))}
+                              />
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-end gap-2 border-t pt-3">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowPostMortemForm(null)}
+                            >
+                              취소
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleCreatePostMortem(incident.id)}
+                              disabled={!pmRootCause.trim()}
+                            >
+                              <FileText className="mr-1 h-3 w-3" />
+                              Post-Mortem 생성
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     )}

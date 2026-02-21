@@ -208,12 +208,33 @@ export function buildDashboard(params: {
   // 품질 메트릭 계산 (최근 배치의 평균)
   const allLogs = params.recentBatches.flatMap((b) => b.logs)
   const withScores = allLogs.filter((l) => l.scoreBreakdown !== null)
+
+  // 실패 사유 집계
+  const failedLogs = allLogs.filter(
+    (l) => (l.status === "FAILED" || l.status === "REJECTED") && l.failReason
+  )
+  const reasonCountMap = new Map<string, number>()
+  for (const log of failedLogs) {
+    // failReason이 복합 사유일 수 있으므로 각각 분리하여 집계
+    const reasons = (log.failReason ?? "").split(", ")
+    for (const reason of reasons) {
+      const normalized = normalizeFailReason(reason)
+      if (normalized) {
+        reasonCountMap.set(normalized, (reasonCountMap.get(normalized) ?? 0) + 1)
+      }
+    }
+  }
+  const topFailureReasons = [...reasonCountMap.entries()]
+    .map(([reason, count]) => ({ reason, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5)
+
   const quality: QualityMetric = {
     avgConsistency: avg(withScores.map((l) => l.consistencyScore ?? 0)),
     avgVectorAlignment: avg(withScores.map((l) => l.scoreBreakdown?.vectorAlignment ?? 0)),
     avgToneMatch: avg(withScores.map((l) => l.scoreBreakdown?.toneMatch ?? 0)),
     avgReasoningQuality: avg(withScores.map((l) => l.scoreBreakdown?.reasoningQuality ?? 0)),
-    topFailureReasons: [],
+    topFailureReasons,
   }
 
   // 알림 생성
@@ -245,4 +266,16 @@ export function buildDashboard(params: {
 function avg(values: number[]): number {
   if (values.length === 0) return 0
   return Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 1000) / 1000
+}
+
+/** 실패 사유를 카테고리로 정규화 (구체 수치 제거) */
+function normalizeFailReason(reason: string): string {
+  const trimmed = reason.trim()
+  if (!trimmed) return ""
+  if (trimmed.startsWith("모순 점수 과소")) return "모순 점수 과소"
+  if (trimmed.startsWith("모순 점수 과다")) return "모순 점수 과다"
+  if (trimmed.startsWith("차원성 크게 미달")) return "차원성 크게 미달"
+  if (trimmed.startsWith("차원성 미달")) return "차원성 미달"
+  if (trimmed.startsWith("품질 미달")) return "품질 미달"
+  return trimmed
 }

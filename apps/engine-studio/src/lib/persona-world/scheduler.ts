@@ -43,14 +43,6 @@ export interface SchedulerPersona {
 export interface SchedulerDataProvider {
   /** 활성 상태 페르소나 목록 조회 */
   getActiveStatusPersonas(): Promise<SchedulerPersona[]>
-
-  /** 포스트 생성 후 DB 저장 */
-  saveActivityLog(params: {
-    personaId: string
-    decision: ActivityDecision
-    context: SchedulerContext
-    stateSnapshot: PersonaStateData
-  }): Promise<void>
 }
 
 /**
@@ -106,13 +98,8 @@ export async function runScheduler(
         : false,
     })
 
-    // Step 7: 로깅
-    await provider.saveActivityLog({
-      personaId: persona.id,
-      decision,
-      context,
-      stateSnapshot: state,
-    })
+    // Step 7: 로깅 — 실행 파이프라인(post-pipeline, interaction-pipeline)에서
+    // 개별적으로 활동 로그를 기록하므로, 여기서는 중복 로깅하지 않음
   }
 
   return {

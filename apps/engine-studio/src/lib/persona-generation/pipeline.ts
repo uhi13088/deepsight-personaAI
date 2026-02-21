@@ -7,7 +7,10 @@
 import { prisma } from "@/lib/prisma"
 import { generatePersona } from "@/lib/persona-generation"
 import { buildCoverageReport, type CoverageReport } from "@/lib/persona-generation/vector-generator"
-import { generateStructuredFields } from "@/lib/persona-generation/structured-fields"
+import {
+  generateStructuredFields,
+  generateDemographicFields,
+} from "@/lib/persona-generation/structured-fields"
 import { inferActivitySettings } from "@/lib/persona-generation/activity-inference"
 import { generateCharacterWithLLM } from "@/lib/persona-generation/llm-character-generator"
 import { buildAllPrompts } from "@/lib/prompt-builder"
@@ -166,6 +169,12 @@ interface SavePersonaParams {
   peakHours?: number[]
   timezone?: string
   postFrequency?: PrismaPostFrequency
+  // T174: 인구통계 필드
+  gender?: string
+  nationality?: string
+  educationLevel?: string
+  languages?: string[]
+  knowledgeAreas?: string[]
 }
 
 async function savePersonaToDb(params: SavePersonaParams) {
@@ -208,6 +217,13 @@ async function savePersonaToDb(params: SavePersonaParams) {
         peakHours: params.peakHours ?? [],
         timezone: params.timezone ?? "Asia/Seoul",
         postFrequency: params.postFrequency ?? "MODERATE",
+
+        // T174: 인구통계 필드
+        gender: params.gender ?? undefined,
+        nationality: params.nationality ?? undefined,
+        educationLevel: params.educationLevel ?? undefined,
+        languages: params.languages ?? [],
+        knowledgeAreas: params.knowledgeAreas ?? [],
 
         // v3 호환: 기존 소비자가 직접 접근하는 필드 유지
         voiceProfile: params.qualitative.voice as unknown as Prisma.InputJsonValue,
@@ -392,6 +408,9 @@ async function executeAutoPipeline(options?: AutoPipelineInput): Promise<Generat
   const activity = inferActivitySettings(l1, l2, l3)
   const structured = generateStructuredFields(l1, l2, l3, activity.activeHours, activity.peakHours)
 
+  // Stage 5.7: T174 인구통계 필드 생성
+  const demographics = generateDemographicFields(l1, l2, structured.region)
+
   // Stage 6: Paradox Score
   const crossAxisProfile = calculateCrossAxisProfile(l1, l2, l3)
   const paradoxProfile = calculateExtendedParadoxScore(l1, l2, l3, crossAxisProfile)
@@ -428,6 +447,11 @@ async function executeAutoPipeline(options?: AutoPipelineInput): Promise<Generat
     peakHours: structured.peakHours,
     timezone: structured.timezone,
     postFrequency: activity.postFrequency as PrismaPostFrequency,
+    gender: demographics.gender,
+    nationality: demographics.nationality,
+    educationLevel: demographics.educationLevel,
+    languages: demographics.languages,
+    knowledgeAreas: demographics.knowledgeAreas,
   })
 
   // T161-AC4: 커버리지 리포트
@@ -485,6 +509,9 @@ async function executeManualPipeline(input: ManualPipelineInput): Promise<Genera
   const activity = inferActivitySettings(l1, l2, l3)
   const structured = generateStructuredFields(l1, l2, l3, activity.activeHours, activity.peakHours)
 
+  // T174: 인구통계 필드 생성
+  const demographics = generateDemographicFields(l1, l2, structured.region)
+
   // Paradox Score
   const crossAxisProfile = calculateCrossAxisProfile(l1, l2, l3)
   const paradoxProfile = calculateExtendedParadoxScore(l1, l2, l3, crossAxisProfile)
@@ -522,6 +549,11 @@ async function executeManualPipeline(input: ManualPipelineInput): Promise<Genera
     peakHours: structured.peakHours,
     timezone: structured.timezone,
     postFrequency: activity.postFrequency as PrismaPostFrequency,
+    gender: demographics.gender,
+    nationality: demographics.nationality,
+    educationLevel: demographics.educationLevel,
+    languages: demographics.languages,
+    knowledgeAreas: demographics.knowledgeAreas,
   })
 
   return {

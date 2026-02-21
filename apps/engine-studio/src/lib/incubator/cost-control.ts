@@ -187,17 +187,18 @@ export async function getDailyCostsFromDB(
   since.setDate(since.getDate() - days)
 
   try {
+    // 컬럼명은 Prisma 스키마 필드명과 동일 (camelCase, @map 없음)
     const dailyRaw = await prisma.$queryRaw<
       { date: Date; total_cost: string; total_calls: bigint; total_tokens: bigint }[]
     >`
       SELECT
-        DATE(created_at) as date,
-        COALESCE(SUM(estimated_cost_usd), 0) as total_cost,
+        DATE("createdAt") as date,
+        COALESCE(SUM("estimatedCostUsd"), 0) as total_cost,
         COUNT(*) as total_calls,
-        COALESCE(SUM(total_tokens), 0) as total_tokens
+        COALESCE(SUM("totalTokens"), 0) as total_tokens
       FROM llm_usage_logs
-      WHERE created_at >= ${since}
-      GROUP BY DATE(created_at)
+      WHERE "createdAt" >= ${since}
+      GROUP BY DATE("createdAt")
       ORDER BY date ASC
     `
 

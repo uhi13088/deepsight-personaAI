@@ -114,7 +114,19 @@ describe("T162-AC2: region 자동 매핑", () => {
   it("inferRegion — 높은 sociability/extraversion → 대도시 지역", () => {
     const socialL1 = { ...YOUNG_L1, sociability: 0.9 }
     const socialL2 = { ...YOUNG_L2, extraversion: 0.9 }
-    const metro = ["서울 강남", "서울 마포", "서울 성동", "부산 해운대", "인천 송도"]
+    const metro = [
+      "서울 강남",
+      "서울 마포",
+      "부산 해운대",
+      "Tokyo, Shibuya",
+      "Tokyo, Minato",
+      "Osaka, Umeda",
+      "New York, Manhattan",
+      "London, Soho",
+      "Shanghai, Pudong",
+      "Singapore, Central",
+      "Sydney, CBD",
+    ]
 
     // 10번 생성, 절반 이상이 대도시여야 함
     let metroCount = 0
@@ -128,7 +140,19 @@ describe("T162-AC2: region 자동 매핑", () => {
   it("inferRegion — 높은 conscientiousness/purpose → 계획도시 지역", () => {
     const plannedL1 = { ...MATURE_L1, purpose: 0.9, taste: 0.1, sociability: 0.2, depth: 0.3 }
     const plannedL2 = { ...MATURE_L2, conscientiousness: 0.95, extraversion: 0.2, openness: 0.2 }
-    const planned = ["세종", "성남 분당", "수원 영통", "대전 유성", "고양 일산"]
+    const planned = [
+      "세종",
+      "성남 분당",
+      "대전 유성",
+      "Singapore, Jurong",
+      "Dubai, Downtown",
+      "Zurich",
+      "Copenhagen",
+      "Helsinki",
+      "Canberra",
+      "Abu Dhabi",
+      "Songdo, Incheon",
+    ]
 
     let plannedCount = 0
     for (let i = 0; i < 20; i++) {
@@ -204,7 +228,8 @@ describe("T162: generateStructuredFields 통합", () => {
     expect(fields.activeHours.length).toBeGreaterThan(0)
     expect(Array.isArray(fields.peakHours)).toBe(true)
     expect(fields.peakHours.length).toBeGreaterThan(0)
-    expect(fields.timezone).toBe("Asia/Seoul")
+    expect(typeof fields.timezone).toBe("string")
+    expect(fields.timezone.length).toBeGreaterThan(0)
   })
 
   it("activeHours와 peakHours는 입력 범위에 기반해야 함", () => {

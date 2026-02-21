@@ -129,6 +129,14 @@ export interface PersonaDetail {
   updatedAt: string
   activatedAt: string | null
   archivedAt: string | null
+  // T174: 인구통계 프로필
+  gender: string | null
+  birthDate: string | null
+  nationality: string | null
+  region: string | null
+  educationLevel: string | null
+  languages: string[]
+  knowledgeAreas: string[]
 }
 
 // ── Persona Update API ────────────────────────────────────────

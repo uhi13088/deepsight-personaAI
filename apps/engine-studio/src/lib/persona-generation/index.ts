@@ -11,7 +11,11 @@ import type {
   PersonaArchetype,
 } from "@/types"
 import { ARCHETYPES, getArchetypeById, generateVectorsFromArchetype } from "./archetypes"
-import { generateDiverseVectors, type ExistingPersonaVectors } from "./vector-generator"
+import {
+  generateDiverseVectors,
+  suggestUnderrepresentedArchetypes,
+  type ExistingPersonaVectors,
+} from "./vector-generator"
 import { designParadox, type ParadoxDesignResult } from "./paradox-designer"
 import { generateCharacter, type CharacterProfile } from "./character-generator"
 import {
@@ -139,15 +143,27 @@ export function generatePersonaBatch(
   config?: {
     archetypeIds?: string[]
     existingPersonas?: ExistingPersonaVectors[]
+    existingArchetypeIds?: (string | null)[]
     diversityWeight?: number
   }
 ): GeneratedPersona[] {
   const results: GeneratedPersona[] = []
   const existingVectors: ExistingPersonaVectors[] = config?.existingPersonas ?? []
-  const archetypeIds = config?.archetypeIds ?? ARCHETYPES.map((a) => a.id)
+  const usedArchetypeIds: (string | null)[] = [...(config?.existingArchetypeIds ?? [])]
+
+  // 미사용/저사용 아키타입 우선 배정 (균등 분배)
+  const availableArchetypes = config?.archetypeIds
+    ? ARCHETYPES.filter((a) => config.archetypeIds!.includes(a.id))
+    : ARCHETYPES
 
   for (let i = 0; i < count; i++) {
-    const archetypeId = archetypeIds[i % archetypeIds.length]
+    // 매 반복마다 부족한 아키타입 재계산하여 우선 배정
+    const suggestions = suggestUnderrepresentedArchetypes(usedArchetypeIds, availableArchetypes)
+    const archetypeId =
+      suggestions.length > 0
+        ? suggestions[0].archetypeId
+        : availableArchetypes[i % availableArchetypes.length].id
+
     const persona = generatePersona({
       archetypeId,
       existingPersonas: existingVectors,
@@ -156,6 +172,7 @@ export function generatePersonaBatch(
 
     results.push(persona)
     existingVectors.push(persona.vectors)
+    usedArchetypeIds.push(archetypeId)
   }
 
   return results

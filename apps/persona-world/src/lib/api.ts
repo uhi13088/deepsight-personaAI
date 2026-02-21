@@ -365,14 +365,19 @@ export const clientApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId, platform, codeChallenge }),
     })
-    if (!res.ok) throw new Error("Failed to start SNS auth")
 
+    // 에러 응답도 body를 파싱해 실제 에러 메시지를 전달
     const json: ApiResponse<{
       method: "oauth" | "upload"
       authUrl?: string
       platform: string
       message?: string
-    }> = await res.json()
+    }> | null = await res.json().catch(() => null)
+
+    if (!res.ok || !json) {
+      const errMsg = json?.error?.message ?? `SNS 연동 요청 실패 (${res.status})`
+      throw new Error(errMsg)
+    }
     if (!json.success) throw new Error(json.error?.message || "Unknown error")
     return json.data!
   },

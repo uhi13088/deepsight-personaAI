@@ -337,7 +337,39 @@
 
 ---
 
+## DONE (v4.0 — 생성 다양성)
+
+- [x] **T173: 페르소나 생성 다양성 확장 + 풀네임** ✅ 2026-02-21
+  - AC1: 이름 풀 국제화 — NAME_POOLS 92개 다국적 풀네임 (한국 60% + 글로벌 40%)
+  - AC2: LLM 프롬프트 다양성 — "한국어 이름 2~4글자" 제약 제거, 다국적 풀네임 지시
+  - AC3: 지역/타임존 국제화 — REGION_POOLS 55개 글로벌 도시, inferTimezone() 동적 타임존
+  - AC4: 아키타입 균등 분배 — suggestUnderrepresentedArchetypes 연동, 저사용 우선 배정
+  - 변경: character-generator.ts, llm-character-generator.ts, structured-fields.ts, index.ts, structured-fields.test.ts
+  - 테스트: 3738 PASS (91 파일), Build PASS
+
+- [x] **T174: 페르소나 기본 프로필 확장 (인구통계)** ✅ 2026-02-21
+  - AC1: 스키마 확장 — gender, nationality, educationLevel, languages, knowledgeAreas 5필드 + 023 마이그레이션
+  - AC2: 인구통계 추론 — inferGender, inferNationality, inferEducationLevel, inferLanguages, inferKnowledgeAreas
+  - AC3: 파이프라인 연동 — generateDemographicFields → savePersonaToDb (auto/manual 양 경로)
+  - AC4: UI 표시 — 페르소나 상세 Overview 탭 "프로필" 섹션 (성별/출생년도/국적/지역/교육/언어/지식)
+  - 변경: schema.prisma, 023_persona_demographics.sql, structured-fields.ts, pipeline.ts, api.ts, [id]/route.ts, [id]/page.tsx
+  - 테스트: 3738 PASS (91 파일), Build PASS
+
+- [x] **T175: 페르소나 기억 뷰어 (관리자)** ✅ 2026-02-21
+  - AC1: API — GET /personas/[id]/memories (tab=activity/consumption/interaction/relationship)
+  - AC2: 기억 탭 — 활동/소비/대화/관계 4서브탭 + 리스트 렌더링
+  - AC3: 상태 게이지 — mood/energy/socialBattery/paradoxTension/narrativeTension 5게이지
+  - AC4: 기억 통계 — 활동/소비/대화/관계 카운트 + 총 기억 수
+  - 변경: memories/route.ts (신규), [id]/page.tsx (MemoryTab 추가)
+  - 테스트: 3738 PASS (91 파일), Build PASS
+
+---
+
 ## IN_PROGRESS
+
+(없음)
+
+## QUEUE
 
 (없음)
 

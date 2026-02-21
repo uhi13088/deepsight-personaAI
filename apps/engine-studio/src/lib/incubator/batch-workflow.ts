@@ -46,6 +46,7 @@ export interface IncubatorLogEntry {
   consistencyScore: number | null
   scoreBreakdown: ConsistencyScoreBreakdown | null
   status: IncubatorStatus
+  failReason: string | null
   createdAt: Date
 }
 
@@ -219,6 +220,7 @@ export function executeBatch(
       consistencyScore,
       scoreBreakdown: testResult.breakdown,
       status,
+      failReason: status === "FAILED" ? `품질 미달 (${consistencyScore.toFixed(3)})` : null,
       createdAt: new Date(),
     })
   }

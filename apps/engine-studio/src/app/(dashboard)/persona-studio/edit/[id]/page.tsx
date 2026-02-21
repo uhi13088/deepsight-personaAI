@@ -72,13 +72,31 @@ const L1_DIMS: { key: SocialDimension; label: string; low: string; high: string 
   { key: "sociability", label: "사회적 성향", low: "독립적", high: "사교적" },
 ]
 
+// ── Profile labels ───────────────────────────────────────────
+
+const GENDER_LABELS: Record<string, string> = {
+  MALE: "남성",
+  FEMALE: "여성",
+  NON_BINARY: "논바이너리",
+  OTHER: "기타",
+}
+
+const EDUCATION_LABELS: Record<string, string> = {
+  HIGH_SCHOOL: "고등학교",
+  BACHELOR: "학사",
+  MASTER: "석사",
+  DOCTORATE: "박사",
+  SELF_TAUGHT: "독학",
+}
+
 // ── Tab type ────────────────────────────────────────────────
 
-type TabId = "overview" | "vectors" | "pressure" | "prompt" | "preview"
+type TabId = "overview" | "vectors" | "pressure" | "prompt" | "preview" | "memory"
 
 const TAB_LABELS: Record<TabId, string> = {
   overview: "기본 정보",
   vectors: "벡터",
+  memory: "기억",
   pressure: "V_Final 시뮬레이터",
   prompt: "프롬프트",
   preview: "미리보기 테스트",
@@ -250,19 +268,21 @@ export default function PersonaEditPage({ params }: { params: Promise<{ id: stri
 
         {/* Tabs */}
         <div className="border-border flex gap-1 overflow-x-auto border-b">
-          {(["overview", "vectors", "pressure", "prompt", "preview"] as TabId[]).map((t) => (
-            <button
-              key={t}
-              className={`shrink-0 px-4 py-2 text-sm font-medium transition-colors ${
-                tab === t
-                  ? "text-primary border-primary border-b-2"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              onClick={() => setTab(t)}
-            >
-              {TAB_LABELS[t]}
-            </button>
-          ))}
+          {(["overview", "vectors", "memory", "pressure", "prompt", "preview"] as TabId[]).map(
+            (t) => (
+              <button
+                key={t}
+                className={`shrink-0 px-4 py-2 text-sm font-medium transition-colors ${
+                  tab === t
+                    ? "text-primary border-primary border-b-2"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => setTab(t)}
+              >
+                {TAB_LABELS[t]}
+              </button>
+            )
+          )}
         </div>
 
         {/* Tab Content */}
@@ -278,6 +298,8 @@ export default function PersonaEditPage({ params }: { params: Promise<{ id: stri
         )}
 
         {tab === "vectors" && <VectorsTab data={data} />}
+
+        {tab === "memory" && <MemoryTab personaId={id} />}
 
         {tab === "pressure" && <PressureTab data={data} />}
 
@@ -377,6 +399,40 @@ function OverviewTab({
         </div>
       </section>
 
+      {/* Demographics / Profile */}
+      <section className="space-y-2">
+        <h3 className="text-sm font-semibold">프로필</h3>
+        <div className="grid grid-cols-3 gap-3">
+          <ProfileField label="성별" value={GENDER_LABELS[data.gender ?? ""] ?? data.gender} />
+          <ProfileField
+            label="출생년도"
+            value={data.birthDate ? new Date(data.birthDate).getFullYear().toString() : null}
+          />
+          <ProfileField label="국적" value={data.nationality} />
+          <ProfileField label="지역" value={data.region} />
+          <ProfileField
+            label="교육 수준"
+            value={EDUCATION_LABELS[data.educationLevel ?? ""] ?? data.educationLevel}
+          />
+          <ProfileField
+            label="사용 언어"
+            value={data.languages.length > 0 ? data.languages.join(", ") : null}
+          />
+        </div>
+        {data.knowledgeAreas.length > 0 && (
+          <div className="mt-2">
+            <label className="text-muted-foreground mb-1 block text-xs">전문 지식</label>
+            <div className="flex flex-wrap gap-1.5">
+              {data.knowledgeAreas.map((area) => (
+                <Badge key={area} variant="secondary" className="text-xs">
+                  {area}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
       {/* Scores */}
       <section className="space-y-2">
         <h3 className="text-sm font-semibold">점수</h3>
@@ -411,6 +467,15 @@ function ScoreCard({ label, value }: { label: string; value: number | null }) {
       <p className="mt-1 text-lg font-semibold">
         {value !== null ? (value * 100).toFixed(0) + "%" : "-"}
       </p>
+    </div>
+  )
+}
+
+function ProfileField({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div>
+      <label className="text-muted-foreground mb-0.5 block text-xs">{label}</label>
+      <p className="text-sm">{value || "-"}</p>
     </div>
   )
 }
@@ -462,6 +527,334 @@ function VectorsTab({ data }: { data: PersonaData }) {
     </div>
   )
 }
+
+// ── Memory Tab ──────────────────────────────────────────────
+
+type MemorySubTab = "activity" | "consumption" | "interaction" | "relationship"
+
+const MEMORY_SUB_TABS: { key: MemorySubTab; label: string }[] = [
+  { key: "activity", label: "활동" },
+  { key: "consumption", label: "소비" },
+  { key: "interaction", label: "대화" },
+  { key: "relationship", label: "관계" },
+]
+
+interface MemoryData {
+  tab: string
+  state: {
+    mood: number
+    energy: number
+    socialBattery: number
+    paradoxTension: number
+    narrativeTension: number
+    updatedAt: string
+  } | null
+  stats: {
+    activityCount: number
+    consumptionCount: number
+    sessionCount: number
+    relationshipCount: number
+    totalMemories: number
+  }
+  activities?: Array<{
+    id: string
+    activityType: string
+    targetId: string | null
+    metadata: Record<string, unknown> | null
+    createdAt: string
+  }>
+  consumptions?: Array<{
+    id: string
+    contentType: string
+    title: string
+    impression: string
+    rating: number | null
+    emotionalImpact: number
+    tags: string[]
+    source: string
+    consumedAt: string
+  }>
+  interactions?: Array<{
+    id: string
+    totalTurns: number
+    avgPressure: number | null
+    dominantTopic: string | null
+    startedAt: string
+    endedAt: string | null
+  }>
+  relationships?: Array<{
+    id: string
+    otherPersonaId: string
+    otherPersonaName: string
+    warmth: number
+    tension: number
+    frequency: number
+    depth: number
+    lastInteractionAt: string | null
+  }>
+}
+
+function MemoryTab({ personaId }: { personaId: string }) {
+  const [subTab, setSubTab] = useState<MemorySubTab>("activity")
+  const [memoryData, setMemoryData] = useState<MemoryData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const fetchMemory = useCallback(
+    async (tab: MemorySubTab) => {
+      setLoading(true)
+      try {
+        const res = await fetch(`/api/internal/personas/${personaId}/memories?tab=${tab}`)
+        const result = await res.json()
+        if (result.success) setMemoryData(result.data)
+      } catch {
+        // ignore
+      } finally {
+        setLoading(false)
+      }
+    },
+    [personaId]
+  )
+
+  // 초기 로드 + 탭 전환 시 재조회
+  useMemo(() => {
+    fetchMemory(subTab)
+  }, [subTab, fetchMemory])
+
+  return (
+    <div className="space-y-6">
+      {/* 상태 게이지 (AC3) */}
+      {memoryData?.state && (
+        <section className="space-y-2">
+          <h3 className="text-sm font-semibold">현재 상태</h3>
+          <div className="grid grid-cols-5 gap-3">
+            <StateGauge label="기분" value={memoryData.state.mood} color="bg-yellow-500" />
+            <StateGauge label="에너지" value={memoryData.state.energy} color="bg-green-500" />
+            <StateGauge
+              label="사회적 배터리"
+              value={memoryData.state.socialBattery}
+              color="bg-blue-500"
+            />
+            <StateGauge
+              label="역설 긴장"
+              value={memoryData.state.paradoxTension}
+              color="bg-red-500"
+            />
+            <StateGauge
+              label="서사 긴장"
+              value={memoryData.state.narrativeTension}
+              color="bg-purple-500"
+            />
+          </div>
+          <p className="text-muted-foreground text-xs">
+            마지막 갱신: {new Date(memoryData.state.updatedAt).toLocaleString("ko-KR")}
+          </p>
+        </section>
+      )}
+
+      {/* 기억 통계 (AC4) */}
+      {memoryData?.stats && (
+        <section className="space-y-2">
+          <h3 className="text-sm font-semibold">기억 통계</h3>
+          <div className="grid grid-cols-4 gap-3">
+            <StatCard label="활동" count={memoryData.stats.activityCount} />
+            <StatCard label="소비" count={memoryData.stats.consumptionCount} />
+            <StatCard label="대화" count={memoryData.stats.sessionCount} />
+            <StatCard label="관계" count={memoryData.stats.relationshipCount} />
+          </div>
+          <p className="text-muted-foreground text-xs">
+            총 기억: {memoryData.stats.totalMemories}개
+          </p>
+        </section>
+      )}
+
+      {/* 서브탭 */}
+      <div className="border-border flex gap-1 border-b">
+        {MEMORY_SUB_TABS.map((t) => (
+          <button
+            key={t.key}
+            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+              subTab === t.key
+                ? "text-primary border-primary border-b-2"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={() => setSubTab(t.key)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 서브탭 내용 */}
+      {loading ? (
+        <div className="flex h-32 items-center justify-center">
+          <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
+        </div>
+      ) : (
+        <>
+          {subTab === "activity" && (
+            <MemoryList
+              items={memoryData?.activities ?? []}
+              renderItem={(item) => (
+                <div
+                  key={item.id}
+                  className="border-border flex items-center justify-between border-b py-2 last:border-0"
+                >
+                  <div>
+                    <span className="text-xs font-medium">{item.activityType}</span>
+                    {item.targetId && (
+                      <span className="text-muted-foreground ml-2 text-xs">{item.targetId}</span>
+                    )}
+                  </div>
+                  <span className="text-muted-foreground text-xs">
+                    {new Date(item.createdAt).toLocaleString("ko-KR")}
+                  </span>
+                </div>
+              )}
+              emptyMessage="활동 기록이 없습니다."
+            />
+          )}
+
+          {subTab === "consumption" && (
+            <MemoryList
+              items={memoryData?.consumptions ?? []}
+              renderItem={(item) => (
+                <div key={item.id} className="border-border border-b py-2 last:border-0">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Badge variant="outline" className="mr-2 text-[10px]">
+                        {item.contentType}
+                      </Badge>
+                      <span className="text-sm font-medium">{item.title}</span>
+                    </div>
+                    {item.rating !== null && (
+                      <span className="text-xs font-medium">{(item.rating * 100).toFixed(0)}%</span>
+                    )}
+                  </div>
+                  <p className="text-muted-foreground mt-0.5 text-xs">{item.impression}</p>
+                  {item.tags.length > 0 && (
+                    <div className="mt-1 flex gap-1">
+                      {item.tags.map((tag) => (
+                        <span key={tag} className="bg-muted rounded px-1.5 py-0.5 text-[10px]">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              emptyMessage="소비 기록이 없습니다."
+            />
+          )}
+
+          {subTab === "interaction" && (
+            <MemoryList
+              items={memoryData?.interactions ?? []}
+              renderItem={(item) => (
+                <div key={item.id} className="border-border border-b py-2 last:border-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      {item.dominantTopic ?? "대화"} ({item.totalTurns}턴)
+                    </span>
+                    <span className="text-muted-foreground text-xs">
+                      {new Date(item.startedAt).toLocaleString("ko-KR")}
+                    </span>
+                  </div>
+                  {item.avgPressure !== null && (
+                    <p className="text-muted-foreground mt-0.5 text-xs">
+                      평균 압력: {(item.avgPressure * 100).toFixed(0)}%
+                    </p>
+                  )}
+                </div>
+              )}
+              emptyMessage="대화 기록이 없습니다."
+            />
+          )}
+
+          {subTab === "relationship" && (
+            <MemoryList
+              items={memoryData?.relationships ?? []}
+              renderItem={(item) => (
+                <div key={item.id} className="border-border border-b py-3 last:border-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">{item.otherPersonaName}</span>
+                    {item.lastInteractionAt && (
+                      <span className="text-muted-foreground text-xs">
+                        {new Date(item.lastInteractionAt).toLocaleDateString("ko-KR")}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1.5 grid grid-cols-4 gap-2">
+                    <MiniGauge label="친밀도" value={item.warmth} />
+                    <MiniGauge label="긴장도" value={item.tension} />
+                    <MiniGauge label="빈도" value={item.frequency} />
+                    <MiniGauge label="깊이" value={item.depth} />
+                  </div>
+                </div>
+              )}
+              emptyMessage="관계 기록이 없습니다."
+            />
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function StateGauge({ label, value, color }: { label: string; value: number; color: string }) {
+  const pct = Math.round(value * 100)
+  return (
+    <div className="text-center">
+      <div className="bg-muted relative mx-auto h-2 w-full overflow-hidden rounded-full">
+        <div
+          className={`absolute left-0 top-0 h-full rounded-full ${color}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="mt-1 text-xs font-medium">{pct}%</p>
+      <p className="text-muted-foreground text-[10px]">{label}</p>
+    </div>
+  )
+}
+
+function StatCard({ label, count }: { label: string; count: number }) {
+  return (
+    <div className="border-border rounded-lg border p-3 text-center">
+      <p className="text-lg font-semibold">{count}</p>
+      <p className="text-muted-foreground text-[10px]">{label}</p>
+    </div>
+  )
+}
+
+function MiniGauge({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <span className="text-muted-foreground text-[10px]">{label}</span>
+        <span className="text-[10px] font-medium">{(value * 100).toFixed(0)}%</span>
+      </div>
+      <div className="bg-muted mt-0.5 h-1 overflow-hidden rounded-full">
+        <div className="bg-primary h-full rounded-full" style={{ width: `${value * 100}%` }} />
+      </div>
+    </div>
+  )
+}
+
+function MemoryList<T>({
+  items,
+  renderItem,
+  emptyMessage,
+}: {
+  items: T[]
+  renderItem: (item: T) => React.ReactNode
+  emptyMessage: string
+}) {
+  if (items.length === 0) {
+    return <p className="text-muted-foreground py-8 text-center text-sm">{emptyMessage}</p>
+  }
+  return <div>{items.map(renderItem)}</div>
+}
+
+// ── Dimension Bar ───────────────────────────────────────────
 
 function DimensionBar({
   label,
