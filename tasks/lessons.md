@@ -27,7 +27,7 @@
 
 ## Style
 
-(없음)
+- [2026-02-21] **UI에 표시되는 엔진 버전(Engine Studio, Developer Console 등 사이드바 푸터)을 작업할 때마다 최신 엔진 버전(현재 v4.0)과 일치하는지 확인할 것.** 하드코딩된 버전 문자열이 있으면 즉시 최신화. 확인 위치: `lnb.tsx`, `sidebar.tsx` 등 레이아웃 컴포넌트 푸터
 
 ## Testing
 
