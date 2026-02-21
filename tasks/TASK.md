@@ -347,15 +347,17 @@
   - 변경: character-generator.ts, llm-character-generator.ts, structured-fields.ts, index.ts, structured-fields.test.ts
   - 테스트: 3738 PASS (91 파일), Build PASS
 
+- [x] **T174: 페르소나 기본 프로필 확장 (인구통계)** ✅ 2026-02-21
+  - AC1: 스키마 확장 — gender, nationality, educationLevel, languages, knowledgeAreas 5필드 + 023 마이그레이션
+  - AC2: 인구통계 추론 — inferGender, inferNationality, inferEducationLevel, inferLanguages, inferKnowledgeAreas
+  - AC3: 파이프라인 연동 — generateDemographicFields → savePersonaToDb (auto/manual 양 경로)
+  - AC4: UI 표시 — 페르소나 상세 Overview 탭 "프로필" 섹션 (성별/출생년도/국적/지역/교육/언어/지식)
+  - 변경: schema.prisma, 023_persona_demographics.sql, structured-fields.ts, pipeline.ts, api.ts, [id]/route.ts, [id]/page.tsx
+  - 테스트: 3738 PASS (91 파일), Build PASS
+
 ---
 
 ## IN_PROGRESS
-
-- [ ] **T174: 페르소나 기본 프로필 확장 (인구통계)**
-  - AC1: 스키마 확장 — gender, educationLevel, nationality, languages, knowledgeAreas 필드 추가 + 마이그레이션
-  - AC2: structured-fields.ts 확장 — 벡터 기반 성별/교육수준/지식영역/국적 추론 로직
-  - AC3: LLM 프롬프트 확장 — 캐릭터 생성 시 새 필드(성별 포함) 생성 지시 추가
-  - AC4: 페르소나 상세 페이지에 기본 프로필 정보 표시 UI
 
 - [ ] **T175: 페르소나 기억 뷰어 (관리자)**
   - AC1: API — GET /api/internal/personas/[id]/memories (활동로그/소비기록/대화이력/관계 통합 조회)

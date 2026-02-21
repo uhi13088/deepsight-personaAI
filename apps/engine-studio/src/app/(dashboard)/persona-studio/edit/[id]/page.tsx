@@ -72,6 +72,23 @@ const L1_DIMS: { key: SocialDimension; label: string; low: string; high: string 
   { key: "sociability", label: "사회적 성향", low: "독립적", high: "사교적" },
 ]
 
+// ── Profile labels ───────────────────────────────────────────
+
+const GENDER_LABELS: Record<string, string> = {
+  MALE: "남성",
+  FEMALE: "여성",
+  NON_BINARY: "논바이너리",
+  OTHER: "기타",
+}
+
+const EDUCATION_LABELS: Record<string, string> = {
+  HIGH_SCHOOL: "고등학교",
+  BACHELOR: "학사",
+  MASTER: "석사",
+  DOCTORATE: "박사",
+  SELF_TAUGHT: "독학",
+}
+
 // ── Tab type ────────────────────────────────────────────────
 
 type TabId = "overview" | "vectors" | "pressure" | "prompt" | "preview"
@@ -377,6 +394,40 @@ function OverviewTab({
         </div>
       </section>
 
+      {/* Demographics / Profile */}
+      <section className="space-y-2">
+        <h3 className="text-sm font-semibold">프로필</h3>
+        <div className="grid grid-cols-3 gap-3">
+          <ProfileField label="성별" value={GENDER_LABELS[data.gender ?? ""] ?? data.gender} />
+          <ProfileField
+            label="출생년도"
+            value={data.birthDate ? new Date(data.birthDate).getFullYear().toString() : null}
+          />
+          <ProfileField label="국적" value={data.nationality} />
+          <ProfileField label="지역" value={data.region} />
+          <ProfileField
+            label="교육 수준"
+            value={EDUCATION_LABELS[data.educationLevel ?? ""] ?? data.educationLevel}
+          />
+          <ProfileField
+            label="사용 언어"
+            value={data.languages.length > 0 ? data.languages.join(", ") : null}
+          />
+        </div>
+        {data.knowledgeAreas.length > 0 && (
+          <div className="mt-2">
+            <label className="text-muted-foreground mb-1 block text-xs">전문 지식</label>
+            <div className="flex flex-wrap gap-1.5">
+              {data.knowledgeAreas.map((area) => (
+                <Badge key={area} variant="secondary" className="text-xs">
+                  {area}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
       {/* Scores */}
       <section className="space-y-2">
         <h3 className="text-sm font-semibold">점수</h3>
@@ -411,6 +462,15 @@ function ScoreCard({ label, value }: { label: string; value: number | null }) {
       <p className="mt-1 text-lg font-semibold">
         {value !== null ? (value * 100).toFixed(0) + "%" : "-"}
       </p>
+    </div>
+  )
+}
+
+function ProfileField({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div>
+      <label className="text-muted-foreground mb-0.5 block text-xs">{label}</label>
+      <p className="text-sm">{value || "-"}</p>
     </div>
   )
 }

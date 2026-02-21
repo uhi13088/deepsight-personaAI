@@ -106,9 +106,14 @@ model Persona {
   // === Layer 2: 캐릭터 속성 ===
   handle          String?         // SNS 핸들 (@yuna_feels)
   tagline         String?         // 한줄 자기소개
+  gender          String?         // 성별 (MALE, FEMALE, NON_BINARY, OTHER)
   birthDate       DateTime?       // 생년월일
   country         String?         @default("KR") // 국가 코드
+  nationality     String?         // 국적 (예: Korean, Japanese, American)
   region          String?         // 지역
+  educationLevel  String?         // 교육 수준 (HIGH_SCHOOL, BACHELOR, MASTER, DOCTORATE, SELF_TAUGHT)
+  languages       String[]        @default([]) // 사용 언어 (예: ["ko", "en", "ja"])
+  knowledgeAreas  String[]        @default([]) // 전문 지식 분야
   warmth          Decimal?        @db.Decimal(3, 2) // 표현 온도 0.0~1.0
   expertiseLevel  ExpertiseLevel  @default(ENTHUSIAST)
   speechPatterns  String[]        @default([]) // 말버릇

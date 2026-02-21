@@ -14,6 +14,14 @@ export interface StructuredFields {
   timezone: string
 }
 
+export interface DemographicFields {
+  gender: string
+  nationality: string
+  educationLevel: string
+  languages: string[]
+  knowledgeAreas: string[]
+}
+
 // ── AC1: birthDate 추론 ─────────────────────────────────────
 
 /**
@@ -280,6 +288,206 @@ export function expandPeakHours(range: [number, number]): number[] {
   }
 
   return hours
+}
+
+// ── AC: 인구통계 필드 추론 ────────────────────────────────────
+
+const GENDER_OPTIONS = ["MALE", "FEMALE", "NON_BINARY"] as const
+
+/** 성별 랜덤 배정 (균등 분포, 벡터 무관) */
+export function inferGender(): string {
+  const r = Math.random()
+  if (r < 0.45) return "MALE"
+  if (r < 0.9) return "FEMALE"
+  return "NON_BINARY"
+}
+
+/** 지역에서 국적 추론 */
+const REGION_NATIONALITY_MAP: Record<string, string> = {
+  서울: "Korean",
+  부산: "Korean",
+  경주: "Korean",
+  전주: "Korean",
+  강릉: "Korean",
+  제주: "Korean",
+  세종: "Korean",
+  성남: "Korean",
+  대전: "Korean",
+  대구: "Korean",
+  광주: "Korean",
+  인천: "Korean",
+  Songdo: "Korean",
+  Tokyo: "Japanese",
+  Osaka: "Japanese",
+  Kyoto: "Japanese",
+  Shanghai: "Chinese",
+  Taipei: "Taiwanese",
+  Singapore: "Singaporean",
+  Bangkok: "Thai",
+  "Ho Chi Minh": "Vietnamese",
+  Mumbai: "Indian",
+  Jaipur: "Indian",
+  Dubai: "Emirati",
+  "Abu Dhabi": "Emirati",
+  Istanbul: "Turkish",
+  Cairo: "Egyptian",
+  London: "British",
+  Paris: "French",
+  Berlin: "German",
+  Amsterdam: "Dutch",
+  Barcelona: "Spanish",
+  Prague: "Czech",
+  Zurich: "Swiss",
+  Copenhagen: "Danish",
+  Helsinki: "Finnish",
+  Edinburgh: "British",
+  Florence: "Italian",
+  "New York": "American",
+  Portland: "American",
+  Toronto: "Canadian",
+  Vancouver: "Canadian",
+  "São Paulo": "Brazilian",
+  Cusco: "Peruvian",
+  Sydney: "Australian",
+  Melbourne: "Australian",
+  Canberra: "Australian",
+  Lagos: "Nigerian",
+  Nairobi: "Kenyan",
+  Marrakech: "Moroccan",
+}
+
+export function inferNationality(region: string): string {
+  for (const [key, nat] of Object.entries(REGION_NATIONALITY_MAP)) {
+    if (region.includes(key)) return nat
+  }
+  return "Korean"
+}
+
+/**
+ * 벡터 기반 교육 수준 추론.
+ * depth + purpose 높으면 → 고학력, taste + openness 높으면 → 자기주도학습 가능
+ */
+const EDUCATION_LEVELS = ["HIGH_SCHOOL", "BACHELOR", "MASTER", "DOCTORATE", "SELF_TAUGHT"] as const
+
+export function inferEducationLevel(l1: SocialPersonaVector, l2: CoreTemperamentVector): string {
+  const academicScore =
+    l1.depth * 0.3 + l1.purpose * 0.3 + l2.conscientiousness * 0.2 + l1.lens * 0.2
+  const selfTaughtScore = l1.taste * 0.4 + l2.openness * 0.3 + (1 - l2.conscientiousness) * 0.3
+
+  if (selfTaughtScore > 0.7 && academicScore < 0.4) return "SELF_TAUGHT"
+  if (academicScore > 0.75) return Math.random() > 0.5 ? "DOCTORATE" : "MASTER"
+  if (academicScore > 0.55) return "MASTER"
+  if (academicScore > 0.35) return "BACHELOR"
+  return "HIGH_SCHOOL"
+}
+
+/** 국적에서 주요 언어 추론 + 추가 언어 */
+const NATIONALITY_LANGUAGE_MAP: Record<string, string> = {
+  Korean: "ko",
+  Japanese: "ja",
+  Chinese: "zh",
+  Taiwanese: "zh",
+  Thai: "th",
+  Vietnamese: "vi",
+  Indian: "hi",
+  Singaporean: "en",
+  Emirati: "ar",
+  Turkish: "tr",
+  Egyptian: "ar",
+  British: "en",
+  French: "fr",
+  German: "de",
+  Dutch: "nl",
+  Spanish: "es",
+  Czech: "cs",
+  Swiss: "de",
+  Danish: "da",
+  Finnish: "fi",
+  Italian: "it",
+  American: "en",
+  Canadian: "en",
+  Brazilian: "pt",
+  Peruvian: "es",
+  Australian: "en",
+  Nigerian: "en",
+  Kenyan: "en",
+  Moroccan: "ar",
+}
+
+export function inferLanguages(nationality: string, l2: CoreTemperamentVector): string[] {
+  const primary = NATIONALITY_LANGUAGE_MAP[nationality] ?? "en"
+  const langs = [primary]
+
+  // 영어가 모국어가 아니면 영어 추가 (글로벌 필수)
+  if (primary !== "en") langs.push("en")
+
+  // openness 높으면 추가 언어 가능
+  if (l2.openness > 0.7 && Math.random() > 0.5) {
+    const extras = ["fr", "es", "de", "ja", "ko", "zh"].filter((l) => !langs.includes(l))
+    if (extras.length > 0) langs.push(extras[Math.floor(Math.random() * extras.length)])
+  }
+
+  return langs
+}
+
+/** 벡터 기반 전문 지식 영역 추론 */
+const KNOWLEDGE_POOLS: Record<string, string[]> = {
+  analytical: ["데이터 분석", "통계학", "연구 방법론", "프로그래밍", "과학"],
+  creative: ["문학", "영화학", "예술사", "음악 이론", "디자인"],
+  social: ["사회학", "심리학", "커뮤니케이션", "마케팅", "미디어학"],
+  philosophical: ["철학", "윤리학", "비교문화", "종교학", "인류학"],
+  technical: ["공학", "IT", "경제학", "경영학", "법학"],
+}
+
+export function inferKnowledgeAreas(l1: SocialPersonaVector, l2: CoreTemperamentVector): string[] {
+  const areas: string[] = []
+
+  if (l1.lens > 0.6 && l1.depth > 0.5) {
+    areas.push(pickFromPool(KNOWLEDGE_POOLS.analytical))
+  }
+  if (l1.lens < 0.4 || l1.taste > 0.6) {
+    areas.push(pickFromPool(KNOWLEDGE_POOLS.creative))
+  }
+  if (l1.sociability > 0.5 || l2.extraversion > 0.5) {
+    areas.push(pickFromPool(KNOWLEDGE_POOLS.social))
+  }
+  if (l1.depth > 0.6 && l1.purpose > 0.5) {
+    areas.push(pickFromPool(KNOWLEDGE_POOLS.philosophical))
+  }
+  if (l2.conscientiousness > 0.6) {
+    areas.push(pickFromPool(KNOWLEDGE_POOLS.technical))
+  }
+
+  // 최소 2개, 최대 4개 (중복 제거)
+  const unique = [...new Set(areas)]
+  if (unique.length < 2) {
+    const allPools = Object.values(KNOWLEDGE_POOLS).flat()
+    while (unique.length < 2) {
+      const pick = allPools[Math.floor(Math.random() * allPools.length)]
+      if (!unique.includes(pick)) unique.push(pick)
+    }
+  }
+  return unique.slice(0, 4)
+}
+
+function pickFromPool(pool: string[]): string {
+  return pool[Math.floor(Math.random() * pool.length)]
+}
+
+/** 인구통계 필드 통합 생성 */
+export function generateDemographicFields(
+  l1: SocialPersonaVector,
+  l2: CoreTemperamentVector,
+  region: string
+): DemographicFields {
+  const nationality = inferNationality(region)
+  return {
+    gender: inferGender(),
+    nationality,
+    educationLevel: inferEducationLevel(l1, l2),
+    languages: inferLanguages(nationality, l2),
+    knowledgeAreas: inferKnowledgeAreas(l1, l2),
+  }
 }
 
 // ── 통합: 전체 구조화 필드 생성 ─────────────────────────────

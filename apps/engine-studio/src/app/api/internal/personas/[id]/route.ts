@@ -122,6 +122,14 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       updatedAt: persona.updatedAt.toISOString(),
       activatedAt: persona.activatedAt?.toISOString() ?? null,
       archivedAt: persona.archivedAt?.toISOString() ?? null,
+      // T174: 인구통계 프로필
+      gender: persona.gender ?? null,
+      birthDate: persona.birthDate?.toISOString() ?? null,
+      nationality: persona.nationality ?? null,
+      region: persona.region ?? null,
+      educationLevel: persona.educationLevel ?? null,
+      languages: persona.languages ?? [],
+      knowledgeAreas: persona.knowledgeAreas ?? [],
     }
 
     return NextResponse.json({ success: true, data: detail } satisfies ApiResponse<PersonaDetail>)
