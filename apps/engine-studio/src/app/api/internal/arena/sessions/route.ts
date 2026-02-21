@@ -15,6 +15,70 @@ import { estimateSessionCost } from "@/lib/arena/arena-cost-control"
 
 const VALID_PROFILE_LEVELS = new Set<string>(["FULL", "STANDARD", "LITE"])
 
+// ── GET /api/internal/arena/sessions ─────────────────────────
+// 아레나 세션 목록 조회 (최근 50개, 참가자 이름 포함)
+
+export async function GET() {
+  const { response } = await requireAuth()
+  if (response) return response
+
+  try {
+    const sessions = await prisma.arenaSession.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      include: {
+        judgment: { select: { overallScore: true, method: true } },
+        _count: { select: { turns: true } },
+      },
+    })
+
+    // 참가자 ID → 이름 매핑
+    const personaIds = new Set<string>()
+    for (const s of sessions) {
+      personaIds.add(s.participantA)
+      personaIds.add(s.participantB)
+    }
+    const personas = await prisma.persona.findMany({
+      where: { id: { in: [...personaIds] } },
+      select: { id: true, name: true, role: true, profileImageUrl: true },
+    })
+    const personaMap = new Map(personas.map((p) => [p.id, p]))
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        sessions: sessions.map((s) => ({
+          id: s.id,
+          mode: s.mode,
+          participantA: s.participantA,
+          participantAName: personaMap.get(s.participantA)?.name ?? s.participantA,
+          participantARole: personaMap.get(s.participantA)?.role ?? null,
+          participantB: s.participantB,
+          participantBName: personaMap.get(s.participantB)?.name ?? s.participantB,
+          participantBRole: personaMap.get(s.participantB)?.role ?? null,
+          profileLoadLevel: s.profileLoadLevel,
+          topic: s.topic,
+          maxTurns: s.maxTurns,
+          budgetTokens: s.budgetTokens,
+          usedTokens: s.usedTokens,
+          status: s.status,
+          turnCount: s._count.turns,
+          overallScore: s.judgment ? Number(s.judgment.overallScore) : null,
+          judgmentMethod: s.judgment?.method ?? null,
+          createdAt: s.createdAt.toISOString(),
+          completedAt: s.completedAt?.toISOString() ?? null,
+        })),
+      },
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error"
+    return NextResponse.json(
+      { success: false, error: { code: "ARENA_LIST_ERROR", message } },
+      { status: 500 }
+    )
+  }
+}
+
 // ── POST /api/internal/arena/sessions ────────────────────────
 // 아레나 세션 생성 + 예상 비용 계산
 
