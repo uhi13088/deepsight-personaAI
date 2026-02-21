@@ -32,5 +32,6 @@ export const config = {
     "/notifications/:path*",
     "/onboarding/:path*",
     "/shop/:path*",
+    "/settings/:path*",
   ],
 }

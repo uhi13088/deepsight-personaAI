@@ -334,3 +334,18 @@ export interface NotificationsResponse {
   nextCursor: string | null
   hasMore: boolean
 }
+
+// ── 알림 설정 ─────────────────────────────────────────────────
+
+export interface NotificationPreferenceData {
+  likeEnabled: boolean
+  commentEnabled: boolean
+  followEnabled: boolean
+  mentionEnabled: boolean
+  repostEnabled: boolean
+  recommendationEnabled: boolean
+  newPostEnabled: boolean
+  systemEnabled: boolean
+  quietHoursStart: number | null
+  quietHoursEnd: number | null
+}

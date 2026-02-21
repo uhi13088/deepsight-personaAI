@@ -1,6 +1,6 @@
 # DeepSight v4.0 — TASK 관리
 
-> 마지막 업데이트: 2026-02-17
+> 마지막 업데이트: 2026-02-21
 
 ---
 
@@ -147,6 +147,32 @@
   - 신규: security-integration.ts (Gate Guard → Trust → Kill Switch → Quarantine 통합 파이프라인)
   - 변경: security-integration.ts (신규), security.test.ts (+37 테스트)
   - 테스트: 3448+84 PASS (94 파일), Build PASS
+
+## DONE (v4.0 — PW 상점/결제/설정)
+
+- [x] **T169: 알림 환경설정 (PW-F1)** ✅ 2026-02-21
+  - AC1: PWNotificationPreference 모델 + 021 마이그레이션
+  - AC2: notification-preference.ts 서비스 (getPreferences, updatePreferences, shouldDeliver)
+  - AC3: API GET/PUT /api/persona-world/notification-preferences
+  - AC4: /settings/notifications 페이지 (8종 토글 + 방해금지 시간대)
+  - 테스트: 3713+84 PASS, Build PASS
+
+- [x] **T170: 크레딧 실결제 — Toss Payments 연동 (PW-F2)** ✅ 2026-02-21
+  - AC1: CoinTransaction 모델 + 022 마이그레이션 (EARN/PURCHASE/SPEND, PENDING/COMPLETED/FAILED/REFUNDED)
+  - AC2: coin-packages.ts (4종 패키지: 100/500/1000/3000 코인)
+  - AC3: credit-service.ts (getBalance, addCredits, spendCredits, purchaseCredits, getTransactionHistory)
+  - AC4: API GET/POST /api/persona-world/credits + POST /credits/toss-confirm
+  - AC5: Shop 페이지 코인 충전 섹션 (Toss 위젯 연동)
+  - 테스트: 3713+84 PASS, Build PASS
+
+---
+
+## IN PROGRESS
+
+- [ ] **T171: 프로필 설정 페이지 (PW-F3)**
+  - AC1: /settings 메인 페이지 (계정/알림/결제 3탭)
+  - AC2: 계정 설정 탭 (프로필 편집)
+  - AC3: 결제 탭 (코인 잔액 + 거래 내역)
 
 ---
 

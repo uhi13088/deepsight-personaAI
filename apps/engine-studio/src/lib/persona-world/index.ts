@@ -293,3 +293,28 @@ export type {
   EvolutionRunnerDataProvider,
   EvolutionBatchResult,
 } from "./evolution"
+
+// Credits / Coin Service
+export {
+  getBalance,
+  addCredits,
+  spendCredits,
+  purchaseCredits,
+  getTransactionHistory,
+} from "./credit-service"
+export type { CreditDataProvider } from "./credit-service"
+export { COIN_PACKAGES, getCoinPackageById, formatPrice } from "./coin-packages"
+export type { CoinPackage } from "./coin-packages"
+
+// Notification Preferences
+export {
+  getPreferences as getNotificationPreferences,
+  updatePreferences as updateNotificationPreferences,
+  shouldDeliver as shouldDeliverNotification,
+  DEFAULT_PREFERENCES as DEFAULT_NOTIFICATION_PREFERENCES,
+} from "./notification-preference"
+export type {
+  NotificationType,
+  NotificationPreferenceData,
+  NotificationPreferenceProvider,
+} from "./notification-preference"

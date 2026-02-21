@@ -520,6 +520,40 @@
   - AC5: middleware.ts `/shop` 라우트 추가
   - AC6: Build PASS + 테스트 PASS
 
+### Phase PW-F: PersonaWorld 설정 + 실결제 시스템 (T164~T166)
+
+> 알림 제어 + 코인 실결제 + 설정 페이지 통합
+> Toss Payments 연동 (developer-console 패턴 재사용)
+
+- [ ] **T164: 알림 환경설정 — 유형별 ON/OFF + 방해금지 모드**
+  - 배경: 현재 8종 알림이 모두 자동 전송되며 유저가 제어할 수 없음
+  - AC1: Prisma `PWNotificationPreference` 모델 (userId 1:1, 8종 boolean, quietHoursStart/End Int?) + SQL 마이그레이션
+  - AC2: `notification-preference.ts` — getPreferences, updatePreferences, shouldDeliver(type, userId) 체크 로직
+  - AC3: API — `GET/PUT /api/persona-world/notification-preferences` (userId 기반)
+  - AC4: `/settings/notifications` 페이지 — 8종 토글 스위치 + 방해금지 시간대 선택 (시작/종료 시간)
+  - AC5: middleware.ts `/settings` 라우트 추가
+  - AC6: Build PASS + 테스트 PASS
+
+- [ ] **T165: 크레딧 실결제 — Toss Payments 연동 코인 충전**
+  - 배경: 현재 코인이 온보딩/데일리로만 획득. 실결제로 추가 구매 필요
+  - AC1: Prisma `CoinTransaction` 모델 (userId, type: EARN/PURCHASE/SPEND, amount, balanceAfter, orderId?, paymentKey?, status) + SQL 마이그레이션
+  - AC2: `coin-packages.ts` — 코인 패키지 4종 (100코인 ₩1,100 / 500코인 ₩4,900 / 1,000코인 ₩8,900 / 3,000코인 ₩23,900) + 보너스율
+  - AC3: `credit-service.ts` — getBalance(userId), addCredits(userId, amount, type), spendCredits(userId, amount, reason), getTransactionHistory(userId)
+  - AC4: API — `POST /api/persona-world/credits/purchase` (Toss 결제 요청) + `POST /api/persona-world/credits/toss-confirm` (결제 확인 + 코인 충전)
+  - AC5: `/shop` 페이지에 "코인 충전" 섹션 추가 — 패키지 카드 4종 + Toss 결제 위젯 연동
+  - AC6: `user-store.ts` — creditsBalance DB 동기화 (fetchBalance, 구매 후 갱신)
+  - AC7: 환경변수: `NEXT_PUBLIC_TOSS_CLIENT_KEY` (PW), `TOSS_CLIENT_KEY` + `TOSS_SECRET_KEY` (ES)
+  - AC8: Build PASS + 테스트 PASS
+
+- [ ] **T166: 프로필 설정 페이지 — 계정/알림/결제 통합**
+  - 배경: 현재 프로필에 "데이터 초기화"와 "로그아웃"만 있음. 설정 전용 페이지 필요
+  - AC1: `/settings` 페이지 라우트 — 3탭 (계정, 알림, 결제)
+  - AC2: 계정 탭 — 닉네임 변경, 데이터 초기화, 로그아웃
+  - AC3: 알림 탭 — T164 알림 설정 컴포넌트 임베드
+  - AC4: 결제 탭 — 코인 잔액, 충전 내역 (CoinTransaction 목록), 상점 바로가기
+  - AC5: 프로필 페이지 톱니바퀴 → `/settings` 링크로 변경
+  - AC6: Build PASS + 테스트 PASS
+
 ---
 
 ### 별도 작업 (설계 문서 + 데이터)
