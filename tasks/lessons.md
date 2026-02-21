@@ -56,6 +56,7 @@
 ## Environment
 
 - [2026-02-19] 새 라이브러리/기능 추가 시 라이브러리 기본 컨벤션이 아닌 프로젝트 기존 환경변수명을 먼저 확인하고 통일할 것. 예: NextAuth v5 기본은 `AUTH_GOOGLE_ID`이지만, 프로젝트에서 이미 `GOOGLE_CLIENT_ID`를 쓰면 그걸 사용
+- [2026-02-21] 동일 대상(Engine Studio URL)을 가리키는 환경변수명은 앱 간 통일할 것. `NEXT_PUBLIC_ENGINE_API_URL`(PW)과 `NEXT_PUBLIC_ENGINE_STUDIO_URL`(Landing)이 혼재 → `NEXT_PUBLIC_ENGINE_STUDIO_URL`로 통일 완료
 
 ## Database
 

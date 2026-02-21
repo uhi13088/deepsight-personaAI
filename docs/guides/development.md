@@ -610,7 +610,7 @@ FEATURE_DEMO_MODE="true"
 
 ```env
 # Engine Studio API 연동 (필수)
-NEXT_PUBLIC_ENGINE_API_URL="http://localhost:3001"
+NEXT_PUBLIC_ENGINE_STUDIO_URL="http://localhost:3001"
 ```
 
 ### Developer Console (.env.local)
@@ -641,10 +641,7 @@ NEXT_PUBLIC_CONTACT_EMAIL="contact@deepsight.ai"
 NEXT_PUBLIC_APP_URL="https://engine.deepsight.ai"
 NEXT_PUBLIC_DEVELOPER_CONSOLE_URL="https://console.deepsight.ai"
 
-# PersonaWorld
-NEXT_PUBLIC_ENGINE_API_URL="https://engine.deepsight.ai"
-
-# Landing
+# PersonaWorld + Landing (통일)
 NEXT_PUBLIC_ENGINE_STUDIO_URL="https://engine.deepsight.ai"
 NEXT_PUBLIC_PERSONA_WORLD_URL="https://persona.deepsight.ai"
 NEXT_PUBLIC_DEVELOPER_CONSOLE_URL="https://console.deepsight.ai"

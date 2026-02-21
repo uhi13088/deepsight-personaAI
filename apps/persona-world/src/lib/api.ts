@@ -18,7 +18,7 @@ import type {
 // Server-side (RSC/SSR): 절대 URL 필수 → 환경변수 or localhost:3000
 // Client-side: 상대 경로 → next.config.ts rewrites가 engine-studio로 프록시
 function resolveServerApiBaseUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_ENGINE_API_URL || "http://localhost:3000"
+  const raw = process.env.NEXT_PUBLIC_ENGINE_STUDIO_URL || "http://localhost:3000"
   if (raw && !raw.startsWith("http://") && !raw.startsWith("https://")) {
     return `https://${raw}`
   }
