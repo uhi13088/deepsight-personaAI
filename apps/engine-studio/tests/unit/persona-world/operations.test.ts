@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import {
   OPERATION_SCHEDULES,
   startJobExecution,
@@ -15,6 +15,83 @@ import {
   computeKPISummary,
   analyzeKPITrend,
 } from "@/lib/persona-world/admin/kpi-tracker"
+import type { JobDataProvider } from "@/lib/persona-world/admin/job-runner"
+import {
+  runDailyInterview,
+  runWeeklyPISReport,
+  runDailyPatternAnalysis,
+  runHourlyMetrics,
+  runDailyCostReport,
+  runWeeklyArena,
+  runDailyLogCleanup,
+  runDailyQuarantineExpiry,
+  executeJob,
+  executeDueJobs,
+} from "@/lib/persona-world/admin/job-runner"
+import type { KPIDataProvider } from "@/lib/persona-world/admin/kpi-aggregator"
+import {
+  aggregateServiceKPIInput,
+  aggregateUXKPIInput,
+  aggregateAllKPIInputs,
+} from "@/lib/persona-world/admin/kpi-aggregator"
+
+// ── Mock Providers ──────────────────────────────────────────
+
+function createMockJobProvider(overrides?: Partial<JobDataProvider>): JobDataProvider {
+  return {
+    getInterviewCandidateCount: vi.fn().mockResolvedValue(50),
+    runAutoInterviews: vi.fn().mockResolvedValue({ processed: 10, alerts: 2 }),
+    computeAllPIS: vi.fn().mockResolvedValue({ count: 50, avgScore: 0.82, belowThreshold: 3 }),
+    detectPatternAnomalies: vi.fn().mockResolvedValue({ checked: 100, anomalies: 1 }),
+    aggregateHourlyMetrics: vi.fn().mockResolvedValue({
+      posts: 5,
+      comments: 12,
+      likes: 30,
+      follows: 3,
+      llmCalls: 8,
+      tokenUsage: 1200,
+    }),
+    generateDailyCostReport: vi.fn().mockResolvedValue({
+      totalCost: 1.5,
+      budgetUsagePercent: 15,
+      alerts: 0,
+    }),
+    getWarningPersonaIds: vi.fn().mockResolvedValue(["p1", "p2"]),
+    scheduleArenaSessions: vi.fn().mockResolvedValue({ scheduled: 2 }),
+    archiveExpiredLogs: vi.fn().mockResolvedValue({ archived: 150 }),
+    expireQuarantinedContent: vi.fn().mockResolvedValue({ expired: 3, rejected: 3 }),
+    ...overrides,
+  }
+}
+
+function createMockKPIProvider(overrides?: Partial<KPIDataProvider>): KPIDataProvider {
+  return {
+    countActivePersonas: vi.fn().mockResolvedValue(45),
+    countTotalPersonas: vi.fn().mockResolvedValue(50),
+    getAveragePIS: vi.fn().mockResolvedValue(0.82),
+    countTotalPosts: vi.fn().mockResolvedValue(200),
+    countTotalComments: vi.fn().mockResolvedValue(500),
+    countTotalLikes: vi.fn().mockResolvedValue(1500),
+    countTotalFollows: vi.fn().mockResolvedValue(80),
+    countFactbookViolations: vi.fn().mockResolvedValue(1),
+    countQuarantinedContent: vi.fn().mockResolvedValue(3),
+    countTotalContent: vi.fn().mockResolvedValue(700),
+    getAvgReportResolutionMinutes: vi.fn().mockResolvedValue(25),
+    countKillSwitchActivations: vi.fn().mockResolvedValue(0),
+    countCacheHits: vi.fn().mockResolvedValue(80),
+    countTotalLLMCalls: vi.fn().mockResolvedValue(100),
+    getAvgSessionDurationMinutes: vi.fn().mockResolvedValue(12),
+    getAvgFeedScrollCount: vi.fn().mockResolvedValue(25),
+    countProfileVisits: vi.fn().mockResolvedValue(100),
+    countUserFollows: vi.fn().mockResolvedValue(25),
+    countFeedImpressions: vi.fn().mockResolvedValue(5000),
+    countUserComments: vi.fn().mockResolvedValue(100),
+    countOnboardingStarted: vi.fn().mockResolvedValue(200),
+    countOnboardingCompleted: vi.fn().mockResolvedValue(150),
+    countModeratedContent: vi.fn().mockResolvedValue(5),
+    ...overrides,
+  }
+}
 
 // ═══ Scheduled Jobs ═══
 
@@ -405,5 +482,148 @@ describe("KPI Trend", () => {
   it("데이터 부족 → stable", () => {
     const trend = analyzeKPITrend("test", [{ date: "2026-02-16", value: 10 }], "higher_is_better")
     expect(trend.trend).toBe("stable")
+  })
+})
+
+// ═══ Job Runner ═══
+
+describe("Job Runner", () => {
+  it("dailyInterview — 20% 인터뷰 실행", async () => {
+    const provider = createMockJobProvider()
+    const result = await runDailyInterview(provider)
+    expect(provider.getInterviewCandidateCount).toHaveBeenCalled()
+    expect(provider.runAutoInterviews).toHaveBeenCalledWith(10)
+    expect(result.processedCount).toBe(10)
+    expect(result.alertsGenerated).toBe(2)
+  })
+
+  it("weeklyPISReport — PIS 계산", async () => {
+    const provider = createMockJobProvider()
+    const result = await runWeeklyPISReport(provider)
+    expect(result.processedCount).toBe(50)
+    expect(result.alertsGenerated).toBe(3)
+    expect(result.details).toContain("0.82")
+  })
+
+  it("dailyPatternAnalysis — 이상 탐지", async () => {
+    const provider = createMockJobProvider()
+    const result = await runDailyPatternAnalysis(provider)
+    expect(result.processedCount).toBe(100)
+    expect(result.alertsGenerated).toBe(1)
+  })
+
+  it("hourlyMetrics — 메트릭 집계", async () => {
+    const provider = createMockJobProvider()
+    const result = await runHourlyMetrics(provider)
+    expect(result.processedCount).toBe(50)
+    expect(result.details).toContain("P5")
+  })
+
+  it("dailyCostReport — 비용 리포트", async () => {
+    const provider = createMockJobProvider()
+    const result = await runDailyCostReport(provider)
+    expect(result.processedCount).toBe(1)
+    expect(result.details).toContain("$1.50")
+  })
+
+  it("weeklyArena — WARNING 페르소나 예약", async () => {
+    const provider = createMockJobProvider()
+    const result = await runWeeklyArena(provider)
+    expect(result.processedCount).toBe(2)
+  })
+
+  it("weeklyArena — WARNING 없으면 스킵", async () => {
+    const provider = createMockJobProvider({
+      getWarningPersonaIds: vi.fn().mockResolvedValue([]),
+    })
+    const result = await runWeeklyArena(provider)
+    expect(result.processedCount).toBe(0)
+    expect(result.details).toContain("불필요")
+  })
+
+  it("dailyLogCleanup — 90일 로그 아카이빙", async () => {
+    const provider = createMockJobProvider()
+    const result = await runDailyLogCleanup(provider)
+    expect(provider.archiveExpiredLogs).toHaveBeenCalledWith(90)
+    expect(result.processedCount).toBe(150)
+  })
+
+  it("dailyQuarantineExpiry — 격리 만료", async () => {
+    const provider = createMockJobProvider()
+    const result = await runDailyQuarantineExpiry(provider)
+    expect(result.processedCount).toBe(3)
+    expect(result.alertsGenerated).toBe(3)
+  })
+
+  it("executeJob — 유효한 ID → COMPLETED", async () => {
+    const provider = createMockJobProvider()
+    const exec = await executeJob("daily-interview", provider)
+    expect(exec.status).toBe("COMPLETED")
+    expect(exec.result?.processedCount).toBe(10)
+  })
+
+  it("executeJob — 존재하지 않는 ID → FAILED", async () => {
+    const provider = createMockJobProvider()
+    const exec = await executeJob("nonexistent", provider)
+    expect(exec.status).toBe("FAILED")
+    expect(exec.error).toContain("Unknown job")
+  })
+
+  it("executeJob — 에러 → FAILED", async () => {
+    const provider = createMockJobProvider({
+      getInterviewCandidateCount: vi.fn().mockRejectedValue(new Error("DB down")),
+    })
+    const exec = await executeJob("daily-interview", provider)
+    expect(exec.status).toBe("FAILED")
+    expect(exec.error).toContain("DB down")
+  })
+
+  it("executeDueJobs — 03:00에 daily-interview 실행", async () => {
+    const provider = createMockJobProvider()
+    const now = new Date("2026-02-21T03:00:00Z")
+    const results = await executeDueJobs(provider, now)
+    expect(results.length).toBeGreaterThanOrEqual(1)
+    expect(results.every((r) => r.status === "COMPLETED")).toBe(true)
+  })
+
+  it("executeDueJobs — 01:30에 실행할 Job 없음", async () => {
+    const provider = createMockJobProvider()
+    const now = new Date("2026-02-21T01:30:00Z")
+    const results = await executeDueJobs(provider, now)
+    expect(results).toHaveLength(0)
+  })
+})
+
+// ═══ KPI Aggregator ═══
+
+describe("KPI Aggregator", () => {
+  it("서비스 KPI 입력 집계", async () => {
+    const provider = createMockKPIProvider()
+    const result = await aggregateServiceKPIInput(provider)
+
+    expect(provider.countActivePersonas).toHaveBeenCalled()
+    expect(provider.countTotalPersonas).toHaveBeenCalled()
+    expect(provider.getAveragePIS).toHaveBeenCalled()
+    expect(result.activePersonas).toBe(45)
+    expect(result.totalPersonas).toBe(50)
+    expect(result.averagePIS).toBe(0.82)
+  })
+
+  it("UX KPI 입력 집계", async () => {
+    const provider = createMockKPIProvider()
+    const result = await aggregateUXKPIInput(provider)
+
+    expect(provider.getAvgSessionDurationMinutes).toHaveBeenCalled()
+    expect(provider.countOnboardingStarted).toHaveBeenCalled()
+    expect(result.avgSessionDurationMinutes).toBe(12)
+    expect(result.follows).toBe(25)
+  })
+
+  it("전체 KPI 동시 집계", async () => {
+    const provider = createMockKPIProvider()
+    const { serviceInput, uxInput } = await aggregateAllKPIInputs(provider)
+
+    expect(serviceInput.activePersonas).toBe(45)
+    expect(uxInput.avgSessionDurationMinutes).toBe(12)
   })
 })

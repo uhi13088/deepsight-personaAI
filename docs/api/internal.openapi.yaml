@@ -1053,6 +1053,68 @@ paths:
         "500":
           description: 서버 내부 오류
 
+  # -----------------------------------------------------------
+  # PersonaWorld Admin — Operations
+  # -----------------------------------------------------------
+
+  /persona-world-admin/operations/jobs:
+    get:
+      operationId: getOperationJobs
+      tags: [PersonaWorldOperations]
+      summary: 8종 예약 작업 목록 조회
+      description: 예약 작업 목록과 다음 실행 시간을 반환합니다.
+      responses:
+        "200":
+          description: 작업 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationJobsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      operationId: runOperationJob
+      tags: [PersonaWorldOperations]
+      summary: 특정 Job 수동 실행
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunJobRequest"
+      responses:
+        "200":
+          description: Job 실행 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunJobResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          description: 존재하지 않는 Job
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /persona-world-admin/operations/kpis:
+    get:
+      operationId: getOperationKPIs
+      tags: [PersonaWorldOperations]
+      summary: 서비스 건전성 + UX KPI 대시보드
+      description: 서비스 8종 + UX 6종 KPI 데이터를 반환합니다.
+      responses:
+        "200":
+          description: KPI 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KPIDashboardResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: 서버 내부 오류
+
 # ============================================================
 # Components
 # ============================================================
@@ -2241,6 +2303,86 @@ components:
           properties:
             action: { type: string }
             reportId: { type: string }
+
+    # --- Operations ---
+
+    OperationJobsResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            jobs:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+                  category: { type: string, enum: [QUALITY, OPERATIONS, CLEANUP] }
+                  schedule: { type: string }
+                  description: { type: string }
+                  estimatedDuration: { type: string }
+                  estimatedCost: { type: string }
+                  nextRunAt: { type: string, format: date-time }
+            categories:
+              type: object
+              properties:
+                quality: { type: integer }
+                operations: { type: integer }
+                cleanup: { type: integer }
+            total: { type: integer }
+
+    RunJobRequest:
+      type: object
+      required: [action, jobId]
+      properties:
+        action: { type: string, enum: [run] }
+        jobId: { type: string }
+
+    RunJobResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            jobId: { type: string }
+            status: { type: string, enum: [COMPLETED, FAILED] }
+            startedAt: { type: string, format: date-time }
+            completedAt: { type: string, format: date-time, nullable: true }
+            durationMs: { type: integer, nullable: true }
+            result:
+              type: object
+              nullable: true
+              properties:
+                processedCount: { type: integer }
+                alertsGenerated: { type: integer }
+                details: { type: string }
+            error: { type: string, nullable: true }
+
+    KPIDashboardResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            summary:
+              type: object
+              properties:
+                overallHealth: { type: string, enum: [HEALTHY, WARNING, CRITICAL] }
+                healthyCount: { type: integer }
+                warningCount: { type: integer }
+                criticalCount: { type: integer }
+                measuredAt: { type: string, format: date-time }
+            serviceKPIs:
+              type: object
+              description: 서비스 건전성 8종 KPI (각 KPIMetric 객체)
+            uxKPIs:
+              type: object
+              description: UX 6종 KPI (각 KPIMetric 객체)
 
   responses:
     Unauthorized:

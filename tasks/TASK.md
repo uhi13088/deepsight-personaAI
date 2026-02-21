@@ -186,11 +186,21 @@
 
 ---
 
-## QUEUE
+## DONE (v4.0 — PW 운영)
 
-- [ ] **T167: 운영 스케줄 + KPI (Phase 7-B)**
-  - AC1: 8종 예약 작업 (cron)
-  - AC2: 운영 KPI 트래커 (서비스 8종 + UX 6종)
+- [x] **T167: 운영 스케줄 + KPI (Phase 7-B)** ✅ 2026-02-21
+  - AC1: 8종 예약 작업 실행 — job-runner.ts (DI 기반, 8종 Job 함수 + executeJob/executeDueJobs)
+  - AC2: KPI 데이터 수집 — kpi-aggregator.ts (KPIDataProvider DI, 서비스 13필드 + UX 10필드 집계)
+  - AC3: API — GET/POST /operations/jobs (목록+수동실행), GET /operations/kpis (14종 KPI 대시보드)
+  - AC4: API 문서 — internal.md/openapi 최신화
+  - 기존: scheduled-jobs.ts (8종 스케줄 정의, cron 파싱), kpi-tracker.ts (8+6종 KPI 계산, 트렌드 분석)
+  - 신규: job-runner.ts, kpi-aggregator.ts, operations/jobs/route.ts, operations/kpis/route.ts
+  - 변경: operations.test.ts (+17 테스트), internal.md, internal.openapi.yaml
+  - 테스트: 3730 PASS (91 파일), Build PASS
+
+---
+
+## QUEUE
 
 - [ ] **T168: 비용 모니터링 & 제어 (Phase 8)**
   - AC1: 비용 추적 확장 (활동 유형별 LLM 로깅)

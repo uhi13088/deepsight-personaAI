@@ -51,6 +51,9 @@ https://engine.deepsight.ai/api/internal
 11. [PersonaWorld 모더레이션](#13-personaworld-모더레이션)
     - [GET /persona-world-admin/dashboard](#get-persona-world-admindashboard)
     - [GET/POST /persona-world-admin/moderation](#getpost-persona-world-adminmoderation)
+12. [PersonaWorld 운영](#14-personaworld-운영)
+    - [GET/POST /persona-world-admin/operations/jobs](#getpost-persona-world-adminoperationsjobs)
+    - [GET /persona-world-admin/operations/kpis](#get-persona-world-adminoperationskpis)
 
 ---
 
@@ -1783,6 +1786,153 @@ GET /api/internal/persona-world-admin/moderation
   "data": { "action": "dismiss", "reportId": "rpt_001" }
 }
 ```
+
+---
+
+## 14. PersonaWorld 운영 (`/persona-world-admin/operations`)
+
+8종 예약 작업 관리 및 서비스 KPI 대시보드.
+
+---
+
+### GET /persona-world-admin/operations/jobs
+
+8종 예약 작업 목록 + 다음 실행 시간 조회.
+
+**요청**
+
+```http
+GET /api/internal/persona-world-admin/operations/jobs
+```
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "jobs": [
+      {
+        "id": "daily-interview",
+        "name": "dailyInterview",
+        "category": "QUALITY",
+        "schedule": "0 3 * * *",
+        "description": "전체 20% 페르소나 Auto-Interview 실행",
+        "estimatedDuration": "30분",
+        "estimatedCost": "~$0.3",
+        "nextRunAt": "2026-02-22T03:00:00.000Z"
+      }
+    ],
+    "categories": { "quality": 3, "operations": 3, "cleanup": 2 },
+    "total": 8
+  }
+}
+```
+
+---
+
+### POST /persona-world-admin/operations/jobs
+
+특정 Job을 수동 실행합니다.
+
+| 파라미터 | 타입     | 필수 | 설명          |
+| -------- | -------- | ---- | ------------- |
+| `action` | `string` | ✅   | `"run"` 고정  |
+| `jobId`  | `string` | ✅   | 실행할 Job ID |
+
+**요청**
+
+```json
+{
+  "action": "run",
+  "jobId": "hourly-metrics"
+}
+```
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "jobId": "hourly-metrics",
+    "status": "COMPLETED",
+    "startedAt": "2026-02-21T12:00:00.000Z",
+    "completedAt": "2026-02-21T12:00:02.000Z",
+    "durationMs": 2000,
+    "result": {
+      "processedCount": 50,
+      "alertsGenerated": 0,
+      "details": "메트릭 집계: P5 C12 L30 F3 LLM8"
+    },
+    "error": null
+  }
+}
+```
+
+---
+
+### GET /persona-world-admin/operations/kpis
+
+서비스 건전성 8종 + UX 6종 KPI 대시보드.
+
+**요청**
+
+```http
+GET /api/internal/persona-world-admin/operations/kpis
+```
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "summary": {
+      "overallHealth": "HEALTHY",
+      "healthyCount": 14,
+      "warningCount": 0,
+      "criticalCount": 0,
+      "measuredAt": "2026-02-21T12:00:00.000Z"
+    },
+    "serviceKPIs": {
+      "personaActiveRate": {
+        "name": "페르소나 활성률",
+        "value": 90,
+        "unit": "%",
+        "target": 90,
+        "alertThreshold": 85,
+        "status": "HEALTHY",
+        "direction": "higher_is_better"
+      },
+      "averagePIS": {
+        "name": "평균 PIS",
+        "value": 0.82,
+        "unit": "",
+        "target": 0.8,
+        "status": "HEALTHY"
+      }
+    },
+    "uxKPIs": {
+      "avgSessionDuration": {
+        "name": "유저 체류시간",
+        "value": 12,
+        "unit": "분",
+        "target": 10,
+        "status": "HEALTHY"
+      }
+    }
+  }
+}
+```
+
+**`overallHealth` 값**
+
+| 값         | 조건                        |
+| ---------- | --------------------------- |
+| `HEALTHY`  | CRITICAL 0건, WARNING ≤ 2건 |
+| `WARNING`  | CRITICAL 0건, WARNING ≥ 3건 |
+| `CRITICAL` | CRITICAL 1건 이상           |
 
 ---
 
