@@ -355,15 +355,23 @@
   - 변경: schema.prisma, 023_persona_demographics.sql, structured-fields.ts, pipeline.ts, api.ts, [id]/route.ts, [id]/page.tsx
   - 테스트: 3738 PASS (91 파일), Build PASS
 
+- [x] **T175: 페르소나 기억 뷰어 (관리자)** ✅ 2026-02-21
+  - AC1: API — GET /personas/[id]/memories (tab=activity/consumption/interaction/relationship)
+  - AC2: 기억 탭 — 활동/소비/대화/관계 4서브탭 + 리스트 렌더링
+  - AC3: 상태 게이지 — mood/energy/socialBattery/paradoxTension/narrativeTension 5게이지
+  - AC4: 기억 통계 — 활동/소비/대화/관계 카운트 + 총 기억 수
+  - 변경: memories/route.ts (신규), [id]/page.tsx (MemoryTab 추가)
+  - 테스트: 3738 PASS (91 파일), Build PASS
+
 ---
 
 ## IN_PROGRESS
 
-- [ ] **T175: 페르소나 기억 뷰어 (관리자)**
-  - AC1: API — GET /api/internal/personas/[id]/memories (활동로그/소비기록/대화이력/관계 통합 조회)
-  - AC2: 페르소나 상세 페이지 탭 추가 — 기억 탭 (활동/소비/대화/관계 서브탭)
-  - AC3: 기본정보에 현재 상태 표시 — mood/energy/socialBattery/paradoxTension 게이지
-  - AC4: 기억 통계 — 활성/핵심/망각 기억 수, 평균 보존율 표시
+(없음)
+
+## QUEUE
+
+(없음)
 
 ---
 
