@@ -91,12 +91,6 @@
 
 ---
 
-## IN_PROGRESS
-
-(없음)
-
----
-
 ## DONE (v4.0 — SNS 연동)
 
 - [x] **T169: SNS 연동 파이프라인 (OAuth + 데이터 수집 + UI)** ✅ 2026-02-17
@@ -150,34 +144,6 @@
 
 ## DONE (v4.0 — PW 상점/결제/설정)
 
-- [x] **T169: 알림 환경설정 (PW-F1)** ✅ 2026-02-21
-  - AC1: PWNotificationPreference 모델 + 021 마이그레이션
-  - AC2: notification-preference.ts 서비스 (getPreferences, updatePreferences, shouldDeliver)
-  - AC3: API GET/PUT /api/persona-world/notification-preferences
-  - AC4: /settings/notifications 페이지 (8종 토글 + 방해금지 시간대)
-  - 테스트: 3713+84 PASS, Build PASS
-
-- [x] **T170: 크레딧 실결제 — Toss Payments 연동 (PW-F2)** ✅ 2026-02-21
-  - AC1: CoinTransaction 모델 + 022 마이그레이션 (EARN/PURCHASE/SPEND, PENDING/COMPLETED/FAILED/REFUNDED)
-  - AC2: coin-packages.ts (4종 패키지: 100/500/1000/3000 코인)
-  - AC3: credit-service.ts (getBalance, addCredits, spendCredits, purchaseCredits, getTransactionHistory)
-  - AC4: API GET/POST /api/persona-world/credits + POST /credits/toss-confirm
-  - AC5: Shop 페이지 코인 충전 섹션 (Toss 위젯 연동)
-  - 테스트: 3713+84 PASS, Build PASS
-
----
-
-## IN PROGRESS
-
-- [ ] **T171: 프로필 설정 페이지 (PW-F3)**
-  - AC1: /settings 메인 페이지 (계정/알림/결제 3탭)
-  - AC2: 계정 설정 탭 (프로필 편집)
-  - AC3: 결제 탭 (코인 잔액 + 거래 내역)
-
----
-
-## DONE (v4.0 — PW 상점/결제/설정)
-
 - [x] **T170: 알림 환경설정 (PW-F1)** ✅ 2026-02-21
   - AC1: PWNotificationPreference 모델 + 021 마이그레이션
   - AC2: notification-preference.ts 서비스 (getPreferences, updatePreferences, shouldDeliver)
@@ -199,16 +165,28 @@
   - AC3: 알림 탭 (/settings/notifications 연결)
   - AC4: 결제 탭 (코인 잔액 카드 + 거래 내역 리스트 + 충전 링크)
   - AC5: 프로필 페이지 Settings 아이콘 → /settings 링크로 교체
-  - 테스트: 84 PASS, Build PASS
+  - ENV 통일: NEXT_PUBLIC_ENGINE_API_URL → NEXT_PUBLIC_ENGINE_STUDIO_URL
+  - 테스트: 3713+84 PASS, Build PASS
+
+---
+
+## DONE (v4.0 — PW 모더레이션)
+
+- [x] **T166: 자동 모더레이션 (Phase 7-A)** ✅ 2026-02-21
+  - AC1: 3단계 파이프라인 — auto-moderator.ts (기존 구현 확인: Stage1 규칙 ~5ms, Stage2 PII/시스템누출 ~50ms, Stage3 비동기 24h)
+  - AC2: 신고 처리 6종 — report-handler.ts (DI 패턴, Rate limit 10/hr 30/day, 자동 해결, Trust Decay)
+  - AC3: 관리자 액션 — moderation-actions.ts (9종 액션, 감사 로그)
+  - AC4: 대시보드 서비스 — dashboard-service.ts (활동/품질/보안/신고 4섹션, KPI 알림)
+  - AC5: API — POST /persona-world/reports, GET /persona-world-admin/dashboard, GET/POST /persona-world-admin/moderation
+  - AC6: 배럴 익스포트 — moderation/index.ts + persona-world/index.ts
+  - AC7: API 문서 최신화 — internal.md/openapi, public.md/openapi
+  - 신규: report-handler.ts, moderation-actions.ts, dashboard-service.ts, moderation/index.ts, reports/route.ts, dashboard/route.ts
+  - 변경: persona-world/index.ts, moderation/route.ts, internal.md, public.md, internal.openapi.yaml, public.openapi.yaml
+  - 테스트: 3713 PASS (91 파일), Build PASS
 
 ---
 
 ## QUEUE
-
-- [ ] **T166: 자동 모더레이션 (Phase 7-A)**
-  - AC1: 3단계 파이프라인 (규칙 → Sentinel → 비동기 분석)
-  - AC2: 신고 처리 시스템 6종 카테고리
-  - AC3: 관리자 대시보드 서비스 + API 6개
 
 - [ ] **T167: 운영 스케줄 + KPI (Phase 7-B)**
   - AC1: 8종 예약 작업 (cron)

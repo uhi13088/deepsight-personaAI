@@ -577,6 +577,43 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  # -----------------------------------------------------------
+  # Reports (신고)
+  # -----------------------------------------------------------
+
+  /persona-world/reports:
+    post:
+      operationId: submitReport
+      tags: [Reports]
+      summary: 유저 신고 제출
+      description: |
+        부적절한 콘텐츠를 신고합니다. 6종 카테고리 지원.
+        Rate limit: 10건/시간, 30건/일.
+        동일 대상에 대한 신고가 임계치를 초과하면 자동 처리됩니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportSubmitBody"
+      responses:
+        "200":
+          description: 신고 접수 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportSubmitResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          description: Rate limit 초과
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
 # ============================================================
 # Components
 # ============================================================
@@ -1378,6 +1415,43 @@ components:
               format: date-time
             message:
               type: string
+
+    # --- Reports ---
+
+    ReportSubmitBody:
+      type: object
+      required: [userId, targetType, targetId, category]
+      properties:
+        userId: { type: string }
+        targetType: { type: string, enum: [POST, COMMENT] }
+        targetId: { type: string }
+        category:
+          type: string
+          enum:
+            - INAPPROPRIATE_CONTENT
+            - WRONG_INFORMATION
+            - CHARACTER_BREAK
+            - REPETITIVE_CONTENT
+            - UNPLEASANT_INTERACTION
+            - TECHNICAL_ISSUE
+        description: { type: string }
+
+    ReportSubmitResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            reportId: { type: string }
+            status: { type: string, enum: [PENDING, AUTO_RESOLVED, IN_REVIEW] }
+            action:
+              {
+                type: string,
+                nullable: true,
+                enum: [HIDDEN, DELETED, PERSONA_PAUSED, DISMISSED, NO_ACTION, null],
+              }
+            message: { type: string }
 
   responses:
     BadRequest:

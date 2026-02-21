@@ -325,3 +325,50 @@ export type {
   TransactionRecord,
   CreditDataProvider,
 } from "./credit-service"
+
+// Phase 7-A: 모더레이션
+export {
+  // Auto-Moderator
+  runStage1,
+  runStage2,
+  runStage3,
+  runModerationPipeline,
+  sanitizePII,
+  getEscalationAction,
+  // Report Handler
+  submitReport,
+  getReportStats,
+  getCategorySeverity,
+  REPORT_CATEGORY_CONFIG,
+  // Moderation Actions
+  executeAction,
+  // Dashboard
+  buildDashboard,
+  checkKPIAlerts,
+} from "./moderation"
+export type {
+  ModerationAction,
+  DetectionType,
+  ModerationResult,
+  ModerationDetection,
+  EscalationAction,
+  AsyncAnalysisInput,
+  ReportCategory,
+  ReportResolution,
+  ReportCategoryConfig,
+  ReportInput,
+  ReportResult,
+  ReportStats,
+  ReportDataProvider,
+  ActionType,
+  ActionResult,
+  AuditLogEntry,
+  ModerationActionProvider,
+  DashboardOverview,
+  ActivityStats,
+  QualityStats,
+  SecurityStats,
+  ReportOverview,
+  DashboardAlert,
+  DashboardDataProvider,
+} from "./moderation"

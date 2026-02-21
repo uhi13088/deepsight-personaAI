@@ -86,9 +86,61 @@ export async function POST(request: NextRequest) {
           }
           await prisma.personaWorldReport.update({
             where: { id: reportId },
-            data: { status: "RESOLVED" },
+            data: { status: "RESOLVED", resolvedAt: new Date(), resolution: "HIDDEN" },
           })
         }
+        break
+      }
+
+      case "resolve": {
+        const { resolution } = body as { resolution?: string }
+        await prisma.personaWorldReport.update({
+          where: { id: reportId },
+          data: {
+            status: "RESOLVED",
+            resolvedAt: new Date(),
+            resolution: resolution ?? "RESOLVED",
+          },
+        })
+        break
+      }
+
+      case "delete": {
+        const targetReport = await prisma.personaWorldReport.findUnique({
+          where: { id: reportId },
+        })
+        if (targetReport) {
+          if (targetReport.targetType === "POST") {
+            await prisma.personaPost.delete({ where: { id: targetReport.targetId } }).catch(() => {
+              /* already deleted */
+            })
+          } else if (targetReport.targetType === "COMMENT") {
+            await prisma.personaComment
+              .delete({ where: { id: targetReport.targetId } })
+              .catch(() => {
+                /* already deleted */
+              })
+          }
+          await prisma.personaWorldReport.update({
+            where: { id: reportId },
+            data: { status: "RESOLVED", resolvedAt: new Date(), resolution: "DELETED" },
+          })
+        }
+        break
+      }
+
+      case "pause_persona": {
+        const { personaId } = body as { personaId?: string }
+        if (personaId) {
+          await prisma.persona.update({
+            where: { id: personaId },
+            data: { status: "PAUSED" },
+          })
+        }
+        await prisma.personaWorldReport.update({
+          where: { id: reportId },
+          data: { status: "RESOLVED", resolvedAt: new Date(), resolution: "PERSONA_PAUSED" },
+        })
         break
       }
 

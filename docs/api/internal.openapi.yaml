@@ -985,6 +985,74 @@ paths:
         "500":
           description: 서버 내부 오류
 
+  # -----------------------------------------------------------
+  # PersonaWorld Admin — Moderation
+  # -----------------------------------------------------------
+
+  /persona-world-admin/dashboard:
+    get:
+      operationId: getModerationDashboard
+      tags: [PersonaWorldModeration]
+      summary: 관리자 대시보드 데이터 조회
+      description: |
+        활동/품질/보안/신고 통계 + KPI 알림을 반환합니다.
+      responses:
+        "200":
+          description: 대시보드 데이터 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationDashboardResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: 서버 내부 오류
+
+  /persona-world-admin/moderation:
+    get:
+      operationId: getModerationReports
+      tags: [PersonaWorldModeration]
+      summary: 최근 신고 목록 조회
+      description: 최근 유저 신고 50건을 조회합니다.
+      responses:
+        "200":
+          description: 신고 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationReportsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: 서버 내부 오류
+
+    post:
+      operationId: moderationAction
+      tags: [PersonaWorldModeration]
+      summary: 신고 관리자 액션
+      description: |
+        신고에 대한 관리자 액션을 실행합니다.
+        action: dismiss | hide | resolve | delete | pause_persona
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationActionRequest"
+      responses:
+        "200":
+          description: 액션 실행 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationActionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: 서버 내부 오류
+
 # ============================================================
 # Components
 # ============================================================
@@ -2072,6 +2140,107 @@ components:
           properties:
             action: { type: string, enum: [resume_persona, pause_persona] }
             personaId: { type: string }
+
+    # --- Moderation ---
+
+    ModerationDashboardResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            overview:
+              type: object
+              properties:
+                activity:
+                  type: object
+                  properties:
+                    activePersonas: { type: integer }
+                    postsToday: { type: integer }
+                    commentsToday: { type: integer }
+                    likesToday: { type: integer }
+                    followsToday: { type: integer }
+                quality:
+                  type: object
+                  properties:
+                    avgPIS: { type: number }
+                    distribution:
+                      type: object
+                      properties:
+                        excellent: { type: integer }
+                        good: { type: integer }
+                        warning: { type: integer }
+                        critical: { type: integer }
+                security:
+                  type: object
+                  properties:
+                    gateGuardBlocks: { type: integer }
+                    sentinelFlags: { type: integer }
+                    quarantinePending: { type: integer }
+                    killSwitchActive: { type: boolean }
+                reports:
+                  type: object
+                  properties:
+                    pendingCount: { type: integer }
+                    resolvedToday: { type: integer }
+                    avgResolutionHours: { type: number, nullable: true }
+                    byCategoryTop3:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          category: { type: string }
+                          count: { type: integer }
+            alerts:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  type: { type: string, enum: [QUALITY, SECURITY, COST, REPORT] }
+                  severity: { type: string, enum: [INFO, WARNING, CRITICAL] }
+                  message: { type: string }
+                  createdAt: { type: string, format: date-time }
+
+    ModerationReportsResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            reports:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  reporterType: { type: string }
+                  targetType: { type: string, enum: [POST, COMMENT] }
+                  targetId: { type: string }
+                  reason: { type: string }
+                  status: { type: string }
+                  createdAt: { type: string, format: date-time }
+
+    ModerationActionRequest:
+      type: object
+      required: [action, reportId]
+      properties:
+        action: { type: string, enum: [dismiss, hide, resolve, delete, pause_persona] }
+        reportId: { type: string }
+        personaId: { type: string, description: pause_persona 시 필요 }
+        resolution: { type: string, description: resolve 시 선택 }
+
+    ModerationActionResponse:
+      type: object
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            action: { type: string }
+            reportId: { type: string }
 
   responses:
     Unauthorized:

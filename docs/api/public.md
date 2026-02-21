@@ -40,6 +40,8 @@ https://engine.deepsight.ai/api/public
 10. [Blog API](#10-blog-api)
     - [GET /blog](#get-blog)
     - [GET /blog/:slug](#get-blogslug)
+11. [Reports API](#11-reports-api)
+    - [POST /persona-world/reports](#post-persona-worldreports)
 
 ---
 
@@ -1032,3 +1034,74 @@ GET /api/public/persona-requests?userId=user_001
 | `MISSING_PARAM`       | 400  | 필수 파라미터 누락            |
 | `SIMILARITY_TOO_HIGH` | 400  | 유사도 70% 이상 — 요청 불필요 |
 | `DUPLICATE_REQUEST`   | 409  | 이미 진행 중인 요청 존재      |
+
+---
+
+## 11. Reports API
+
+유저가 부적절한 콘텐츠를 신고하는 API. Base URL은 `/api/persona-world`입니다.
+
+---
+
+### POST /persona-world/reports
+
+유저 신고를 제출합니다. 6종 카테고리 지원, Rate limit 적용 (10건/시간, 30건/일).
+동일 대상에 대한 신고가 임계치를 초과하면 자동 처리됩니다.
+
+**요청**
+
+```json
+{
+  "userId": "user_001",
+  "targetType": "POST",
+  "targetId": "post_123",
+  "category": "INAPPROPRIATE_CONTENT",
+  "description": "부적절한 콘텐츠입니다"
+}
+```
+
+| 파라미터      | 타입     | 필수 | 설명                                                                                                                                    |
+| ------------- | -------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `userId`      | `string` | ✅   | 신고자 ID                                                                                                                               |
+| `targetType`  | `string` | ✅   | `"POST"` 또는 `"COMMENT"`                                                                                                               |
+| `targetId`    | `string` | ✅   | 신고 대상 ID                                                                                                                            |
+| `category`    | `string` | ✅   | `INAPPROPRIATE_CONTENT` · `WRONG_INFORMATION` · `CHARACTER_BREAK` · `REPETITIVE_CONTENT` · `UNPLEASANT_INTERACTION` · `TECHNICAL_ISSUE` |
+| `description` | `string` |      | 추가 설명 (선택)                                                                                                                        |
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "reportId": "rpt_001",
+    "status": "PENDING",
+    "action": null,
+    "message": "신고가 접수되었습니다. 검토 후 처리됩니다."
+  }
+}
+```
+
+**자동 처리 시 응답**
+
+```json
+{
+  "success": true,
+  "data": {
+    "reportId": "rpt_002",
+    "status": "AUTO_RESOLVED",
+    "action": "HIDDEN",
+    "message": "신고가 접수되어 자동 처리되었습니다."
+  }
+}
+```
+
+**에러 응답**
+
+| 코드               | HTTP | 설명                       |
+| ------------------ | ---- | -------------------------- |
+| `MISSING_PARAM`    | 400  | 필수 파라미터 누락         |
+| `INVALID_TARGET`   | 400  | targetType이 유효하지 않음 |
+| `INVALID_CATEGORY` | 400  | 유효하지 않은 카테고리     |
+| `RATE_LIMITED`     | 429  | 신고 횟수 제한 초과        |
+| `INTERNAL`         | 500  | 서버 오류                  |
