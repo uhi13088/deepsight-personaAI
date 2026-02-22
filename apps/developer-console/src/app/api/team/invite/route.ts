@@ -11,6 +11,8 @@ const roleMapping: Record<string, "OWNER" | "ADMIN" | "DEVELOPER" | "VIEWER" | "
   viewer: "VIEWER",
 }
 
+const INVITE_EXPIRES_MS = 7 * 24 * 60 * 60 * 1000 // 7일
+
 /**
  * POST /api/team/invite - 팀원 초대 (DB + 이메일)
  */
@@ -26,10 +28,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: {
-            code: "INVALID_INPUT",
-            message: "이메일과 역할을 입력해주세요.",
-          },
+          error: { code: "INVALID_INPUT", message: "이메일과 역할을 입력해주세요." },
         },
         { status: 400 }
       )
@@ -42,10 +41,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: {
-            code: "NO_ORGANIZATION",
-            message: "조직이 존재하지 않습니다.",
-          },
+          error: { code: "NO_ORGANIZATION", message: "조직이 존재하지 않습니다." },
         },
         { status: 400 }
       )
@@ -56,7 +52,7 @@ export async function POST(request: NextRequest) {
       where: { email: email.toLowerCase() },
     })
 
-    // Create user if not exists
+    // Create user if not exists (pending invitation state)
     if (!user) {
       user = await prisma.user.create({
         data: {
@@ -80,30 +76,51 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: {
-            code: "ALREADY_MEMBER",
-            message: "이미 팀 멤버입니다.",
-          },
+          error: { code: "ALREADY_MEMBER", message: "이미 팀 멤버입니다." },
         },
         { status: 400 }
       )
     }
 
-    // Create organization member with pending status
+    // Create organization member with pending status (acceptedAt is null)
     const member = await prisma.organizationMember.create({
       data: {
         userId: user.id,
         organizationId: organization.id,
         role: roleMapping[role] || "DEVELOPER",
         invitedAt: new Date(),
-        // acceptedAt is null until user accepts
       },
     })
 
-    // Generate invite token
-    const inviteToken = crypto.randomBytes(32).toString("hex")
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"
-    const inviteUrl = `${baseUrl}/invite/${inviteToken}`
+    // T222: 초대 토큰 생성 + DB 저장
+    // rawToken은 이메일 URL에 포함, sha256 해시만 DB에 저장 (rainbow table 방지)
+    const rawToken = crypto.randomBytes(32).toString("hex")
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex")
+    const expiresAt = new Date(Date.now() + INVITE_EXPIRES_MS)
+
+    // 기존 초대 토큰 삭제 후 새로 생성 (재초대 처리)
+    const tokenIdentifier = `invite:${member.id}`
+    await prisma.verificationToken.deleteMany({
+      where: { identifier: tokenIdentifier },
+    })
+    await prisma.verificationToken.create({
+      data: {
+        identifier: tokenIdentifier,
+        token: tokenHash,
+        expires: expiresAt,
+      },
+    })
+
+    // T222: localhost:3001 폴백 제거
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+    if (!baseUrl) {
+      console.error("[Team] NEXT_PUBLIC_APP_URL is not configured")
+      return NextResponse.json(
+        { success: false, error: { code: "MISCONFIGURED", message: "서버 설정 오류" } },
+        { status: 500 }
+      )
+    }
+    const inviteUrl = `${baseUrl}/invite?token=${rawToken}&memberId=${member.id}`
 
     // Send invite email if Resend is configured
     if (process.env.RESEND_API_KEY) {
@@ -131,22 +148,22 @@ export async function POST(request: NextRequest) {
             `,
           }),
         })
-        console.log(`[Team] Invite email sent to ${email}`)
+        console.log(`[Team] Invite email sent to ${email.substring(0, 3)}***`)
       } catch (emailError) {
         console.error("[Team] Failed to send invite email:", emailError)
         // Continue even if email fails
       }
     } else {
-      console.log(`[Team] Resend not configured, skipping email for ${email}`)
+      console.log(`[Team] Resend not configured, skipping email for ${email.substring(0, 3)}***`)
     }
 
     const invite = {
       id: member.id,
       email,
       role,
-      invitedBy: "관리자",
+      invitedBy: session.user.name || "관리자",
       invitedAt: member.invitedAt?.toISOString() || new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      expiresAt: expiresAt.toISOString(),
     }
 
     return NextResponse.json({
@@ -161,10 +178,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: {
-          code: "INVITE_FAILED",
-          message: "초대 발송에 실패했습니다.",
-        },
+        error: { code: "INVITE_FAILED", message: "초대 발송에 실패했습니다." },
       },
       { status: 500 }
     )

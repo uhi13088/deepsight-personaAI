@@ -2217,6 +2217,26 @@
   - AC2: Build PASS ✅
   - 변경파일: `admin/seed/route.ts`
 
+### Phase DC-H: 개발자콘솔 보안 Medium/Low 이슈 수정 (T220~T222)
+
+> Phase DC-G 후속 — OWASP Medium/Low 취약점 수정
+
+- [x] **T220+T221: 보안 응답 헤더 + 요청 크기 제한 미들웨어** 🟡 Medium ✅ 2026-02-22
+  - 배경: API 응답에 보안 헤더 없음; 요청 크기 제한 없어 대용량 페이로드 허용
+  - AC1: `src/middleware.ts` 생성 — X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy ✅
+  - AC2: Content-Length > 1MB 요청 → 413 응답 (DoS 완화) ✅
+  - AC3: `/api/*` 라우트에만 적용 ✅
+  - AC4: Build PASS ✅ (tsc clean, 171 tests)
+  - 변경파일: `src/middleware.ts` (신규)
+
+- [x] **T222: 초대 토큰 DB 저장 + 만료 검증 + accept API** 🟡 Medium ✅ 2026-02-22
+  - 배경: 초대 토큰 DB 미저장 → 만료·취소 불가; `localhost:3001` 폴백; accept 엔드포인트 없음
+  - AC1: `VerificationToken` 모델 활용 — `identifier: invite:{memberId}`, `token: sha256(rawToken)`, `expires: +7일` ✅
+  - AC2: `team/invite/route.ts` — 토큰 DB 저장 + `localhost:3001` 폴백 제거 ✅
+  - AC3: `team/invite/accept/route.ts` 신규 생성 — 토큰 검증 + `acceptedAt` 업데이트 + VerificationToken 삭제 ✅
+  - AC4: Build PASS ✅
+  - 변경파일: `team/invite/route.ts`, `team/invite/accept/route.ts` (신규)
+
 ---
 
 ## 🚫 BLOCKED (막힘)
