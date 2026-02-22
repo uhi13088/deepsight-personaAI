@@ -16,7 +16,14 @@ export async function GET(request: NextRequest) {
   const amount = searchParams.get("amount")
   const planId = searchParams.get("planId")
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+  if (!baseUrl) {
+    console.error("[Toss] NEXT_PUBLIC_APP_URL is not configured")
+    return NextResponse.json(
+      { success: false, error: { code: "MISCONFIGURED", message: "서버 설정 오류" } },
+      { status: 500 }
+    )
+  }
 
   if (!paymentKey || !orderId || !amount) {
     return NextResponse.redirect(`${baseUrl}/billing?error=missing_params`)

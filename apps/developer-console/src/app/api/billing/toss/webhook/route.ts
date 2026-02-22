@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import prisma from "@/lib/prisma"
 
 /**
  * POST /api/billing/toss/webhook - Toss Payments 웹훅
@@ -51,7 +52,23 @@ export async function POST(request: NextRequest) {
         console.log(`[Toss Webhook] Payment ${paymentKey} status: ${status}, order: ${orderId}`)
 
         if (status === "CANCELED" || status === "PARTIAL_CANCELED") {
-          // TODO: 플랜 다운그레이드 또는 취소 처리
+          // orderId 기반으로 Invoice 조회 → 해당 Organization 플랜을 FREE로 다운그레이드
+          const invoice = await prisma.invoice.findFirst({
+            where: { stripeInvoiceId: orderId },
+          })
+          if (invoice) {
+            await Promise.all([
+              prisma.organization.update({
+                where: { id: invoice.organizationId },
+                data: { plan: "FREE" },
+              }),
+              prisma.invoice.update({
+                where: { id: invoice.id },
+                data: { status: "CANCELLED" },
+              }),
+            ])
+            console.log(`[Toss Webhook] Plan downgraded to FREE for org ${invoice.organizationId}`)
+          }
         }
         break
       }
@@ -59,7 +76,17 @@ export async function POST(request: NextRequest) {
       case "BILLING_KEY_DELETED": {
         const { billingKey } = data
         console.log(`[Toss Webhook] Billing key deleted: ${billingKey}`)
-        // TODO: 구독 취소 처리
+        // stripeSubscriptionId에 billingKey가 저장된 경우 해당 조직 구독 취소
+        const org = await prisma.organization.findFirst({
+          where: { stripeSubscriptionId: billingKey },
+        })
+        if (org) {
+          await prisma.organization.update({
+            where: { id: org.id },
+            data: { plan: "FREE", stripeSubscriptionId: null },
+          })
+          console.log(`[Toss Webhook] Subscription cancelled for org ${org.id}`)
+        }
         break
       }
 

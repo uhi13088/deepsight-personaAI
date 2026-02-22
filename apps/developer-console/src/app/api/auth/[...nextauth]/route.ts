@@ -1,27 +1,9 @@
-import { NextRequest, NextResponse } from "next/server"
+/**
+ * NextAuth v5 (Auth.js) Catch-All Route Handler
+ *
+ * Auth.js v5에서는 handlers를 직접 export해야 합니다.
+ * try-catch 래핑은 내부 URL 감지 컨텍스트를 깨뜨려 "Invalid URL" 에러를 유발합니다.
+ */
 import { handlers } from "@/lib/auth"
 
-export async function GET(request: NextRequest) {
-  try {
-    return await handlers.GET(request)
-  } catch (error) {
-    console.error("[Auth] GET /api/auth/session error:", error)
-    // Return valid JSON so SessionProvider doesn't crash
-    return NextResponse.json(
-      { error: "Internal auth error", detail: error instanceof Error ? error.message : "Unknown" },
-      { status: 500 }
-    )
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    return await handlers.POST(request)
-  } catch (error) {
-    console.error("[Auth] POST /api/auth error:", error)
-    return NextResponse.json(
-      { error: "Internal auth error", detail: error instanceof Error ? error.message : "Unknown" },
-      { status: 500 }
-    )
-  }
-}
+export const { GET, POST } = handlers

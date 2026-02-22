@@ -111,21 +111,12 @@ export async function GET() {
     })
   } catch (error) {
     console.error("Error fetching team:", error)
-    // Return empty data on error
-    return NextResponse.json({
-      success: true,
-      data: {
-        organization: {
-          id: "",
-          name: "My Organization",
-          plan: "Free",
-          createdAt: new Date().toISOString(),
-          memberCount: 0,
-          maxMembers: 5,
-        },
-        members: [],
-        pendingInvites: [],
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: "INTERNAL_ERROR", message: "팀 정보 조회에 실패했습니다." },
       },
-    })
+      { status: 500 }
+    )
   }
 }

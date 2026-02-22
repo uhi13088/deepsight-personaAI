@@ -2100,6 +2100,62 @@
   - 테스트: 빌드 PASS
   - 비고: Mock 데이터 서비스 패턴 적용, 모든 UI 페이지 동적 연결
 
+### Phase DC-F: 개발자콘솔 API 전면 수정 (T200~T205)
+
+> 점검 보고서(2026-02-22) 기반 — 하드코딩·목업·멀티테넌시·성능 전면 수정
+> 우선순위: Critical → High → Medium 순서. 각 티켓은 독립 가능한 단위로 분리.
+
+- [x] **T200: API Keys [id] CRUD 실제 DB 구현** 🔴 Critical ✅ 2026-02-22
+  - 배경: GET/PATCH/DELETE /api/api-keys/[id] 전부 TODO 주석과 mock 데이터 반환
+  - AC1: GET — `prisma.apiKey.findFirst({ where: { id, organizationId } })` + 조직 필터 ✅
+  - AC2: PATCH — `name`, `rateLimit`, `permissions` 필드 실제 DB 업데이트 ✅
+  - AC3: DELETE — `status: REVOKED`, `revokedAt` 소프트 삭제 ✅
+  - AC4: 조직 소속 여부 검증 (Cross-Org 방지) ✅
+  - AC5: Build PASS ✅ (tsc --noEmit, 171 tests)
+  - 변경파일: `apps/developer-console/src/app/api/api-keys/[id]/route.ts`
+
+- [x] **T201: localhost 하드코딩 제거 + 조직 필터링(Multi-tenancy) 적용** 🔴 Critical ✅ 2026-02-22
+  - 배경: status/route.ts, billing/toss/success/route.ts에 "localhost:3001" 하드코딩; usage + dashboard/stats는 조직 필터링 없음
+  - AC1: `status/route.ts` — `"http://localhost:3001"` 제거, `NEXT_PUBLIC_APP_URL` 없으면 graceful degradation ✅
+  - AC2: `billing/toss/success/route.ts` — fallback 제거, 미설정 시 500 반환 ✅
+  - AC3: `usage/route.ts` — `getUserOrganization()` + `organizationId` 필터 추가 ✅
+  - AC4: `dashboard/stats/route.ts` — 동일 패턴 ✅
+  - AC5: Build PASS ✅
+  - 변경파일: `status/route.ts`, `billing/toss/success/route.ts`, `usage/route.ts`, `dashboard/stats/route.ts`
+
+- [x] **T202: Settings/Profile 실제 DB 구현** 🔴 Critical ✅ 2026-02-22
+  - 배경: GET /api/settings, PATCH /api/settings/profile 전부 TODO 주석과 mock 반환
+  - AC1: GET /api/settings — `prisma.user.findUnique()` + sessions 포함 ✅
+  - AC2: PATCH /api/settings/profile — `prisma.user.update()` name/phone 업데이트 (email 제외) ✅
+  - AC3: 응답 형식 표준 준수 ✅
+  - AC4: Build PASS ✅
+  - 변경파일: `settings/route.ts`, `settings/profile/route.ts`
+
+- [x] **T203: 가격/쿼터 상수화 + 응답 형식 표준화 + 에러 시 Mock 반환 제거** 🟠 High ✅ 2026-02-22
+  - 배경: 가격/쿼터 여러 파일에 중복 하드코딩; 에러 발생 시 성공 응답으로 mock 데이터 반환
+  - AC1: `src/lib/constants.ts` 신규 생성 — `PLAN_INFO`, `PLAN_PRICES`, `API_COST_PER_CALL`, `getQuotaByPlan()` ✅
+  - AC2: `billing/route.ts`, `billing/upgrade/route.ts` — 상수 import로 교체 ✅
+  - AC3: `dashboard/stats/route.ts`, `usage/route.ts` — 상수 사용 ✅
+  - AC4: 에러 catch mock 제거 (`dashboard/stats`, `logs`, `usage`, `team`, `webhooks`) ✅
+  - AC7: Build PASS ✅
+  - 변경파일: `src/lib/constants.ts`(신규), `billing/route.ts`, `billing/upgrade/route.ts`, `usage/route.ts`, `dashboard/stats/route.ts`, `logs/route.ts`, `team/route.ts`, `webhooks/route.ts`
+
+- [x] **T204: Webhooks N+1 최적화 + Billing Toss Webhook 구독취소 + auth/login** 🟠 High ✅ 2026-02-22
+  - 배경: webhooks/route.ts에 루프 내 DB 쿼리(N+1); billing/toss/webhook의 CANCELED/BILLING_KEY_DELETED TODO; auth/login 501 반환
+  - AC1: `webhooks/route.ts` GET — `groupBy` 2쿼리 + Map 조인으로 N+1 제거 ✅
+  - AC2: `billing/toss/webhook/route.ts` — CANCELED: org→FREE + Invoice CANCELLED; BILLING_KEY_DELETED: 구독 해제 ✅
+  - AC3: `auth/login/route.ts` — 실제 bcrypt 검증 + lastLoginAt 업데이트 ✅
+  - AC4: Build PASS ✅
+  - 변경파일: `webhooks/route.ts`, `billing/toss/webhook/route.ts`, `auth/login/route.ts`
+
+- [x] **T205: Dashboard Alerts/Alert-Channels Notification 연동** 🟡 Medium ✅ 2026-02-22
+  - 배경: alert-channels, alerts 라우트 전부 TODO 목업; Notification 모델 활용 가능
+  - AC1: `dashboard/alerts/route.ts` GET — `prisma.notification.findMany()` ✅
+  - AC2: `dashboard/alerts/route.ts` PATCH — 단건/전체 읽음 처리 ✅
+  - AC3: `dashboard/alert-channels/route.ts` GET/PUT — 입력 검증 추가 (AlertChannel DB 모델 없어 스키마 확장 필요 명시) ✅
+  - AC4: Build PASS ✅ (tsc --noEmit clean, 171/171 tests pass)
+  - 변경파일: `dashboard/alerts/route.ts`, `dashboard/alert-channels/route.ts`
+
 ---
 
 ## 🚫 BLOCKED (막힘)

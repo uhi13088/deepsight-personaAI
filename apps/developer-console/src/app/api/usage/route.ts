@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { requireAuth } from "@/lib/require-auth"
+import { getUserOrganization } from "@/lib/get-user-organization"
+import { API_COST_PER_CALL, getQuotaByPlan } from "@/lib/constants"
 
 // ============================================================================
 // Types
@@ -75,7 +77,7 @@ function formatDateForGroup(date: Date, groupBy: string): string {
 // ============================================================================
 
 export async function GET(request: NextRequest) {
-  const { response } = await requireAuth()
+  const { session, response } = await requireAuth()
   if (response) return response
 
   try {
@@ -83,9 +85,34 @@ export async function GET(request: NextRequest) {
     const period = searchParams.get("period") || "7d"
     const groupBy = searchParams.get("groupBy") || "day"
 
-    // TODO: Scope to user's organization via session
-    // const organizationId = await getOrganizationId(request)
+    const membership = await getUserOrganization(session.user.id)
+    if (!membership) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          period,
+          overview: {
+            totalCalls: 0,
+            successfulCalls: 0,
+            failedCalls: 0,
+            successRate: 100,
+            averageLatency: 0,
+            p95Latency: 0,
+            p99Latency: 0,
+            totalCost: 0,
+            quotaUsed: 0,
+            quotaLimit: 0,
+          },
+          dailyUsage: [],
+          byEndpoint: [],
+          byStatusCode: [],
+          byRegion: [],
+          hourlyDistribution: [],
+        },
+      })
+    }
 
+    const orgFilter = { organizationId: membership.organizationId }
     const { start, end } = getDateRangeForPeriod(period)
 
     // Fetch all data in parallel
@@ -93,7 +120,7 @@ export async function GET(request: NextRequest) {
       await Promise.all([
         // All logs in period
         prisma.apiLog.findMany({
-          where: { createdAt: { gte: start, lte: end } },
+          where: { ...orgFilter, createdAt: { gte: start, lte: end } },
           select: {
             createdAt: true,
             statusCode: true,
@@ -103,15 +130,15 @@ export async function GET(request: NextRequest) {
         }),
         // Success count
         prisma.apiLog.count({
-          where: { createdAt: { gte: start, lte: end }, statusCode: { lt: 400 } },
+          where: { ...orgFilter, createdAt: { gte: start, lte: end }, statusCode: { lt: 400 } },
         }),
         // Failed count
         prisma.apiLog.count({
-          where: { createdAt: { gte: start, lte: end }, statusCode: { gte: 400 } },
+          where: { ...orgFilter, createdAt: { gte: start, lte: end }, statusCode: { gte: 400 } },
         }),
         // Latency stats
         prisma.apiLog.aggregate({
-          where: { createdAt: { gte: start, lte: end } },
+          where: { ...orgFilter, createdAt: { gte: start, lte: end } },
           _avg: { latencyMs: true },
           _max: { latencyMs: true },
           _min: { latencyMs: true },
@@ -119,14 +146,14 @@ export async function GET(request: NextRequest) {
         // By endpoint
         prisma.apiLog.groupBy({
           by: ["endpoint"],
-          where: { createdAt: { gte: start, lte: end } },
+          where: { ...orgFilter, createdAt: { gte: start, lte: end } },
           _count: true,
           _avg: { latencyMs: true },
         }),
         // By status code
         prisma.apiLog.groupBy({
           by: ["statusCode"],
-          where: { createdAt: { gte: start, lte: end } },
+          where: { ...orgFilter, createdAt: { gte: start, lte: end } },
           _count: true,
         }),
       ])
@@ -151,9 +178,9 @@ export async function GET(request: NextRequest) {
       averageLatency: Math.round(avgLatency),
       p95Latency: Math.round(p95Latency),
       p99Latency: Math.round(p99Latency),
-      totalCost: Math.round(totalCalls * 0.002 * 100) / 100,
+      totalCost: Math.round(totalCalls * API_COST_PER_CALL * 100) / 100,
       quotaUsed: totalCalls,
-      quotaLimit: 500000,
+      quotaLimit: getQuotaByPlan(membership.organization.plan),
     }
 
     // Group logs by time period
@@ -183,7 +210,7 @@ export async function GET(request: NextRequest) {
         calls: data.calls,
         success: data.success,
         failed: data.failed,
-        cost: Math.round(data.calls * 0.002 * 100) / 100,
+        cost: Math.round(data.calls * API_COST_PER_CALL * 100) / 100,
         avgLatency: Math.round(data.latencySum / data.calls),
       }))
 
@@ -260,31 +287,12 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error("Error fetching usage data:", error)
-    // Return empty data on error to prevent 500
-    const { searchParams } = new URL(request.url)
-    const period = searchParams.get("period") || "7d"
-    return NextResponse.json({
-      success: true,
-      data: {
-        period,
-        overview: {
-          totalCalls: 0,
-          successfulCalls: 0,
-          failedCalls: 0,
-          successRate: 100,
-          averageLatency: 0,
-          p95Latency: 0,
-          p99Latency: 0,
-          totalCost: 0,
-          quotaUsed: 0,
-          quotaLimit: 3000,
-        },
-        dailyUsage: [],
-        byEndpoint: [],
-        byStatusCode: [],
-        byRegion: [],
-        hourlyDistribution: [],
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: "INTERNAL_ERROR", message: "사용량 데이터 조회에 실패했습니다." },
       },
-    })
+      { status: 500 }
+    )
   }
 }

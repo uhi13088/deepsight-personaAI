@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import type { Environment, ApiKeyStatus } from "@/generated/prisma"
 import { requireAuth } from "@/lib/require-auth"
+import { getUserOrganization } from "@/lib/get-user-organization"
+import { API_COST_PER_CALL, getQuotaByPlan } from "@/lib/constants"
 
 // ============================================================================
 // Helper Functions
@@ -24,11 +26,12 @@ function formatDate(date: Date): string {
 // ============================================================================
 
 export async function GET(request: NextRequest) {
-  const { response } = await requireAuth()
+  const { session, response } = await requireAuth()
   if (response) return response
 
   try {
-    // TODO: Scope to user's organization via session
+    const membership = await getUserOrganization(session.user.id)
+    const orgFilter = membership ? { organizationId: membership.organizationId } : {}
 
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -53,28 +56,29 @@ export async function GET(request: NextRequest) {
     ] = await Promise.all([
       // Today's logs
       prisma.apiLog.aggregate({
-        where: { createdAt: { gte: today } },
+        where: { ...orgFilter, createdAt: { gte: today } },
         _count: true,
         _avg: { latencyMs: true },
       }),
       // Yesterday's logs
       prisma.apiLog.aggregate({
-        where: { createdAt: { gte: yesterday, lt: today } },
+        where: { ...orgFilter, createdAt: { gte: yesterday, lt: today } },
         _count: true,
       }),
       // This month's logs
       prisma.apiLog.aggregate({
-        where: { createdAt: { gte: thisMonthStart } },
+        where: { ...orgFilter, createdAt: { gte: thisMonthStart } },
         _count: true,
         _avg: { latencyMs: true },
       }),
       // Last month's logs
       prisma.apiLog.aggregate({
-        where: { createdAt: { gte: lastMonthStart, lte: lastMonthEnd } },
+        where: { ...orgFilter, createdAt: { gte: lastMonthStart, lte: lastMonthEnd } },
         _count: true,
       }),
       // Recent activity (last 10 logs)
       prisma.apiLog.findMany({
+        where: orgFilter,
         orderBy: { createdAt: "desc" },
         take: 10,
         select: {
@@ -87,20 +91,21 @@ export async function GET(request: NextRequest) {
           requestId: true,
         },
       }),
-      // API keys
+      // API keys (scoped to org)
       prisma.apiKey.groupBy({
         by: ["environment", "status"],
+        where: membership ? { organizationId: membership.organizationId } : {},
         _count: true,
       }),
       // Last 7 days aggregated
       prisma.apiLog.findMany({
-        where: { createdAt: { gte: getDateRange(7).start } },
+        where: { ...orgFilter, createdAt: { gte: getDateRange(7).start } },
         select: { createdAt: true },
       }),
       // Endpoint stats
       prisma.apiLog.groupBy({
         by: ["endpoint"],
-        where: { createdAt: { gte: thisMonthStart } },
+        where: { ...orgFilter, createdAt: { gte: thisMonthStart } },
         _count: true,
       }),
     ])
@@ -108,10 +113,10 @@ export async function GET(request: NextRequest) {
     // Calculate success rate
     const [successCount, totalCount] = await Promise.all([
       prisma.apiLog.count({
-        where: { createdAt: { gte: thisMonthStart }, statusCode: { lt: 400 } },
+        where: { ...orgFilter, createdAt: { gte: thisMonthStart }, statusCode: { lt: 400 } },
       }),
       prisma.apiLog.count({
-        where: { createdAt: { gte: thisMonthStart } },
+        where: { ...orgFilter, createdAt: { gte: thisMonthStart } },
       }),
     ])
 
@@ -204,10 +209,10 @@ export async function GET(request: NextRequest) {
         change: 0, // Would need historical data to calculate
       },
       cost: {
-        thisMonth: Math.round(thisMonthLogs._count * 0.002 * 100) / 100, // $0.002 per call
-        lastMonth: Math.round(lastMonthLogs._count * 0.002 * 100) / 100,
+        thisMonth: Math.round(thisMonthLogs._count * API_COST_PER_CALL * 100) / 100,
+        lastMonth: Math.round(lastMonthLogs._count * API_COST_PER_CALL * 100) / 100,
         quotaUsed: totalCount,
-        quotaLimit: 500000, // Default quota
+        quotaLimit: membership ? getQuotaByPlan(membership.organization.plan) : 0,
       },
       activeKeys,
     }
@@ -241,21 +246,12 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error("Error fetching dashboard stats:", error)
-    // Return mock data on error to prevent 500
-    return NextResponse.json({
-      success: true,
-      data: {
-        stats: {
-          apiCalls: { today: 0, yesterday: 0, thisMonth: 0, lastMonth: 0, change: 0 },
-          successRate: { value: 100, change: 0 },
-          latency: { p50: 0, p95: 0, p99: 0, change: 0 },
-          cost: { thisMonth: 0, lastMonth: 0, quotaUsed: 0, quotaLimit: 3000 },
-          activeKeys: { total: 0, live: 0, test: 0 },
-        },
-        recentActivity: [],
-        usageByDay: [],
-        usageByEndpoint: [],
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: "INTERNAL_ERROR", message: "대시보드 통계 조회에 실패했습니다." },
       },
-    })
+      { status: 500 }
+    )
   }
 }

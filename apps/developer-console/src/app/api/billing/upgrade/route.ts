@@ -2,23 +2,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import crypto from "crypto"
 import { auth } from "@/lib/auth"
+import { PLAN_PRICES, PLAN_DISPLAY_NAMES } from "@/lib/constants"
 
 const upgradeSchema = z.object({
   planId: z.enum(["free", "starter", "pro", "enterprise"]),
 })
-
-// Toss Payments 플랜별 가격 (원화)
-const PLAN_PRICES: Record<string, number> = {
-  starter: 29000, // ₩29,000/월
-  pro: 99000, // ₩99,000/월
-  enterprise: 299000, // ₩299,000/월
-}
-
-const PLAN_NAMES: Record<string, string> = {
-  starter: "Starter 플랜",
-  pro: "Pro 플랜",
-  enterprise: "Enterprise 플랜",
-}
 
 // ============================================================================
 // POST /api/billing/upgrade - 플랜 업그레이드 (Toss Payments)
@@ -72,7 +60,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || ""
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+    if (!baseUrl) {
+      console.error("[billing/upgrade] NEXT_PUBLIC_APP_URL is not configured")
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: "MISCONFIGURED", message: "서버 설정 오류입니다. 관리자에게 문의하세요." },
+        },
+        { status: 500 }
+      )
+    }
 
     // Generate unique order ID
     const orderId = `ORDER_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`
@@ -84,7 +82,7 @@ export async function POST(request: NextRequest) {
         paymentInfo: {
           clientKey: process.env.TOSS_CLIENT_KEY,
           orderId,
-          orderName: PLAN_NAMES[planId],
+          orderName: PLAN_DISPLAY_NAMES[planId],
           amount: PLAN_PRICES[planId],
           customerName,
           successUrl: `${baseUrl}/api/billing/toss/success?planId=${planId}`,
