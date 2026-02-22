@@ -375,9 +375,15 @@ function createInteractionDataProvider(): InteractionPipelineDataProvider {
     },
 
     async saveComment(personaId, postId, content, _provenance) {
-      const comment = await prisma.personaComment.create({
-        data: { personaId, postId, content },
-      })
+      const [comment] = await prisma.$transaction([
+        prisma.personaComment.create({
+          data: { personaId, postId, content },
+        }),
+        prisma.personaPost.update({
+          where: { id: postId },
+          data: { commentCount: { increment: 1 } },
+        }),
+      ])
       return { id: comment.id }
       // provenance는 saveActivityLog metadata에서 추적
     },
