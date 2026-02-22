@@ -10,20 +10,12 @@ import {
   Clock,
   Play,
   Plus,
-  BarChart3,
-  AlertTriangle,
   CheckCircle,
   XCircle,
-  TrendingUp,
+  ExternalLink,
+  Database,
 } from "lucide-react"
-import type {
-  BackupPolicy,
-  BackupRecord,
-  DRPlan,
-  DRDrill,
-  CapacityReport,
-  BackupMethod,
-} from "@/lib/operations"
+import type { BackupPolicy, BackupRecord, DRPlan, DRDrill, BackupMethod } from "@/lib/operations"
 
 // ── Method labels ──────────────────────────────────────────────
 
@@ -45,6 +37,16 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
 }
 
+// ── T186: 실측 용량 현황 타입 ──────────────────────────────────
+
+interface CapacitySnapshot {
+  activePersonas: number
+  llmCallsLast30d: number
+  llmCostLast30d: number
+  matchingCountLast30d: number
+  measuredAt: number
+}
+
 // ── API response type ──────────────────────────────────────────
 
 interface BackupData {
@@ -61,7 +63,23 @@ interface BackupData {
       summary: string
     }
   }>
-  capacityReport: CapacityReport
+  capacitySnapshot: CapacitySnapshot
+}
+
+// ── T185: DR 드릴 완료 입력 폼 상태 ───────────────────────────
+
+interface DrillCompleteForm {
+  actualRtoMinutes: string
+  actualRpoMinutes: string
+  findings: string
+  improvements: string
+}
+
+const EMPTY_DRILL_FORM: DrillCompleteForm = {
+  actualRtoMinutes: "",
+  actualRpoMinutes: "",
+  findings: "",
+  improvements: "",
 }
 
 export default function BackupPage() {
@@ -69,6 +87,8 @@ export default function BackupPage() {
   const [data, setData] = useState<BackupData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // T185: 완료 입력 폼 (drillId → 폼 상태)
+  const [drillForms, setDrillForms] = useState<Record<string, DrillCompleteForm>>({})
 
   // ── Fetch data ──────────────────────────────────────────────
 
@@ -97,26 +117,7 @@ export default function BackupPage() {
     fetchData()
   }, [fetchData])
 
-  // ── Handlers ─────────────────────────────────────────────────
-
-  const handleCreateBackup = useCallback(
-    async (policy: BackupPolicy) => {
-      try {
-        const res = await fetch("/api/internal/operations/backup", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "create_backup", policyId: policy.id }),
-        })
-        const json = (await res.json()) as { success: boolean }
-        if (json.success) {
-          await fetchData()
-        }
-      } catch {
-        // silent fail
-      }
-    },
-    [fetchData]
-  )
+  // ── DR Drill handlers ─────────────────────────────────────────
 
   const handleScheduleDrill = useCallback(async () => {
     try {
@@ -126,9 +127,7 @@ export default function BackupPage() {
         body: JSON.stringify({ action: "schedule_drill" }),
       })
       const json = (await res.json()) as { success: boolean }
-      if (json.success) {
-        await fetchData()
-      }
+      if (json.success) await fetchData()
     } catch {
       // silent fail
     }
@@ -143,9 +142,7 @@ export default function BackupPage() {
           body: JSON.stringify({ action: "start_drill", drillId }),
         })
         const json = (await res.json()) as { success: boolean }
-        if (json.success) {
-          await fetchData()
-        }
+        if (json.success) await fetchData()
       } catch {
         // silent fail
       }
@@ -153,26 +150,62 @@ export default function BackupPage() {
     [fetchData]
   )
 
+  const openCompleteForm = useCallback((drillId: string) => {
+    setDrillForms((prev) => ({ ...prev, [drillId]: EMPTY_DRILL_FORM }))
+  }, [])
+
+  const cancelCompleteForm = useCallback((drillId: string) => {
+    setDrillForms((prev) => {
+      const next = { ...prev }
+      delete next[drillId]
+      return next
+    })
+  }, [])
+
   const handleCompleteDrill = useCallback(
     async (drillId: string) => {
+      const form = drillForms[drillId]
+      if (!form) return
+
+      const actualRtoMinutes = Number(form.actualRtoMinutes)
+      const actualRpoMinutes = Number(form.actualRpoMinutes)
+      if (!actualRtoMinutes || !actualRpoMinutes) return
+
+      const findings = form.findings
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean)
+      const improvements = form.improvements
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean)
+
       try {
         const res = await fetch("/api/internal/operations/backup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "complete_drill", drillId }),
+          body: JSON.stringify({
+            action: "complete_drill",
+            drillId,
+            actualRtoMinutes,
+            actualRpoMinutes,
+            findings,
+            improvements,
+          }),
         })
         const json = (await res.json()) as { success: boolean }
         if (json.success) {
+          cancelCompleteForm(drillId)
           await fetchData()
         }
       } catch {
         // silent fail
       }
     },
-    [fetchData]
+    [drillForms, cancelCompleteForm, fetchData]
   )
 
-  // ── Loading state ───────────────────────────────────────────
+  // ── Loading / Error ──────────────────────────────────────────
 
   if (loading) {
     return (
@@ -184,8 +217,6 @@ export default function BackupPage() {
       </>
     )
   }
-
-  // ── Error state ─────────────────────────────────────────────
 
   if (error) {
     return (
@@ -205,9 +236,77 @@ export default function BackupPage() {
       <Header title="Backup & Recovery" description="백업 정책, 재해복구 계획" />
 
       <div className="space-y-6 p-6">
-        {/* ── Backup Policy Cards ───────────────────────────── */}
+        {/* ── T184: Neon 자동백업 안내 배너 ────────────────── */}
+        <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4">
+          <div className="flex items-start gap-3">
+            <Database className="mt-0.5 h-5 w-5 shrink-0 text-blue-400" />
+            <div>
+              <p className="text-sm font-medium text-blue-300">
+                Neon PostgreSQL이 자동으로 백업을 관리합니다
+              </p>
+              <p className="mt-1 text-xs text-blue-400/80">
+                현재 플랜의 PITR(Point-in-Time Recovery) 정책에 따라 최근 7일 내 임의 시점으로
+                복구할 수 있습니다. 아래 백업 정책은 참고용 정보이며, 실제 백업 및 복구는 Neon
+                콘솔에서 관리하세요.
+              </p>
+              <a
+                href="https://console.neon.tech"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
+              >
+                Neon 콘솔 열기
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* ── T186: 실측 용량 현황 (실 DB 쿼리) ──────────── */}
+        <div className="bg-card rounded-lg border p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Database className="h-4 w-4 text-emerald-400" />
+            <h3 className="text-sm font-medium">리소스 현황 (최근 30일 실측)</h3>
+            <Badge variant="muted">
+              {new Date(data.capacitySnapshot.measuredAt).toLocaleString()} 기준
+            </Badge>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-xs lg:grid-cols-4">
+            <div className="rounded-md border p-3 text-center">
+              <p className="text-muted-foreground">활성 페르소나</p>
+              <p className="mt-1 text-2xl font-bold">{data.capacitySnapshot.activePersonas}</p>
+              <p className="text-muted-foreground text-[10px]">개</p>
+            </div>
+            <div className="rounded-md border p-3 text-center">
+              <p className="text-muted-foreground">LLM 호출</p>
+              <p className="mt-1 text-2xl font-bold">
+                {data.capacitySnapshot.llmCallsLast30d.toLocaleString()}
+              </p>
+              <p className="text-muted-foreground text-[10px]">회 / 30일</p>
+            </div>
+            <div className="rounded-md border p-3 text-center">
+              <p className="text-muted-foreground">LLM 비용</p>
+              <p className="mt-1 text-2xl font-bold">
+                ${data.capacitySnapshot.llmCostLast30d.toFixed(2)}
+              </p>
+              <p className="text-muted-foreground text-[10px]">USD / 30일</p>
+            </div>
+            <div className="rounded-md border p-3 text-center">
+              <p className="text-muted-foreground">매칭 횟수</p>
+              <p className="mt-1 text-2xl font-bold">
+                {data.capacitySnapshot.matchingCountLast30d.toLocaleString()}
+              </p>
+              <p className="text-muted-foreground text-[10px]">회 / 30일</p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── T184: 백업 정책 (참고용, 실행 버튼 없음) ────── */}
         <div>
-          <h3 className="mb-3 text-sm font-medium">백업 정책</h3>
+          <h3 className="mb-1 text-sm font-medium">백업 정책 (참고용)</h3>
+          <p className="text-muted-foreground mb-3 text-xs">
+            실제 백업 실행은 Neon이 자동으로 처리합니다.
+          </p>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {data.policies.map((policy) => {
               const policyRecords = data.records.filter((r) => r.policyId === policy.id)
@@ -224,8 +323,7 @@ export default function BackupPage() {
                       {METHOD_LABELS[policy.method].label}
                     </Badge>
                   </div>
-
-                  <div className="mb-3 space-y-1 text-xs">
+                  <div className="space-y-1 text-xs">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">대상</span>
                       <span>{policy.target}</span>
@@ -243,104 +341,93 @@ export default function BackupPage() {
                       <span>{policy.encryptionEnabled ? "활성" : "비활성"}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">압축</span>
-                      <span>{policy.compressionEnabled ? "활성" : "비활성"}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">마지막 백업</span>
+                      <span className="text-muted-foreground">마지막 기록</span>
                       <span>
                         {lastRecord ? new Date(lastRecord.startedAt).toLocaleDateString() : "-"}
                       </span>
                     </div>
                   </div>
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => handleCreateBackup(policy)}
-                  >
-                    <Play className="mr-1 h-3 w-3" />
-                    백업 실행
-                  </Button>
                 </div>
               )
             })}
           </div>
         </div>
 
-        {/* ── Backup History Table ──────────────────────────── */}
+        {/* ── 백업 이력 ────────────────────────────────────── */}
         <div className="bg-card rounded-lg border p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-blue-400" />
-              <h3 className="text-sm font-medium">백업 이력</h3>
-              <Badge variant="muted">{data.records.length}건</Badge>
-            </div>
+          <div className="mb-3 flex items-center gap-2">
+            <Clock className="h-4 w-4 text-blue-400" />
+            <h3 className="text-sm font-medium">백업 이력</h3>
+            <Badge variant="muted">{data.records.length}건</Badge>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-border border-b">
-                  <th className="text-muted-foreground px-2 py-2 text-left font-medium">상태</th>
-                  <th className="text-muted-foreground px-2 py-2 text-left font-medium">방식</th>
-                  <th className="text-muted-foreground px-2 py-2 text-left font-medium">대상</th>
-                  <th className="text-muted-foreground px-2 py-2 text-left font-medium">크기</th>
-                  <th className="text-muted-foreground px-2 py-2 text-left font-medium">
-                    시작 시각
-                  </th>
-                  <th className="text-muted-foreground px-2 py-2 text-left font-medium">
-                    소요 시간
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.records.slice(0, 15).map((record) => {
-                  const duration =
-                    record.completedAt && record.startedAt
-                      ? Math.round((record.completedAt - record.startedAt) / 1000)
-                      : null
-                  return (
-                    <tr key={record.id} className="border-border border-b last:border-0">
-                      <td className="px-2 py-1.5">
-                        {record.status === "completed" && (
-                          <Badge variant="success">
-                            <CheckCircle className="mr-1 h-3 w-3" />
-                            완료
+          {data.records.length === 0 ? (
+            <p className="text-muted-foreground py-4 text-center text-xs">
+              백업 이력이 없습니다. Neon 콘솔에서 백업 상태를 확인하세요.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-border border-b">
+                    <th className="text-muted-foreground px-2 py-2 text-left font-medium">상태</th>
+                    <th className="text-muted-foreground px-2 py-2 text-left font-medium">방식</th>
+                    <th className="text-muted-foreground px-2 py-2 text-left font-medium">대상</th>
+                    <th className="text-muted-foreground px-2 py-2 text-left font-medium">크기</th>
+                    <th className="text-muted-foreground px-2 py-2 text-left font-medium">
+                      시작 시각
+                    </th>
+                    <th className="text-muted-foreground px-2 py-2 text-left font-medium">
+                      소요 시간
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.records.slice(0, 15).map((record) => {
+                    const duration =
+                      record.completedAt && record.startedAt
+                        ? Math.round((record.completedAt - record.startedAt) / 1000)
+                        : null
+                    return (
+                      <tr key={record.id} className="border-border border-b last:border-0">
+                        <td className="px-2 py-1.5">
+                          {record.status === "completed" && (
+                            <Badge variant="success">
+                              <CheckCircle className="mr-1 h-3 w-3" />
+                              완료
+                            </Badge>
+                          )}
+                          {record.status === "running" && (
+                            <Badge variant="info">
+                              <Play className="mr-1 h-3 w-3" />
+                              실행중
+                            </Badge>
+                          )}
+                          {record.status === "failed" && (
+                            <Badge variant="destructive">
+                              <XCircle className="mr-1 h-3 w-3" />
+                              실패
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <Badge variant={METHOD_LABELS[record.method].variant}>
+                            {METHOD_LABELS[record.method].label}
                           </Badge>
-                        )}
-                        {record.status === "running" && (
-                          <Badge variant="info">
-                            <Play className="mr-1 h-3 w-3" />
-                            실행중
-                          </Badge>
-                        )}
-                        {record.status === "failed" && (
-                          <Badge variant="destructive">
-                            <XCircle className="mr-1 h-3 w-3" />
-                            실패
-                          </Badge>
-                        )}
-                        {record.status === "verifying" && <Badge variant="warning">검증중</Badge>}
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <Badge variant={METHOD_LABELS[record.method].variant}>
-                          {METHOD_LABELS[record.method].label}
-                        </Badge>
-                      </td>
-                      <td className="px-2 py-1.5">{record.target}</td>
-                      <td className="px-2 py-1.5 font-mono">{formatBytes(record.sizeBytes)}</td>
-                      <td className="text-muted-foreground px-2 py-1.5">
-                        {new Date(record.startedAt).toLocaleString()}
-                      </td>
-                      <td className="px-2 py-1.5">{duration !== null ? `${duration}s` : "-"}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+                        <td className="px-2 py-1.5">{record.target}</td>
+                        <td className="px-2 py-1.5 font-mono">{formatBytes(record.sizeBytes)}</td>
+                        <td className="text-muted-foreground px-2 py-1.5">
+                          {new Date(record.startedAt).toLocaleString()}
+                        </td>
+                        <td className="px-2 py-1.5">{duration !== null ? `${duration}s` : "-"}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* ── DR Plan ───────────────────────────────────────── */}
@@ -366,16 +453,15 @@ export default function BackupPage() {
               <p className="font-medium">{data.drPlan.scenario}</p>
             </div>
             <div>
-              <span className="text-muted-foreground">RTO</span>
+              <span className="text-muted-foreground">RTO 목표</span>
               <p className="font-medium">{data.drPlan.rtoMinutes}분</p>
             </div>
             <div>
-              <span className="text-muted-foreground">RPO</span>
+              <span className="text-muted-foreground">RPO 목표</span>
               <p className="font-medium">{data.drPlan.rpoMinutes}분</p>
             </div>
           </div>
 
-          {/* DR Plan Steps */}
           <div className="mb-4">
             <h4 className="mb-2 text-xs font-medium">복구 단계</h4>
             <div className="space-y-1.5">
@@ -392,7 +478,6 @@ export default function BackupPage() {
             </div>
           </div>
 
-          {/* DR Contacts */}
           <div className="mb-4">
             <h4 className="mb-2 text-xs font-medium">비상 연락처</h4>
             <div className="flex gap-3">
@@ -408,243 +493,178 @@ export default function BackupPage() {
             </div>
           </div>
 
-          {/* DR Drills */}
           {data.drDrills.length > 0 && (
             <div>
               <h4 className="mb-2 text-xs font-medium">DR 훈련 이력</h4>
               <div className="space-y-2">
                 {data.drDrills.map((drill) => {
                   const evaluation = data.drillEvaluations.find((e) => e.drillId === drill.id)
+                  const completeForm = drillForms[drill.id]
+
                   return (
-                    <div
-                      key={drill.id}
-                      className="flex items-center justify-between rounded-md border px-3 py-2 text-xs"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Badge
-                          variant={
-                            drill.status === "completed"
-                              ? "success"
-                              : drill.status === "in_progress"
-                                ? "warning"
-                                : "muted"
-                          }
-                        >
-                          {drill.status}
-                        </Badge>
-                        <span>{drill.scenario}</span>
-                        {evaluation && (
+                    <div key={drill.id} className="rounded-md border px-3 py-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
                           <Badge
-                            variant={evaluation.evaluation.overallPass ? "success" : "destructive"}
+                            variant={
+                              drill.status === "completed"
+                                ? "success"
+                                : drill.status === "in_progress"
+                                  ? "warning"
+                                  : "muted"
+                            }
                           >
-                            {evaluation.evaluation.overallPass ? "PASS" : "FAIL"}
+                            {drill.status}
                           </Badge>
-                        )}
-                        {evaluation && (
-                          <span className="text-muted-foreground">
-                            {evaluation.evaluation.summary}
-                          </span>
-                        )}
+                          <span>{drill.scenario}</span>
+                          {evaluation && (
+                            <Badge
+                              variant={
+                                evaluation.evaluation.overallPass ? "success" : "destructive"
+                              }
+                            >
+                              {evaluation.evaluation.overallPass ? "PASS" : "FAIL"}
+                            </Badge>
+                          )}
+                          {evaluation && (
+                            <span className="text-muted-foreground">
+                              {evaluation.evaluation.summary}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          {drill.status === "scheduled" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleStartDrill(drill.id)}
+                            >
+                              <Play className="mr-1 h-3 w-3" />
+                              시작
+                            </Button>
+                          )}
+                          {drill.status === "in_progress" && !completeForm && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openCompleteForm(drill.id)}
+                            >
+                              <CheckCircle className="mr-1 h-3 w-3" />
+                              완료 입력
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        {drill.status === "scheduled" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleStartDrill(drill.id)}
-                          >
-                            <Play className="mr-1 h-3 w-3" />
-                            시작
-                          </Button>
-                        )}
-                        {drill.status === "in_progress" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleCompleteDrill(drill.id)}
-                          >
-                            <CheckCircle className="mr-1 h-3 w-3" />
-                            완료
-                          </Button>
-                        )}
-                      </div>
+
+                      {/* T185: 완료 입력 폼 (인라인, 실측값만 저장) */}
+                      {completeForm && (
+                        <div className="mt-3 space-y-2 border-t pt-3">
+                          <p className="text-muted-foreground text-[10px]">
+                            실제 측정값을 입력하세요. (자동 생성 없음)
+                          </p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-muted-foreground mb-1 block text-[10px]">
+                                실제 RTO (분) *
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                className="bg-background w-full rounded border px-2 py-1 text-xs"
+                                value={completeForm.actualRtoMinutes}
+                                onChange={(e) =>
+                                  setDrillForms((prev) => ({
+                                    ...prev,
+                                    [drill.id]: {
+                                      ...prev[drill.id],
+                                      actualRtoMinutes: e.target.value,
+                                    },
+                                  }))
+                                }
+                                placeholder="예: 28"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-muted-foreground mb-1 block text-[10px]">
+                                실제 RPO (분) *
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                className="bg-background w-full rounded border px-2 py-1 text-xs"
+                                value={completeForm.actualRpoMinutes}
+                                onChange={(e) =>
+                                  setDrillForms((prev) => ({
+                                    ...prev,
+                                    [drill.id]: {
+                                      ...prev[drill.id],
+                                      actualRpoMinutes: e.target.value,
+                                    },
+                                  }))
+                                }
+                                placeholder="예: 4"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-muted-foreground mb-1 block text-[10px]">
+                              발견사항 (줄바꿈으로 구분)
+                            </label>
+                            <textarea
+                              rows={2}
+                              className="bg-background w-full rounded border px-2 py-1 text-xs"
+                              value={completeForm.findings}
+                              onChange={(e) =>
+                                setDrillForms((prev) => ({
+                                  ...prev,
+                                  [drill.id]: { ...prev[drill.id], findings: e.target.value },
+                                }))
+                              }
+                              placeholder="예: 페일오버 지연 5분 발생"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-muted-foreground mb-1 block text-[10px]">
+                              개선 사항 (줄바꿈으로 구분)
+                            </label>
+                            <textarea
+                              rows={2}
+                              className="bg-background w-full rounded border px-2 py-1 text-xs"
+                              value={completeForm.improvements}
+                              onChange={(e) =>
+                                setDrillForms((prev) => ({
+                                  ...prev,
+                                  [drill.id]: { ...prev[drill.id], improvements: e.target.value },
+                                }))
+                              }
+                              placeholder="예: 자동 페일오버 스크립트 개선"
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => cancelCompleteForm(drill.id)}
+                            >
+                              취소
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={
+                                !completeForm.actualRtoMinutes || !completeForm.actualRpoMinutes
+                              }
+                              onClick={() => handleCompleteDrill(drill.id)}
+                            >
+                              <CheckCircle className="mr-1 h-3 w-3" />
+                              저장
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ── Capacity Report ───────────────────────────────── */}
-        <div className="bg-card rounded-lg border p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-emerald-400" />
-            <h3 className="text-sm font-medium">용량 리포트</h3>
-            <Badge variant="muted">
-              헬스 스코어: {data.capacityReport.summary.overallHealthScore}/100
-            </Badge>
-          </div>
-
-          {/* Health + Summary */}
-          <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-3">
-            <div className="rounded-md border p-3 text-center">
-              <p className="text-muted-foreground text-xs">전체 헬스 스코어</p>
-              <p
-                className={`text-3xl font-bold ${
-                  data.capacityReport.summary.overallHealthScore >= 80
-                    ? "text-emerald-400"
-                    : data.capacityReport.summary.overallHealthScore >= 60
-                      ? "text-amber-400"
-                      : "text-red-400"
-                }`}
-              >
-                {data.capacityReport.summary.overallHealthScore}
-              </p>
-            </div>
-            <div className="rounded-md border p-3 text-center">
-              <p className="text-muted-foreground text-xs">예상 절감률</p>
-              <p className="text-3xl font-bold text-blue-400">
-                {data.capacityReport.summary.estimatedTotalSavingsPercent}%
-              </p>
-            </div>
-            <div className="rounded-md border p-3 text-center">
-              <p className="text-muted-foreground text-xs">위험 리소스</p>
-              <p className="text-3xl font-bold">
-                {data.capacityReport.summary.criticalResources.length}
-              </p>
-            </div>
-          </div>
-
-          {/* Forecasts */}
-          {data.capacityReport.forecasts.length > 0 && (
-            <div className="mb-4">
-              <h4 className="mb-2 text-xs font-medium">리소스 예측</h4>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {data.capacityReport.forecasts.map((forecast) => (
-                  <div key={forecast.metricType} className="rounded-md border px-3 py-2 text-xs">
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="font-medium">{forecast.metricType}</span>
-                      <Badge
-                        variant={
-                          forecast.trend === "increasing"
-                            ? "warning"
-                            : forecast.trend === "decreasing"
-                              ? "success"
-                              : "muted"
-                        }
-                      >
-                        {forecast.trend === "increasing"
-                          ? "증가"
-                          : forecast.trend === "decreasing"
-                            ? "감소"
-                            : "안정"}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">현재</span>
-                      <span>{forecast.currentUsagePercent}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">예측 (90일)</span>
-                      <span>{forecast.projectedUsagePercent}%</span>
-                    </div>
-                    {forecast.daysUntilThreshold !== null && (
-                      <div className="mt-1 flex items-center gap-1 text-amber-400">
-                        <AlertTriangle className="h-3 w-3" />
-                        <span>{forecast.daysUntilThreshold}일 후 임계값 도달</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Cost Optimizations */}
-          {data.capacityReport.optimizations.length > 0 && (
-            <div className="mb-4">
-              <h4 className="mb-2 text-xs font-medium">비용 최적화 권고</h4>
-              <div className="space-y-2">
-                {data.capacityReport.optimizations.map((opt) => (
-                  <div
-                    key={opt.id}
-                    className="flex items-center justify-between rounded-md border px-3 py-2 text-xs"
-                  >
-                    <div className="flex items-center gap-3">
-                      <TrendingUp className="text-muted-foreground h-3.5 w-3.5" />
-                      <div>
-                        <p className="font-medium">{opt.title}</p>
-                        <p className="text-muted-foreground">{opt.description}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="success">-{opt.estimatedSavingsPercent}%</Badge>
-                      <Badge
-                        variant={
-                          opt.effort === "low"
-                            ? "success"
-                            : opt.effort === "medium"
-                              ? "warning"
-                              : "destructive"
-                        }
-                      >
-                        노력: {opt.effort}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Scaling Recommendations */}
-          {data.capacityReport.scalingRecommendations.length > 0 && (
-            <div>
-              <h4 className="mb-2 text-xs font-medium">스케일링 권고</h4>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {data.capacityReport.scalingRecommendations.map((rec) => (
-                  <div key={rec.metricType} className="rounded-md border px-3 py-2 text-xs">
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="font-medium">{rec.metricType}</span>
-                      <Badge
-                        variant={
-                          rec.direction === "scale_up"
-                            ? "warning"
-                            : rec.direction === "scale_down"
-                              ? "info"
-                              : "muted"
-                        }
-                      >
-                        {rec.direction === "scale_up"
-                          ? "확장"
-                          : rec.direction === "scale_down"
-                            ? "축소"
-                            : "유지"}
-                      </Badge>
-                    </div>
-                    <p className="text-muted-foreground">{rec.reason}</p>
-                    <div className="mt-1 flex justify-between">
-                      <span className="text-muted-foreground">현재: {rec.currentCapacity}</span>
-                      <span>권장: {rec.recommendedCapacity}</span>
-                    </div>
-                    <Badge
-                      variant={
-                        rec.urgency === "immediate"
-                          ? "destructive"
-                          : rec.urgency === "soon"
-                            ? "warning"
-                            : "muted"
-                      }
-                    >
-                      {rec.urgency === "immediate"
-                        ? "즉시"
-                        : rec.urgency === "soon"
-                          ? "조만간"
-                          : "계획적"}
-                    </Badge>
-                  </div>
-                ))}
               </div>
             </div>
           )}

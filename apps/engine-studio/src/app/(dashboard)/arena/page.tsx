@@ -14,6 +14,14 @@ interface PersonaOption {
   profileImageUrl: string | null
 }
 
+interface ArenaTurn {
+  turnNumber: number
+  speakerId: string
+  content: string
+  tokensUsed: number
+  timestamp: string
+}
+
 interface ArenaSessionSummary {
   id: string
   mode: string
@@ -82,7 +90,6 @@ function PersonaSelector({
   const containerRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // 외부 클릭으로 닫기
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -93,10 +100,8 @@ function PersonaSelector({
     return () => document.removeEventListener("mousedown", handleClick)
   }, [])
 
-  // 검색
   useEffect(() => {
     if (!open) return
-
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
       setLoading(true)
@@ -136,7 +141,6 @@ function PersonaSelector({
       .slice(0, 2)
       .toUpperCase()
 
-  // 선택된 상태
   if (value && !open) {
     return (
       <div ref={containerRef}>
@@ -207,18 +211,21 @@ function PersonaSelector({
   )
 }
 
-// ── 상태 Badge ──────────────────────────────────────────────
+// ── 상태 Badge (한글 라벨) ──────────────────────────────────
+
+const STATUS_CONFIG: Record<
+  string,
+  { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
+> = {
+  PENDING: { label: "대기 중", variant: "outline" },
+  RUNNING: { label: "실행 중", variant: "secondary" },
+  COMPLETED: { label: "완료", variant: "default" },
+  CANCELLED: { label: "취소됨", variant: "destructive" },
+}
 
 function StatusBadge({ status }: { status: string }) {
-  const variant =
-    status === "COMPLETED"
-      ? "default"
-      : status === "RUNNING"
-        ? "secondary"
-        : status === "ERROR"
-          ? "destructive"
-          : "outline"
-  return <Badge variant={variant}>{status}</Badge>
+  const cfg = STATUS_CONFIG[status] ?? { label: status, variant: "outline" as const }
+  return <Badge variant={cfg.variant}>{cfg.label}</Badge>
 }
 
 // ── 시간 포맷 ───────────────────────────────────────────────
@@ -234,29 +241,188 @@ function timeAgo(iso: string): string {
   return `${days}일 전`
 }
 
+// ── 턴 뷰어 모달 ────────────────────────────────────────────
+
+function TurnViewer({ session, onClose }: { session: ArenaSessionSummary; onClose: () => void }) {
+  const [turns, setTurns] = useState<ArenaTurn[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch(`/api/internal/arena/sessions/${session.id}/turns`)
+      .then((r) => r.json())
+      .then((json: { success: boolean; data?: { turns: ArenaTurn[] } }) => {
+        if (json.success && json.data) setTurns(json.data.turns)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [session.id])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-background max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-xl border shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 헤더 */}
+        <div className="sticky top-0 flex items-center justify-between border-b bg-inherit px-5 py-4">
+          <div>
+            <p className="text-sm font-semibold">{session.topic}</p>
+            <p className="text-muted-foreground text-xs">
+              {session.participantAName} vs {session.participantBName}
+              {session.overallScore !== null && (
+                <span className="ml-2 font-medium text-blue-500">
+                  점수: {session.overallScore.toFixed(2)}
+                </span>
+              )}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground text-lg"
+            onClick={onClose}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* 턴 목록 */}
+        <div className="space-y-3 p-5">
+          {loading && <p className="text-muted-foreground text-sm">불러오는 중...</p>}
+          {!loading && turns.length === 0 && (
+            <p className="text-muted-foreground text-sm">턴 데이터가 없습니다.</p>
+          )}
+          {turns.map((t) => {
+            const isA = t.speakerId === session.participantA
+            const name = isA ? session.participantAName : session.participantBName
+            return (
+              <div
+                key={t.turnNumber}
+                className={`rounded-lg border p-3 ${isA ? "border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/20" : "border-orange-200 bg-orange-50/50 dark:border-orange-900 dark:bg-orange-950/20"}`}
+              >
+                <div className="mb-1 flex items-center gap-2">
+                  <span className="text-xs font-semibold">{name}</span>
+                  <span className="text-muted-foreground text-xs">턴 {t.turnNumber}</span>
+                  <span className="text-muted-foreground ml-auto text-xs">{t.tokensUsed}tok</span>
+                </div>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed">{t.content}</p>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── 세션 카드 ───────────────────────────────────────────────
+
+function SessionCard({
+  session,
+  onRun,
+  onDelete,
+  onViewTurns,
+  running,
+  deleting,
+}: {
+  session: ArenaSessionSummary
+  onRun: (id: string) => void
+  onDelete: (id: string) => void
+  onViewTurns: (session: ArenaSessionSummary) => void
+  running: boolean
+  deleting: boolean
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border p-3 transition hover:bg-gray-50 dark:hover:bg-gray-900">
+      {/* 메인 정보 */}
+      <div className="min-w-0 flex-1">
+        <button
+          type="button"
+          className="w-full text-left"
+          onClick={() => session.status === "COMPLETED" && onViewTurns(session)}
+          disabled={session.status !== "COMPLETED"}
+        >
+          <p className="truncate text-sm font-medium">
+            {session.topic}
+            {session.status === "COMPLETED" && (
+              <span className="text-muted-foreground ml-1 text-xs">(클릭하여 대화 보기)</span>
+            )}
+          </p>
+          <p className="text-muted-foreground text-xs">
+            {session.participantAName} vs {session.participantBName}
+          </p>
+        </button>
+      </div>
+
+      {/* 오른쪽 정보 */}
+      <div className="flex shrink-0 items-center gap-2">
+        {session.overallScore !== null && (
+          <span className="text-xs font-medium text-blue-500">
+            {session.overallScore.toFixed(2)}점
+          </span>
+        )}
+        <span className="text-muted-foreground text-xs">
+          {session.turnCount}/{session.maxTurns}턴
+        </span>
+        <StatusBadge status={session.status} />
+        <span className="text-muted-foreground w-14 text-right text-xs">
+          {timeAgo(session.createdAt)}
+        </span>
+
+        {/* 실행 버튼 (PENDING만) */}
+        {session.status === "PENDING" && (
+          <Button
+            size="sm"
+            variant="default"
+            className="h-7 px-2 text-xs"
+            onClick={() => onRun(session.id)}
+            disabled={running}
+          >
+            {running ? "실행 중..." : "▶ 실행"}
+          </Button>
+        )}
+
+        {/* 삭제 버튼 (RUNNING 제외) */}
+        {session.status !== "RUNNING" && (
+          <button
+            type="button"
+            className="text-muted-foreground text-xs transition hover:text-red-500"
+            onClick={() => onDelete(session.id)}
+            disabled={deleting}
+            title="세션 삭제"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── 메인 페이지 ──────────────────────────────────────────────
 
 export default function ArenaAdminPage() {
   const [sessions, setSessions] = useState<ArenaSessionSummary[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<CreateFormState>(INITIAL_FORM)
   const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
-
-  // 선택된 페르소나 정보
   const [personaA, setPersonaA] = useState<PersonaOption | null>(null)
   const [personaB, setPersonaB] = useState<PersonaOption | null>(null)
+  const [runningSessions, setRunningSessions] = useState<Set<string>>(new Set())
+  const [deletingSessions, setDeletingSessions] = useState<Set<string>>(new Set())
+  const [viewingSession, setViewingSession] = useState<ArenaSessionSummary | null>(null)
 
   // 세션 목록 로드
   const fetchSessions = useCallback(async () => {
-    setLoading(true)
     try {
       const res = await fetch("/api/internal/arena/sessions")
       const json = (await res.json()) as {
         success: boolean
         data?: { sessions: ArenaSessionSummary[] }
-        error?: { message: string }
       }
       if (json.success && json.data) {
         setSessions(json.data.sessions)
@@ -275,17 +441,15 @@ export default function ArenaAdminPage() {
   // 세션 생성
   const handleCreate = async () => {
     if (!personaA || !personaB || !form.topic.trim()) {
-      setError("참가자 2명과 주제를 입력하세요.")
+      setCreateError("참가자 2명과 주제를 입력하세요.")
       return
     }
     if (personaA.id === personaB.id) {
-      setError("서로 다른 참가자를 선택하세요.")
+      setCreateError("서로 다른 참가자를 선택하세요.")
       return
     }
-
     setCreating(true)
-    setError(null)
-
+    setCreateError(null)
     try {
       const res = await fetch("/api/internal/arena/sessions", {
         method: "POST",
@@ -296,36 +460,81 @@ export default function ArenaAdminPage() {
           participantB: personaB.id,
         }),
       })
-
       const json = (await res.json()) as {
         success: boolean
         data?: { session: ArenaSessionSummary }
         error?: { message: string }
       }
-
       if (json.success) {
         setForm(INITIAL_FORM)
         setPersonaA(null)
         setPersonaB(null)
         await fetchSessions()
       } else {
-        setError(json.error?.message ?? "세션 생성 실패")
+        setCreateError(json.error?.message ?? "세션 생성 실패")
       }
     } catch {
-      setError("네트워크 오류")
+      setCreateError("네트워크 오류")
     } finally {
       setCreating(false)
     }
   }
 
+  // 세션 실행
+  const handleRun = async (sessionId: string) => {
+    setRunningSessions((s) => new Set(s).add(sessionId))
+    try {
+      const res = await fetch(`/api/internal/arena/sessions/${sessionId}/run`, {
+        method: "POST",
+      })
+      const json = (await res.json()) as { success: boolean; error?: { message: string } }
+      if (!json.success) {
+        alert(json.error?.message ?? "세션 실행 실패")
+      }
+    } catch {
+      alert("네트워크 오류")
+    } finally {
+      setRunningSessions((s) => {
+        const next = new Set(s)
+        next.delete(sessionId)
+        return next
+      })
+      await fetchSessions()
+    }
+  }
+
+  // 세션 삭제
+  const handleDelete = async (sessionId: string) => {
+    if (!confirm("이 세션을 삭제하시겠습니까?")) return
+    setDeletingSessions((s) => new Set(s).add(sessionId))
+    try {
+      const res = await fetch(`/api/internal/arena/sessions/${sessionId}`, {
+        method: "DELETE",
+      })
+      const json = (await res.json()) as { success: boolean; error?: { message: string } }
+      if (json.success) {
+        setSessions((prev) => prev.filter((s) => s.id !== sessionId))
+      } else {
+        alert(json.error?.message ?? "세션 삭제 실패")
+      }
+    } catch {
+      alert("네트워크 오류")
+    } finally {
+      setDeletingSessions((s) => {
+        const next = new Set(s)
+        next.delete(sessionId)
+        return next
+      })
+    }
+  }
+
   // 통계
   const completedCount = sessions.filter((s) => s.status === "COMPLETED").length
+  const pendingCount = sessions.filter((s) => s.status === "PENDING").length
+  const scoredSessions = sessions.filter((s) => s.overallScore !== null)
   const avgScore =
-    completedCount > 0
-      ? sessions
-          .filter((s) => s.overallScore !== null)
-          .reduce((sum, s) => sum + (s.overallScore ?? 0), 0) /
-        sessions.filter((s) => s.overallScore !== null).length
+    scoredSessions.length > 0
+      ? scoredSessions.reduce((sum, s) => sum + (s.overallScore ?? 0), 0) / scoredSessions.length
       : 0
 
   return (
@@ -334,7 +543,7 @@ export default function ArenaAdminPage() {
 
       {/* 통계 카드 */}
       {sessions.length > 0 && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <div className="rounded-lg border p-4 text-center">
             <p className="text-muted-foreground text-xs">총 세션</p>
             <p className="text-2xl font-bold">{sessions.length}</p>
@@ -344,8 +553,12 @@ export default function ArenaAdminPage() {
             <p className="text-2xl font-bold">{completedCount}</p>
           </div>
           <div className="rounded-lg border p-4 text-center">
+            <p className="text-muted-foreground text-xs">대기 중</p>
+            <p className="text-2xl font-bold text-orange-500">{pendingCount}</p>
+          </div>
+          <div className="rounded-lg border p-4 text-center">
             <p className="text-muted-foreground text-xs">평균 점수</p>
-            <p className="text-2xl font-bold">{avgScore > 0 ? avgScore.toFixed(1) : "-"}</p>
+            <p className="text-2xl font-bold">{avgScore > 0 ? avgScore.toFixed(2) : "-"}</p>
           </div>
         </div>
       )}
@@ -379,7 +592,6 @@ export default function ArenaAdminPage() {
           />
         </div>
 
-        {/* 선택 완료 시 VS 배너 */}
         {personaA && personaB && (
           <div className="bg-muted/50 mb-4 flex items-center justify-center gap-3 rounded-lg py-2 text-sm">
             <span className="font-medium">{personaA.name}</span>
@@ -461,7 +673,7 @@ export default function ArenaAdminPage() {
           )}
         </div>
 
-        {error && <p className="mb-3 text-sm text-red-500">{error}</p>}
+        {createError && <p className="mb-3 text-sm text-red-500">{createError}</p>}
 
         <Button onClick={handleCreate} disabled={creating || !personaA || !personaB}>
           {creating ? "생성 중..." : "세션 생성"}
@@ -470,7 +682,12 @@ export default function ArenaAdminPage() {
 
       {/* 세션 목록 */}
       <div className="rounded-lg border p-5">
-        <h3 className="mb-4 text-sm font-semibold">세션 목록</h3>
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-sm font-semibold">세션 목록</h3>
+          {pendingCount > 0 && (
+            <p className="text-muted-foreground text-xs">▶ 버튼을 눌러 PENDING 세션을 실행하세요</p>
+          )}
+        </div>
         {loading ? (
           <p className="text-muted-foreground text-sm">로딩 중...</p>
         ) : sessions.length === 0 ? (
@@ -478,33 +695,24 @@ export default function ArenaAdminPage() {
         ) : (
           <div className="space-y-2">
             {sessions.map((s) => (
-              <div
+              <SessionCard
                 key={s.id}
-                className="flex items-center gap-4 rounded-lg border p-3 transition hover:bg-gray-50 dark:hover:bg-gray-900"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{s.topic}</p>
-                  <p className="text-muted-foreground text-xs">
-                    {s.participantAName} vs {s.participantBName}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  {s.overallScore !== null && (
-                    <span className="text-xs font-medium">{s.overallScore.toFixed(1)}점</span>
-                  )}
-                  <span className="text-muted-foreground text-xs">
-                    {s.turnCount}/{s.maxTurns}턴
-                  </span>
-                  <StatusBadge status={s.status} />
-                  <span className="text-muted-foreground w-16 text-right text-xs">
-                    {timeAgo(s.createdAt)}
-                  </span>
-                </div>
-              </div>
+                session={s}
+                onRun={handleRun}
+                onDelete={handleDelete}
+                onViewTurns={setViewingSession}
+                running={runningSessions.has(s.id)}
+                deleting={deletingSessions.has(s.id)}
+              />
             ))}
           </div>
         )}
       </div>
+
+      {/* 턴 뷰어 모달 */}
+      {viewingSession && (
+        <TurnViewer session={viewingSession} onClose={() => setViewingSession(null)} />
+      )}
     </div>
   )
 }

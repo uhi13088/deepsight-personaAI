@@ -18,7 +18,7 @@ export async function GET() {
   if (response) return response
 
   try {
-    const provider = createPrismaCostDataProvider()
+    const provider = await createPrismaCostDataProvider()
     const dashboard = await buildCostDashboard(provider)
 
     return NextResponse.json({
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const provider = createPrismaCostDataProvider()
+    const provider = await createPrismaCostDataProvider()
     const application = await changeCostMode(provider, mode as CostMode)
 
     return NextResponse.json({
@@ -134,9 +134,51 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// ── LLM 가격 정보 (SystemConfig DB 기반) ─────────────────────
+
+interface LlmPricing {
+  inputPerMillion: number
+  cacheReadPerMillion: number
+  outputPerMillion: number
+}
+
+// Claude Sonnet 현행 가격 — DB에 설정이 없을 때 사용하는 기본값
+const DEFAULT_PRICING: LlmPricing = {
+  inputPerMillion: 3.0,
+  cacheReadPerMillion: 0.3,
+  outputPerMillion: 15.0,
+}
+
+async function loadPricing(): Promise<LlmPricing> {
+  const config = await prisma.systemConfig
+    .findUnique({
+      where: { category_key: { category: "COST", key: "llm_pricing" } },
+    })
+    .catch(() => null)
+
+  if (config?.value && typeof config.value === "object") {
+    const v = config.value as Record<string, unknown>
+    if (
+      typeof v.inputPerMillion === "number" &&
+      typeof v.cacheReadPerMillion === "number" &&
+      typeof v.outputPerMillion === "number"
+    ) {
+      return {
+        inputPerMillion: v.inputPerMillion,
+        cacheReadPerMillion: v.cacheReadPerMillion,
+        outputPerMillion: v.outputPerMillion,
+      }
+    }
+  }
+
+  return DEFAULT_PRICING
+}
+
 // ── Prisma 기반 CostDataProvider ──────────────────────────────
 
-function createPrismaCostDataProvider(): CostDataProvider {
+async function createPrismaCostDataProvider(): Promise<CostDataProvider> {
+  const pricing = await loadPricing()
+
   return {
     async getTodayUsageLogs(): Promise<LlmUsageLog[]> {
       const todayStart = new Date()
@@ -157,9 +199,9 @@ function createPrismaCostDataProvider(): CostDataProvider {
           output: log.outputTokens,
         },
         cost: {
-          inputCost: computeInputCost(log.inputTokens, log.cacheReadInputTokens ?? 0),
-          cacheCost: computeCacheCost(log.cacheReadInputTokens ?? 0),
-          outputCost: computeOutputCost(log.outputTokens),
+          inputCost: computeInputCost(log.inputTokens, log.cacheReadInputTokens ?? 0, pricing),
+          cacheCost: computeCacheCost(log.cacheReadInputTokens ?? 0, pricing),
+          outputCost: computeOutputCost(log.outputTokens, pricing),
           totalCost: Number(log.estimatedCostUsd),
         },
         latencyMs: log.durationMs,
@@ -290,12 +332,6 @@ function createPrismaCostDataProvider(): CostDataProvider {
 
 // ── 비용 계산 유틸리티 ──────────────────────────────────────────
 
-const PRICING = {
-  inputPerMillion: 3.0,
-  cacheReadPerMillion: 0.3,
-  outputPerMillion: 15.0,
-}
-
 function mapCallType(dbCallType: string): LLMCallType {
   const mapping: Record<string, LLMCallType> = {
     post: "POST",
@@ -310,15 +346,15 @@ function mapCallType(dbCallType: string): LLMCallType {
   return mapping[dbCallType.toLowerCase()] ?? "OTHER"
 }
 
-function computeInputCost(inputTokens: number, cachedTokens: number): number {
+function computeInputCost(inputTokens: number, cachedTokens: number, pricing: LlmPricing): number {
   const nonCached = inputTokens - cachedTokens
-  return (nonCached / 1_000_000) * PRICING.inputPerMillion
+  return (nonCached / 1_000_000) * pricing.inputPerMillion
 }
 
-function computeCacheCost(cachedTokens: number): number {
-  return (cachedTokens / 1_000_000) * PRICING.cacheReadPerMillion
+function computeCacheCost(cachedTokens: number, pricing: LlmPricing): number {
+  return (cachedTokens / 1_000_000) * pricing.cacheReadPerMillion
 }
 
-function computeOutputCost(outputTokens: number): number {
-  return (outputTokens / 1_000_000) * PRICING.outputPerMillion
+function computeOutputCost(outputTokens: number, pricing: LlmPricing): number {
+  return (outputTokens / 1_000_000) * pricing.outputPerMillion
 }

@@ -107,44 +107,38 @@ export async function GET(request: NextRequest) {
     const entries = rows.map(toAuditLogEntry)
 
     // ── Summary: DB aggregation (전체 레코드 메모리 로드 대신 집계 쿼리 사용) ──
-    const [
-      allCount,
-      actionCountRows,
-      targetTypeCountRows,
-      topActorRows,
-      periodBounds,
-      recentRows,
-    ] = await Promise.all([
-      prisma.auditLog.count(),
-      // 액션별 카운트
-      prisma.auditLog.groupBy({
-        by: ["action"],
-        _count: { _all: true },
-      }),
-      // 대상 유형별 카운트
-      prisma.auditLog.groupBy({
-        by: ["targetType"],
-        _count: { _all: true },
-      }),
-      // Top actors (userId 기준 집계)
-      prisma.auditLog.groupBy({
-        by: ["userId"],
-        _count: { _all: true },
-        orderBy: { _count: { userId: "desc" } },
-        take: 10,
-      }),
-      // 전체 기간 범위
-      prisma.auditLog.aggregate({
-        _min: { createdAt: true },
-        _max: { createdAt: true },
-      }),
-      // 최근 활동 10건
-      prisma.auditLog.findMany({
-        include: { user: { select: { name: true } } },
-        orderBy: { createdAt: "desc" },
-        take: 10,
-      }),
-    ])
+    const [allCount, actionCountRows, targetTypeCountRows, topActorRows, periodBounds, recentRows] =
+      await Promise.all([
+        prisma.auditLog.count(),
+        // 액션별 카운트
+        prisma.auditLog.groupBy({
+          by: ["action"],
+          _count: { _all: true },
+        }),
+        // 대상 유형별 카운트
+        prisma.auditLog.groupBy({
+          by: ["targetType"],
+          _count: { _all: true },
+        }),
+        // Top actors (userId 기준 집계)
+        prisma.auditLog.groupBy({
+          by: ["userId"],
+          _count: { _all: true },
+          orderBy: { _count: { userId: "desc" } },
+          take: 10,
+        }),
+        // 전체 기간 범위
+        prisma.auditLog.aggregate({
+          _min: { createdAt: true },
+          _max: { createdAt: true },
+        }),
+        // 최근 활동 10건
+        prisma.auditLog.findMany({
+          include: { user: { select: { name: true } } },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        }),
+      ])
 
     // Top actors에 actorName 조회 (별도 쿼리로 최소화)
     const actorIds = topActorRows.map((r) => r.userId)

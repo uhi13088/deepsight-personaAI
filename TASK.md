@@ -1159,6 +1159,60 @@
   - AC4: ✅ CRITICAL 교정 시 reasons에 "[자동 교정] ..." 내역 기록 (운영자 사후 확인용)
   - AC5: ✅ 단위 테스트 42개 PASS + Build PASS
 
+### Phase OPS-A: Operations 가짜 데이터 일괄 제거 (T184~T187)
+
+> 감사 결과: Backup/DR/Incident 메뉴에 Math.random(), 하드코딩 결과값, 가짜 용량 데이터 다수 발견.
+> 원칙: 가짜 데이터 0 — 없는 데이터는 보여주지 않거나 안내로 대체. 사용자 입력이 필요한 곳은 폼으로.
+
+- [x] **T184: Backup 페이지 — 가짜 백업 실행 제거 + Neon 자동백업 안내** ✅ 2026-02-22
+  - 배경: Vercel+Neon 환경에서 "백업 실행" 버튼은 150MB 고정값/랜덤 체크섬의 가짜 DB 레코드만 생성. Neon이 PITR 자동백업을 제공하므로 앱 레벨 백업 불필요
+  - AC1: ✅ `backup/route.ts` — `create_backup` action 완전 제거. 가짜 백업 레코드 생성 코드(150MB 고정, 랜덤 체크섬) 삭제
+  - AC2: ✅ `backup/route.ts` — `buildDefaultCapacityReport()` 제거, GET 응답에서 `capacityReport` 제거
+  - AC3: ✅ `backup/page.tsx` — "백업 실행" 버튼 제거, 정책 카드를 "참고용" 표시로 변경
+  - AC4: ✅ `backup/page.tsx` — 상단에 Neon 자동백업 안내 배너 추가 (Neon 콘솔 링크 포함)
+  - AC5: ✅ `backup/page.tsx` — 가짜 Capacity Report 섹션 제거 → T186 실측 현황으로 교체
+  - AC6: ✅ Build PASS
+
+- [x] **T185: DR 드릴 완료 — 랜덤값 제거 + 사용자 입력 폼** ✅ 2026-02-22
+  - 배경: "훈련 완료" 버튼이 RTO=25~40분(랜덤), RPO=3~8분(랜덤), findings/improvements 고정 문자열을 자동 저장. SLA 지표를 조작하는 것과 같음
+  - AC1: ✅ `backup/route.ts` — `complete_drill`: Math.random() 완전 제거. `actualRtoMinutes`, `actualRpoMinutes` 필수값으로 요구, `findings`/`improvements` 사용자 입력 수신
+  - AC2: ✅ `backup/page.tsx` — "완료 입력" 버튼 클릭 시 인라인 폼 표시 (RTO, RPO 필수, 발견/개선사항 선택). "자동 생성 없음" 안내 명시
+  - AC3: ✅ `backup/route.ts` — `schedule_drill`: body에서 `scheduledAt` 수신 가능 (없으면 7일 기본값, 주석 명시)
+  - AC4: ✅ Build PASS
+
+- [x] **T186: Capacity Report — 실 DB 쿼리로 교체** ✅ 2026-02-22
+  - 배경: `buildDefaultCapacityReport()`의 30일 이력이 `10 + day * 0.5` 등 공식으로 생성한 완전 가짜 데이터. 실제 LlmUsageLog, Persona 집계로 교체
+  - AC1: ✅ `backup/route.ts` — `buildRealCapacitySnapshot()`: Promise.all로 3개 실 DB 쿼리 (활성 페르소나 count, LLM 30일 집계, 매칭 30일 count)
+  - AC2: ✅ 스냅샷 이력 없이 현재 단일 시점 실측값만 표시 (Decimal 타입 Number() 변환 포함)
+  - AC3: ✅ `backup/page.tsx` — 4개 실측 현황 카드 (활성 페르소나/LLM 호출/LLM 비용/매칭 횟수) 표시
+  - AC4: ✅ Build PASS
+
+- [x] **T187: Post-mortem — 하드코딩 액션아이템/교훈 제거** ✅ 2026-02-22
+  - 배경: 모든 장애 사후분석에 "모니터링 개선 (ops-team, 7일)" 액션과 "알림 임계값 조정 필요" 교훈이 자동 삽입됨. 실제 분석과 무관한 고정값
+  - AC1: ✅ `incidents/route.ts` — `createPostMortem` 호출에서 하드코딩 actionItems/lessons 제거, 빈 배열 기본값
+  - AC2: ✅ `incidents/route.ts` — POST body에서 `actionItems` (priority 타입 안전 포함), `lessons` 수신하여 전달
+  - AC3: ✅ Build PASS
+
+### Phase OPS-B: Operations 추가 하드코딩 제거 (T188~T190)
+
+- [x] **T188: Incidents — DEMO_DETECTION_RULES 폴백 제거** ✅ 2026-02-22
+  - 배경: DB에 감지 규칙이 없을 때 `DEMO_DETECTION_RULES`(가짜 데모 규칙)를 반환해 실제 규칙처럼 보임
+  - AC1: ✅ `incidents/route.ts` — `loadDetectionRules()` 폴백을 빈 배열로 교체
+  - AC2: ✅ `DEMO_DETECTION_RULES` import 제거
+  - AC3: ✅ Build PASS
+
+- [x] **T189: Cost — LLM 가격 하드코딩 → SystemConfig DB 기반** ✅ 2026-02-22
+  - 배경: `PRICING = { inputPerMillion: 3.0, outputPerMillion: 15.0 }` 하드코딩 → 가격 변경 시 코드 수정 필요
+  - AC1: ✅ `cost/route.ts` — `loadPricing()` 함수 추가 (SystemConfig `COST.llm_pricing` 조회, 없으면 현행 가격 기본값)
+  - AC2: ✅ `createPrismaCostDataProvider()` → async 전환, pricing 로드 후 cost 함수에 전달
+  - AC3: ✅ `computeInputCost/computeCacheCost/computeOutputCost` pricing 인자 추가
+  - AC4: ✅ Build PASS
+
+- [x] **T190: KPIs — 가짜 UX 기본값(12, 25) → 0** ✅ 2026-02-22
+  - 배경: `getAvgSessionDurationMinutes()=12`, `getAvgFeedScrollCount()=25` — 실측값처럼 보이는 가짜 수치
+  - AC1: ✅ `kpis/route.ts` — 두 함수 모두 0 반환으로 변경 (추적 인프라 미구축 명시)
+  - AC2: ✅ Build PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
