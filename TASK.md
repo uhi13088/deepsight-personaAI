@@ -1217,7 +1217,16 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-- **T176: 프로덕션 DB 마이그레이션 미적용 수정** (AC1~AC2 완료, AC3 프로덕션 적용 대기)
+(없음)
+
+---
+
+## ✅ DONE (최근 완료)
+
+- [x] **T176: 프로덕션 DB 마이그레이션 미적용 수정** ✅ 2026-02-22
+  - AC1: ✅ 마이그레이션 023 테이블명 오타 수정 (`"Persona"` → `"personas"`)
+  - AC2: ✅ 통합 마이그레이션 스크립트 생성 (`apply_missing_016_to_024.sql`)
+  - AC3: ✅ 프로덕션 DB에 `apply_missing_016_to_024` 적용 완료 (사용자 직접 실행)
 
 - [x] **T177: Incident Management 자동 감지 — Detection Rules → 자동 장애 생성** ✅ 2026-02-22
   - 배경: 현재 장애 관리가 100% 수동 입력. Detection Rules 타입과 evaluateDetectionRules() 함수가 이미 존재하지만 아무 곳에서도 호출하지 않음. System Monitoring 메트릭과 연결하여 자동 감지 구현
