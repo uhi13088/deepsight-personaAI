@@ -6,6 +6,8 @@ import { processSnsDataWithLlm } from "@/lib/persona-world/onboarding/sns-proces
 import type { SNSExtendedData } from "@/lib/persona-world/types"
 import type { Prisma, SNSPlatform } from "@/generated/prisma"
 import { verifyInternalToken } from "@/lib/internal-auth"
+import { encryptToken } from "@/lib/persona-world/token-crypto"
+import { logSecurityEvent, extractClientIp } from "@/lib/persona-world/security-log"
 
 /**
  * GET /api/persona-world/onboarding/sns/callback
@@ -103,18 +105,21 @@ export async function GET(request: NextRequest) {
     // 6. Claude Sonnet으로 심층 분석 (최초 1회 무료)
     const result = await processSnsDataWithLlm([snsData], existingVector)
 
-    // 7. DB 저장 — SNSConnection
+    // 7. DB 저장 — SNSConnection (토큰 암호화)
     const expiresAt = tokenResult.expiresIn
       ? new Date(Date.now() + tokenResult.expiresIn * 1000)
       : null
+
+    const encAccessToken = encryptToken(tokenResult.accessToken)
+    const encRefreshToken = tokenResult.refreshToken ? encryptToken(tokenResult.refreshToken) : null
 
     await prisma.sNSConnection.upsert({
       where: {
         userId_platform: { userId, platform },
       },
       update: {
-        accessToken: tokenResult.accessToken,
-        refreshToken: tokenResult.refreshToken ?? null,
+        accessToken: encAccessToken,
+        refreshToken: encRefreshToken,
         expiresAt,
         profileData: snsData.profileData as Prisma.InputJsonValue,
         extractedData: snsData.extractedData as Prisma.InputJsonValue,
@@ -123,13 +128,32 @@ export async function GET(request: NextRequest) {
       create: {
         userId,
         platform,
-        accessToken: tokenResult.accessToken,
-        refreshToken: tokenResult.refreshToken ?? null,
+        accessToken: encAccessToken,
+        refreshToken: encRefreshToken,
         expiresAt,
         profileData: snsData.profileData as Prisma.InputJsonValue,
         extractedData: snsData.extractedData as Prisma.InputJsonValue,
         lastSyncAt: new Date(),
       },
+    })
+
+    // 감사 로그: OAuth 연결 + 데이터 분석
+    const clientIp = extractClientIp(request.headers)
+    void logSecurityEvent({
+      userId,
+      eventType: "SNS_OAUTH_CONNECTED",
+      details: { platform, hasRefreshToken: !!tokenResult.refreshToken },
+      ipAddress: clientIp,
+    })
+    void logSecurityEvent({
+      userId,
+      eventType: "SNS_DATA_ANALYZED",
+      details: {
+        platform,
+        profileLevel: result.profileLevel,
+        confidence: result.confidence,
+      },
+      ipAddress: clientIp,
     })
 
     // 8. DB 저장 — PersonaWorldUser 프로필 업데이트 + 분석 횟수 증가

@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { logSecurityEvent, extractClientIp } from "@/lib/persona-world/security-log"
 
 const HEADER_NAME = "x-internal-token"
 const EMAIL_HEADER = "x-authenticated-email"
@@ -70,6 +71,16 @@ export async function verifyUserOwnership(
   })
 
   if (!user || user.email.toLowerCase() !== authenticatedEmail.toLowerCase()) {
+    // 감사 로그: 소유권 거부 이벤트 기록
+    void logSecurityEvent({
+      userId,
+      eventType: "OWNERSHIP_DENIED",
+      details: {
+        attemptedEmail: authenticatedEmail,
+        endpoint: request.nextUrl.pathname,
+      },
+      ipAddress: extractClientIp(request.headers),
+    })
     return NextResponse.json(
       { success: false, error: { code: "FORBIDDEN", message: "접근 권한이 없습니다" } },
       { status: 403 }

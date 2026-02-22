@@ -39,6 +39,38 @@
 - 새로운 사용 방법
 -->
 
+## [2026-02-22] PWSecurityLog 보안 감사 로그 테이블
+
+### Added
+
+- pw_security_logs 테이블: PersonaWorld 보안 이벤트 기록 (SNS 연동, 분석, 소유권 거부 등)
+  - id, userId, eventType, details (Json), ipAddress, createdAt
+  - 인덱스: (userId, createdAt), (eventType, createdAt)
+
+### Migration
+
+```sql
+CREATE TABLE IF NOT EXISTS "pw_security_logs" (
+    "id"          TEXT NOT NULL,
+    "userId"      TEXT NOT NULL,
+    "eventType"   TEXT NOT NULL,
+    "details"     JSONB,
+    "ipAddress"   TEXT,
+    "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "pw_security_logs_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX ... ON "pw_security_logs"("userId", "createdAt");
+CREATE INDEX ... ON "pw_security_logs"("eventType", "createdAt");
+```
+
+### Claude에게
+
+- 로그 유틸: `apps/engine-studio/src/lib/persona-world/security-log.ts`
+- fire-and-forget 패턴 (void logSecurityEvent) — 메인 로직 차단 안 함
+- 이벤트 타입: SNS_OAUTH_CONNECTED, SNS_DATA_ANALYZED, SNS_DATA_REANALYZED, OWNERSHIP_DENIED, RATE_LIMITED 등
+
+---
+
 ## [2026-02-22] PersonaWorldUser SNS 분석 횟수 추적
 
 ### Added
