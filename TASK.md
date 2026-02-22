@@ -1217,14 +1217,24 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-- **T176: 프로덕션 DB 마이그레이션 미적용 수정** (AC1~AC2 완료, AC3 프로덕션 적용 대기)
+(없음)
 
-- [ ] **T177: Incident Management 자동 감지 — Detection Rules → 자동 장애 생성**
+---
+
+## ✅ DONE (최근 완료)
+
+- [x] **T176: 프로덕션 DB 마이그레이션 미적용 수정** ✅ 2026-02-22
+  - AC1: ✅ 마이그레이션 023 테이블명 오타 수정 (`"Persona"` → `"personas"`)
+  - AC2: ✅ 통합 마이그레이션 스크립트 생성 (`apply_missing_016_to_024.sql`)
+  - AC3: ✅ 프로덕션 DB에 `apply_missing_016_to_024` 적용 완료 (사용자 직접 실행)
+
+- [x] **T177: Incident Management 자동 감지 — Detection Rules → 자동 장애 생성** ✅ 2026-02-22
   - 배경: 현재 장애 관리가 100% 수동 입력. Detection Rules 타입과 evaluateDetectionRules() 함수가 이미 존재하지만 아무 곳에서도 호출하지 않음. System Monitoring 메트릭과 연결하여 자동 감지 구현
-  - AC1: incidents API에 `auto_detect` 액션 추가 — 현재 메트릭 조회 → Detection Rules 평가 → 중복 체크 → 자동 Incident 생성 (reportedById: "auto-detection")
-  - AC2: Monitoring 페이지에서 진입 시 auto_detect 호출 — 대시보드 확인할 때마다 자동 감지 실행
-  - AC3: Incident 페이지에 자동 감지 배지 표시 — "자동 감지" vs "수동 등록" 구분 + Detection Rules 상태 표시 섹션
-  - AC4: Build PASS
+  - AC1: ✅ incidents API에 `auto_detect` 액션 — `runAutoDetect()`: 메트릭 조회 → 규칙 평가 → 중복 체크 → 자동 Incident 생성 (reportedById: "auto-detection")
+  - AC2: ✅ Monitoring 페이지 진입 시 `useEffect`에서 `runAutoDetect()` 자동 호출 + 신규 장애 발생 시 배너 표시
+  - AC3: ✅ Incidents 페이지 — `[자동감지]` prefix 감지 → 배지 표시, Detection Rules 섹션 별도 표시
+  - AC4: ✅ tsc clean, 3,902 tests PASS
+  - 변경파일: 없음 (이미 구현 완료 상태 확인)
 
 ---
 
@@ -2155,6 +2165,87 @@
   - AC3: `dashboard/alert-channels/route.ts` GET/PUT — 입력 검증 추가 (AlertChannel DB 모델 없어 스키마 확장 필요 명시) ✅
   - AC4: Build PASS ✅ (tsc --noEmit clean, 171/171 tests pass)
   - 변경파일: `dashboard/alerts/route.ts`, `dashboard/alert-channels/route.ts`
+
+---
+
+### Phase DC-G: 개발자콘솔 보안 취약점 전면 수정 (T210~T216)
+
+> 보안 감사(2026-02-22) 기반 — OWASP Top 10 기준 Critical/High 우선 수정
+> 우선순위: Critical → High 순서
+
+- [x] **T210: API Key Rotate 인증 완전 누락 수정** 🔴 Critical ✅ 2026-02-22
+  - 배경: `POST /api/api-keys/[id]/rotate` — `requireAuth()` 호출 없음. 비로그인 상태로 타 org 키 교체 가능
+  - AC1: `requireAuth()` 추가, 미인증 시 401 반환 ✅
+  - AC2: `getUserOrganization()` 후 `findFirst({ where: { id, organizationId } })`로 Cross-Org 방지 ✅
+  - AC3: REVOKED 키 교체 차단 유지 ✅
+  - AC4: Build PASS ✅ (tsc clean, 171 tests)
+  - 변경파일: `api-keys/[id]/rotate/route.ts`
+
+- [x] **T211: Webhooks [id] Cross-Org 데이터 유출 수정** 🔴 Critical ✅ 2026-02-22
+  - 배경: GET/PATCH/DELETE 모두 `findUnique({ where: { id } })` 후 별도 org 검증 → 404 vs 403 차이로 타 org 웹훅 ID 열거 가능
+  - AC1: GET — `findFirst({ where: { id, organizationId } })`로 변경 ✅
+  - AC2: PATCH — 동일 패턴 ✅
+  - AC3: DELETE — 동일 패턴 ✅
+  - AC4: Build PASS ✅
+  - 변경파일: `webhooks/[id]/route.ts`
+
+- [x] **T212: Webhooks GET null-filter + POST organizationId 누락 수정** 🔴 Critical ✅ 2026-02-22
+  - 배경: GET에서 `membership null` 시 `orgFilter = {}` → 전체 org 웹훅 반환; POST에서 `organizationId` 미설정
+  - AC1: GET — `!membership` 시 즉시 403 반환 ✅
+  - AC2: POST — `getUserOrganization()` 후 `organizationId: membership.organizationId` 추가 ✅
+  - AC3 (T215 병합): SSRF 방어 — `BLOCKED_HOSTS` 정규식으로 내부 IP 전체 차단 ✅
+  - AC4: Build PASS ✅
+  - 변경파일: `webhooks/route.ts`
+
+- [x] **T213: Status endpoint 정보 최소화** 🔴 Critical ✅ 2026-02-22
+  - 배경: 인증 없이 UptimeRobot 연동, 레이턴시 측정값, 서비스 uptime 상세 노출 → 인프라 정찰 가능
+  - AC1: UptimeRobot API 통합 제거 ✅
+  - AC2: latency 측정값 응답에서 제거 ✅
+  - AC3: uptime 수치 제거, status만 반환 ✅
+  - AC4: 공개 엔드포인트 유지 (status page 목적), 노출 최소화 ✅
+  - AC5: Build PASS ✅
+  - 변경파일: `status/route.ts`
+
+- [x] **T214: Billing amount 검증 + Toss 에러 노출 수정** 🟠 High ✅ 2026-02-22
+  - 배경: `amount` 쿼리파람을 그대로 Toss에 전달 (가격 조작 가능); Toss 에러 메시지 리다이렉트 URL에 노출
+  - AC1: `PLAN_PRICES[planId]`와 `parseInt(amount)` 비교 — 불일치 시 error redirect ✅
+  - AC2: `planId` 유효성 검사 (starter/pro/enterprise만 허용) ✅
+  - AC3: Toss 에러 메시지 리다이렉트 URL에서 제거 (서버 로그만) ✅
+  - AC4: Build PASS ✅
+  - 변경파일: `billing/toss/success/route.ts`
+
+- [x] **T215: Webhook URL SSRF 방어 + POST secret 주석 명확화** 🟠 High ✅ 2026-02-22
+  - T212에서 함께 처리 (webhooks/route.ts SSRF 방어)
+  - AC1: `BLOCKED_HOSTS` 정규식으로 localhost/127.x/10.x/192.168.x/169.254.x 차단 ✅
+  - AC2: POST 응답 secret — one-time reveal 주석 명확화 ✅
+  - AC3: Build PASS ✅
+  - 변경파일: `webhooks/route.ts` (T212 동일)
+
+- [x] **T216: Admin seed 프로덕션 방어** 🟠 High ✅ 2026-02-22
+  - 배경: `NODE_ENV=production` 에서도 `/api/admin/seed` 접근 가능
+  - AC1: 핸들러 시작에 `NODE_ENV === 'production'` 체크 → 404 반환 ✅
+  - AC2: Build PASS ✅
+  - 변경파일: `admin/seed/route.ts`
+
+### Phase DC-H: 개발자콘솔 보안 Medium/Low 이슈 수정 (T220~T222)
+
+> Phase DC-G 후속 — OWASP Medium/Low 취약점 수정
+
+- [x] **T220+T221: 보안 응답 헤더 + 요청 크기 제한 미들웨어** 🟡 Medium ✅ 2026-02-22
+  - 배경: API 응답에 보안 헤더 없음; 요청 크기 제한 없어 대용량 페이로드 허용
+  - AC1: `src/middleware.ts` 생성 — X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy ✅
+  - AC2: Content-Length > 1MB 요청 → 413 응답 (DoS 완화) ✅
+  - AC3: `/api/*` 라우트에만 적용 ✅
+  - AC4: Build PASS ✅ (tsc clean, 171 tests)
+  - 변경파일: `src/middleware.ts` (신규)
+
+- [x] **T222: 초대 토큰 DB 저장 + 만료 검증 + accept API** 🟡 Medium ✅ 2026-02-22
+  - 배경: 초대 토큰 DB 미저장 → 만료·취소 불가; `localhost:3001` 폴백; accept 엔드포인트 없음
+  - AC1: `VerificationToken` 모델 활용 — `identifier: invite:{memberId}`, `token: sha256(rawToken)`, `expires: +7일` ✅
+  - AC2: `team/invite/route.ts` — 토큰 DB 저장 + `localhost:3001` 폴백 제거 ✅
+  - AC3: `team/invite/accept/route.ts` 신규 생성 — 토큰 검증 + `acceptedAt` 업데이트 + VerificationToken 삭제 ✅
+  - AC4: Build PASS ✅
+  - 변경파일: `team/invite/route.ts`, `team/invite/accept/route.ts` (신규)
 
 ---
 

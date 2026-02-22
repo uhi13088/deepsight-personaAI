@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import crypto from "crypto"
+import { requireAuth } from "@/lib/require-auth"
+import { getUserOrganization } from "@/lib/get-user-organization"
 
 /**
  * Generate a secure API key with prefix
@@ -27,13 +29,26 @@ function generateApiKey(environment: "TEST" | "LIVE"): {
 /**
  * POST /api/api-keys/:id/rotate - Rotate (regenerate) an API key
  */
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // T210: 인증 필수
+  const { session, response } = await requireAuth()
+  if (response) return response
+
   try {
     const { id } = await params
 
-    // Find the existing API key
-    const existingKey = await prisma.apiKey.findUnique({
-      where: { id },
+    // T210: 조직 소속 확인
+    const membership = await getUserOrganization(session.user.id)
+    if (!membership) {
+      return NextResponse.json(
+        { success: false, error: { code: "FORBIDDEN", message: "조직 접근 권한이 없습니다." } },
+        { status: 403 }
+      )
+    }
+
+    // T210: organizationId 필터로 Cross-Org 방지
+    const existingKey = await prisma.apiKey.findFirst({
+      where: { id, organizationId: membership.organizationId },
     })
 
     if (!existingKey) {
@@ -60,8 +75,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Update the key in a transaction
     const updatedKey = await prisma.$transaction(async (tx) => {
-      // Update the existing key with new values
-      const updated = await tx.apiKey.update({
+      return tx.apiKey.update({
         where: { id },
         data: {
           keyHash: newHash,
@@ -69,18 +83,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           updatedAt: new Date(),
         },
       })
-
-      return updated
     })
 
-    // Return the new key (only shown once)
+    // Return the new key (only shown once — client must copy immediately)
     return NextResponse.json({
       success: true,
       data: {
         apiKey: {
           id: updatedKey.id,
           name: updatedKey.name,
-          key: newKey, // Full key - only shown once!
+          key: newKey,
           prefix: updatedKey.keyPrefix,
           lastFour: newLastFour,
           environment: updatedKey.environment.toLowerCase(),
