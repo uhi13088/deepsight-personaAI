@@ -83,8 +83,8 @@ const navSections: NavSection[] = [
     icon: Link2,
     basePath: "/system-integration",
     children: [
-      { label: "Deployment Pipeline", href: "/system-integration/deployment" },
-      { label: "Version Control", href: "/system-integration/versions" },
+      { label: "알고리즘 배포 파이프라인", href: "/system-integration/deployment" },
+      { label: "알고리즘 버전 관리", href: "/system-integration/versions" },
     ],
   },
   {
