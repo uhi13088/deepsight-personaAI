@@ -93,13 +93,13 @@ export default function ModelSettingsPage() {
     }
   }, [])
 
-  // ── Record sample spend ──────────────────────────────────────
-  const handleRecordSpend = useCallback(async () => {
+  // ── Sync budget from actual LLM usage ──────────────────────────
+  const handleSyncBudget = useCallback(async () => {
     try {
       const res = await fetch("/api/internal/global-config/models", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "recordSpend", amountUsd: 25 }),
+        body: JSON.stringify({ action: "syncBudget" }),
       })
       const json = await res.json()
       if (json.success && json.data) {
@@ -296,9 +296,9 @@ export default function ModelSettingsPage() {
               <DollarSign className="text-muted-foreground h-4 w-4" />
               <h3 className="text-sm font-medium">Monthly Budget</h3>
             </div>
-            <Button size="sm" variant="outline" onClick={handleRecordSpend}>
+            <Button size="sm" variant="outline" onClick={handleSyncBudget}>
               <DollarSign className="mr-1 h-3.5 w-3.5" />
-              Record $25 Spend
+              비용 동기화
             </Button>
           </div>
 

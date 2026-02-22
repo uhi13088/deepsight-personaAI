@@ -14,7 +14,15 @@ import type {
   FilterLogEntry,
 } from "@/lib/global-config"
 
-// ── Severity badge variant mapping ──────────────────────────────
+// ── 한국어 라벨 매핑 ────────────────────────────────────────────
+
+const SEVERITY_LABEL: Record<ForbiddenWord["severity"], string> = {
+  critical: "치명적",
+  high: "높음",
+  medium: "보통",
+  low: "낮음",
+}
+
 const SEVERITY_VARIANT: Record<
   ForbiddenWord["severity"],
   "destructive" | "warning" | "info" | "muted"
@@ -25,6 +33,13 @@ const SEVERITY_VARIANT: Record<
   low: "muted",
 }
 
+const ACTION_LABEL: Record<FilterAction, string> = {
+  block: "차단",
+  warn: "경고",
+  flag: "플래그",
+  pass: "통과",
+}
+
 const ACTION_VARIANT: Record<FilterAction, "destructive" | "warning" | "info" | "success"> = {
   block: "destructive",
   warn: "warning",
@@ -32,15 +47,48 @@ const ACTION_VARIANT: Record<FilterAction, "destructive" | "warning" | "info" | 
   pass: "success",
 }
 
-const FILTER_LEVELS: { value: FilterLevel; label: string; description: string }[] = [
-  { value: "strict", label: "Strict", description: "Most restrictive - blocks high severity" },
-  { value: "moderate", label: "Moderate", description: "Balanced - warns on high severity" },
-  {
-    value: "permissive",
-    label: "Permissive",
-    description: "Least restrictive - flags high severity",
-  },
+// ── 카테고리 정의 ──────────────────────────────────────────────
+
+const CATEGORY_OPTIONS: { value: string; label: string }[] = [
+  { value: "violence", label: "폭력" },
+  { value: "self_harm", label: "자해" },
+  { value: "discrimination", label: "차별" },
+  { value: "hate_speech", label: "혐오 표현" },
+  { value: "explicit", label: "음란" },
+  { value: "illegal", label: "불법" },
+  { value: "fraud", label: "사기" },
+  { value: "harassment", label: "괴롭힘" },
+  { value: "misinformation", label: "허위정보" },
+  { value: "privacy", label: "개인정보" },
 ]
+
+const CATEGORY_LABEL: Record<string, string> = Object.fromEntries(
+  CATEGORY_OPTIONS.map((c) => [c.value, c.label])
+)
+
+// ── 필터 레벨 정의 ─────────────────────────────────────────────
+
+const FILTER_LEVELS: { value: FilterLevel; label: string; description: string; detail: string }[] =
+  [
+    {
+      value: "strict",
+      label: "엄격",
+      description: "가장 강력한 필터링",
+      detail: "치명적·높음 → 차단 | 보통 → 경고 | 낮음 → 플래그",
+    },
+    {
+      value: "moderate",
+      label: "보통",
+      description: "균형 잡힌 필터링",
+      detail: "치명적 → 차단 | 높음 → 경고 | 보통 → 플래그 | 낮음 → 통과",
+    },
+    {
+      value: "permissive",
+      label: "관대",
+      description: "최소한의 필터링",
+      detail: "치명적 → 차단 | 높음 → 플래그 | 보통·낮음 → 통과",
+    },
+  ]
 
 // ── API response shape ───────────────────────────────────────
 interface LogSummary {
@@ -63,7 +111,7 @@ export default function SafetyFiltersPage() {
 
   // ── New word form state ────────────────────────────────────────
   const [newWord, setNewWord] = useState("")
-  const [newCategory, setNewCategory] = useState("")
+  const [newCategory, setNewCategory] = useState(CATEGORY_OPTIONS[0].value)
   const [newSeverity, setNewSeverity] = useState<ForbiddenWord["severity"]>("medium")
   const [addError, setAddError] = useState<string | null>(null)
 

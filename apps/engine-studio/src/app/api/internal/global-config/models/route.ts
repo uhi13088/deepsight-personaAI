@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/require-auth"
 import type { ApiResponse } from "@/types"
-import { createModelConfig, recordSpend, getBudgetStatus } from "@/lib/global-config"
+import { createModelConfig, getBudgetStatus } from "@/lib/global-config"
 import type { ModelConfig, RoutingRule, SupportedModel } from "@/lib/global-config"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@/generated/prisma"
@@ -30,6 +30,39 @@ async function saveModelConfigField(key: string, value: unknown): Promise<void> 
   })
 }
 
+// ── Budget auto-sync from llmUsageLog ────────────────────────
+
+async function syncBudgetFromDB(config: ModelConfig): Promise<ModelConfig> {
+  const periodStart = new Date(config.budget.periodStart)
+  const periodEnd = new Date(config.budget.periodEnd)
+
+  const agg = await prisma.llmUsageLog.aggregate({
+    where: {
+      createdAt: { gte: periodStart, lt: periodEnd },
+    },
+    _sum: { estimatedCostUsd: true },
+  })
+
+  const actualSpend = agg._sum.estimatedCostUsd ? Number(agg._sum.estimatedCostUsd) : 0
+  const usagePercent = config.budget.limitUsd > 0 ? (actualSpend / config.budget.limitUsd) * 100 : 0
+
+  const updatedThresholds = config.budget.alertThresholds.map((t) => {
+    if (!t.notified && usagePercent >= t.percent) {
+      return { ...t, notified: true, notifiedAt: Date.now() }
+    }
+    return { ...t }
+  })
+
+  const budget = {
+    ...config.budget,
+    currentSpendUsd: Math.round(actualSpend * 10000) / 10000,
+    alertThresholds: updatedThresholds,
+  }
+
+  await saveModelConfigField("budget", budget)
+  return { ...config, budget }
+}
+
 // ── Serialized response type ─────────────────────────────────
 interface ModelConfigResponse {
   models: ModelConfig["models"]
@@ -55,7 +88,8 @@ export async function GET() {
   if (response) return response
 
   try {
-    const config = await loadModelConfig()
+    const raw = await loadModelConfig()
+    const config = await syncBudgetFromDB(raw)
 
     return NextResponse.json<ApiResponse<ModelConfigResponse>>({
       success: true,
@@ -77,7 +111,7 @@ type PostAction =
   | { action: "updateRoutingRules"; routingRules: RoutingRule[] }
   | { action: "toggleModel"; modelId: SupportedModel }
   | { action: "updateBudgetLimit"; limitUsd: number }
-  | { action: "recordSpend"; amountUsd: number }
+  | { action: "syncBudget" }
 
 export async function POST(request: NextRequest) {
   const { response } = await requireAuth()
@@ -104,10 +138,8 @@ export async function POST(request: NextRequest) {
         updated = { ...config, budget }
         break
       }
-      case "recordSpend": {
-        const budget = recordSpend(config.budget, body.amountUsd)
-        await saveModelConfigField("budget", budget)
-        updated = { ...config, budget }
+      case "syncBudget": {
+        updated = await syncBudgetFromDB(config)
         break
       }
       case "updateRoutingRules": {
