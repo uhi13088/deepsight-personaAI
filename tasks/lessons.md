@@ -66,3 +66,12 @@
 ## Performance
 
 (없음)
+
+## Claude Code / Session Management
+
+- [2026-02-22] **`tool_use ids must be unique` 에러 원인 3가지 — 복합 발생** (관련: fix-tool-use-ids)
+  - **경로 1 (가장 흔함, 확인됨)**: `ask` 권한 설정된 명령(예: git push)이 실행될 때, Claude Code가 실행을 중단하고 사용자 승인을 대기. 이 때 tool_use 블록은 이미 히스토리에 기록되었지만 tool_result가 없는 미완성 상태. 이 상태가 세션 파일(.claude/projects/.../\*.jsonl)에 저장되고, 세션 재개 시 동일 ID가 API 요청에 중복 포함되어 에러 발생. **수정: 일상 작업 명령(git push)을 ask → allow로 이동**
+  - **경로 2 ("새 대화"에서도 발생하는 이유)**: Claude Code는 프로젝트 디렉토리 기준으로 **이전 세션을 자동 재개**함. 경로 1로 깨진 세션 파일이 존재하면, 새 대화처럼 보여도 실제로는 깨진 히스토리를 로드함 → messages.5 같은 초반 메시지에서 에러 발생. **수정: 깨진 세션 파일 삭제 (~/.claude/projects/{project-dir}/*.jsonl)**
+  - **경로 3 (긴 대화 중 발생, messages.75 등)**: Claude Code 내부 컨텍스트 컴팩션 버그로 tool_use 블록이 중복 삽입됨. 외부에서 수정 불가능. 대화를 짧게 유지하거나 에러 발생 시 새 세션 시작.
+  - **훅 stdout 주의**: PostToolUse 훅(pnpm format)의 stdout이 Claude Code에 피드백으로 주입되면 추가 메시지가 대화에 삽입됨. `> /dev/null 2>&1`로 출력 전체 억제 필요. PreToolUse 훅의 echo도 마찬가지로 stdout 대신 로그 파일로 리디렉션.
+  - **응급 처치**: 에러 발생 시 → 해당 대화 닫기 → 세션 파일 삭제(~/.claude/projects/...) → 새 대화 시작. 기존 깨진 세션은 수정 불가, 새 시작이 유일한 해결책.
