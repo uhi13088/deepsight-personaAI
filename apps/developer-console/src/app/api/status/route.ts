@@ -26,23 +26,29 @@ export async function GET() {
 
     // Check API health
     const apiStart = Date.now()
-    try {
-      // Simple DB ping
-      const dbCheck = await fetch(
-        `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"}/api/health`,
-        {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL
+    if (appUrl) {
+      try {
+        const dbCheck = await fetch(`${appUrl}/api/health`, {
           method: "GET",
           signal: AbortSignal.timeout(5000),
-        }
-      ).catch(() => null)
+        }).catch(() => null)
 
-      services.push({
-        name: "API",
-        status: dbCheck?.ok ? "operational" : "degraded",
-        uptime: "99.99%",
-        latency: Date.now() - apiStart,
-      })
-    } catch {
+        services.push({
+          name: "API",
+          status: dbCheck?.ok ? "operational" : "degraded",
+          uptime: "99.99%",
+          latency: Date.now() - apiStart,
+        })
+      } catch {
+        services.push({
+          name: "API",
+          status: "operational",
+          uptime: "99.99%",
+          latency: Date.now() - apiStart,
+        })
+      }
+    } else {
       services.push({
         name: "API",
         status: "operational",

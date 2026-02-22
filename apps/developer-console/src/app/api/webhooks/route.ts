@@ -15,11 +15,17 @@ const createWebhookSchema = z.object({
 // ============================================================================
 
 export async function GET() {
-  const { response } = await requireAuth()
+  const { session, response } = await requireAuth()
   if (response) return response
 
   try {
+    const { getUserOrganization } = await import("@/lib/get-user-organization")
+    const membership = await getUserOrganization(session.user.id)
+    const orgFilter = membership ? { organizationId: membership.organizationId } : {}
+
+    // 1쿼리: 웹훅 목록 (최근 배달 포함)
     const webhooks = await prisma.webhook.findMany({
+      where: orgFilter,
       orderBy: { createdAt: "desc" },
       include: {
         deliveries: {
@@ -32,7 +38,9 @@ export async function GET() {
       },
     })
 
+    // 1쿼리: 최근 배달 로그
     const deliveryLogs = await prisma.webhookDelivery.findMany({
+      where: membership ? { webhook: { organizationId: membership.organizationId } } : {},
       orderBy: { createdAt: "desc" },
       take: 50,
       include: {
@@ -42,52 +50,64 @@ export async function GET() {
       },
     })
 
-    const webhooksWithStats = await Promise.all(
-      webhooks.map(async (webhook) => {
-        const deliveryStats = await prisma.webhookDelivery.aggregate({
-          where: { webhookId: webhook.id },
-          _count: true,
-          _avg: { latencyMs: true },
-        })
+    // N+1 제거: webhookId별 통계를 2쿼리로 사전 집계
+    const webhookIds = webhooks.map((w) => w.id)
 
-        const successCount = await prisma.webhookDelivery.count({
-          where: { webhookId: webhook.id, status: "SUCCESS" },
-        })
+    const [deliveryAggByWebhook, successCountByWebhook] = await Promise.all([
+      // 웹훅별 총 배달 수 + 평균 지연 시간
+      prisma.webhookDelivery.groupBy({
+        by: ["webhookId"],
+        where: { webhookId: { in: webhookIds } },
+        _count: { id: true },
+        _avg: { latencyMs: true },
+      }),
+      // 웹훅별 성공 배달 수
+      prisma.webhookDelivery.groupBy({
+        by: ["webhookId"],
+        where: { webhookId: { in: webhookIds }, status: "SUCCESS" },
+        _count: { id: true },
+      }),
+    ])
 
-        const lastDelivery = webhook.deliveries[0]
+    // Map으로 O(1) 조회
+    const aggMap = new Map(deliveryAggByWebhook.map((r) => [r.webhookId, r]))
+    const successMap = new Map(successCountByWebhook.map((r) => [r.webhookId, r._count.id]))
 
-        return {
-          id: webhook.id,
-          url: webhook.url,
-          description: webhook.description || "",
-          status: webhook.status.toLowerCase() as "active" | "disabled",
-          events: webhook.events,
-          secret: webhook.secret.substring(0, 8) + "...",
-          createdAt: webhook.createdAt.toISOString(),
-          lastDelivery: lastDelivery
-            ? {
-                timestamp: lastDelivery.createdAt.toISOString(),
-                status: lastDelivery.status,
-                statusCode: lastDelivery.statusCode || 0,
-                latency: lastDelivery.latencyMs || 0,
-              }
-            : {
-                timestamp: "",
-                status: "never",
-                statusCode: 0,
-                latency: 0,
-              },
-          stats: {
-            totalDeliveries: deliveryStats._count,
-            successRate:
-              deliveryStats._count > 0
-                ? Math.round((successCount / deliveryStats._count) * 100)
-                : 100,
-            avgLatency: Math.round(deliveryStats._avg.latencyMs || 0),
-          },
-        }
-      })
-    )
+    const webhooksWithStats = webhooks.map((webhook) => {
+      const agg = aggMap.get(webhook.id)
+      const totalDeliveries = agg?._count.id ?? 0
+      const successCount = successMap.get(webhook.id) ?? 0
+      const lastDelivery = webhook.deliveries[0]
+
+      return {
+        id: webhook.id,
+        url: webhook.url,
+        description: webhook.description || "",
+        status: webhook.status.toLowerCase() as "active" | "disabled",
+        events: webhook.events,
+        secret: webhook.secret.substring(0, 8) + "...",
+        createdAt: webhook.createdAt.toISOString(),
+        lastDelivery: lastDelivery
+          ? {
+              timestamp: lastDelivery.createdAt.toISOString(),
+              status: lastDelivery.status,
+              statusCode: lastDelivery.statusCode || 0,
+              latency: lastDelivery.latencyMs || 0,
+            }
+          : {
+              timestamp: "",
+              status: "never",
+              statusCode: 0,
+              latency: 0,
+            },
+        stats: {
+          totalDeliveries,
+          successRate:
+            totalDeliveries > 0 ? Math.round((successCount / totalDeliveries) * 100) : 100,
+          avgLatency: Math.round(agg?._avg.latencyMs ?? 0),
+        },
+      }
+    })
 
     return NextResponse.json({
       success: true,
@@ -107,14 +127,13 @@ export async function GET() {
     })
   } catch (error) {
     console.error("Error fetching webhooks:", error)
-    // Return empty data on error (e.g., table doesn't exist)
-    return NextResponse.json({
-      success: true,
-      data: {
-        webhooks: [],
-        deliveryLogs: [],
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: "INTERNAL_ERROR", message: "웹훅 목록 조회에 실패했습니다." },
       },
-    })
+      { status: 500 }
+    )
   }
 }
 
