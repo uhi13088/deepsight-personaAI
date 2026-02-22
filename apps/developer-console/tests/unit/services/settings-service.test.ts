@@ -64,7 +64,17 @@ describe("settingsService.updateProfile", () => {
 
 describe("settingsService.updateNotifications", () => {
   it("updates notification settings", async () => {
-    const notifications = { email: { billing: true, security: true } }
+    const notifications = {
+      email: {
+        apiAlerts: true,
+        usageReports: true,
+        billing: true,
+        security: true,
+        marketing: false,
+        productUpdates: false,
+      },
+      push: { apiAlerts: true, usageReports: false, billing: true, security: true },
+    }
     mockApiClient.patch.mockResolvedValue({ success: true, data: { notifications } })
 
     const result = await settingsService.updateNotifications(notifications)

@@ -12,7 +12,6 @@ import type {
   NarrativeDriveVector,
   CrossAxisProfile,
   ParadoxProfile,
-  VFinalResult,
 } from "@/types"
 
 import {
@@ -42,7 +41,6 @@ import type {
   MatchBreakdown,
 } from "@/lib/matching/three-tier-engine"
 
-import { calculateVFinal } from "@/lib/vector/v-final"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
 import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
 
@@ -79,7 +77,6 @@ function makePersonaCandidate(id: string, base = 0.5): PersonaCandidate {
   const l3 = makeL3(base)
   const crossAxisProfile = calculateCrossAxisProfile(l1, l2, l3)
   const paradoxProfile = calculateExtendedParadoxScore(l1, l2, l3, crossAxisProfile)
-  const vFinal = calculateVFinal(l1, l2, l3, 0)
 
   return {
     id,
@@ -88,10 +85,8 @@ function makePersonaCandidate(id: string, base = 0.5): PersonaCandidate {
     l1,
     l2,
     l3,
-    vFinal,
     crossAxisProfile,
     paradoxProfile,
-    recentMatchCount: 0,
   }
 }
 
@@ -165,14 +160,24 @@ describe("Consumer Journey — rankMatches", () => {
         personaId: "p1",
         score: 0.7,
         tier: "basic" as MatchingTier,
-        breakdown: { basicScore: 0.7, advancedScore: 0, explorationScore: 0, freshness: 0 },
+        breakdown: {
+          vectorScore: 0.7,
+          crossAxisScore: 0,
+          paradoxCompatibility: 0,
+          qualitativeBonus: 0,
+        },
         explanation: "test",
       },
       {
         personaId: "p2",
         score: 0.9,
         tier: "basic" as MatchingTier,
-        breakdown: { basicScore: 0.9, advancedScore: 0, explorationScore: 0, freshness: 0 },
+        breakdown: {
+          vectorScore: 0.9,
+          crossAxisScore: 0,
+          paradoxCompatibility: 0,
+          qualitativeBonus: 0,
+        },
         explanation: "test",
       },
     ]
@@ -194,7 +199,12 @@ describe("Consumer Journey — rankMatches", () => {
       personaId: p.id,
       score: 0.5 + i * 0.1,
       tier: "basic" as MatchingTier,
-      breakdown: { basicScore: 0.5 + i * 0.1, advancedScore: 0, explorationScore: 0, freshness: 0 },
+      breakdown: {
+        vectorScore: 0.5 + i * 0.1,
+        crossAxisScore: 0,
+        paradoxCompatibility: 0,
+        qualitativeBonus: 0,
+      },
       explanation: "test",
     }))
 
@@ -209,7 +219,12 @@ describe("Consumer Journey — rankMatches", () => {
         personaId: "p1",
         score: 0.8,
         tier: "basic" as MatchingTier,
-        breakdown: { basicScore: 0.8, advancedScore: 0, explorationScore: 0, freshness: 0 },
+        breakdown: {
+          vectorScore: 0.8,
+          crossAxisScore: 0,
+          paradoxCompatibility: 0,
+          qualitativeBonus: 0,
+        },
         explanation: "match explanation",
       },
     ]
@@ -226,7 +241,12 @@ describe("Consumer Journey — rankMatches", () => {
         personaId: "missing",
         score: 0.5,
         tier: "basic" as MatchingTier,
-        breakdown: { basicScore: 0.5, advancedScore: 0, explorationScore: 0, freshness: 0 },
+        breakdown: {
+          vectorScore: 0.5,
+          crossAxisScore: 0,
+          paradoxCompatibility: 0,
+          qualitativeBonus: 0,
+        },
         explanation: "test",
       },
     ]

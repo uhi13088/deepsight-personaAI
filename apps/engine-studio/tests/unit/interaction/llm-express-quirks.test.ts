@@ -309,7 +309,7 @@ describe("validateAndNormalize (quirks)", () => {
           dimension: "derived",
           derivedState: "enthusiasm",
           operator: "between",
-          value: [0.3, 0.7],
+          value: [0.3, 0.7] as [number, number],
         },
       },
     ]

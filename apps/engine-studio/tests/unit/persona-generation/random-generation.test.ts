@@ -10,7 +10,7 @@ import { generateAllQualitativeDimensions } from "@/lib/qualitative"
 import { computeActivityTraits, computeActiveHours } from "@/lib/persona-world/activity-mapper"
 import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
-import type { PersonaRole } from "@prisma/client"
+import type { PersonaRole } from "@/generated/prisma"
 
 // ── inferPersonaRole 재현 (API route에서 사용하는 것과 동일 로직) ──
 function inferPersonaRole(

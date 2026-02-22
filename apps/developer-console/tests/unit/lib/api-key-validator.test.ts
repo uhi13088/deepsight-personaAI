@@ -14,8 +14,7 @@ vi.mock("@/lib/prisma", () => ({
 
 function createMockRequest(headers: Record<string, string> = {}): NextRequest {
   const url = "http://localhost:3001/api/v1/test"
-  const init: RequestInit = { headers: new Headers(headers) }
-  return new NextRequest(url, init)
+  return new NextRequest(url, { headers: new Headers(headers) })
 }
 
 function createMockApiKey(overrides: Partial<ValidatedApiKey> = {}): ValidatedApiKey {

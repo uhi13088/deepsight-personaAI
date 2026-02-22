@@ -10,7 +10,7 @@ import {
   ACTION_LABELS,
   DANGEROUS_ACTIONS,
 } from "@/lib/lifecycle"
-import type { PersonaStatus } from "@prisma/client"
+import type { PersonaStatus } from "@/generated/prisma"
 
 // ── Status Labels ───────────────────────────────────────────
 

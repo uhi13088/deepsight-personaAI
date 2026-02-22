@@ -719,8 +719,8 @@ describe("Node Executor — Engine Nodes", () => {
 // ═══════════════════════════════════════════════════════════════
 
 describe("Node Executor — Control Flow Nodes", () => {
-  it("conditional: 분기 결과를 반환한다", () => {
-    const result = executeNode(
+  it("conditional: 분기 결과를 반환한다", async () => {
+    const result = await executeNode(
       "n1",
       "conditional",
       { conditionType: "threshold", operator: ">", threshold: 0.5 },
@@ -730,8 +730,8 @@ describe("Node Executor — Control Flow Nodes", () => {
     expect(result.outputs).toHaveProperty("true")
   })
 
-  it("conditional: false 분기를 반환한다", () => {
-    const result = executeNode(
+  it("conditional: false 분기를 반환한다", async () => {
+    const result = await executeNode(
       "n1",
       "conditional",
       { conditionType: "threshold", operator: ">", threshold: 0.5 },
@@ -741,8 +741,8 @@ describe("Node Executor — Control Flow Nodes", () => {
     expect(result.outputs).toHaveProperty("false")
   })
 
-  it("switch: 활성 케이스를 반환한다", () => {
-    const result = executeNode(
+  it("switch: 활성 케이스를 반환한다", async () => {
+    const result = await executeNode(
       "n1",
       "switch",
       {
@@ -759,8 +759,13 @@ describe("Node Executor — Control Flow Nodes", () => {
     expect(result.outputs).toHaveProperty("low")
   })
 
-  it("merge: 활성 입력을 병합한다", () => {
-    const result = executeNode("n1", "merge", { mergeStrategy: "first-active" }, { in: "hello" })
+  it("merge: 활성 입력을 병합한다", async () => {
+    const result = await executeNode(
+      "n1",
+      "merge",
+      { mergeStrategy: "first-active" },
+      { in: "hello" }
+    )
     expect(result.outputs).toHaveProperty("merged", "hello")
   })
 })
