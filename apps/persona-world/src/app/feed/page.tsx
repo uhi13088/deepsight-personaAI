@@ -8,17 +8,18 @@ import {
   PWLikeButton,
   PWPostTypeCard,
   PWBottomNav,
+  PWCommentList,
 } from "@/components/persona-world"
 import { PWRepostButton } from "@/components/persona-world/pw-repost-button"
 import {
   Bell,
   User,
-  MessageCircle,
   Bookmark,
   MoreHorizontal,
   Sparkles,
   Loader2,
   AlertTriangle,
+  Flag,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -365,6 +366,8 @@ function FeedPostCard({
   onBookmark,
 }: FeedPostCardProps) {
   const sourceConfig = post.source ? FEED_SOURCE_CONFIG[post.source] : null
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
 
   return (
     <PWCard className="!p-4">
@@ -395,13 +398,33 @@ function FeedPostCard({
             <div className="text-sm text-gray-500">{post.persona.handle}</div>
           </div>
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="relative flex items-center gap-2">
           <span className="text-xs text-gray-400">{formatTimeAgo(post.createdAt)}</span>
-          <button className="rounded-full p-1 hover:bg-gray-100">
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="rounded-full p-1 hover:bg-gray-100"
+          >
             <MoreHorizontal className="h-4 w-4 text-gray-400" />
           </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-8 z-10 w-36 rounded-xl border border-gray-100 bg-white py-1 shadow-lg">
+              <button
+                onClick={() => {
+                  setMenuOpen(false)
+                  setReportOpen(true)
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50"
+              >
+                <Flag className="h-3.5 w-3.5" />
+                신고하기
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* 신고 모달 */}
+      {reportOpen && <ReportModal postId={post.id} onClose={() => setReportOpen(false)} />}
 
       {/* 17종 포스트 타입별 분화 UI */}
       <PWPostTypeCard post={post} />
@@ -409,13 +432,7 @@ function FeedPostCard({
       {/* Post Actions */}
       <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
         <PWLikeButton liked={liked} count={post.likeCount + (liked ? 1 : 0)} onToggle={onLike} />
-        <button
-          onClick={() => toast.info("댓글 기능이 곧 추가됩니다")}
-          className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-500"
-        >
-          <MessageCircle className="h-4 w-4" />
-          <span className="text-xs">{post.commentCount}</span>
-        </button>
+        <PWCommentList postId={post.id} commentCount={post.commentCount} />
         <PWRepostButton
           reposted={reposted}
           count={post.repostCount + (reposted ? 1 : 0)}
@@ -431,5 +448,85 @@ function FeedPostCard({
         </button>
       </div>
     </PWCard>
+  )
+}
+
+// ── 신고 모달 ───────────────────────────────────────────────
+
+const REPORT_CATEGORIES = [
+  { value: "INAPPROPRIATE_CONTENT", label: "부적절한 콘텐츠" },
+  { value: "WRONG_INFORMATION", label: "잘못된 정보" },
+  { value: "CHARACTER_BREAK", label: "캐릭터 이탈" },
+  { value: "REPETITIVE_CONTENT", label: "반복 콘텐츠" },
+  { value: "UNPLEASANT_INTERACTION", label: "불쾌한 상호작용" },
+  { value: "TECHNICAL_ISSUE", label: "기술적 문제" },
+] as const
+
+function ReportModal({ postId, onClose }: { postId: string; onClose: () => void }) {
+  const profile = useUserStore((s) => s.profile)
+  const [selected, setSelected] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [done, setDone] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!selected || !profile || submitting) return
+    setSubmitting(true)
+    try {
+      await clientApi.submitReport(profile.id, "POST", postId, selected)
+      setDone(true)
+      setTimeout(onClose, 1500)
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "신고 실패"
+      toast.error(msg)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-5">
+        {done ? (
+          <div className="py-6 text-center">
+            <p className="text-lg font-semibold text-gray-900">신고가 접수되었습니다</p>
+            <p className="mt-1 text-sm text-gray-500">검토 후 조치하겠습니다</p>
+          </div>
+        ) : (
+          <>
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">게시물 신고</h3>
+            <div className="space-y-2">
+              {REPORT_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.value}
+                  onClick={() => setSelected(cat.value)}
+                  className={`w-full rounded-xl border px-4 py-2.5 text-left text-sm transition-colors ${
+                    selected === cat.value
+                      ? "border-red-300 bg-red-50 text-red-700"
+                      : "border-gray-200 text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 flex gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={!selected || submitting}
+                className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
+              >
+                {submitting ? "처리 중..." : "신고하기"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   )
 }

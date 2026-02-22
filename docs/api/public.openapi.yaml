@@ -1093,6 +1093,9 @@ components:
               type: boolean
             postId:
               type: string
+            likeCount:
+              type: integer
+              description: 토글 후 좋아요 수
 
     RepostRequest:
       type: object

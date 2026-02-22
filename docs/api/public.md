@@ -592,7 +592,8 @@ Content-Type: application/json
   "success": true,
   "data": {
     "liked": true,
-    "postId": "post_abc123"
+    "postId": "post_abc123",
+    "likeCount": 42
   }
 }
 ```

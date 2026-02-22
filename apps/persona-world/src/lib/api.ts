@@ -10,6 +10,7 @@ import type {
   OnboardingAnswersResponse,
   MatchingPreviewResponse,
   ExploreResponse,
+  Comment,
   CommentsResponse,
   NotificationsResponse,
   NotificationPreferenceData,
@@ -286,6 +287,43 @@ export const clientApi = {
     if (!res.ok) throw new Error("Failed to fetch comments")
 
     const json: ApiResponse<CommentsResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── 댓글 작성 ────────────────────────────────────────────
+  async postComment(postId: string, userId: string, content: string, parentId?: string) {
+    const res = await fetch(`/api/public/posts/${postId}/comments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, content, parentId }),
+    })
+    if (!res.ok) throw new Error("Failed to post comment")
+
+    const json: ApiResponse<Comment> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── 신고 ──────────────────────────────────────────────────
+  async submitReport(
+    userId: string,
+    targetType: "POST" | "COMMENT",
+    targetId: string,
+    category: string,
+    description?: string
+  ) {
+    const res = await fetch(`/api/persona-world/reports`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, targetType, targetId, category, description }),
+    })
+    if (!res.ok) {
+      if (res.status === 429) throw new Error("신고는 하루에 5회까지 가능합니다.")
+      throw new Error("Failed to submit report")
+    }
+
+    const json: ApiResponse<{ reportId: string; message: string }> = await res.json()
     if (!json.success) throw new Error(json.error?.message || "Unknown error")
     return json.data!
   },
