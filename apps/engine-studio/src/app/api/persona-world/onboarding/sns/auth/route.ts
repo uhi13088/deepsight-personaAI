@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import type { SNSPlatform } from "@/generated/prisma"
 import {
   buildAuthUrl,
+  getConfiguredPlatforms,
   getRedirectUri,
   isOAuthSupported,
   OAUTH_SUPPORTED_PLATFORMS,
@@ -82,10 +83,10 @@ export async function POST(request: NextRequest) {
           success: false,
           error: {
             code: "OAUTH_CONFIG_MISSING",
-            message: `${platform} OAuth 설정이 누락되었습니다 (환경변수 확인 필요)`,
+            message: `${platform} OAuth 환경변수가 설정되지 않았습니다 (${platform === "youtube" ? "GOOGLE" : platform.toUpperCase()}_CLIENT_ID 확인 필요)`,
           },
         },
-        { status: 500 }
+        { status: 422 }
       )
     }
 
@@ -111,7 +112,8 @@ export async function POST(request: NextRequest) {
 /**
  * GET /api/persona-world/onboarding/sns/auth
  *
- * 지원 플랫폼 목록 반환.
+ * 지원 플랫폼 목록 및 환경변수 설정 완료 플랫폼 반환.
+ * configuredPlatforms: CLIENT_ID가 설정된 플랫폼 → 즉시 사용 가능
  */
 export async function GET() {
   return NextResponse.json({
@@ -119,6 +121,7 @@ export async function GET() {
     data: {
       oauthPlatforms: OAUTH_SUPPORTED_PLATFORMS,
       uploadPlatforms: UPLOAD_ONLY_PLATFORMS,
+      configuredPlatforms: getConfiguredPlatforms(),
     },
   })
 }

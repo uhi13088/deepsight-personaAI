@@ -399,3 +399,14 @@ export function isOAuthSupported(platform: SNSPlatform): boolean {
 export function getPlatformConfig(platform: SNSPlatform): OAuthPlatformConfig {
   return PLATFORM_CONFIGS[platform]
 }
+
+/**
+ * CLIENT_ID 환경변수가 설정된 플랫폼 목록 반환.
+ * 프론트엔드에서 "환경변수 설정됨 → 사용 가능" 여부 표시에 활용.
+ */
+export function getConfiguredPlatforms(): SNSPlatform[] {
+  return OAUTH_SUPPORTED_PLATFORMS.filter((platform) => {
+    const prefix = platform === "YOUTUBE" ? "GOOGLE" : platform.toUpperCase()
+    return !!process.env[`${prefix}_CLIENT_ID`]
+  })
+}
