@@ -72,6 +72,19 @@ export interface ArenaJudgment {
   judgedAt: number
 }
 
+/**
+ * 페르소나 메타데이터 (룰 기반 판정용)
+ * - API 호출 전 DB에서 미리 로드 후 Map으로 전달
+ */
+export interface PersonaMeta {
+  /** 장황함 대리 지표 (voiceSpec.styleParams.sentenceLength, 0~1) */
+  sentenceLength: number
+  /** 현재 에너지 상태 (PersonaState.energy, 0~1) */
+  energy: number
+  /** 역설 긴장도 — 높으면 주제 이탈 의도로 간주 (PersonaState.paradoxTension, 0~1) */
+  paradoxTension: number
+}
+
 /** 세션 생성 파라미터 */
 export interface CreateSessionParams {
   id: string
@@ -290,8 +303,28 @@ export async function runSession(
 // AI 심판
 // ══════════════════════════════════════════════════════════════
 
-/** 룰 기반 판정 (LLM 없이 기본 평가) */
-export function judgeSessionRuleBased(session: ArenaSession): ArenaJudgment {
+// ── 룰 기반 판정 상수 ────────────────────────────────────────
+
+/** 양의 격률: 기대 응답 길이 기준 (글자 수) */
+const QUANTITY_BASE_LENGTH = 150
+/** 양의 격률: 허용 오차 범위 (±40%) */
+const QUANTITY_TOLERANCE = 0.4
+/** 관련성의 격률: Jaccard 동문서답 임계값 */
+const JACCARD_RELEVANCE_THRESHOLD = 0.05
+/** 역설 긴장도 면제 임계값 (이상이면 의도적 이탈로 간주) */
+const PARADOX_TENSION_EXEMPT = 0.7
+
+/**
+ * 룰 기반 판정 (LLM 없이 기본 평가).
+ *
+ * personaMeta를 전달하면 양/관련성 격률 검증이 활성화됩니다.
+ * - 양의 격률: sentenceLength + energy 기반 기대 길이 vs 실제 길이
+ * - 관련성의 격률: 상대방 직전 발화 대비 Jaccard 유사도 (paradoxTension 면제 포함)
+ */
+export function judgeSessionRuleBased(
+  session: ArenaSession,
+  personaMeta?: Map<string, PersonaMeta>
+): ArenaJudgment {
   const issues: TurnIssue[] = []
 
   // 턴 수 기반 기본 점수
@@ -303,8 +336,8 @@ export function judgeSessionRuleBased(session: ArenaSession): ArenaJudgment {
   const avgLength =
     turnLengths.length > 0 ? turnLengths.reduce((a, b) => a + b, 0) / turnLengths.length : 0
 
-  // 극단적으로 짧은 턴 → consistency 이슈
   for (const turn of session.turns) {
+    // ── 기본: 극단적으로 짧은 턴 ──────────────────────────────
     if (turn.content.length < 20) {
       issues.push({
         turnNumber: turn.turnNumber,
@@ -316,7 +349,7 @@ export function judgeSessionRuleBased(session: ArenaSession): ArenaJudgment {
       })
     }
 
-    // 동일 발화자가 연속으로 같은 내용 → repetition 이슈
+    // ── 기본: 동일 발화자 연속 중복 ──────────────────────────
     if (turn.turnNumber > 1) {
       const prevTurn = session.turns[turn.turnNumber - 2]
       if (prevTurn && prevTurn.speakerId === turn.speakerId) {
@@ -332,18 +365,83 @@ export function judgeSessionRuleBased(session: ArenaSession): ArenaJudgment {
         }
       }
     }
+
+    // ── 양의 격률: 기대 길이 vs 실제 길이 ───────────────────
+    const meta = personaMeta?.get(turn.speakerId)
+    if (meta) {
+      // Expected = BaseLength × (1 + sentenceLength - 0.5) × (0.5 + energy)
+      const expected =
+        QUANTITY_BASE_LENGTH * (1.0 + (meta.sentenceLength - 0.5)) * (0.5 + meta.energy)
+      const ratio = turn.content.length / expected
+
+      if (ratio < 1 - QUANTITY_TOLERANCE && turn.content.length >= 20) {
+        // 기대 대비 60% 미만 (이미 <20자 이슈와 중복 방지)
+        issues.push({
+          turnNumber: turn.turnNumber,
+          personaId: turn.speakerId,
+          category: "voice",
+          severity: "minor",
+          description: `턴 ${turn.turnNumber}: 설정 대비 과도하게 짧음 (실제 ${turn.content.length}자 / 기대 ${Math.round(expected)}자, ${Math.round(ratio * 100)}%)`,
+          suggestion: "sentenceLength 설정에 맞는 응답 길이 확보",
+        })
+      } else if (ratio > 1 + QUANTITY_TOLERANCE) {
+        // 기대 대비 140% 초과 → TMI
+        issues.push({
+          turnNumber: turn.turnNumber,
+          personaId: turn.speakerId,
+          category: "voice",
+          severity: "minor",
+          description: `턴 ${turn.turnNumber}: 설정 대비 과도하게 김 (실제 ${turn.content.length}자 / 기대 ${Math.round(expected)}자, ${Math.round(ratio * 100)}%)`,
+          suggestion: "TMI 억제 — sentenceLength 설정에 맞게 단축",
+        })
+      }
+    }
   }
 
-  // 길이 변동성으로 voice 일관성 추정
+  // ── 관련성의 격률: Jaccard 유사도 ───────────────────────────
+  let relationIssueCount = 0
+  for (const turn of session.turns) {
+    if (turn.turnNumber < 2) continue
+    const prevTurn = session.turns.find((t) => t.turnNumber === turn.turnNumber - 1)
+    if (!prevTurn || prevTurn.speakerId === turn.speakerId) continue
+
+    const meta = personaMeta?.get(turn.speakerId)
+    const isParadoxIntentional = (meta?.paradoxTension ?? 0) >= PARADOX_TENSION_EXEMPT
+
+    const currKeywords = extractKeywords(turn.content)
+    const prevKeywords = extractKeywords(prevTurn.content)
+
+    // 키워드 너무 적으면 스킵 (단답형은 Jaccard 불안정)
+    if (currKeywords.size < 3 || prevKeywords.size < 3) continue
+
+    const similarity = jaccardSimilarity(currKeywords, prevKeywords)
+
+    if (!isParadoxIntentional && similarity < JACCARD_RELEVANCE_THRESHOLD) {
+      issues.push({
+        turnNumber: turn.turnNumber,
+        personaId: turn.speakerId,
+        category: "consistency",
+        severity: "minor",
+        description: `턴 ${turn.turnNumber}: 동문서답 의심 — 직전 발화와 키워드 유사도 ${(similarity * 100).toFixed(0)}%`,
+        suggestion: "상대방 발화의 핵심 주제를 반영한 응답 생성",
+      })
+      relationIssueCount++
+    }
+  }
+
+  // ── 최종 점수 ────────────────────────────────────────────────
   const lengthStdDev = computeStdDev(turnLengths)
   const lengthVariation = avgLength > 0 ? lengthStdDev / avgLength : 0
   const voiceConsistency = lengthVariation < 0.5 ? 0.8 : lengthVariation < 1.0 ? 0.6 : 0.4
+
+  // 관련성 이슈가 있으면 triggerResponse 페널티 (턴당 -0.1, 최대 -0.3)
+  const relationPenalty = Math.min(0.3, relationIssueCount * 0.1)
 
   const scores: JudgmentScores = {
     characterConsistency: Math.min(1, baseConsistency + (issues.length === 0 ? 0.2 : 0)),
     l2Emergence: 0.5, // 룰 기반으로는 평가 어려움 → 기본값
     paradoxEmergence: 0.5, // 룰 기반으로는 평가 어려움 → 기본값
-    triggerResponse: voiceConsistency,
+    triggerResponse: Math.max(0, voiceConsistency - relationPenalty),
   }
 
   const overallScore = computeOverallScore(scores)
@@ -403,7 +501,8 @@ export const JUDGMENT_MODEL_MAP: Record<JudgmentPrecision, string> = {
 export async function judgeSessionLLM(
   session: ArenaSession,
   llm: ArenaLLMProvider,
-  _precision: JudgmentPrecision = "PRECISE"
+  _precision: JudgmentPrecision = "PRECISE",
+  personaMeta?: Map<string, PersonaMeta>
 ): Promise<ArenaJudgment> {
   const prompt = buildJudgmentPrompt(session)
 
@@ -423,10 +522,10 @@ export async function judgeSessionLLM(
       }
     }
   } catch {
-    // LLM 실패 → 룰 기반 폴백
+    // LLM 실패 → 룰 기반 폴백 (personaMeta 전달)
   }
 
-  return judgeSessionRuleBased(session)
+  return judgeSessionRuleBased(session, personaMeta)
 }
 
 /**
@@ -531,6 +630,22 @@ function generateJudgmentSummary(
 }
 
 // ── 유틸 ────────────────────────────────────────────────────
+
+/**
+ * 2글자 이상 단어 추출 (공백 분리 + 길이 필터).
+ * 한국어 1글자 조사/어미를 걸러내는 경량 전처리.
+ */
+function extractKeywords(text: string): Set<string> {
+  return new Set(text.split(/\s+/).filter((w) => w.length > 1))
+}
+
+/** Jaccard 유사도 계산 (교집합 / 합집합) */
+function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 && b.size === 0) return 1
+  const intersection = [...a].filter((w) => b.has(w)).length
+  const union = new Set([...a, ...b]).size
+  return union === 0 ? 1 : intersection / union
+}
 
 function computeStdDev(values: number[]): number {
   if (values.length < 2) return 0
