@@ -1139,6 +1139,26 @@
   - AC5: 보류 — 상태 API는 스키마 변경(AC1) 후 적용
   - AC6: ✅ 단위 테스트 55개 PASS (trust 32 + rapport 23) + Build PASS
 
+### Phase QI-C: 품질 자동 교정 — Diversity + Drift 자동화 (T182~T183)
+
+> T179/T178 감지(measure)에서 교정(correct)으로 확장. 운영자 개입 없이 자동 복구.
+> 원칙: LLM 비용 0, 순수 수학/텍스트 처리, 기존 파이프라인 최소 변경
+
+- [x] **T182: DiversityConstraint 자동 주입 — 반복 trigram 블랙리스트** ✅ 2026-02-22
+  - 배경: DiversityScore CRITICAL/WARNING 시 운영자가 수동 수정해야 함. topRepeatedTrigrams를 콘텐츠 생성 프롬프트에 자동 주입하면 다음 생성부터 즉시 회피
+  - AC1: ✅ `diversity-constraint.ts` (신규) — `buildDiversityConstraint(result)`: DiversityResult → constraint 텍스트 생성 (DIVERSE=NONE/WARNING=SOFT/CRITICAL=STRONG)
+  - AC2: ✅ `applyDiversityConstraint(prompt, result)`: WARNING 이상 시 프롬프트 끝에 constraint 블록 추가, DIVERSE면 원본 반환
+  - AC3: ✅ `quality-integration.ts` — QualityCheckResult에 `diversityConstraint: DiversityConstraintResult | null` 추가, runQualityCheck Step 7에서 자동 생성
+  - AC4: ✅ 단위 테스트 42개 PASS + Build PASS
+
+- [x] **T183: VoiceStyle Drift 자동 보정 — baseline pull-back** ✅ 2026-02-22
+  - 배경: Drift WARNING/CRITICAL 시 운영자가 수동 교정해야 함. dimensionDrifts 기반으로 baseline 방향 수식 보정 (α = severity별 차등)
+  - AC1: ✅ `drift-correction.ts` (신규) — `applyDriftCorrection(current, baseline, severity)`: 6개 차원을 severity별 α(WARNING=0.3, CRITICAL=0.7)로 pull-back, 0~1 클램프
+  - AC2: ✅ `getCorrectionStrength(severity)`: α값 결정 함수 (STABLE=0, WARNING=0.3, CRITICAL=0.7)
+  - AC3: ✅ `quality-integration.ts` — QualityCheckResult에 `driftCorrection: DriftCorrectionResult | null` 추가, STABLE이 아닐 때 자동 계산
+  - AC4: ✅ CRITICAL 교정 시 reasons에 "[자동 교정] ..." 내역 기록 (운영자 사후 확인용)
+  - AC5: ✅ 단위 테스트 42개 PASS + Build PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)

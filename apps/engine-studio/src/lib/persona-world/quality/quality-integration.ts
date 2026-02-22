@@ -37,6 +37,8 @@ import {
   type DiversityResult,
   type DiversitySeverity,
 } from "./diversity-score"
+import { buildDiversityConstraint, type DiversityConstraintResult } from "./diversity-constraint"
+import { applyDriftCorrection, type DriftCorrectionResult } from "./drift-correction"
 import type { VoiceStyleParams } from "../types"
 
 // ── 통합 결과 타입 ──────────────────────────────────────────
@@ -49,6 +51,10 @@ export interface QualityCheckResult {
   triggers: ArenaTrigger[]
   drift: DriftResult | null
   diversity: DiversityResult | null
+  /** T182: 다양성 자동 constraint (WARNING/CRITICAL 시 자동 생성) */
+  diversityConstraint: DiversityConstraintResult | null
+  /** T183: VoiceStyle 자동 보정 결과 (STABLE이 아닐 때 자동 생성) */
+  driftCorrection: DriftCorrectionResult | null
   summary: QualitySummary
 }
 
@@ -137,8 +143,26 @@ export function runQualityCheck(params: {
   const diversity =
     recentContents && recentContents.length > 0 ? measureDiversity(recentContents) : null
 
-  // Step 7: 종합 상태 판정
-  const summary = buildSummary(pis, interview, postStats, commentStats, triggers, drift, diversity)
+  // Step 7: T182 — DiversityConstraint 자동 생성 (WARNING/CRITICAL 시)
+  const diversityConstraint = diversity ? buildDiversityConstraint(diversity) : null
+
+  // Step 8: T183 — VoiceStyle Drift 자동 보정 (STABLE이 아닐 때)
+  const driftCorrection =
+    drift && voiceStyleBaseline && voiceStyleCurrent && drift.severity !== "STABLE"
+      ? applyDriftCorrection(voiceStyleCurrent, voiceStyleBaseline, drift.severity)
+      : null
+
+  // Step 9: 종합 상태 판정
+  const summary = buildSummary(
+    pis,
+    interview,
+    postStats,
+    commentStats,
+    triggers,
+    drift,
+    diversity,
+    driftCorrection
+  )
 
   return {
     personaId,
@@ -148,6 +172,8 @@ export function runQualityCheck(params: {
     triggers,
     drift,
     diversity,
+    diversityConstraint,
+    driftCorrection,
     summary,
   }
 }
@@ -241,7 +267,8 @@ function buildSummary(
   commentStats: ReturnType<typeof aggregateCommentQualityLogs> | null,
   triggers: ArenaTrigger[],
   drift: DriftResult | null = null,
-  diversity: DiversityResult | null = null
+  diversity: DiversityResult | null = null,
+  driftCorrection: DriftCorrectionResult | null = null
 ): QualitySummary {
   const reasons: string[] = []
 
@@ -277,6 +304,11 @@ function buildSummary(
     if (drift.severity !== "STABLE") {
       reasons.push(summarizeDrift(drift))
     }
+  }
+
+  // T183: CRITICAL 교정 내역 기록 (운영자 사후 확인용)
+  if (driftCorrection?.applied && driftCorrection.summary && drift?.severity === "CRITICAL") {
+    reasons.push(`[자동 교정] ${driftCorrection.summary}`)
   }
 
   // 다양성 기반
