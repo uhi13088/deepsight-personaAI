@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { MessageCircle, Heart, Loader2, Send } from "lucide-react"
+import { MessageCircle, Heart, Loader2, Send, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { clientApi } from "@/lib/api"
@@ -57,6 +57,11 @@ export function PWCommentList({ postId, commentCount }: PWCommentListProps) {
     setDisplayCount((c) => c + 1)
   }
 
+  const handleCommentDeleted = (commentId: string) => {
+    setComments((prev) => prev.filter((c) => c.id !== commentId))
+    setDisplayCount((c) => Math.max(0, c - 1))
+  }
+
   return (
     <div>
       {/* 댓글 토글 버튼 */}
@@ -79,7 +84,12 @@ export function PWCommentList({ postId, commentCount }: PWCommentListProps) {
           ) : comments.length > 0 ? (
             <div className="space-y-2">
               {comments.map((comment) => (
-                <CommentItem key={comment.id} comment={comment} />
+                <CommentItem
+                  key={comment.id}
+                  comment={comment}
+                  postId={postId}
+                  onDeleted={handleCommentDeleted}
+                />
               ))}
             </div>
           ) : (
@@ -167,15 +177,42 @@ function CommentInput({
 
 // ── 댓글 아이템 ───────────────────────────────────────────────
 
-function CommentItem({ comment }: { comment: Comment }) {
+function CommentItem({
+  comment,
+  postId,
+  onDeleted,
+}: {
+  comment: Comment
+  postId: string
+  onDeleted: (commentId: string) => void
+}) {
+  const profile = useUserStore((s) => s.profile)
+  const [deleting, setDeleting] = useState(false)
+
   const toneConfig = COMMENT_TONE_CONFIG[comment.tone]
   const gradientClass = ROLE_COLORS_BOLD[comment.personaRole] ?? "from-gray-400 to-gray-500"
   const isPersona = comment.personaId != null
   const linkHref = isPersona ? `/persona/${comment.personaId}` : "#"
+  const isOwn = !isPersona && comment.userId != null && comment.userId === profile?.id
+
+  const handleDelete = async () => {
+    if (deleting || !profile) return
+    setDeleting(true)
+    try {
+      await clientApi.deleteComment(postId, comment.id, profile.id)
+      onDeleted(comment.id)
+      toast.success("댓글이 삭제되었습니다")
+    } catch (error) {
+      console.error("Failed to delete comment:", error)
+      toast.error("댓글 삭제에 실패했습니다")
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   return (
     <div className="rounded-xl border border-gray-100 bg-white p-3">
-      <div className="mb-2 flex items-start gap-2.5">
+      <div className="flex items-start gap-2.5">
         {/* 아바타 */}
         <Link href={linkHref} className="flex-shrink-0">
           <div
@@ -186,7 +223,7 @@ function CommentItem({ comment }: { comment: Comment }) {
         </Link>
 
         <div className="min-w-0 flex-1">
-          {/* 이름 + 톤 뱃지 */}
+          {/* 이름 + 톤 뱃지 + 삭제 버튼 */}
           <div className="flex items-center gap-2">
             <Link href={linkHref} className="text-sm font-medium text-gray-900 hover:underline">
               {comment.personaName}
@@ -200,6 +237,20 @@ function CommentItem({ comment }: { comment: Comment }) {
               </span>
             )}
             <span className="text-xs text-gray-400">{formatTimeAgo(comment.createdAt)}</span>
+            {isOwn && (
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="ml-auto flex-shrink-0 rounded p-0.5 text-gray-300 transition-colors hover:text-red-400 disabled:opacity-50"
+                title="댓글 삭제"
+              >
+                {deleting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+              </button>
+            )}
           </div>
 
           {/* 댓글 본문 (멘션 하이라이트) */}
