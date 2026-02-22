@@ -18,7 +18,6 @@ import type {
   IncidentTimelineEntry,
 } from "@/lib/operations"
 import type { Prisma } from "@/generated/prisma"
-import { DEMO_DETECTION_RULES } from "@/lib/demo-fixtures"
 
 // ── Severity/Phase mapping ────────────────────────────────────
 
@@ -157,7 +156,8 @@ async function loadDetectionRules(): Promise<DetectionRule[]> {
   if (row) {
     return row.value as unknown as DetectionRule[]
   }
-  return DEMO_DETECTION_RULES
+  // DB에 규칙이 없으면 빈 배열 반환 (데모 데이터 노출 방지)
+  return []
 }
 
 // ── Response type ───────────────────────────────────────────────

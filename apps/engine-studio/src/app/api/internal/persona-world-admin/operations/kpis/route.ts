@@ -131,13 +131,13 @@ function createPrismaKPIDataProvider(): KPIDataProvider {
       return 0
     },
 
-    // UX 지표 — 유저 행동 추적 인프라 미구축 시 기본값 반환
+    // UX 지표 — 유저 행동 추적 인프라 미구축 시 0 반환 (대시보드에서 "측정 전" 표시)
     async getAvgSessionDurationMinutes() {
-      return 12 // 기본값 (추적 인프라 구축 전)
+      return 0
     },
 
     async getAvgFeedScrollCount() {
-      return 25 // 기본값
+      return 0
     },
 
     async countProfileVisits() {

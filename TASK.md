@@ -1193,6 +1193,26 @@
   - AC2: ✅ `incidents/route.ts` — POST body에서 `actionItems` (priority 타입 안전 포함), `lessons` 수신하여 전달
   - AC3: ✅ Build PASS
 
+### Phase OPS-B: Operations 추가 하드코딩 제거 (T188~T190)
+
+- [x] **T188: Incidents — DEMO_DETECTION_RULES 폴백 제거** ✅ 2026-02-22
+  - 배경: DB에 감지 규칙이 없을 때 `DEMO_DETECTION_RULES`(가짜 데모 규칙)를 반환해 실제 규칙처럼 보임
+  - AC1: ✅ `incidents/route.ts` — `loadDetectionRules()` 폴백을 빈 배열로 교체
+  - AC2: ✅ `DEMO_DETECTION_RULES` import 제거
+  - AC3: ✅ Build PASS
+
+- [x] **T189: Cost — LLM 가격 하드코딩 → SystemConfig DB 기반** ✅ 2026-02-22
+  - 배경: `PRICING = { inputPerMillion: 3.0, outputPerMillion: 15.0 }` 하드코딩 → 가격 변경 시 코드 수정 필요
+  - AC1: ✅ `cost/route.ts` — `loadPricing()` 함수 추가 (SystemConfig `COST.llm_pricing` 조회, 없으면 현행 가격 기본값)
+  - AC2: ✅ `createPrismaCostDataProvider()` → async 전환, pricing 로드 후 cost 함수에 전달
+  - AC3: ✅ `computeInputCost/computeCacheCost/computeOutputCost` pricing 인자 추가
+  - AC4: ✅ Build PASS
+
+- [x] **T190: KPIs — 가짜 UX 기본값(12, 25) → 0** ✅ 2026-02-22
+  - 배경: `getAvgSessionDurationMinutes()=12`, `getAvgFeedScrollCount()=25` — 실측값처럼 보이는 가짜 수치
+  - AC1: ✅ `kpis/route.ts` — 두 함수 모두 0 반환으로 변경 (추적 인프라 미구축 명시)
+  - AC2: ✅ Build PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
