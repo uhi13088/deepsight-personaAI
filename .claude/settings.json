@@ -10,7 +10,6 @@
       "Bash(sudo:*)"
     ],
     "ask": [
-      "Bash(git push:*)",
       "Bash(git push --force:*)",
       "Bash(pnpm publish:*)",
       "Bash(pnpm run deploy:*)"
@@ -33,6 +32,7 @@
       "Bash(git branch:*)",
       "Bash(git checkout:*)",
       "Bash(git fetch:*)",
+      "Bash(git push:*)",
       "Bash(pnpm:*)",
       "Bash(npx:*)",
       "Bash(tsc:*)",
