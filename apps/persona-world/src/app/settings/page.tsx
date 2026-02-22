@@ -98,11 +98,11 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white">
+    <div className="flex min-h-screen flex-col bg-gray-50">
       {/* 헤더 */}
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-gray-950/80 px-4 py-3 backdrop-blur-xl">
+      <header className="sticky top-0 z-20 border-b border-gray-100 bg-white px-4 py-3">
         <div className="mx-auto flex max-w-lg items-center gap-3">
-          <Link href="/profile" className="rounded-lg p-1.5 transition hover:bg-white/10">
+          <Link href="/profile" className="rounded-lg p-1.5 transition hover:bg-gray-100">
             <ArrowLeft className="h-5 w-5 text-gray-400" />
           </Link>
           <PWLogoWithText size="sm" />
@@ -110,7 +110,7 @@ export default function SettingsPage() {
       </header>
 
       {/* 탭 바 */}
-      <div className="border-b border-white/10 bg-gray-950/60 px-4">
+      <div className="border-b border-gray-100 bg-white px-4">
         <div className="mx-auto flex max-w-lg">
           {TAB_CONFIG.map(({ key, label, icon: Icon }) => (
             <button
@@ -119,7 +119,7 @@ export default function SettingsPage() {
               className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 py-3 text-sm font-medium transition-colors ${
                 activeTab === key
                   ? "border-purple-500 text-purple-400"
-                  : "border-transparent text-gray-500 hover:text-gray-300"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -146,7 +146,7 @@ export default function SettingsPage() {
                   <User className="h-7 w-7 text-white" />
                 </div>
                 <div className="flex-1">
-                  <div className="font-semibold text-gray-100">{profile?.nickname || "관찰자"}</div>
+                  <div className="font-semibold text-gray-900">{profile?.nickname || "관찰자"}</div>
                   {profile?.email && <div className="text-sm text-gray-400">{profile.email}</div>}
                   <div className="mt-1 text-xs text-gray-500">
                     {profile?.completedOnboarding ? "온보딩 완료" : "온보딩 미완료"}
@@ -157,7 +157,7 @@ export default function SettingsPage() {
 
             {/* 취향 분석 */}
             <Link href="/onboarding">
-              <PWCard className="flex items-center justify-between p-4 transition-colors hover:bg-white/5">
+              <PWCard className="flex items-center justify-between p-4 transition-colors hover:bg-gray-50">
                 <div>
                   <div className="text-sm font-medium">취향 분석</div>
                   <div className="text-xs text-gray-500">
@@ -185,11 +185,11 @@ export default function SettingsPage() {
 
                 <button
                   onClick={handleLogout}
-                  className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-4 text-left transition-colors hover:bg-white/10"
+                  className="flex w-full items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 text-left transition-colors hover:bg-gray-50"
                 >
                   <LogOut className="h-5 w-5 text-gray-400" />
                   <div>
-                    <div className="text-sm font-medium text-gray-300">로그아웃</div>
+                    <div className="text-sm font-medium text-gray-700">로그아웃</div>
                     <div className="text-xs text-gray-500">계정에서 로그아웃합니다</div>
                   </div>
                 </button>
@@ -207,7 +207,7 @@ export default function SettingsPage() {
             </div>
 
             <Link href="/settings/notifications">
-              <PWCard className="flex items-center justify-between p-4 transition-colors hover:bg-white/5">
+              <PWCard className="flex items-center justify-between p-4 transition-colors hover:bg-gray-50">
                 <div className="flex items-center gap-3">
                   <Bell className="h-5 w-5 text-purple-400" />
                   <div>
@@ -285,15 +285,15 @@ export default function SettingsPage() {
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <span
-                              className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${typeInfo.color} bg-white/10`}
+                              className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${typeInfo.color} bg-gray-100`}
                             >
                               {typeInfo.label}
                             </span>
-                            <span className="text-sm text-gray-300">
+                            <span className="text-sm text-gray-700">
                               {tx.reason || "코인 거래"}
                             </span>
                           </div>
-                          <div className="mt-1 text-xs text-gray-600">
+                          <div className="mt-1 text-xs text-gray-500">
                             {formatDate(tx.createdAt)}
                           </div>
                         </div>
@@ -304,7 +304,7 @@ export default function SettingsPage() {
                             {sign}
                             {tx.amount}
                           </div>
-                          <div className="text-xs text-gray-600">잔액 {tx.balanceAfter}</div>
+                          <div className="text-xs text-gray-500">잔액 {tx.balanceAfter}</div>
                         </div>
                       </PWCard>
                     )
