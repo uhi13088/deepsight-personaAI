@@ -98,6 +98,7 @@ type PostAction =
   | { action: "removeWord"; word: string; category: string }
   | { action: "changeLevel"; level: FilterLevel }
   | { action: "evaluate"; input: string }
+  | { action: "evaluate_test"; input: string }
 
 interface EvaluateResponse {
   result: FilterEvaluationResult
@@ -184,6 +185,26 @@ export async function POST(request: NextRequest) {
           data: {
             result,
             filter: serialize(updatedFilter),
+          },
+        })
+      }
+      case "evaluate_test": {
+        if (!body.input || !body.input.trim()) {
+          return NextResponse.json<ApiResponse<never>>(
+            {
+              success: false,
+              error: { code: "VALIDATION_ERROR", message: "input은 필수입니다" },
+            },
+            { status: 400 }
+          )
+        }
+        // 테스트용: 평가만 하고 로그 저장 안 함
+        const { result } = evaluateFilter(filter, body.input)
+        return NextResponse.json<ApiResponse<EvaluateResponse>>({
+          success: true,
+          data: {
+            result,
+            filter: serialize(filter),
           },
         })
       }

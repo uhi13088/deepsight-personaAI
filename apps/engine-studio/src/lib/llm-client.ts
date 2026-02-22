@@ -6,6 +6,9 @@
 
 import Anthropic from "@anthropic-ai/sdk"
 import { prisma } from "@/lib/prisma"
+import { createSafetyFilter, evaluateFilter } from "@/lib/global-config"
+import type { SafetyFilter, FilterAction } from "@/lib/global-config"
+import type { Prisma } from "@/generated/prisma"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
@@ -131,6 +134,42 @@ export function buildSystemBlocks(
   return blocks
 }
 
+// ── 안전 필터 연동 ───────────────────────────────────────────
+
+export class SafetyFilterBlockedError extends Error {
+  action: FilterAction
+  matchedWords: string[]
+  constructor(action: FilterAction, matchedWords: string[]) {
+    super(`안전 필터에 의해 차단됨: ${matchedWords.join(", ")}`)
+    this.name = "SafetyFilterBlockedError"
+    this.action = action
+    this.matchedWords = matchedWords
+  }
+}
+
+async function loadSafetyFilter(): Promise<SafetyFilter> {
+  const rows = await prisma.systemConfig.findMany({ where: { category: "SAFETY" } })
+  if (rows.length === 0) return createSafetyFilter()
+  const configMap = Object.fromEntries(rows.map((r) => [r.key, r.value]))
+  const defaults = createSafetyFilter()
+  return {
+    config: (configMap.config ?? defaults.config) as SafetyFilter["config"],
+    logs: (configMap.logs ?? defaults.logs) as SafetyFilter["logs"],
+  }
+}
+
+async function saveSafetyFilterLogs(filter: SafetyFilter): Promise<void> {
+  await prisma.systemConfig.upsert({
+    where: { category_key: { category: "SAFETY", key: "logs" } },
+    update: { value: filter.logs as unknown as Prisma.InputJsonValue },
+    create: {
+      category: "SAFETY",
+      key: "logs",
+      value: filter.logs as unknown as Prisma.InputJsonValue,
+    },
+  })
+}
+
 // ── 생성 함수 ─────────────────────────────────────────────────
 
 const DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
@@ -147,6 +186,24 @@ export async function generateText(params: LLMGenerateParams): Promise<LLMGenera
   let result: LLMGenerateResult
 
   try {
+    // ── 안전 필터 사전 검사 ──────────────────────────────────
+    const safetyFilter = await loadSafetyFilter()
+    if (safetyFilter.config.level !== "off") {
+      const { result: filterResult, updatedFilter } = evaluateFilter(
+        safetyFilter,
+        params.userMessage
+      )
+      // 로그 저장 (비동기, 실패 무시)
+      saveSafetyFilterLogs(updatedFilter).catch(() => {})
+
+      if (filterResult.action === "block") {
+        throw new SafetyFilterBlockedError(
+          filterResult.action,
+          filterResult.matchedWords.map((m) => m.word)
+        )
+      }
+    }
+
     const systemContent = buildSystemBlocks(params.systemPrompt, params.systemPromptPrefix)
 
     const response = await client.messages.create({
@@ -202,7 +259,6 @@ export async function generateText(params: LLMGenerateParams): Promise<LLMGenera
   } catch (error) {
     const durationMs = Date.now() - startTime
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
-
     logUsage({
       personaId: params.personaId ?? null,
       callType: params.callType ?? "unknown",
