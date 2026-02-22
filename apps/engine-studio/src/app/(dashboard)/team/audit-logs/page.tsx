@@ -522,7 +522,8 @@ export default function AuditLogsPage() {
           {totalPages > 1 && (
             <div className="border-border flex items-center justify-between border-t px-4 py-3">
               <p className="text-muted-foreground text-xs">
-                {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalCount)} / {totalCount}건
+                {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalCount)} / {totalCount}
+                건
               </p>
               <div className="flex items-center gap-2">
                 <Button

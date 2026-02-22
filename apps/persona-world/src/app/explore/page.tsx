@@ -144,10 +144,7 @@ function ExploreContent() {
     setActiveRoles([])
   }, [])
 
-  const totalPersonas = useMemo(
-    () => clusters.reduce((sum, c) => sum + c.count, 0),
-    [clusters]
-  )
+  const totalPersonas = useMemo(() => clusters.reduce((sum, c) => sum + c.count, 0), [clusters])
 
   return (
     <div className="min-h-screen bg-gray-50">
