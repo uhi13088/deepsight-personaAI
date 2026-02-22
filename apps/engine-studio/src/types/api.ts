@@ -93,6 +93,7 @@ export interface PersonaListItem {
     mood: number
     socialBattery: number
   } | null
+  engineVersion: string | null
   createdAt: string
   updatedAt: string
 }

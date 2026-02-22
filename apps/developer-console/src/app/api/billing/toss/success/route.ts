@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { getUserOrganization } from "@/lib/get-user-organization"
+import { PLAN_PRICES } from "@/lib/constants"
 
 /**
  * GET /api/billing/toss/success - Toss 결제 성공 콜백
@@ -16,7 +17,14 @@ export async function GET(request: NextRequest) {
   const amount = searchParams.get("amount")
   const planId = searchParams.get("planId")
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+  if (!baseUrl) {
+    console.error("[Toss] NEXT_PUBLIC_APP_URL is not configured")
+    return NextResponse.json(
+      { success: false, error: { code: "MISCONFIGURED", message: "서버 설정 오류" } },
+      { status: 500 }
+    )
+  }
 
   if (!paymentKey || !orderId || !amount) {
     return NextResponse.redirect(`${baseUrl}/billing?error=missing_params`)
@@ -24,6 +32,20 @@ export async function GET(request: NextRequest) {
 
   if (!process.env.TOSS_SECRET_KEY) {
     return NextResponse.redirect(`${baseUrl}/billing?error=not_configured`)
+  }
+
+  // T214: planId 유효성 검사
+  if (!planId || !(planId in PLAN_PRICES)) {
+    console.warn("[Toss] Invalid planId:", planId)
+    return NextResponse.redirect(`${baseUrl}/billing?error=invalid_plan`)
+  }
+
+  // T214: 결제금액 검증 — 쿼리파람 amount를 그대로 사용하면 가격 조작 가능
+  const parsedAmount = parseInt(amount)
+  const expectedAmount = PLAN_PRICES[planId]
+  if (isNaN(parsedAmount) || parsedAmount !== expectedAmount) {
+    console.warn(`[Toss] Amount mismatch: received=${parsedAmount}, expected=${expectedAmount}`)
+    return NextResponse.redirect(`${baseUrl}/billing?error=amount_mismatch`)
   }
 
   try {
@@ -40,21 +62,20 @@ export async function GET(request: NextRequest) {
       body: JSON.stringify({
         paymentKey,
         orderId,
-        amount: parseInt(amount),
+        amount: parsedAmount,
       }),
     })
 
     const paymentResult = await response.json()
 
     if (!response.ok) {
+      // T214: Toss 에러 메시지를 URL에 노출하지 않음 (서버 로그에만 기록)
       console.error("[Toss] Payment confirmation failed:", paymentResult)
-      return NextResponse.redirect(
-        `${baseUrl}/billing?error=payment_failed&message=${encodeURIComponent(paymentResult.message || "결제 승인 실패")}`
-      )
+      return NextResponse.redirect(`${baseUrl}/billing?error=payment_failed`)
     }
 
     // 결제 성공 - DB에 결제 기록 저장
-    console.log("[Toss] Payment confirmed:", paymentResult)
+    console.log("[Toss] Payment confirmed:", paymentResult.paymentKey)
 
     // 세션에서 사용자 조직 조회
     const session = await auth()
@@ -64,7 +85,7 @@ export async function GET(request: NextRequest) {
       organization = membership?.organization ?? null
     }
 
-    if (organization && planId) {
+    if (organization) {
       // 플랜 업데이트
       const planMapping: Record<string, "FREE" | "STARTER" | "PRO" | "ENTERPRISE"> = {
         starter: "STARTER",
@@ -76,9 +97,7 @@ export async function GET(request: NextRequest) {
       if (newPlan) {
         await prisma.organization.update({
           where: { id: organization.id },
-          data: {
-            plan: newPlan,
-          },
+          data: { plan: newPlan },
         })
       }
 
@@ -91,7 +110,7 @@ export async function GET(request: NextRequest) {
         await prisma.invoice.create({
           data: {
             organizationId: organization.id,
-            amount: parseInt(amount),
+            amount: parsedAmount,
             currency: "KRW",
             status: "PAID",
             description: `${planId} 플랜 구독`,
@@ -101,7 +120,7 @@ export async function GET(request: NextRequest) {
           },
         })
       } catch (invoiceError) {
-        console.log("[Toss] Invoice creation error:", invoiceError)
+        console.error("[Toss] Invoice creation error:", invoiceError)
       }
     }
 

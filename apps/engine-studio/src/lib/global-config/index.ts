@@ -230,7 +230,7 @@ export function getBudgetStatus(budget: MonthlyBudget): {
 
 // ── 안전 필터 타입 정의 ───────────────────────────────────────
 
-export type FilterLevel = "strict" | "moderate" | "permissive"
+export type FilterLevel = "strict" | "moderate" | "permissive" | "off"
 
 export type FilterAction = "block" | "warn" | "flag" | "pass"
 
@@ -295,6 +295,12 @@ const LEVEL_ACTION_MAP: Record<FilterLevel, Record<ForbiddenWord["severity"], Fi
   permissive: {
     critical: "block",
     high: "flag",
+    medium: "pass",
+    low: "pass",
+  },
+  off: {
+    critical: "pass",
+    high: "pass",
     medium: "pass",
     low: "pass",
   },
@@ -443,7 +449,7 @@ export function getFilterLogSummary(filter: SafetyFilter): {
   recentBlocks: FilterLogEntry[]
 } {
   const byAction: Record<FilterAction, number> = { block: 0, warn: 0, flag: 0, pass: 0 }
-  const byLevel: Record<FilterLevel, number> = { strict: 0, moderate: 0, permissive: 0 }
+  const byLevel: Record<FilterLevel, number> = { strict: 0, moderate: 0, permissive: 0, off: 0 }
 
   for (const log of filter.logs) {
     byAction[log.action]++
@@ -1162,8 +1168,16 @@ function validateSafetyFilter(filter: SafetyFilter): ValidationIssue[] {
     seen.add(key)
   }
 
-  // permissive 레벨 경고
-  if (filter.config.level === "permissive") {
+  // permissive / off 레벨 경고
+  if (filter.config.level === "off") {
+    issues.push({
+      section: "safety",
+      severity: "warning",
+      code: "SAFETY_LEVEL_OFF",
+      message: "안전 필터가 비활성화(off) 상태입니다",
+      suggestion: "프로덕션 환경에서는 'moderate' 이상을 권장합니다",
+    })
+  } else if (filter.config.level === "permissive") {
     issues.push({
       section: "safety",
       severity: "warning",
@@ -1419,8 +1433,17 @@ export function suggestOptimizations(config: GlobalConfig): OptimizationSuggesti
     }
   }
 
-  // 안전성: permissive 레벨
-  if (config.safetyFilter.config.level === "permissive") {
+  // 안전성: off / permissive 레벨
+  if (config.safetyFilter.config.level === "off") {
+    suggestions.push({
+      category: "safety",
+      priority: "high",
+      title: "안전 필터 활성화 권장",
+      description:
+        "현재 안전 필터가 비활성화(off) 상태입니다. B2B 서비스 특성상 'moderate' 이상을 권장합니다.",
+      estimatedImpact: "콘텐츠 안전성 확보",
+    })
+  } else if (config.safetyFilter.config.level === "permissive") {
     suggestions.push({
       category: "safety",
       priority: "high",

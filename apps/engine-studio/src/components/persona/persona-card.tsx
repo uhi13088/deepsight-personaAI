@@ -1,10 +1,27 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
-import { User, BarChart3, Sparkles, Pencil, Trash2 } from "lucide-react"
+import { User, BarChart3, Sparkles, Pencil, Trash2, ArrowUpCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { ARCHETYPE_LABELS } from "@/constants/v3/interpretation-tables"
 import type { PersonaListItem } from "@/types"
+
+const CURRENT_ENGINE_VERSION = "4.0"
+
+// ── Engine Version → Badge variant 매핑 ─────────────────────
+const ENGINE_VERSION_BADGE: Record<
+  string,
+  { variant: "success" | "warning" | "muted"; label: string }
+> = {
+  "4.0": { variant: "success", label: "v4.0" },
+  "3.0": { variant: "warning", label: "v3.0" },
+}
+
+function getEngineVersionBadge(version: string | null) {
+  if (!version) return { variant: "muted" as const, label: "v?" }
+  return ENGINE_VERSION_BADGE[version] ?? { variant: "muted" as const, label: `v${version}` }
+}
 
 // ── Status → Badge variant 매핑 ─────────────────────────────
 const STATUS_BADGE: Record<
@@ -62,9 +79,11 @@ function formatParadox(score: number | null): string {
 interface PersonaCardProps {
   persona: PersonaListItem
   onDelete?: (id: string, name: string) => void
+  onUpgrade?: (id: string) => void
 }
 
-export function PersonaCard({ persona, onDelete }: PersonaCardProps) {
+export function PersonaCard({ persona, onDelete, onUpgrade }: PersonaCardProps) {
+  const [isUpgrading, setIsUpgrading] = useState(false)
   const statusInfo = STATUS_BADGE[persona.status] ?? {
     variant: "muted" as const,
     label: persona.status,
@@ -73,6 +92,23 @@ export function PersonaCard({ persona, onDelete }: PersonaCardProps) {
   const archetypeLabel = persona.archetypeId
     ? (ARCHETYPE_LABELS[persona.archetypeId] ?? persona.archetypeId)
     : null
+  const engineBadge = getEngineVersionBadge(persona.engineVersion)
+  const needsUpgrade = persona.engineVersion !== CURRENT_ENGINE_VERSION
+
+  async function handleUpgrade(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (isUpgrading) return
+    setIsUpgrading(true)
+    try {
+      const res = await fetch(`/api/internal/personas/${persona.id}/upgrade`, { method: "POST" })
+      if (res.ok) {
+        onUpgrade?.(persona.id)
+      }
+    } finally {
+      setIsUpgrading(false)
+    }
+  }
 
   return (
     <div className="border-border bg-card group flex flex-col rounded-lg border transition-all hover:shadow-md">
@@ -103,7 +139,12 @@ export function PersonaCard({ persona, onDelete }: PersonaCardProps) {
                 {statusInfo.label}
               </Badge>
             </div>
-            <p className="text-muted-foreground mt-0.5 text-xs">{persona.role}</p>
+            <div className="mt-0.5 flex items-center gap-1.5">
+              <p className="text-muted-foreground text-xs">{persona.role}</p>
+              <Badge variant={engineBadge.variant} className="h-4 px-1 text-[9px]">
+                {engineBadge.label}
+              </Badge>
+            </div>
           </div>
         </div>
 
@@ -159,7 +200,7 @@ export function PersonaCard({ persona, onDelete }: PersonaCardProps) {
         </div>
       </Link>
 
-      {/* Footer: 수정 / 삭제 버튼 */}
+      {/* Footer: 수정 / [업그레이드] / 삭제 버튼 */}
       <div className="border-border flex items-center border-t">
         <Link
           href={`/persona-studio/edit/${persona.id}`}
@@ -168,6 +209,21 @@ export function PersonaCard({ persona, onDelete }: PersonaCardProps) {
           <Pencil className="h-3 w-3" />
           수정
         </Link>
+        {needsUpgrade && (
+          <>
+            <div className="border-border h-5 border-l" />
+            <button
+              type="button"
+              onClick={handleUpgrade}
+              disabled={isUpgrading}
+              className="flex flex-1 items-center justify-center gap-1 py-2 text-xs text-amber-500 transition-colors hover:bg-amber-500/10 disabled:opacity-50"
+              title="v4.0으로 업그레이드"
+            >
+              <ArrowUpCircle className="h-3 w-3" />
+              {isUpgrading ? "업그레이드 중..." : "업그레이드"}
+            </button>
+          </>
+        )}
         <div className="border-border h-5 border-l" />
         <button
           type="button"

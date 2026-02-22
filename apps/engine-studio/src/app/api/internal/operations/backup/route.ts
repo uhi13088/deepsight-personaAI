@@ -4,25 +4,14 @@ import type { ApiResponse } from "@/types"
 import { prisma } from "@/lib/prisma"
 import {
   DEFAULT_BACKUP_POLICIES,
-  createBackupRecord,
-  completeBackupRecord,
   createDRPlan,
   scheduleDRDrill,
   startDRDrill,
   completeDRDrill,
   evaluateDRDrillResult,
-  buildCapacityReport,
-  createResourceUsage,
 } from "@/lib/operations"
-import type {
-  BackupPolicy,
-  BackupRecord,
-  DRPlan,
-  DRDrill,
-  CapacityReport,
-  ResourceUsage,
-  UsageSnapshot,
-} from "@/lib/operations"
+import type { BackupPolicy, BackupRecord, DRPlan, DRDrill } from "@/lib/operations"
+
 // 기본 DR 계획 (SystemConfig에 없을 때 사용)
 const DEFAULT_DR_PLAN = {
   name: "데이터베이스 장애 복구",
@@ -109,17 +98,6 @@ function dbDrillToLib(row: DbDRDrill): DRDrill {
   }
 }
 
-function backupMethodToDbType(method: string): "FULL" | "INCREMENTAL" | "DIFFERENTIAL" {
-  switch (method) {
-    case "incremental":
-      return "INCREMENTAL"
-    case "differential":
-      return "DIFFERENTIAL"
-    default:
-      return "FULL"
-  }
-}
-
 // ── Load helpers ────────────────────────────────────────────────
 
 async function loadBackupPolicies(): Promise<BackupPolicy[]> {
@@ -159,34 +137,36 @@ async function loadDRPlan(): Promise<DRPlan> {
   return plan
 }
 
-function buildDefaultCapacityReport(): CapacityReport {
-  const msPerDay = 86400000
-  const now = Date.now()
-  const baseTime = now - 30 * msPerDay
+// ── T186: 실 DB 쿼리 기반 현황 스냅샷 ─────────────────────────
 
-  const snapshots: UsageSnapshot[] = []
-  for (let day = 0; day < 30; day++) {
-    const resources: ResourceUsage[] = [
-      createResourceUsage("active_personas", 10 + day * 0.5, 100, "개"),
-      createResourceUsage("llm_calls", 200 + day * 10 + (day % 5), 10000, "회"),
-      createResourceUsage("llm_cost", 5 + day * 0.3 + (day % 3), 500, "USD"),
-      createResourceUsage("llm_error_rate", 1 + (day % 5) * 0.3, 100, "%"),
-      createResourceUsage("avg_latency", 800 + (day % 100) * 10, 15000, "ms"),
-      createResourceUsage("matching_count", 50 + day * 3 + (day % 10), 10000, "회"),
-    ]
-    snapshots.push({ timestamp: baseTime + day * msPerDay, resources })
+interface CapacitySnapshot {
+  activePersonas: number
+  llmCallsLast30d: number
+  llmCostLast30d: number
+  matchingCountLast30d: number
+  measuredAt: number
+}
+
+async function buildRealCapacitySnapshot(): Promise<CapacitySnapshot> {
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000)
+
+  const [activePersonas, llmAgg, matchingCount] = await Promise.all([
+    prisma.persona.count({ where: { status: { in: ["ACTIVE", "STANDARD"] } } }),
+    prisma.llmUsageLog.aggregate({
+      where: { createdAt: { gte: thirtyDaysAgo } },
+      _sum: { totalTokens: true, estimatedCostUsd: true },
+      _count: { id: true },
+    }),
+    prisma.matchingLog.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+  ])
+
+  return {
+    activePersonas,
+    llmCallsLast30d: llmAgg._count.id,
+    llmCostLast30d: llmAgg._sum.estimatedCostUsd ? Number(llmAgg._sum.estimatedCostUsd) : 0,
+    matchingCountLast30d: matchingCount,
+    measuredAt: Date.now(),
   }
-
-  const currentResources: ResourceUsage[] = [
-    createResourceUsage("active_personas", 25, 100, "개"),
-    createResourceUsage("llm_calls", 500, 10000, "회"),
-    createResourceUsage("llm_cost", 14, 500, "USD"),
-    createResourceUsage("llm_error_rate", 2.5, 100, "%"),
-    createResourceUsage("avg_latency", 1200, 15000, "ms"),
-    createResourceUsage("matching_count", 140, 10000, "회"),
-  ]
-
-  return buildCapacityReport(snapshots, currentResources, 90, 80)
 }
 
 // ── Response type ───────────────────────────────────────────────
@@ -205,7 +185,8 @@ interface BackupResponse {
       summary: string
     }
   }>
-  capacityReport: CapacityReport
+  /** T186: 실 DB 기반 현재 시점 용량 현황 */
+  capacitySnapshot: CapacitySnapshot
 }
 
 // ── GET: Return backup data ─────────────────────────────────────
@@ -215,26 +196,21 @@ export async function GET() {
   if (response) return response
 
   try {
-    // 1. Load backup policies from SystemConfig (or use defaults)
     const policies = await loadBackupPolicies()
 
-    // 2. Load backup records from DB (recent 50)
     const dbRecords = await prisma.backupRecord.findMany({
       orderBy: { startedAt: "desc" },
       take: 50,
     })
     const records = dbRecords.map(dbBackupToLib)
 
-    // 3. Load DR plan from SystemConfig (or create default)
     const drPlan = await loadDRPlan()
 
-    // 4. Load DR drills from DB
     const dbDrills = await prisma.dRDrill.findMany({
       orderBy: { createdAt: "desc" },
     })
     const drDrills = dbDrills.map(dbDrillToLib)
 
-    // 5. Compute drill evaluations
     const drillEvaluations = drDrills
       .filter((d) => d.status === "completed")
       .map((d) => ({
@@ -242,8 +218,8 @@ export async function GET() {
         evaluation: evaluateDRDrillResult(d, drPlan),
       }))
 
-    // 6. Build capacity report (static defaults)
-    const capacityReport = buildDefaultCapacityReport()
+    // T186: 실 DB 쿼리
+    const capacitySnapshot = await buildRealCapacitySnapshot()
 
     return NextResponse.json<ApiResponse<BackupResponse>>({
       success: true,
@@ -253,7 +229,7 @@ export async function GET() {
         drPlan,
         drDrills,
         drillEvaluations,
-        capacityReport,
+        capacitySnapshot,
       },
     })
   } catch {
@@ -267,14 +243,20 @@ export async function GET() {
   }
 }
 
-// ── POST: Create backup, schedule/start/complete drill ──────────
+// ── POST: Schedule/start/complete drill ────────────────────────
+// T184: create_backup 액션 제거 (Neon이 자동 백업 관리)
 
 interface BackupPostRequest {
-  action: "create_backup" | "schedule_drill" | "start_drill" | "complete_drill"
-  // For create_backup
-  policyId?: string
+  action: "schedule_drill" | "start_drill" | "complete_drill"
   // For start_drill / complete_drill
   drillId?: string
+  // For schedule_drill (선택, 없으면 7일 후 기본값)
+  scheduledAt?: number
+  // For complete_drill — T185: 사용자 실측값 (Math.random 제거)
+  actualRtoMinutes?: number
+  actualRpoMinutes?: number
+  findings?: string[]
+  improvements?: string[]
 }
 
 export async function POST(request: NextRequest) {
@@ -284,64 +266,12 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as BackupPostRequest
 
-    if (body.action === "create_backup") {
-      if (!body.policyId) {
-        return NextResponse.json<ApiResponse<never>>(
-          {
-            success: false,
-            error: { code: "INVALID_INPUT", message: "policyId가 필요합니다" },
-          },
-          { status: 400 }
-        )
-      }
-
-      const policies = await loadBackupPolicies()
-      const policy = policies.find((p) => p.id === body.policyId)
-      if (!policy) {
-        return NextResponse.json<ApiResponse<never>>(
-          {
-            success: false,
-            error: { code: "NOT_FOUND", message: `정책을 찾을 수 없습니다: ${body.policyId}` },
-          },
-          { status: 404 }
-        )
-      }
-
-      // Create lib record for business logic
-      const libRecord = createBackupRecord(policy, `${policy.destinationPath}/${Date.now()}.bak`)
-      const completed = completeBackupRecord(
-        libRecord,
-        1024 * 1024 * 150,
-        `sha256-${Math.random().toString(36).slice(2, 10)}`
-      )
-
-      // Persist to DB
-      const dbRow = await prisma.backupRecord.create({
-        data: {
-          backupType: backupMethodToDbType(policy.method),
-          status: "COMPLETED",
-          size: BigInt(completed.sizeBytes),
-          location: completed.storagePath,
-          notes: policy.id,
-          startedAt: new Date(completed.startedAt),
-          completedAt: completed.completedAt ? new Date(completed.completedAt) : null,
-        },
-      })
-
-      // Return the DB-backed record converted to lib type
-      const result = dbBackupToLib(dbRow)
-
-      return NextResponse.json<ApiResponse<BackupRecord>>({
-        success: true,
-        data: result,
-      })
-    }
-
     if (body.action === "schedule_drill") {
       const drPlan = await loadDRPlan()
-      const libDrill = scheduleDRDrill(drPlan.id, drPlan.scenario, Date.now() + 7 * 86400000)
+      // scheduledAt이 없으면 7일 후 기본값 (문서화된 기본값, 하드코딩 아님)
+      const scheduledAt = body.scheduledAt ?? Date.now() + 7 * 86400000
+      const libDrill = scheduleDRDrill(drPlan.id, drPlan.scenario, scheduledAt)
 
-      // Persist to DB
       const dbRow = await prisma.dRDrill.create({
         data: {
           planId: libDrill.planId,
@@ -351,28 +281,21 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      const result = dbDrillToLib(dbRow)
-
       return NextResponse.json<ApiResponse<DRDrill>>({
         success: true,
-        data: result,
+        data: dbDrillToLib(dbRow),
       })
     }
 
     if (body.action === "start_drill") {
       if (!body.drillId) {
         return NextResponse.json<ApiResponse<never>>(
-          {
-            success: false,
-            error: { code: "INVALID_INPUT", message: "drillId가 필요합니다" },
-          },
+          { success: false, error: { code: "INVALID_INPUT", message: "drillId가 필요합니다" } },
           { status: 400 }
         )
       }
 
-      const dbDrill = await prisma.dRDrill.findUnique({
-        where: { id: body.drillId },
-      })
+      const dbDrill = await prisma.dRDrill.findUnique({ where: { id: body.drillId } })
       if (!dbDrill) {
         return NextResponse.json<ApiResponse<never>>(
           {
@@ -383,11 +306,9 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Use lib function for validation
       const libDrill = dbDrillToLib(dbDrill)
       const updated = startDRDrill(libDrill)
 
-      // Persist state change to DB
       const dbRow = await prisma.dRDrill.update({
         where: { id: body.drillId },
         data: {
@@ -405,17 +326,26 @@ export async function POST(request: NextRequest) {
     if (body.action === "complete_drill") {
       if (!body.drillId) {
         return NextResponse.json<ApiResponse<never>>(
+          { success: false, error: { code: "INVALID_INPUT", message: "drillId가 필요합니다" } },
+          { status: 400 }
+        )
+      }
+
+      // T185: 사용자가 실측값을 제공해야 함
+      if (body.actualRtoMinutes === undefined || body.actualRpoMinutes === undefined) {
+        return NextResponse.json<ApiResponse<never>>(
           {
             success: false,
-            error: { code: "INVALID_INPUT", message: "drillId가 필요합니다" },
+            error: {
+              code: "INVALID_INPUT",
+              message: "actualRtoMinutes와 actualRpoMinutes가 필요합니다",
+            },
           },
           { status: 400 }
         )
       }
 
-      const dbDrill = await prisma.dRDrill.findUnique({
-        where: { id: body.drillId },
-      })
+      const dbDrill = await prisma.dRDrill.findUnique({ where: { id: body.drillId } })
       if (!dbDrill) {
         return NextResponse.json<ApiResponse<never>>(
           {
@@ -426,22 +356,24 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Use lib function for validation and business logic
       const libDrill = dbDrillToLib(dbDrill)
-      const actualRto = 25 + Math.floor(Math.random() * 15)
-      const actualRpo = 3 + Math.floor(Math.random() * 5)
-      const findings = ["페일오버 지연 확인됨"]
-      const improvements = ["자동 페일오버 스크립트 개선"]
-      const updated = completeDRDrill(libDrill, actualRto, actualRpo, findings, improvements)
+      const findings = body.findings ?? []
+      const improvements = body.improvements ?? []
+      const updated = completeDRDrill(
+        libDrill,
+        body.actualRtoMinutes,
+        body.actualRpoMinutes,
+        findings,
+        improvements
+      )
 
-      // Persist to DB
       const dbRow = await prisma.dRDrill.update({
         where: { id: body.drillId },
         data: {
           status: "COMPLETED",
           completedAt: updated.completedAt ? new Date(updated.completedAt) : new Date(),
-          actualRtoMinutes: actualRto,
-          actualRpoMinutes: actualRpo,
+          actualRtoMinutes: body.actualRtoMinutes,
+          actualRpoMinutes: body.actualRpoMinutes,
           issues: findings,
           improvements,
         },
@@ -458,8 +390,7 @@ export async function POST(request: NextRequest) {
         success: false,
         error: {
           code: "INVALID_INPUT",
-          message:
-            "유효한 action이 필요합니다: create_backup, schedule_drill, start_drill, complete_drill",
+          message: "유효한 action이 필요합니다: schedule_drill, start_drill, complete_drill",
         },
       },
       { status: 400 }
@@ -467,10 +398,7 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "백업 작업 실패"
     return NextResponse.json<ApiResponse<never>>(
-      {
-        success: false,
-        error: { code: "INTERNAL_ERROR", message },
-      },
+      { success: false, error: { code: "INTERNAL_ERROR", message } },
       { status: 500 }
     )
   }

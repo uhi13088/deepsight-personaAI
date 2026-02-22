@@ -1159,18 +1159,82 @@
   - AC4: ✅ CRITICAL 교정 시 reasons에 "[자동 교정] ..." 내역 기록 (운영자 사후 확인용)
   - AC5: ✅ 단위 테스트 42개 PASS + Build PASS
 
+### Phase OPS-A: Operations 가짜 데이터 일괄 제거 (T184~T187)
+
+> 감사 결과: Backup/DR/Incident 메뉴에 Math.random(), 하드코딩 결과값, 가짜 용량 데이터 다수 발견.
+> 원칙: 가짜 데이터 0 — 없는 데이터는 보여주지 않거나 안내로 대체. 사용자 입력이 필요한 곳은 폼으로.
+
+- [x] **T184: Backup 페이지 — 가짜 백업 실행 제거 + Neon 자동백업 안내** ✅ 2026-02-22
+  - 배경: Vercel+Neon 환경에서 "백업 실행" 버튼은 150MB 고정값/랜덤 체크섬의 가짜 DB 레코드만 생성. Neon이 PITR 자동백업을 제공하므로 앱 레벨 백업 불필요
+  - AC1: ✅ `backup/route.ts` — `create_backup` action 완전 제거. 가짜 백업 레코드 생성 코드(150MB 고정, 랜덤 체크섬) 삭제
+  - AC2: ✅ `backup/route.ts` — `buildDefaultCapacityReport()` 제거, GET 응답에서 `capacityReport` 제거
+  - AC3: ✅ `backup/page.tsx` — "백업 실행" 버튼 제거, 정책 카드를 "참고용" 표시로 변경
+  - AC4: ✅ `backup/page.tsx` — 상단에 Neon 자동백업 안내 배너 추가 (Neon 콘솔 링크 포함)
+  - AC5: ✅ `backup/page.tsx` — 가짜 Capacity Report 섹션 제거 → T186 실측 현황으로 교체
+  - AC6: ✅ Build PASS
+
+- [x] **T185: DR 드릴 완료 — 랜덤값 제거 + 사용자 입력 폼** ✅ 2026-02-22
+  - 배경: "훈련 완료" 버튼이 RTO=25~40분(랜덤), RPO=3~8분(랜덤), findings/improvements 고정 문자열을 자동 저장. SLA 지표를 조작하는 것과 같음
+  - AC1: ✅ `backup/route.ts` — `complete_drill`: Math.random() 완전 제거. `actualRtoMinutes`, `actualRpoMinutes` 필수값으로 요구, `findings`/`improvements` 사용자 입력 수신
+  - AC2: ✅ `backup/page.tsx` — "완료 입력" 버튼 클릭 시 인라인 폼 표시 (RTO, RPO 필수, 발견/개선사항 선택). "자동 생성 없음" 안내 명시
+  - AC3: ✅ `backup/route.ts` — `schedule_drill`: body에서 `scheduledAt` 수신 가능 (없으면 7일 기본값, 주석 명시)
+  - AC4: ✅ Build PASS
+
+- [x] **T186: Capacity Report — 실 DB 쿼리로 교체** ✅ 2026-02-22
+  - 배경: `buildDefaultCapacityReport()`의 30일 이력이 `10 + day * 0.5` 등 공식으로 생성한 완전 가짜 데이터. 실제 LlmUsageLog, Persona 집계로 교체
+  - AC1: ✅ `backup/route.ts` — `buildRealCapacitySnapshot()`: Promise.all로 3개 실 DB 쿼리 (활성 페르소나 count, LLM 30일 집계, 매칭 30일 count)
+  - AC2: ✅ 스냅샷 이력 없이 현재 단일 시점 실측값만 표시 (Decimal 타입 Number() 변환 포함)
+  - AC3: ✅ `backup/page.tsx` — 4개 실측 현황 카드 (활성 페르소나/LLM 호출/LLM 비용/매칭 횟수) 표시
+  - AC4: ✅ Build PASS
+
+- [x] **T187: Post-mortem — 하드코딩 액션아이템/교훈 제거** ✅ 2026-02-22
+  - 배경: 모든 장애 사후분석에 "모니터링 개선 (ops-team, 7일)" 액션과 "알림 임계값 조정 필요" 교훈이 자동 삽입됨. 실제 분석과 무관한 고정값
+  - AC1: ✅ `incidents/route.ts` — `createPostMortem` 호출에서 하드코딩 actionItems/lessons 제거, 빈 배열 기본값
+  - AC2: ✅ `incidents/route.ts` — POST body에서 `actionItems` (priority 타입 안전 포함), `lessons` 수신하여 전달
+  - AC3: ✅ Build PASS
+
+### Phase OPS-B: Operations 추가 하드코딩 제거 (T188~T190)
+
+- [x] **T188: Incidents — DEMO_DETECTION_RULES 폴백 제거** ✅ 2026-02-22
+  - 배경: DB에 감지 규칙이 없을 때 `DEMO_DETECTION_RULES`(가짜 데모 규칙)를 반환해 실제 규칙처럼 보임
+  - AC1: ✅ `incidents/route.ts` — `loadDetectionRules()` 폴백을 빈 배열로 교체
+  - AC2: ✅ `DEMO_DETECTION_RULES` import 제거
+  - AC3: ✅ Build PASS
+
+- [x] **T189: Cost — LLM 가격 하드코딩 → SystemConfig DB 기반** ✅ 2026-02-22
+  - 배경: `PRICING = { inputPerMillion: 3.0, outputPerMillion: 15.0 }` 하드코딩 → 가격 변경 시 코드 수정 필요
+  - AC1: ✅ `cost/route.ts` — `loadPricing()` 함수 추가 (SystemConfig `COST.llm_pricing` 조회, 없으면 현행 가격 기본값)
+  - AC2: ✅ `createPrismaCostDataProvider()` → async 전환, pricing 로드 후 cost 함수에 전달
+  - AC3: ✅ `computeInputCost/computeCacheCost/computeOutputCost` pricing 인자 추가
+  - AC4: ✅ Build PASS
+
+- [x] **T190: KPIs — 가짜 UX 기본값(12, 25) → 0** ✅ 2026-02-22
+  - 배경: `getAvgSessionDurationMinutes()=12`, `getAvgFeedScrollCount()=25` — 실측값처럼 보이는 가짜 수치
+  - AC1: ✅ `kpis/route.ts` — 두 함수 모두 0 반환으로 변경 (추적 인프라 미구축 명시)
+  - AC2: ✅ Build PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
 
-- **T176: 프로덕션 DB 마이그레이션 미적용 수정** (AC1~AC2 완료, AC3 프로덕션 적용 대기)
+(없음)
 
-- [ ] **T177: Incident Management 자동 감지 — Detection Rules → 자동 장애 생성**
+---
+
+## ✅ DONE (최근 완료)
+
+- [x] **T176: 프로덕션 DB 마이그레이션 미적용 수정** ✅ 2026-02-22
+  - AC1: ✅ 마이그레이션 023 테이블명 오타 수정 (`"Persona"` → `"personas"`)
+  - AC2: ✅ 통합 마이그레이션 스크립트 생성 (`apply_missing_016_to_024.sql`)
+  - AC3: ✅ 프로덕션 DB에 `apply_missing_016_to_024` 적용 완료 (사용자 직접 실행)
+
+- [x] **T177: Incident Management 자동 감지 — Detection Rules → 자동 장애 생성** ✅ 2026-02-22
   - 배경: 현재 장애 관리가 100% 수동 입력. Detection Rules 타입과 evaluateDetectionRules() 함수가 이미 존재하지만 아무 곳에서도 호출하지 않음. System Monitoring 메트릭과 연결하여 자동 감지 구현
-  - AC1: incidents API에 `auto_detect` 액션 추가 — 현재 메트릭 조회 → Detection Rules 평가 → 중복 체크 → 자동 Incident 생성 (reportedById: "auto-detection")
-  - AC2: Monitoring 페이지에서 진입 시 auto_detect 호출 — 대시보드 확인할 때마다 자동 감지 실행
-  - AC3: Incident 페이지에 자동 감지 배지 표시 — "자동 감지" vs "수동 등록" 구분 + Detection Rules 상태 표시 섹션
-  - AC4: Build PASS
+  - AC1: ✅ incidents API에 `auto_detect` 액션 — `runAutoDetect()`: 메트릭 조회 → 규칙 평가 → 중복 체크 → 자동 Incident 생성 (reportedById: "auto-detection")
+  - AC2: ✅ Monitoring 페이지 진입 시 `useEffect`에서 `runAutoDetect()` 자동 호출 + 신규 장애 발생 시 배너 표시
+  - AC3: ✅ Incidents 페이지 — `[자동감지]` prefix 감지 → 배지 표시, Detection Rules 섹션 별도 표시
+  - AC4: ✅ tsc clean, 3,902 tests PASS
+  - 변경파일: 없음 (이미 구현 완료 상태 확인)
 
 ---
 
@@ -2045,6 +2109,143 @@
   - 변경: `apps/engine-studio/src/**` (페이지, 서비스)
   - 테스트: 빌드 PASS
   - 비고: Mock 데이터 서비스 패턴 적용, 모든 UI 페이지 동적 연결
+
+### Phase DC-F: 개발자콘솔 API 전면 수정 (T200~T205)
+
+> 점검 보고서(2026-02-22) 기반 — 하드코딩·목업·멀티테넌시·성능 전면 수정
+> 우선순위: Critical → High → Medium 순서. 각 티켓은 독립 가능한 단위로 분리.
+
+- [x] **T200: API Keys [id] CRUD 실제 DB 구현** 🔴 Critical ✅ 2026-02-22
+  - 배경: GET/PATCH/DELETE /api/api-keys/[id] 전부 TODO 주석과 mock 데이터 반환
+  - AC1: GET — `prisma.apiKey.findFirst({ where: { id, organizationId } })` + 조직 필터 ✅
+  - AC2: PATCH — `name`, `rateLimit`, `permissions` 필드 실제 DB 업데이트 ✅
+  - AC3: DELETE — `status: REVOKED`, `revokedAt` 소프트 삭제 ✅
+  - AC4: 조직 소속 여부 검증 (Cross-Org 방지) ✅
+  - AC5: Build PASS ✅ (tsc --noEmit, 171 tests)
+  - 변경파일: `apps/developer-console/src/app/api/api-keys/[id]/route.ts`
+
+- [x] **T201: localhost 하드코딩 제거 + 조직 필터링(Multi-tenancy) 적용** 🔴 Critical ✅ 2026-02-22
+  - 배경: status/route.ts, billing/toss/success/route.ts에 "localhost:3001" 하드코딩; usage + dashboard/stats는 조직 필터링 없음
+  - AC1: `status/route.ts` — `"http://localhost:3001"` 제거, `NEXT_PUBLIC_APP_URL` 없으면 graceful degradation ✅
+  - AC2: `billing/toss/success/route.ts` — fallback 제거, 미설정 시 500 반환 ✅
+  - AC3: `usage/route.ts` — `getUserOrganization()` + `organizationId` 필터 추가 ✅
+  - AC4: `dashboard/stats/route.ts` — 동일 패턴 ✅
+  - AC5: Build PASS ✅
+  - 변경파일: `status/route.ts`, `billing/toss/success/route.ts`, `usage/route.ts`, `dashboard/stats/route.ts`
+
+- [x] **T202: Settings/Profile 실제 DB 구현** 🔴 Critical ✅ 2026-02-22
+  - 배경: GET /api/settings, PATCH /api/settings/profile 전부 TODO 주석과 mock 반환
+  - AC1: GET /api/settings — `prisma.user.findUnique()` + sessions 포함 ✅
+  - AC2: PATCH /api/settings/profile — `prisma.user.update()` name/phone 업데이트 (email 제외) ✅
+  - AC3: 응답 형식 표준 준수 ✅
+  - AC4: Build PASS ✅
+  - 변경파일: `settings/route.ts`, `settings/profile/route.ts`
+
+- [x] **T203: 가격/쿼터 상수화 + 응답 형식 표준화 + 에러 시 Mock 반환 제거** 🟠 High ✅ 2026-02-22
+  - 배경: 가격/쿼터 여러 파일에 중복 하드코딩; 에러 발생 시 성공 응답으로 mock 데이터 반환
+  - AC1: `src/lib/constants.ts` 신규 생성 — `PLAN_INFO`, `PLAN_PRICES`, `API_COST_PER_CALL`, `getQuotaByPlan()` ✅
+  - AC2: `billing/route.ts`, `billing/upgrade/route.ts` — 상수 import로 교체 ✅
+  - AC3: `dashboard/stats/route.ts`, `usage/route.ts` — 상수 사용 ✅
+  - AC4: 에러 catch mock 제거 (`dashboard/stats`, `logs`, `usage`, `team`, `webhooks`) ✅
+  - AC7: Build PASS ✅
+  - 변경파일: `src/lib/constants.ts`(신규), `billing/route.ts`, `billing/upgrade/route.ts`, `usage/route.ts`, `dashboard/stats/route.ts`, `logs/route.ts`, `team/route.ts`, `webhooks/route.ts`
+
+- [x] **T204: Webhooks N+1 최적화 + Billing Toss Webhook 구독취소 + auth/login** 🟠 High ✅ 2026-02-22
+  - 배경: webhooks/route.ts에 루프 내 DB 쿼리(N+1); billing/toss/webhook의 CANCELED/BILLING_KEY_DELETED TODO; auth/login 501 반환
+  - AC1: `webhooks/route.ts` GET — `groupBy` 2쿼리 + Map 조인으로 N+1 제거 ✅
+  - AC2: `billing/toss/webhook/route.ts` — CANCELED: org→FREE + Invoice CANCELLED; BILLING_KEY_DELETED: 구독 해제 ✅
+  - AC3: `auth/login/route.ts` — 실제 bcrypt 검증 + lastLoginAt 업데이트 ✅
+  - AC4: Build PASS ✅
+  - 변경파일: `webhooks/route.ts`, `billing/toss/webhook/route.ts`, `auth/login/route.ts`
+
+- [x] **T205: Dashboard Alerts/Alert-Channels Notification 연동** 🟡 Medium ✅ 2026-02-22
+  - 배경: alert-channels, alerts 라우트 전부 TODO 목업; Notification 모델 활용 가능
+  - AC1: `dashboard/alerts/route.ts` GET — `prisma.notification.findMany()` ✅
+  - AC2: `dashboard/alerts/route.ts` PATCH — 단건/전체 읽음 처리 ✅
+  - AC3: `dashboard/alert-channels/route.ts` GET/PUT — 입력 검증 추가 (AlertChannel DB 모델 없어 스키마 확장 필요 명시) ✅
+  - AC4: Build PASS ✅ (tsc --noEmit clean, 171/171 tests pass)
+  - 변경파일: `dashboard/alerts/route.ts`, `dashboard/alert-channels/route.ts`
+
+---
+
+### Phase DC-G: 개발자콘솔 보안 취약점 전면 수정 (T210~T216)
+
+> 보안 감사(2026-02-22) 기반 — OWASP Top 10 기준 Critical/High 우선 수정
+> 우선순위: Critical → High 순서
+
+- [x] **T210: API Key Rotate 인증 완전 누락 수정** 🔴 Critical ✅ 2026-02-22
+  - 배경: `POST /api/api-keys/[id]/rotate` — `requireAuth()` 호출 없음. 비로그인 상태로 타 org 키 교체 가능
+  - AC1: `requireAuth()` 추가, 미인증 시 401 반환 ✅
+  - AC2: `getUserOrganization()` 후 `findFirst({ where: { id, organizationId } })`로 Cross-Org 방지 ✅
+  - AC3: REVOKED 키 교체 차단 유지 ✅
+  - AC4: Build PASS ✅ (tsc clean, 171 tests)
+  - 변경파일: `api-keys/[id]/rotate/route.ts`
+
+- [x] **T211: Webhooks [id] Cross-Org 데이터 유출 수정** 🔴 Critical ✅ 2026-02-22
+  - 배경: GET/PATCH/DELETE 모두 `findUnique({ where: { id } })` 후 별도 org 검증 → 404 vs 403 차이로 타 org 웹훅 ID 열거 가능
+  - AC1: GET — `findFirst({ where: { id, organizationId } })`로 변경 ✅
+  - AC2: PATCH — 동일 패턴 ✅
+  - AC3: DELETE — 동일 패턴 ✅
+  - AC4: Build PASS ✅
+  - 변경파일: `webhooks/[id]/route.ts`
+
+- [x] **T212: Webhooks GET null-filter + POST organizationId 누락 수정** 🔴 Critical ✅ 2026-02-22
+  - 배경: GET에서 `membership null` 시 `orgFilter = {}` → 전체 org 웹훅 반환; POST에서 `organizationId` 미설정
+  - AC1: GET — `!membership` 시 즉시 403 반환 ✅
+  - AC2: POST — `getUserOrganization()` 후 `organizationId: membership.organizationId` 추가 ✅
+  - AC3 (T215 병합): SSRF 방어 — `BLOCKED_HOSTS` 정규식으로 내부 IP 전체 차단 ✅
+  - AC4: Build PASS ✅
+  - 변경파일: `webhooks/route.ts`
+
+- [x] **T213: Status endpoint 정보 최소화** 🔴 Critical ✅ 2026-02-22
+  - 배경: 인증 없이 UptimeRobot 연동, 레이턴시 측정값, 서비스 uptime 상세 노출 → 인프라 정찰 가능
+  - AC1: UptimeRobot API 통합 제거 ✅
+  - AC2: latency 측정값 응답에서 제거 ✅
+  - AC3: uptime 수치 제거, status만 반환 ✅
+  - AC4: 공개 엔드포인트 유지 (status page 목적), 노출 최소화 ✅
+  - AC5: Build PASS ✅
+  - 변경파일: `status/route.ts`
+
+- [x] **T214: Billing amount 검증 + Toss 에러 노출 수정** 🟠 High ✅ 2026-02-22
+  - 배경: `amount` 쿼리파람을 그대로 Toss에 전달 (가격 조작 가능); Toss 에러 메시지 리다이렉트 URL에 노출
+  - AC1: `PLAN_PRICES[planId]`와 `parseInt(amount)` 비교 — 불일치 시 error redirect ✅
+  - AC2: `planId` 유효성 검사 (starter/pro/enterprise만 허용) ✅
+  - AC3: Toss 에러 메시지 리다이렉트 URL에서 제거 (서버 로그만) ✅
+  - AC4: Build PASS ✅
+  - 변경파일: `billing/toss/success/route.ts`
+
+- [x] **T215: Webhook URL SSRF 방어 + POST secret 주석 명확화** 🟠 High ✅ 2026-02-22
+  - T212에서 함께 처리 (webhooks/route.ts SSRF 방어)
+  - AC1: `BLOCKED_HOSTS` 정규식으로 localhost/127.x/10.x/192.168.x/169.254.x 차단 ✅
+  - AC2: POST 응답 secret — one-time reveal 주석 명확화 ✅
+  - AC3: Build PASS ✅
+  - 변경파일: `webhooks/route.ts` (T212 동일)
+
+- [x] **T216: Admin seed 프로덕션 방어** 🟠 High ✅ 2026-02-22
+  - 배경: `NODE_ENV=production` 에서도 `/api/admin/seed` 접근 가능
+  - AC1: 핸들러 시작에 `NODE_ENV === 'production'` 체크 → 404 반환 ✅
+  - AC2: Build PASS ✅
+  - 변경파일: `admin/seed/route.ts`
+
+### Phase DC-H: 개발자콘솔 보안 Medium/Low 이슈 수정 (T220~T222)
+
+> Phase DC-G 후속 — OWASP Medium/Low 취약점 수정
+
+- [x] **T220+T221: 보안 응답 헤더 + 요청 크기 제한 미들웨어** 🟡 Medium ✅ 2026-02-22
+  - 배경: API 응답에 보안 헤더 없음; 요청 크기 제한 없어 대용량 페이로드 허용
+  - AC1: `src/middleware.ts` 생성 — X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy ✅
+  - AC2: Content-Length > 1MB 요청 → 413 응답 (DoS 완화) ✅
+  - AC3: `/api/*` 라우트에만 적용 ✅
+  - AC4: Build PASS ✅ (tsc clean, 171 tests)
+  - 변경파일: `src/middleware.ts` (신규)
+
+- [x] **T222: 초대 토큰 DB 저장 + 만료 검증 + accept API** 🟡 Medium ✅ 2026-02-22
+  - 배경: 초대 토큰 DB 미저장 → 만료·취소 불가; `localhost:3001` 폴백; accept 엔드포인트 없음
+  - AC1: `VerificationToken` 모델 활용 — `identifier: invite:{memberId}`, `token: sha256(rawToken)`, `expires: +7일` ✅
+  - AC2: `team/invite/route.ts` — 토큰 DB 저장 + `localhost:3001` 폴백 제거 ✅
+  - AC3: `team/invite/accept/route.ts` 신규 생성 — 토큰 검증 + `acceptedAt` 업데이트 + VerificationToken 삭제 ✅
+  - AC4: Build PASS ✅
+  - 변경파일: `team/invite/route.ts`, `team/invite/accept/route.ts` (신규)
 
 ---
 

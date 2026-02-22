@@ -15,7 +15,7 @@ const updateWebhookSchema = z.object({
 // GET /api/webhooks/[id] - 웹훅 상세 조회
 // ============================================================================
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { session, response } = await requireAuth()
   if (response) return response
 
@@ -30,15 +30,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       )
     }
 
-    const webhook = await prisma.webhook.findUnique({
-      where: { id },
+    // T211: findFirst + organizationId 필터로 Cross-Org 열거 공격 방지
+    // (findUnique 후 별도 org 검증은 404 vs 403 차이로 타 org ID 열거 가능)
+    const webhook = await prisma.webhook.findFirst({
+      where: { id, organizationId: membership.organizationId },
       include: {
         deliveries: {
           orderBy: { createdAt: "desc" },
           take: 1,
-        },
-        _count: {
-          select: { deliveries: true },
         },
       },
     })
@@ -50,22 +49,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       )
     }
 
-    if (webhook.organizationId !== membership.organizationId) {
-      return NextResponse.json(
-        { success: false, error: { code: "FORBIDDEN", message: "접근 권한이 없습니다." } },
-        { status: 403 }
-      )
-    }
-
-    const deliveryStats = await prisma.webhookDelivery.aggregate({
-      where: { webhookId: webhook.id },
-      _count: true,
-      _avg: { latencyMs: true },
-    })
-
-    const successCount = await prisma.webhookDelivery.count({
-      where: { webhookId: webhook.id, status: "SUCCESS" },
-    })
+    const [deliveryAgg, successCount] = await Promise.all([
+      prisma.webhookDelivery.aggregate({
+        where: { webhookId: webhook.id },
+        _count: true,
+        _avg: { latencyMs: true },
+      }),
+      prisma.webhookDelivery.count({
+        where: { webhookId: webhook.id, status: "SUCCESS" },
+      }),
+    ])
 
     const lastDelivery = webhook.deliveries[0]
 
@@ -94,12 +87,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 latency: 0,
               },
           stats: {
-            totalDeliveries: deliveryStats._count,
+            totalDeliveries: deliveryAgg._count,
             successRate:
-              deliveryStats._count > 0
-                ? Math.round((successCount / deliveryStats._count) * 100)
-                : 100,
-            avgLatency: Math.round(deliveryStats._avg.latencyMs || 0),
+              deliveryAgg._count > 0 ? Math.round((successCount / deliveryAgg._count) * 100) : 100,
+            avgLatency: Math.round(deliveryAgg._avg.latencyMs || 0),
           },
         },
       },
@@ -150,21 +141,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const { url, description, events, status } = parsed.data
 
-    const existingWebhook = await prisma.webhook.findUnique({
-      where: { id },
+    // T211: Cross-Org 방지 — organizationId 필터를 쿼리에 포함
+    const existingWebhook = await prisma.webhook.findFirst({
+      where: { id, organizationId: membership.organizationId },
     })
 
     if (!existingWebhook) {
       return NextResponse.json(
         { success: false, error: { code: "NOT_FOUND", message: "Webhook not found" } },
         { status: 404 }
-      )
-    }
-
-    if (existingWebhook.organizationId !== membership.organizationId) {
-      return NextResponse.json(
-        { success: false, error: { code: "FORBIDDEN", message: "접근 권한이 없습니다." } },
-        { status: 403 }
       )
     }
 
@@ -236,7 +221,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 // ============================================================================
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { session, response: authRes } = await requireAuth()
@@ -253,21 +238,15 @@ export async function DELETE(
       )
     }
 
-    const existingWebhook = await prisma.webhook.findUnique({
-      where: { id },
+    // T211: Cross-Org 방지 — organizationId 필터를 쿼리에 포함
+    const existingWebhook = await prisma.webhook.findFirst({
+      where: { id, organizationId: membership.organizationId },
     })
 
     if (!existingWebhook) {
       return NextResponse.json(
         { success: false, error: { code: "NOT_FOUND", message: "Webhook not found" } },
         { status: 404 }
-      )
-    }
-
-    if (existingWebhook.organizationId !== membership.organizationId) {
-      return NextResponse.json(
-        { success: false, error: { code: "FORBIDDEN", message: "접근 권한이 없습니다." } },
-        { status: 403 }
       )
     }
 

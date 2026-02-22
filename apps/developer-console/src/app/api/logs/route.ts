@@ -144,20 +144,9 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error("Error fetching logs:", error)
-    // Return empty data on error to prevent 500
-    return NextResponse.json({
-      success: true,
-      data: {
-        logs: [],
-        stats: {
-          total: 0,
-          success: 0,
-          clientError: 0,
-          serverError: 0,
-          avgLatency: 0,
-        },
-        total: 0,
-      },
-    })
+    return NextResponse.json(
+      { success: false, error: { code: "INTERNAL_ERROR", message: "로그 조회에 실패했습니다." } },
+      { status: 500 }
+    )
   }
 }
