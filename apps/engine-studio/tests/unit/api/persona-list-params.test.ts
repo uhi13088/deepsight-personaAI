@@ -126,6 +126,7 @@ describe("PersonaListItem", () => {
         },
         l3: { lack: 0.65, moralCompass: 0.55, volatility: 0.5, growthArc: 0.6 },
       },
+      engineVersion: "4.0",
       createdAt: "2026-01-15T09:30:00Z",
       updatedAt: "2026-02-01T14:00:00Z",
     }
@@ -154,6 +155,7 @@ describe("PersonaListItem", () => {
       qualityScore: null,
       validationScore: null,
       vectors: { l1: null, l2: null, l3: null },
+      engineVersion: null,
       createdAt: "2026-02-11T00:00:00Z",
       updatedAt: "2026-02-11T00:00:00Z",
     }
