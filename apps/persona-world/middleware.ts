@@ -18,21 +18,14 @@ export async function middleware(request: NextRequest) {
     request.cookies.get("__Secure-next-auth.session-token")?.value ||
     request.cookies.get("next-auth.session-token")?.value
 
-  // ── API 프록시 라우트: 인증 + 내부 토큰 주입 ──────────────
-  if (pathname.startsWith("/api/public/") || pathname.startsWith("/api/persona-world/")) {
-    // /api/public/auth/* 는 로그인 전에 호출되므로 인증 제외
-    if (pathname.startsWith("/api/public/auth/")) {
-      return NextResponse.next()
-    }
+  // ── /api/public/auth/*: 로그인 전 호출되므로 인증 완전 제외 ──
+  if (pathname.startsWith("/api/public/auth/")) {
+    return NextResponse.next()
+  }
 
-    if (!sessionToken) {
-      return NextResponse.json(
-        { success: false, error: { code: "UNAUTHORIZED", message: "인증이 필요합니다." } },
-        { status: 401 }
-      )
-    }
-
-    // 프록시 요청에 내부 인증 토큰 + 인증된 유저 이메일 주입
+  // ── /api/public/*: 공개 API — 세션 불필요, 내부 토큰만 주입 ──
+  // 공개 피드/페르소나/탐색 등은 비로그인 사용자도 접근 가능해야 함
+  if (pathname.startsWith("/api/public/")) {
     const requestHeaders = new Headers(request.headers)
 
     const internalSecret = process.env.INTERNAL_API_SECRET
@@ -40,7 +33,42 @@ export async function middleware(request: NextRequest) {
       requestHeaders.set("x-internal-token", internalSecret)
     }
 
-    // JWT에서 이메일 추출 → 유저 소유권 검증에 사용
+    // 세션이 있으면 이메일도 주입 (팔로우/좋아요 등 소유권 검증에 사용)
+    if (sessionToken) {
+      try {
+        const token = await getToken({
+          req: request,
+          secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
+        })
+        if (token?.email) {
+          requestHeaders.set("x-authenticated-email", token.email as string)
+        }
+      } catch {
+        // JWT 디코딩 실패 무시
+      }
+    }
+
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+    })
+  }
+
+  // ── /api/persona-world/*: 인증 필수 + 내부 토큰 + 이메일 주입 ──
+  if (pathname.startsWith("/api/persona-world/")) {
+    if (!sessionToken) {
+      return NextResponse.json(
+        { success: false, error: { code: "UNAUTHORIZED", message: "인증이 필요합니다." } },
+        { status: 401 }
+      )
+    }
+
+    const requestHeaders = new Headers(request.headers)
+
+    const internalSecret = process.env.INTERNAL_API_SECRET
+    if (internalSecret) {
+      requestHeaders.set("x-internal-token", internalSecret)
+    }
+
     try {
       const token = await getToken({
         req: request,
