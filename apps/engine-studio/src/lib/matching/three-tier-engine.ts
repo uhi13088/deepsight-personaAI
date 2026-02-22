@@ -78,19 +78,29 @@ export function calculateBasicScore(
   userVFinal: number[],
   personaVFinal: number[],
   userCAP: CrossAxisProfile,
-  personaCAP: CrossAxisProfile
+  personaCAP: CrossAxisProfile,
+  userEPS?: ParadoxProfile,
+  personaEPS?: ParadoxProfile
 ): { score: number; breakdown: MatchBreakdown } {
   const vectorScore = Math.max(0, cosineSimilarity(userVFinal, personaVFinal))
   const crossAxisScore = calculateCrossAxisSimilarity(userCAP, personaCAP)
 
-  const score = round(0.7 * vectorScore + 0.3 * crossAxisScore)
+  // Paradox 호환성: 제공되면 5% 반영, 없으면 기존과 동일
+  const paradoxCompat =
+    userEPS && personaEPS ? calculateParadoxCompatibility(userEPS, personaEPS) : 0
+  const hasParadox = userEPS && personaEPS
+
+  // V_Final 65% + 교차축 30% + Paradox 5% (Paradox 없으면 V_Final 70% + 교차축 30%)
+  const score = hasParadox
+    ? round(0.65 * vectorScore + 0.3 * crossAxisScore + 0.05 * paradoxCompat)
+    : round(0.7 * vectorScore + 0.3 * crossAxisScore)
 
   return {
     score,
     breakdown: {
       vectorScore: round(vectorScore),
       crossAxisScore: round(crossAxisScore),
-      paradoxCompatibility: 0,
+      paradoxCompatibility: round(paradoxCompat),
       qualitativeBonus: 0,
     },
   }
@@ -289,7 +299,9 @@ export function matchPersona(
         user.vFinal.vector,
         personaVFinal.vector,
         user.crossAxisProfile,
-        persona.crossAxisProfile
+        persona.crossAxisProfile,
+        user.paradoxProfile,
+        persona.paradoxProfile
       )
       break
     case "advanced":

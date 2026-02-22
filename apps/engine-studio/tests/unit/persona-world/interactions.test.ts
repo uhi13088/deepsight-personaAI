@@ -386,7 +386,7 @@ describe("recalculateRelationship", () => {
     expect(result.depth).toBeCloseTo(0.3, 2)
   })
 
-  it("인터랙션 없으면 감쇠", async () => {
+  it("인터랙션 없고 lastInteractionAt null → warmth 유지 (기준점 없음)", async () => {
     const rel = makeRelationship({ warmth: 0.8, tension: 0.5 })
     const provider: RelationshipDataProvider = {
       findRelationship: vi.fn().mockResolvedValue(rel),
@@ -401,8 +401,32 @@ describe("recalculateRelationship", () => {
     }
 
     const result = await recalculateRelationship("p1", "p2", provider)
-    // warmth 감쇠: 0.8 × 0.95 = 0.76
-    expect(result.warmth).toBeCloseTo(0.76, 2)
+    // lastInteractionAt null → applyWarmthDecay가 원본 반환
+    expect(result.warmth).toBe(0.8)
+    // tension 감쇠: 0.5 × 0.9 = 0.45
+    expect(result.tension).toBeCloseTo(0.45, 2)
+  })
+
+  it("인터랙션 없고 lastInteractionAt 설정 → 시간 기반 warmth 감쇠", async () => {
+    const tenDaysAgo = new Date()
+    tenDaysAgo.setDate(tenDaysAgo.getDate() - 10)
+    const rel = makeRelationship({ warmth: 0.8, tension: 0.5, lastInteractionAt: tenDaysAgo })
+    const provider: RelationshipDataProvider = {
+      findRelationship: vi.fn().mockResolvedValue(rel),
+      upsertRelationship: vi.fn().mockResolvedValue(undefined),
+      getInteractionStats: vi.fn().mockResolvedValue({
+        totalComments: 0,
+        positiveComments: 0,
+        negativeComments: 0,
+        totalInteractions: 0,
+        avgChainLength: 0,
+      }),
+    }
+
+    const result = await recalculateRelationship("p1", "p2", provider)
+    // warmth = 0.8 × e^(-0.02 × 10) ≈ 0.8 × 0.818 ≈ 0.655
+    expect(result.warmth).toBeLessThan(0.8)
+    expect(result.warmth).toBeGreaterThan(0.5)
     // tension 감쇠: 0.5 × 0.9 = 0.45
     expect(result.tension).toBeCloseTo(0.45, 2)
   })

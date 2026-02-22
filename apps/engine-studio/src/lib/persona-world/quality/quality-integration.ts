@@ -30,6 +30,14 @@ import {
   type CommentQualityLog,
 } from "./quality-logger"
 import { checkAllTriggers, type ArenaTrigger } from "./arena-bridge"
+import { measureDrift, summarizeDrift, type DriftResult, type DriftSeverity } from "./persona-drift"
+import {
+  measureDiversity,
+  summarizeDiversity,
+  type DiversityResult,
+  type DiversitySeverity,
+} from "./diversity-score"
+import type { VoiceStyleParams } from "../types"
 
 // ── 통합 결과 타입 ──────────────────────────────────────────
 
@@ -39,6 +47,8 @@ export interface QualityCheckResult {
   pis: PWIntegrityScore
   action: PISAction
   triggers: ArenaTrigger[]
+  drift: DriftResult | null
+  diversity: DiversityResult | null
   summary: QualitySummary
 }
 
@@ -71,6 +81,9 @@ export function runQualityCheck(params: {
   commentLogs?: CommentQualityLog[]
   hasCriticalBotPattern?: boolean
   dailyFactbookViolations?: number
+  voiceStyleBaseline?: VoiceStyleParams
+  voiceStyleCurrent?: VoiceStyleParams
+  recentContents?: string[]
 }): QualityCheckResult {
   const {
     personaId,
@@ -84,6 +97,9 @@ export function runQualityCheck(params: {
     commentLogs,
     hasCriticalBotPattern,
     dailyFactbookViolations,
+    voiceStyleBaseline,
+    voiceStyleCurrent,
+    recentContents,
   } = params
 
   // Step 1: PIS 계산
@@ -111,8 +127,18 @@ export function runQualityCheck(params: {
     dailyFactbookViolations,
   })
 
-  // Step 5: 종합 상태 판정
-  const summary = buildSummary(pis, interview, postStats, commentStats, triggers)
+  // Step 5: PersonaDrift 감지
+  const drift =
+    voiceStyleBaseline && voiceStyleCurrent
+      ? measureDrift(voiceStyleBaseline, voiceStyleCurrent)
+      : null
+
+  // Step 6: DiversityScore 측정
+  const diversity =
+    recentContents && recentContents.length > 0 ? measureDiversity(recentContents) : null
+
+  // Step 7: 종합 상태 판정
+  const summary = buildSummary(pis, interview, postStats, commentStats, triggers, drift, diversity)
 
   return {
     personaId,
@@ -120,6 +146,8 @@ export function runQualityCheck(params: {
     pis,
     action,
     triggers,
+    drift,
+    diversity,
     summary,
   }
 }
@@ -211,7 +239,9 @@ function buildSummary(
   interview: PWInterviewResult | null,
   postStats: ReturnType<typeof aggregatePostQualityLogs> | null,
   commentStats: ReturnType<typeof aggregateCommentQualityLogs> | null,
-  triggers: ArenaTrigger[]
+  triggers: ArenaTrigger[],
+  drift: DriftResult | null = null,
+  diversity: DiversityResult | null = null
 ): QualitySummary {
   const reasons: string[] = []
 
@@ -242,6 +272,20 @@ function buildSummary(
   })
   reasons.push(...logIssues)
 
+  // 드리프트 기반
+  if (drift) {
+    if (drift.severity !== "STABLE") {
+      reasons.push(summarizeDrift(drift))
+    }
+  }
+
+  // 다양성 기반
+  if (diversity) {
+    if (diversity.severity !== "DIVERSE") {
+      reasons.push(summarizeDiversity(diversity))
+    }
+  }
+
   // 트리거 기반
   if (triggers.some((t) => t.priority === "CRITICAL")) {
     reasons.push(
@@ -256,12 +300,19 @@ function buildSummary(
   let status: QualitySummary["status"]
   if (triggers.some((t) => t.priority === "CRITICAL") || pis.grade === "QUARANTINE") {
     status = "CRITICAL"
-  } else if (pis.grade === "CRITICAL" || (interview && interview.verdict === "fail")) {
+  } else if (
+    pis.grade === "CRITICAL" ||
+    (interview && interview.verdict === "fail") ||
+    (drift && drift.severity === "CRITICAL") ||
+    (diversity && diversity.severity === "CRITICAL")
+  ) {
     status = "DEGRADED"
   } else if (
     pis.grade === "WARNING" ||
     (interview && interview.verdict === "warning") ||
-    logIssues.length > 0
+    logIssues.length > 0 ||
+    (drift && drift.severity === "WARNING") ||
+    (diversity && diversity.severity === "WARNING")
   ) {
     status = "CAUTION"
   } else {
