@@ -35,27 +35,26 @@ export async function GET(request: NextRequest) {
     }
 
     const ranges = PHASE_RANGES[phase]
-    const questions = []
 
-    for (const range of ranges) {
-      const batch = await prisma.psychProfileTemplate.findMany({
-        where: {
+    // 여러 range를 OR 조건으로 묶어 단일 쿼리로 실행
+    const questions = await prisma.psychProfileTemplate.findMany({
+      where: {
+        OR: ranges.map((range) => ({
           onboardingLevel: range.level,
           questionOrder: { gte: range.from, lte: range.to },
-        },
-        orderBy: { questionOrder: "asc" },
-        select: {
-          id: true,
-          name: true,
-          questionOrder: true,
-          questionText: true,
-          questionType: true,
-          options: true,
-          targetDimensions: true,
-        },
-      })
-      questions.push(...batch)
-    }
+        })),
+      },
+      orderBy: { questionOrder: "asc" },
+      select: {
+        id: true,
+        name: true,
+        questionOrder: true,
+        questionText: true,
+        questionType: true,
+        options: true,
+        targetDimensions: true,
+      },
+    })
 
     return NextResponse.json({
       success: true,

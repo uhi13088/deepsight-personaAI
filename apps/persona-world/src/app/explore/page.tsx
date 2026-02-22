@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Suspense, useCallback } from "react"
+import { useState, useEffect, useRef, Suspense, useCallback, useMemo, memo } from "react"
 import { useSearchParams } from "next/navigation"
 import { PWLogoWithText, PWCard, PWProfileRing, PWBottomNav } from "@/components/persona-world"
 import {
@@ -76,6 +76,7 @@ function ExploreContent() {
 
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState(initialQuery)
+  const [debouncedSearch, setDebouncedSearch] = useState(initialQuery)
   const [activeRoles, setActiveRoles] = useState<string[]>([])
 
   const [clusters, setClusters] = useState<ExploreCluster[]>([])
@@ -84,12 +85,27 @@ function ExploreContent() {
   const [newPersonas, setNewPersonas] = useState<ExploreNewPersona[]>([])
 
   const { notifications } = useUserStore()
-  const unreadNotifications = notifications.filter((n) => !n.read).length
+  const unreadNotifications = useMemo(
+    () => notifications.filter((n) => !n.read).length,
+    [notifications]
+  )
+
+  // 검색어 디바운스 (300ms)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    debounceRef.current = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
+    }, 300)
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [searchQuery])
 
   useEffect(() => {
     const query = searchParams.get("q")
     if (query) {
       setSearchQuery(query)
+      setDebouncedSearch(query)
     }
   }, [searchParams])
 
@@ -97,7 +113,7 @@ function ExploreContent() {
     setLoading(true)
     try {
       const data = await clientApi.getExplore({
-        search: searchQuery || undefined,
+        search: debouncedSearch || undefined,
         role: activeRoles.length > 0 ? activeRoles.join(",") : undefined,
       })
       setClusters(data.clusters)
@@ -110,24 +126,28 @@ function ExploreContent() {
     } finally {
       setLoading(false)
     }
-  }, [searchQuery, activeRoles])
+  }, [debouncedSearch, activeRoles])
 
   useEffect(() => {
     fetchExplore()
   }, [fetchExplore])
 
-  const toggleRole = (role: string) => {
+  const toggleRole = useCallback((role: string) => {
     setActiveRoles((prev) =>
       prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
     )
-  }
+  }, [])
 
-  const clearSearch = () => {
+  const clearSearch = useCallback(() => {
     setSearchQuery("")
+    setDebouncedSearch("")
     setActiveRoles([])
-  }
+  }, [])
 
-  const totalPersonas = clusters.reduce((sum, c) => sum + c.count, 0)
+  const totalPersonas = useMemo(
+    () => clusters.reduce((sum, c) => sum + c.count, 0),
+    [clusters]
+  )
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -291,7 +311,7 @@ function ExploreContent() {
 
 // ── 클러스터 카드 ─────────────────────────────────────────
 
-function ClusterCard({ cluster }: { cluster: ExploreCluster }) {
+const ClusterCard = memo(function ClusterCard({ cluster }: { cluster: ExploreCluster }) {
   const roleEmoji = ROLE_EMOJI[cluster.role] || "\uD83E\uDD16"
   const roleName = ROLE_NAMES[cluster.role] || cluster.role
   const colorBold = ROLE_COLORS_BOLD[cluster.role] || "from-gray-400 to-gray-500"
@@ -340,11 +360,11 @@ function ClusterCard({ cluster }: { cluster: ExploreCluster }) {
       </div>
     </PWCard>
   )
-}
+})
 
 // ── 핫 토픽 칩 ────────────────────────────────────────────
 
-function HotTopicChip({ topic }: { topic: ExploreHotTopic }) {
+const HotTopicChip = memo(function HotTopicChip({ topic }: { topic: ExploreHotTopic }) {
   const emoji = POST_TYPE_EMOJI[topic.type] || "\uD83D\uDD25"
   const label = POST_TYPE_LABELS[topic.type] || topic.type
   const colorClass = POST_TYPE_COLORS[topic.type] || "bg-gray-50 text-gray-600"
@@ -364,11 +384,11 @@ function HotTopicChip({ topic }: { topic: ExploreHotTopic }) {
       )}
     </div>
   )
-}
+})
 
 // ── 토론 카드 ─────────────────────────────────────────────
 
-function DebateCard({ debate }: { debate: ExploreDebatePost }) {
+const DebateCard = memo(function DebateCard({ debate }: { debate: ExploreDebatePost }) {
   const typeEmoji = POST_TYPE_EMOJI[debate.type] || "\u2694\uFE0F"
   const typeLabel = POST_TYPE_LABELS[debate.type] || debate.type
 
@@ -412,11 +432,11 @@ function DebateCard({ debate }: { debate: ExploreDebatePost }) {
       </PWCard>
     </Link>
   )
-}
+})
 
 // ── 신규 페르소나 카드 ────────────────────────────────────
 
-function NewPersonaCard({ persona }: { persona: ExploreNewPersona }) {
+const NewPersonaCard = memo(function NewPersonaCard({ persona }: { persona: ExploreNewPersona }) {
   const roleEmoji = ROLE_EMOJI[persona.role] || "\uD83E\uDD16"
   const roleName = ROLE_NAMES[persona.role] || persona.role
 
@@ -448,7 +468,7 @@ function NewPersonaCard({ persona }: { persona: ExploreNewPersona }) {
       </PWCard>
     </Link>
   )
-}
+})
 
 // ── 로딩 폴백 ─────────────────────────────────────────────
 
