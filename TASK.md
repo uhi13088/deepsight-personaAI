@@ -1080,24 +1080,41 @@
 
 > 소스 코드 리팩토링 후 미동기화된 테스트 파일 일괄 수정.
 
-- [ ] **T173: 테스트 파일 타입 에러 일괄 수정**
+- [x] **T173: 테스트 파일 타입 에러 일괄 수정** ✅ 2026-02-22
   - 배경: v3→v4 리팩토링 시 타입 인터페이스/Prisma 스키마가 변경되었으나 테스트 파일이 동기화되지 않아 `pnpm test` 실행 불가
-  - AC1: Prisma import 경로 수정 — `@prisma/client` → `@/generated/prisma` (lifecycle, random-generation, post-type-selector)
-  - AC2: 인터페이스 필드명 동기화 — `vFinal`→`l1/l2/l3`, `basicScore`→`vectorScore` 등 (consumer-journey)
-  - AC3: 제거된 메서드/필드 반영 — `saveActivityLog` 제거 (scheduler), `LLMCallType` import 수정 (cost)
-  - AC4: 타입 불일치 수정 — `string`→`Date`, `number[]`→`[number,number]`, `null`→`undefined` (comment-utils, llm-express-quirks, data-architecture)
-  - AC5: Next.js 16 호환 — `RequestInit.signal` 타입, `NotificationSettings.push` 추가 (api-key-validator, settings-service)
-  - AC6: `pnpm test` 전체 PASS
+  - AC1: ✅ Prisma import 경로 수정 — `@prisma/client` → `@/generated/prisma` (lifecycle, random-generation, post-type-selector)
+  - AC2: ✅ 인터페이스 필드명 동기화 — `vFinal`→`l1/l2/l3`, `basicScore`→`vectorScore` 등 (consumer-journey)
+  - AC3: ✅ 제거된 메서드/필드 반영 — `saveActivityLog` 제거 (scheduler), `LLMCallType` import 수정 (cost)
+  - AC4: ✅ 타입 불일치 수정 — `string`→`Date`, `number[]`→`[number,number]`, `null`→`undefined` (comment-utils, llm-express-quirks, data-architecture)
+  - AC5: ✅ Next.js 16 호환 — `RequestInit.signal` 타입, `NotificationSettings.push` 추가 (api-key-validator, settings-service)
+  - AC6: ✅ `pnpm test` 전체 PASS (3,993 tests / 113 files)
+
+- [ ] **T176: 프로덕션 DB 마이그레이션 미적용 수정 — 500 에러 해결**
+  - 배경: 엔진 스튜디오 프로덕션 `/api/internal/personas`, `/api/internal/incubator/dashboard` 500 에러. 원인: 마이그레이션 016~024가 프로덕션 DB에 미적용. Prisma 클라이언트는 최신 스키마 기준 빌드하나 실제 DB에 컬럼/테이블 부재
+  - AC1: 마이그레이션 023 테이블명 버그 수정 (`"Persona"` → `"personas"`)
+  - AC2: 통합 마이그레이션 스크립트 생성 (`apply_missing_016_to_024.sql`)
+  - AC3: 프로덕션 DB에 마이그레이션 적용 후 500 에러 해결 확인
 
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
 
-(없음)
+- **T176: 프로덕션 DB 마이그레이션 미적용 수정** (AC1~AC2 완료, AC3 프로덕션 적용 대기)
 
 ---
 
 ## ✅ DONE (완료)
+
+- [x] **T173: 테스트 파일 타입 에러 일괄 수정** ✅ 2026-02-22
+  - 12개 테스트 파일 타입 동기화 → 3,993 tests / 113 files 전체 PASS
+
+- [x] **T167~T172: 보안 감사 일괄 수정** ✅ 2026-02-22
+  - T167: 하드코딩 비밀키 제거 (verifyInternalToken 도입)
+  - T168: 조직 격리 강화 (getUserOrganization)
+  - T169: Toss 웹훅 인증 추가
+  - T170: Developer Console 인증 미들웨어
+  - T171: 입력 유효성 검증 + Internal Token 가드 21개 라우트
+  - T172: 보안 헤더 + CORS 정리
 
 - [x] **T163: Factbook 런타임 연동 — mutableContext 업데이트 파이프라인** ✅ 2026-02-20
   - AC1: ✅ `updateMutableContextRuntime(personaId, interaction, dataProvider)` — 상호작용 타입→카테고리 매핑 + 콘텐츠 요약 생성 + DB 영속화
