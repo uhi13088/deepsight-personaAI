@@ -7,7 +7,7 @@
 // ── 타입 ────────────────────────────────────────────────────
 
 /** 아레나 세션 모드 */
-export type ArenaMode = "SPARRING_1V1"
+export type ArenaMode = "SPARRING_1V1" | "SPARRING_1VN"
 
 /** 프로필 로드 수준 */
 export type ProfileLoadLevel = "FULL" | "STANDARD" | "LITE"
@@ -19,7 +19,7 @@ export type ArenaSessionStatus = "PENDING" | "RUNNING" | "COMPLETED" | "CANCELLE
 export interface ArenaSession {
   id: string
   mode: ArenaMode
-  participants: [string, string] // [personaA, personaB]
+  participants: string[] // [host, opponent1, ...opponentsN] (최소 2명)
   profileLoadLevel: ProfileLoadLevel
   topic: string
   maxTurns: number
@@ -75,7 +75,7 @@ export interface ArenaJudgment {
 /** 세션 생성 파라미터 */
 export interface CreateSessionParams {
   id: string
-  participants: [string, string]
+  participants: string[] // 2~5명
   topic: string
   maxTurns?: number
   budgetTokens?: number
@@ -132,10 +132,11 @@ export function createArenaSession(params: CreateSessionParams): ArenaSession {
     Math.max(params.maxTurns ?? DEFAULT_MAX_TURNS, MIN_TURNS),
     MAX_TURNS_LIMIT
   )
+  const mode: ArenaMode = params.participants.length > 2 ? "SPARRING_1VN" : "SPARRING_1V1"
 
   return {
     id: params.id,
-    mode: "SPARRING_1V1",
+    mode,
     participants: params.participants,
     profileLoadLevel: params.profileLoadLevel ?? "STANDARD",
     topic: params.topic,
@@ -156,6 +157,12 @@ export function startSession(session: ArenaSession): ArenaSession {
   }
   return { ...session, status: "RUNNING" }
 }
+
+/** 최대 참가자 수 */
+export const MAX_PARTICIPANTS = 5
+
+/** 최소 참가자 수 */
+export const MIN_PARTICIPANTS = 2
 
 /** 턴 추가 */
 export function addTurn(
@@ -196,14 +203,14 @@ export function cancelSession(session: ArenaSession): ArenaSession {
   return { ...session, status: "CANCELLED", completedAt: Date.now() }
 }
 
-/** 다음 발화자 결정 */
+/** 다음 발화자 결정 (1:1은 교대, 1:N은 라운드로빈) */
 export function getNextSpeaker(session: ArenaSession): string | null {
   if (session.status !== "RUNNING") return null
   if (session.turns.length >= session.maxTurns) return null
   if (session.usedTokens >= session.budgetTokens) return null
 
-  // 교대로 발화 (첫 번째 참가자 먼저)
-  const idx = session.turns.length % 2
+  const n = session.participants.length
+  const idx = session.turns.length % n
   return session.participants[idx]
 }
 

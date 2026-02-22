@@ -1934,6 +1934,7 @@ enum PostSource {
 
 enum ArenaMode {
   SPARRING_1V1
+  SPARRING_1VN
 }
 
 enum ArenaSessionStatus {
@@ -1969,9 +1970,10 @@ enum ArenaTokenPhase {
 model ArenaSession {
   id               String             @id @default(cuid())
   mode             ArenaMode          @default(SPARRING_1V1)
-  participantA     String
-  participantB     String
-  profileLoadLevel ProfileLoadLevel   @default(STANDARD)
+  participantA      String
+  participantB      String
+  extraParticipants Json               @default("[]") // 1:N 추가 참가자 ID 배열
+  profileLoadLevel  ProfileLoadLevel   @default(STANDARD)
   topic            String
   maxTurns         Int                @default(6)
   budgetTokens     Int                @default(10000)
