@@ -10,7 +10,7 @@ import { useUserStore } from "@/lib/user-store"
 export default function LoginPage() {
   const router = useRouter()
   const { data: session, status: authStatus } = useSession()
-  const { profile, setProfile, completeOnboarding, reset } = useUserStore()
+  const { profile, setProfile, completeOnboarding, reset, restoreFollows } = useUserStore()
   const [nickname, setNickname] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
@@ -104,6 +104,9 @@ export default function LoginPage() {
             createdAt: data.createdAt,
           })
 
+          // 서버에서 팔로우 목록 복원 (reset으로 초기화된 경우 대비)
+          void restoreFollows()
+
           if (data.completedOnboarding) {
             router.push("/feed")
           } else {
@@ -122,7 +125,7 @@ export default function LoginPage() {
         setIsGoogleLoading(false)
       }
     },
-    [isRegistering, setProfile, router]
+    [isRegistering, setProfile, restoreFollows, router]
   )
 
   // NextAuth 세션이 있고 로컬 프로필이 없으면 등록

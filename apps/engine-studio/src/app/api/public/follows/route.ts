@@ -5,6 +5,54 @@ import { notifyFollowed } from "@/lib/persona-world/notification-service"
 import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
+ * GET /api/public/follows?userId=...
+ *
+ * 유저의 팔로우 목록 조회.
+ */
+export async function GET(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
+  try {
+    const userId = request.nextUrl.searchParams.get("userId")
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, error: { code: "INVALID_REQUEST", message: "userId 필요" } },
+        { status: 400 }
+      )
+    }
+
+    const follows = await prisma.personaFollow.findMany({
+      where: { followerUserId: userId },
+      select: {
+        followingPersonaId: true,
+        createdAt: true,
+        followingPersona: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    })
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        follows: follows.map((f) => ({
+          personaId: f.followingPersonaId,
+          personaName: f.followingPersona?.name ?? "페르소나",
+          followedAt: f.createdAt.toISOString(),
+        })),
+      },
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error"
+    console.error("[follows] GET error:", error)
+    return NextResponse.json(
+      { success: false, error: { code: "FOLLOW_ERROR", message } },
+      { status: 500 }
+    )
+  }
+}
+
+/**
  * POST /api/public/follows
  *
  * 팔로우 토글 (유저 또는 페르소나).
