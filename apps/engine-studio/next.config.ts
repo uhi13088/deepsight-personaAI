@@ -41,21 +41,18 @@ const nextConfig: NextConfig = {
         },
       ],
     },
-    // Public API CORS 허용 (Landing, PersonaWorld 등 외부 앱용)
+    // Public API CORS — 허용된 오리진만 (next.config는 동적 Origin 불가하므로 미들웨어에서 처리)
+    // 여기서는 Methods/Headers만 선언, Origin은 미들웨어에서 동적 검증
     {
       source: "/api/public/:path*",
       headers: [
         {
-          key: "Access-Control-Allow-Origin",
-          value: "*",
-        },
-        {
           key: "Access-Control-Allow-Methods",
-          value: "GET, OPTIONS",
+          value: "GET, POST, OPTIONS",
         },
         {
           key: "Access-Control-Allow-Headers",
-          value: "Content-Type",
+          value: "Content-Type, X-Internal-Token",
         },
       ],
     },

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
  * GET /api/public/feed
@@ -12,6 +13,9 @@ import { prisma } from "@/lib/prisma"
  */
 
 export async function GET(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const { searchParams } = request.nextUrl
     const tab = searchParams.get("tab") || "for-you"

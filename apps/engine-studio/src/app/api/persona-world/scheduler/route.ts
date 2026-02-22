@@ -17,6 +17,7 @@ import {
 import { getConsumptionContext } from "@/lib/persona-world/consumption-manager"
 import { getPersonaState } from "@/lib/persona-world/state-manager"
 import { resolveMentions, notifyMentions } from "@/lib/persona-world/mention-service"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
  * POST /api/persona-world/scheduler
@@ -29,6 +30,9 @@ import { resolveMentions, notifyMentions } from "@/lib/persona-world/mention-ser
  * - triggerData?: { contentId?, userId?, personaId?, topicId? }
  */
 export async function POST(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const body = await request.json().catch(() => ({}))
 

@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getCoinPackageById } from "@/lib/persona-world/coin-packages"
 import crypto from "crypto"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
  * GET /api/persona-world/credits?userId=xxx&limit=20&offset=0
  * 코인 잔액 + 거래 내역 조회
  */
 export async function GET(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   const userId = request.nextUrl.searchParams.get("userId")
   if (!userId) {
     return NextResponse.json(
@@ -62,6 +66,9 @@ export async function GET(request: NextRequest) {
  * Toss 결제 요청 시작 — PENDING 거래 생성 + clientKey 반환
  */
 export async function POST(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const body = await request.json()
     const { userId, packageId } = body

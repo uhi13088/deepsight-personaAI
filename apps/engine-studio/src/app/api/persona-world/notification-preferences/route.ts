@@ -4,12 +4,16 @@ import {
   DEFAULT_PREFERENCES,
   type NotificationPreferenceData,
 } from "@/lib/persona-world/notification-preference"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
  * GET /api/persona-world/notification-preferences?userId=xxx
  * 알림 환경설정 조회
  */
 export async function GET(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   const userId = request.nextUrl.searchParams.get("userId")
   if (!userId) {
     return NextResponse.json(
@@ -53,6 +57,9 @@ export async function GET(request: NextRequest) {
  * 알림 환경설정 업데이트 (upsert)
  */
 export async function PUT(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const body = await request.json()
     const { userId, ...updates } = body

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { MemberRole } from "@/generated/prisma"
 import { requireAuth } from "@/lib/require-auth"
+import { getUserOrganization } from "@/lib/get-user-organization"
 
 // Role mapping (frontend → DB)
 const frontendToDbRole: Record<string, MemberRole> = {
@@ -24,11 +25,20 @@ const dbToFrontendRole: Record<MemberRole, string> = {
  * PATCH /api/team/members/:id - 멤버 역할 수정
  */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { response: authRes } = await requireAuth()
+  const { session, response: authRes } = await requireAuth()
   if (authRes) return authRes
 
   try {
     const { id } = await params
+
+    const userMembership = await getUserOrganization(session.user.id)
+    if (!userMembership) {
+      return NextResponse.json(
+        { success: false, error: { code: "FORBIDDEN", message: "조직 접근 권한이 없습니다." } },
+        { status: 403 }
+      )
+    }
+
     const body = await request.json()
     const { role } = body
 
@@ -79,6 +89,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json(
         { success: false, error: { code: "NOT_FOUND", message: "멤버를 찾을 수 없습니다." } },
         { status: 404 }
+      )
+    }
+
+    if (member.organizationId !== userMembership.organizationId) {
+      return NextResponse.json(
+        { success: false, error: { code: "FORBIDDEN", message: "접근 권한이 없습니다." } },
+        { status: 403 }
       )
     }
 
@@ -142,11 +159,19 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { response: authRes } = await requireAuth()
+  const { session, response: authRes } = await requireAuth()
   if (authRes) return authRes
 
   try {
     const { id } = await params
+
+    const userMembership = await getUserOrganization(session.user.id)
+    if (!userMembership) {
+      return NextResponse.json(
+        { success: false, error: { code: "FORBIDDEN", message: "조직 접근 권한이 없습니다." } },
+        { status: 403 }
+      )
+    }
 
     // Find the member
     const member = await prisma.organizationMember.findUnique({
@@ -157,6 +182,13 @@ export async function DELETE(
       return NextResponse.json(
         { success: false, error: { code: "NOT_FOUND", message: "멤버를 찾을 수 없습니다." } },
         { status: 404 }
+      )
+    }
+
+    if (member.organizationId !== userMembership.organizationId) {
+      return NextResponse.json(
+        { success: false, error: { code: "FORBIDDEN", message: "접근 권한이 없습니다." } },
+        { status: 403 }
       )
     }
 

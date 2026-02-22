@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { resolveMentions, parseTextWithMentions } from "@/lib/persona-world/mention-service"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
  * POST /api/persona-world/mentions
@@ -11,6 +12,9 @@ import { resolveMentions, parseTextWithMentions } from "@/lib/persona-world/ment
  * - text: string (필수)
  */
 export async function POST(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const body = await request.json()
     const { text } = body as { text?: string }

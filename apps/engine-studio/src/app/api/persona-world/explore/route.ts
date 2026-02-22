@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
  * GET /api/persona-world/explore
@@ -16,6 +17,9 @@ import { prisma } from "@/lib/prisma"
  * - newPersonas: 신규 페르소나 수 (기본 6)
  */
 export async function GET(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const { searchParams } = request.nextUrl
     const search = searchParams.get("search") || ""

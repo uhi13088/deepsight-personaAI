@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import crypto from "crypto"
 import { requireAuth } from "@/lib/require-auth"
+import { getUserOrganization } from "@/lib/get-user-organization"
 
 const roleMapping: Record<string, "OWNER" | "ADMIN" | "DEVELOPER" | "VIEWER" | "BILLING"> = {
   owner: "OWNER",
@@ -14,7 +15,7 @@ const roleMapping: Record<string, "OWNER" | "ADMIN" | "DEVELOPER" | "VIEWER" | "
  * POST /api/team/invite - 팀원 초대 (DB + 이메일)
  */
 export async function POST(request: NextRequest) {
-  const { response } = await requireAuth()
+  const { session, response } = await requireAuth()
   if (response) return response
 
   try {
@@ -34,8 +35,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get the first organization (TODO: get from session)
-    const organization = await prisma.organization.findFirst()
+    const membership = await getUserOrganization(session.user.id)
+    const organization = membership?.organization ?? null
 
     if (!organization) {
       return NextResponse.json(

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
  * GET /api/persona-world/notifications
@@ -13,6 +14,9 @@ import { prisma } from "@/lib/prisma"
  * - unreadOnly: "true"이면 읽지 않은 알림만
  */
 export async function GET(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const { searchParams } = request.nextUrl
     const userId = searchParams.get("userId")

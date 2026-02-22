@@ -6,6 +6,7 @@ import {
   OAUTH_SUPPORTED_PLATFORMS,
   UPLOAD_ONLY_PLATFORMS,
 } from "@/lib/persona-world/onboarding/sns-oauth"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
  * POST /api/persona-world/onboarding/sns/auth
@@ -22,6 +23,9 @@ import {
  * - method: "oauth" | "upload" (인증 방식)
  */
 export async function POST(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const body = await request.json()
     const { userId, platform, codeChallenge } = body as {

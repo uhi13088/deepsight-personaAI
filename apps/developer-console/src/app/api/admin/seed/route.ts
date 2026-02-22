@@ -3,16 +3,40 @@ import bcrypt from "bcryptjs"
 import prisma from "@/lib/prisma"
 
 async function seedDatabase(secret: string | null) {
-  if (secret !== process.env.SEED_SECRET && secret !== "deepsight-init-2024") {
+  const expectedSecret = process.env.SEED_SECRET
+  if (!expectedSecret) {
+    return NextResponse.json(
+      { success: false, error: { code: "CONFIG_ERROR", message: "SEED_SECRET not configured" } },
+      { status: 500 }
+    )
+  }
+
+  if (secret !== expectedSecret) {
     return NextResponse.json(
       { success: false, error: { code: "UNAUTHORIZED", message: "Invalid secret" } },
       { status: 401 }
     )
   }
 
+  const adminEmail = process.env.SEED_ADMIN_EMAIL
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD
+
+  if (!adminEmail || !adminPassword) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: "CONFIG_ERROR",
+          message: "SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD must be set",
+        },
+      },
+      { status: 500 }
+    )
+  }
+
   // 이미 시드된 경우 스킵
   const existingAdmin = await prisma.user.findUnique({
-    where: { email: "uhi1308@naver.com" },
+    where: { email: adminEmail },
   })
 
   if (existingAdmin) {
@@ -25,19 +49,17 @@ async function seedDatabase(secret: string | null) {
 
   console.log("🌱 Starting database seed...")
 
-  // 관리자 비밀번호 해싱
-  const adminPassword = "Ghrnfldks12!!@"
   const hashedPassword = await bcrypt.hash(adminPassword, 12)
 
   // 관리자 계정 생성
   const admin = await prisma.user.create({
     data: {
-      email: "uhi1308@naver.com",
+      email: adminEmail,
       name: "관리자",
       password: hashedPassword,
     },
   })
-  console.log(`✅ Admin user created: ${admin.email}`)
+  console.log("✅ Admin user created")
 
   // 기본 Organization 생성
   const org = await prisma.organization.create({
@@ -58,7 +80,7 @@ async function seedDatabase(secret: string | null) {
       acceptedAt: new Date(),
     },
   })
-  console.log(`✅ Admin added to organization as OWNER`)
+  console.log("✅ Admin added to organization as OWNER")
 
   console.log("🎉 Database seed completed!")
 
@@ -66,38 +88,16 @@ async function seedDatabase(secret: string | null) {
     success: true,
     message: "Database seeded successfully",
     data: {
-      admin: admin.email,
       organization: org.name,
     },
   })
 }
 
-// GET /api/admin/seed
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const secret = searchParams.get("secret")
-    return await seedDatabase(secret)
-  } catch (error) {
-    console.error("❌ Seed error:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: "SEED_ERROR",
-          message: error instanceof Error ? error.message : "Seed failed",
-        },
-      },
-      { status: 500 }
-    )
-  }
-}
-
-// POST /api/admin/seed
+// POST /api/admin/seed (Authorization 헤더로 시크릿 전달)
 export async function POST(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const secret = searchParams.get("secret")
+    const authHeader = request.headers.get("authorization")
+    const secret = authHeader?.replace("Bearer ", "") || null
     return await seedDatabase(secret)
   } catch (error) {
     console.error("❌ Seed error:", error)

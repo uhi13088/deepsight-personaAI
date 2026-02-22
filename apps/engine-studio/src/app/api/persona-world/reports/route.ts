@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import type { ReportDataProvider, ReportInput } from "@/lib/persona-world/moderation/report-handler"
 import { submitReport } from "@/lib/persona-world/moderation/report-handler"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 // 유효한 카테고리 목록
 const VALID_CATEGORIES = [
@@ -101,6 +102,9 @@ const prismaReportProvider: ReportDataProvider = {
  * 유저 신고 제출
  */
 export async function POST(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const body = await request.json()
     const { userId, targetType, targetId, category, description } = body

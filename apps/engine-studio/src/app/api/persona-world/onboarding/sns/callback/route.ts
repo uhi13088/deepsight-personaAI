@@ -5,6 +5,7 @@ import { analyzeSnsProfile } from "@/lib/persona-world/onboarding/sns-analyzer"
 import { processSnsData } from "@/lib/persona-world/onboarding/sns-processor"
 import type { SNSExtendedData } from "@/lib/persona-world/types"
 import type { Prisma, SNSPlatform } from "@/generated/prisma"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
  * GET /api/persona-world/onboarding/sns/callback
@@ -18,6 +19,9 @@ import type { Prisma, SNSPlatform } from "@/generated/prisma"
  * 6. 프론트엔드로 리다이렉트
  */
 export async function GET(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const { searchParams } = new URL(request.url)
     const code = searchParams.get("code")

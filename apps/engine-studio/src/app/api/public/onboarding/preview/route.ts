@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
  * GET /api/public/onboarding/preview?phase=1&userId=xxx
@@ -38,6 +39,9 @@ const PHASE_CONFIDENCE: Record<number, number> = { 1: 0.65, 2: 0.8, 3: 0.93 }
 const PHASE_TOP_N: Record<number, number> = { 1: 3, 2: 1, 3: 5 }
 
 export async function GET(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const phase = Number(request.nextUrl.searchParams.get("phase") || "1")
     const userId = request.nextUrl.searchParams.get("userId") || ""

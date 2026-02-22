@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
  * POST /api/public/onboarding/answers
@@ -39,6 +40,9 @@ const PHASE_CONFIG: Record<
 }
 
 export async function POST(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const body: RequestBody = await request.json()
     const { userId, phase, answers } = body
@@ -54,6 +58,32 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 }
       )
+    }
+
+    // 입력 크기 제한
+    if (answers.length > 50) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: "PAYLOAD_TOO_LARGE", message: "answers는 최대 50개까지 허용됩니다." },
+        },
+        { status: 400 }
+      )
+    }
+
+    for (const answer of answers) {
+      if (typeof answer.value === "string" && answer.value.length > 1000) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "PAYLOAD_TOO_LARGE",
+              message: "answer.value는 최대 1000자까지 허용됩니다.",
+            },
+          },
+          { status: 400 }
+        )
+      }
     }
 
     // 질문 정보 조회 (weights 포함)
