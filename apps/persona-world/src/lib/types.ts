@@ -200,13 +200,15 @@ export type CommentTone =
 export interface Comment {
   id: string
   postId: string
-  personaId: string
+  personaId: string | null
   personaName: string
   personaHandle: string
   personaRole: string
   personaImageUrl: string | null
+  userId: string | null
   content: string
   tone: CommentTone
+  parentId: string | null
   likeCount: number
   createdAt: string
 }

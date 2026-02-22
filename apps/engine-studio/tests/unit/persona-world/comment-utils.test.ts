@@ -258,7 +258,8 @@ describe("decideCommentTone", () => {
       warmth: 0.2,
       tension: 0.8,
       frequency: 0.5,
-      lastInteractionAt: new Date().toISOString(),
+      depth: 0,
+      lastInteractionAt: new Date(),
     }
     const decision = decideCommentTone(stanceVectors, neutralState, rivalRelation, 0)
     expect(decision.tone).toBe("direct_rebuttal")
@@ -269,7 +270,8 @@ describe("decideCommentTone", () => {
       warmth: 0.85,
       tension: 0.1,
       frequency: 0.8,
-      lastInteractionAt: new Date().toISOString(),
+      depth: 0,
+      lastInteractionAt: new Date(),
     }
     const happyState: PersonaStateData = { ...neutralState, mood: 0.8 }
     const decision = decideCommentTone(baseVectors, happyState, closeRelation, 0)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
  * POST /api/public/onboarding/answers
@@ -39,6 +40,9 @@ const PHASE_CONFIG: Record<
 }
 
 export async function POST(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const body: RequestBody = await request.json()
     const { userId, phase, answers } = body
@@ -54,6 +58,32 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 }
       )
+    }
+
+    // 입력 크기 제한
+    if (answers.length > 50) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: "PAYLOAD_TOO_LARGE", message: "answers는 최대 50개까지 허용됩니다." },
+        },
+        { status: 400 }
+      )
+    }
+
+    for (const answer of answers) {
+      if (typeof answer.value === "string" && answer.value.length > 1000) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "PAYLOAD_TOO_LARGE",
+              message: "answer.value는 최대 1000자까지 허용됩니다.",
+            },
+          },
+          { status: 400 }
+        )
+      }
     }
 
     // 질문 정보 조회 (weights 포함)
@@ -117,23 +147,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 사용자 프로필 upsert
+    // 사용자 프로필 업데이트 (userId = PersonaWorldUser.id)
     const config = PHASE_CONFIG[phase]
 
-    const user = await prisma.personaWorldUser.upsert({
-      where: { email: userId },
-      create: {
-        email: userId,
-        depth: vectorUpdate.depth ?? null,
-        lens: vectorUpdate.lens ?? null,
-        stance: vectorUpdate.stance ?? null,
-        scope: vectorUpdate.scope ?? null,
-        taste: vectorUpdate.taste ?? null,
-        purpose: vectorUpdate.purpose ?? null,
-        profileQuality: config.quality,
-        confidenceScore: config.confidence,
-      },
-      update: {
+    const user = await prisma.personaWorldUser.update({
+      where: { id: userId },
+      data: {
         ...(vectorUpdate.depth !== undefined && { depth: vectorUpdate.depth }),
         ...(vectorUpdate.lens !== undefined && { lens: vectorUpdate.lens }),
         ...(vectorUpdate.stance !== undefined && { stance: vectorUpdate.stance }),

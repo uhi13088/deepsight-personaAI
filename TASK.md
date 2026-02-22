@@ -1035,6 +1035,60 @@
 
 - [x] **T163: Factbook 런타임 연동 — mutableContext 업데이트 파이프라인** ✅ 2026-02-20
 
+### Phase SEC: 보안 감사 수정 (T167~T172)
+
+> 전체 보안 정밀 검사에서 발견된 CRITICAL~MEDIUM 취약점 일괄 수정.
+
+- [x] **T167: [SEC-C1] 하드코딩 자격증명 제거** ✅ 2026-02-22
+  - 배경: seed 라우트에 관리자 비밀번호·이메일·시드 시크릿이 소스코드에 하드코딩됨 (CRITICAL)
+  - AC1: developer-console `admin/seed/route.ts`에서 하드코딩된 비밀번호(`Ghrnfldks12!!@`), 이메일(`uhi1308@naver.com`), 시드 시크릿(`deepsight-init-2024`) 제거 → 환경변수 필수화
+  - AC2: engine-studio `prisma/seed.ts`에서 하드코딩된 비밀번호 fallback 제거 → 환경변수 필수화
+  - AC3: seed GET 핸들러 제거 (POST만 허용), 시크릿을 query param → Authorization 헤더로 변경
+
+- [x] **T168: [SEC-C2] Developer Console 조직 격리 강화** ✅ 2026-02-22
+  - 배경: 6개 라우트에서 `prisma.organization.findFirst()` WHERE 없이 사용 → Cross-Org 접근 가능 (CRITICAL)
+  - AC1: `getUserOrganization(userId)` 헬퍼 함수 생성 (OrganizationMember 기반 조회)
+  - AC2: `team/route.ts`, `team/invite/route.ts`, `billing/route.ts`에 헬퍼 적용
+  - AC3: `api-keys/route.ts`, `billing/toss/success/route.ts`에서 `findFirst()` fallback 제거
+  - AC4: `webhooks/[id]/route.ts` PATCH/DELETE에 조직 소유권 검증 추가
+  - AC5: `team/members/[id]/route.ts` PATCH/DELETE에 조직 소유권 검증 추가
+
+- [x] **T169: [SEC-C3] Toss 웹훅 서명 검증** ✅ 2026-02-22
+  - 배경: 웹훅 엔드포인트에 서명 검증 없이 누구든 결제 상태 변조 가능 (CRITICAL)
+  - AC1: Toss Basic Auth (Base64 시크릿키) 기반 서명 검증 추가
+  - AC2: `TOSS_WEBHOOK_SECRET` 환경변수 필수화
+
+- [x] **T170: [SEC-C4] Public API 인증 가드 — IDOR 방지** ✅ 2026-02-22
+  - 배경: engine-studio public API가 userId를 body에서 받아 인증 없이 사용 → 누구나 다른 유저로 액션 가능 (CRITICAL)
+  - AC1: engine-studio에 `verifyInternalToken()` 유틸리티 생성 (`INTERNAL_API_SECRET` 환경변수)
+  - AC2: persona-world 미들웨어에 API 프록시 경로 인증 + `X-Internal-Token` 헤더 주입
+  - AC3: engine-studio public 라우트 6개에 internal token 검증 적용 (likes, comments, repost, follows, feed, onboarding/answers)
+
+- [x] **T171: [SEC-H1] 입력 검증 강화** ✅ 2026-02-22
+  - 배경: 배열 크기/문자열 길이 무제한으로 DoS 가능 (HIGH)
+  - AC1: `onboarding/answers` 배열 크기 50 제한 + `answer.value` 길이 1000 제한
+  - AC2: developer-console `search` 쿼리 길이 100 제한
+  - AC3: developer-console `login` 이메일 254/비밀번호 128 길이 제한
+  - AC4: `sns/upload` uploadedData 항목 수 10000 제한
+
+- [x] **T172: [SEC-M1] 보안 헤더 + CORS 강화** ✅ 2026-02-22
+  - 배경: CORS 와일드카드, CSP 미설정 (MEDIUM)
+  - AC1: engine-studio CORS에서 와일드카드(`*`) 제거 → 허용 도메인 환경변수화
+  - AC2: 3개 앱에 Content-Security-Policy 헤더 추가
+
+### Phase FIX: 테스트 동기화 (T173)
+
+> 소스 코드 리팩토링 후 미동기화된 테스트 파일 일괄 수정.
+
+- [ ] **T173: 테스트 파일 타입 에러 일괄 수정**
+  - 배경: v3→v4 리팩토링 시 타입 인터페이스/Prisma 스키마가 변경되었으나 테스트 파일이 동기화되지 않아 `pnpm test` 실행 불가
+  - AC1: Prisma import 경로 수정 — `@prisma/client` → `@/generated/prisma` (lifecycle, random-generation, post-type-selector)
+  - AC2: 인터페이스 필드명 동기화 — `vFinal`→`l1/l2/l3`, `basicScore`→`vectorScore` 등 (consumer-journey)
+  - AC3: 제거된 메서드/필드 반영 — `saveActivityLog` 제거 (scheduler), `LLMCallType` import 수정 (cost)
+  - AC4: 타입 불일치 수정 — `string`→`Date`, `number[]`→`[number,number]`, `null`→`undefined` (comment-utils, llm-express-quirks, data-architecture)
+  - AC5: Next.js 16 호환 — `RequestInit.signal` 타입, `NotificationSettings.push` 추가 (api-key-validator, settings-service)
+  - AC6: `pnpm test` 전체 PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)

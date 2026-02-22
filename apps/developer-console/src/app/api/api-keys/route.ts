@@ -1,35 +1,25 @@
 import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
 import prisma from "@/lib/prisma"
-import { auth } from "@/lib/auth"
+import { requireAuth } from "@/lib/require-auth"
+import { getUserOrganization } from "@/lib/get-user-organization"
 
 // GET /api/api-keys - List all API keys
 export async function GET() {
+  const { session, response } = await requireAuth()
+  if (response) return response
+
   try {
-    const session = await auth()
+    const membership = await getUserOrganization(session.user.id)
 
-    // Get organization (use first one for now if no session)
-    let organization
-    if (session?.user?.id) {
-      // Find user's organization membership
-      const membership = await prisma.organizationMember.findFirst({
-        where: { userId: session.user.id },
-        include: { organization: true },
-      })
-      organization = membership?.organization
-    }
-    if (!organization) {
-      organization = await prisma.organization.findFirst()
-    }
-
-    if (!organization) {
+    if (!membership) {
       return NextResponse.json({ apiKeys: [], total: 0 })
     }
 
     // Fetch API keys from database
     const dbApiKeys = await prisma.apiKey.findMany({
       where: {
-        organizationId: organization.id,
+        organizationId: membership.organizationId,
         status: "ACTIVE",
       },
       orderBy: { createdAt: "desc" },
@@ -60,40 +50,13 @@ export async function GET() {
 
 // POST /api/api-keys - Create a new API key
 export async function POST(request: NextRequest) {
+  const { session, response } = await requireAuth()
+  if (response) return response
+
   try {
-    const session = await auth()
+    const membership = await getUserOrganization(session.user.id)
 
-    // Get organization and user
-    let organization
-    let userId: string
-
-    if (session?.user?.id) {
-      // Find user's organization membership
-      const membership = await prisma.organizationMember.findFirst({
-        where: { userId: session.user.id },
-        include: { organization: true },
-      })
-      organization = membership?.organization
-      userId = session.user.id
-    }
-
-    // Fallback for development
-    if (!organization) {
-      organization = await prisma.organization.findFirst()
-    }
-
-    if (!userId!) {
-      const user = await prisma.user.findFirst()
-      if (!user) {
-        return NextResponse.json(
-          { error: { code: "NO_USER", message: "No user found. Please run database seed." } },
-          { status: 400 }
-        )
-      }
-      userId = user.id
-    }
-
-    if (!organization) {
+    if (!membership) {
       return NextResponse.json(
         { error: { code: "NO_ORGANIZATION", message: "No organization found" } },
         { status: 400 }
@@ -143,8 +106,8 @@ export async function POST(request: NextRequest) {
         status: "ACTIVE",
         permissions,
         rateLimit: environment === "live" ? 1000 : 100,
-        userId,
-        organizationId: organization.id,
+        userId: session.user.id,
+        organizationId: membership.organizationId,
       },
     })
 

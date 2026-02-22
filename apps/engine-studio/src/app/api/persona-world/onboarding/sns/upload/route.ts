@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { parseUploadedData } from "@/lib/persona-world/onboarding/sns-analyzer"
 import { processSnsData } from "@/lib/persona-world/onboarding/sns-processor"
+import { verifyInternalToken } from "@/lib/internal-auth"
 import type { SNSExtendedData } from "@/lib/persona-world/types"
 import type { Prisma, SNSPlatform } from "@/generated/prisma"
 
@@ -17,6 +18,9 @@ import type { Prisma, SNSPlatform } from "@/generated/prisma"
  * - uploadedData: Record<string, unknown> (필수 — 파싱된 CSV/JSON 데이터)
  */
 export async function POST(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const body = await request.json()
     const { userId, platform, uploadedData } = body as {
@@ -30,6 +34,35 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error: { code: "INVALID_REQUEST", message: "userId, platform, uploadedData 필요" },
+        },
+        { status: 400 }
+      )
+    }
+
+    // 업로드 데이터 크기 제한: 항목 수 최대 10,000개
+    if (Array.isArray(uploadedData.items) && uploadedData.items.length > 10000) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "PAYLOAD_TOO_LARGE",
+            message: "업로드 데이터는 최대 10,000개 항목까지 허용됩니다.",
+          },
+        },
+        { status: 400 }
+      )
+    }
+
+    // JSON 전체 크기 제한 (5MB)
+    const bodyStr = JSON.stringify(uploadedData)
+    if (bodyStr.length > 5 * 1024 * 1024) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "PAYLOAD_TOO_LARGE",
+            message: "업로드 데이터 크기가 5MB를 초과합니다.",
+          },
         },
         { status: 400 }
       )

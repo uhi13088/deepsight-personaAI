@@ -108,7 +108,7 @@ function makeRawData(overrides: Partial<PersonaRawData> = {}): PersonaRawData {
       activationThresholds: {},
     },
     factbook: makeFactbook(),
-    interactionRules: null,
+    interactionRules: undefined,
     prompts: {
       base: "당신은 리나입니다.",
       review: "비평 프롬프트",

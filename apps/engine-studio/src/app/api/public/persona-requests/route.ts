@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@/generated/prisma"
 import type { ApiResponse } from "@/types"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 /** 하루 최대 생성 요청 수 (인큐베이터 dailyLimit 기본값) */
 const DEFAULT_DAILY_LIMIT = 10
 
 // ── GET: 사용자의 페르소나 요청 상태 조회 ──────────────────────
 export async function GET(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const userId = request.nextUrl.searchParams.get("userId")
     if (!userId) {
@@ -62,6 +66,9 @@ export async function GET(request: NextRequest) {
 
 // ── POST: 페르소나 생성 요청 ─────────────────────────────────
 export async function POST(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const body = await request.json()
     const { userId, userVector, topSimilarity } = body as {

@@ -74,7 +74,6 @@ const makeContext = (overrides?: Partial<SchedulerContext>): SchedulerContext =>
 
 const makeMockProvider = (personas: SchedulerPersona[] = []): SchedulerDataProvider => ({
   getActiveStatusPersonas: vi.fn().mockResolvedValue(personas),
-  saveActivityLog: vi.fn().mockResolvedValue(undefined),
 })
 
 // ═══ decideActivity ═══
@@ -328,7 +327,7 @@ describe("runScheduler", () => {
     }
   })
 
-  it("saveActivityLog가 활성 페르소나마다 호출됨", async () => {
+  it("decision에 paradoxTriggered 필드 포함", async () => {
     const persona = makePersona({
       vectors: makeVectors({
         social: {
@@ -345,15 +344,11 @@ describe("runScheduler", () => {
     const provider = makeMockProvider([persona])
     const context = makeContext({ currentHour: 17 })
 
-    await runScheduler(context, provider)
+    const result = await runScheduler(context, provider)
 
-    if ((provider.saveActivityLog as ReturnType<typeof vi.fn>).mock.calls.length > 0) {
-      expect(provider.saveActivityLog).toHaveBeenCalledWith(
-        expect.objectContaining({
-          personaId: "persona-1",
-          context,
-        })
-      )
+    if (result.activePersonas > 0) {
+      expect(result.decisions[0]).toHaveProperty("paradoxTriggered")
+      expect(typeof result.decisions[0].paradoxTriggered).toBe("boolean")
     }
   })
 

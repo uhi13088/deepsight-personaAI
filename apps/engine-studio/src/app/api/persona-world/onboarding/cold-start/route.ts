@@ -5,6 +5,7 @@ import type { OnboardingDataProvider } from "@/lib/persona-world/onboarding/onbo
 import type { OnboardingQuestion } from "@/lib/persona-world/onboarding/questions"
 import type { OnboardingAnswer, OnboardingResult } from "@/lib/persona-world/types"
 import type { Prisma } from "@/generated/prisma"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
  * POST /api/persona-world/onboarding/cold-start
@@ -17,6 +18,9 @@ import type { Prisma } from "@/generated/prisma"
  * - answers: OnboardingAnswer[] (필수)
  */
 export async function POST(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const body = await request.json()
     const { userId, level, answers } = body as {

@@ -8,6 +8,7 @@ import {
   validateCommentContent,
   MAX_COMMENT_LENGTH,
 } from "@/lib/persona-world/comment-utils"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
  * GET /api/public/posts/[postId]/comments
@@ -130,6 +131,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ postId: string }> }
 ) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const { postId } = await params
     const body = await request.json()

@@ -1,34 +1,39 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { requireAuth } from "@/lib/require-auth"
+import { getUserOrganization } from "@/lib/get-user-organization"
 
 /**
  * GET /api/team - 팀 데이터 조회 (DB 연동)
  */
 export async function GET() {
-  const { response } = await requireAuth()
+  const { session, response } = await requireAuth()
   if (response) return response
 
   try {
-    // TODO: Scope to user's organization via session
-    const organization = await prisma.organization.findFirst({
-      include: {
-        members: {
+    const membership = await getUserOrganization(session.user.id)
+
+    const organization = membership
+      ? await prisma.organization.findUnique({
+          where: { id: membership.organizationId },
           include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                image: true,
-                lastLoginAt: true,
+            members: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    image: true,
+                    lastLoginAt: true,
+                  },
+                },
               },
+              orderBy: { createdAt: "asc" },
             },
           },
-          orderBy: { createdAt: "asc" },
-        },
-      },
-    })
+        })
+      : null
 
     if (!organization) {
       // Return default data if no organization exists

@@ -17,8 +17,11 @@ export default function LoginPage() {
   const [isRegistering, setIsRegistering] = useState(false)
   const [registerError, setRegisterError] = useState<string | null>(null)
 
-  // OAuth 복귀 여부를 마운트 시 1회 캡처 (useEffect 재실행에 안전)
+  // OAuth 복귀 여부를 마운트 시 1회 캡처
+  // Strict Mode에서 ref가 유지되므로 null 체크로 1회만 읽기
   const isOAuthReturnRef = useRef<boolean | null>(null)
+  // signOut 진행 중 플래그 — Hook 3(자동 등록)이 cleanup 중에 실행되지 않도록 방지
+  const isCleaningUpRef = useRef(false)
 
   // 로그인 페이지 진입 시 인증 상태 초기화
   // OAuth 콜백 복귀 시에는 초기화 스킵 (세션 유지 필요)
@@ -26,21 +29,28 @@ export default function LoginPage() {
     if (authStatus === "loading") return // 세션 확인 완료까지 대기
 
     // 마운트 후 첫 실행 시 sessionStorage에서 OAuth 플래그 캡처
+    // Strict Mode 안전: null일 때만 읽고, true면 계속 true 유지
     if (isOAuthReturnRef.current === null) {
       isOAuthReturnRef.current = !!sessionStorage.getItem("pw-oauth-pending")
+      if (isOAuthReturnRef.current) {
+        sessionStorage.removeItem("pw-oauth-pending")
+      }
     }
 
     if (isOAuthReturnRef.current) {
-      sessionStorage.removeItem("pw-oauth-pending")
-      isOAuthReturnRef.current = false
-      return // OAuth 콜백 복귀 → 초기화 스킵
+      return // OAuth 콜백 복귀 → 초기화 스킵 (Strict Mode 2회차에도 유지)
     }
     // 일반 진입 (뒤로가기, 직접 접근 등) → 모든 인증 상태 초기화
+    isCleaningUpRef.current = true
     if (profile) {
       reset()
     }
     if (authStatus === "authenticated") {
-      void signOut({ redirect: false })
+      void signOut({ redirect: false }).finally(() => {
+        isCleaningUpRef.current = false
+      })
+    } else {
+      isCleaningUpRef.current = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authStatus])
@@ -107,7 +117,9 @@ export default function LoginPage() {
   )
 
   // NextAuth 세션이 있고 로컬 프로필이 없으면 등록
+  // cleanup(signOut) 진행 중에는 실행하지 않음 — reset()으로 profile이 null이 되어도 무시
   useEffect(() => {
+    if (isCleaningUpRef.current) return
     if (authStatus === "authenticated" && session?.user?.email && !profile) {
       registerGoogleUser(session.user.email, session.user.name, session.user.image)
     }

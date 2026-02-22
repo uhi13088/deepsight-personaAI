@@ -4,7 +4,7 @@ import {
   computeDailyCostReport,
   computeMonthlyCostReport,
 } from "@/lib/persona-world/cost/usage-tracker"
-import type { LlmUsageLog } from "@/lib/persona-world/cost/usage-tracker"
+import type { LlmUsageLog, LLMCallType } from "@/lib/persona-world/cost/usage-tracker"
 import {
   checkDailyBudget,
   checkMonthlyBudget,

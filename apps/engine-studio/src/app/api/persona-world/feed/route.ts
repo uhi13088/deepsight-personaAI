@@ -6,6 +6,7 @@ import type { RecommendedCandidate } from "@/lib/persona-world/feed/recommended-
 import { cosineSimilarity } from "@/lib/vector/utils"
 import { calculateVFinal } from "@/lib/vector/v-final"
 import type { SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector } from "@/types"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
  * POST /api/persona-world/feed
@@ -20,6 +21,9 @@ import type { SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector }
  * - tab?: string ("for-you" | "following" | "explore")
  */
 export async function POST(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const body = await request.json()
     const { userId, limit, cursor, tab } = body as {

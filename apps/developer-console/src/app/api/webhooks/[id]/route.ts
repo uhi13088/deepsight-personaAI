@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import prisma from "@/lib/prisma"
 import { requireAuth } from "@/lib/require-auth"
+import { getUserOrganization } from "@/lib/get-user-organization"
 
 const updateWebhookSchema = z.object({
   url: z.string().url().optional(),
@@ -15,11 +16,19 @@ const updateWebhookSchema = z.object({
 // ============================================================================
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { response } = await requireAuth()
+  const { session, response } = await requireAuth()
   if (response) return response
 
   try {
     const { id } = await params
+
+    const membership = await getUserOrganization(session.user.id)
+    if (!membership) {
+      return NextResponse.json(
+        { success: false, error: { code: "FORBIDDEN", message: "조직 접근 권한이 없습니다." } },
+        { status: 403 }
+      )
+    }
 
     const webhook = await prisma.webhook.findUnique({
       where: { id },
@@ -36,11 +45,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     if (!webhook) {
       return NextResponse.json(
-        {
-          success: false,
-          error: { code: "NOT_FOUND", message: "Webhook not found" },
-        },
+        { success: false, error: { code: "NOT_FOUND", message: "Webhook not found" } },
         { status: 404 }
+      )
+    }
+
+    if (webhook.organizationId !== membership.organizationId) {
+      return NextResponse.json(
+        { success: false, error: { code: "FORBIDDEN", message: "접근 권한이 없습니다." } },
+        { status: 403 }
       )
     }
 
@@ -108,11 +121,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 // ============================================================================
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { response: authRes } = await requireAuth()
+  const { session, response: authRes } = await requireAuth()
   if (authRes) return authRes
 
   try {
     const { id } = await params
+
+    const membership = await getUserOrganization(session.user.id)
+    if (!membership) {
+      return NextResponse.json(
+        { success: false, error: { code: "FORBIDDEN", message: "조직 접근 권한이 없습니다." } },
+        { status: 403 }
+      )
+    }
+
     const body = await request.json()
     const parsed = updateWebhookSchema.safeParse(body)
 
@@ -134,11 +156,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (!existingWebhook) {
       return NextResponse.json(
-        {
-          success: false,
-          error: { code: "NOT_FOUND", message: "Webhook not found" },
-        },
+        { success: false, error: { code: "NOT_FOUND", message: "Webhook not found" } },
         { status: 404 }
+      )
+    }
+
+    if (existingWebhook.organizationId !== membership.organizationId) {
+      return NextResponse.json(
+        { success: false, error: { code: "FORBIDDEN", message: "접근 권한이 없습니다." } },
+        { status: 403 }
       )
     }
 
@@ -213,11 +239,19 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { response: authRes } = await requireAuth()
+  const { session, response: authRes } = await requireAuth()
   if (authRes) return authRes
 
   try {
     const { id } = await params
+
+    const membership = await getUserOrganization(session.user.id)
+    if (!membership) {
+      return NextResponse.json(
+        { success: false, error: { code: "FORBIDDEN", message: "조직 접근 권한이 없습니다." } },
+        { status: 403 }
+      )
+    }
 
     const existingWebhook = await prisma.webhook.findUnique({
       where: { id },
@@ -225,11 +259,15 @@ export async function DELETE(
 
     if (!existingWebhook) {
       return NextResponse.json(
-        {
-          success: false,
-          error: { code: "NOT_FOUND", message: "Webhook not found" },
-        },
+        { success: false, error: { code: "NOT_FOUND", message: "Webhook not found" } },
         { status: 404 }
+      )
+    }
+
+    if (existingWebhook.organizationId !== membership.organizationId) {
+      return NextResponse.json(
+        { success: false, error: { code: "FORBIDDEN", message: "접근 권한이 없습니다." } },
+        { status: 403 }
       )
     }
 

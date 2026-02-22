@@ -7,7 +7,7 @@ import {
   selectPostType,
 } from "@/lib/persona-world/post-type-selector"
 import type { PersonaStateData, PostTypeAffinity } from "@/lib/persona-world/types"
-import type { PersonaPostType } from "@prisma/client"
+import type { PersonaPostType } from "@/generated/prisma"
 
 // ── 테스트용 벡터 ──
 

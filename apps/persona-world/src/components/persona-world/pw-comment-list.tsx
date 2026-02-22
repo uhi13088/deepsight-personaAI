@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { MessageCircle, Heart, Loader2 } from "lucide-react"
+import { MessageCircle, Heart, Loader2, Send } from "lucide-react"
 import Link from "next/link"
 import { clientApi } from "@/lib/api"
+import { useUserStore } from "@/lib/user-store"
 import { COMMENT_TONE_CONFIG, ROLE_COLORS_BOLD } from "@/lib/role-config"
 import { formatTimeAgo } from "@/lib/format"
 import { parseMentions } from "@/lib/mention-utils"
@@ -15,7 +16,7 @@ interface PWCommentListProps {
 }
 
 /**
- * 댓글 목록 컴포넌트 — 톤 뱃지 포함
+ * 댓글 목록 + 작성 컴포넌트 — 톤 뱃지 포함
  *
  * 포스트 하단에 노출, 댓글 토글 시 API 호출
  */
@@ -24,6 +25,7 @@ export function PWCommentList({ postId, commentCount }: PWCommentListProps) {
   const [comments, setComments] = useState<Comment[]>([])
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [displayCount, setDisplayCount] = useState(commentCount)
 
   const loadComments = useCallback(async () => {
     if (loaded) return
@@ -45,6 +47,11 @@ export function PWCommentList({ postId, commentCount }: PWCommentListProps) {
     }
   }, [open, loaded, loadComments])
 
+  const handleCommentPosted = (newComment: Comment) => {
+    setComments((prev) => [newComment, ...prev])
+    setDisplayCount((c) => c + 1)
+  }
+
   return (
     <div>
       {/* 댓글 토글 버튼 */}
@@ -53,12 +60,16 @@ export function PWCommentList({ postId, commentCount }: PWCommentListProps) {
         className="flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-purple-500"
       >
         <MessageCircle className="h-4 w-4" />
-        <span>{commentCount > 0 ? `댓글 ${commentCount}` : "댓글"}</span>
+        <span>{displayCount > 0 ? `댓글 ${displayCount}` : "댓글"}</span>
       </button>
 
-      {/* 댓글 목록 */}
+      {/* 댓글 영역 */}
       {open && (
         <div className="mt-3 space-y-3">
+          {/* 댓글 입력 */}
+          <CommentInput postId={postId} onPosted={handleCommentPosted} />
+
+          {/* 댓글 목록 */}
           {loading ? (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="h-5 w-5 animate-spin text-purple-500" />
@@ -74,15 +85,78 @@ export function PWCommentList({ postId, commentCount }: PWCommentListProps) {
   )
 }
 
+// ── 댓글 입력 ─────────────────────────────────────────────────
+
+function CommentInput({
+  postId,
+  onPosted,
+}: {
+  postId: string
+  onPosted: (comment: Comment) => void
+}) {
+  const profile = useUserStore((s) => s.profile)
+  const [content, setContent] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+
+  if (!profile) return null
+
+  const handleSubmit = async () => {
+    const trimmed = content.trim()
+    if (!trimmed || submitting) return
+
+    setSubmitting(true)
+    try {
+      const comment = await clientApi.postComment(postId, profile.id, trimmed)
+      onPosted(comment)
+      setContent("")
+    } catch (error) {
+      console.error("Failed to post comment:", error)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-purple-600 text-[10px] font-bold text-white">
+        {profile.nickname.charAt(0)}
+      </div>
+      <div className="flex flex-1 items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5">
+        <input
+          type="text"
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && handleSubmit()}
+          placeholder="댓글을 입력하세요..."
+          maxLength={1000}
+          disabled={submitting}
+          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400"
+        />
+        <button
+          onClick={handleSubmit}
+          disabled={!content.trim() || submitting}
+          className="flex-shrink-0 text-purple-500 disabled:text-gray-300"
+        >
+          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── 댓글 아이템 ───────────────────────────────────────────────
+
 function CommentItem({ comment }: { comment: Comment }) {
   const toneConfig = COMMENT_TONE_CONFIG[comment.tone]
   const gradientClass = ROLE_COLORS_BOLD[comment.personaRole] ?? "from-gray-400 to-gray-500"
+  const isPersona = comment.personaId != null
+  const linkHref = isPersona ? `/persona/${comment.personaId}` : "#"
 
   return (
     <div className="rounded-xl border border-gray-100 bg-white p-3">
       <div className="mb-2 flex items-start gap-2.5">
         {/* 아바타 */}
-        <Link href={`/persona/${comment.personaId}`} className="flex-shrink-0">
+        <Link href={linkHref} className="flex-shrink-0">
           <div
             className={`flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br text-xs font-bold text-white ${gradientClass}`}
           >
@@ -93,10 +167,7 @@ function CommentItem({ comment }: { comment: Comment }) {
         <div className="min-w-0 flex-1">
           {/* 이름 + 톤 뱃지 */}
           <div className="flex items-center gap-2">
-            <Link
-              href={`/persona/${comment.personaId}`}
-              className="text-sm font-medium text-gray-900 hover:underline"
-            >
+            <Link href={linkHref} className="text-sm font-medium text-gray-900 hover:underline">
               {comment.personaName}
             </Link>
             {toneConfig && (

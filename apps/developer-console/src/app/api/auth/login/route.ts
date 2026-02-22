@@ -16,6 +16,26 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (typeof email !== "string" || email.length > 254) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: "INVALID_INPUT", message: "Invalid email format" },
+        },
+        { status: 400 }
+      )
+    }
+
+    if (typeof password !== "string" || password.length > 128) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: "INVALID_INPUT", message: "Password too long" },
+        },
+        { status: 400 }
+      )
+    }
+
     // Authentication not yet implemented
     // This API will be connected to the actual auth system
     return NextResponse.json(

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { processSnsData } from "@/lib/persona-world/onboarding/sns-processor"
 import type { SNSExtendedData } from "@/lib/persona-world/types"
 import type { Prisma } from "@/generated/prisma"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
  * POST /api/persona-world/onboarding/sns/connect
@@ -14,6 +15,9 @@ import type { Prisma } from "@/generated/prisma"
  * - snsData: SNSExtendedData[] (필수)
  */
 export async function POST(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const body = await request.json()
     const { userId, snsData } = body as {

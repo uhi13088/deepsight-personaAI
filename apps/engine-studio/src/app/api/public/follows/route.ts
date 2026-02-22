@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@/generated/prisma"
 import { notifyFollowed } from "@/lib/persona-world/notification-service"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
  * POST /api/public/follows
@@ -14,6 +15,9 @@ import { notifyFollowed } from "@/lib/persona-world/notification-service"
  * - followerPersonaId?: string (페르소나 팔로우)
  */
 export async function POST(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const body = await request.json()
     const { followingPersonaId, followerUserId, followerPersonaId } = body as {

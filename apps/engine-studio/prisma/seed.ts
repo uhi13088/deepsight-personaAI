@@ -11,20 +11,26 @@ const prisma = new PrismaClient()
 async function main() {
   console.log("🌱 Starting database seed...")
 
-  // 관리자 비밀번호 (환경변수 또는 기본값)
-  const adminPassword = process.env.ADMIN_PASSWORD || "Ghrnfldks12!!@"
+  // 관리자 비밀번호 (환경변수 필수)
+  const adminEmail = process.env.SEED_ADMIN_EMAIL
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD
+
+  if (!adminEmail || !adminPassword) {
+    throw new Error("SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD environment variables are required")
+  }
+
   const hashedPassword = await bcrypt.hash(adminPassword, 12)
 
   // 관리자 계정 생성
   const admin = await prisma.user.upsert({
-    where: { email: "uhi1308@naver.com" },
+    where: { email: adminEmail },
     update: {
       password: hashedPassword,
       role: "ADMIN",
       isActive: true,
     },
     create: {
-      email: "uhi1308@naver.com",
+      email: adminEmail,
       name: "관리자",
       password: hashedPassword,
       role: "ADMIN",

@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
  * POST /api/persona-world/credits/toss-confirm
  * Toss Payments 결제 승인 확인
  */
 export async function POST(request: NextRequest) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
   try {
     const body = await request.json()
     const { paymentKey, orderId, amount } = body
