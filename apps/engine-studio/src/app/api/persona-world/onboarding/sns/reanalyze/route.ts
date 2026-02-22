@@ -3,10 +3,13 @@ import { prisma } from "@/lib/prisma"
 import { processSnsDataWithLlm } from "@/lib/persona-world/onboarding/sns-processor"
 import type { SNSExtendedData } from "@/lib/persona-world/types"
 import type { Prisma } from "@/generated/prisma"
-import { verifyInternalToken } from "@/lib/internal-auth"
+import { verifyInternalToken, verifyUserOwnership } from "@/lib/internal-auth"
 
 /** SNS 재분석 비용 (코인) */
 const REANALYSIS_COST = 5
+
+/** 재분석 최소 간격 (밀리초) — 5분 */
+const REANALYSIS_COOLDOWN_MS = 5 * 60 * 1000
 
 /**
  * POST /api/persona-world/onboarding/sns/reanalyze
@@ -14,6 +17,8 @@ const REANALYSIS_COST = 5
  * SNS 데이터를 Claude Sonnet으로 재분석.
  * - 최초 1회는 무료 (snsAnalysisCount === 0)
  * - 이후 재분석은 크레딧 차감
+ * - 유저 소유권 검증 (x-authenticated-email)
+ * - 재분석 간격 제한 (5분)
  *
  * Body:
  * - userId: string
@@ -35,6 +40,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    // 소유권 검증: 요청자 본인의 데이터만 접근 가능
+    const ownershipError = await verifyUserOwnership(request, userId)
+    if (ownershipError) return ownershipError
 
     // 1. 유저 조회
     const user = await prisma.personaWorldUser.findUnique({
@@ -63,7 +72,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 2. 크레딧 차감 (최초 1회는 무료)
+    // 2. 재분석 간격 제한 (5분) — 남용 방지
+    const lastReanalysis = await prisma.coinTransaction.findFirst({
+      where: { userId, reason: { contains: "SNS 재분석" } },
+      orderBy: { createdAt: "desc" },
+    })
+    if (lastReanalysis) {
+      const elapsed = Date.now() - lastReanalysis.createdAt.getTime()
+      if (elapsed < REANALYSIS_COOLDOWN_MS) {
+        const remainingSec = Math.ceil((REANALYSIS_COOLDOWN_MS - elapsed) / 1000)
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "RATE_LIMITED",
+              message: `재분석은 ${remainingSec}초 후에 가능합니다`,
+            },
+            data: { retryAfterSeconds: remainingSec },
+          },
+          { status: 429 }
+        )
+      }
+    }
+
+    // 3. 크레딧 차감 (최초 1회는 무료)
     const isFirstAnalysis = user.snsAnalysisCount === 0
     let creditUsed = 0
     let remainingBalance = 0
@@ -105,7 +137,7 @@ export async function POST(request: NextRequest) {
       remainingBalance = currentBalance - REANALYSIS_COST
     }
 
-    // 3. 기존 SNS 연결 데이터 조회
+    // 4. 기존 SNS 연결 데이터 조회
     const connections = await prisma.sNSConnection.findMany({
       where: { userId },
       select: {
@@ -125,14 +157,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 4. SNSExtendedData 구성
+    // 5. SNSExtendedData 구성
     const snsDataList: SNSExtendedData[] = connections.map((conn) => ({
       platform: conn.platform,
       profileData: (conn.profileData ?? {}) as Record<string, unknown>,
       extractedData: (conn.extractedData ?? {}) as Record<string, unknown>,
     }))
 
-    // 5. 기존 벡터 구성
+    // 6. 기존 벡터 구성
     const latestSurvey = await prisma.pWUserSurveyResponse.findFirst({
       where: { userId, completedAt: { not: null } },
       orderBy: { createdAt: "desc" },
@@ -165,15 +197,46 @@ export async function POST(request: NextRequest) {
         }
       : undefined
 
-    // 6. Claude Sonnet으로 재분석
+    // 7. Claude Sonnet으로 재분석
     const result = await processSnsDataWithLlm(snsDataList, existingVector)
 
-    // 7. DB 업데이트
+    // 8. DB 업데이트 — 벡터 + LLM 분석 결과를 snsExtendedData에 보존
+    const existingSnsData = (
+      await prisma.personaWorldUser.findUnique({
+        where: { id: userId },
+        select: { snsExtendedData: true },
+      })
+    )?.snsExtendedData as Record<string, unknown> | null
+
+    const updatedSnsExtendedData = {
+      ...(existingSnsData ?? {}),
+      platforms: {
+        ...((existingSnsData?.platforms as Record<string, unknown>) ?? {}),
+        ...Object.fromEntries(
+          snsDataList.map((d) => [
+            d.platform.toLowerCase(),
+            {
+              extractedData: d.extractedData,
+              analyzedAt: new Date().toISOString(),
+            },
+          ])
+        ),
+      },
+      llmAnalysis: {
+        summary: result.llmSummary ?? null,
+        traits: result.llmTraits ?? [],
+        confidence: result.confidence,
+        analyzedAt: new Date().toISOString(),
+      },
+    }
+
     await prisma.personaWorldUser.update({
       where: { id: userId },
       data: {
         profileQuality: result.profileLevel,
+        confidenceScore: result.confidence,
         snsAnalysisCount: { increment: 1 },
+        snsExtendedData: updatedSnsExtendedData as Prisma.InputJsonValue,
         ...(result.l1Vector
           ? {
               depth: result.l1Vector.depth,
@@ -235,6 +298,10 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     )
   }
+
+  // 소유권 검증: 요청자 본인의 비용 정보만 조회 가능
+  const ownershipError = await verifyUserOwnership(request, userId)
+  if (ownershipError) return ownershipError
 
   const user = await prisma.personaWorldUser.findUnique({
     where: { id: userId },

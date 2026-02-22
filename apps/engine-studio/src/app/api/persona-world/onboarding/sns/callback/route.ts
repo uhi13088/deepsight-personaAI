@@ -133,11 +133,38 @@ export async function GET(request: NextRequest) {
     })
 
     // 8. DB 저장 — PersonaWorldUser 프로필 업데이트 + 분석 횟수 증가
+    // snsExtendedData: LLM 분석 결과(요약·키워드) + 플랫폼별 추출 데이터 보존
+    const existingSnsData = (
+      await prisma.personaWorldUser.findUnique({
+        where: { id: userId },
+        select: { snsExtendedData: true },
+      })
+    )?.snsExtendedData as Record<string, unknown> | null
+
+    const updatedSnsExtendedData = {
+      ...(existingSnsData ?? {}),
+      platforms: {
+        ...((existingSnsData?.platforms as Record<string, unknown>) ?? {}),
+        [platform.toLowerCase()]: {
+          extractedData: snsData.extractedData,
+          analyzedAt: new Date().toISOString(),
+        },
+      },
+      llmAnalysis: {
+        summary: result.llmSummary ?? null,
+        traits: result.llmTraits ?? [],
+        confidence: result.confidence,
+        analyzedAt: new Date().toISOString(),
+      },
+    }
+
     await prisma.personaWorldUser.update({
       where: { id: userId },
       data: {
         profileQuality: result.profileLevel,
+        confidenceScore: result.confidence,
         snsAnalysisCount: { increment: 1 },
+        snsExtendedData: updatedSnsExtendedData as Prisma.InputJsonValue,
         ...(result.l1Vector
           ? {
               depth: result.l1Vector.depth,

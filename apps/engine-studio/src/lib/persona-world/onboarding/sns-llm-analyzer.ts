@@ -93,6 +93,39 @@ export async function analyzeSnsWithLlm(
   return parseAnalysisResponse(result.text)
 }
 
+// ── 입력 데이터 sanitize ────────────────────────────────────
+
+/** 단일 문자열 길이 제한 */
+const MAX_FIELD_LENGTH = 200
+/** 배열 항목 최대 수 */
+const MAX_ARRAY_ITEMS = 15
+/** 팔로우 그룹 최대 수 */
+const MAX_FOLLOW_GROUPS = 5
+
+/**
+ * 문자열에서 제어 문자·프롬프트 인젝션 패턴 제거 + 길이 제한.
+ */
+function sanitizeText(text: string, maxLen = MAX_FIELD_LENGTH): string {
+  return (
+    text
+      // 제어 문자 제거 (탭·줄바꿈 제외)
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+      // 마크다운 헤딩/코드블록/지시문 패턴 무력화
+      .replace(/^#{1,6}\s/gm, "")
+      .replace(/```/g, "")
+      .replace(/<\/?[a-zA-Z][^>]*>/g, "")
+      .trim()
+      .slice(0, maxLen)
+  )
+}
+
+/**
+ * 문자열 배열 sanitize — 각 항목 길이 제한 + 최대 수 제한.
+ */
+function sanitizeArray(arr: string[], maxItems = MAX_ARRAY_ITEMS): string[] {
+  return arr.slice(0, maxItems).map((s) => sanitizeText(s, 100))
+}
+
 // ── 유저 메시지 빌드 ────────────────────────────────────────
 
 function buildUserMessage(
@@ -104,54 +137,59 @@ function buildUserMessage(
 ): string {
   const sections: string[] = []
 
-  sections.push(`## 분석 대상: ${profiles.length}개 플랫폼 SNS 데이터\n`)
+  sections.push(`## 분석 대상: ${Math.min(profiles.length, 5)}개 플랫폼 SNS 데이터\n`)
 
-  for (const profile of profiles) {
-    sections.push(`### ${profile.platform}`)
-    sections.push(`추출 시각: ${profile.extractedAt}\n`)
+  // 플랫폼 수 제한 (최대 5개)
+  for (const profile of profiles.slice(0, 5)) {
+    sections.push(`### ${sanitizeText(profile.platform, 30)}`)
+    sections.push(`추출 시각: ${sanitizeText(profile.extractedAt, 30)}\n`)
 
     // 취향
     if (profile.specificTastes.favoriteGenres.length > 0) {
-      sections.push(`선호 장르: ${profile.specificTastes.favoriteGenres.join(", ")}`)
+      sections.push(`선호 장르: ${sanitizeArray(profile.specificTastes.favoriteGenres).join(", ")}`)
     }
     if (profile.specificTastes.favoriteMovies.length > 0) {
-      sections.push(`선호 작품: ${profile.specificTastes.favoriteMovies.slice(0, 15).join(", ")}`)
+      sections.push(`선호 작품: ${sanitizeArray(profile.specificTastes.favoriteMovies).join(", ")}`)
     }
 
     // 활동 패턴
-    sections.push(`활동 빈도: ${profile.activityPattern.frequency}`)
+    sections.push(`활동 빈도: ${sanitizeText(profile.activityPattern.frequency, 50)}`)
     sections.push(`콘텐츠 소비량: ${profile.activityPattern.contentConsumptionRate}`)
     if (profile.activityPattern.peakHours.length > 0) {
-      sections.push(`활동 피크 시간: ${profile.activityPattern.peakHours.join(", ")}시`)
+      sections.push(
+        `활동 피크 시간: ${profile.activityPattern.peakHours.slice(0, 24).join(", ")}시`
+      )
     }
 
     // 표현 스타일
     if (profile.expressionStyle.emojiUsage) {
-      sections.push(`이모지 사용: ${profile.expressionStyle.emojiUsage}`)
+      sections.push(`이모지 사용: ${sanitizeText(profile.expressionStyle.emojiUsage, 50)}`)
     }
     if (profile.expressionStyle.averagePostLength) {
-      sections.push(`글 길이: ${profile.expressionStyle.averagePostLength}`)
+      sections.push(`글 길이: ${sanitizeText(profile.expressionStyle.averagePostLength, 50)}`)
     }
     if (profile.expressionStyle.sentimentTone) {
-      sections.push(`감정 톤: ${profile.expressionStyle.sentimentTone}`)
+      sections.push(`감정 톤: ${sanitizeText(profile.expressionStyle.sentimentTone, 50)}`)
     }
 
     // 소셜 성향
     if (profile.socialBehavior) {
-      sections.push(`참여 수준: ${profile.socialBehavior.engagementLevel}`)
-      sections.push(`상호작용 스타일: ${profile.socialBehavior.interactionStyle}`)
+      sections.push(`참여 수준: ${sanitizeText(profile.socialBehavior.engagementLevel, 50)}`)
+      sections.push(`상호작용 스타일: ${sanitizeText(profile.socialBehavior.interactionStyle, 50)}`)
     }
 
     // 관심사
     if (profile.interests.hashtags.length > 0) {
-      sections.push(`해시태그: ${profile.interests.hashtags.slice(0, 15).join(", ")}`)
+      sections.push(`해시태그: ${sanitizeArray(profile.interests.hashtags).join(", ")}`)
     }
     if (profile.interests.mentionedKeywords.length > 0) {
-      sections.push(`키워드: ${profile.interests.mentionedKeywords.slice(0, 15).join(", ")}`)
+      sections.push(`키워드: ${sanitizeArray(profile.interests.mentionedKeywords).join(", ")}`)
     }
     if (profile.interests.followedAccounts.length > 0) {
-      for (const group of profile.interests.followedAccounts) {
-        sections.push(`팔로우 (${group.category}): ${group.names.slice(0, 10).join(", ")}`)
+      for (const group of profile.interests.followedAccounts.slice(0, MAX_FOLLOW_GROUPS)) {
+        sections.push(
+          `팔로우 (${sanitizeText(group.category, 30)}): ${sanitizeArray(group.names, 10).join(", ")}`
+        )
       }
     }
 
