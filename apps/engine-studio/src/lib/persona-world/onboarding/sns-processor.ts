@@ -2,11 +2,15 @@
 // PersonaWorld v3 — SNS Data Processor
 // 구현계획서 §8, 설계서 §9.3
 // SNS 데이터 → Init 알고리즘 → L1/L2 벡터 생성
+// LLM 분석 옵션: Claude Sonnet으로 심층 분석 가능
 // ═══════════════════════════════════════════════════════════════
 
 import type { SocialPersonaVector, CoreTemperamentVector } from "@/types/persona-v3"
 import type { SNSExtendedData, OnboardingResult } from "../types"
 import { calculateInitDelta } from "@/lib/interaction/init-algorithm"
+import { analyzeSnsWithLlm, type SnsLlmAnalysisResult } from "./sns-llm-analyzer"
+import type { SnsExtractedProfile } from "./sns-analyzer"
+import { isLLMConfigured } from "@/lib/llm-client"
 
 /**
  * SNS 데이터 프로바이더 (DI).
@@ -114,6 +118,113 @@ export async function processSnsData(
   )
 
   return { l1Vector, l2Vector, profileLevel, confidence }
+}
+
+// ── LLM 분석 결과 타입 (외부 노출용) ────────────────────────
+
+export interface SnsProcessResultWithLlm extends OnboardingResult {
+  /** LLM 분석 요약 (한국어) */
+  llmSummary?: string
+  /** LLM이 추출한 성향 키워드 */
+  llmTraits?: string[]
+}
+
+/**
+ * SNS 데이터를 Claude Sonnet으로 심층 분석하여 벡터 생성.
+ *
+ * 규칙 기반 결과(30%)와 LLM 결과(70%)를 블렌딩하여
+ * 더 정확한 벡터를 산출함.
+ *
+ * LLM 호출 실패 시 규칙 기반 결과로 fallback.
+ */
+export async function processSnsDataWithLlm(
+  snsData: SNSExtendedData[],
+  existingVector?: { l1: SocialPersonaVector; l2?: CoreTemperamentVector }
+): Promise<SnsProcessResultWithLlm> {
+  // 규칙 기반 결과 먼저 계산 (fallback용)
+  const ruleResult = await processSnsData(snsData, existingVector)
+
+  // LLM 미설정 시 규칙 기반만 반환
+  if (!isLLMConfigured()) {
+    console.warn("[sns-processor] ANTHROPIC_API_KEY 미설정 — 규칙 기반 분석만 사용")
+    return ruleResult
+  }
+
+  // extractedData를 SnsExtractedProfile로 변환
+  const extractedProfiles: SnsExtractedProfile[] = snsData
+    .map((d) => d.extractedData as unknown as SnsExtractedProfile)
+    .filter((p) => p?.platform)
+
+  if (extractedProfiles.length === 0) {
+    return ruleResult
+  }
+
+  let llmResult: SnsLlmAnalysisResult
+  try {
+    llmResult = await analyzeSnsWithLlm(extractedProfiles, {
+      l1: existingVector?.l1,
+      l2: existingVector?.l2,
+    })
+  } catch (error) {
+    console.error("[sns-processor] LLM 분석 실패, 규칙 기반 fallback:", error)
+    return ruleResult
+  }
+
+  // 블렌딩: 규칙 기반 30% + LLM 70%
+  const RULE_WEIGHT = 0.3
+  const LLM_WEIGHT = 0.7
+
+  const l1Vector = blendL1(ruleResult.l1Vector, llmResult.l1, RULE_WEIGHT, LLM_WEIGHT)
+  const l2Vector = blendL2(ruleResult.l2Vector ?? L2_BASE, llmResult.l2, RULE_WEIGHT, LLM_WEIGHT)
+
+  // LLM 신뢰도가 높으면 confidence 부스트
+  const confidence = Math.min(
+    0.98,
+    ruleResult.confidence * RULE_WEIGHT + llmResult.confidence * LLM_WEIGHT + 0.05
+  )
+
+  return {
+    l1Vector,
+    l2Vector,
+    profileLevel: ruleResult.profileLevel,
+    confidence,
+    llmSummary: llmResult.summary,
+    llmTraits: llmResult.traits,
+  }
+}
+
+/** L1 벡터 블렌딩 */
+function blendL1(
+  rule: SocialPersonaVector,
+  llm: SocialPersonaVector,
+  rw: number,
+  lw: number
+): SocialPersonaVector {
+  return {
+    depth: clamp(rule.depth * rw + llm.depth * lw),
+    lens: clamp(rule.lens * rw + llm.lens * lw),
+    stance: clamp(rule.stance * rw + llm.stance * lw),
+    scope: clamp(rule.scope * rw + llm.scope * lw),
+    taste: clamp(rule.taste * rw + llm.taste * lw),
+    purpose: clamp(rule.purpose * rw + llm.purpose * lw),
+    sociability: clamp(rule.sociability * rw + llm.sociability * lw),
+  }
+}
+
+/** L2 벡터 블렌딩 */
+function blendL2(
+  rule: CoreTemperamentVector,
+  llm: CoreTemperamentVector,
+  rw: number,
+  lw: number
+): CoreTemperamentVector {
+  return {
+    openness: clamp(rule.openness * rw + llm.openness * lw),
+    conscientiousness: clamp(rule.conscientiousness * rw + llm.conscientiousness * lw),
+    extraversion: clamp(rule.extraversion * rw + llm.extraversion * lw),
+    agreeableness: clamp(rule.agreeableness * rw + llm.agreeableness * lw),
+    neuroticism: clamp(rule.neuroticism * rw + llm.neuroticism * lw),
+  }
 }
 
 /**

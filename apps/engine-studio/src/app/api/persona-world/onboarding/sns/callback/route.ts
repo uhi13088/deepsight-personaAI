@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { exchangeCodeForToken, validateState } from "@/lib/persona-world/onboarding/sns-oauth"
 import { analyzeSnsProfile } from "@/lib/persona-world/onboarding/sns-analyzer"
-import { processSnsData } from "@/lib/persona-world/onboarding/sns-processor"
+import { processSnsDataWithLlm } from "@/lib/persona-world/onboarding/sns-processor"
 import type { SNSExtendedData } from "@/lib/persona-world/types"
 import type { Prisma, SNSPlatform } from "@/generated/prisma"
 import { verifyInternalToken } from "@/lib/internal-auth"
@@ -88,6 +88,7 @@ export async function GET(request: NextRequest) {
         agreeableness: true,
         neuroticism: true,
         hasOceanProfile: true,
+        snsAnalysisCount: true,
       },
     })
 
@@ -99,8 +100,8 @@ export async function GET(request: NextRequest) {
 
     const existingVector = buildExistingVector(latestSurvey?.computedVector, user)
 
-    // 6. sns-processor로 벡터 생성/보정
-    const result = await processSnsData([snsData], existingVector)
+    // 6. Claude Sonnet으로 심층 분석 (최초 1회 무료)
+    const result = await processSnsDataWithLlm([snsData], existingVector)
 
     // 7. DB 저장 — SNSConnection
     const expiresAt = tokenResult.expiresIn
@@ -131,11 +132,22 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // 8. DB 저장 — PersonaWorldUser 프로필 업데이트
+    // 8. DB 저장 — PersonaWorldUser 프로필 업데이트 + 분석 횟수 증가
     await prisma.personaWorldUser.update({
       where: { id: userId },
       data: {
         profileQuality: result.profileLevel,
+        snsAnalysisCount: { increment: 1 },
+        ...(result.l1Vector
+          ? {
+              depth: result.l1Vector.depth,
+              lens: result.l1Vector.lens,
+              stance: result.l1Vector.stance,
+              scope: result.l1Vector.scope,
+              taste: result.l1Vector.taste,
+              purpose: result.l1Vector.purpose,
+            }
+          : {}),
         ...(result.l2Vector
           ? {
               openness: result.l2Vector.openness,
@@ -150,9 +162,14 @@ export async function GET(request: NextRequest) {
     })
 
     // 9. 프론트엔드로 리다이렉트 (성공)
-    return NextResponse.redirect(
-      `${redirectBase}?sns_connected=${platform.toLowerCase()}&level=${result.profileLevel}`
-    )
+    const params = new URLSearchParams({
+      sns_connected: platform.toLowerCase(),
+      level: result.profileLevel,
+    })
+    if (result.llmSummary) {
+      params.set("sns_summary", result.llmSummary)
+    }
+    return NextResponse.redirect(`${redirectBase}?${params.toString()}`)
   } catch (error) {
     console.error("[persona-world/sns/callback] Error:", error)
     const message = error instanceof Error ? error.message : "Unknown error"

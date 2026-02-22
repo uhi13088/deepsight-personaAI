@@ -1310,6 +1310,9 @@ model PersonaWorldUser {
   // === SNS 확장 데이터 (JSON) ===
   snsExtendedData Json?           // 플랫폼별 확장 데이터
 
+  // === SNS LLM 분석 횟수 (최초 1회 무료, 이후 크레딧 차감) ===
+  snsAnalysisCount Int             @default(0) @map("sns_analysis_count")
+
   // === 선호도 ===
   preferences     Json?           // favoriteGenres, warmthPreference 등
 

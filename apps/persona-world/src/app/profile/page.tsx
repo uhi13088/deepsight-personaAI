@@ -25,6 +25,8 @@ import {
   Check,
   X,
   Shield,
+  RefreshCw,
+  Brain,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -57,6 +59,13 @@ export default function ProfilePage() {
   const [showSnsConnect, setShowSnsConnect] = useState(false)
   const [dailyAnswered, setDailyAnswered] = useState(false)
   const [consentProvider, setConsentProvider] = useState<SnsProvider | null>(null)
+  const [reanalyzing, setReanalyzing] = useState(false)
+  const [reanalysisResult, setReanalysisResult] = useState<{
+    llmSummary?: string
+    llmTraits?: string[]
+    creditUsed: number
+    isFirstFree: boolean
+  } | null>(null)
 
   // SNS OAuth 콜백 결과 처리
   useEffect(() => {
@@ -67,12 +76,23 @@ export default function ProfilePage() {
       const config = SNS_PROVIDER_CONFIG[connected]
       if (config) {
         connectSns(connected as SnsProvider, `${connected}_oauth`)
-        toast.success(`${config.label} 연동 및 분석이 완료되었습니다!`)
+        const summary = params.get("sns_summary")
+        if (summary) {
+          toast.success(`${config.label} 연동 완료! AI 분석이 적용되었습니다`)
+          setReanalysisResult({
+            llmSummary: decodeURIComponent(summary),
+            creditUsed: 0,
+            isFirstFree: true,
+          })
+        } else {
+          toast.success(`${config.label} 연동 및 분석이 완료되었습니다!`)
+        }
       }
       // URL 정리
       const url = new URL(window.location.href)
       url.searchParams.delete("sns_connected")
       url.searchParams.delete("level")
+      url.searchParams.delete("sns_summary")
       window.history.replaceState({}, "", url.pathname)
     }
     if (snsError) {
@@ -192,6 +212,33 @@ export default function ProfilePage() {
     },
     [profile?.id, connectSns, disconnectSns, setSnsAnalyzing]
   )
+
+  // SNS 재분석 (Claude Sonnet)
+  const handleReanalyze = useCallback(async () => {
+    const userId = profile?.id
+    if (!userId) return
+
+    setReanalyzing(true)
+    setReanalysisResult(null)
+    try {
+      const result = await clientApi.reanalyzeSns(userId)
+      setReanalysisResult({
+        llmSummary: result.llmSummary,
+        llmTraits: result.llmTraits,
+        creditUsed: result.creditUsed,
+        isFirstFree: result.isFirstFree,
+      })
+      if (result.isFirstFree) {
+        toast.success("AI 심층 분석이 완료되었습니다! (무료)")
+      } else {
+        toast.success(`AI 심층 분석 완료 (${result.creditUsed} 코인 사용)`)
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "재분석에 실패했습니다")
+    } finally {
+      setReanalyzing(false)
+    }
+  }, [profile?.id])
 
   const handleSnsDisconnect = useCallback(
     (provider: SnsProvider) => {
@@ -618,6 +665,63 @@ export default function ProfilePage() {
                   </div>
                 )
               })}
+              {/* SNS AI 재분석 버튼 */}
+              {snsConnections.some((c) => c.connected) && (
+                <div className="mt-3 rounded-lg border border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Brain className="h-4 w-4 text-purple-500" />
+                      <span className="text-sm font-medium text-gray-900">AI 심층 분석</span>
+                    </div>
+                    <PWButton
+                      size="sm"
+                      variant="outline"
+                      onClick={handleReanalyze}
+                      disabled={reanalyzing}
+                      className="!border-purple-300 !text-purple-700 hover:!bg-purple-100"
+                    >
+                      {reanalyzing ? (
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      ) : (
+                        <RefreshCw className="mr-1 h-3 w-3" />
+                      )}
+                      {reanalyzing ? "분석 중..." : "재분석"}
+                    </PWButton>
+                  </div>
+                  <p className="mt-1.5 text-xs text-gray-500">
+                    Claude Sonnet이 SNS 데이터를 심층 분석합니다 · 최초 1회 무료, 이후 5 코인
+                  </p>
+                </div>
+              )}
+
+              {/* 재분석 결과 표시 */}
+              {reanalysisResult?.llmSummary && (
+                <div className="mt-3 rounded-lg border border-green-200 bg-green-50/50 p-3">
+                  <div className="mb-1.5 flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-green-600" />
+                    <span className="text-xs font-medium text-green-700">AI 분석 결과</span>
+                    {reanalysisResult.isFirstFree && (
+                      <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] text-green-600">
+                        무료
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-700">{reanalysisResult.llmSummary}</p>
+                  {reanalysisResult.llmTraits && reanalysisResult.llmTraits.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {reanalysisResult.llmTraits.map((trait) => (
+                        <span
+                          key={trait}
+                          className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700"
+                        >
+                          {trait}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <p className="pt-2 text-center text-xs text-gray-400">
                 연동할수록 정밀도가 높아져요 — 1개: +2~3% | 2개+: +4~5% (교차검증)
               </p>
