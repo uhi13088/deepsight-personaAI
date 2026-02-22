@@ -20,32 +20,31 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get("sortBy")
 
     const activeStatuses = ["ACTIVE", "STANDARD"] as const
-
-    // 전체 활성 페르소나 수
-    const total = await prisma.persona.count({
-      where: { status: { in: [...activeStatuses] } },
-    })
-
-    // 팔로워순: _count 기반 정렬
     const isByFollowers = sortBy === "followers"
 
-    const personas = await prisma.persona.findMany({
-      where: { status: { in: [...activeStatuses] } },
-      select: {
-        id: true,
-        name: true,
-        handle: true,
-        tagline: true,
-        role: true,
-        expertise: true,
-        profileImageUrl: true,
-        warmth: true,
-        archetypeId: true,
-        _count: { select: { followers: true } },
-      },
-      orderBy: isByFollowers ? { followers: { _count: "desc" } } : { createdAt: "desc" },
-      take: limit,
-    })
+    // count + findMany 병렬 실행
+    const [total, personas] = await Promise.all([
+      prisma.persona.count({
+        where: { status: { in: [...activeStatuses] } },
+      }),
+      prisma.persona.findMany({
+        where: { status: { in: [...activeStatuses] } },
+        select: {
+          id: true,
+          name: true,
+          handle: true,
+          tagline: true,
+          role: true,
+          expertise: true,
+          profileImageUrl: true,
+          warmth: true,
+          archetypeId: true,
+          _count: { select: { followers: true } },
+        },
+        orderBy: isByFollowers ? { followers: { _count: "desc" } } : { createdAt: "desc" },
+        take: limit,
+      }),
+    ])
 
     const data = {
       personas: personas.map((p) => ({

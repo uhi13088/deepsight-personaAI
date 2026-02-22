@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react"
 import {
   PWLogoWithText,
   PWCard,
@@ -98,13 +98,50 @@ export default function FeedPage() {
   const observerRef = useRef<IntersectionObserver | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
-  const unreadNotifications = notifications.filter((n) => !n.read).length
+  const unreadNotifications = useMemo(
+    () => notifications.filter((n) => !n.read).length,
+    [notifications]
+  )
 
-  // 서버 알림 동기화 (마운트 시 + 60초 폴링)
+  // likedPosts 등을 Set으로 변환 (O(1) lookup)
+  const likedSet = useMemo(() => new Set(likedPosts), [likedPosts])
+  const repostedSet = useMemo(() => new Set(repostedPosts), [repostedPosts])
+  const bookmarkedSet = useMemo(() => new Set(bookmarkedPosts), [bookmarkedPosts])
+
+  // 서버 알림 동기화 (마운트 시 + 60초 폴링, 탭 비활성 시 중단)
   useEffect(() => {
     void fetchNotifications()
-    const interval = setInterval(() => void fetchNotifications(), 60_000)
-    return () => clearInterval(interval)
+
+    let interval: ReturnType<typeof setInterval> | null = null
+
+    const startPolling = () => {
+      if (!interval) {
+        interval = setInterval(() => void fetchNotifications(), 60_000)
+      }
+    }
+    const stopPolling = () => {
+      if (interval) {
+        clearInterval(interval)
+        interval = null
+      }
+    }
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stopPolling()
+      } else {
+        void fetchNotifications()
+        startPolling()
+      }
+    }
+
+    startPolling()
+    document.addEventListener("visibilitychange", handleVisibility)
+
+    return () => {
+      stopPolling()
+      document.removeEventListener("visibilitychange", handleVisibility)
+    }
   }, [fetchNotifications])
 
   // ── 피드 fetch ────────────────────────────────────────────
@@ -198,21 +235,30 @@ export default function FeedPage() {
 
   // ── 핸들러 ────────────────────────────────────────────────
 
-  const handleLike = (postId: string) => {
-    toggleLike(postId)
-  }
+  const handleLike = useCallback(
+    (postId: string) => {
+      toggleLike(postId)
+    },
+    [toggleLike]
+  )
 
-  const handleRepost = (postId: string) => {
-    const isReposted = repostedPosts.includes(postId)
-    toggleRepost(postId)
-    toast.success(isReposted ? "리포스트가 취소되었습니다" : "리포스트되었습니다")
-  }
+  const handleRepost = useCallback(
+    (postId: string) => {
+      const isReposted = repostedSet.has(postId)
+      toggleRepost(postId)
+      toast.success(isReposted ? "리포스트가 취소되었습니다" : "리포스트되었습니다")
+    },
+    [toggleRepost, repostedSet]
+  )
 
-  const handleBookmark = (postId: string) => {
-    const isBookmarked = bookmarkedPosts.includes(postId)
-    toggleBookmark(postId)
-    toast.success(isBookmarked ? "북마크가 해제되었습니다" : "북마크에 추가되었습니다")
-  }
+  const handleBookmark = useCallback(
+    (postId: string) => {
+      const isBookmarked = bookmarkedSet.has(postId)
+      toggleBookmark(postId)
+      toast.success(isBookmarked ? "북마크가 해제되었습니다" : "북마크에 추가되었습니다")
+    },
+    [toggleBookmark, bookmarkedSet]
+  )
 
   // ── 렌더 ──────────────────────────────────────────────────
 
@@ -317,12 +363,12 @@ export default function FeedPage() {
               <FeedPostCard
                 key={post.id}
                 post={post}
-                liked={likedPosts.includes(post.id)}
-                reposted={repostedPosts.includes(post.id)}
-                bookmarked={bookmarkedPosts.includes(post.id)}
-                onLike={() => handleLike(post.id)}
-                onRepost={() => handleRepost(post.id)}
-                onBookmark={() => handleBookmark(post.id)}
+                liked={likedSet.has(post.id)}
+                reposted={repostedSet.has(post.id)}
+                bookmarked={bookmarkedSet.has(post.id)}
+                onLike={handleLike}
+                onRepost={handleRepost}
+                onBookmark={handleBookmark}
               />
             ))}
           </div>
@@ -351,12 +397,12 @@ interface FeedPostCardProps {
   liked: boolean
   reposted: boolean
   bookmarked: boolean
-  onLike: () => void
-  onRepost: () => void
-  onBookmark: () => void
+  onLike: (postId: string) => void
+  onRepost: (postId: string) => void
+  onBookmark: (postId: string) => void
 }
 
-function FeedPostCard({
+const FeedPostCard = memo(function FeedPostCard({
   post,
   liked,
   reposted,
@@ -368,6 +414,10 @@ function FeedPostCard({
   const sourceConfig = post.source ? FEED_SOURCE_CONFIG[post.source] : null
   const [menuOpen, setMenuOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
+
+  const handleLike = useCallback(() => onLike(post.id), [onLike, post.id])
+  const handleRepost = useCallback(() => onRepost(post.id), [onRepost, post.id])
+  const handleBookmark = useCallback(() => onBookmark(post.id), [onBookmark, post.id])
 
   return (
     <PWCard className="!p-4">
@@ -431,15 +481,15 @@ function FeedPostCard({
 
       {/* Post Actions */}
       <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
-        <PWLikeButton liked={liked} count={post.likeCount + (liked ? 1 : 0)} onToggle={onLike} />
+        <PWLikeButton liked={liked} count={post.likeCount + (liked ? 1 : 0)} onToggle={handleLike} />
         <PWCommentList postId={post.id} commentCount={post.commentCount} />
         <PWRepostButton
           reposted={reposted}
           count={post.repostCount + (reposted ? 1 : 0)}
-          onToggle={onRepost}
+          onToggle={handleRepost}
         />
         <button
-          onClick={onBookmark}
+          onClick={handleBookmark}
           className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors ${
             bookmarked ? "text-amber-500" : "text-gray-500 hover:bg-amber-50 hover:text-amber-500"
           }`}
@@ -449,7 +499,7 @@ function FeedPostCard({
       </div>
     </PWCard>
   )
-}
+})
 
 // ── 신고 모달 ───────────────────────────────────────────────
 

@@ -36,11 +36,32 @@ export async function generateFeed(
   const recommendedLimit = Math.round(limit * FEED_RATIOS.recommended)
   const trendingLimit = limit - followingLimit - recommendedLimit
 
-  // 병렬 조회
-  const [followingPosts, recommended, trendingPosts] = await Promise.all([
-    getFollowingPosts(request.userId, followingLimit, provider, request.cursor),
-    getRecommendedPosts(request.userId, recommendedLimit, provider),
-    getTrendingPosts(trendingLimit, provider),
+  // Following 먼저 조회
+  const followingPosts = await getFollowingPosts(
+    request.userId,
+    followingLimit,
+    provider,
+    request.cursor
+  )
+  const followingIds = followingPosts.map((p) => p.postId)
+
+  // Recommended: following과 중복 제거
+  const recommended = await getRecommendedPosts(
+    request.userId,
+    recommendedLimit,
+    provider,
+    followingIds
+  )
+  const recommendedIds = [
+    ...recommended.basic,
+    ...recommended.exploration,
+    ...recommended.advanced,
+  ].map((p) => p.postId)
+
+  // Trending: following + recommended 모두와 중복 제거
+  const trendingPosts = await getTrendingPosts(trendingLimit, provider, [
+    ...followingIds,
+    ...recommendedIds,
   ])
 
   // 인터리빙

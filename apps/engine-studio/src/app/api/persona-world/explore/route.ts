@@ -47,23 +47,88 @@ export async function GET(request: NextRequest) {
       personaWhere.role = { in: roles }
     }
 
-    // 1. 역할별 클러스터
-    const personasForClusters = await prisma.persona.findMany({
-      where: personaWhere,
-      select: {
-        id: true,
-        name: true,
-        handle: true,
-        tagline: true,
-        role: true,
-        profileImageUrl: true,
-        warmth: true,
-        archetypeId: true,
-        _count: { select: { followers: true, posts: true } },
-      },
-      orderBy: { followers: { _count: "desc" } },
-      take: topPersonasLimit * 10,
-    })
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+
+    // 4개 독립 쿼리를 병렬 실행
+    const [personasForClusters, hotPosts, activeDebates, newPersonas] = await Promise.all([
+      // 1. 역할별 클러스터
+      prisma.persona.findMany({
+        where: personaWhere,
+        select: {
+          id: true,
+          name: true,
+          handle: true,
+          tagline: true,
+          role: true,
+          profileImageUrl: true,
+          warmth: true,
+          archetypeId: true,
+          _count: { select: { followers: true, posts: true } },
+        },
+        orderBy: { followers: { _count: "desc" } },
+        take: topPersonasLimit * 10,
+      }),
+      // 2. 핫 토픽
+      prisma.personaPost.groupBy({
+        by: ["type"],
+        where: {
+          isHidden: false,
+          createdAt: { gte: sevenDaysAgo },
+          persona: { status: { in: [...activeStatuses] } },
+        },
+        _count: { id: true },
+        _sum: { likeCount: true, commentCount: true },
+        orderBy: { _count: { id: "desc" } },
+        take: hotTopicsLimit,
+      }),
+      // 3. 활성 토론
+      prisma.personaPost.findMany({
+        where: {
+          type: { in: ["DEBATE", "VS_BATTLE"] },
+          isHidden: false,
+          persona: { status: { in: [...activeStatuses] } },
+        },
+        orderBy: [{ commentCount: "desc" }, { likeCount: "desc" }],
+        take: activeDebatesLimit,
+        select: {
+          id: true,
+          type: true,
+          content: true,
+          metadata: true,
+          likeCount: true,
+          commentCount: true,
+          createdAt: true,
+          persona: {
+            select: {
+              id: true,
+              name: true,
+              handle: true,
+              role: true,
+              profileImageUrl: true,
+            },
+          },
+        },
+      }),
+      // 4. 신규 페르소나
+      prisma.persona.findMany({
+        where: { status: { in: [...activeStatuses] } },
+        orderBy: { createdAt: "desc" },
+        take: newPersonasLimit,
+        select: {
+          id: true,
+          name: true,
+          handle: true,
+          tagline: true,
+          role: true,
+          expertise: true,
+          profileImageUrl: true,
+          warmth: true,
+          archetypeId: true,
+          createdAt: true,
+          _count: { select: { followers: true, posts: true } },
+        },
+      }),
+    ])
 
     const clusterMap = new Map<
       string,
@@ -103,21 +168,6 @@ export async function GET(request: NextRequest) {
       personas: personas.slice(0, topPersonasLimit + 1),
     }))
 
-    // 2. 핫 토픽
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    const hotPosts = await prisma.personaPost.groupBy({
-      by: ["type"],
-      where: {
-        isHidden: false,
-        createdAt: { gte: sevenDaysAgo },
-        persona: { status: { in: [...activeStatuses] } },
-      },
-      _count: { id: true },
-      _sum: { likeCount: true, commentCount: true },
-      orderBy: { _count: { id: "desc" } },
-      take: hotTopicsLimit,
-    })
-
     const hotTopics = hotPosts.map((g) => ({
       type: g.type,
       postCount: g._count.id,
@@ -125,55 +175,6 @@ export async function GET(request: NextRequest) {
       totalComments: g._sum.commentCount ?? 0,
       engagement: (g._sum.likeCount ?? 0) + (g._sum.commentCount ?? 0),
     }))
-
-    // 3. 활성 토론
-    const activeDebates = await prisma.personaPost.findMany({
-      where: {
-        type: { in: ["DEBATE", "VS_BATTLE"] },
-        isHidden: false,
-        persona: { status: { in: [...activeStatuses] } },
-      },
-      orderBy: [{ commentCount: "desc" }, { likeCount: "desc" }],
-      take: activeDebatesLimit,
-      select: {
-        id: true,
-        type: true,
-        content: true,
-        metadata: true,
-        likeCount: true,
-        commentCount: true,
-        createdAt: true,
-        persona: {
-          select: {
-            id: true,
-            name: true,
-            handle: true,
-            role: true,
-            profileImageUrl: true,
-          },
-        },
-      },
-    })
-
-    // 4. 신규 페르소나
-    const newPersonas = await prisma.persona.findMany({
-      where: { status: { in: [...activeStatuses] } },
-      orderBy: { createdAt: "desc" },
-      take: newPersonasLimit,
-      select: {
-        id: true,
-        name: true,
-        handle: true,
-        tagline: true,
-        role: true,
-        expertise: true,
-        profileImageUrl: true,
-        warmth: true,
-        archetypeId: true,
-        createdAt: true,
-        _count: { select: { followers: true, posts: true } },
-      },
-    })
 
     return NextResponse.json({
       success: true,

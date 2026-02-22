@@ -151,28 +151,28 @@ export async function POST(request: NextRequest) {
             }
           : null
 
-        // 페르소나 벡터 일괄 조회
+        // 페르소나 벡터 + paradoxScore 병렬 조회
         const personaIds = [...new Set(posts.map((p) => p.personaId))]
-        const personaVectors = await prisma.personaLayerVector.findMany({
-          where: { personaId: { in: personaIds } },
-          select: {
-            personaId: true,
-            layerType: true,
-            dim1: true,
-            dim2: true,
-            dim3: true,
-            dim4: true,
-            dim5: true,
-            dim6: true,
-            dim7: true,
-          },
-        })
-
-        // 페르소나별 paradoxScore 조회
-        const personas = await prisma.persona.findMany({
-          where: { id: { in: personaIds } },
-          select: { id: true, paradoxScore: true },
-        })
+        const [personaVectors, personas] = await Promise.all([
+          prisma.personaLayerVector.findMany({
+            where: { personaId: { in: personaIds } },
+            select: {
+              personaId: true,
+              layerType: true,
+              dim1: true,
+              dim2: true,
+              dim3: true,
+              dim4: true,
+              dim5: true,
+              dim6: true,
+              dim7: true,
+            },
+          }),
+          prisma.persona.findMany({
+            where: { id: { in: personaIds } },
+            select: { id: true, paradoxScore: true },
+          }),
+        ])
         const paradoxMap = new Map(personas.map((p) => [p.id, Number(p.paradoxScore ?? 0)]))
 
         // 페르소나별 벡터 맵 구축

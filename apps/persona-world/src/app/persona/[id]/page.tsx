@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, memo } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import {
@@ -31,7 +31,7 @@ import type { PersonaFullDetail } from "@/lib/types"
 
 // ── 포스트 카드 ───────────────────────────────────────────
 
-function PostCard({ post }: { post: PersonaFullDetail["recentPosts"][number] }) {
+const PostCard = memo(function PostCard({ post }: { post: PersonaFullDetail["recentPosts"][number] }) {
   const [expanded, setExpanded] = useState(false)
   const emoji = POST_TYPE_EMOJI[post.type] || ""
   const typeLabel = POST_TYPE_LABELS[post.type] || post.type
@@ -70,7 +70,7 @@ function PostCard({ post }: { post: PersonaFullDetail["recentPosts"][number] }) 
       </div>
     </button>
   )
-}
+})
 
 // ── 메인 페이지 ───────────────────────────────────────────
 
