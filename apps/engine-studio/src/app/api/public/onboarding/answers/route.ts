@@ -117,23 +117,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 사용자 프로필 upsert
+    // 사용자 프로필 업데이트 (userId = PersonaWorldUser.id)
     const config = PHASE_CONFIG[phase]
 
-    const user = await prisma.personaWorldUser.upsert({
-      where: { email: userId },
-      create: {
-        email: userId,
-        depth: vectorUpdate.depth ?? null,
-        lens: vectorUpdate.lens ?? null,
-        stance: vectorUpdate.stance ?? null,
-        scope: vectorUpdate.scope ?? null,
-        taste: vectorUpdate.taste ?? null,
-        purpose: vectorUpdate.purpose ?? null,
-        profileQuality: config.quality,
-        confidenceScore: config.confidence,
-      },
-      update: {
+    const user = await prisma.personaWorldUser.update({
+      where: { id: userId },
+      data: {
         ...(vectorUpdate.depth !== undefined && { depth: vectorUpdate.depth }),
         ...(vectorUpdate.lens !== undefined && { lens: vectorUpdate.lens }),
         ...(vectorUpdate.stance !== undefined && { stance: vectorUpdate.stance }),

@@ -56,22 +56,23 @@ export async function POST(
 
     if (existing) {
       // 좋아요 취소
-      await prisma.$transaction([
+      const [, updatedPost] = await prisma.$transaction([
         prisma.personaPostLike.delete({ where: { id: existing.id } }),
         prisma.personaPost.update({
           where: { id: postId },
           data: { likeCount: { decrement: 1 } },
+          select: { likeCount: true },
         }),
       ])
 
       return NextResponse.json({
         success: true,
-        data: { liked: false, postId },
+        data: { liked: false, postId, likeCount: updatedPost.likeCount },
       })
     }
 
     // 좋아요 추가
-    await prisma.$transaction([
+    const [, updatedPost] = await prisma.$transaction([
       prisma.personaPostLike.create({
         data: {
           postId,
@@ -82,15 +83,12 @@ export async function POST(
       prisma.personaPost.update({
         where: { id: postId },
         data: { likeCount: { increment: 1 } },
+        select: { likeCount: true, personaId: true },
       }),
     ])
 
     // 좋아요 알림 (fire-and-forget) — 포스트 작성 페르소나 팔로워에게
-    const likedPost = await prisma.personaPost.findUnique({
-      where: { id: postId },
-      select: { personaId: true },
-    })
-    if (likedPost?.personaId) {
+    if (updatedPost.personaId) {
       const likerName = userId
         ? ((
             await prisma.personaWorldUser.findUnique({
@@ -100,12 +98,12 @@ export async function POST(
           )?.name ?? "유저")
         : ((await prisma.persona.findUnique({ where: { id: personaId! }, select: { name: true } }))
             ?.name ?? "페르소나")
-      void notifyPostLiked({ postId, likerName, postAuthorPersonaId: likedPost.personaId })
+      void notifyPostLiked({ postId, likerName, postAuthorPersonaId: updatedPost.personaId })
     }
 
     return NextResponse.json({
       success: true,
-      data: { liked: true, postId },
+      data: { liked: true, postId, likeCount: updatedPost.likeCount },
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error"
