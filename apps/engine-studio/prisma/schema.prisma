@@ -1399,6 +1399,24 @@ enum SNSPlatform {
 }
 
 // ============================================
+// PersonaWorld - 보안 감사 로그
+// ============================================
+
+model PWSecurityLog {
+  id          String   @id @default(cuid())
+  userId      String
+  eventType   String   // SNS_OAUTH_CONNECTED, SNS_DATA_ANALYZED, etc.
+  details     Json?    // 이벤트 세부 (민감 데이터 제외)
+  ipAddress   String?
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([eventType, createdAt])
+  @@map("pw_security_logs")
+}
+
+// ============================================
 // PersonaWorld - 알림
 // ============================================
 

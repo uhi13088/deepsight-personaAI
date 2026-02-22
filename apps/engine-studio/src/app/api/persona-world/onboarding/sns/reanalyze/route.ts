@@ -4,6 +4,7 @@ import { processSnsDataWithLlm } from "@/lib/persona-world/onboarding/sns-proces
 import type { SNSExtendedData } from "@/lib/persona-world/types"
 import type { Prisma } from "@/generated/prisma"
 import { verifyInternalToken, verifyUserOwnership } from "@/lib/internal-auth"
+import { logSecurityEvent, extractClientIp } from "@/lib/persona-world/security-log"
 
 /** SNS 재분석 비용 (코인) */
 const REANALYSIS_COST = 5
@@ -77,10 +78,18 @@ export async function POST(request: NextRequest) {
       where: { userId, reason: { contains: "SNS 재분석" } },
       orderBy: { createdAt: "desc" },
     })
+    const clientIp = extractClientIp(request.headers)
+
     if (lastReanalysis) {
       const elapsed = Date.now() - lastReanalysis.createdAt.getTime()
       if (elapsed < REANALYSIS_COOLDOWN_MS) {
         const remainingSec = Math.ceil((REANALYSIS_COOLDOWN_MS - elapsed) / 1000)
+        void logSecurityEvent({
+          userId,
+          eventType: "RATE_LIMITED",
+          details: { endpoint: "sns/reanalyze", remainingSec },
+          ipAddress: clientIp,
+        })
         return NextResponse.json(
           {
             success: false,
@@ -258,6 +267,20 @@ export async function POST(request: NextRequest) {
             }
           : {}),
       },
+    })
+
+    // 감사 로그: 재분석 완료
+    void logSecurityEvent({
+      userId,
+      eventType: "SNS_DATA_REANALYZED",
+      details: {
+        platforms: connections.map((c) => c.platform),
+        profileLevel: result.profileLevel,
+        confidence: result.confidence,
+        creditUsed,
+        isFirstFree: isFirstAnalysis,
+      },
+      ipAddress: clientIp,
     })
 
     return NextResponse.json({
