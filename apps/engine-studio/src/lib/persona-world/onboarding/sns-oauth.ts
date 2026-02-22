@@ -144,7 +144,8 @@ function getRedirectUri(platform: SNSPlatform): string {
 export function buildAuthUrl(
   platform: SNSPlatform,
   userId: string,
-  codeChallenge?: string
+  codeChallenge?: string,
+  returnTo?: string
 ): string | null {
   if (!OAUTH_SUPPORTED_PLATFORMS.includes(platform)) return null
 
@@ -156,8 +157,8 @@ export function buildAuthUrl(
 
   const redirectUri = getRedirectUri(platform)
 
-  // state에 userId를 인코딩 (CSRF 방지 + 유저 식별)
-  const state = encodeState(userId, platform)
+  // state에 userId + returnTo를 인코딩 (CSRF 방지 + 유저 식별 + 복귀 URL)
+  const state = encodeState(userId, platform, returnTo)
 
   const params = new URLSearchParams({
     response_type: "code",
@@ -299,8 +300,10 @@ export async function refreshAccessToken(
 /**
  * OAuth state 파라미터에 userId와 platform 인코딩.
  */
-export function encodeState(userId: string, platform: SNSPlatform): string {
-  return Buffer.from(JSON.stringify({ userId, platform, ts: Date.now() })).toString("base64url")
+export function encodeState(userId: string, platform: SNSPlatform, returnTo?: string): string {
+  return Buffer.from(JSON.stringify({ userId, platform, ts: Date.now(), returnTo })).toString(
+    "base64url"
+  )
 }
 
 /**
@@ -310,11 +313,12 @@ export function decodeState(state: string): {
   userId: string
   platform: SNSPlatform
   ts: number
+  returnTo?: string
 } | null {
   try {
     const decoded = JSON.parse(Buffer.from(state, "base64url").toString("utf-8"))
     if (!decoded.userId || !decoded.platform) return null
-    return decoded as { userId: string; platform: SNSPlatform; ts: number }
+    return decoded as { userId: string; platform: SNSPlatform; ts: number; returnTo?: string }
   } catch {
     return null
   }
@@ -327,6 +331,7 @@ export function validateState(state: string): {
   valid: boolean
   userId?: string
   platform?: SNSPlatform
+  returnTo?: string
 } {
   const decoded = decodeState(state)
   if (!decoded) return { valid: false }
@@ -335,7 +340,12 @@ export function validateState(state: string): {
   const maxAge = 10 * 60 * 1000 // 10분
   if (elapsed > maxAge) return { valid: false }
 
-  return { valid: true, userId: decoded.userId, platform: decoded.platform }
+  return {
+    valid: true,
+    userId: decoded.userId,
+    platform: decoded.platform,
+    returnTo: decoded.returnTo,
+  }
 }
 
 // ── 유틸리티 ─────────────────────────────────────────────────

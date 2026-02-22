@@ -1,10 +1,10 @@
 -- ═══════════════════════════════════════════════════════════════
 -- 프로덕션 DB 마이그레이션: 016 ~ 024 통합 적용
 -- 001_full_schema.sql 적용 이후 누락된 모든 변경사항 포함
+-- 주의: ALTER TYPE ADD VALUE는 트랜잭션 안에서 실행 불가 → BEGIN/COMMIT 미사용
+-- 모든 구문은 IF NOT EXISTS / IF NOT EXISTS 가드 포함 → 안전 재실행 가능
 -- 실행: psql $DATABASE_URL -f apply_missing_016_to_024.sql
 -- ═══════════════════════════════════════════════════════════════
-
-BEGIN;
 
 -- ────────────────────────────────────────────────────────────
 -- 016: Social Module Config 싱글톤 테이블
@@ -21,8 +21,8 @@ CREATE TABLE IF NOT EXISTS "social_module_config" (
     CONSTRAINT "social_module_config_pkey" PRIMARY KEY ("id")
 );
 
-INSERT INTO "social_module_config" ("id", "updatedBy")
-VALUES ('singleton', 'system')
+INSERT INTO "social_module_config" ("id", "updatedAt", "updatedBy")
+VALUES ('singleton', CURRENT_TIMESTAMP, 'system')
 ON CONFLICT ("id") DO NOTHING;
 
 -- ────────────────────────────────────────────────────────────
@@ -51,7 +51,11 @@ CREATE INDEX IF NOT EXISTS "pw_notifications_userId_createdAt_idx"
   ON "pw_notifications"("userId", "createdAt");
 
 ALTER TABLE "persona_reposts" ADD COLUMN IF NOT EXISTS "userId" TEXT;
-ALTER TABLE "persona_reposts" ALTER COLUMN "personaId" DROP NOT NULL;
+
+DO $$ BEGIN
+  ALTER TABLE "persona_reposts" ALTER COLUMN "personaId" DROP NOT NULL;
+EXCEPTION WHEN others THEN NULL;
+END $$;
 
 DO $$ BEGIN
   ALTER TABLE "persona_reposts"
@@ -66,6 +70,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS "persona_reposts_originalPostId_userId_key"
 
 -- ────────────────────────────────────────────────────────────
 -- 018: ActivityTrigger enum에 MANUAL 추가
+-- 주의: ALTER TYPE ADD VALUE는 트랜잭션 밖에서만 실행 가능
 -- ────────────────────────────────────────────────────────────
 
 ALTER TYPE "ActivityTrigger" ADD VALUE IF NOT EXISTS 'MANUAL';
@@ -135,7 +140,7 @@ CREATE TABLE IF NOT EXISTS "pw_notification_preferences" (
     "quietHoursStart"       INTEGER,
     "quietHoursEnd"         INTEGER,
     "createdAt"             TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt"             TIMESTAMP(3) NOT NULL,
+    "updatedAt"             TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "pw_notification_preferences_pkey" PRIMARY KEY ("id")
 );
 
@@ -192,7 +197,7 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 -- ────────────────────────────────────────────────────────────
--- 023: 페르소나 인구통계 컬럼 추가 (테이블명 수정: "Persona" → "personas")
+-- 023: 페르소나 인구통계 컬럼 추가
 -- ────────────────────────────────────────────────────────────
 
 ALTER TABLE "personas" ADD COLUMN IF NOT EXISTS "gender" TEXT;
@@ -207,4 +212,6 @@ ALTER TABLE "personas" ADD COLUMN IF NOT EXISTS "knowledgeAreas" TEXT[] DEFAULT 
 
 ALTER TABLE "incubator_logs" ADD COLUMN IF NOT EXISTS "failReason" TEXT;
 
-COMMIT;
+-- ═══════════════════════════════════════════════════════════════
+-- 완료! 모든 마이그레이션이 적용되었습니다.
+-- ═══════════════════════════════════════════════════════════════

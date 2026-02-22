@@ -43,7 +43,10 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // completedOnboarding 판별: 벡터가 하나라도 있으면 완료 상태
+    // completedOnboarding 판별: profileQuality가 BASIC이 아니면 온보딩 완료
+    // BASIC = 신규 가입 또는 Phase 1 진행 전 (Cold Start LIGHT 미완료)
+    // STANDARD+ = Phase 2 이상 완료 또는 SNS 연동 완료
+    const completedOnboarding = user.profileQuality !== "BASIC"
     const hasVector = user.depth !== null || user.lens !== null
 
     return NextResponse.json({
@@ -53,7 +56,7 @@ export async function POST(request: NextRequest) {
         email: user.email,
         name: user.name,
         profileImageUrl: user.profileImageUrl,
-        completedOnboarding: hasVector,
+        completedOnboarding,
         profileQuality: user.profileQuality,
         vector: hasVector
           ? {

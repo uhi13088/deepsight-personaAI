@@ -10,7 +10,7 @@ import { useUserStore } from "@/lib/user-store"
 export default function LoginPage() {
   const router = useRouter()
   const { data: session, status: authStatus } = useSession()
-  const { profile, setProfile, completeOnboarding, reset } = useUserStore()
+  const { profile, setProfile, completeOnboarding, reset, restoreFollows } = useUserStore()
   const [nickname, setNickname] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
@@ -31,9 +31,18 @@ export default function LoginPage() {
     // 마운트 후 첫 실행 시 sessionStorage에서 OAuth 플래그 캡처
     // Strict Mode 안전: null일 때만 읽고, true면 계속 true 유지
     if (isOAuthReturnRef.current === null) {
-      isOAuthReturnRef.current = !!sessionStorage.getItem("pw-oauth-pending")
+      const hasSessionFlag = !!sessionStorage.getItem("pw-oauth-pending")
+      const hasUrlFlag = new URLSearchParams(window.location.search).has("oauth")
+      isOAuthReturnRef.current = hasSessionFlag || hasUrlFlag
       if (isOAuthReturnRef.current) {
         sessionStorage.removeItem("pw-oauth-pending")
+        // URL에서 oauth 파라미터 제거 (히스토리 깔끔하게)
+        if (hasUrlFlag) {
+          const url = new URL(window.location.href)
+          url.searchParams.delete("oauth")
+          const clean = url.pathname + (url.search || "")
+          window.history.replaceState({}, "", clean)
+        }
       }
     }
 
@@ -95,6 +104,9 @@ export default function LoginPage() {
             createdAt: data.createdAt,
           })
 
+          // 서버에서 팔로우 목록 복원 (reset으로 초기화된 경우 대비)
+          void restoreFollows()
+
           if (data.completedOnboarding) {
             router.push("/feed")
           } else {
@@ -113,7 +125,7 @@ export default function LoginPage() {
         setIsGoogleLoading(false)
       }
     },
-    [isRegistering, setProfile, router]
+    [isRegistering, setProfile, restoreFollows, router]
   )
 
   // NextAuth 세션이 있고 로컬 프로필이 없으면 등록
@@ -129,7 +141,7 @@ export default function LoginPage() {
     setIsGoogleLoading(true)
     sessionStorage.setItem("pw-oauth-pending", "1")
     try {
-      await signIn("google", { callbackUrl: "/" })
+      await signIn("google", { callbackUrl: "/?oauth=1" })
     } catch {
       sessionStorage.removeItem("pw-oauth-pending")
       setIsGoogleLoading(false)

@@ -356,6 +356,19 @@ export const clientApi = {
     return json.data!
   },
 
+  // ── 팔로우 목록 조회 ────────────────────────────────────────
+  async getFollows(userId: string) {
+    const params = new URLSearchParams({ userId })
+    const res = await fetch(`/api/public/follows?${params}`)
+    if (!res.ok) throw new Error("Failed to fetch follows")
+
+    const json: ApiResponse<{
+      follows: Array<{ personaId: string; personaName: string; followedAt: string }>
+    }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
   // ── 팔로우 토글 ──────────────────────────────────────────
   async toggleFollow(personaId: string, userId: string) {
     const res = await fetch(`/api/public/follows`, {
@@ -397,11 +410,11 @@ export const clientApi = {
   },
 
   // ── SNS OAuth 시작 ──────────────────────────────────────────
-  async startSnsAuth(userId: string, platform: string, codeChallenge?: string) {
+  async startSnsAuth(userId: string, platform: string, codeChallenge?: string, returnTo?: string) {
     const res = await fetch(`/api/persona-world/onboarding/sns/auth`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, platform, codeChallenge }),
+      body: JSON.stringify({ userId, platform, codeChallenge, returnTo }),
     })
 
     // 에러 응답도 body를 파싱해 실제 에러 메시지를 전달

@@ -91,6 +91,7 @@ interface UserState {
   followPersona: (personaId: string, personaName: string) => void
   unfollowPersona: (personaId: string) => void
   isFollowing: (personaId: string) => boolean
+  restoreFollows: () => Promise<void>
 
   // 좋아요
   likedPosts: string[]
@@ -307,6 +308,18 @@ export const useUserStore = create<UserState>()(
       },
 
       isFollowing: (personaId) => get().followedPersonas.some((f) => f.personaId === personaId),
+
+      // 서버에서 팔로우 목록 복원 (로그인 후 호출)
+      restoreFollows: async () => {
+        const userId = get().profile?.id
+        if (!userId) return
+        try {
+          const data = await clientApi.getFollows(userId)
+          set({ followedPersonas: data.follows })
+        } catch (err) {
+          console.warn("[user-store] Failed to restore follows:", err)
+        }
+      },
 
       // 좋아요 관리 — Optimistic + Server Sync
       toggleLike: (postId) => {

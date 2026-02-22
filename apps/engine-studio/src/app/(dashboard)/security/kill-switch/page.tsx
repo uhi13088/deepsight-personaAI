@@ -118,130 +118,136 @@ export default function KillSwitchPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6 p-6">
+      <>
         <Header title="Kill Switch" description="시스템 안전 제어판" />
-        <div className="text-muted-foreground animate-pulse">Loading...</div>
-      </div>
+        <div className="space-y-6 p-6">
+          <div className="text-muted-foreground animate-pulse">Loading...</div>
+        </div>
+      </>
     )
   }
 
   if (error || !config) {
     return (
-      <div className="space-y-6 p-6">
+      <>
         <Header title="Kill Switch" description="시스템 안전 제어판" />
-        <div className="text-destructive">{error ?? "No data"}</div>
-      </div>
+        <div className="space-y-6 p-6">
+          <div className="text-destructive">{error ?? "No data"}</div>
+        </div>
+      </>
     )
   }
 
   const toggles = Object.entries(config.featureToggles)
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <Header title="Kill Switch" description="시스템 안전 제어판 — 기능별 토글 + 긴급 동결" />
-        <Button variant="outline" size="sm" onClick={() => void fetchConfig()}>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Refresh
-        </Button>
-      </div>
+    <>
+      <Header title="Kill Switch" description="시스템 안전 제어판 — 기능별 토글 + 긴급 동결" />
+      <div className="space-y-6 p-6">
+        <div className="flex items-center justify-end">
+          <Button variant="outline" size="sm" onClick={() => void fetchConfig()}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
+        </div>
 
-      {/* Emergency Freeze */}
-      <div
-        className={`rounded-lg border p-6 ${
-          config.emergencyFreeze
-            ? "border-blue-500/50 bg-blue-500/5"
-            : "border-green-500/50 bg-green-500/5"
-        }`}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {config.emergencyFreeze ? (
-              <Snowflake className="h-8 w-8 text-blue-500" />
-            ) : (
-              <Power className="h-8 w-8 text-green-500" />
-            )}
-            <div>
-              <h2 className="text-xl font-bold">
-                {config.emergencyFreeze ? "Emergency Freeze Active" : "System Normal"}
-              </h2>
-              {config.emergencyFreeze && config.freezeReason && (
-                <p className="text-muted-foreground text-sm">사유: {config.freezeReason}</p>
+        {/* Emergency Freeze */}
+        <div
+          className={`rounded-lg border p-6 ${
+            config.emergencyFreeze
+              ? "border-blue-500/50 bg-blue-500/5"
+              : "border-green-500/50 bg-green-500/5"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {config.emergencyFreeze ? (
+                <Snowflake className="h-8 w-8 text-blue-500" />
+              ) : (
+                <Power className="h-8 w-8 text-green-500" />
               )}
-              {config.emergencyFreeze && config.freezeAt && (
-                <p className="text-muted-foreground text-xs">
-                  동결 시각: {new Date(config.freezeAt).toLocaleString()}
-                </p>
-              )}
+              <div>
+                <h2 className="text-xl font-bold">
+                  {config.emergencyFreeze ? "Emergency Freeze Active" : "System Normal"}
+                </h2>
+                {config.emergencyFreeze && config.freezeReason && (
+                  <p className="text-muted-foreground text-sm">사유: {config.freezeReason}</p>
+                )}
+                {config.emergencyFreeze && config.freezeAt && (
+                  <p className="text-muted-foreground text-xs">
+                    동결 시각: {new Date(config.freezeAt).toLocaleString()}
+                  </p>
+                )}
+              </div>
             </div>
+            {config.emergencyFreeze ? (
+              <Button
+                variant="outline"
+                disabled={actionLoading}
+                onClick={() => void handleUnfreeze()}
+              >
+                동결 해제
+              </Button>
+            ) : (
+              <Button
+                variant="destructive"
+                disabled={actionLoading}
+                onClick={() => void handleFreeze()}
+              >
+                <AlertTriangle className="mr-2 h-4 w-4" />
+                긴급 동결
+              </Button>
+            )}
           </div>
-          {config.emergencyFreeze ? (
-            <Button
-              variant="outline"
-              disabled={actionLoading}
-              onClick={() => void handleUnfreeze()}
-            >
-              동결 해제
-            </Button>
-          ) : (
-            <Button
-              variant="destructive"
-              disabled={actionLoading}
-              onClick={() => void handleFreeze()}
-            >
-              <AlertTriangle className="mr-2 h-4 w-4" />
-              긴급 동결
-            </Button>
+        </div>
+
+        {/* Feature Toggles */}
+        <div className="rounded-lg border p-4">
+          <h3 className="mb-4 text-lg font-semibold">기능별 토글</h3>
+          <div className="space-y-3">
+            {toggles.map(([key, toggle]) => {
+              const meta = FEATURE_LABELS[key] ?? { label: key, description: "" }
+              const featureToggle = toggle as FeatureToggle
+              return (
+                <div key={key} className="flex items-center justify-between rounded-md border p-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{meta.label}</span>
+                      <Badge variant={featureToggle.enabled ? "secondary" : "destructive"}>
+                        {featureToggle.enabled ? "ON" : "OFF"}
+                      </Badge>
+                    </div>
+                    <p className="text-muted-foreground text-xs">{meta.description}</p>
+                    {!featureToggle.enabled && featureToggle.disabledReason && (
+                      <p className="mt-1 text-xs text-red-500">
+                        사유: {featureToggle.disabledReason}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={featureToggle.enabled ? "outline" : "default"}
+                    disabled={actionLoading || config.emergencyFreeze}
+                    onClick={() => void toggleFeature(key, !featureToggle.enabled)}
+                  >
+                    {featureToggle.enabled ? "Disable" : "Enable"}
+                  </Button>
+                </div>
+              )
+            })}
+          </div>
+          {config.emergencyFreeze && (
+            <p className="text-muted-foreground mt-3 text-xs">
+              * 긴급 동결 상태에서는 개별 토글을 변경할 수 없습니다
+            </p>
           )}
         </div>
-      </div>
 
-      {/* Feature Toggles */}
-      <div className="rounded-lg border p-4">
-        <h3 className="mb-4 text-lg font-semibold">기능별 토글</h3>
-        <div className="space-y-3">
-          {toggles.map(([key, toggle]) => {
-            const meta = FEATURE_LABELS[key] ?? { label: key, description: "" }
-            const featureToggle = toggle as FeatureToggle
-            return (
-              <div key={key} className="flex items-center justify-between rounded-md border p-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{meta.label}</span>
-                    <Badge variant={featureToggle.enabled ? "secondary" : "destructive"}>
-                      {featureToggle.enabled ? "ON" : "OFF"}
-                    </Badge>
-                  </div>
-                  <p className="text-muted-foreground text-xs">{meta.description}</p>
-                  {!featureToggle.enabled && featureToggle.disabledReason && (
-                    <p className="mt-1 text-xs text-red-500">
-                      사유: {featureToggle.disabledReason}
-                    </p>
-                  )}
-                </div>
-                <Button
-                  size="sm"
-                  variant={featureToggle.enabled ? "outline" : "default"}
-                  disabled={actionLoading || config.emergencyFreeze}
-                  onClick={() => void toggleFeature(key, !featureToggle.enabled)}
-                >
-                  {featureToggle.enabled ? "Disable" : "Enable"}
-                </Button>
-              </div>
-            )
-          })}
+        {/* Meta */}
+        <div className="text-muted-foreground text-xs">
+          마지막 업데이트: {new Date(config.updatedAt).toLocaleString()} by {config.updatedBy}
         </div>
-        {config.emergencyFreeze && (
-          <p className="text-muted-foreground mt-3 text-xs">
-            * 긴급 동결 상태에서는 개별 토글을 변경할 수 없습니다
-          </p>
-        )}
       </div>
-
-      {/* Meta */}
-      <div className="text-muted-foreground text-xs">
-        마지막 업데이트: {new Date(config.updatedAt).toLocaleString()} by {config.updatedBy}
-      </div>
-    </div>
+    </>
   )
 }
