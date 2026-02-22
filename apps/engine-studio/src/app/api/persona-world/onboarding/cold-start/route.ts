@@ -116,11 +116,22 @@ export async function POST(request: NextRequest) {
           },
         })
 
-        // 프로필 레벨 업데이트
+        // 프로필 레벨 + L1 벡터 + L2(OCEAN) 업데이트
         await prisma.personaWorldUser.update({
           where: { id: uid },
           data: {
             profileQuality: result.profileLevel,
+            // L1 벡터를 user 레코드에 저장 (매칭 프리뷰에서 사용)
+            ...(result.l1Vector
+              ? {
+                  depth: result.l1Vector.depth,
+                  lens: result.l1Vector.lens,
+                  stance: result.l1Vector.stance,
+                  scope: result.l1Vector.scope,
+                  taste: result.l1Vector.taste,
+                  purpose: result.l1Vector.purpose,
+                }
+              : {}),
             ...(result.l2Vector
               ? {
                   openness: result.l2Vector.openness,

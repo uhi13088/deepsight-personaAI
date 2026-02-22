@@ -53,31 +53,68 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // 사용자 벡터 조회
-    const user = userId
+    // 사용자 벡터 조회 — userId는 UUID(id) 또는 email일 수 있음
+    const userSelect = {
+      id: true,
+      depth: true,
+      lens: true,
+      stance: true,
+      scope: true,
+      taste: true,
+      purpose: true,
+    } as const
+
+    let user = userId
       ? await prisma.personaWorldUser.findUnique({
-          where: { email: userId },
-          select: {
-            depth: true,
-            lens: true,
-            stance: true,
-            scope: true,
-            taste: true,
-            purpose: true,
-          },
+          where: { id: userId },
+          select: userSelect,
         })
       : null
 
-    const userVec = user
-      ? toVector({
-          depth: user.depth ? Number(user.depth) : null,
-          lens: user.lens ? Number(user.lens) : null,
-          stance: user.stance ? Number(user.stance) : null,
-          scope: user.scope ? Number(user.scope) : null,
-          taste: user.taste ? Number(user.taste) : null,
-          purpose: user.purpose ? Number(user.purpose) : null,
+    // id로 못 찾으면 email로 fallback
+    if (!user && userId) {
+      user = await prisma.personaWorldUser.findUnique({
+        where: { email: userId },
+        select: userSelect,
+      })
+    }
+
+    // user 레코드의 L1 벡터가 없으면 survey response에서 조회
+    let userVec: number[]
+    const hasL1OnUser = user && (user.depth !== null || user.lens !== null)
+
+    if (user && hasL1OnUser) {
+      userVec = toVector({
+        depth: user.depth ? Number(user.depth) : null,
+        lens: user.lens ? Number(user.lens) : null,
+        stance: user.stance ? Number(user.stance) : null,
+        scope: user.scope ? Number(user.scope) : null,
+        taste: user.taste ? Number(user.taste) : null,
+        purpose: user.purpose ? Number(user.purpose) : null,
+      })
+    } else if (user) {
+      // survey response에서 최신 computed vector 조회
+      const survey = await prisma.pWUserSurveyResponse.findFirst({
+        where: { userId: user.id },
+        orderBy: { completedAt: "desc" },
+        select: { computedVector: true },
+      })
+      const cv = survey?.computedVector as { l1?: Record<string, number> } | null
+      if (cv?.l1) {
+        userVec = toVector({
+          depth: cv.l1.depth ?? null,
+          lens: cv.l1.lens ?? null,
+          stance: cv.l1.stance ?? null,
+          scope: cv.l1.scope ?? null,
+          taste: cv.l1.taste ?? null,
+          purpose: cv.l1.purpose ?? null,
         })
-      : DIMS.map(() => 0.5)
+      } else {
+        userVec = DIMS.map(() => 0.5)
+      }
+    } else {
+      userVec = DIMS.map(() => 0.5)
+    }
 
     // 활성 페르소나 + 벡터 조회
     const personas = await prisma.persona.findMany({
