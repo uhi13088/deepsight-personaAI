@@ -3,6 +3,8 @@ import { requireAuth } from "@/lib/require-auth"
 import type { ApiResponse } from "@/types"
 import { ROLE_DEFINITIONS, getPermissionsForRole } from "@/lib/team"
 import type { Role, RoleDefinition, Permission } from "@/lib/team"
+import type { UserRole } from "@/generated/prisma"
+import { prisma } from "@/lib/prisma"
 
 interface PermissionResource {
   resource: string
@@ -129,14 +131,6 @@ const PERMISSION_MATRIX: PermissionResource[] = [
   },
 ]
 
-// ── Seed member counts for demo ──────────────────────────────────
-const SEED_MEMBER_COUNTS: Record<Role, number> = {
-  admin: 1,
-  ai_engineer: 2,
-  content_manager: 1,
-  analyst: 1,
-}
-
 export async function GET() {
   const { response } = await requireAuth()
   if (response) return response
@@ -149,12 +143,30 @@ export async function GET() {
       permissionsByRole[rd.role] = getPermissionsForRole(rd.role)
     }
 
+    // 실제 DB에서 역할별 멤버 수 집계
+    const roleCounts = await prisma.user.groupBy({
+      by: ["role"],
+      _count: { _all: true },
+    })
+
+    const memberCounts: Record<Role, number> = {
+      admin: 0,
+      ai_engineer: 0,
+      content_manager: 0,
+      analyst: 0,
+    }
+
+    for (const rc of roleCounts) {
+      const role = (rc.role as UserRole).toLowerCase() as Role
+      memberCounts[role] = rc._count._all
+    }
+
     return NextResponse.json<ApiResponse<RolesResponse>>({
       success: true,
       data: {
         roles,
         permissionsByRole,
-        memberCounts: SEED_MEMBER_COUNTS,
+        memberCounts,
         permissionMatrix: PERMISSION_MATRIX,
       },
     })

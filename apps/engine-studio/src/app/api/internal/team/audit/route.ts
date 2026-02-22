@@ -74,11 +74,22 @@ export async function GET(request: NextRequest) {
       where.targetType = targetType
     }
     if (keyword) {
-      where.OR = [
+      // actorName 검색: 이름이 매칭되는 userId 목록 먼저 조회
+      const matchingUsers = await prisma.user.findMany({
+        where: { name: { contains: keyword, mode: "insensitive" } },
+        select: { id: true },
+      })
+      const matchingUserIds = matchingUsers.map((u) => u.id)
+
+      const orConditions: Array<Record<string, unknown>> = [
         { action: { contains: keyword, mode: "insensitive" } },
         { targetType: { contains: keyword, mode: "insensitive" } },
-        { details: { string_contains: keyword } },
+        { targetId: { contains: keyword, mode: "insensitive" } },
       ]
+      if (matchingUserIds.length > 0) {
+        orConditions.push({ userId: { in: matchingUserIds } })
+      }
+      where.OR = orConditions
     }
 
     // Fetch filtered entries + total count in parallel
@@ -95,59 +106,81 @@ export async function GET(request: NextRequest) {
 
     const entries = rows.map(toAuditLogEntry)
 
-    // Build summary from all records (unfiltered)
-    const [allRows, allCount] = await Promise.all([
+    // ── Summary: DB aggregation (전체 레코드 메모리 로드 대신 집계 쿼리 사용) ──
+    const [
+      allCount,
+      actionCountRows,
+      targetTypeCountRows,
+      topActorRows,
+      periodBounds,
+      recentRows,
+    ] = await Promise.all([
+      prisma.auditLog.count(),
+      // 액션별 카운트
+      prisma.auditLog.groupBy({
+        by: ["action"],
+        _count: { _all: true },
+      }),
+      // 대상 유형별 카운트
+      prisma.auditLog.groupBy({
+        by: ["targetType"],
+        _count: { _all: true },
+      }),
+      // Top actors (userId 기준 집계)
+      prisma.auditLog.groupBy({
+        by: ["userId"],
+        _count: { _all: true },
+        orderBy: { _count: { userId: "desc" } },
+        take: 10,
+      }),
+      // 전체 기간 범위
+      prisma.auditLog.aggregate({
+        _min: { createdAt: true },
+        _max: { createdAt: true },
+      }),
+      // 최근 활동 10건
       prisma.auditLog.findMany({
         include: { user: { select: { name: true } } },
         orderBy: { createdAt: "desc" },
+        take: 10,
       }),
-      prisma.auditLog.count(),
     ])
 
+    // Top actors에 actorName 조회 (별도 쿼리로 최소화)
+    const actorIds = topActorRows.map((r) => r.userId)
+    const actorUsers =
+      actorIds.length > 0
+        ? await prisma.user.findMany({
+            where: { id: { in: actorIds } },
+            select: { id: true, name: true },
+          })
+        : []
+    const actorNameMap = new Map(actorUsers.map((u) => [u.id, u.name]))
+
     const actionCounts: Partial<Record<AuditAction, number>> = {}
-    const targetTypeCounts: Partial<Record<AuditTargetType, number>> = {}
-    const actorMap = new Map<string, { actorId: string; actorName: string; count: number }>()
-
-    let periodStart: number | null = null
-    let periodEnd: number | null = null
-
-    for (const row of allRows) {
-      const a = row.action as AuditAction
-      actionCounts[a] = (actionCounts[a] ?? 0) + 1
-
-      const tt = row.targetType as AuditTargetType
-      targetTypeCounts[tt] = (targetTypeCounts[tt] ?? 0) + 1
-
-      const existing = actorMap.get(row.userId)
-      if (existing) {
-        existing.count += 1
-      } else {
-        actorMap.set(row.userId, {
-          actorId: row.userId,
-          actorName: row.user.name ?? row.userId,
-          count: 1,
-        })
-      }
-
-      const ts = row.createdAt.getTime()
-      if (periodStart === null || ts < periodStart) periodStart = ts
-      if (periodEnd === null || ts > periodEnd) periodEnd = ts
+    for (const row of actionCountRows) {
+      actionCounts[row.action as AuditAction] = row._count._all
     }
 
-    const topActors = Array.from(actorMap.values())
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10)
+    const targetTypeCounts: Partial<Record<AuditTargetType, number>> = {}
+    for (const row of targetTypeCountRows) {
+      targetTypeCounts[row.targetType as AuditTargetType] = row._count._all
+    }
 
-    const recentActivity = allRows.slice(0, 10).map(toAuditLogEntry)
+    const topActors = topActorRows.map((row) => ({
+      actorId: row.userId,
+      actorName: actorNameMap.get(row.userId) ?? row.userId,
+      count: row._count._all,
+    }))
 
     const summary: AuditSummary = {
       totalEntries: allCount,
       actionCounts,
       topActors,
-      recentActivity,
+      recentActivity: recentRows.map(toAuditLogEntry),
       targetTypeCounts,
-      periodStart,
-      periodEnd,
+      periodStart: periodBounds._min.createdAt?.getTime() ?? null,
+      periodEnd: periodBounds._max.createdAt?.getTime() ?? null,
     }
 
     return NextResponse.json<ApiResponse<AuditGetResponse>>({

@@ -186,6 +186,10 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      // TODO: 실제 이메일 초대 발송 구현 필요
+      // - 이메일 서비스(Resend/SendGrid 등)와 연동하여 초대 링크 발송
+      // - 비밀번호 없이 생성(password: null) → 초대 수락 전까지 로그인 불가
+      // - 이메일 인증 토큰(VerificationToken) 생성 후 링크로 비밀번호 설정 유도
       const newUser = await prisma.user.create({
         data: {
           email: body.email.toLowerCase(),
