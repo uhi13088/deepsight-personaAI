@@ -114,10 +114,9 @@ const navSections: NavSection[] = [
     icon: Globe,
     basePath: "/persona-world-admin",
     children: [
-      { label: "Activity Dashboard", href: "/persona-world-admin/activity" },
+      { label: "Operations", href: "/persona-world-admin/operations" },
       { label: "Moderation", href: "/persona-world-admin/moderation" },
       { label: "Quality Monitor", href: "/persona-world-admin/quality" },
-      { label: "Scheduler Control", href: "/persona-world-admin/scheduler" },
       { label: "Evolution", href: "/persona-world-admin/evolution" },
     ],
   },
