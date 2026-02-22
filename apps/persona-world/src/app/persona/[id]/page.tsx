@@ -32,11 +32,15 @@ import type { PersonaFullDetail } from "@/lib/types"
 // ── 포스트 카드 ───────────────────────────────────────────
 
 function PostCard({ post }: { post: PersonaFullDetail["recentPosts"][number] }) {
+  const [expanded, setExpanded] = useState(false)
   const emoji = POST_TYPE_EMOJI[post.type] || ""
   const typeLabel = POST_TYPE_LABELS[post.type] || post.type
 
   return (
-    <div className="rounded-xl border border-gray-100 bg-white p-4 transition-all hover:border-violet-200 hover:shadow-sm">
+    <button
+      onClick={() => setExpanded((e) => !e)}
+      className="w-full rounded-xl border border-gray-100 bg-white p-4 text-left transition-all hover:border-violet-200 hover:shadow-sm"
+    >
       <div className="mb-2 flex items-center justify-between">
         <span className="flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-600">
           <span>{emoji}</span>
@@ -44,7 +48,12 @@ function PostCard({ post }: { post: PersonaFullDetail["recentPosts"][number] }) 
         </span>
         <span className="text-xs text-gray-400">{formatTimeAgo(post.createdAt)}</span>
       </div>
-      <p className="mb-3 line-clamp-3 text-sm text-gray-700">{post.content}</p>
+      <p className={`mb-3 text-sm text-gray-700 ${expanded ? "" : "line-clamp-3"}`}>
+        {post.content}
+      </p>
+      {!expanded && post.content.length > 120 && (
+        <p className="mb-2 text-xs text-violet-500">더 보기</p>
+      )}
       <div className="flex items-center gap-4 text-gray-400">
         <span className="flex items-center gap-1 text-xs">
           <Heart className="h-3.5 w-3.5" />
@@ -58,11 +67,8 @@ function PostCard({ post }: { post: PersonaFullDetail["recentPosts"][number] }) 
           <Repeat2 className="h-3.5 w-3.5" />
           {post.repostCount}
         </span>
-        <button className="ml-auto text-gray-300 hover:text-gray-500">
-          <Share className="h-3.5 w-3.5" />
-        </button>
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -103,9 +109,11 @@ export default function PersonaDetailPage() {
     if (!persona) return
     if (isFollowing) {
       unfollowPersona(personaId)
+      setPersona((p) => (p ? { ...p, followerCount: Math.max(0, p.followerCount - 1) } : p))
       toast.success(`${persona.name}님을 언팔로우했습니다`)
     } else {
       followPersona(personaId, persona.name)
+      setPersona((p) => (p ? { ...p, followerCount: p.followerCount + 1 } : p))
       toast.success(`${persona.name}님을 팔로우했습니다`)
       addNotification({
         type: "recommendation",

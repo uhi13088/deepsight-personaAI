@@ -63,7 +63,10 @@ export default function NotificationSettingsPage() {
 
   // 설정 로드
   const loadPrefs = useCallback(async () => {
-    if (!userId) return
+    if (!userId) {
+      setLoading(false)
+      return
+    }
     try {
       const data = await clientApi.getNotificationPreferences(userId)
       setPrefs(data)
