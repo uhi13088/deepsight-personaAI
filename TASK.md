@@ -1165,6 +1165,13 @@
 
 - **T176: 프로덕션 DB 마이그레이션 미적용 수정** (AC1~AC2 완료, AC3 프로덕션 적용 대기)
 
+- [ ] **T177: Incident Management 자동 감지 — Detection Rules → 자동 장애 생성**
+  - 배경: 현재 장애 관리가 100% 수동 입력. Detection Rules 타입과 evaluateDetectionRules() 함수가 이미 존재하지만 아무 곳에서도 호출하지 않음. System Monitoring 메트릭과 연결하여 자동 감지 구현
+  - AC1: incidents API에 `auto_detect` 액션 추가 — 현재 메트릭 조회 → Detection Rules 평가 → 중복 체크 → 자동 Incident 생성 (reportedById: "auto-detection")
+  - AC2: Monitoring 페이지에서 진입 시 auto_detect 호출 — 대시보드 확인할 때마다 자동 감지 실행
+  - AC3: Incident 페이지에 자동 감지 배지 표시 — "자동 감지" vs "수동 등록" 구분 + Detection Rules 상태 표시 섹션
+  - AC4: Build PASS
+
 ---
 
 ## ✅ DONE (완료)

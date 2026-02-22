@@ -36,11 +36,6 @@ const SEARCH_ITEMS: SearchItem[] = [
     section: "System Integration",
   },
   { label: "Version Control", href: "/system-integration/versions", section: "System Integration" },
-  {
-    label: "Event Bus Monitor",
-    href: "/system-integration/event-bus",
-    section: "System Integration",
-  },
   { label: "System Monitoring", href: "/operations/monitoring", section: "Operations" },
   { label: "LLM 비용", href: "/operations/llm-costs", section: "Operations" },
   { label: "Incident Management", href: "/operations/incidents", section: "Operations" },

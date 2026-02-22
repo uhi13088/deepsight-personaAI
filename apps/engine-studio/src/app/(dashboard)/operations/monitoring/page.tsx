@@ -15,6 +15,7 @@ import {
   Search,
   CheckCircle,
   XCircle,
+  ShieldAlert,
 } from "lucide-react"
 import { searchLogs, DEFAULT_METRIC_THRESHOLDS } from "@/lib/operations"
 import type {
@@ -69,6 +70,12 @@ export default function MonitoringPage() {
   const [logServiceFilter, setLogServiceFilter] = useState("")
   const [logKeyword, setLogKeyword] = useState("")
 
+  // Auto-detect state
+  const [autoDetectResult, setAutoDetectResult] = useState<{
+    created: number
+    skipped: number
+  } | null>(null)
+
   // ── Fetch data ──────────────────────────────────────────────
 
   const fetchData = useCallback(async () => {
@@ -92,9 +99,34 @@ export default function MonitoringPage() {
     }
   }, [])
 
+  // ── Auto-detect incidents from metrics ─────────────────────
+
+  const runAutoDetect = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/operations/incidents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "auto_detect" }),
+      })
+      const json = (await res.json()) as {
+        success: boolean
+        data?: { createdIncidents: string[]; skippedDuplicates: string[] }
+      }
+      if (json.success && json.data) {
+        setAutoDetectResult({
+          created: json.data.createdIncidents.length,
+          skipped: json.data.skippedDuplicates.length,
+        })
+      }
+    } catch {
+      // silent — auto-detect is best-effort
+    }
+  }, [])
+
   useEffect(() => {
     fetchData()
-  }, [fetchData])
+    runAutoDetect()
+  }, [fetchData, runAutoDetect])
 
   // ── Derived data ─────────────────────────────────────────────
 
@@ -237,6 +269,22 @@ export default function MonitoringPage() {
             새로고침
           </Button>
         </div>
+
+        {/* ── Auto-detect Banner ─────────────────────────────── */}
+        {autoDetectResult && autoDetectResult.created > 0 && (
+          <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5">
+            <ShieldAlert className="h-4 w-4 text-amber-400" />
+            <span className="text-sm text-amber-200">
+              자동 감지: <strong>{autoDetectResult.created}건</strong>의 장애가 새로 등록되었습니다.
+            </span>
+            <a
+              href="/operations/incidents"
+              className="ml-auto text-xs text-amber-400 underline hover:text-amber-300"
+            >
+              장애 관리로 이동
+            </a>
+          </div>
+        )}
 
         {/* ── 6 Metric Cards Grid ───────────────────────────── */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">

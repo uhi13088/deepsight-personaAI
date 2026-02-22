@@ -85,7 +85,6 @@ const navSections: NavSection[] = [
     children: [
       { label: "Deployment Pipeline", href: "/system-integration/deployment" },
       { label: "Version Control", href: "/system-integration/versions" },
-      { label: "Event Bus Monitor", href: "/system-integration/event-bus" },
     ],
   },
   {
