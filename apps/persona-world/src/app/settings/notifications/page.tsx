@@ -63,7 +63,10 @@ export default function NotificationSettingsPage() {
 
   // 설정 로드
   const loadPrefs = useCallback(async () => {
-    if (!userId) return
+    if (!userId) {
+      setLoading(false)
+      return
+    }
     try {
       const data = await clientApi.getNotificationPreferences(userId)
       setPrefs(data)
@@ -171,12 +174,12 @@ export default function NotificationSettingsPage() {
   const enabledCount = prefs ? NOTIFICATION_TYPES.filter((t) => prefs[t.key]).length : 8
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white">
+    <div className="flex min-h-screen flex-col bg-gray-50">
       {/* 헤더 */}
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-gray-950/80 px-4 py-3 backdrop-blur-xl">
+      <header className="sticky top-0 z-20 border-b border-gray-100 bg-white px-4 py-3">
         <div className="mx-auto flex max-w-lg items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/settings" className="rounded-lg p-1.5 transition hover:bg-white/10">
+            <Link href="/settings" className="rounded-lg p-1.5 transition hover:bg-gray-100">
               <ArrowLeft className="h-5 w-5 text-gray-400" />
             </Link>
             <PWLogoWithText size="sm" />
@@ -289,7 +292,7 @@ export default function NotificationSettingsPage() {
                 </div>
 
                 {quietEnabled && (
-                  <div className="flex items-center gap-3 rounded-lg bg-white/5 p-3">
+                  <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-3">
                     <Clock className="h-4 w-4 shrink-0 text-gray-400" />
                     <div className="flex items-center gap-2">
                       <select
@@ -297,7 +300,7 @@ export default function NotificationSettingsPage() {
                         onChange={(e) =>
                           handleQuietHourChange("quietHoursStart", Number(e.target.value))
                         }
-                        className="rounded-md bg-gray-800 px-2 py-1 text-sm text-white"
+                        className="rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900"
                       >
                         {HOURS.map((h) => (
                           <option key={h} value={h}>
@@ -311,7 +314,7 @@ export default function NotificationSettingsPage() {
                         onChange={(e) =>
                           handleQuietHourChange("quietHoursEnd", Number(e.target.value))
                         }
-                        className="rounded-md bg-gray-800 px-2 py-1 text-sm text-white"
+                        className="rounded-md border border-gray-200 bg-white px-2 py-1 text-sm text-gray-900"
                       >
                         {HOURS.map((h) => (
                           <option key={h} value={h}>

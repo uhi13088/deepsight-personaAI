@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { ArrowLeft, Coins, Check, Lock, Zap } from "lucide-react"
@@ -37,8 +37,19 @@ export default function ShopPage() {
   const [confirm, setConfirm] = useState<ConfirmState>(null)
   const [coinLoading, setCoinLoading] = useState<string | null>(null)
 
-  const balance = onboarding.creditsBalance
+  const [serverBalance, setServerBalance] = useState<number | null>(null)
+  const balance = serverBalance ?? onboarding.creditsBalance
   const items = getShopItemsByCategory(activeTab)
+
+  // 서버에서 실제 잔액 fetch (Zustand 초기값 0 문제 해결)
+  useEffect(() => {
+    const userId = profile?.id
+    if (!userId) return
+    clientApi
+      .getCredits(userId, { limit: 1 })
+      .then((data) => setServerBalance(data.balance))
+      .catch(() => {})
+  }, [profile?.id])
   const handleCoinPurchase = async (packageId: string) => {
     const userId = profile?.id
     if (!userId) {
