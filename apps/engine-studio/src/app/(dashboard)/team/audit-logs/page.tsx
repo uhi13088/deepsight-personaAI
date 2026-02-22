@@ -14,11 +14,13 @@ import {
   Users,
   Clock,
   Filter,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import type { AuditLogEntry, AuditAction, AuditTargetType, AuditSummary } from "@/lib/team"
 
 // ── Action labels ───────────────────────────────────────────────
-const ACTION_LABELS: Partial<Record<AuditAction, string>> = {
+const ACTION_LABELS: Record<AuditAction, string> = {
   "user.invited": "사용자 초대",
   "user.activated": "사용자 활성화",
   "user.deactivated": "사용자 비활성화",
@@ -49,6 +51,9 @@ const ACTION_LABELS: Partial<Record<AuditAction, string>> = {
   "team.updated": "팀 수정",
 }
 
+// ── 전체 AuditAction 목록 (필터 드롭다운용) ────────────────────
+const ALL_AUDIT_ACTIONS: AuditAction[] = Object.keys(ACTION_LABELS) as AuditAction[]
+
 // ── Target type labels ──────────────────────────────────────────
 const TARGET_TYPE_LABELS: Record<AuditTargetType, string> = {
   user: "사용자",
@@ -76,27 +81,14 @@ function getActionVariant(
   return "muted"
 }
 
-// ── Unique action types for filter dropdown ─────────────────────
-const FILTER_ACTION_TYPES: AuditAction[] = [
-  "user.invited",
-  "user.deactivated",
-  "user.role_changed",
-  "persona.created",
-  "persona.updated",
-  "persona.published",
-  "matching.executed",
-  "matching.configured",
-  "content.created",
-  "content.published",
-  "settings.updated",
-]
-
 // ── API response type ───────────────────────────────────────────
 interface AuditApiData {
   entries: AuditLogEntry[]
   totalCount: number
   summary: AuditSummary
 }
+
+const PAGE_SIZE = 50
 
 export default function AuditLogsPage() {
   const [data, setData] = useState<AuditApiData | null>(null)
@@ -109,19 +101,28 @@ export default function AuditLogsPage() {
   const [filterTargetType, setFilterTargetType] = useState<AuditTargetType | "">("")
   const [filterKeyword, setFilterKeyword] = useState("")
 
+  // ── Pagination state ─────────────────────────────────────────
+  const [page, setPage] = useState(0)
+
   // ── Expand state ────────────────────────────────────────────
   const [expandedEntry, setExpandedEntry] = useState<string | null>(null)
 
+  // 필터 변경 시 1페이지로 리셋
+  useEffect(() => {
+    setPage(0)
+  }, [filterActor, filterAction, filterTargetType, filterKeyword])
+
   // ── Fetch data from API ───────────────────────────────────────
   const fetchData = useCallback(async () => {
+    setLoading(true)
     try {
       const params = new URLSearchParams()
       if (filterActor) params.set("actor", filterActor)
       if (filterAction) params.set("action", filterAction)
       if (filterTargetType) params.set("targetType", filterTargetType)
       if (filterKeyword) params.set("keyword", filterKeyword)
-      params.set("limit", "100")
-      params.set("offset", "0")
+      params.set("limit", String(PAGE_SIZE))
+      params.set("offset", String(page * PAGE_SIZE))
 
       const qs = params.toString()
       const res = await fetch(`/api/internal/team/audit${qs ? `?${qs}` : ""}`)
@@ -137,7 +138,7 @@ export default function AuditLogsPage() {
     } finally {
       setLoading(false)
     }
-  }, [filterActor, filterAction, filterTargetType, filterKeyword])
+  }, [filterActor, filterAction, filterTargetType, filterKeyword, page])
 
   useEffect(() => {
     fetchData()
@@ -147,7 +148,6 @@ export default function AuditLogsPage() {
   const uniqueActors = (() => {
     if (!data) return []
     const actorMap = new Map<string, string>()
-    // Use summary's topActors as the source for unique actors
     for (const actor of data.summary.topActors) {
       actorMap.set(actor.actorId, actor.actorName)
     }
@@ -263,6 +263,8 @@ export default function AuditLogsPage() {
     periodEnd: null,
   }
 
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE)
+
   return (
     <>
       <Header title="Audit Logs" description="전체 작업 감사 로그" />
@@ -352,7 +354,7 @@ export default function AuditLogsPage() {
               <input
                 type="text"
                 className="border-border bg-background w-full rounded-md border py-2 pl-9 pr-3 text-sm"
-                placeholder="키워드 검색..."
+                placeholder="키워드, 사용자명 검색..."
                 value={filterKeyword}
                 onChange={(e) => setFilterKeyword(e.target.value)}
               />
@@ -375,9 +377,9 @@ export default function AuditLogsPage() {
               onChange={(e) => setFilterAction(e.target.value as AuditAction | "")}
             >
               <option value="">전체 액션</option>
-              {FILTER_ACTION_TYPES.map((action) => (
+              {ALL_AUDIT_ACTIONS.map((action) => (
                 <option key={action} value={action}>
-                  {ACTION_LABELS[action] ?? action}
+                  {ACTION_LABELS[action]}
                 </option>
               ))}
             </select>
@@ -422,9 +424,6 @@ export default function AuditLogsPage() {
                   <th className="text-muted-foreground px-4 py-3 text-left text-xs font-medium">
                     대상
                   </th>
-                  <th className="text-muted-foreground px-4 py-3 text-left text-xs font-medium">
-                    결과
-                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -460,15 +459,12 @@ export default function AuditLogsPage() {
                         <span className="text-muted-foreground mx-1 text-xs">/</span>
                         <span className="font-mono text-xs">{entry.targetId}</span>
                       </td>
-                      <td className="px-4 py-3">
-                        <Badge variant="success">성공</Badge>
-                      </td>
                     </tr>
                   )
                 })}
                 {entries.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="text-muted-foreground px-4 py-8 text-center text-sm">
+                    <td colSpan={5} className="text-muted-foreground px-4 py-8 text-center text-sm">
                       조건에 맞는 로그가 없습니다
                     </td>
                   </tr>
@@ -521,6 +517,36 @@ export default function AuditLogsPage() {
               </div>
             )
           })}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="border-border flex items-center justify-between border-t px-4 py-3">
+              <p className="text-muted-foreground text-xs">
+                {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalCount)} / {totalCount}건
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => p - 1)}
+                  disabled={page === 0}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-xs">
+                  {page + 1} / {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={page >= totalPages - 1}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>
