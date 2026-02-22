@@ -1154,11 +1154,12 @@ GET /api/internal/security/dashboard
 
 **Request Body** (action 기반)
 
-| `action`            | 추가 필드                                                       | 설명               |
-| ------------------- | --------------------------------------------------------------- | ------------------ |
-| `create_incident`   | `title`, `severity` (`P0`~`P3`), `affectedServices?`            | 인시던트 생성      |
-| `advance_phase`     | `incidentId`, `nextPhase`, `actor?`, `description?`             | 인시던트 상태 전이 |
-| `create_postmortem` | `incidentId`, `rootCause`, `affectedUsers?`, `downtimeMinutes?` | 포스트모템 작성    |
+| `action`            | 추가 필드                                                       | 설명                                          |
+| ------------------- | --------------------------------------------------------------- | --------------------------------------------- |
+| `create_incident`   | `title`, `severity` (`P0`~`P3`), `affectedServices?`            | 인시던트 생성                                 |
+| `advance_phase`     | `incidentId`, `nextPhase`, `actor?`, `description?`             | 인시던트 상태 전이                            |
+| `create_postmortem` | `incidentId`, `rootCause`, `affectedUsers?`, `downtimeMinutes?` | 포스트모템 작성                               |
+| `auto_detect`       | (없음)                                                          | 메트릭 기반 자동 감지 → 장애 생성 (중복 방지) |
 
 **심각도 기준**
 

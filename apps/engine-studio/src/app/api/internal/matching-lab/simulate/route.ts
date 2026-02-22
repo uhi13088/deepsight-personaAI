@@ -18,7 +18,6 @@ import { createRandomVirtualUser } from "@/lib/matching/simulator"
 import { calculateVFinal } from "@/lib/vector/v-final"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
 import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
-import { DEMO_PERSONA_ARCHETYPES } from "@/lib/demo-fixtures"
 import { DEFAULT_L1_VECTOR, DEFAULT_L2_VECTOR, DEFAULT_L3_VECTOR } from "@/constants/v3/dimensions"
 
 // ── DB에서 페르소나 로드 ─────────────────────────────────────
@@ -90,25 +89,6 @@ async function loadPersonasFromDB(): Promise<PersonaCandidate[]> {
   })
 }
 
-// ── 데모 페르소나 (DB에 데이터 없을 때 폴백) ────────────────
-
-function createDemoPersonas(): PersonaCandidate[] {
-  return DEMO_PERSONA_ARCHETYPES.map((a, i) => {
-    const crossAxisProfile = calculateCrossAxisProfile(a.l1, a.l2, a.l3)
-    const paradoxProfile = calculateExtendedParadoxScore(a.l1, a.l2, a.l3)
-    return {
-      id: `persona_sim_${i}`,
-      name: a.name,
-      l1: a.l1,
-      l2: a.l2,
-      l3: a.l3,
-      crossAxisProfile,
-      paradoxProfile,
-      archetype: a.archetype,
-    }
-  })
-}
-
 // ── Types ───────────────────────────────────────────────────────
 
 interface SimulateRequest {
@@ -146,17 +126,11 @@ export async function GET() {
   if (response) return response
 
   try {
-    let personas = await loadPersonasFromDB()
-    let source: "db" | "demo" = "db"
-
-    if (personas.length === 0) {
-      personas = createDemoPersonas()
-      source = "demo"
-    }
+    const personas = await loadPersonasFromDB()
 
     return NextResponse.json<ApiResponse<PersonaListResponse>>({
       success: true,
-      data: { personas, source },
+      data: { personas, source: "db" },
     })
   } catch {
     return NextResponse.json<ApiResponse<never>>(
@@ -180,16 +154,12 @@ export async function POST(request: NextRequest) {
 
     // 커스텀 페르소나가 없으면 DB에서 로드
     let personas: PersonaCandidate[]
-    let personaSource: "db" | "demo" = "db"
+    const personaSource: "db" | "demo" = "db"
 
     if (body.personas && body.personas.length > 0) {
       personas = body.personas
     } else {
       personas = await loadPersonasFromDB()
-      if (personas.length === 0) {
-        personas = createDemoPersonas()
-        personaSource = "demo"
-      }
     }
 
     if (personas.length === 0) {

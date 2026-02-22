@@ -171,34 +171,7 @@ async function seedEndpointsIfEmpty(): Promise<void> {
     })
   }
 
-  // Record sample health checks for seeded endpoints
-  const seeded = await prisma.apiEndpoint.findMany()
-  for (const row of seeded) {
-    const ep = toLibEndpoint(row)
-    if (ep.status === "active" && ep.healthCheck.enabled) {
-      const isHealthy = ep.path !== "/api/v3/match"
-      const responseTimeMs = isHealthy ? 50 + Math.floor(Math.random() * 200) : 4200
-      const result: HealthCheckResult = {
-        endpointId: ep.id,
-        status: isHealthy ? "healthy" : "degraded",
-        responseTimeMs,
-        checkedAt: Date.now(),
-        consecutiveFailures: isHealthy ? 0 : 1,
-        lastSuccessAt: isHealthy ? Date.now() : null,
-        errorMessage: isHealthy ? null : "High latency",
-      }
-      await prisma.systemConfig.upsert({
-        where: { category_key: { category: "HEALTH_CHECK", key: ep.id } },
-        update: { value: result as unknown as Prisma.InputJsonValue },
-        create: {
-          category: "HEALTH_CHECK",
-          key: ep.id,
-          value: result as unknown as Prisma.InputJsonValue,
-          description: `Health check result for ${ep.name}`,
-        },
-      })
-    }
-  }
+  // 시드 후 헬스체크 결과는 실제 요청 시 생성됨 (수동 체크 버튼 사용)
 }
 
 // ── Load health check results from SystemConfig ──────────────
@@ -384,8 +357,41 @@ export async function POST(request: NextRequest) {
         })
         const prevResult = prevConfig ? (prevConfig.value as unknown as HealthCheckResult) : null
 
-        const success = Math.random() > 0.3
-        const responseTimeMs = success ? 50 + Math.floor(Math.random() * 300) : 0
+        // 실제 HTTP 요청으로 헬스체크
+        let success = false
+        let responseTimeMs = 0
+        let errorMessage: string | null = null
+
+        const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000"
+        const targetUrl = `${baseUrl}${ep.path}`
+        const startTime = Date.now()
+
+        try {
+          const controller = new AbortController()
+          const timeout = setTimeout(() => controller.abort(), ep.healthCheck.timeoutMs)
+
+          const res = await fetch(targetUrl, {
+            method: "HEAD",
+            signal: controller.signal,
+            redirect: "follow",
+          })
+          clearTimeout(timeout)
+
+          responseTimeMs = Date.now() - startTime
+          success = res.status < 500
+          if (!success) {
+            errorMessage = `HTTP ${res.status}`
+          }
+        } catch (err) {
+          responseTimeMs = Date.now() - startTime
+          errorMessage =
+            err instanceof Error && err.name === "AbortError"
+              ? `Timeout (${ep.healthCheck.timeoutMs}ms)`
+              : err instanceof Error
+                ? err.message
+                : "Connection failed"
+        }
+
         const consecutiveFailures = success ? 0 : (prevResult?.consecutiveFailures ?? 0) + 1
 
         let status: HealthCheckResult["status"]
@@ -406,7 +412,7 @@ export async function POST(request: NextRequest) {
           checkedAt: Date.now(),
           consecutiveFailures,
           lastSuccessAt: success ? Date.now() : (prevResult?.lastSuccessAt ?? null),
-          errorMessage: success ? null : "Connection timeout",
+          errorMessage,
         }
 
         await prisma.systemConfig.upsert({

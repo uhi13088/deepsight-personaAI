@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Shield,
+  ShieldAlert,
   AlertTriangle,
   Clock,
   Plus,
@@ -15,9 +16,17 @@ import {
   FileText,
   BarChart3,
   X,
+  Eye,
+  EyeOff,
 } from "lucide-react"
 import { INCIDENT_SEVERITY_DEFINITIONS } from "@/lib/operations"
-import type { Incident, IncidentSeverity, IncidentPhase, PostMortem } from "@/lib/operations"
+import type {
+  Incident,
+  IncidentSeverity,
+  IncidentPhase,
+  PostMortem,
+  DetectionRule,
+} from "@/lib/operations"
 
 // ── Severity badge mapping ─────────────────────────────────────
 
@@ -123,6 +132,7 @@ function formatMTTR(minutes: number): React.ReactNode {
 interface IncidentData {
   incidents: Incident[]
   postMortems: PostMortem[]
+  detectionRules: DetectionRule[]
   stats: {
     totalIncidents: number
     mttrMinutes: number
@@ -378,6 +388,46 @@ export default function IncidentsPage() {
           </div>
         </div>
 
+        {/* ── Detection Rules ─────────────────────────────────── */}
+        {data.detectionRules && data.detectionRules.length > 0 && (
+          <div className="bg-card rounded-lg border p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4 text-blue-400" />
+              <h3 className="text-sm font-medium">자동 감지 규칙</h3>
+              <Badge variant="muted">{data.detectionRules.length}개</Badge>
+            </div>
+            <div className="space-y-2">
+              {data.detectionRules.map((rule) => (
+                <div
+                  key={rule.id}
+                  className="flex items-center justify-between rounded-md border px-3 py-2"
+                >
+                  <div className="flex items-center gap-3">
+                    {rule.enabled ? (
+                      <Eye className="h-4 w-4 text-emerald-400" />
+                    ) : (
+                      <EyeOff className="h-4 w-4 text-gray-500" />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium">{rule.name}</p>
+                      <p className="text-muted-foreground text-xs">{rule.description}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground text-xs">
+                      {rule.metricType} {rule.condition === "above" ? ">" : "<"} {rule.threshold}
+                    </span>
+                    <Badge variant={SEVERITY_BADGE[rule.severity].variant}>{rule.severity}</Badge>
+                    <Badge variant={rule.enabled ? "success" : "muted"}>
+                      {rule.enabled ? "활성" : "비활성"}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ── Create Incident Button/Form ───────────────────── */}
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-medium">장애 목록</h3>
@@ -519,7 +569,15 @@ export default function IncidentsPage() {
                       {incident.severity}
                     </Badge>
                     <div>
-                      <p className="text-sm font-medium">{incident.title}</p>
+                      <p className="flex items-center gap-1.5 text-sm font-medium">
+                        {incident.title.startsWith("[자동감지]") && (
+                          <Badge variant="info" className="text-[10px]">
+                            <ShieldAlert className="mr-0.5 h-3 w-3" />
+                            자동감지
+                          </Badge>
+                        )}
+                        {incident.title.replace("[자동감지] ", "")}
+                      </p>
                       <div className="mt-0.5 flex items-center gap-1.5">
                         {incident.affectedServices.length > 0 ? (
                           incident.affectedServices.map((svc) => {

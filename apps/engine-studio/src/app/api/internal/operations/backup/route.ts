@@ -11,7 +11,53 @@ import {
   evaluateDRDrillResult,
 } from "@/lib/operations"
 import type { BackupPolicy, BackupRecord, DRPlan, DRDrill } from "@/lib/operations"
-import { DEMO_DR_PLAN } from "@/lib/demo-fixtures"
+
+// 기본 DR 계획 (SystemConfig에 없을 때 사용)
+const DEFAULT_DR_PLAN = {
+  name: "데이터베이스 장애 복구",
+  scenario: "database_failure" as const,
+  rtoMinutes: 30,
+  rpoMinutes: 5,
+  steps: [
+    {
+      description: "DB 페일오버 실행",
+      responsible: "DBA팀",
+      estimatedMinutes: 10,
+      prerequisites: [] as string[],
+      verificationCommand: "pg_isready",
+    },
+    {
+      description: "트래픽 리다이렉트",
+      responsible: "인프라팀",
+      estimatedMinutes: 5,
+      prerequisites: ["DB 페일오버 실행"],
+      verificationCommand: null,
+    },
+    {
+      description: "서비스 검증",
+      responsible: "QA팀",
+      estimatedMinutes: 15,
+      prerequisites: ["트래픽 리다이렉트"],
+      verificationCommand: "curl /health",
+    },
+  ],
+  contacts: [
+    {
+      name: "DBA 담당자",
+      role: "DBA Lead",
+      phone: "000-0000-0000",
+      email: "dba@example.com",
+      isPrimary: true,
+    },
+    {
+      name: "인프라 담당자",
+      role: "Infra Lead",
+      phone: "000-0000-0000",
+      email: "infra@example.com",
+      isPrimary: false,
+    },
+  ],
+}
 import { Prisma } from "@/generated/prisma"
 import type { BackupRecord as DbBackupRecord, DRDrill as DbDRDrill } from "@/generated/prisma"
 
@@ -71,13 +117,14 @@ async function loadDRPlan(): Promise<DRPlan> {
   if (row) {
     return row.value as unknown as DRPlan
   }
+  // Create default from DEFAULT_DR_PLAN and persist it
   const plan = createDRPlan(
-    DEMO_DR_PLAN.name,
-    DEMO_DR_PLAN.scenario,
-    DEMO_DR_PLAN.rtoMinutes,
-    DEMO_DR_PLAN.rpoMinutes,
-    DEMO_DR_PLAN.steps,
-    DEMO_DR_PLAN.contacts
+    DEFAULT_DR_PLAN.name,
+    DEFAULT_DR_PLAN.scenario,
+    DEFAULT_DR_PLAN.rtoMinutes,
+    DEFAULT_DR_PLAN.rpoMinutes,
+    DEFAULT_DR_PLAN.steps,
+    DEFAULT_DR_PLAN.contacts
   )
   await prisma.systemConfig.create({
     data: {

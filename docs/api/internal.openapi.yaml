@@ -1847,7 +1847,7 @@ components:
       properties:
         action:
           type: string
-          enum: [create_incident, advance_phase, create_postmortem]
+          enum: [create_incident, advance_phase, create_postmortem, auto_detect]
         title: { type: string }
         severity: { type: string, enum: [P0, P1, P2, P3] }
         affectedServices: { type: array, items: { type: string } }
