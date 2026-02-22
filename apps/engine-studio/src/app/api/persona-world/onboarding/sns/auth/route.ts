@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import type { SNSPlatform } from "@/generated/prisma"
 import {
   buildAuthUrl,
+  getRedirectUri,
   isOAuthSupported,
   OAUTH_SUPPORTED_PLATFORMS,
   UPLOAD_ONLY_PLATFORMS,
@@ -94,6 +95,7 @@ export async function POST(request: NextRequest) {
         method: "oauth" as const,
         authUrl,
         platform: snsPlatform,
+        redirectUri: getRedirectUri(snsPlatform),
       },
     })
   } catch (error) {

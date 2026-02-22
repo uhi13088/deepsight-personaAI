@@ -126,9 +126,17 @@ function getClientCredentials(platform: SNSPlatform): {
   return { clientId, clientSecret }
 }
 
-function getRedirectUri(platform: SNSPlatform): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? ""
-  return `${baseUrl}/api/persona-world/onboarding/sns/callback?platform=${platform.toLowerCase()}`
+export function getRedirectUri(platform: SNSPlatform): string {
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? process.env.APP_URL ?? ""
+  if (!baseUrl) {
+    console.error(
+      "[sns-oauth] NEXT_PUBLIC_APP_URL / NEXTAUTH_URL 환경변수가 설정되지 않았습니다. redirect_uri가 유효하지 않습니다."
+    )
+  }
+  // 쿼리 파라미터 대신 경로 기반으로 플랫폼 식별
+  // Google Cloud Console에 등록할 URI: {baseUrl}/api/persona-world/onboarding/sns/callback/youtube
+  return `${baseUrl}/api/persona-world/onboarding/sns/callback/${platform.toLowerCase()}`
 }
 
 // ── OAuth URL 빌드 ───────────────────────────────────────────
