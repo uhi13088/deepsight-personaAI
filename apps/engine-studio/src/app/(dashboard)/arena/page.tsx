@@ -342,16 +342,36 @@ function SessionDetailPanel({ sessionId, onClose }: { sessionId: string; onClose
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const loadDetail = async () => {
+    const res = await fetch(`/api/internal/arena/sessions/${sessionId}`)
+    const json = (await res.json()) as {
+      success: boolean
+      data?: SessionDetail
+      error?: { message: string }
+    }
+    if (json.success && json.data) return json.data
+    throw new Error(json.error?.message ?? "로드 실패")
+  }
+
   useEffect(() => {
     setLoading(true)
-    fetch(`/api/internal/arena/sessions/${sessionId}`)
-      .then((r) => r.json())
-      .then((json: { success: boolean; data?: SessionDetail; error?: { message: string } }) => {
-        if (json.success && json.data) setDetail(json.data)
-        else setError(json.error?.message ?? "로드 실패")
+    loadDetail()
+      .then(async (data) => {
+        // 판정이 있고 교정이 아직 없으면 자동 교정 생성 (minor → 즉시 반영)
+        if (data.judgment && data.qualityImpact.totalCorrections === 0) {
+          await fetch(`/api/internal/arena/sessions/${sessionId}/corrections/generate`, {
+            method: "POST",
+          }).catch(() => null) // 실패해도 보고서는 표시
+          // 교정 생성 후 최신 상태 다시 로드
+          const refreshed = await loadDetail()
+          setDetail(refreshed)
+        } else {
+          setDetail(data)
+        }
       })
-      .catch(() => setError("네트워크 오류"))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "네트워크 오류"))
       .finally(() => setLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId])
 
   if (loading) {

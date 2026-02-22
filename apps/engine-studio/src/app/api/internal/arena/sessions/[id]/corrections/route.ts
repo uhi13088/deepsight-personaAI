@@ -2,14 +2,57 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 
+// ── 헬퍼: 교정 내용을 페르소나에 반영 ─────────────────────────────
+
+async function applyPersonaCorrection(correction: {
+  id: string
+  personaId: string
+  category: string
+  reason: string
+  correctedContent: string
+}): Promise<void> {
+  // voiceProfile JSON 머지 (기존 데이터 보존)
+  const persona = await prisma.persona.findUnique({
+    where: { id: correction.personaId },
+    select: { voiceProfile: true, consistencyScore: true },
+  })
+  if (!persona) return
+
+  const existingVoice = (persona.voiceProfile as Record<string, unknown>) ?? {}
+
+  const updateData: Record<string, unknown> = {
+    voiceProfile: {
+      ...existingVoice,
+      correctionApplied: true,
+      lastCorrectionAt: new Date().toISOString(),
+      lastCorrectionReason: correction.reason,
+      lastCorrectionCategory: correction.category,
+      lastCorrectionId: correction.id,
+    },
+  }
+
+  // consistency 카테고리: consistencyScore 소폭 상향 (+0.01, max 1.0)
+  if (correction.category === "consistency") {
+    const current = Number(persona.consistencyScore ?? 0)
+    updateData.consistencyScore = Math.min(1.0, current + 0.01)
+  }
+
+  await prisma.persona.update({
+    where: { id: correction.personaId },
+    data: updateData,
+  })
+}
+
 /**
  * POST /api/internal/arena/sessions/[id]/corrections
  *
  * 아레나 세션의 심판 판정에서 교정 요청 생성.
+ * severity === "minor" 인 경우 자동 승인 후 페르소나에 즉시 반영.
  *
  * Body:
  * - personaId: string (교정 대상 페르소나)
  * - category: string (consistency|l2|paradox|trigger|voice)
+ * - severity?: "minor" | "major" | "critical" (기본값: "major")
  * - originalContent: string (원본 텍스트)
  * - correctedContent: string (교정된 텍스트)
  * - reason: string (교정 사유)
@@ -32,7 +75,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    const { personaId, category, originalContent, correctedContent, reason } = body
+    const { personaId, category, severity, originalContent, correctedContent, reason } = body
 
     // 필수 필드 검증
     if (!personaId || typeof personaId !== "string") {
@@ -85,6 +128,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
+    // minor severity → 자동 승인
+    const isMinor = severity === "minor"
+    const initialStatus = isMinor ? "APPROVED" : "PENDING"
+
     // 세션 + 판정 존재 확인
     const session = await prisma.arenaSession.findUnique({
       where: { id: sessionId },
@@ -124,9 +171,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         originalContent,
         correctedContent,
         reason,
-        status: "PENDING",
+        status: initialStatus,
+        ...(isMinor && {
+          reviewedAt: new Date(),
+          reviewedBy: "auto",
+        }),
       },
     })
+
+    // minor → 즉시 페르소나 반영
+    let personaUpdated = false
+    if (isMinor) {
+      await applyPersonaCorrection({
+        id: correction.id,
+        personaId: correction.personaId,
+        category: correction.category,
+        reason: correction.reason,
+        correctedContent: correction.correctedContent,
+      })
+      personaUpdated = true
+    }
 
     return NextResponse.json({
       success: true,
@@ -137,8 +201,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           personaId: correction.personaId,
           category: correction.category,
           status: correction.status,
+          autoApplied: isMinor,
           createdAt: correction.createdAt.toISOString(),
         },
+        personaUpdated,
       },
     })
   } catch (error) {
@@ -157,6 +223,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  * PATCH /api/internal/arena/sessions/[id]/corrections
  *
  * 교정 요청 승인/거부.
+ * 승인 시 모든 카테고리(voice/consistency/l2/paradox/trigger) 페르소나에 반영.
  *
  * Body:
  * - correctionId: string
@@ -241,21 +308,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       },
     })
 
-    // 승인 시 voiceProfile 반영 (AC2)
-    let voiceProfileUpdated = false
-    if (action === "approve" && correction.category === "voice") {
-      await prisma.persona.update({
-        where: { id: correction.personaId },
-        data: {
-          voiceProfile: {
-            // JSON merge: 교정 사유를 기록
-            correctionApplied: true,
-            lastCorrectionAt: new Date().toISOString(),
-            lastCorrectionReason: correction.reason,
-          },
-        },
+    // 승인 시 모든 카테고리 페르소나 반영
+    let personaUpdated = false
+    if (action === "approve") {
+      await applyPersonaCorrection({
+        id: correction.id,
+        personaId: correction.personaId,
+        category: correction.category,
+        reason: correction.reason,
+        correctedContent: correction.correctedContent,
       })
-      voiceProfileUpdated = true
+      personaUpdated = true
     }
 
     return NextResponse.json({
@@ -267,7 +330,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           reviewedAt: updated.reviewedAt?.toISOString() ?? null,
           reviewedBy: updated.reviewedBy,
         },
-        voiceProfileUpdated,
+        personaUpdated,
       },
     })
   } catch (error) {
