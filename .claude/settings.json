@@ -9,11 +9,7 @@
       "Bash(wget:*)",
       "Bash(sudo:*)"
     ],
-    "ask": [
-      "Bash(git push --force:*)",
-      "Bash(pnpm publish:*)",
-      "Bash(pnpm run deploy:*)"
-    ],
+    "ask": ["Bash(git push --force:*)", "Bash(pnpm publish:*)", "Bash(pnpm run deploy:*)"],
     "allow": [
       "Read(./**)",
       "Write(./**)",
