@@ -1159,6 +1159,40 @@
   - AC4: ✅ CRITICAL 교정 시 reasons에 "[자동 교정] ..." 내역 기록 (운영자 사후 확인용)
   - AC5: ✅ 단위 테스트 42개 PASS + Build PASS
 
+### Phase OPS-A: Operations 가짜 데이터 일괄 제거 (T184~T187)
+
+> 감사 결과: Backup/DR/Incident 메뉴에 Math.random(), 하드코딩 결과값, 가짜 용량 데이터 다수 발견.
+> 원칙: 가짜 데이터 0 — 없는 데이터는 보여주지 않거나 안내로 대체. 사용자 입력이 필요한 곳은 폼으로.
+
+- [x] **T184: Backup 페이지 — 가짜 백업 실행 제거 + Neon 자동백업 안내** ✅ 2026-02-22
+  - 배경: Vercel+Neon 환경에서 "백업 실행" 버튼은 150MB 고정값/랜덤 체크섬의 가짜 DB 레코드만 생성. Neon이 PITR 자동백업을 제공하므로 앱 레벨 백업 불필요
+  - AC1: ✅ `backup/route.ts` — `create_backup` action 완전 제거. 가짜 백업 레코드 생성 코드(150MB 고정, 랜덤 체크섬) 삭제
+  - AC2: ✅ `backup/route.ts` — `buildDefaultCapacityReport()` 제거, GET 응답에서 `capacityReport` 제거
+  - AC3: ✅ `backup/page.tsx` — "백업 실행" 버튼 제거, 정책 카드를 "참고용" 표시로 변경
+  - AC4: ✅ `backup/page.tsx` — 상단에 Neon 자동백업 안내 배너 추가 (Neon 콘솔 링크 포함)
+  - AC5: ✅ `backup/page.tsx` — 가짜 Capacity Report 섹션 제거 → T186 실측 현황으로 교체
+  - AC6: ✅ Build PASS
+
+- [x] **T185: DR 드릴 완료 — 랜덤값 제거 + 사용자 입력 폼** ✅ 2026-02-22
+  - 배경: "훈련 완료" 버튼이 RTO=25~40분(랜덤), RPO=3~8분(랜덤), findings/improvements 고정 문자열을 자동 저장. SLA 지표를 조작하는 것과 같음
+  - AC1: ✅ `backup/route.ts` — `complete_drill`: Math.random() 완전 제거. `actualRtoMinutes`, `actualRpoMinutes` 필수값으로 요구, `findings`/`improvements` 사용자 입력 수신
+  - AC2: ✅ `backup/page.tsx` — "완료 입력" 버튼 클릭 시 인라인 폼 표시 (RTO, RPO 필수, 발견/개선사항 선택). "자동 생성 없음" 안내 명시
+  - AC3: ✅ `backup/route.ts` — `schedule_drill`: body에서 `scheduledAt` 수신 가능 (없으면 7일 기본값, 주석 명시)
+  - AC4: ✅ Build PASS
+
+- [x] **T186: Capacity Report — 실 DB 쿼리로 교체** ✅ 2026-02-22
+  - 배경: `buildDefaultCapacityReport()`의 30일 이력이 `10 + day * 0.5` 등 공식으로 생성한 완전 가짜 데이터. 실제 LlmUsageLog, Persona 집계로 교체
+  - AC1: ✅ `backup/route.ts` — `buildRealCapacitySnapshot()`: Promise.all로 3개 실 DB 쿼리 (활성 페르소나 count, LLM 30일 집계, 매칭 30일 count)
+  - AC2: ✅ 스냅샷 이력 없이 현재 단일 시점 실측값만 표시 (Decimal 타입 Number() 변환 포함)
+  - AC3: ✅ `backup/page.tsx` — 4개 실측 현황 카드 (활성 페르소나/LLM 호출/LLM 비용/매칭 횟수) 표시
+  - AC4: ✅ Build PASS
+
+- [x] **T187: Post-mortem — 하드코딩 액션아이템/교훈 제거** ✅ 2026-02-22
+  - 배경: 모든 장애 사후분석에 "모니터링 개선 (ops-team, 7일)" 액션과 "알림 임계값 조정 필요" 교훈이 자동 삽입됨. 실제 분석과 무관한 고정값
+  - AC1: ✅ `incidents/route.ts` — `createPostMortem` 호출에서 하드코딩 actionItems/lessons 제거, 빈 배열 기본값
+  - AC2: ✅ `incidents/route.ts` — POST body에서 `actionItems` (priority 타입 안전 포함), `lessons` 수신하여 전달
+  - AC3: ✅ Build PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)

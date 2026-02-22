@@ -252,10 +252,17 @@ interface IncidentPostRequest {
   nextPhase?: IncidentPhase
   actor?: string
   description?: string
-  // For create_postmortem
+  // For create_postmortem — T187: 사용자 입력값 (하드코딩 제거)
   rootCause?: string
   affectedUsers?: number
   downtimeMinutes?: number
+  actionItems?: Array<{
+    description: string
+    assignee: string
+    dueDate: number
+    priority: "high" | "medium" | "low"
+  }>
+  lessons?: string[]
 }
 
 export async function POST(request: NextRequest) {
@@ -428,7 +435,7 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Use lib function for business logic
+      // T187: 하드코딩 제거 — 사용자가 제공한 actionItems/lessons 사용 (기본값 빈 배열)
       const libIncident = dbIncidentToLib(dbIncident as unknown as DbIncidentRow)
       const pm = createPostMortem(
         libIncident,
@@ -436,15 +443,8 @@ export async function POST(request: NextRequest) {
         body.affectedUsers ?? 0,
         body.downtimeMinutes ?? 0,
         false,
-        [
-          {
-            description: "모니터링 개선",
-            assignee: "ops-team",
-            dueDate: Date.now() + 7 * 86400000,
-            priority: "high",
-          },
-        ],
-        ["재발 방지 위해 알림 임계값 조정 필요"]
+        body.actionItems ?? [],
+        body.lessons ?? []
       )
 
       // Persist to DB
