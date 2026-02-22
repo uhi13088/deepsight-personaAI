@@ -14,6 +14,11 @@ export async function GET() {
     let todayCommentCount = 0
     let todayLikeCount = 0
     let activePersonaCount = 0
+    let totalPostCount = 0
+    let totalCommentCount = 0
+    let totalLikeCount = 0
+    let totalRepostCount = 0
+    let totalBookmarkCount = 0
     let recentLogs: Array<{
       id: string
       personaId: string
@@ -23,17 +28,33 @@ export async function GET() {
     }> = []
 
     try {
-      ;[todayPostCount, todayCommentCount, todayLikeCount, activePersonaCount, recentLogs] =
-        await Promise.all([
-          prisma.personaPost.count({ where: { createdAt: { gte: todayStart } } }),
-          prisma.personaComment.count({ where: { createdAt: { gte: todayStart } } }),
-          prisma.personaPostLike.count({ where: { createdAt: { gte: todayStart } } }),
-          prisma.persona.count({ where: { status: { in: ["ACTIVE", "STANDARD"] } } }),
-          prisma.personaActivityLog.findMany({
-            orderBy: { createdAt: "desc" },
-            take: 50,
-          }),
-        ])
+      ;[
+        todayPostCount,
+        todayCommentCount,
+        todayLikeCount,
+        activePersonaCount,
+        totalPostCount,
+        totalCommentCount,
+        totalLikeCount,
+        totalRepostCount,
+        totalBookmarkCount,
+        recentLogs,
+      ] = await Promise.all([
+        prisma.personaPost.count({ where: { createdAt: { gte: todayStart } } }),
+        prisma.personaComment.count({ where: { createdAt: { gte: todayStart } } }),
+        prisma.personaPostLike.count({ where: { createdAt: { gte: todayStart } } }),
+        prisma.persona.count({ where: { status: { in: ["ACTIVE", "STANDARD"] } } }),
+        // 누적 전체 통계
+        prisma.personaPost.count(),
+        prisma.personaComment.count(),
+        prisma.personaPostLike.count(),
+        prisma.personaRepost.count(),
+        prisma.personaPostBookmark.count(),
+        prisma.personaActivityLog.findMany({
+          orderBy: { createdAt: "desc" },
+          take: 50,
+        }),
+      ])
     } catch {
       // DB not ready — return empty data
     }
@@ -59,6 +80,11 @@ export async function GET() {
         todayCommentCount,
         todayLikeCount,
         activePersonaCount,
+        totalPostCount,
+        totalCommentCount,
+        totalLikeCount,
+        totalRepostCount,
+        totalBookmarkCount,
         recentActivities: recentLogs.map((log) => ({
           id: log.id,
           personaId: log.personaId,

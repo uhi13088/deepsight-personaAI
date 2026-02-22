@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { MessageCircle, Heart, Loader2, Send } from "lucide-react"
 import Link from "next/link"
+import { toast } from "sonner"
 import { clientApi } from "@/lib/api"
 import { useUserStore } from "@/lib/user-store"
 import { COMMENT_TONE_CONFIG, ROLE_COLORS_BOLD } from "@/lib/role-config"
@@ -33,13 +34,17 @@ export function PWCommentList({ postId, commentCount }: PWCommentListProps) {
     try {
       const data = await clientApi.getComments(postId)
       setComments(data.comments)
+      // 서버에서 받은 댓글 수가 더 많으면 카운트 동기화 (다른 세션에서 추가된 경우)
+      if (data.total > displayCount) {
+        setDisplayCount(data.total)
+      }
       setLoaded(true)
     } catch (error) {
       console.error("Failed to load comments:", error)
     } finally {
       setLoading(false)
     }
-  }, [postId, loaded])
+  }, [postId, loaded, displayCount])
 
   useEffect(() => {
     if (open && !loaded) {
@@ -65,20 +70,24 @@ export function PWCommentList({ postId, commentCount }: PWCommentListProps) {
 
       {/* 댓글 영역 */}
       {open && (
-        <div className="mt-3 space-y-3">
-          {/* 댓글 입력 */}
-          <CommentInput postId={postId} onPosted={handleCommentPosted} />
-
+        <div className="mt-3 space-y-2">
           {/* 댓글 목록 */}
           {loading ? (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="h-5 w-5 animate-spin text-purple-500" />
             </div>
           ) : comments.length > 0 ? (
-            comments.map((comment) => <CommentItem key={comment.id} comment={comment} />)
+            <div className="space-y-2">
+              {comments.map((comment) => (
+                <CommentItem key={comment.id} comment={comment} />
+              ))}
+            </div>
           ) : (
             <p className="py-3 text-center text-sm text-gray-400">아직 댓글이 없습니다</p>
           )}
+
+          {/* 댓글 입력 — 목록 아래 배치 */}
+          <CommentInput postId={postId} onPosted={handleCommentPosted} />
         </div>
       )}
     </div>
@@ -111,34 +120,46 @@ function CommentInput({
       setContent("")
     } catch (error) {
       console.error("Failed to post comment:", error)
+      toast.error("댓글 작성에 실패했습니다. 다시 시도해주세요.")
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-purple-600 text-[10px] font-bold text-white">
+    <div className="flex items-start gap-2.5 border-t border-gray-100 pt-2">
+      {/* 유저 아바타 */}
+      <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-purple-600 text-xs font-bold text-white shadow-sm">
         {profile.nickname.charAt(0)}
       </div>
-      <div className="flex flex-1 items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5">
-        <input
-          type="text"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && handleSubmit()}
-          placeholder="댓글을 입력하세요..."
-          maxLength={1000}
-          disabled={submitting}
-          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400"
-        />
-        <button
-          onClick={handleSubmit}
-          disabled={!content.trim() || submitting}
-          className="flex-shrink-0 text-purple-500 disabled:text-gray-300"
-        >
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        </button>
+      {/* 입력 영역 */}
+      <div className="flex flex-1 flex-col gap-1.5">
+        <div className="flex items-center gap-2 rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 transition-all focus-within:border-purple-300 focus-within:bg-white focus-within:shadow-sm">
+          <input
+            type="text"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && handleSubmit()}
+            placeholder={`${profile.nickname}(으)로 댓글 달기...`}
+            maxLength={1000}
+            disabled={submitting}
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400"
+          />
+          <button
+            onClick={handleSubmit}
+            disabled={!content.trim() || submitting}
+            className="flex-shrink-0 rounded-full p-0.5 text-purple-500 transition-colors hover:text-purple-600 disabled:text-gray-300"
+          >
+            {submitting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </button>
+        </div>
+        {content.length > 900 && (
+          <p className="px-1 text-right text-[10px] text-gray-400">{content.length}/1000</p>
+        )}
       </div>
     </div>
   )
