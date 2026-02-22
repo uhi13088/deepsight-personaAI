@@ -88,7 +88,20 @@ const FILTER_LEVELS: { value: FilterLevel; label: string; description: string; d
       description: "최소한의 필터링",
       detail: "치명적 → 차단 | 높음 → 플래그 | 보통·낮음 → 통과",
     },
+    {
+      value: "off",
+      label: "미적용",
+      description: "필터링 비활성화",
+      detail: "모든 심각도 → 통과 (필터 미적용)",
+    },
   ]
+
+const LEVEL_LABEL: Record<FilterLevel, string> = {
+  strict: "엄격",
+  moderate: "보통",
+  permissive: "관대",
+  off: "미적용",
+}
 
 // ── API response shape ───────────────────────────────────────
 interface LogSummary {
@@ -161,7 +174,7 @@ export default function SafetyFiltersPage() {
   // ── Add forbidden word ─────────────────────────────────────────
   const handleAddWord = useCallback(async () => {
     if (!newWord.trim() || !newCategory.trim()) {
-      setAddError("Word and category are required")
+      setAddError("단어와 카테고리는 필수입니다")
       return
     }
     try {
@@ -180,14 +193,14 @@ export default function SafetyFiltersPage() {
       if (json.success && json.data) {
         setData(json.data)
         setNewWord("")
-        setNewCategory("")
+        setNewCategory(CATEGORY_OPTIONS[0].value)
         setNewSeverity("medium")
         setAddError(null)
       } else {
-        setAddError(json.error?.message ?? "Failed to add word")
+        setAddError(json.error?.message ?? "금기어 추가 실패")
       }
     } catch {
-      setAddError("Failed to add word")
+      setAddError("금기어 추가 실패")
     }
   }, [newWord, newCategory, newSeverity])
 
@@ -215,7 +228,7 @@ export default function SafetyFiltersPage() {
       const res = await fetch("/api/internal/global-config/safety", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "evaluate", input: testInput }),
+        body: JSON.stringify({ action: "evaluate_test", input: testInput }),
       })
       const json = await res.json()
       if (json.success && json.data) {
@@ -262,21 +275,23 @@ export default function SafetyFiltersPage() {
         <div className="bg-card rounded-lg border p-4">
           <div className="mb-4 flex items-center gap-2">
             <Shield className="text-muted-foreground h-4 w-4" />
-            <h3 className="text-sm font-medium">Filter Level</h3>
+            <h3 className="text-sm font-medium">필터 강도</h3>
             <Badge
               variant={
                 filterConfig.level === "strict"
                   ? "destructive"
                   : filterConfig.level === "moderate"
                     ? "warning"
-                    : "info"
+                    : filterConfig.level === "permissive"
+                      ? "info"
+                      : "muted"
               }
             >
-              {filterConfig.level}
+              {LEVEL_LABEL[filterConfig.level] ?? filterConfig.level}
             </Badge>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-4">
             {FILTER_LEVELS.map((level) => (
               <button
                 key={level.value}
@@ -288,7 +303,10 @@ export default function SafetyFiltersPage() {
                 }`}
               >
                 <p className="text-sm font-medium">{level.label}</p>
-                <p className="text-muted-foreground mt-1 text-xs">{level.description}</p>
+                <p className="text-muted-foreground mt-0.5 text-[10px]">{level.description}</p>
+                <p className="text-muted-foreground mt-1 text-[10px] leading-relaxed">
+                  {level.detail}
+                </p>
               </button>
             ))}
           </div>
@@ -299,50 +317,52 @@ export default function SafetyFiltersPage() {
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Lock className="text-muted-foreground h-4 w-4" />
-              <h3 className="text-sm font-medium">
-                Forbidden Words ({filterConfig.forbiddenWords.length})
-              </h3>
+              <h3 className="text-sm font-medium">금기어 ({filterConfig.forbiddenWords.length})</h3>
             </div>
           </div>
 
           {/* Add new word form */}
           <div className="mb-4 flex flex-wrap items-end gap-2">
             <div className="space-y-1">
-              <label className="text-muted-foreground text-[10px]">Word</label>
+              <label className="text-muted-foreground text-[10px]">단어</label>
               <input
                 type="text"
                 value={newWord}
                 onChange={(e) => setNewWord(e.target.value)}
-                placeholder="Enter word..."
+                placeholder="금기어 입력..."
                 className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-muted-foreground text-[10px]">Category</label>
-              <input
-                type="text"
+              <label className="text-muted-foreground text-[10px]">카테고리</label>
+              <select
                 value={newCategory}
                 onChange={(e) => setNewCategory(e.target.value)}
-                placeholder="e.g. violence"
                 className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
-              />
+              >
+                {CATEGORY_OPTIONS.map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label} ({cat.value})
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="space-y-1">
-              <label className="text-muted-foreground text-[10px]">Severity</label>
+              <label className="text-muted-foreground text-[10px]">심각도</label>
               <select
                 value={newSeverity}
                 onChange={(e) => setNewSeverity(e.target.value as ForbiddenWord["severity"])}
                 className="border-border bg-background rounded-md border px-2 py-1.5 text-xs"
               >
-                <option value="critical">Critical</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
+                <option value="critical">{SEVERITY_LABEL.critical} (critical)</option>
+                <option value="high">{SEVERITY_LABEL.high} (high)</option>
+                <option value="medium">{SEVERITY_LABEL.medium} (medium)</option>
+                <option value="low">{SEVERITY_LABEL.low} (low)</option>
               </select>
             </div>
             <Button size="sm" onClick={handleAddWord}>
               <Plus className="mr-1 h-3.5 w-3.5" />
-              Add
+              추가
             </Button>
           </div>
           {addError && <p className="mb-3 text-xs text-red-400">{addError}</p>}
@@ -352,19 +372,15 @@ export default function SafetyFiltersPage() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-border border-b">
-                  <th className="text-muted-foreground px-3 py-2 text-left font-medium">Word</th>
+                  <th className="text-muted-foreground px-3 py-2 text-left font-medium">단어</th>
                   <th className="text-muted-foreground px-3 py-2 text-left font-medium">
-                    Category
+                    카테고리
                   </th>
-                  <th className="text-muted-foreground px-3 py-2 text-left font-medium">
-                    Severity
-                  </th>
+                  <th className="text-muted-foreground px-3 py-2 text-left font-medium">심각도</th>
                   <th className="text-muted-foreground px-3 py-2 text-center font-medium">
-                    Match Type
+                    매칭 방식
                   </th>
-                  <th className="text-muted-foreground px-3 py-2 text-center font-medium">
-                    Action
-                  </th>
+                  <th className="text-muted-foreground px-3 py-2 text-center font-medium">삭제</th>
                 </tr>
               </thead>
               <tbody>
@@ -374,14 +390,16 @@ export default function SafetyFiltersPage() {
                     className="border-border border-b last:border-0"
                   >
                     <td className="px-3 py-2 font-medium">{fw.word}</td>
-                    <td className="text-muted-foreground px-3 py-2">{fw.category}</td>
+                    <td className="text-muted-foreground px-3 py-2">
+                      {CATEGORY_LABEL[fw.category] ?? fw.category}
+                    </td>
                     <td className="px-3 py-2">
                       <Badge variant={SEVERITY_VARIANT[fw.severity]} className="text-[10px]">
-                        {fw.severity}
+                        {SEVERITY_LABEL[fw.severity]} ({fw.severity})
                       </Badge>
                     </td>
                     <td className="px-3 py-2 text-center text-[10px]">
-                      {fw.exactMatch ? "Exact" : "Contains"}
+                      {fw.exactMatch ? "완전 일치" : "포함"}
                     </td>
                     <td className="px-3 py-2 text-center">
                       <Button
@@ -404,15 +422,17 @@ export default function SafetyFiltersPage() {
         <div className="bg-card rounded-lg border p-4">
           <div className="mb-4 flex items-center gap-2">
             <AlertTriangle className="text-muted-foreground h-4 w-4" />
-            <h3 className="text-sm font-medium">Filter Log Summary</h3>
-            <Badge variant="muted">{logSummary.totalEntries} entries</Badge>
+            <h3 className="text-sm font-medium">필터 로그 요약</h3>
+            <Badge variant="muted">{logSummary.totalEntries}건</Badge>
           </div>
 
           {/* Action stats */}
           <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {(["block", "warn", "flag", "pass"] as const).map((action) => (
               <div key={action} className="rounded-lg border p-3 text-center">
-                <p className="text-muted-foreground text-[10px] uppercase">{action}</p>
+                <p className="text-muted-foreground text-[10px]">
+                  {ACTION_LABEL[action]} ({action})
+                </p>
                 <p className="mt-1 text-lg font-bold">{logSummary.byAction[action]}</p>
               </div>
             ))}
@@ -422,7 +442,7 @@ export default function SafetyFiltersPage() {
           {logSummary.recentBlocks.length > 0 && (
             <div>
               <h4 className="text-muted-foreground mb-2 text-xs font-medium">
-                Recent Blocks ({logSummary.recentBlocks.length})
+                최근 차단 내역 ({logSummary.recentBlocks.length})
               </h4>
               <div className="space-y-1">
                 {logSummary.recentBlocks.map((log) => (
@@ -432,9 +452,9 @@ export default function SafetyFiltersPage() {
                   >
                     <span className="truncate">{log.input}</span>
                     <div className="ml-2 flex items-center gap-2">
-                      <span className="text-muted-foreground">{log.matchedWord ?? "N/A"}</span>
+                      <span className="text-muted-foreground">{log.matchedWord ?? "-"}</span>
                       <Badge variant="destructive" className="text-[10px]">
-                        {log.action}
+                        {ACTION_LABEL[log.action]}
                       </Badge>
                     </div>
                   </div>
@@ -448,12 +468,15 @@ export default function SafetyFiltersPage() {
         <div className="bg-card rounded-lg border p-4">
           <div className="mb-4 flex items-center gap-2">
             <Play className="text-muted-foreground h-4 w-4" />
-            <h3 className="text-sm font-medium">Filter Test Simulator</h3>
+            <h3 className="text-sm font-medium">필터 테스트</h3>
+            <Badge variant="muted" className="text-[10px]">
+              로그 미적재
+            </Badge>
           </div>
 
           <div className="flex items-end gap-2">
             <div className="flex-1 space-y-1">
-              <label className="text-muted-foreground text-[10px]">Test Input</label>
+              <label className="text-muted-foreground text-[10px]">테스트 입력</label>
               <input
                 type="text"
                 value={testInput}
@@ -461,13 +484,13 @@ export default function SafetyFiltersPage() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleTestFilter()
                 }}
-                placeholder="Enter text to test against filters..."
+                placeholder="필터 테스트할 텍스트 입력..."
                 className="border-border bg-background w-full rounded-md border px-3 py-2 text-sm"
               />
             </div>
             <Button onClick={handleTestFilter} disabled={!testInput.trim()}>
               <Play className="mr-1.5 h-4 w-4" />
-              Evaluate
+              평가
             </Button>
           </div>
 
@@ -475,42 +498,46 @@ export default function SafetyFiltersPage() {
           {testResult && (
             <div className="mt-4 rounded-lg border p-4">
               <div className="mb-3 flex items-center justify-between">
-                <h4 className="text-sm font-medium">Result</h4>
+                <h4 className="text-sm font-medium">평가 결과</h4>
                 <Badge variant={ACTION_VARIANT[testResult.action]} className="text-sm">
-                  {testResult.action.toUpperCase()}
+                  {ACTION_LABEL[testResult.action]}
                 </Badge>
               </div>
 
               <div className="space-y-2 text-xs">
                 <div className="text-muted-foreground flex justify-between">
-                  <span>Passed</span>
+                  <span>통과 여부</span>
                   <span className={testResult.passed ? "text-emerald-400" : "text-red-400"}>
-                    {testResult.passed ? "Yes" : "No"}
+                    {testResult.passed ? "통과" : "차단"}
                   </span>
                 </div>
                 <div className="text-muted-foreground flex justify-between">
-                  <span>Action</span>
-                  <span className="font-medium">{testResult.action}</span>
+                  <span>적용 액션</span>
+                  <span className="font-medium">
+                    {ACTION_LABEL[testResult.action]} ({testResult.action})
+                  </span>
                 </div>
                 <div className="text-muted-foreground flex justify-between">
-                  <span>Matched Words</span>
+                  <span>탐지 단어</span>
                   <span className="font-medium">
                     {testResult.matchedWords.length > 0
                       ? testResult.matchedWords.map((m) => m.word).join(", ")
-                      : "None"}
+                      : "없음"}
                   </span>
                 </div>
 
                 {testResult.matchedWords.length > 0 && (
                   <div className="mt-2 space-y-1">
-                    <p className="text-muted-foreground text-[10px] font-medium">Matched Details</p>
+                    <p className="text-muted-foreground text-[10px] font-medium">탐지 상세</p>
                     {testResult.matchedWords.map((m, i) => (
                       <div key={i} className="flex items-center gap-2">
                         <Badge variant={SEVERITY_VARIANT[m.severity]} className="text-[10px]">
-                          {m.severity}
+                          {SEVERITY_LABEL[m.severity]}
                         </Badge>
                         <span>{m.word}</span>
-                        <span className="text-muted-foreground">({m.category})</span>
+                        <span className="text-muted-foreground">
+                          ({CATEGORY_LABEL[m.category] ?? m.category})
+                        </span>
                       </div>
                     ))}
                   </div>
