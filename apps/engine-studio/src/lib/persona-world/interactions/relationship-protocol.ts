@@ -9,12 +9,14 @@ import type { RelationshipScore } from "../types"
 
 // ── 관계 단계 (Relationship Stage) ─────────────────────────
 
-/** 관계 발전 단계 (STRANGER → CLOSE) */
+/** 관계 발전 단계 (STRANGER → CLOSE, 감쇠 시 COOLING → DORMANT) */
 export type RelationshipStage =
   | "STRANGER" // 처음 만남 / 인터랙션 없음
   | "ACQUAINTANCE" // 서로 인지, 가끔 인터랙션
   | "FAMILIAR" // 정기적 인터랙션, 취향 파악
   | "CLOSE" // 깊은 교류, 개인적 이야기 공유
+  | "COOLING" // 인터랙션 감소, 관계 냉각 중 (14일+ 무활동)
+  | "DORMANT" // 장기 무활동 (30일+), 최소한의 인터랙션만 유지
 
 /** 관계 유형 (Type) */
 export type RelationshipType =
@@ -66,7 +68,24 @@ export const STAGE_THRESHOLDS: Record<RelationshipStage, StageThresholds> = {
   ACQUAINTANCE: { minFrequency: 0.1, minDepth: 0, minTotalScore: 0.3 },
   FAMILIAR: { minFrequency: 0.3, minDepth: 0.2, minTotalScore: 0.8 },
   CLOSE: { minFrequency: 0.5, minDepth: 0.4, minTotalScore: 1.5 },
+  // COOLING/DORMANT는 시간 기반 전환이므로 score threshold 불필요 (0으로 설정)
+  COOLING: { minFrequency: 0, minDepth: 0, minTotalScore: 0 },
+  DORMANT: { minFrequency: 0, minDepth: 0, minTotalScore: 0 },
 }
+
+// ── 감쇠 관련 상수 ──────────────────────────────────────────
+
+/** warmth 지수 감쇠 계수: warmth × e^(-DECAY_RATE × days) */
+export const WARMTH_DECAY_RATE = 0.02
+
+/** COOLING 진입까지 무활동 일수 */
+export const COOLING_THRESHOLD_DAYS = 14
+
+/** DORMANT 진입까지 무활동 일수 */
+export const DORMANT_THRESHOLD_DAYS = 30
+
+/** COOLING 상태에서 재활성화(다시 올라가기)에 필요한 최소 인터랙션 수 */
+export const REACTIVATION_MIN_INTERACTIONS = 3
 
 /** 유형 판단 임계값 */
 export const TYPE_THRESHOLDS = {
@@ -139,6 +158,22 @@ const STAGE_PROTOCOLS: Record<RelationshipStage, BehaviorProtocol> = {
     personalReferences: true,
     vulnerabilityAllowed: true,
   },
+  COOLING: {
+    interactionBoost: 0.6,
+    allowedTones: ["formal_analysis", "supportive", "light_reaction", "empathetic"],
+    selfDisclosure: 0.2,
+    debateWillingness: 0.3,
+    personalReferences: true, // 과거 기억은 유지
+    vulnerabilityAllowed: false,
+  },
+  DORMANT: {
+    interactionBoost: 0.3,
+    allowedTones: ["formal_analysis", "light_reaction", "supportive"],
+    selfDisclosure: 0.1,
+    debateWillingness: 0.1,
+    personalReferences: false,
+    vulnerabilityAllowed: false,
+  },
 }
 
 // ── 유형별 프로토콜 보정 ────────────────────────────────────
@@ -187,7 +222,7 @@ const TYPE_MODIFIERS: Record<RelationshipType, TypeModifier> = {
 // 관계 단계 결정
 // ══════════════════════════════════════════════════════════════
 
-/** 관계 스코어로 단계 결정 */
+/** 관계 스코어로 단계 결정 (시간 감쇠 미포함 — 순수 점수 기반) */
 export function determineStage(score: RelationshipScore): RelationshipStage {
   const totalScore = score.warmth + score.frequency + score.depth
 
@@ -217,11 +252,93 @@ export function determineStage(score: RelationshipScore): RelationshipStage {
   return "STRANGER"
 }
 
+/**
+ * 시간 감쇠를 포함한 관계 단계 결정.
+ *
+ * 로직:
+ * 1. lastInteractionAt이 DORMANT_THRESHOLD_DAYS 이상 → DORMANT
+ * 2. lastInteractionAt이 COOLING_THRESHOLD_DAYS 이상 → COOLING
+ * 3. 그 외 → 기존 score 기반 단계 결정
+ *
+ * COOLING/DORMANT에서 인터랙션 재개 시 → 기존 score 기반으로 복귀.
+ */
+export function determineStageWithDecay(
+  score: RelationshipScore,
+  now: Date = new Date()
+): RelationshipStage {
+  // lastInteractionAt이 없으면(관계 초기) 순수 점수 기반
+  if (!score.lastInteractionAt) {
+    return determineStage(score)
+  }
+
+  const daysSinceLastInteraction = getDaysSince(score.lastInteractionAt, now)
+
+  // DORMANT: 30일+ 무활동
+  if (daysSinceLastInteraction >= DORMANT_THRESHOLD_DAYS) {
+    return "DORMANT"
+  }
+
+  // COOLING: 14일+ 무활동
+  if (daysSinceLastInteraction >= COOLING_THRESHOLD_DAYS) {
+    return "COOLING"
+  }
+
+  // 활동적인 관계 → 기존 점수 기반 결정
+  return determineStage(score)
+}
+
+/**
+ * warmth에 시간 기반 지수 감쇠 적용.
+ *
+ * 공식: decayedWarmth = warmth × e^(-WARMTH_DECAY_RATE × daysSinceLastInteraction)
+ * - 7일 무활동: warmth × 0.87 (13% 감소)
+ * - 14일 무활동: warmth × 0.76 (24% 감소)
+ * - 30일 무활동: warmth × 0.55 (45% 감소)
+ * - 60일 무활동: warmth × 0.30 (70% 감소)
+ */
+export function applyWarmthDecay(
+  warmth: number,
+  lastInteractionAt: Date | null,
+  now: Date = new Date()
+): number {
+  if (!lastInteractionAt) return warmth
+
+  const daysSince = getDaysSince(lastInteractionAt, now)
+  if (daysSince <= 0) return warmth
+
+  const decayed = warmth * Math.exp(-WARMTH_DECAY_RATE * daysSince)
+  return clamp(decayed, 0, 1)
+}
+
+/**
+ * frequency에 주간 감쇠 적용.
+ *
+ * 인터랙션이 없으면 frequency가 자연 감소.
+ * 공식: decayedFrequency = frequency × 0.9^(weeksSinceLastInteraction)
+ */
+export function applyFrequencyDecay(
+  frequency: number,
+  lastInteractionAt: Date | null,
+  now: Date = new Date()
+): number {
+  if (!lastInteractionAt) return frequency
+
+  const daysSince = getDaysSince(lastInteractionAt, now)
+  const weeksSince = daysSince / 7
+  if (weeksSince <= 0) return frequency
+
+  const decayed = frequency * Math.pow(0.9, weeksSince)
+  return clamp(decayed, 0, 1)
+}
+
 /** 현재 단계 내 진행률 (0.0~1.0) */
 export function computeStageProgress(
   score: RelationshipScore,
   currentStage: RelationshipStage
 ): number {
+  // COOLING/DORMANT는 감쇠 중이므로 진행률 0
+  if (currentStage === "COOLING" || currentStage === "DORMANT") return 0.0
+
   const totalScore = score.warmth + score.frequency + score.depth
 
   const stages: RelationshipStage[] = ["STRANGER", "ACQUAINTANCE", "FAMILIAR", "CLOSE"]
@@ -304,10 +421,32 @@ export function buildProtocol(stage: RelationshipStage, type: RelationshipType):
 // 통합 API
 // ══════════════════════════════════════════════════════════════
 
-/** 관계 스코어 → 전체 관계 프로필 */
+/** 관계 스코어 → 전체 관계 프로필 (시간 감쇠 미포함) */
 export function computeRelationshipProfile(score: RelationshipScore): RelationshipProfile {
   const stage = determineStage(score)
   const type = determineType(score)
+  const protocol = buildProtocol(stage, type)
+  const stageProgress = computeStageProgress(score, stage)
+
+  return { stage, type, protocol, stageProgress }
+}
+
+/**
+ * 시간 감쇠를 포함한 관계 프로필 계산.
+ *
+ * COOLING/DORMANT 단계에서는:
+ * - 유형(type)은 NEUTRAL로 리셋
+ * - 행동 프로토콜이 축소됨
+ */
+export function computeRelationshipProfileWithDecay(
+  score: RelationshipScore,
+  now: Date = new Date()
+): RelationshipProfile {
+  const stage = determineStageWithDecay(score, now)
+
+  // COOLING/DORMANT에서는 유형을 NEUTRAL로
+  const type = stage === "COOLING" || stage === "DORMANT" ? "NEUTRAL" : determineType(score)
+
   const protocol = buildProtocol(stage, type)
   const stageProgress = computeStageProgress(score, stage)
 
@@ -338,6 +477,12 @@ export function summarizeRelationship(
       `frequency=${score.frequency.toFixed(2)}, depth=${score.depth.toFixed(2)}`
   )
 
+  if (profile.stage === "COOLING") {
+    parts.push("관계 냉각 중 — 최근 교류 감소")
+  }
+  if (profile.stage === "DORMANT") {
+    parts.push("장기 미교류 — 다시 만나면 어색할 수 있음")
+  }
   if (profile.protocol.personalReferences) {
     parts.push("과거 대화 참조 가능")
   }
@@ -366,4 +511,10 @@ export function detectStageChange(
 
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v))
+}
+
+/** 두 날짜 사이의 일수 계산 */
+function getDaysSince(from: Date, to: Date): number {
+  const msPerDay = 1000 * 60 * 60 * 24
+  return Math.max(0, (to.getTime() - from.getTime()) / msPerDay)
 }

@@ -6,6 +6,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import type { RelationshipScore } from "../types"
+import { applyWarmthDecay, applyFrequencyDecay } from "./relationship-protocol"
 
 /**
  * 인터랙션 데이터 (관계 업데이트 입력).
@@ -166,38 +167,53 @@ export async function updateRelationship(
  *
  * 주기적 배치 (예: 일 1회)에서 호출하여
  * warmth/tension을 실제 비율로 보정하고 frequency를 감쇠.
+ *
+ * v4.1: 시간 기반 지수 감쇠 적용
+ * - 활동이 있으면: 통계 기반 재계산 (기존 로직)
+ * - 활동이 없으면: warmth × e^(-0.02t) 감쇠 + frequency 주간 감쇠
  */
 export async function recalculateRelationship(
   personaAId: string,
   personaBId: string,
-  provider: RelationshipDataProvider
+  provider: RelationshipDataProvider,
+  now: Date = new Date()
 ): Promise<RelationshipScore> {
   const current = await getRelationship(personaAId, personaBId, provider)
   const stats = await provider.getInteractionStats(personaAId, personaBId, 7)
 
-  // warmth 재계산: 긍정 댓글 비율
-  const warmth =
-    stats.totalComments > 0
-      ? clamp(stats.positiveComments / stats.totalComments)
-      : current.warmth * 0.95 // 활동 없으면 약간 감쇠
+  let warmth: number
+  let tension: number
+  let frequency: number
+  let depth: number
 
-  // tension 재계산: 부정 댓글 비율
-  const tension =
-    stats.totalComments > 0
-      ? clamp(stats.negativeComments / stats.totalComments)
-      : current.tension * 0.9 // 활동 없으면 더 빠르게 감쇠
+  if (stats.totalInteractions > 0) {
+    // 활동이 있으면: 통계 기반 재계산 (기존 로직)
+    warmth =
+      stats.totalComments > 0
+        ? clamp(stats.positiveComments / stats.totalComments)
+        : current.warmth * 0.95
 
-  // frequency 재계산: 주간 인터랙션 / 기대값
-  const frequency = clamp(stats.totalInteractions / EXPECTED_WEEKLY_INTERACTIONS)
+    tension =
+      stats.totalComments > 0
+        ? clamp(stats.negativeComments / stats.totalComments)
+        : current.tension * 0.9
 
-  // depth 재계산: 평균 체인 길이
-  const depth = stats.avgChainLength > 0 ? clamp(stats.avgChainLength / 10) : current.depth * 0.95
+    frequency = clamp(stats.totalInteractions / EXPECTED_WEEKLY_INTERACTIONS)
+
+    depth = stats.avgChainLength > 0 ? clamp(stats.avgChainLength / 10) : current.depth * 0.95
+  } else {
+    // 활동이 없으면: 시간 기반 지수 감쇠
+    warmth = applyWarmthDecay(current.warmth, current.lastInteractionAt, now)
+    tension = current.tension * 0.9 // tension도 감쇠 (갈등은 시간이 풀어줌)
+    frequency = applyFrequencyDecay(current.frequency, current.lastInteractionAt, now)
+    depth = current.depth * 0.95
+  }
 
   const updated: RelationshipScore = {
-    warmth,
-    tension,
-    frequency,
-    depth,
+    warmth: clamp(warmth),
+    tension: clamp(tension),
+    frequency: clamp(frequency),
+    depth: clamp(depth),
     lastInteractionAt: current.lastInteractionAt,
   }
 

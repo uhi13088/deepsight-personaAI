@@ -1095,6 +1095,50 @@
   - AC2: 통합 마이그레이션 스크립트 생성 (`apply_missing_016_to_024.sql`)
   - AC3: 프로덕션 DB에 마이그레이션 적용 후 500 에러 해결 확인
 
+### Phase QI-B: 페르소나 품질 개선 2차 — 관계 감쇠 + 드리프트 + 다양성 + 매칭 강화 (T177~T181)
+
+> 연구 기반 + 코드베이스 분석에서 도출된 5개 품질 개선.
+> 우선순위: (1) 안 하면 장기 시스템 붕괴 → (2) 모니터링 사각지대 → (3) 매칭 품질 → (4) 데이터 인프라
+> 원칙: LLM 비용 0, 기존 코드 최소 변경, 테스트 필수
+
+- [x] **T177: COOLING/DORMANT + warmth 시간 감쇠 — 관계 자연 소멸** ✅ 2026-02-22
+  - 배경: 현재 관계 단계가 올라가기만 하고 내려가지 않음. 장기 운영 시 모든 관계가 CLOSE에 수렴하여 관계 시스템 자체가 무의미해짐
+  - AC1: ✅ `relationship-protocol.ts` — COOLING/DORMANT 2단계 추가 (STRANGER→ACQUAINTANCE→FAMILIAR→CLOSE→COOLING→DORMANT), 시간 기반 하강 조건
+  - AC2: ✅ `relationship-manager.ts` — `recalculateRelationship()`에 warmth 시간 감쇠 적용 (`warmth × e^(-0.02 × daysSinceLastInteraction)`), frequency 주간 감쇠
+  - AC3: ✅ COOLING 진입 조건: lastInteractionAt > 14일 AND warmth < 이전 단계 threshold. DORMANT: > 30일 무활동
+  - AC4: ✅ COOLING/DORMANT 단계별 행동 프로토콜 (interactionBoost 감소, allowedTones 축소, vulnerabilityAllowed false)
+  - AC5: ✅ 단위 테스트 66개 PASS + Build PASS
+
+- [x] **T178: PersonaDrift 감지 — VoiceStyle baseline 비교** ✅ 2026-02-22
+  - 배경: VoiceAnchor(few-shot)로 일관성을 유지하지만 드리프트가 발생하는지 측정할 수 없음. Arena 교정 루프의 핵심 입력
+  - AC1: ✅ `persona-drift.ts` (신규) — VoiceStyleParams baseline 저장 + 현재값 비교 (코사인 유사도)
+  - AC2: ✅ 드리프트 점수 = 1 - cosineSimilarity(baseline, current), WARNING: > 0.15, CRITICAL: > 0.30
+  - AC3: ✅ `quality-integration.ts`에 드리프트 점수 통합 — QualityCheckResult에 driftScore 추가
+  - AC4: ✅ 단위 테스트 20개 PASS + Build PASS
+
+- [x] **T179: DiversityScore — 콘텐츠 다양성 측정** ✅ 2026-02-22
+  - 배경: B2B 고객이 "페르소나가 맨날 비슷한 말만 해요" → 해지 사유. trigram 중복 체크로 다양성 지표 제공
+  - AC1: ✅ `diversity-score.ts` (신규) — trigram 추출 + 자기반복률 계산 (최근 N개 포스트 내)
+  - AC2: ✅ DiversityScore = 1 - selfRepetitionRate. WARNING: < 0.6, CRITICAL: < 0.4
+  - AC3: ✅ `quality-integration.ts`에 DiversityScore 통합 — QualityCheckResult에 diversityScore 추가
+  - AC4: ✅ 단위 테스트 21개 PASS + Build PASS
+
+- [x] **T180: Basic Tier에 Paradox 소량 반영 — 매칭 인간미 향상** ✅ 2026-02-22
+  - 배경: Paradox 호환성이 Advanced Tier(10%)에서만 사용됨. Basic Tier(60%)에도 5% 반영하면 즉시 매칭 인간미 향상
+  - AC1: ✅ `three-tier-engine.ts` — calculateBasicScore 가중치 변경: V_Final 65% + 교차축 30% + Paradox 5%
+  - AC2: ✅ calculateBasicScore 시그니처에 ParadoxProfile 파라미터 추가 (옵셔널, 하위호환)
+  - AC3: ✅ matchPersona(), matchAll() 호출부 업데이트
+  - AC4: ✅ 단위 테스트 63개 PASS + Build PASS
+
+- [x] **T181: TrustScore + RapportScore 인프라 — 데이터 수집 + 계산 로직** ✅ 2026-02-22
+  - 배경: 신뢰/라포 매칭은 데이터가 쌓여야 의미. 지금 인프라를 구축하고 데이터 수집 시작, 활성화는 데이터 축적 후
+  - AC1: 보류 — Prisma 스키마 변경은 프로덕션 DB 마이그레이션 인프라(T176) 완료 후 적용
+  - AC2: ✅ `trust-score.ts` (신규) — computeTrustScore(totalSessions, conflictResolutionRate, engagementDepthSlope), λ = sigmoid(sessions/30 - 1)로 가중치 자동 조절
+  - AC3: ✅ `rapport-score.ts` (신규) — computeRapportScore(lexicalAlignment, balanceScore, warmth), lexicalAlignment = trigram Jaccard 유사도, balanceScore = 발화 길이 대칭성
+  - AC4: 보류 — 데이터 수집 배선은 스키마 변경(AC1) 후 적용
+  - AC5: 보류 — 상태 API는 스키마 변경(AC1) 후 적용
+  - AC6: ✅ 단위 테스트 55개 PASS (trust 32 + rapport 23) + Build PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)

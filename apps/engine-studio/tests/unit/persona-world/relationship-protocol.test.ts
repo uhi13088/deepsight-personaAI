@@ -1,16 +1,23 @@
 import { describe, it, expect } from "vitest"
 import {
   determineStage,
+  determineStageWithDecay,
   determineType,
   buildProtocol,
   computeRelationshipProfile,
+  computeRelationshipProfileWithDecay,
   computeStageProgress,
   isToneAllowed,
   getInteractionMultiplier,
   summarizeRelationship,
   detectStageChange,
+  applyWarmthDecay,
+  applyFrequencyDecay,
   STAGE_THRESHOLDS,
   TYPE_THRESHOLDS,
+  WARMTH_DECAY_RATE,
+  COOLING_THRESHOLD_DAYS,
+  DORMANT_THRESHOLD_DAYS,
 } from "@/lib/persona-world/interactions/relationship-protocol"
 import type { RelationshipScore } from "@/lib/persona-world/types"
 
@@ -342,5 +349,269 @@ describe("상수 검증", () => {
     expect(TYPE_THRESHOLDS.ally.minWarmth).toBeLessThanOrEqual(1)
     expect(TYPE_THRESHOLDS.rival.minTension).toBeGreaterThanOrEqual(0)
     expect(TYPE_THRESHOLDS.rival.minTension).toBeLessThanOrEqual(1)
+  })
+
+  it("감쇠 상수 정합성", () => {
+    expect(WARMTH_DECAY_RATE).toBe(0.02)
+    expect(COOLING_THRESHOLD_DAYS).toBe(14)
+    expect(DORMANT_THRESHOLD_DAYS).toBe(30)
+    expect(DORMANT_THRESHOLD_DAYS).toBeGreaterThan(COOLING_THRESHOLD_DAYS)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// applyWarmthDecay
+// ═══════════════════════════════════════════════════════════════
+
+describe("applyWarmthDecay", () => {
+  it("lastInteractionAt null → 감쇠 없음", () => {
+    expect(applyWarmthDecay(0.8, null)).toBe(0.8)
+  })
+
+  it("방금 인터랙션 → 감쇠 거의 없음", () => {
+    const now = new Date()
+    expect(applyWarmthDecay(0.8, now, now)).toBeCloseTo(0.8, 2)
+  })
+
+  it("7일 무활동 → ~13% 감쇠", () => {
+    const now = new Date()
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const result = applyWarmthDecay(1.0, sevenDaysAgo, now)
+    // e^(-0.02 * 7) ≈ 0.869
+    expect(result).toBeCloseTo(0.869, 2)
+  })
+
+  it("14일 무활동 → ~24% 감쇠", () => {
+    const now = new Date()
+    const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
+    const result = applyWarmthDecay(1.0, twoWeeksAgo, now)
+    // e^(-0.02 * 14) ≈ 0.756
+    expect(result).toBeCloseTo(0.756, 2)
+  })
+
+  it("30일 무활동 → ~45% 감쇠", () => {
+    const now = new Date()
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    const result = applyWarmthDecay(1.0, thirtyDaysAgo, now)
+    // e^(-0.02 * 30) ≈ 0.549
+    expect(result).toBeCloseTo(0.549, 2)
+  })
+
+  it("결과는 0~1 범위", () => {
+    const now = new Date()
+    const longAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+    const result = applyWarmthDecay(0.5, longAgo, now)
+    expect(result).toBeGreaterThanOrEqual(0)
+    expect(result).toBeLessThanOrEqual(1)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// applyFrequencyDecay
+// ═══════════════════════════════════════════════════════════════
+
+describe("applyFrequencyDecay", () => {
+  it("lastInteractionAt null → 감쇠 없음", () => {
+    expect(applyFrequencyDecay(0.5, null)).toBe(0.5)
+  })
+
+  it("1주 무활동 → 10% 감쇠", () => {
+    const now = new Date()
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const result = applyFrequencyDecay(1.0, oneWeekAgo, now)
+    // 1.0 * 0.9^1 = 0.9
+    expect(result).toBeCloseTo(0.9, 2)
+  })
+
+  it("4주 무활동 → ~34% 감쇠", () => {
+    const now = new Date()
+    const fourWeeksAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000)
+    const result = applyFrequencyDecay(1.0, fourWeeksAgo, now)
+    // 1.0 * 0.9^4 ≈ 0.656
+    expect(result).toBeCloseTo(0.656, 2)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// determineStageWithDecay
+// ═══════════════════════════════════════════════════════════════
+
+describe("determineStageWithDecay", () => {
+  it("lastInteractionAt null → 기존 로직 (STRANGER)", () => {
+    expect(determineStageWithDecay(makeScore())).toBe("STRANGER")
+  })
+
+  it("최근 활동 → 기존 score 기반 (CLOSE)", () => {
+    const now = new Date()
+    const score = makeScore({
+      warmth: 0.7,
+      frequency: 0.6,
+      depth: 0.5,
+      lastInteractionAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000), // 1일 전
+    })
+    expect(determineStageWithDecay(score, now)).toBe("CLOSE")
+  })
+
+  it("14일 무활동 → COOLING", () => {
+    const now = new Date()
+    const score = makeScore({
+      warmth: 0.8,
+      frequency: 0.6,
+      depth: 0.5,
+      lastInteractionAt: new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000), // 15일 전
+    })
+    expect(determineStageWithDecay(score, now)).toBe("COOLING")
+  })
+
+  it("30일 무활동 → DORMANT", () => {
+    const now = new Date()
+    const score = makeScore({
+      warmth: 0.9,
+      frequency: 0.8,
+      depth: 0.6,
+      lastInteractionAt: new Date(now.getTime() - 31 * 24 * 60 * 60 * 1000), // 31일 전
+    })
+    expect(determineStageWithDecay(score, now)).toBe("DORMANT")
+  })
+
+  it("13일 무활동 → 아직 COOLING 아님", () => {
+    const now = new Date()
+    const score = makeScore({
+      warmth: 0.7,
+      frequency: 0.6,
+      depth: 0.5,
+      lastInteractionAt: new Date(now.getTime() - 13 * 24 * 60 * 60 * 1000),
+    })
+    expect(determineStageWithDecay(score, now)).toBe("CLOSE")
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// COOLING/DORMANT 행동 프로토콜
+// ═══════════════════════════════════════════════════════════════
+
+describe("COOLING/DORMANT 행동 프로토콜", () => {
+  it("COOLING → interactionBoost 감소", () => {
+    const protocol = buildProtocol("COOLING", "NEUTRAL")
+    expect(protocol.interactionBoost).toBe(0.6)
+    expect(protocol.selfDisclosure).toBe(0.2)
+    expect(protocol.vulnerabilityAllowed).toBe(false)
+    expect(protocol.personalReferences).toBe(true) // 과거 기억은 유지
+  })
+
+  it("DORMANT → 최소한의 인터랙션", () => {
+    const protocol = buildProtocol("DORMANT", "NEUTRAL")
+    expect(protocol.interactionBoost).toBe(0.3)
+    expect(protocol.selfDisclosure).toBe(0.1)
+    expect(protocol.debateWillingness).toBe(0.1)
+    expect(protocol.personalReferences).toBe(false)
+    expect(protocol.vulnerabilityAllowed).toBe(false)
+  })
+
+  it("COOLING 톤 제한 — paradox_response 불허", () => {
+    const protocol = buildProtocol("COOLING", "NEUTRAL")
+    expect(protocol.allowedTones).not.toContain("paradox_response")
+    expect(protocol.allowedTones).not.toContain("direct_rebuttal")
+    expect(protocol.allowedTones).toContain("supportive")
+  })
+
+  it("DORMANT 톤 제한 — empathetic 불허", () => {
+    const protocol = buildProtocol("DORMANT", "NEUTRAL")
+    expect(protocol.allowedTones).not.toContain("empathetic")
+    expect(protocol.allowedTones).not.toContain("paradox_response")
+    expect(protocol.allowedTones).toContain("formal_analysis")
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// computeRelationshipProfileWithDecay
+// ═══════════════════════════════════════════════════════════════
+
+describe("computeRelationshipProfileWithDecay", () => {
+  it("최근 활동 → 기존과 동일", () => {
+    const now = new Date()
+    const score = makeScore({
+      warmth: 0.7,
+      frequency: 0.6,
+      depth: 0.5,
+      lastInteractionAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000),
+    })
+    const profile = computeRelationshipProfileWithDecay(score, now)
+    const originalProfile = computeRelationshipProfile(score)
+    expect(profile.stage).toBe(originalProfile.stage)
+    expect(profile.type).toBe(originalProfile.type)
+  })
+
+  it("COOLING → type은 NEUTRAL로 리셋", () => {
+    const now = new Date()
+    const score = makeScore({
+      warmth: 0.8,
+      frequency: 0.7,
+      depth: 0.5,
+      lastInteractionAt: new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000),
+    })
+    const profile = computeRelationshipProfileWithDecay(score, now)
+    expect(profile.stage).toBe("COOLING")
+    expect(profile.type).toBe("NEUTRAL")
+  })
+
+  it("DORMANT → type은 NEUTRAL로 리셋", () => {
+    const now = new Date()
+    const score = makeScore({
+      warmth: 0.9,
+      frequency: 0.8,
+      depth: 0.6,
+      lastInteractionAt: new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000),
+    })
+    const profile = computeRelationshipProfileWithDecay(score, now)
+    expect(profile.stage).toBe("DORMANT")
+    expect(profile.type).toBe("NEUTRAL")
+    expect(profile.stageProgress).toBe(0)
+  })
+
+  it("COOLING → stageProgress는 0", () => {
+    const now = new Date()
+    const score = makeScore({
+      warmth: 0.8,
+      frequency: 0.6,
+      depth: 0.5,
+      lastInteractionAt: new Date(now.getTime() - 16 * 24 * 60 * 60 * 1000),
+    })
+    const profile = computeRelationshipProfileWithDecay(score, now)
+    expect(profile.stageProgress).toBe(0)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// summarizeRelationship — COOLING/DORMANT
+// ═══════════════════════════════════════════════════════════════
+
+describe("summarizeRelationship — COOLING/DORMANT", () => {
+  it("COOLING → 냉각 중 메시지 포함", () => {
+    const now = new Date()
+    const score = makeScore({
+      warmth: 0.7,
+      frequency: 0.5,
+      depth: 0.4,
+      lastInteractionAt: new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000),
+    })
+    const profile = computeRelationshipProfileWithDecay(score, now)
+    const summary = summarizeRelationship(score, profile)
+    expect(summary).toContain("COOLING")
+    expect(summary).toContain("냉각 중")
+  })
+
+  it("DORMANT → 미교류 메시지 포함", () => {
+    const now = new Date()
+    const score = makeScore({
+      warmth: 0.8,
+      frequency: 0.6,
+      depth: 0.5,
+      lastInteractionAt: new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000),
+    })
+    const profile = computeRelationshipProfileWithDecay(score, now)
+    const summary = summarizeRelationship(score, profile)
+    expect(summary).toContain("DORMANT")
+    expect(summary).toContain("미교류")
   })
 })
