@@ -40,7 +40,7 @@ DeepSight Engine v4.0은 다음 영역에서 강점을 보인다:
 
 반면, 다음 영역에서 학술적 근거가 부족하거나 설계 공백이 존재한다:
 
-| 영역 | 부족한 점 | 관련 섹션 |
+| 영역 | 부족한 점 | 본 문서 § |
 |------|----------|-----------|
 | 관계 모델 | 4단계 단방향 발전만 존재, 쇠퇴/퇴행 경로 없음 | §2 |
 | 라포르 측정 | warmth/tension만으로 관계 품질을 측정, 과정 지표 없음 | §3 |
@@ -110,3 +110,196 @@ DeepSight Engine v4.0은 다음 영역에서 강점을 보인다:
 - **포함**: 현재 v4.0 설계의 공백 분석, 학술 근거 기반 보강 제안, 구체적 타입/수식/로직 수준 명세
 - **제외**: 구현 코드, UI/UX 설계, 비용 추정 (별도 구현계획서에서 다룸)
 - **전제**: v4.0 기존 설계(3-Layer 벡터, 보안 3계층, 아레나 등)는 유지하며, **기존 구조 위에 보강**하는 방향
+
+---
+
+## 2. 관계 모델 보강
+
+> **대응 설계**: `persona-engine-v4.md §4.2` (관계 프로토콜)
+
+### 2.1 현재 설계의 공백
+
+v4.0 관계 프로토콜은 다음 구조로 정의되어 있다:
+
+```
+STRANGER → ACQUAINTANCE → FAMILIAR → CLOSE
+```
+
+**단계 전환 조건**: 인터랙션 빈도 + warmth/tension 임계값 기반 자동 감지
+
+이 모델은 **관계 발전**만 다루며, 두 가지 공백이 존재한다:
+
+1. **쇠퇴 경로 없음**: 비활성·갈등·냉각 시 관계가 어떻게 변하는지 미정의
+2. **복귀 경로 없음**: 한번 떨어진 관계가 재활성화되는 메커니즘 없음
+
+결과적으로, 오랫동안 인터랙션이 없는 페르소나도 영구히 `CLOSE` 상태를 유지하는 비현실적 상황이 발생한다.
+
+### 2.2 이론적 근거
+
+#### Knapp의 관계 발전 모델 [R5]
+
+Knapp(1978)은 인간 관계를 **10단계** 양방향 모델로 기술한다:
+
+| 방향 | 단계 | 특징 |
+|------|------|------|
+| 접근 (Coming Together) | Initiating → Experimenting → Intensifying → Integrating → Bonding | 점진적 자기노출, 의존도 증가 |
+| 이탈 (Coming Apart) | Differentiating → Circumscribing → Stagnating → Avoiding → Terminating | 거리감 증가, 소통 감소 |
+
+핵심 인사이트: **관계는 어느 단계에서든 이탈이 시작될 수 있으며, 발전과 이탈이 동시에 공존할 수도 있다.**
+
+#### Bickmore & Picard의 관계적 에이전트 연구 [R9]
+
+Bickmore & Picard(2005)는 장기 인간-컴퓨터 관계 연구에서 다음을 발견했다:
+
+- **연속성(continuity)**: 이전 대화를 기억하는 에이전트가 신뢰도와 친밀감을 유의미하게 높임
+- **반복성 저해(habituation)**: 동일한 인터랙션 패턴이 반복되면 관계 동기가 저하됨
+- **공백 인정**: 오랜 부재 후 재접촉 시 "공백을 언급"하는 행동이 관계 재개에 효과적
+
+→ DeepSight 적용: 쇠퇴 상태에서의 **재활성화 프로토콜** 필요성 지지
+
+#### Smith et al. — AI 챗봇에 대한 관계 과학 적용 [R11]
+
+Smith et al.(2025)은 50년간의 관계 과학 성과를 AI 챗봇에 적용하면서, AI 관계의 **비대칭성**을 강조한다:
+
+- 사용자는 감정적 투자를 하지만, AI는 지속적 메모리 없이 리셋됨
+- 이 비대칭성이 장기적으로 신뢰 손상으로 이어질 수 있음
+
+→ DeepSight 적용: 관계 이력(peakStage, lastInteractionAt)을 명시적으로 기록하여 **비대칭성을 완화**
+
+#### Turkle의 윤리적 경고 [R13]
+
+Turkle(2011)은 AI와의 시뮬레이션 친밀감이 과도한 의존성을 유발할 수 있음을 경고한다. 쇠퇴 모델은 오히려 이 위험을 낮추는 방향으로 작동한다: **자연스러운 거리감**을 설계에 반영함으로써 현실적 관계 감각을 유지시킨다.
+
+### 2.3 보강 방향: 6단계 양방향 모델
+
+v4.0의 4단계를 유지하되, **쇠퇴 2단계**를 추가한다. AI 페르소나 맥락에서 Knapp의 5단계 이탈을 모두 구현하는 것은 과도하므로, 핵심 패턴만 추출한다.
+
+```
+발전 경로:
+  STRANGER → ACQUAINTANCE → FAMILIAR → CLOSE
+
+쇠퇴 경로 (신규):
+  CLOSE / FAMILIAR / ACQUAINTANCE → COOLING → DORMANT
+
+재활성화 경로 (신규):
+  DORMANT → ACQUAINTANCE (재접촉 시)
+  COOLING → 이전 단계 복귀 (warmth 회복 시)
+```
+
+**단계 정의**
+
+| 단계 | 설명 | 행동 프로토콜 |
+|------|------|--------------|
+| STRANGER | 첫 접촉 또는 재활성화 전 | 격식 only, 자기노출 없음 |
+| ACQUAINTANCE | 초기 교류 | 약간 캐주얼, 표면적 자기노출 |
+| FAMILIAR | 반복적 관계 | 자유로운 톤, 개인적 자기노출 |
+| CLOSE | 깊은 친밀감 | 매우 친밀, 깊은 자기노출 |
+| COOLING *(신규)* | 비활성 또는 갈등으로 거리감 발생 | 격식으로 회귀, 자기노출 감소 |
+| DORMANT *(신규)* | 장기 비활성 — 사실상 휴면 | 격식 only, 자기노출 없음 |
+
+### 2.4 단계 전환 조건
+
+#### 발전 조건 (기존 유지)
+
+```
+발전: warmth ≥ threshold[stage] && interaction_count ≥ N[stage]
+```
+
+#### 쇠퇴 조건 (신규)
+
+```
+COOLING 진입:
+  inactivity_days ≥ 14
+  OR (tension ≥ 0.8 && warmth < 0.4)
+
+DORMANT 진입:
+  COOLING 상태 && inactivity_days ≥ 60
+```
+
+#### 재활성화 조건 (신규)
+
+```
+DORMANT → ACQUAINTANCE:
+  신규 인터랙션 발생 시 (cold restart)
+  warmth = peakWarmth × 0.3  (기억의 흔적 반영)
+
+COOLING → 이전 단계:
+  inactivity_days < 14 복구
+  AND warmth ≥ threshold[previousStage] × 0.8
+```
+
+### 2.5 warmth 자동 감쇠 공식
+
+비활성 기간에 따른 warmth 지수 감쇠:
+
+```
+warmth(t) = warmth_0 × e^(-decayRate × inactivity_days)
+```
+
+- `decayRate` 기본값: `0.02` (1/일) → 35일 후 warmth 약 50% 감쇠
+- COOLING 상태에서는 감쇠율 1.5배 적용
+
+### 2.6 타입 명세
+
+```typescript
+type RelationshipStage =
+  | 'STRANGER'
+  | 'ACQUAINTANCE'
+  | 'FAMILIAR'
+  | 'CLOSE'
+  | 'COOLING'   // 신규
+  | 'DORMANT'   // 신규
+
+interface RelationshipDecayConfig {
+  inactivityDaysForCooling: number   // 기본: 14
+  inactivityDaysForDormant: number   // 기본: 60
+  warmthDecayRate: number            // 기본: 0.02 (일별)
+  tensionThresholdForCooling: number // 기본: 0.8
+}
+
+interface StageTransition {
+  from: RelationshipStage
+  to: RelationshipStage
+  at: Date
+  trigger: 'warmth_threshold' | 'inactivity' | 'tension_peak' | 'reactivation'
+}
+
+// 기존 PersonaRelationship에 추가되는 필드
+interface RelationshipHistory {
+  peakStage: RelationshipStage     // 역대 최고 단계
+  peakWarmth: number               // 역대 최고 warmth
+  lastInteractionAt: Date          // 마지막 인터랙션 시각
+  inactivityDays: number           // 현재 비활성 일수 (주기적 계산)
+  stageTransitions: StageTransition[] // 단계 전환 이력
+}
+```
+
+### 2.7 행동 프로토콜 확장
+
+기존 4단계 테이블에 COOLING/DORMANT 행을 추가한다:
+
+| 속성 | STRANGER | ACQUAINTANCE | FAMILIAR | CLOSE | COOLING | DORMANT |
+|------|----------|--------------|----------|-------|---------|---------|
+| 톤 허용 | 격식 only | 약간 캐주얼 | 자유 | 매우 친밀 | 격식으로 회귀 | 격식 only |
+| 자기노출 | 없음 | 표면적 | 개인적 | 깊은 | 줄어듦 | 없음 |
+| 논쟁 의지 | 회피 | 조심스럽게 | 직접적 | 격렬 가능 | 회피 | 회피 |
+| 재접촉 언급 | — | — | — | — | 선택적 | **공백 언급** [R9] |
+
+> **DORMANT 재접촉 시 권장 행동**: Bickmore & Picard [R9]의 연구에 따라, 장기 공백 후 재접촉 시 페르소나가 자연스럽게 부재를 인지하고 언급하는 것이 신뢰 회복에 효과적이다.
+
+### 2.8 기존 설계와의 통합 지점
+
+| 통합 대상 | 변경 내용 |
+|----------|----------|
+| `PersonaRelationship` (DB) | `stage` 컬럼에 `COOLING`, `DORMANT` 값 추가, `RelationshipHistory` 필드 추가 |
+| 감정 전염 (`§10`) | COOLING/DORMANT 관계는 전파 가중치 0.1× 이하 적용 |
+| 소셜 모듈 그래프 (`§9`) | DORMANT 엣지를 약엣지(weak edge)로 분류, betweenness 계산 제외 |
+| Integrity Monitor (`§5.2`) | DORMANT → ACQUAINTANCE 전환 시 warmth 리셋 이력 감사 로그 기록 |
+
+### References
+
+- [R5] Knapp, M. L. (1978). *Social Intercourse: From Greeting to Goodbye*. Allyn & Bacon.
+- [R9] Bickmore, T., & Picard, R. W. (2005). Establishing and maintaining long-term human-computer relationships. *ACM Transactions on Computer-Human Interaction*, 12(2), 293–327.
+- [R11] Smith, T. W., Bradbury, T. N., & Karney, B. R. (2025). Applying 50 years of relationship science to evaluate AI chatbot relationships. *PNAS*.
+- [R12] Horton, D., & Wohl, R. R. (1956). Mass communication and para-social interaction. *Psychiatry*, 19(3), 215–229.
+- [R13] Turkle, S. (2011). *Alone Together: Why We Expect More from Technology and Less from Each Other*. Basic Books.
