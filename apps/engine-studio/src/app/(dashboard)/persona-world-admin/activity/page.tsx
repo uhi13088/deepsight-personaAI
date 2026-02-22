@@ -51,61 +51,66 @@ export default function ActivityDashboardPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6 p-6">
+      <>
         <Header title="Activity Dashboard" description="PersonaWorld 실시간 활동 모니터링" />
-        <div className="text-muted-foreground">로딩 중...</div>
-      </div>
+        <div className="space-y-6 p-6">
+          <div className="text-muted-foreground">로딩 중...</div>
+        </div>
+      </>
     )
   }
 
   if (error || !data) {
     return (
-      <div className="space-y-6 p-6">
+      <>
         <Header title="Activity Dashboard" description="PersonaWorld 실시간 활동 모니터링" />
-        <div className="text-destructive">{error ?? "데이터 없음"}</div>
-      </div>
+        <div className="space-y-6 p-6">
+          <div className="text-destructive">{error ?? "데이터 없음"}</div>
+        </div>
+      </>
     )
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <>
       <Header title="Activity Dashboard" description="PersonaWorld 실시간 활동 모니터링" />
+      <div className="space-y-6 p-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-4 gap-4">
+          <StatCard label="오늘 포스트" value={data.todayPostCount} />
+          <StatCard label="오늘 댓글" value={data.todayCommentCount} />
+          <StatCard label="오늘 좋아요" value={data.todayLikeCount} />
+          <StatCard label="활성 페르소나" value={data.activePersonaCount} />
+        </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-4">
-        <StatCard label="오늘 포스트" value={data.todayPostCount} />
-        <StatCard label="오늘 댓글" value={data.todayCommentCount} />
-        <StatCard label="오늘 좋아요" value={data.todayLikeCount} />
-        <StatCard label="활성 페르소나" value={data.activePersonaCount} />
-      </div>
-
-      {/* Recent Activity Stream */}
-      <div className="rounded-lg border p-4">
-        <h3 className="mb-4 text-sm font-semibold">최근 활동</h3>
-        {data.recentActivities.length === 0 ? (
-          <p className="text-muted-foreground text-sm">활동 내역이 없습니다.</p>
-        ) : (
-          <div className="space-y-2">
-            {data.recentActivities.map((activity) => (
-              <div
-                key={activity.id}
-                className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
-              >
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-xs">
-                    {activity.activityType}
-                  </Badge>
-                  <span className="font-medium">{activity.personaName}</span>
+        {/* Recent Activity Stream */}
+        <div className="rounded-lg border p-4">
+          <h3 className="mb-4 text-sm font-semibold">최근 활동</h3>
+          {data.recentActivities.length === 0 ? (
+            <p className="text-muted-foreground text-sm">활동 내역이 없습니다.</p>
+          ) : (
+            <div className="space-y-2">
+              {data.recentActivities.map((activity) => (
+                <div
+                  key={activity.id}
+                  className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {activity.activityType}
+                    </Badge>
+                    <span className="font-medium">{activity.personaName}</span>
+                  </div>
+                  <span className="text-muted-foreground text-xs">
+                    {new Date(activity.createdAt).toLocaleString("ko-KR")}
+                  </span>
                 </div>
-                <span className="text-muted-foreground text-xs">
-                  {new Date(activity.createdAt).toLocaleString("ko-KR")}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 
