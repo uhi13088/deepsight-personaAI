@@ -95,6 +95,14 @@ async function seedDatabase(secret: string | null) {
 
 // POST /api/admin/seed (Authorization 헤더로 시크릿 전달)
 export async function POST(request: NextRequest) {
+  // T216: 프로덕션 환경에서 시드 엔드포인트 비활성화
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      { success: false, error: { code: "NOT_FOUND", message: "Not found" } },
+      { status: 404 }
+    )
+  }
+
   try {
     const authHeader = request.headers.get("authorization")
     const secret = authHeader?.replace("Bearer ", "") || null

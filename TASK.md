@@ -2158,6 +2158,67 @@
 
 ---
 
+### Phase DC-G: 개발자콘솔 보안 취약점 전면 수정 (T210~T216)
+
+> 보안 감사(2026-02-22) 기반 — OWASP Top 10 기준 Critical/High 우선 수정
+> 우선순위: Critical → High 순서
+
+- [x] **T210: API Key Rotate 인증 완전 누락 수정** 🔴 Critical ✅ 2026-02-22
+  - 배경: `POST /api/api-keys/[id]/rotate` — `requireAuth()` 호출 없음. 비로그인 상태로 타 org 키 교체 가능
+  - AC1: `requireAuth()` 추가, 미인증 시 401 반환 ✅
+  - AC2: `getUserOrganization()` 후 `findFirst({ where: { id, organizationId } })`로 Cross-Org 방지 ✅
+  - AC3: REVOKED 키 교체 차단 유지 ✅
+  - AC4: Build PASS ✅ (tsc clean, 171 tests)
+  - 변경파일: `api-keys/[id]/rotate/route.ts`
+
+- [x] **T211: Webhooks [id] Cross-Org 데이터 유출 수정** 🔴 Critical ✅ 2026-02-22
+  - 배경: GET/PATCH/DELETE 모두 `findUnique({ where: { id } })` 후 별도 org 검증 → 404 vs 403 차이로 타 org 웹훅 ID 열거 가능
+  - AC1: GET — `findFirst({ where: { id, organizationId } })`로 변경 ✅
+  - AC2: PATCH — 동일 패턴 ✅
+  - AC3: DELETE — 동일 패턴 ✅
+  - AC4: Build PASS ✅
+  - 변경파일: `webhooks/[id]/route.ts`
+
+- [x] **T212: Webhooks GET null-filter + POST organizationId 누락 수정** 🔴 Critical ✅ 2026-02-22
+  - 배경: GET에서 `membership null` 시 `orgFilter = {}` → 전체 org 웹훅 반환; POST에서 `organizationId` 미설정
+  - AC1: GET — `!membership` 시 즉시 403 반환 ✅
+  - AC2: POST — `getUserOrganization()` 후 `organizationId: membership.organizationId` 추가 ✅
+  - AC3 (T215 병합): SSRF 방어 — `BLOCKED_HOSTS` 정규식으로 내부 IP 전체 차단 ✅
+  - AC4: Build PASS ✅
+  - 변경파일: `webhooks/route.ts`
+
+- [x] **T213: Status endpoint 정보 최소화** 🔴 Critical ✅ 2026-02-22
+  - 배경: 인증 없이 UptimeRobot 연동, 레이턴시 측정값, 서비스 uptime 상세 노출 → 인프라 정찰 가능
+  - AC1: UptimeRobot API 통합 제거 ✅
+  - AC2: latency 측정값 응답에서 제거 ✅
+  - AC3: uptime 수치 제거, status만 반환 ✅
+  - AC4: 공개 엔드포인트 유지 (status page 목적), 노출 최소화 ✅
+  - AC5: Build PASS ✅
+  - 변경파일: `status/route.ts`
+
+- [x] **T214: Billing amount 검증 + Toss 에러 노출 수정** 🟠 High ✅ 2026-02-22
+  - 배경: `amount` 쿼리파람을 그대로 Toss에 전달 (가격 조작 가능); Toss 에러 메시지 리다이렉트 URL에 노출
+  - AC1: `PLAN_PRICES[planId]`와 `parseInt(amount)` 비교 — 불일치 시 error redirect ✅
+  - AC2: `planId` 유효성 검사 (starter/pro/enterprise만 허용) ✅
+  - AC3: Toss 에러 메시지 리다이렉트 URL에서 제거 (서버 로그만) ✅
+  - AC4: Build PASS ✅
+  - 변경파일: `billing/toss/success/route.ts`
+
+- [x] **T215: Webhook URL SSRF 방어 + POST secret 주석 명확화** 🟠 High ✅ 2026-02-22
+  - T212에서 함께 처리 (webhooks/route.ts SSRF 방어)
+  - AC1: `BLOCKED_HOSTS` 정규식으로 localhost/127.x/10.x/192.168.x/169.254.x 차단 ✅
+  - AC2: POST 응답 secret — one-time reveal 주석 명확화 ✅
+  - AC3: Build PASS ✅
+  - 변경파일: `webhooks/route.ts` (T212 동일)
+
+- [x] **T216: Admin seed 프로덕션 방어** 🟠 High ✅ 2026-02-22
+  - 배경: `NODE_ENV=production` 에서도 `/api/admin/seed` 접근 가능
+  - AC1: 핸들러 시작에 `NODE_ENV === 'production'` 체크 → 404 반환 ✅
+  - AC2: Build PASS ✅
+  - 변경파일: `admin/seed/route.ts`
+
+---
+
 ## 🚫 BLOCKED (막힘)
 
 (없음)

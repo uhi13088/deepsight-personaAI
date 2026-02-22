@@ -3,9 +3,26 @@ import { z } from "zod"
 import prisma from "@/lib/prisma"
 import crypto from "crypto"
 import { requireAuth } from "@/lib/require-auth"
+import { getUserOrganization } from "@/lib/get-user-organization"
+
+// T215: SSRF 방어 — 내부 IP/호스트 차단
+const BLOCKED_HOSTS =
+  /^(localhost|127\.|0\.0\.0\.0|::1|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.)/i
+
+function isInternalUrl(url: string): boolean {
+  try {
+    const { hostname } = new URL(url)
+    return BLOCKED_HOSTS.test(hostname)
+  } catch {
+    return true
+  }
+}
 
 const createWebhookSchema = z.object({
-  url: z.string().url("올바른 URL 형식이 아닙니다"),
+  url: z
+    .string()
+    .url("올바른 URL 형식이 아닙니다")
+    .refine((url) => !isInternalUrl(url), "내부 네트워크 URL은 사용할 수 없습니다"),
   description: z.string().optional(),
   events: z.array(z.string()).min(1, "최소 1개 이상의 이벤트를 선택해주세요"),
 })
@@ -19,9 +36,17 @@ export async function GET() {
   if (response) return response
 
   try {
-    const { getUserOrganization } = await import("@/lib/get-user-organization")
     const membership = await getUserOrganization(session.user.id)
-    const orgFilter = membership ? { organizationId: membership.organizationId } : {}
+
+    // T212: membership null 시 빈 필터({})로 전체 조회하는 것을 방지
+    if (!membership) {
+      return NextResponse.json(
+        { success: false, error: { code: "FORBIDDEN", message: "조직 접근 권한이 없습니다." } },
+        { status: 403 }
+      )
+    }
+
+    const orgFilter = { organizationId: membership.organizationId }
 
     // 1쿼리: 웹훅 목록 (최근 배달 포함)
     const webhooks = await prisma.webhook.findMany({
@@ -40,7 +65,7 @@ export async function GET() {
 
     // 1쿼리: 최근 배달 로그
     const deliveryLogs = await prisma.webhookDelivery.findMany({
-      where: membership ? { webhook: { organizationId: membership.organizationId } } : {},
+      where: { webhook: orgFilter },
       orderBy: { createdAt: "desc" },
       take: 50,
       include: {
@@ -146,6 +171,15 @@ export async function POST(request: NextRequest) {
   if (response) return response
 
   try {
+    // T212: POST에도 조직 소속 확인 후 organizationId 설정
+    const membership = await getUserOrganization(session.user.id)
+    if (!membership) {
+      return NextResponse.json(
+        { success: false, error: { code: "FORBIDDEN", message: "조직 접근 권한이 없습니다." } },
+        { status: 403 }
+      )
+    }
+
     const body = await request.json()
     const parsed = createWebhookSchema.safeParse(body)
 
@@ -162,6 +196,7 @@ export async function POST(request: NextRequest) {
     const { url, description, events } = parsed.data
     const secret = `whsec_${crypto.randomBytes(24).toString("hex")}`
 
+    // T212: organizationId 누락 수정
     const webhook = await prisma.webhook.create({
       data: {
         url,
@@ -169,6 +204,7 @@ export async function POST(request: NextRequest) {
         events,
         secret,
         status: "ACTIVE",
+        organizationId: membership.organizationId,
       },
     })
 
@@ -181,6 +217,8 @@ export async function POST(request: NextRequest) {
           description: webhook.description || "",
           status: webhook.status.toLowerCase(),
           events: webhook.events,
+          // T215: 생성 시 secret 1회 공개는 의도적 (one-time reveal)
+          // 이후 GET 응답에서는 앞 8자리만 노출
           secret: webhook.secret,
           createdAt: webhook.createdAt.toISOString(),
           lastDelivery: {
@@ -205,7 +243,7 @@ export async function POST(request: NextRequest) {
         success: false,
         error: {
           code: "INTERNAL_ERROR",
-          message: "웹훅 생성에 실패했습니다. 데이터베이스를 확인해주세요.",
+          message: "웹훅 생성에 실패했습니다.",
         },
       },
       { status: 500 }

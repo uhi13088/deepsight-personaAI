@@ -3,8 +3,6 @@ import { NextResponse } from "next/server"
 interface ServiceStatus {
   name: string
   status: "operational" | "degraded" | "outage"
-  uptime: string
-  latency?: number
 }
 
 interface Incident {
@@ -17,106 +15,42 @@ interface Incident {
 }
 
 /**
- * GET /api/status - System Status
+ * GET /api/status - System Status (공개 엔드포인트)
+ *
+ * T213 보안 수정:
+ * - UptimeRobot API 통합 제거 (모니터링 인프라 노출 차단)
+ * - latency 측정값 제거 (인프라 정찰 방지)
+ * - uptime 수치 제거 (내부 SLA 정보 노출 방지)
+ * - 상태(status)만 반환
  */
 export async function GET() {
   try {
     const services: ServiceStatus[] = []
     const incidents: Incident[] = []
 
-    // Check API health
-    const apiStart = Date.now()
+    // 자체 API 헬스 체크 (응답 중이면 operational)
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
     if (appUrl) {
       try {
         const dbCheck = await fetch(`${appUrl}/api/health`, {
           method: "GET",
-          signal: AbortSignal.timeout(5000),
+          signal: AbortSignal.timeout(3000),
         }).catch(() => null)
 
         services.push({
           name: "API",
           status: dbCheck?.ok ? "operational" : "degraded",
-          uptime: "99.99%",
-          latency: Date.now() - apiStart,
         })
       } catch {
-        services.push({
-          name: "API",
-          status: "operational",
-          uptime: "99.99%",
-          latency: Date.now() - apiStart,
-        })
+        services.push({ name: "API", status: "operational" })
       }
     } else {
-      services.push({
-        name: "API",
-        status: "operational",
-        uptime: "99.99%",
-        latency: Date.now() - apiStart,
-      })
+      services.push({ name: "API", status: "operational" })
     }
 
-    // Dashboard status (always operational if we're responding)
-    services.push({
-      name: "Dashboard",
-      status: "operational",
-      uptime: "99.95%",
-    })
-
-    // Playground status
-    services.push({
-      name: "Playground",
-      status: "operational",
-      uptime: "99.90%",
-    })
-
-    // Webhooks status
-    services.push({
-      name: "Webhooks",
-      status: "operational",
-      uptime: "99.85%",
-    })
-
-    // Check UptimeRobot if configured
-    if (process.env.UPTIMEROBOT_API_KEY) {
-      try {
-        const response = await fetch("https://api.uptimerobot.com/v2/getMonitors", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            api_key: process.env.UPTIMEROBOT_API_KEY,
-            format: "json",
-          }),
-          signal: AbortSignal.timeout(5000),
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          if (data.monitors) {
-            // Update services based on UptimeRobot data
-            for (const monitor of data.monitors) {
-              const existingService = services.find(
-                (s) => s.name.toLowerCase() === monitor.friendly_name.toLowerCase()
-              )
-              if (existingService) {
-                existingService.status =
-                  monitor.status === 2
-                    ? "operational"
-                    : monitor.status === 8
-                      ? "degraded"
-                      : "outage"
-                existingService.uptime = `${monitor.all_time_uptime_ratio}%`
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error("[Status] UptimeRobot error:", error)
-      }
-    }
+    services.push({ name: "Dashboard", status: "operational" })
+    services.push({ name: "Playground", status: "operational" })
+    services.push({ name: "Webhooks", status: "operational" })
 
     // Calculate overall status
     const hasOutage = services.some((s) => s.status === "outage")
@@ -139,10 +73,10 @@ export async function GET() {
       data: {
         status: "operational",
         services: [
-          { name: "API", status: "operational", uptime: "99.99%" },
-          { name: "Dashboard", status: "operational", uptime: "99.95%" },
-          { name: "Playground", status: "operational", uptime: "99.90%" },
-          { name: "Webhooks", status: "operational", uptime: "99.85%" },
+          { name: "API", status: "operational" },
+          { name: "Dashboard", status: "operational" },
+          { name: "Playground", status: "operational" },
+          { name: "Webhooks", status: "operational" },
         ],
         incidents: [],
         lastUpdated: new Date().toISOString(),
