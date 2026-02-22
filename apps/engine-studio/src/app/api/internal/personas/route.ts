@@ -178,6 +178,7 @@ export async function GET(request: NextRequest) {
     const sortOrder = (searchParams.get("order") ?? "desc") as SortOrder
     const paradoxMin = parseFloatSafe(searchParams.get("paradoxMin"))
     const paradoxMax = parseFloatSafe(searchParams.get("paradoxMax"))
+    const engineVersionParam = searchParams.get("engineVersion")
     const vectorFilters = parseJsonSafe<VectorRangeFilter>(searchParams.get("vectorFilters"))
     const crossAxisFilters = parseJsonSafe<CrossAxisFilter[]>(searchParams.get("crossAxisFilters"))
 
@@ -211,6 +212,15 @@ export async function GET(request: NextRequest) {
         { name: { contains: searchQuery.trim(), mode: "insensitive" } },
         { description: { contains: searchQuery.trim(), mode: "insensitive" } },
       ]
+    }
+
+    // Engine version filter
+    if (engineVersionParam) {
+      if (engineVersionParam === "unknown") {
+        where.engineVersion = null
+      } else {
+        where.engineVersion = engineVersionParam
+      }
     }
 
     // Paradox score range
@@ -295,6 +305,7 @@ export async function GET(request: NextRequest) {
           l2: l2Vector ? layerVectorToRecord(l2Vector, L2_DIM_MAP) : null,
           l3: l3Vector ? layerVectorToRecord(l3Vector, L3_DIM_MAP) : null,
         },
+        engineVersion: p.engineVersion ?? null,
         createdAt: p.createdAt.toISOString(),
         updatedAt: p.updatedAt.toISOString(),
       }

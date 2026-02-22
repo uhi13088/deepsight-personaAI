@@ -40,6 +40,9 @@ function buildQueryString(filters: PersonaFilterState): string {
   if (filters.crossAxisFilters.length > 0) {
     params.set("crossAxisFilters", JSON.stringify(filters.crossAxisFilters))
   }
+  if (filters.engineVersion !== "all") {
+    params.set("engineVersion", filters.engineVersion)
+  }
 
   return params.toString()
 }

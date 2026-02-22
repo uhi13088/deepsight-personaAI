@@ -20,6 +20,7 @@ import type { PersonaSortField, SortOrder, VectorRangeFilter, CrossAxisFilter } 
 export interface PersonaFilterState {
   search: string
   status: string
+  engineVersion: string
   archetypeIds: string[]
   sort: PersonaSortField
   order: SortOrder
@@ -33,6 +34,7 @@ export interface PersonaFilterState {
 export const DEFAULT_FILTERS: PersonaFilterState = {
   search: "",
   status: "all",
+  engineVersion: "all",
   archetypeIds: [],
   sort: "createdAt",
   order: "desc",
@@ -51,6 +53,14 @@ const STATUS_OPTIONS = [
   { value: "REVIEW", label: "Review" },
   { value: "STANDARD", label: "Standard" },
   { value: "ARCHIVED", label: "Archived" },
+]
+
+// ── Engine Version Options ───────────────────────────────────
+const ENGINE_VERSION_OPTIONS = [
+  { value: "all", label: "전체 버전" },
+  { value: "4.0", label: "v4.0" },
+  { value: "3.0", label: "v3.0" },
+  { value: "unknown", label: "버전 미상" },
 ]
 
 // ── Sort Options ────────────────────────────────────────────
@@ -156,6 +166,7 @@ export function PersonaFilters({ filters, onFiltersChange, totalCount }: Persona
   // Count active filters
   const activeFilterCount =
     (filters.status !== "all" ? 1 : 0) +
+    (filters.engineVersion !== "all" ? 1 : 0) +
     filters.archetypeIds.length +
     (filters.paradoxRange[0] > 0 || filters.paradoxRange[1] < 1 ? 1 : 0) +
     Object.keys(filters.vectorFilters).length +
@@ -230,9 +241,41 @@ export function PersonaFilters({ filters, onFiltersChange, totalCount }: Persona
         <span className="text-muted-foreground ml-auto text-xs">{totalCount}개 페르소나</span>
       </div>
 
+      {/* Engine Version Chips */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-muted-foreground text-xs font-medium">엔진:</span>
+        {ENGINE_VERSION_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              filters.engineVersion === opt.value
+                ? opt.value === "all"
+                  ? "bg-primary text-primary-foreground"
+                  : opt.value === "4.0"
+                    ? "bg-emerald-600 text-white"
+                    : "bg-amber-500 text-white"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+            onClick={() => update({ engineVersion: opt.value })}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
       {/* Active filter chips */}
       {activeFilterCount > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
+          {filters.engineVersion !== "all" && (
+            <Badge variant="secondary" className="gap-1">
+              엔진{" "}
+              {ENGINE_VERSION_OPTIONS.find((o) => o.value === filters.engineVersion)?.label ??
+                filters.engineVersion}
+              <button onClick={() => update({ engineVersion: "all" })}>
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
           {filters.archetypeIds.map((id) => (
             <Badge key={id} variant="secondary" className="gap-1">
               {archetypeMap[id] ?? id}
