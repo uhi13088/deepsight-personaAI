@@ -18,7 +18,20 @@ import type {
   IncidentTimelineEntry,
 } from "@/lib/operations"
 import type { Prisma } from "@/generated/prisma"
-import { DEMO_DETECTION_RULES } from "@/lib/demo-fixtures"
+// 기본 탐지 규칙 (SystemConfig에 없을 때 사용)
+const DEFAULT_DETECTION_RULES: DetectionRule[] = [
+  {
+    id: "rule_llm_error_rate",
+    name: "LLM 에러율 급증",
+    description: "LLM 에러율이 15%를 초과하면 P1 장애 탐지",
+    metricType: "llm_error_rate",
+    condition: "above",
+    threshold: 15,
+    durationSeconds: 60,
+    severity: "P1",
+    enabled: true,
+  },
+]
 
 // ── Severity/Phase mapping ────────────────────────────────────
 
@@ -157,7 +170,7 @@ async function loadDetectionRules(): Promise<DetectionRule[]> {
   if (row) {
     return row.value as unknown as DetectionRule[]
   }
-  return DEMO_DETECTION_RULES
+  return DEFAULT_DETECTION_RULES
 }
 
 // ── Response type ───────────────────────────────────────────────

@@ -22,33 +22,23 @@ import type {
   EventSubscription,
   SyncDelayReport,
 } from "@/lib/system-integration"
-import {
-  DEMO_EVENT_SUBSCRIPTIONS,
-  DEMO_SAMPLE_EVENTS,
-  DEMO_EVENT_SOURCE,
-  DEMO_EVENT_METADATA,
-} from "@/lib/demo-fixtures"
 
 // ── In-memory Store ────────────────────────────────────────────
 
 let bus: EventBusState | null = null
 
-function ensureSeedData(): EventBusState {
-  if (bus) return bus
+// 이벤트 소스/메타 (수동 발행 시 사용)
+const EVENT_SOURCE = { service: "engine-studio", instance: "production" }
+const EVENT_METADATA = {
+  userId: "system",
+  userRole: "operator",
+  environment: "production" as const,
+}
 
-  bus = createEventBus(1000)
-
-  // 구독자 추가
-  for (const sub of DEMO_EVENT_SUBSCRIPTIONS) {
-    bus = subscribe(bus, sub.subscriberId, sub.eventTypes, sub.endpoint)
+function ensureBus(): EventBusState {
+  if (!bus) {
+    bus = createEventBus(1000)
   }
-
-  // 샘플 이벤트 발행
-  for (const { type, payload } of DEMO_SAMPLE_EVENTS) {
-    const event = createEvent(type, payload, DEMO_EVENT_SOURCE, DEMO_EVENT_METADATA)
-    bus = publish(bus, event)
-  }
-
   return bus
 }
 
@@ -76,7 +66,7 @@ export async function GET() {
   if (response) return response
 
   try {
-    const currentBus = ensureSeedData()
+    const currentBus = ensureBus()
     const stats = getEventStats(currentBus)
 
     return NextResponse.json<ApiResponse<SerializableEventBusResponse>>({
@@ -134,7 +124,7 @@ export async function POST(request: NextRequest) {
   if (response) return response
 
   try {
-    const currentBus = ensureSeedData()
+    const currentBus = ensureBus()
     const body = (await request.json()) as EventAction
 
     switch (body.action) {
@@ -151,8 +141,8 @@ export async function POST(request: NextRequest) {
         const event = createEvent(
           body.eventType,
           body.payload ?? { manual: true, timestamp: Date.now() },
-          DEMO_EVENT_SOURCE,
-          DEMO_EVENT_METADATA
+          EVENT_SOURCE,
+          EVENT_METADATA
         )
         bus = publish(currentBus, event)
         return NextResponse.json<ApiResponse<{ eventId: string }>>({
