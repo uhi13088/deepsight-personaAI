@@ -28,10 +28,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { userId, platform, codeChallenge } = body as {
+    const { userId, platform, codeChallenge, returnTo } = body as {
       userId: string
       platform: string
       codeChallenge?: string
+      returnTo?: string
     }
 
     if (!userId || !platform) {
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const authUrl = buildAuthUrl(snsPlatform, userId, codeChallenge)
+    const authUrl = buildAuthUrl(snsPlatform, userId, codeChallenge, returnTo)
 
     if (!authUrl) {
       return NextResponse.json(

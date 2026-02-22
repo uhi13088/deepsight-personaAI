@@ -58,6 +58,32 @@ export default function ProfilePage() {
   const [dailyAnswered, setDailyAnswered] = useState(false)
   const [consentProvider, setConsentProvider] = useState<SnsProvider | null>(null)
 
+  // SNS OAuth 콜백 결과 처리
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const connected = params.get("sns_connected")
+    const snsError = params.get("sns_error")
+    if (connected) {
+      const config = SNS_PROVIDER_CONFIG[connected]
+      if (config) {
+        connectSns(connected as SnsProvider, `${connected}_oauth`)
+        toast.success(`${config.label} 연동 및 분석이 완료되었습니다!`)
+      }
+      // URL 정리
+      const url = new URL(window.location.href)
+      url.searchParams.delete("sns_connected")
+      url.searchParams.delete("level")
+      window.history.replaceState({}, "", url.pathname)
+    }
+    if (snsError) {
+      toast.error(`SNS 연동 실패: ${decodeURIComponent(snsError)}`)
+      const url = new URL(window.location.href)
+      url.searchParams.delete("sns_error")
+      window.history.replaceState({}, "", url.pathname)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // 오늘 이미 답변했는지 확인
   const today = new Date().toISOString().slice(0, 10)
   const alreadyAnsweredToday = dailyQuestion.lastAnsweredDate === today
@@ -90,19 +116,81 @@ export default function ProfilePage() {
     toast.success("10 코인 획득! 매칭 정밀도가 향상됩니다")
   }, [answerDailyQuestion])
 
+  // OAuth 지원 플랫폼 (서버 환경변수 설정 필요)
+  const OAUTH_PLATFORMS = new Set(["youtube", "spotify", "instagram", "twitter"])
+  // 데이터 업로드 플랫폼
+  const UPLOAD_PLATFORMS = new Set(["netflix"])
+
   const handleSnsConnect = useCallback(
-    (provider: SnsProvider) => {
+    async (provider: SnsProvider) => {
       setConsentProvider(null)
-      connectSns(provider, `${provider}_${Date.now()}`)
-      setSnsAnalyzing(provider, true)
-      toast.success(`${SNS_PROVIDER_CONFIG[provider].label} 연동 완료! 분석을 시작합니다`)
-      // 분석 완료 시뮬레이션
-      setTimeout(() => {
-        setSnsAnalyzing(provider, false)
-        toast.success(`${SNS_PROVIDER_CONFIG[provider].label} 분석이 완료되었습니다`)
-      }, 3000)
+      const userId = profile?.id
+      if (!userId) {
+        toast.error("로그인이 필요합니다")
+        return
+      }
+
+      // 미지원 플랫폼 (threads, naver_blog, youtube_music)
+      if (!OAUTH_PLATFORMS.has(provider) && !UPLOAD_PLATFORMS.has(provider)) {
+        toast.info(`${SNS_PROVIDER_CONFIG[provider].label}은(는) 준비 중입니다.`)
+        return
+      }
+
+      // 업로드 방식 (Netflix)
+      if (UPLOAD_PLATFORMS.has(provider)) {
+        const input = document.createElement("input")
+        input.type = "file"
+        input.accept = ".csv,.json"
+        input.onchange = async (e) => {
+          const file = (e.target as HTMLInputElement).files?.[0]
+          if (!file) return
+          setSnsAnalyzing(provider, true)
+          connectSns(provider, file.name)
+          toast.info(`${SNS_PROVIDER_CONFIG[provider].label} 데이터 분석 중...`)
+          try {
+            const text = await file.text()
+            let parsedData: Record<string, unknown>
+            if (file.name.endsWith(".json")) {
+              parsedData = JSON.parse(text)
+            } else {
+              const lines = text.split("\n")
+              const headers = lines[0]?.split(",").map((h) => h.trim()) ?? []
+              const rows = lines.slice(1).map((line) => {
+                const values = line.split(",").map((v) => v.trim())
+                const row: Record<string, string> = {}
+                headers.forEach((h, i) => {
+                  row[h] = values[i] ?? ""
+                })
+                return row
+              })
+              parsedData = { viewingHistory: rows }
+            }
+            await clientApi.uploadSnsData(userId, provider, parsedData)
+            setSnsAnalyzing(provider, false)
+            toast.success(`${SNS_PROVIDER_CONFIG[provider].label} 분석이 완료되었습니다`)
+          } catch (err) {
+            setSnsAnalyzing(provider, false)
+            disconnectSns(provider)
+            toast.error(err instanceof Error ? err.message : "데이터 업로드에 실패했습니다")
+          }
+        }
+        input.click()
+        return
+      }
+
+      // OAuth 방식 (YouTube, Spotify, Instagram, Twitter)
+      try {
+        const result = await clientApi.startSnsAuth(userId, provider, undefined, "/profile")
+        if (result.method === "oauth" && result.authUrl) {
+          window.location.href = result.authUrl
+        } else {
+          toast.error(`${SNS_PROVIDER_CONFIG[provider].label} OAuth 설정이 필요합니다`)
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "SNS 연동에 실패했습니다")
+      }
     },
-    [connectSns, setSnsAnalyzing]
+    [profile?.id, connectSns, disconnectSns, setSnsAnalyzing]
   )
 
   const handleSnsDisconnect = useCallback(
@@ -465,22 +553,34 @@ export default function ProfilePage() {
                 const connection = snsConnections.find((c) => c.provider === provider)
                 const isConnected = connection?.connected ?? false
                 const isAnalyzing = connection?.analyzing ?? false
+                const isSupported = OAUTH_PLATFORMS.has(provider) || UPLOAD_PLATFORMS.has(provider)
 
                 return (
                   <div
                     key={provider}
                     className={`flex items-center justify-between rounded-lg border p-3 ${
-                      isConnected ? "border-green-200 bg-green-50/50" : "border-gray-100 bg-white"
+                      isConnected
+                        ? "border-green-200 bg-green-50/50"
+                        : !isSupported
+                          ? "border-gray-100 bg-gray-50/50"
+                          : "border-gray-100 bg-white"
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       <span
-                        className={`flex h-9 w-9 items-center justify-center rounded-lg text-lg ${config.color}`}
+                        className={`flex h-9 w-9 items-center justify-center rounded-lg text-lg ${config.color} ${!isSupported && !isConnected ? "opacity-50" : ""}`}
                       >
                         {config.emoji}
                       </span>
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{config.label}</div>
+                        <div
+                          className={`text-sm font-medium ${!isSupported && !isConnected ? "text-gray-400" : "text-gray-900"}`}
+                        >
+                          {config.label}
+                          {!isSupported && !isConnected && (
+                            <span className="ml-1.5 text-[10px] text-gray-400">준비 중</span>
+                          )}
+                        </div>
                         <div className="text-xs text-gray-500">
                           {isAnalyzing
                             ? "분석 중..."
@@ -501,8 +601,16 @@ export default function ProfilePage() {
                       </button>
                     ) : (
                       <button
-                        onClick={() => setConsentProvider(provider)}
-                        className="rounded-full bg-purple-100 px-3 py-1 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-200"
+                        onClick={() =>
+                          isSupported
+                            ? setConsentProvider(provider)
+                            : toast.info(`${config.label}은(는) 준비 중입니다.`)
+                        }
+                        className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                          isSupported
+                            ? "bg-purple-100 text-purple-700 hover:bg-purple-200"
+                            : "bg-gray-100 text-gray-400"
+                        }`}
                       >
                         연동하기
                       </button>

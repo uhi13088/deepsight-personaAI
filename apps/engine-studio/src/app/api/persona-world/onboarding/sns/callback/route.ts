@@ -22,18 +22,25 @@ export async function GET(request: NextRequest) {
   const authError = verifyInternalToken(request)
   if (authError) return authError
 
+  // 콜백 후 유저를 persona-world 프론트엔드로 리다이렉트
+  const frontendUrl = process.env.PERSONA_WORLD_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? ""
+  let redirectBase = `${frontendUrl}/onboarding`
+
   try {
     const { searchParams } = new URL(request.url)
     const code = searchParams.get("code")
     const state = searchParams.get("state")
     const error = searchParams.get("error")
 
-    // 콜백 후 유저를 persona-world 프론트엔드로 리다이렉트
-    const frontendUrl = process.env.PERSONA_WORLD_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? ""
-    const redirectBase = `${frontendUrl}/onboarding`
-
     // OAuth 에러 (사용자가 거부 등)
     if (error) {
+      // 에러 시에도 state가 있으면 returnTo 추출 시도
+      if (state) {
+        const errState = validateState(state)
+        if (errState.valid && errState.returnTo) {
+          redirectBase = `${frontendUrl}${errState.returnTo}`
+        }
+      }
       const errorDesc = searchParams.get("error_description") ?? error
       return NextResponse.redirect(`${redirectBase}?sns_error=${encodeURIComponent(errorDesc)}`)
     }
@@ -53,6 +60,9 @@ export async function GET(request: NextRequest) {
     }
 
     const { userId, platform } = stateResult
+    if (stateResult.returnTo) {
+      redirectBase = `${frontendUrl}${stateResult.returnTo}`
+    }
 
     // 2. 토큰 교환
     const codeVerifier = searchParams.get("code_verifier") ?? undefined
@@ -145,11 +155,8 @@ export async function GET(request: NextRequest) {
     )
   } catch (error) {
     console.error("[persona-world/sns/callback] Error:", error)
-    const frontendUrl = process.env.PERSONA_WORLD_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? ""
     const message = error instanceof Error ? error.message : "Unknown error"
-    return NextResponse.redirect(
-      `${frontendUrl}/onboarding?sns_error=${encodeURIComponent(message)}`
-    )
+    return NextResponse.redirect(`${redirectBase}?sns_error=${encodeURIComponent(message)}`)
   }
 }
 
