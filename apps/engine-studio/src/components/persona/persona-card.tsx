@@ -37,6 +37,23 @@ function getTopTraits(l1: Record<string, number> | null): string[] {
     .map((d) => (l1[d.key] >= 0.5 ? d.highLabel : d.lowLabel))
 }
 
+function EnergyBar({ label, value }: { label: string; value: number }) {
+  const pct = Math.round(value * 100)
+  const color = pct >= 60 ? "bg-emerald-500" : pct >= 30 ? "bg-amber-400" : "bg-red-500"
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-muted-foreground w-6 shrink-0 text-[9px]">{label}</span>
+      <div className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full">
+        <div
+          className={`h-full rounded-full transition-all ${color}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className="text-muted-foreground w-6 text-right text-[9px]">{pct}%</span>
+    </div>
+  )
+}
+
 function formatParadox(score: number | null): string {
   if (score === null) return "-"
   return (score * 100).toFixed(0) + "%"
@@ -114,6 +131,14 @@ export function PersonaCard({ persona, onDelete }: PersonaCardProps) {
                 {trait}
               </span>
             ))}
+          </div>
+        )}
+
+        {/* Energy Bar */}
+        {persona.state && (
+          <div className="mb-2 space-y-1">
+            <EnergyBar label="에너지" value={persona.state.energy} />
+            <EnergyBar label="소셜" value={persona.state.socialBattery} />
           </div>
         )}
 

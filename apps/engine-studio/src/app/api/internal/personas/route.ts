@@ -254,6 +254,7 @@ export async function GET(request: NextRequest) {
           layerVectors: {
             orderBy: { version: "desc" },
           },
+          personaState: true,
         },
       }),
       prisma.persona.count({ where }),
@@ -295,6 +296,13 @@ export async function GET(request: NextRequest) {
           l2: l2Vector ? layerVectorToRecord(l2Vector, L2_DIM_MAP) : null,
           l3: l3Vector ? layerVectorToRecord(l3Vector, L3_DIM_MAP) : null,
         },
+        state: p.personaState
+          ? {
+              energy: Number(p.personaState.energy),
+              mood: Number(p.personaState.mood),
+              socialBattery: Number(p.personaState.socialBattery),
+            }
+          : null,
         createdAt: p.createdAt.toISOString(),
         updatedAt: p.updatedAt.toISOString(),
       }
