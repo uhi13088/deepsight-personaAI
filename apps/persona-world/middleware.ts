@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
+import { getToken } from "next-auth/jwt"
 
 /**
  * PersonaWorld Auth Middleware
  *
  * 1. 페이지 라우트: 세션 쿠키 없으면 로그인 페이지로 리다이렉트
- * 2. API 프록시 라우트: 세션 쿠키 검증 + X-Internal-Token 헤더 주입
- *    → engine-studio에 전달되어 서비스간 인증으로 사용
+ * 2. API 프록시 라우트: 세션 쿠키 검증 + X-Internal-Token + X-Authenticated-Email 헤더 주입
+ *    → engine-studio에 전달되어 서비스간 인증 + 유저 소유권 검증으로 사용
  */
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // NextAuth v5 JWT 세션 쿠키 확인
@@ -31,17 +32,30 @@ export function middleware(request: NextRequest) {
       )
     }
 
-    // 프록시 요청에 내부 인증 토큰 주입
+    // 프록시 요청에 내부 인증 토큰 + 인증된 유저 이메일 주입
+    const requestHeaders = new Headers(request.headers)
+
     const internalSecret = process.env.INTERNAL_API_SECRET
     if (internalSecret) {
-      const requestHeaders = new Headers(request.headers)
       requestHeaders.set("x-internal-token", internalSecret)
-      return NextResponse.next({
-        request: { headers: requestHeaders },
-      })
     }
 
-    return NextResponse.next()
+    // JWT에서 이메일 추출 → 유저 소유권 검증에 사용
+    try {
+      const token = await getToken({
+        req: request,
+        secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
+      })
+      if (token?.email) {
+        requestHeaders.set("x-authenticated-email", token.email as string)
+      }
+    } catch {
+      // JWT 디코딩 실패 시에도 요청은 통과 (x-internal-token 검증은 별도)
+    }
+
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+    })
   }
 
   // ── 페이지 라우트: 세션 없으면 로그인 리다이렉트 ───────────

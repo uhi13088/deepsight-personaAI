@@ -639,6 +639,48 @@ export const clientApi = {
     return json.data!
   },
 
+  // ── SNS 재분석 비용 조회 ──────────────────────────────────
+  async getSnsReanalyzeCost(userId: string) {
+    const params = new URLSearchParams({ userId })
+    const res = await fetch(`/api/persona-world/onboarding/sns/reanalyze?${params}`)
+    if (!res.ok) throw new Error("Failed to fetch reanalyze cost")
+
+    const json: ApiResponse<{
+      cost: number
+      isFirstFree: boolean
+      currentBalance: number
+      canAfford: boolean
+      analysisCount: number
+    }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── SNS 재분석 실행 ──────────────────────────────────────
+  async reanalyzeSns(userId: string) {
+    const res = await fetch(`/api/persona-world/onboarding/sns/reanalyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    })
+
+    const json: ApiResponse<{
+      profileLevel: string
+      confidence: number
+      llmSummary?: string
+      llmTraits?: string[]
+      creditUsed: number
+      remainingBalance: number
+      isFirstFree: boolean
+    }> = await res.json()
+
+    if (!res.ok || !json.success) {
+      const errMsg = json?.error?.message ?? "SNS 재분석 실패"
+      throw new Error(errMsg)
+    }
+    return json.data!
+  },
+
   // ── Toss 결제 승인 확인 ────────────────────────────────────
   async confirmCoinPayment(paymentKey: string, orderId: string, amount: number) {
     const res = await fetch(`/api/persona-world/credits/toss-confirm`, {

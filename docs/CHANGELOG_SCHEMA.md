@@ -39,6 +39,26 @@
 - 새로운 사용 방법
 -->
 
+## [2026-02-22] PersonaWorldUser SNS 분석 횟수 추적
+
+### Added
+
+- PersonaWorldUser.snsAnalysisCount (Int, default 0): SNS LLM 분석 횟수. 최초 1회 무료, 이후 크레딧 차감.
+
+### Migration
+
+```sql
+ALTER TABLE "persona_world_users" ADD COLUMN "sns_analysis_count" INTEGER NOT NULL DEFAULT 0;
+```
+
+### Claude에게
+
+- snsAnalysisCount가 0이면 최초 무료 분석 대상
+- 재분석 시 크레딧 차감 로직: `apps/engine-studio/src/app/api/persona-world/onboarding/sns/reanalyze/route.ts`
+- LLM 분석 모듈: `apps/engine-studio/src/lib/persona-world/onboarding/sns-llm-analyzer.ts`
+
+---
+
 ## [2026-02-21] IncubatorLog failReason 추가
 
 ### Added

@@ -42,6 +42,9 @@ https://engine.deepsight.ai/api/public
     - [GET /blog/:slug](#get-blogslug)
 11. [Reports API](#11-reports-api)
     - [POST /persona-world/reports](#post-persona-worldreports)
+12. [SNS 재분석 API](#12-sns-재분석-api-persona-worldonboardingsnsreanalyze)
+    - [GET /persona-world/onboarding/sns/reanalyze](#get-persona-worldonboardingsnsreanalyze)
+    - [POST /persona-world/onboarding/sns/reanalyze](#post-persona-worldonboardingsnsreanalyze)
 
 ---
 
@@ -1106,3 +1109,90 @@ GET /api/public/persona-requests?userId=user_001
 | `INVALID_CATEGORY` | 400  | 유효하지 않은 카테고리     |
 | `RATE_LIMITED`     | 429  | 신고 횟수 제한 초과        |
 | `INTERNAL`         | 500  | 서버 오류                  |
+
+---
+
+## 12. SNS 재분석 API (`/persona-world/onboarding/sns/reanalyze`)
+
+SNS 데이터를 Claude Sonnet으로 심층 재분석하는 API. Base URL은 `/api/persona-world`입니다.
+최초 1회는 무료, 이후 재분석은 5 코인이 차감됩니다.
+
+---
+
+### GET /persona-world/onboarding/sns/reanalyze
+
+재분석 비용 정보를 조회합니다.
+
+**Query Parameters**
+
+| 파라미터 | 타입     | 필수 | 설명      |
+| -------- | -------- | ---- | --------- |
+| `userId` | `string` | ✅   | 사용자 ID |
+
+**요청**
+
+```http
+GET /api/persona-world/onboarding/sns/reanalyze?userId=user_001
+```
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "cost": 5,
+    "isFirstFree": false,
+    "currentBalance": 150,
+    "canAfford": true,
+    "analysisCount": 1
+  }
+}
+```
+
+---
+
+### POST /persona-world/onboarding/sns/reanalyze
+
+연동된 SNS 데이터를 Claude Sonnet으로 심층 분석하여 L1/L2 벡터를 재생성합니다.
+
+**Request Body**
+
+| 필드     | 타입     | 필수 | 설명      |
+| -------- | -------- | ---- | --------- |
+| `userId` | `string` | ✅   | 사용자 ID |
+
+**요청**
+
+```json
+{
+  "userId": "user_001"
+}
+```
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "profileLevel": "ADVANCED",
+    "confidence": 0.85,
+    "llmSummary": "다양한 장르의 콘텐츠를 고르게 소비하며, 분석적이고 비판적인 시각을 가지고 있습니다.",
+    "llmTraits": ["분석적", "비판적", "실험적", "독립적"],
+    "creditUsed": 5,
+    "remainingBalance": 145,
+    "isFirstFree": false
+  }
+}
+```
+
+**에러 응답**
+
+| 코드                   | HTTP | 설명                    |
+| ---------------------- | ---- | ----------------------- |
+| `INVALID_REQUEST`      | 400  | userId 누락             |
+| `USER_NOT_FOUND`       | 404  | 존재하지 않는 유저      |
+| `NO_SNS_DATA`          | 400  | 연동된 SNS 없음         |
+| `INSUFFICIENT_BALANCE` | 402  | 크레딧 부족             |
+| `REANALYZE_ERROR`      | 500  | 분석 실패 (LLM 오류 등) |
