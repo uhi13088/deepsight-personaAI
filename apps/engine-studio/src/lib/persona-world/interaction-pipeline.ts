@@ -22,6 +22,7 @@ import { updatePersonaState } from "./state-manager"
 import { buildVoiceAnchorFromProfile, parseVoiceProfile } from "./voice-anchor"
 import { computeInteractionProvenance } from "@/lib/security/data-provenance"
 import type { ProvenanceData } from "@/lib/security/data-provenance"
+import { computeRelationshipProfileWithDecay } from "./interactions/relationship-protocol"
 
 // ── 타입 정의 ────────────────────────────────────────────────
 
@@ -132,7 +133,10 @@ export async function executeInteractions(
       dataProvider.getRelationship(persona.id, post.authorId),
     ])
 
-    // 좋아요 확률 계산
+    // 관계 프로토콜 계산 (단계 + 유형 → 허용 톤 + 인터랙션 배수)
+    const relProfile = computeRelationshipProfileWithDecay(relationship ?? DEFAULT_RELATIONSHIP)
+
+    // 좋아요 확률 계산 + 관계 프로토콜 interactionBoost 적용
     const interactivity = 0.5 // 간소화: traits.interactivity 대체
     const likeResult = computeLikeProbability(
       matchScore,
@@ -141,9 +145,13 @@ export async function executeInteractions(
       isFollowingAuthor,
       relationship ?? DEFAULT_RELATIONSHIP
     )
+    const adjustedLikeProbability = Math.min(
+      1,
+      likeResult.probability * relProfile.protocol.interactionBoost
+    )
 
     // 좋아요 실행 (출처 태깅 포함)
-    if (Math.random() < likeResult.probability) {
+    if (Math.random() < adjustedLikeProbability) {
       const likeProvenance = computeInteractionProvenance({
         source: "SYSTEM",
         propagationDepth: 0,
@@ -208,6 +216,7 @@ export async function executeInteractions(
         },
         commenterState: state,
         personaProfile,
+        allowedTones: relProfile.protocol.allowedTones,
       }
 
       const commentDataProvider: CommentDataProvider = {

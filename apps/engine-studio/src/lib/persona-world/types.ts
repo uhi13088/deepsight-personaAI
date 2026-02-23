@@ -216,6 +216,7 @@ export interface CommentGenerationInput {
     strength: number
   }
   personaProfile?: PersonaProfileSnapshot // 댓글 작성자 프로필 (LLM 프롬프트 개인화)
+  allowedTones?: string[] // 관계 프로토콜 기반 허용 톤 목록
 }
 
 // ── 댓글 톤 (v4: 11종) ───────────────────────────────────────

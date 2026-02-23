@@ -21,6 +21,8 @@ import type {
   PersonaStateData,
   SchedulerContext,
 } from "./types"
+import { evaluateRules } from "@/lib/trigger/rule-dsl"
+import type { TriggerRuleDSL, RuleContext, RuleEffect } from "@/lib/trigger/rule-dsl"
 
 /**
  * 최소한의 페르소나 데이터 (스케줄러용).
@@ -45,6 +47,12 @@ export interface SchedulerPersona {
   commentPrompt?: string | null
   voiceSpec?: unknown | null
   factbook?: unknown | null
+  // Activity scheduling fields
+  postFrequency?: string // PostFrequency enum value
+  activeHours?: number[] // DB 저장 활동 시간대
+  peakHours?: number[] // DB 저장 피크 시간대
+  triggerMap?: unknown // TriggerRuleDSL[] - structured rule engine
+  knowledgeAreas?: string[] // 전문 지식 분야 (topic fallback)
 }
 
 /**
@@ -146,8 +154,11 @@ export async function getActivePersonas(
     // 1. 벡터 → 활동 특성 계산
     const traits = computeActivityTraits(persona.vectors, persona.paradoxScore)
 
-    // 2. 활동 시간대 계산
-    const activeHours = computeActiveHours(persona.vectors, traits)
+    // 2. 활동 시간대: DB 저장값 우선, 없으면 벡터에서 재계산
+    const activeHours =
+      persona.activeHours && persona.activeHours.length > 0
+        ? persona.activeHours
+        : computeActiveHours(persona.vectors, traits)
 
     // 3. 현재 시간이 활동 시간대에 포함되는지
     if (!activeHours.includes(currentHour)) continue
@@ -166,7 +177,10 @@ export async function getActivePersonas(
     const state = await getPersonaState(persona.id)
     if (state.energy <= ACTIVITY_THRESHOLDS.minEnergy) continue
 
-    result.push({ persona, traits, state })
+    // 6. triggerMap 효과 적용 (벡터 임시 보정)
+    const effectiveTraits = applyTriggerMapToTraits(persona, state, traits)
+
+    result.push({ persona, traits: effectiveTraits, state })
   }
 
   return result
@@ -189,8 +203,12 @@ export function decideActivity(
   state: PersonaStateData,
   context: SchedulerContext
 ): ActivityDecision {
-  // 1. 활동 확률
-  const { postProbability, interactionProbability } = computeActivityProbabilities(traits, state)
+  // 1. 활동 확률 (postFrequency 반영)
+  const { postProbability, interactionProbability } = computeActivityProbabilities(
+    traits,
+    state,
+    persona.postFrequency
+  )
 
   // 2. 포스트 여부
   const shouldPost = Math.random() < postProbability
@@ -239,5 +257,98 @@ export function decideActivity(
     shouldInteract,
     postType: postType as ActivityDecision["postType"],
     postTypeReason,
+  }
+}
+
+// ── 헬퍼: TriggerMap 효과 → ActivityTraits 보정 ──────────────
+
+/**
+ * triggerMap 규칙을 평가하여 ActivityTraits를 임시 보정.
+ *
+ * 벡터 차원에 boost/suppress/override 효과를 적용한 수정 벡터로
+ * 새로운 ActivityTraits를 계산한다. 원본 벡터는 변경하지 않음.
+ */
+function applyTriggerMapToTraits(
+  persona: SchedulerPersona,
+  state: PersonaStateData,
+  baseTraits: ActivityTraitsV3
+): ActivityTraitsV3 {
+  if (!persona.triggerMap) return baseTraits
+
+  let rules: TriggerRuleDSL[]
+  try {
+    rules = Array.isArray(persona.triggerMap) ? (persona.triggerMap as TriggerRuleDSL[]) : []
+  } catch {
+    return baseTraits
+  }
+
+  if (rules.length === 0) return baseTraits
+
+  const { social: l1, temperament: l2, narrative: l3 } = persona.vectors
+  const ctx: RuleContext = {
+    L1: {
+      depth: l1.depth,
+      lens: l1.lens,
+      stance: l1.stance,
+      scope: l1.scope,
+      taste: l1.taste,
+      purpose: l1.purpose,
+      sociability: l1.sociability,
+    },
+    L2: {
+      openness: l2.openness,
+      conscientiousness: l2.conscientiousness,
+      extraversion: l2.extraversion,
+      agreeableness: l2.agreeableness,
+      neuroticism: l2.neuroticism,
+    },
+    L3: {
+      lack: l3.lack,
+      moralCompass: l3.moralCompass,
+      volatility: l3.volatility,
+      growthArc: l3.growthArc,
+    },
+    state: {
+      mood: state.mood,
+      energy: state.energy,
+      socialBattery: state.socialBattery,
+      paradoxTension: state.paradoxTension,
+    },
+  }
+
+  const evalResult = evaluateRules(rules, ctx)
+  if (evalResult.appliedEffects.length === 0) return baseTraits
+
+  // 효과를 벡터 복사본에 적용
+  const v: ThreeLayerVector = {
+    social: { ...l1 },
+    temperament: { ...l2 },
+    narrative: { ...l3 },
+  }
+
+  for (const effect of evalResult.appliedEffects) {
+    applyEffectToVector(v, effect)
+  }
+
+  // 수정된 벡터로 새로운 ActivityTraits 계산
+  return computeActivityTraits(v, persona.paradoxScore)
+}
+
+function applyEffectToVector(v: ThreeLayerVector, effect: RuleEffect): void {
+  const layerMap: Record<string, Record<string, number>> = {
+    L1: v.social as unknown as Record<string, number>,
+    L2: v.temperament as unknown as Record<string, number>,
+    L3: v.narrative as unknown as Record<string, number>,
+  }
+  const layer = layerMap[effect.layer]
+  if (!layer || !(effect.dimension in layer)) return
+
+  const cur = layer[effect.dimension]
+  if (effect.mode === "boost") {
+    layer[effect.dimension] = Math.min(1, cur + effect.magnitude)
+  } else if (effect.mode === "suppress") {
+    layer[effect.dimension] = Math.max(0, cur - effect.magnitude)
+  } else if (effect.mode === "override") {
+    layer[effect.dimension] = effect.magnitude
   }
 }

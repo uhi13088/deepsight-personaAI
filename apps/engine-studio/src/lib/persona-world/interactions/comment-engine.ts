@@ -107,12 +107,14 @@ export async function generateComment(
 ): Promise<CommentResult> {
   const paradoxScore = await provider.getParadoxScore(input.commenterId)
 
-  // Step 3: 톤 결정
+  // Step 3: 톤 결정 (관계 프로토콜 allowedTones 반영)
   const tone = decideCommentTone(
     commenterVectors,
     input.commenterState,
     input.relationship,
-    paradoxScore
+    paradoxScore,
+    undefined,
+    input.allowedTones
   )
 
   // Step 2: Override가 트리거되면 톤 보정
