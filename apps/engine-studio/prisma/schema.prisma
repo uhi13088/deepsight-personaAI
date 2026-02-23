@@ -1520,6 +1520,7 @@ enum PersonaActivityType {
   DEBATE_STARTED
   COLLAB_STARTED
   SYSTEM            // 시스템 이벤트 (L3 진화, 품질 체크 등)
+  COMMENT_SUPPRESSED // Phase RA: L2 기질 + tension → 댓글 억제 (skip/react_only)
 }
 
 // ============================================

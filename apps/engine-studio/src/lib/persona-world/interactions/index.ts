@@ -41,3 +41,13 @@ export type {
   UserInteractionLLMProvider,
   UserInteractionResult,
 } from "./user-interaction"
+
+// ── Phase RA: Rapport-Aware Engagement ──
+export { classifyL2Pattern } from "./l2-pattern"
+export type { L2ConflictPattern, L2PatternResult } from "./l2-pattern"
+
+export { decideEngagement } from "./engagement-decision"
+export type { EngagementAction, EngagementDecision } from "./engagement-decision"
+
+export { computeVoiceAdjustment, mergeAllowedTones } from "./voice-adjustment"
+export type { VoiceAdjustment } from "./voice-adjustment"
