@@ -147,6 +147,21 @@ export interface PostTypeAffinity {
   conditions: PostTypeAffinityCondition[]
 }
 
+// ── 페르소나 프로필 스냅샷 (LLM 프롬프트용) ──────────────────
+// 스케줄러 → 파이프라인 → 콘텐츠 생성기로 전달되는 프로필 데이터
+export interface PersonaProfileSnapshot {
+  name: string
+  role?: string | null
+  expertise?: string[]
+  description?: string | null
+  speechPatterns?: string[]
+  quirks?: string[]
+  postPrompt?: string | null
+  commentPrompt?: string | null
+  voiceSpec?: unknown | null // VoiceSpec JSON (profile + styleParams + guardrails)
+  factbook?: unknown | null // Factbook JSON (immutableFacts + mutableContext)
+}
+
 // ── Voice 스타일 파라미터 (벡터 → 말투 개인화) ──────────────
 // 3-Layer 벡터에서 도출되는 명시적 스타일 수치
 export interface VoiceStyleParams {
@@ -172,6 +187,7 @@ export interface PostGenerationInput {
   }
   personaState: PersonaStateData
   voiceStyle?: VoiceStyleParams // Voice 스타일 (벡터에서 도출)
+  personaProfile?: PersonaProfileSnapshot // 프로필 데이터 (LLM 프롬프트 개인화)
 }
 
 export interface PostGenerationResult {
@@ -199,6 +215,7 @@ export interface CommentGenerationInput {
     triggerName: string | null
     strength: number
   }
+  personaProfile?: PersonaProfileSnapshot // 댓글 작성자 프로필 (LLM 프롬프트 개인화)
 }
 
 // ── 댓글 톤 (v4: 11종) ───────────────────────────────────────

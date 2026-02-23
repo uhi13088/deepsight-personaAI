@@ -8,6 +8,7 @@ import type {
   PostGenerationInput,
   PostGenerationResult,
   PersonaPostType,
+  PersonaProfileSnapshot,
   VoiceStyleParams,
 } from "./types"
 
@@ -54,10 +55,17 @@ const POST_TYPE_LENGTH_GUIDE: Partial<
  *
  * 설계서 §4.6:
  * [System] 페르소나 정의 (3-Layer + Paradox + Voice + State) ~3,000 tok
+ *
+ * 구조: [페르소나 정의 — 캐시 가능] + [현재 상태 — 동적]
+ * splitSystemPromptForCache()가 "[현재 상태]" 마커 기준으로 prefix/suffix 분리.
  */
 export function buildSystemPrompt(input: PostGenerationInput): string {
   const { personaState } = input
 
+  // Part 1: 페르소나 정의 (정적, 캐시 가능)
+  const personaSection = buildPersonaSection(input.personaProfile)
+
+  // Part 2: 현재 상태 (동적, 매 호출 달라짐)
   const stateDesc = [
     `현재 기분: ${describeValue(personaState.mood, "극부정", "중립", "극긍정")}(${personaState.mood.toFixed(2)})`,
     `에너지: ${describeValue(personaState.energy, "소진", "보통", "충만")}(${personaState.energy.toFixed(2)})`,
@@ -65,11 +73,9 @@ export function buildSystemPrompt(input: PostGenerationInput): string {
     `내면 긴장: ${describeValue(personaState.paradoxTension, "안정", "보통", "폭발 직전")}(${personaState.paradoxTension.toFixed(2)})`,
   ].join("\n")
 
-  // Voice 스타일 파라미터가 있으면 구체적 말투 지시 생성
   const voiceStyleSection = input.voiceStyle ? buildVoiceStyleInstruction(input.voiceStyle) : ""
 
-  return `당신은 SNS에서 활동하는 페르소나입니다.
-
+  return `${personaSection}
 [현재 상태]
 ${stateDesc}
 
@@ -85,6 +91,132 @@ ${input.ragContext.emotionalState}
 - 현재 기분과 에너지 상태를 글의 톤에 반영하세요
 - 지나치게 인위적이거나 봇 같은 말투를 피하세요
 - 자연스러운 SNS 사용자처럼 글을 작성하세요`
+}
+
+/**
+ * 페르소나 정의 섹션 빌드 (캐시 가능한 정적 부분).
+ *
+ * 우선순위:
+ * 1. postPrompt (DB 저장된 완성형 프롬프트)
+ * 2. voiceSpec + factbook + 기본 필드 조합
+ * 3. 기본 폴백 (페르소나 이름 없을 때)
+ */
+function buildPersonaSection(profile?: PersonaProfileSnapshot): string {
+  if (!profile) {
+    return "당신은 SNS에서 활동하는 페르소나입니다.\n"
+  }
+
+  // Priority 1: DB에 저장된 완성형 포스트 프롬프트
+  if (profile.postPrompt?.trim()) {
+    // [현재 상태] 마커가 포함된 경우 그 이전까지만 사용 (동적 부분은 분리)
+    const markerIdx = profile.postPrompt.indexOf("[현재 상태]")
+    const clean =
+      markerIdx > 0 ? profile.postPrompt.slice(0, markerIdx).trimEnd() : profile.postPrompt.trim()
+    if (clean) return clean + "\n"
+  }
+
+  // Priority 2: 구조적 필드 조합
+  const parts: string[] = []
+
+  const roleLabel = profile.role ?? ""
+  parts.push(
+    roleLabel
+      ? `당신은 ${profile.name}입니다. [${roleLabel}] 역할을 맡은 SNS 페르소나입니다.`
+      : `당신은 ${profile.name}입니다. SNS에서 활동하는 페르소나입니다.`
+  )
+
+  if (profile.description) {
+    parts.push(`\n${profile.description}`)
+  }
+
+  if (profile.expertise?.length) {
+    parts.push(`\n[전문 분야]\n${profile.expertise.join(", ")}`)
+  }
+
+  // VoiceSpec에서 말투/습관/금지 사항 추출
+  const vs = safeParseVoiceSpec(profile.voiceSpec)
+  if (vs) {
+    if (vs.speechStyle) {
+      parts.push(`\n[말투 스타일]\n${vs.speechStyle}`)
+    }
+    if (vs.habitualExpressions?.length) {
+      parts.push(`[습관적 표현] ${vs.habitualExpressions.join(" / ")}`)
+    }
+    if (vs.forbiddenBehaviors?.length) {
+      parts.push(`[절대 하지 않는 것] ${vs.forbiddenBehaviors.slice(0, 3).join(", ")}`)
+    }
+    if (vs.forbiddenPatterns?.length) {
+      parts.push(`[사용 금지 표현] ${vs.forbiddenPatterns.join(", ")}`)
+    }
+  }
+
+  if (profile.speechPatterns?.length) {
+    parts.push(`\n[말버릇]\n${profile.speechPatterns.map((p) => `- ${p}`).join("\n")}`)
+  }
+
+  if (profile.quirks?.length) {
+    parts.push(`\n[특이 습관]\n${profile.quirks.map((q) => `- ${q}`).join("\n")}`)
+  }
+
+  // Factbook에서 배경/맥락 추출
+  const fb = safeParseFactbook(profile.factbook)
+  if (fb) {
+    if (fb.immutableFacts?.length) {
+      const lines = fb.immutableFacts.map((f) => `- ${f.content}`).join("\n")
+      parts.push(`\n[배경 — 불변의 진실]\n${lines}`)
+    }
+    if (fb.mutableContext?.length) {
+      const lines = fb.mutableContext.map((c) => `- ${c.content}`).join("\n")
+      parts.push(`\n[현재 맥락]\n${lines}`)
+    }
+  }
+
+  return parts.join("\n") + "\n"
+}
+
+// ── JSON 파서 헬퍼 ────────────────────────────────────────────
+
+interface ParsedVoiceSpec {
+  speechStyle?: string
+  habitualExpressions?: string[]
+  forbiddenBehaviors?: string[]
+  forbiddenPatterns?: string[]
+}
+
+function safeParseVoiceSpec(raw: unknown): ParsedVoiceSpec | null {
+  const obj = safeParseJson<{
+    profile?: { speechStyle?: string; habitualExpressions?: string[] }
+    guardrails?: { forbiddenBehaviors?: string[]; forbiddenPatterns?: string[] }
+  }>(raw)
+  if (!obj) return null
+  return {
+    speechStyle: obj.profile?.speechStyle,
+    habitualExpressions: obj.profile?.habitualExpressions,
+    forbiddenBehaviors: obj.guardrails?.forbiddenBehaviors,
+    forbiddenPatterns: obj.guardrails?.forbiddenPatterns,
+  }
+}
+
+interface ParsedFactbook {
+  immutableFacts?: Array<{ content: string }>
+  mutableContext?: Array<{ content: string }>
+}
+
+function safeParseFactbook(raw: unknown): ParsedFactbook | null {
+  return safeParseJson<ParsedFactbook>(raw)
+}
+
+function safeParseJson<T>(raw: unknown): T | null {
+  if (!raw) return null
+  if (typeof raw === "object") return raw as T
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw) as T
+    } catch {
+      return null
+    }
+  }
+  return null
 }
 
 /**
