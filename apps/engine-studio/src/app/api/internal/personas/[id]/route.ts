@@ -127,6 +127,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       birthDate: persona.birthDate?.toISOString() ?? null,
       nationality: persona.nationality ?? null,
       region: persona.region ?? null,
+      height: persona.height ?? null,
       educationLevel: persona.educationLevel ?? null,
       languages: persona.languages ?? [],
       knowledgeAreas: persona.knowledgeAreas ?? [],

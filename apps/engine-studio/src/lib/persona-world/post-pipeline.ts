@@ -34,6 +34,7 @@ export interface PostPipelineDataProvider {
     metadata: Record<string, unknown>
     poignancyScore?: number
     postSource?: PostSource
+    locationTag?: string
   }): Promise<{ id: string }>
 
   /** 최근 포스트 텍스트 조회 (RAG voiceAnchor용) */
@@ -178,6 +179,7 @@ export async function executePostCreation(
     },
     poignancyScore,
     postSource,
+    locationTag: persona.region ?? undefined,
   })
 
   // Step 7: PersonaState 갱신

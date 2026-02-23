@@ -140,6 +140,7 @@ export interface PersonaDetail {
   birthDate: string | null
   nationality: string | null
   region: string | null
+  height: number | null
   educationLevel: string | null
   languages: string[]
   knowledgeAreas: string[]

@@ -411,7 +411,8 @@ function OverviewTab({
             value={data.birthDate ? new Date(data.birthDate).getFullYear().toString() : null}
           />
           <ProfileField label="국적" value={data.nationality} />
-          <ProfileField label="지역" value={data.region} />
+          <ProfileField label="활동 지역" value={data.region} />
+          <ProfileField label="키" value={data.height ? `${data.height}cm` : null} />
           <ProfileField
             label="교육 수준"
             value={EDUCATION_LABELS[data.educationLevel ?? ""] ?? data.educationLevel}

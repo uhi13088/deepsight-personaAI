@@ -20,6 +20,7 @@ export interface DemographicFields {
   educationLevel: string
   languages: string[]
   knowledgeAreas: string[]
+  height: number // cm
 }
 
 // ── AC1: birthDate 추론 ─────────────────────────────────────
@@ -381,6 +382,24 @@ export function inferEducationLevel(l1: SocialPersonaVector, l2: CoreTemperament
   return "HIGH_SCHOOL"
 }
 
+/**
+ * 성별 + 지역 기반 키(cm) 추론.
+ * 지역별 평균 키를 기반으로 정규분포(±5cm) 생성.
+ */
+export function inferHeight(gender: string, region: string): number {
+  const isAsian =
+    /서울|부산|경주|전주|강릉|세종|성남|대전|제주|Tokyo|Kyoto|Shanghai|Singapore|Bangkok|Jaipur/i.test(
+      region
+    )
+  const baseHeight =
+    gender === "FEMALE" || gender === "NON_BINARY" ? (isAsian ? 160 : 165) : isAsian ? 173 : 178
+
+  const u1 = Math.random()
+  const u2 = Math.random()
+  const normal = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2)
+  return Math.round(baseHeight + normal * 5)
+}
+
 /** 국적에서 주요 언어 추론 + 추가 언어 */
 const NATIONALITY_LANGUAGE_MAP: Record<string, string> = {
   Korean: "ko",
@@ -481,12 +500,14 @@ export function generateDemographicFields(
   region: string
 ): DemographicFields {
   const nationality = inferNationality(region)
+  const gender = inferGender()
   return {
-    gender: inferGender(),
+    gender,
     nationality,
     educationLevel: inferEducationLevel(l1, l2),
     languages: inferLanguages(nationality, l2),
     knowledgeAreas: inferKnowledgeAreas(l1, l2),
+    height: inferHeight(gender, region),
   }
 }
 

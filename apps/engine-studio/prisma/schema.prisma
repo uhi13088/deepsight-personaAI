@@ -110,7 +110,8 @@ model Persona {
   birthDate       DateTime?       // 생년월일
   country         String?         @default("KR") // 국가 코드
   nationality     String?         // 국적 (예: Korean, Japanese, American)
-  region          String?         // 지역
+  region          String?         // 활동 지역 (현재 거주/활동 중인 도시)
+  height          Int?            // 키 (cm)
   educationLevel  String?         // 교육 수준 (HIGH_SCHOOL, BACHELOR, MASTER, DOCTORATE, SELF_TAUGHT)
   languages       String[]        @default([]) // 사용 언어 (예: ["ko", "en", "ja"])
   knowledgeAreas  String[]        @default([]) // 전문 지식 분야
@@ -1137,6 +1138,9 @@ model PersonaPost {
 
   // v4.0: Data Provenance (출처 추적)
   postSource  PostSource?     @default(AUTONOMOUS)
+
+  // 위치 태그 (페르소나 활동 지역 기반)
+  locationTag String?         // 예: "서울 강남", "Berlin Kreuzberg"
 
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt

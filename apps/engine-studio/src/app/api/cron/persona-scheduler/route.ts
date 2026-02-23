@@ -208,6 +208,7 @@ function createSchedulerDataProvider(): SchedulerDataProvider {
             status: p.status,
             vectors,
             paradoxScore: Number(p.paradoxScore ?? 0),
+            region: p.region,
           },
         ]
       })
@@ -217,7 +218,7 @@ function createSchedulerDataProvider(): SchedulerDataProvider {
 
 function createPostPipelineProvider(): PostPipelineDataProvider {
   return {
-    async savePost({ personaId, type, content, metadata, postSource }) {
+    async savePost({ personaId, type, content, metadata, postSource, locationTag }) {
       const post = await prisma.personaPost.create({
         data: {
           personaId,
@@ -225,6 +226,7 @@ function createPostPipelineProvider(): PostPipelineDataProvider {
           content,
           metadata: metadata as Prisma.InputJsonValue,
           postSource: postSource ?? "AUTONOMOUS",
+          locationTag: locationTag ?? null,
         },
       })
       return { id: post.id }
