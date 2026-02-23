@@ -14,6 +14,15 @@ import type { TriggerRuleDSL } from "@/lib/trigger/rule-dsl"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
+export interface PromptDemographics {
+  region?: string | null
+  gender?: string | null
+  birthDate?: string | null
+  height?: number | null
+  educationLevel?: string | null
+  nationality?: string | null
+}
+
 export interface PromptBuildInput {
   name: string
   role: string
@@ -21,6 +30,8 @@ export interface PromptBuildInput {
   l1: SocialPersonaVector
   l2: CoreTemperamentVector
   l3: NarrativeDriveVector
+  /** 인구통계 프로필 — 있으면 프롬프트에 자연스럽게 반영 */
+  demographics?: PromptDemographics
   /** v4 optional fields — 있으면 v4 프롬프트, 없으면 v3 fallback */
   voiceSpec?: VoiceSpec
   factbook?: Factbook | null
@@ -130,13 +141,57 @@ function buildL1Descriptions(l1: SocialPersonaVector) {
 
 // ── 공통 섹션 ──────────────────────────────────────────────
 
-function buildRoleSection(name: string, role: string, expertiseText: string): string[] {
-  return [
+function buildRoleSection(
+  name: string,
+  role: string,
+  expertiseText: string,
+  demographics?: PromptDemographics
+): string[] {
+  const lines = [
     `[역할 정의]`,
     `당신은 "${name}"입니다. ${role} 역할을 수행합니다.`,
     `전문 분야: ${expertiseText}`,
-    ``,
   ]
+
+  const profileParts: string[] = []
+  if (demographics) {
+    if (demographics.region) profileParts.push(`활동 지역: ${demographics.region}`)
+    if (demographics.gender) {
+      const genderLabel =
+        demographics.gender === "MALE"
+          ? "남성"
+          : demographics.gender === "FEMALE"
+            ? "여성"
+            : demographics.gender === "NON_BINARY"
+              ? "논바이너리"
+              : null
+      if (genderLabel) profileParts.push(`성별: ${genderLabel}`)
+    }
+    if (demographics.birthDate) {
+      const age = new Date().getFullYear() - new Date(demographics.birthDate).getFullYear()
+      profileParts.push(`나이: ${age}세`)
+    }
+    if (demographics.height) profileParts.push(`키: ${demographics.height}cm`)
+    if (demographics.educationLevel) {
+      const eduLabels: Record<string, string> = {
+        HIGH_SCHOOL: "고등학교 졸업",
+        BACHELOR: "대학교 졸업",
+        MASTER: "석사",
+        DOCTORATE: "박사",
+        SELF_TAUGHT: "독학",
+      }
+      const label = eduLabels[demographics.educationLevel]
+      if (label) profileParts.push(`교육: ${label}`)
+    }
+    if (demographics.nationality) profileParts.push(`국적: ${demographics.nationality}`)
+  }
+
+  if (profileParts.length > 0) {
+    lines.push(`프로필: ${profileParts.join(" / ")}`)
+  }
+
+  lines.push(``)
+  return lines
 }
 
 // ── 보이스 & 성격 섹션 (v4) ──────────────────────────────────
@@ -437,7 +492,7 @@ export function buildBasePrompt(input: PromptBuildInput): string {
 
   if (isV4Input(input)) {
     const lines: string[] = [
-      ...buildRoleSection(name, role, expertiseText),
+      ...buildRoleSection(name, role, expertiseText, input.demographics),
       ...buildVoiceSection(input.voiceSpec!),
       ...buildPersonalitySection(l1, l2, l3),
       ...(input.factbook ? buildFactbookSection(input.factbook) : []),
@@ -450,7 +505,7 @@ export function buildBasePrompt(input: PromptBuildInput): string {
 
   // v3 fallback
   const lines: string[] = [
-    ...buildRoleSection(name, role, expertiseText),
+    ...buildRoleSection(name, role, expertiseText, input.demographics),
     ...buildL1Section(l1),
     ...buildL2Section(l2),
     ...buildL3Section(l3),
@@ -495,7 +550,7 @@ export function buildReviewPrompt(input: PromptBuildInput): string {
 
   if (isV4Input(input)) {
     const lines: string[] = [
-      ...buildRoleSection(name, role, expertiseText),
+      ...buildRoleSection(name, role, expertiseText, input.demographics),
       `[리뷰 작성 가이드]`,
       `- 리뷰 길이: ${lengthGuide} 리뷰를 작성하세요.`,
       `- 리뷰 톤: ${toneGuide}으로 작성하세요.`,
@@ -520,7 +575,7 @@ export function buildReviewPrompt(input: PromptBuildInput): string {
 
   // v3 fallback
   const lines: string[] = [
-    ...buildRoleSection(name, role, expertiseText),
+    ...buildRoleSection(name, role, expertiseText, input.demographics),
     `[리뷰 작성 가이드]`,
     `- 리뷰 길이: ${lengthGuide} 리뷰를 작성하세요.`,
     `- 리뷰 톤: ${toneGuide}으로 작성하세요.`,
@@ -563,7 +618,7 @@ export function buildPostPrompt(input: PromptBuildInput): string {
 
   if (isV4Input(input)) {
     const lines: string[] = [
-      ...buildRoleSection(name, role, expertiseText),
+      ...buildRoleSection(name, role, expertiseText, input.demographics),
       `[포스트 작성 가이드]`,
       `- 글쓰기 스타일: ${styleGuide} 스타일로 작성하세요.`,
       `- 분석 깊이: ${desc.depth} 수준으로 작성하세요.`,
@@ -581,7 +636,7 @@ export function buildPostPrompt(input: PromptBuildInput): string {
 
   // v3 fallback
   const lines: string[] = [
-    ...buildRoleSection(name, role, expertiseText),
+    ...buildRoleSection(name, role, expertiseText, input.demographics),
     `[포스트 작성 가이드]`,
     `- 글쓰기 스타일: ${styleGuide} 스타일로 작성하세요.`,
     `- 분석 깊이: ${desc.depth} 수준으로 작성하세요.`,
@@ -625,7 +680,7 @@ export function buildCommentPrompt(input: PromptBuildInput): string {
 
   if (isV4Input(input)) {
     const lines: string[] = [
-      ...buildRoleSection(name, role, expertiseText),
+      ...buildRoleSection(name, role, expertiseText, input.demographics),
       `[댓글 작성 가이드]`,
       `- 댓글 스타일: ${commentStyle} 댓글을 작성하세요.`,
       `- 댓글 길이: ${lengthGuide} 댓글을 작성하세요.`,
@@ -643,7 +698,7 @@ export function buildCommentPrompt(input: PromptBuildInput): string {
 
   // v3 fallback
   const lines: string[] = [
-    ...buildRoleSection(name, role, expertiseText),
+    ...buildRoleSection(name, role, expertiseText, input.demographics),
     `[댓글 작성 가이드]`,
     `- 댓글 스타일: ${commentStyle} 댓글을 작성하세요.`,
     `- 댓글 길이: ${lengthGuide} 댓글을 작성하세요.`,
@@ -688,7 +743,7 @@ export function buildInteractionPrompt(input: PromptBuildInput): string {
 
   if (isV4Input(input)) {
     const lines: string[] = [
-      ...buildRoleSection(name, role, expertiseText),
+      ...buildRoleSection(name, role, expertiseText, input.demographics),
       `[대화 스타일 가이드]`,
       `- 대화 방식: ${interactionStyle} 방식을 사용하세요.`,
       `- 감정 표현: ${emotionalStyle} 감정 표현을 하세요.`,
@@ -712,7 +767,7 @@ export function buildInteractionPrompt(input: PromptBuildInput): string {
 
   // v3 fallback
   const lines: string[] = [
-    ...buildRoleSection(name, role, expertiseText),
+    ...buildRoleSection(name, role, expertiseText, input.demographics),
     `[대화 스타일 가이드]`,
     `- 대화 방식: ${interactionStyle} 방식을 사용하세요.`,
     `- 감정 표현: ${emotionalStyle} 감정 표현을 하세요.`,

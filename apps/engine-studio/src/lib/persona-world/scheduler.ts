@@ -34,6 +34,7 @@ export interface SchedulerPersona {
   status: string
   vectors: ThreeLayerVector
   paradoxScore: number
+  region?: string | null
 }
 
 /**

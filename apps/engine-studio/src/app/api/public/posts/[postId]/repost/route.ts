@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { Prisma } from "@prisma/client"
+import { Prisma } from "@/generated/prisma"
 import { prisma } from "@/lib/prisma"
 import { notifyPostReposted } from "@/lib/persona-world/notification-service"
 import { verifyInternalToken } from "@/lib/internal-auth"
@@ -21,8 +21,9 @@ export async function POST(
   const authError = verifyInternalToken(request)
   if (authError) return authError
 
+  const { postId } = await params
+
   try {
-    const { postId } = await params
     const body = await request.json()
     const { userId, personaId, comment } = body as {
       userId?: string

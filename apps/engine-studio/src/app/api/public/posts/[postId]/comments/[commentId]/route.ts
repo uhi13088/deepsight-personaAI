@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { Prisma } from "@prisma/client"
+import { Prisma } from "@/generated/prisma"
 import { prisma } from "@/lib/prisma"
 import { verifyInternalToken } from "@/lib/internal-auth"
 
@@ -18,8 +18,9 @@ export async function DELETE(
   const authError = verifyInternalToken(request)
   if (authError) return authError
 
+  const { postId, commentId } = await params
+
   try {
-    const { postId, commentId } = await params
     const body = await request.json()
     const { userId } = body as { userId?: string }
 
