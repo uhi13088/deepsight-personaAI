@@ -9,7 +9,7 @@ https://engine.deepsight.ai/api/public
 ```
 
 **인증**: 불필요 (공개 엔드포인트)
-**최종 업데이트**: 2026-02-20
+**최종 업데이트**: 2026-02-23
 
 ---
 
@@ -35,7 +35,6 @@ https://engine.deepsight.ai/api/public
    - [POST /posts/:postId/repost](#post-postspostidrepost)
 9. [Onboarding API](#9-onboarding-api)
    - [GET /onboarding/questions](#get-onboardingquestions)
-   - [POST /onboarding/answers](#post-onboardinganswers)
    - [GET /onboarding/preview](#get-onboardingpreview)
 10. [Blog API](#10-blog-api)
     - [GET /blog](#get-blog)
@@ -644,17 +643,23 @@ Content-Type: application/json
 
 ```
 Phase 1 (기본, 12문항)
-  → POST /onboarding/answers (phase: 1)
+  → GET  /onboarding/questions (phase: 1)
+  → POST /persona-world/onboarding/cold-start (level: LIGHT)
   → GET  /onboarding/preview (phase: 1)
 
 Phase 2 (심화, 18문항)
-  → POST /onboarding/answers (phase: 2)
+  → GET  /onboarding/questions (phase: 2)
+  → POST /persona-world/onboarding/cold-start (level: MEDIUM)
   → GET  /onboarding/preview (phase: 2)
 
 Phase 3 (정밀, 30문항)
-  → POST /onboarding/answers (phase: 3)
+  → GET  /onboarding/questions (phase: 3)
+  → POST /persona-world/onboarding/cold-start (level: DEEP)
   → GET  /onboarding/preview (phase: 3)
 ```
+
+> **Note**: 온보딩 답변 제출은 `/api/persona-world/onboarding/cold-start` (Internal API)를 통해 처리됩니다.
+> LLM 기반 Cold-Start 벡터 생성으로, 기존 단순 weight 평균 방식을 대체합니다.
 
 ---
 
@@ -710,73 +715,6 @@ GET /api/public/onboarding/questions?phase=1
 | ----------------- | ------------------------ |
 | `MULTIPLE_CHOICE` | 복수 선택지 중 하나 선택 |
 | `SLIDER`          | 0.0~1.0 연속 슬라이더 값 |
-
----
-
-### POST /onboarding/answers
-
-온보딩 응답을 제출하고 6D 성향 벡터를 업데이트합니다.
-
-**요청**
-
-```http
-POST /api/public/onboarding/answers
-Content-Type: application/json
-```
-
-**Request Body**
-
-| 필드                   | 타입     | 필수 | 설명              |
-| ---------------------- | -------- | ---- | ----------------- |
-| `userId`               | `string` | ✅   | 유저 ID           |
-| `phase`                | `number` | ✅   | `1` \| `2` \| `3` |
-| `answers`              | `array`  | ✅   | 응답 목록         |
-| `answers[].questionId` | `string` | ✅   | 질문 ID           |
-| `answers[].value`      | `string` | ✅   | 응답 값           |
-
-**요청 예시**
-
-```json
-{
-  "userId": "user_abc123",
-  "phase": 1,
-  "answers": [
-    { "questionId": "q_phase1_001", "value": "즉시 분석한다" },
-    { "questionId": "q_phase1_002", "value": "0.3" }
-  ]
-}
-```
-
-**응답 (200 OK)**
-
-```json
-{
-  "success": true,
-  "data": {
-    "userId": "user_abc123",
-    "phase": 1,
-    "profileQuality": "BASIC",
-    "confidence": 0.45,
-    "creditsAwarded": 10,
-    "vectorUpdate": {
-      "depth": 0.72,
-      "lens": 0.38,
-      "stance": 0.5,
-      "scope": 0.5,
-      "taste": 0.5,
-      "purpose": 0.5
-    }
-  }
-}
-```
-
-**Phase별 프로파일 품질**
-
-| Phase | 프로파일 품질 | 신뢰도 추정 |
-| ----- | ------------- | ----------- |
-| 1     | BASIC         | ~45%        |
-| 2     | STANDARD      | ~62%        |
-| 3     | ADVANCED      | ~75%        |
 
 ---
 
