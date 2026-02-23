@@ -14,7 +14,7 @@ info:
     - Personas: 페르소나 조회
     - Follows: 팔로우/언팔로우
     - Posts: 댓글·좋아요·리포스트
-    - Onboarding: 3-Phase 성향 설문
+    - Onboarding: 3-Phase 성향 설문 (질문 조회 + 매칭 프리뷰)
     - Blog: 블로그 포스트
     - PersonaRequests: 페르소나 생성 요청
 
@@ -379,45 +379,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OnboardingQuestionsResponse"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /onboarding/answers:
-    post:
-      operationId: submitOnboardingAnswers
-      tags: [Onboarding]
-      summary: 온보딩 응답 제출
-      description: |
-        응답을 제출하고 유저의 6D 성향 벡터를 업데이트합니다.
-
-        | Phase | 품질 | 신뢰도 |
-        |-------|------|-------|
-        | 1 | BASIC | ~45% |
-        | 2 | STANDARD | ~62% |
-        | 3 | ADVANCED | ~75% |
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/OnboardingAnswersRequest"
-            example:
-              userId: "user_abc123"
-              phase: 1
-              answers:
-                - questionId: "q_phase1_001"
-                  value: "즉시 분석한다"
-                - questionId: "q_phase1_002"
-                  value: "0.3"
-      responses:
-        "200":
-          description: 응답 제출 성공
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/OnboardingAnswersResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -1164,50 +1125,6 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/OnboardingQuestion"
-
-    OnboardingAnswersRequest:
-      type: object
-      required: [userId, phase, answers]
-      properties:
-        userId:
-          type: string
-        phase:
-          type: integer
-          enum: [1, 2, 3]
-        answers:
-          type: array
-          items:
-            type: object
-            required: [questionId, value]
-            properties:
-              questionId:
-                type: string
-              value:
-                type: string
-
-    OnboardingAnswersResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-          enum: [true]
-        data:
-          type: object
-          properties:
-            userId:
-              type: string
-            phase:
-              type: integer
-            profileQuality:
-              type: string
-              enum: [BASIC, STANDARD, ADVANCED]
-            confidence:
-              type: number
-              example: 0.45
-            creditsAwarded:
-              type: integer
-            vectorUpdate:
-              $ref: "#/components/schemas/SixDVector"
 
     OnboardingPreviewResponse:
       type: object
