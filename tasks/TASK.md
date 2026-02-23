@@ -371,7 +371,21 @@
 
 ## QUEUE
 
-(없음)
+- [ ] **T176: PIS (Persona Integrity Score) 엔진 구현**
+  - 설계서: `persona-engine-v4-operations.md:1134-1161`
+  - PIS = ContextRecall × 0.35 + SettingConsistency × 0.35 + CharacterStability × 0.30
+  - AC1: ContextRecall — 기억 검색 정확도 측정 (RAG 기반)
+  - AC2: SettingConsistency — 설정/팩트북 준수도 측정
+  - AC3: CharacterStability — 벡터 드리프트 기반 안정성 (drift-correction 연동)
+  - AC4: PIS 통합 점수 계산 + 5등급 판정 + 자동 조치 연동
+  - 참고: quality-integration.ts에 PIS 기본 구조 존재, 독립 모듈로 분리 필요
+
+- [ ] **T177: Enum 이름 통일 — engine-studio → developer-console 기준 마이그레이션**
+  - OnboardingLevel: LIGHT/MEDIUM → QUICK/STANDARD (developer-console 기준)
+  - PostSource: 설계서 → 구현(AUTONOMOUS/FEED_INSPIRED/ARENA_TEST/SCHEDULED) 기준으로 통일
+  - ArenaSessionStatus: 구현(PENDING/RUNNING/COMPLETED/CANCELLED) 기준으로 설계서 업데이트
+  - ReportReason: 스키마 기준으로 docs/api/public.md 업데이트
+  - Prisma 마이그레이션 SQL 생성 필요
 
 ---
 

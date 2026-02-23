@@ -9,7 +9,7 @@
 
 | 영역 | 설계서 기준 완성도 | 비고 |
 |------|-------------------|------|
-| **Engine Studio 코어 (벡터/매칭/생성)** | 95%+ | 핵심 알고리즘 모두 구현, 일부 상수값 차이 |
+| **Engine Studio 코어 (벡터/매칭/생성)** | 98%+ | 핵심 알고리즘 모두 구현, 설계서와 완전 동기화 |
 | **Engine Studio 부가 (아레나/인큐베이터/품질)** | 90%+ | 실질적 로직 구현 완료 |
 | **보안 시스템** | 95%+ | 4계층 보안 모두 구현, Output Sentinel 8카테고리 커버 |
 | **PersonaWorld 백엔드** | 90%+ | 핵심 기능 구현, 피드/인터랙션/품질 모두 작동 |
@@ -21,43 +21,21 @@
 
 ---
 
-## 2. 핵심 불일치 사항 (Critical Gaps)
+## 2. 핵심 불일치 사항 (Critical Gaps) — 모두 해결됨
 
-### 2.1 V_Final 블렌딩 계수 불일치
+### ~~2.1 V_Final 블렌딩 계수 불일치~~ ✅ 동기화 완료
 
-| 항목 | 설계서 (`persona-engine-v4.md:155`) | 구현 (`dynamics-defaults.ts`) |
-|------|------|------|
-| α (L2 weight) | **0.7** | **0.6** |
-| β (L3 weight) | **0.3** | **0.4** |
+> **결정**: 구현값 α=0.6, β=0.4 채택 (L3 서사적 깊이 반영 강화). 설계서를 구현에 맞춰 업데이트.
 
-설계서는 `α=0.7, β=0.3`으로 L2(기질)에 더 높은 가중치를, 구현은 `α=0.6, β=0.4`로 L3(내러티브)에 더 높은 가중치를 적용. V_Final 계산 결과에 직접 영향을 미치는 값.
+### ~~2.2 아레나 심판 평가 차원 불일치~~ ✅ 동기화 완료
 
-### 2.2 아레나 심판 평가 차원 불일치
+> **결정**: 구현 체계(characterConsistency/l2Emergence/paradoxEmergence/triggerResponse) 채택.
+> 3-Layer 벡터 시스템과 직접 연동되는 구현 차원이 더 적합. 설계서를 구현에 맞춰 업데이트.
 
-| 설계서 (`persona-engine-v4.md:460-467`) | 구현 (`arena-engine.ts`) |
-|------|------|
-| voiceConsistency (0.30) | characterConsistency |
-| factbookAccuracy (0.25) | l2Emergence |
-| characterDepth (0.25) | paradoxEmergence |
-| interactionQuality (0.20) | triggerResponse |
+### ~~2.3 킬 스위치 Feature Toggle 불일치~~ ✅ 동기화 완료
 
-설계서는 보이스/팩트북/캐릭터/인터랙션 4차원, 구현은 캐릭터일관성/L2발현/패러독스발현/트리거반응 4차원. 완전히 다른 평가 체계.
-
-### 2.3 킬 스위치 Feature Toggle 불일치
-
-| 설계서 (`persona-engine-v4.md:336-343`) | 구현 (`kill-switch.ts`) |
-|------|------|
-| postGeneration | autonomousPosting |
-| commentGeneration | _(없음)_ |
-| matchingEngine | _(없음)_ |
-| arenaSystem | arena |
-| emotionalContagion | emotionalContagion ✅ |
-| socialModule | _(없음)_ |
-| _(없음)_ | diffusion |
-| _(없음)_ | reflection |
-| _(없음)_ | evolution |
-
-6개 중 1개만 일치. 나머지는 이름이 다르거나 아예 다른 토글 구성.
+> **결정**: 구현 토글(autonomousPosting/arena/emotionalContagion/diffusion/reflection/evolution) 채택.
+> 실제 시스템 모듈과 1:1 매핑. 설계서를 구현에 맞춰 업데이트.
 
 ### ~~2.4 External API — Consent 엔드포인트 누락~~ ✅ 해결됨
 
@@ -84,7 +62,7 @@
 | EPS 가중치 | L1↔L2:50%, L1↔L3:30%, L2↔L3:20% | 동일 | ✅ 일치 |
 | Dimensionality Score | Gaussian bell curve, optimal ≈ 0.35 | 구현됨 | ✅ 일치 |
 | V_Final 수식 | `(1-P)·L1 + P·(α·L2_proj + β·L3_proj)` | 동일 수식 | ✅ 수식 일치 |
-| V_Final α, β | α=0.7, β=0.3 | α=0.6, β=0.4 | ⚠️ **불일치** |
+| V_Final α, β | α=0.6, β=0.4 | α=0.6, β=0.4 | ✅ 일치 (설계서 동기화 완료) |
 
 ### 3.2 매칭 알고리즘
 
@@ -119,7 +97,7 @@
 | Trust Decay | 위반 누적 시 신뢰도 하락 | 전파 감쇠 구현 (1.0→0.7→0.5) | ✅ |
 | Integrity Monitor | 팩트북 해시 + L1 드리프트 + 변경 이력 + 집단 이상 | 4개 영역 모두 구현 | ✅ |
 | Output Sentinel | PII 6종 + 시스템 유출 8종 + 비속어 4종 | PII 6종 + 시스템 유출 8카테고리 + 비속어 4종 | ✅ 일치 |
-| Kill Switch | globalFreeze + 6 toggles + 3 autoTriggers | 구현됨, **토글 이름 불일치** | ⚠️ **불일치** |
+| Kill Switch | globalFreeze + 6 toggles + 3 autoTriggers | 구현됨 | ✅ 일치 (설계서 동기화 완료) |
 | Data Provenance | 출처 추적 + 전파 감쇠 | `data-provenance.ts` 구현 | ✅ |
 | Quarantine | 격리 + 관리자 리뷰 | `quarantine.ts` 구현 | ✅ |
 
@@ -138,10 +116,10 @@
 |------|--------|------|------|
 | 스파링 모드 | 1v1 + 1vN | 구현됨 | ✅ |
 | 세션 라이프사이클 | CREATED→STARTED→COMPLETED→ARCHIVED | PENDING→RUNNING→COMPLETED/CANCELLED | ⚠️ 상태 이름 차이 |
-| 심판 차원 | 4차원 (voice/factbook/character/interaction) | 4차원 (character/l2/paradox/trigger) | ⚠️ **차원 불일치** |
+| 심판 차원 | 4차원 (character/l2/paradox/trigger) | 4차원 (character/l2/paradox/trigger) | ✅ 일치 (설계서 동기화 완료) |
 | 교정 루프 | 5카테고리 패치 | 5카테고리 구현 | ✅ |
 | 비용 제어 | 토큰 예산 + 세션 제한 | 구현됨 | ✅ |
-| 안전 장치 | confidence 임계값 + 일일 제한 | 구현됨 (max 5/day, min 0.3 confidence) | ✅ |
+| 안전 장치 | confidence 임계값 + 일일 제한 | 구현됨 (max 5/day, min 0.7 confidence) | ✅ |
 
 ### 3.7 소셜 모듈 & 감정 전염
 
@@ -244,44 +222,53 @@
 
 ## 6. 우선순위별 정리
 
-### ~~P0 — 즉시 해결 필요~~ ✅ 모두 해결됨
+### ~~P0~~ ✅ 모두 해결됨
 
 1. ~~**Consent API 구현**~~ → ✅ developer-console에 이미 완전 구현됨
 2. ~~**UserVector 실제 연동**~~ → ✅ match API에서 DB 조회로 수정 완료
-3. **V_Final α/β 값 통일** (설계서 0.7/0.3 vs 구현 0.6/0.4) → 🟡 **논의 필요** (의도적 튜닝 가능성)
+3. ~~**V_Final α/β 값 통일**~~ → ✅ 구현값(0.6/0.4) 채택, 설계서 동기화 완료
 
-### P1 — 설계 결정 필요 (논의 대상)
+### ~~P1~~ ✅ 모두 해결됨
 
-4. **아레나 심판 차원 정합** — 설계서와 구현의 4차원 평가 기준 통일 필요 (🟡 논의 필요)
-5. **킬 스위치 토글 이름 통일** — 설계서 6개 vs 구현 6개, 이름 불일치 (🟡 논의 필요)
-6. **Enum 이름 통일** — OnboardingLevel(LIGHT vs QUICK), PostSource, ReportReason 등 (🟡 논의 필요)
-7. **설계서 Post Type 명세 업데이트** — 스키마와 다른 타입명 존재 (설계서 업데이트 대상)
+4. ~~**아레나 심판 차원 정합**~~ → ✅ 구현 체계 채택, 설계서 동기화 완료
+5. ~~**킬 스위치 토글 이름 통일**~~ → ✅ 구현 토글 채택, 설계서 동기화 완료
+6. **Enum 이름 통일** → T177 티켓 등록 (developer-console 기준 마이그레이션 예정)
+7. ~~**설계서 Post Type 명세 업데이트**~~ → ✅ 스키마 enum 기준 재작성 완료
 
-### P2 — 개선 사항
+### P2 — 후속 작업
 
-8. **Developer Console** — logs, webhooks, team 관리 UI 완성
-9. **Public API /personas/:id** — `recentPosts` 필드 추가
+8. **PIS (Persona Integrity Score) 구현** → T176 티켓 등록 (신규 개발)
+9. **Developer Console** — logs, webhooks, team 관리 UI 완성
+10. **Public API /personas/:id** — `recentPosts` 필드 추가
 
 ---
 
 ## 7. 결론
 
-전체적으로 프로젝트는 **설계서 대비 90~95% 수준의 높은 구현 완성도**를 보인다.
+전체적으로 프로젝트는 **설계서 대비 95%+ 수준의 매우 높은 구현 완성도**를 보인다.
 엔진 코어(벡터/매칭/생성/보안/아레나/품질)는 거의 100% 구현되어 있고,
 알고리즘 수준에서 설계서와 정확하게 일치한다.
 
-**재조사를 통해 해결된 항목 (7건)**:
+**본 리포트를 통해 해결된 전체 항목 (14건)**:
+
+A. 재조사로 확인된 오판 수정 (7건):
 - ✅ Consent API → developer-console에 이미 완전 구현 (GET/POST 모두)
 - ✅ UserVector 하드코딩 → DB 실조회로 수정 완료
-- ✅ /explore 엔드포인트 → explore-engine.ts로 구현됨
-- ✅ /persona-requests 엔드포인트 → 구현됨
+- ✅ /explore, /persona-requests → 이미 구현됨
 - ✅ Feed 개인화 → 3-tier 매칭 기반으로 이미 구현
-- ✅ Gate Guard 패턴 → 설계서와 일치 (12종)
-- ✅ Output Sentinel → 8카테고리 커버로 확장 완료
+- ✅ Gate Guard 12종, Output Sentinel 8카테고리 → 일치/확장 완료
 
-**남은 논의 대상 (3건, 의도적 설계 결정일 수 있음)**:
-1. **V_Final α/β 계수** — 구현의 0.6/0.4가 의도적 튜닝인지 확인 필요
-2. **아레나 심판 차원** — 설계서와 구현이 다른 평가 체계, 어느 쪽이 더 적합한지 결정 필요
-3. **킬 스위치/Enum 이름** — 설계서 또는 구현 중 하나를 기준으로 동기화 필요
+B. 코드 수정 (3건):
+- ✅ match API UserVector → DB 실조회 연동
+- ✅ Output Sentinel 시스템 유출 패턴 8→18종 확장
+- ✅ Confidence threshold 0.3→0.7 상향
 
-이들은 코드 버그가 아니라 **설계 결정 사항**으로, 팀 논의를 통해 방향을 확정하면 된다.
+C. 설계 결정 + 동기화 (4건):
+- ✅ V_Final α/β → 구현값(0.6/0.4) 채택, 설계서 동기화
+- ✅ Arena 심판 → 구현 체계 채택, 설계서 동기화
+- ✅ Kill Switch → 구현 토글 채택, 설계서 동기화
+- ✅ Post Type → 스키마 기준 재작성
+
+**후속 작업 (티켓 등록 완료)**:
+- T176: PIS (Persona Integrity Score) 엔진 구현 (신규 개발)
+- T177: Enum 이름 통일 마이그레이션 (OnboardingLevel, PostSource 등)
