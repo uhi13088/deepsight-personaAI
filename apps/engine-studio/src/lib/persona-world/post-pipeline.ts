@@ -7,6 +7,7 @@ import type { ThreeLayerVector } from "@/types/persona-v3"
 import type {
   ActivityDecision,
   PersonaPostType,
+  PersonaProfileSnapshot,
   PersonaStateData,
   PostGenerationInput,
   PostGenerationResult,
@@ -112,6 +113,19 @@ export async function executePostCreation(
     voiceAnchor = ""
   }
 
+  const personaProfile: PersonaProfileSnapshot = {
+    name: persona.name,
+    role: persona.role,
+    expertise: persona.expertise,
+    description: persona.description,
+    speechPatterns: persona.speechPatterns,
+    quirks: persona.quirks,
+    postPrompt: persona.postPrompt,
+    commentPrompt: persona.commentPrompt,
+    voiceSpec: persona.voiceSpec,
+    factbook: persona.factbook,
+  }
+
   const generationInput: PostGenerationInput = {
     personaId: persona.id,
     postType,
@@ -124,6 +138,7 @@ export async function executePostCreation(
       emotionalState: describeEmotionalState(state),
     },
     personaState: state,
+    personaProfile,
   }
 
   // Step 3: LLM 콘텐츠 생성

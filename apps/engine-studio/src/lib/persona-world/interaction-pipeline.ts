@@ -4,7 +4,12 @@
 // ═══════════════════════════════════════════════════════════════
 
 import type { ThreeLayerVector } from "@/types/persona-v3"
-import type { PersonaStateData, RelationshipScore, CommentGenerationInput } from "./types"
+import type {
+  PersonaStateData,
+  PersonaProfileSnapshot,
+  RelationshipScore,
+  CommentGenerationInput,
+} from "./types"
 import type { SchedulerPersona } from "./scheduler"
 import type {
   CommentLLMProvider,
@@ -178,6 +183,18 @@ export async function executeInteractions(
         }
       }
 
+      const personaProfile: PersonaProfileSnapshot = {
+        name: persona.name,
+        role: persona.role,
+        expertise: persona.expertise,
+        description: persona.description,
+        speechPatterns: persona.speechPatterns,
+        quirks: persona.quirks,
+        commentPrompt: persona.commentPrompt,
+        voiceSpec: persona.voiceSpec,
+        factbook: persona.factbook,
+      }
+
       const commentInput: CommentGenerationInput = {
         commenterId: persona.id,
         postId: post.id,
@@ -190,6 +207,7 @@ export async function executeInteractions(
           consumptionMemory: "",
         },
         commenterState: state,
+        personaProfile,
       }
 
       const commentDataProvider: CommentDataProvider = {

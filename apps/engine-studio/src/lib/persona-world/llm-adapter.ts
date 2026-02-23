@@ -11,7 +11,7 @@ import type {
   UserInteractionLLMProvider,
   UserInteractionVector,
 } from "./interactions/user-interaction"
-import type { CommentToneDecision, PersonaStateData } from "./types"
+import type { CommentToneDecision, PersonaProfileSnapshot, PersonaStateData } from "./types"
 import type { CommentGenerationInput } from "./types"
 import type { ThreeLayerVector } from "@/types/persona-v3"
 import type { ConsumptionContentType } from "./types"
@@ -43,7 +43,13 @@ export function createPostLLMProvider(personaId: string): LLMProvider {
 
 // ── Comment LLM Provider ─────────────────────────────────────
 
-export function createCommentLLMProvider(personaId: string): CommentLLMProvider {
+export function createCommentLLMProvider(
+  personaId: string,
+  personaProfile?: PersonaProfileSnapshot
+): CommentLLMProvider {
+  // T143: 페르소나별 정적 prefix — DB 프로필로 개인화, 매 호출 동일 → 캐시 가능
+  const staticPrefix = buildCommentRolePrefix(personaProfile)
+
   return {
     async generateComment(params: {
       postContent: string
@@ -52,7 +58,6 @@ export function createCommentLLMProvider(personaId: string): CommentLLMProvider 
       commenterState: PersonaStateData
     }): Promise<string> {
       // T143: 정적 역할 정의(prefix) + 동적 상태/톤(suffix) 분리
-      const staticPrefix = COMMENT_ROLE_PREFIX
       const dynamicSuffix = buildCommentDynamicSuffix(params.commenterState, params.tone)
       const userPrompt = buildCommentUserPrompt(params.postContent, params.tone, params.ragContext)
 
@@ -71,8 +76,81 @@ export function createCommentLLMProvider(personaId: string): CommentLLMProvider 
   }
 }
 
-/** T143: 캐시 대상 — 댓글 작성 역할 정의 (정적, 매 호출 동일) */
-const COMMENT_ROLE_PREFIX = `당신은 SNS에서 활동하는 페르소나입니다. 다른 사람의 포스트에 댓글을 작성합니다.
+/**
+ * 페르소나 프로필에서 댓글 역할 prefix 빌드.
+ * T143: 정적 캐시 대상 — 프로필이 바뀌지 않으면 동일한 prefix.
+ *
+ * 우선순위:
+ * 1. commentPrompt (DB 저장된 완성형)
+ * 2. voiceSpec + 기본 필드 조합
+ * 3. 기본 폴백
+ */
+function buildCommentRolePrefix(profile?: PersonaProfileSnapshot): string {
+  if (!profile) return DEFAULT_COMMENT_ROLE_PREFIX
+
+  // Priority 1: DB에 저장된 댓글 전용 프롬프트
+  if (profile.commentPrompt?.trim()) {
+    return profile.commentPrompt.trim()
+  }
+
+  // Priority 2: 구조적 필드 조합
+  const parts: string[] = []
+
+  const roleLabel = profile.role ?? ""
+  parts.push(
+    roleLabel
+      ? `당신은 ${profile.name}입니다. [${roleLabel}] 역할을 맡은 SNS 페르소나로, 다른 사람의 포스트에 댓글을 작성합니다.`
+      : `당신은 ${profile.name}입니다. SNS에서 활동하는 페르소나로, 다른 사람의 포스트에 댓글을 작성합니다.`
+  )
+
+  // VoiceSpec에서 말투 추출
+  const vs = safeParseCommentVoiceSpec(profile.voiceSpec)
+  if (vs?.speechStyle) {
+    parts.push(`\n[말투] ${vs.speechStyle}`)
+  }
+  if (vs?.habitualExpressions?.length) {
+    parts.push(`[습관 표현] ${vs.habitualExpressions.join(" / ")}`)
+  }
+  if (profile.quirks?.length) {
+    parts.push(`[특이 습관] ${profile.quirks.slice(0, 2).join(", ")}`)
+  }
+
+  parts.push(
+    `\n[주의사항]\n- 댓글만 출력하세요 (부가 설명 없이)\n- 자연스러운 SNS 댓글처럼 작성하세요`
+  )
+
+  return parts.join("\n")
+}
+
+function safeParseCommentVoiceSpec(
+  raw: unknown
+): { speechStyle?: string; habitualExpressions?: string[] } | null {
+  if (!raw) return null
+  const obj =
+    typeof raw === "object"
+      ? (raw as Record<string, unknown>)
+      : typeof raw === "string"
+        ? (() => {
+            try {
+              return JSON.parse(raw) as Record<string, unknown>
+            } catch {
+              return null
+            }
+          })()
+        : null
+  if (!obj) return null
+  const profile = obj.profile as Record<string, unknown> | undefined
+  if (!profile) return null
+  return {
+    speechStyle: typeof profile.speechStyle === "string" ? profile.speechStyle : undefined,
+    habitualExpressions: Array.isArray(profile.habitualExpressions)
+      ? (profile.habitualExpressions as string[])
+      : undefined,
+  }
+}
+
+/** 기본 폴백 — 프로필 없을 때 */
+const DEFAULT_COMMENT_ROLE_PREFIX = `당신은 SNS에서 활동하는 페르소나입니다. 다른 사람의 포스트에 댓글을 작성합니다.
 
 [주의사항]
 - 댓글만 출력하세요 (부가 설명 없이)

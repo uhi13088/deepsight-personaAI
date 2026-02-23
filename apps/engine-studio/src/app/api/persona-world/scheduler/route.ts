@@ -107,6 +107,15 @@ export async function POST(request: NextRequest) {
               vectors,
               paradoxScore: Number(p.paradoxScore ?? 0),
               region: p.region,
+              role: p.role,
+              expertise: p.expertise,
+              description: p.description,
+              speechPatterns: p.speechPatterns,
+              quirks: p.quirks,
+              postPrompt: p.postPrompt,
+              commentPrompt: p.commentPrompt,
+              voiceSpec: p.voiceSpec,
+              factbook: p.factbook,
             },
           ]
         })
@@ -184,7 +193,19 @@ export async function POST(request: NextRequest) {
 
           const state = await getPersonaState(persona.id)
           const interactionDataProvider = createInteractionDataProvider()
-          const commentLLM = llmAvailable ? createCommentLLMProvider(persona.id) : undefined
+          const commentLLM = llmAvailable
+            ? createCommentLLMProvider(persona.id, {
+                name: persona.name,
+                role: persona.role,
+                expertise: persona.expertise,
+                description: persona.description,
+                speechPatterns: persona.speechPatterns,
+                quirks: persona.quirks,
+                commentPrompt: persona.commentPrompt,
+                voiceSpec: persona.voiceSpec,
+                factbook: persona.factbook,
+              })
+            : undefined
 
           const result = await executeInteractions(
             persona,

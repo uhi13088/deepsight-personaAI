@@ -35,6 +35,16 @@ export interface SchedulerPersona {
   vectors: ThreeLayerVector
   paradoxScore: number
   region?: string | null
+  // Profile fields (LLM 프롬프트 생성용)
+  role?: string | null
+  expertise?: string[]
+  description?: string | null
+  speechPatterns?: string[]
+  quirks?: string[]
+  postPrompt?: string | null
+  commentPrompt?: string | null
+  voiceSpec?: unknown | null
+  factbook?: unknown | null
 }
 
 /**
