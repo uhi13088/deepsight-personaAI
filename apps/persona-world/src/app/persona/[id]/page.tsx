@@ -31,7 +31,11 @@ import type { PersonaFullDetail } from "@/lib/types"
 
 // ── 포스트 카드 ───────────────────────────────────────────
 
-const PostCard = memo(function PostCard({ post }: { post: PersonaFullDetail["recentPosts"][number] }) {
+const PostCard = memo(function PostCard({
+  post,
+}: {
+  post: PersonaFullDetail["recentPosts"][number]
+}) {
   const [expanded, setExpanded] = useState(false)
   const emoji = POST_TYPE_EMOJI[post.type] || ""
   const typeLabel = POST_TYPE_LABELS[post.type] || post.type
