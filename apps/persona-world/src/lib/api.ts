@@ -2,8 +2,6 @@ import type {
   ApiResponse,
   PersonasResponse,
   FeedResponse,
-  PersonaDetail,
-  FeedPost,
   PersonaFullDetail,
   OnboardingQuestionsResponse,
   OnboardingAnswer,
@@ -16,103 +14,9 @@ import type {
   NotificationPreferenceData,
 } from "./types"
 
-// Engine Studio API 베이스 URL
-// Server-side (RSC/SSR): 절대 URL 필수 → 환경변수 or localhost:3000
-// Client-side: 상대 경로 → next.config.ts rewrites가 engine-studio로 프록시
-function resolveServerApiBaseUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_ENGINE_STUDIO_URL || "http://localhost:3000"
-  if (raw && !raw.startsWith("http://") && !raw.startsWith("https://")) {
-    return `https://${raw}`
-  }
-  return raw
-}
-const SERVER_API_BASE_URL = resolveServerApiBaseUrl()
-
-// ── Server-side 함수 (RSC 호환) ─────────────────────────────
-
-// 공개 페르소나 목록 조회
-export async function getPersonas(options?: {
-  limit?: number
-  page?: number
-}): Promise<PersonaDetail[]> {
-  try {
-    const params = new URLSearchParams()
-    if (options?.limit) params.set("limit", String(options.limit))
-    if (options?.page) params.set("page", String(options.page))
-
-    const res = await fetch(`${SERVER_API_BASE_URL}/api/public/personas?${params}`, {
-      next: { revalidate: 60 },
-    })
-
-    if (!res.ok) {
-      console.error("Failed to fetch personas:", res.status)
-      return []
-    }
-
-    const json: ApiResponse<PersonasResponse> = await res.json()
-    return json.success ? json.data?.personas || [] : []
-  } catch (error) {
-    console.error("Error fetching personas:", error)
-    return []
-  }
-}
-
-// 공개 피드 조회 (비로그인 fallback용)
-export async function getFeed(options?: {
-  limit?: number
-  cursor?: string
-  personaId?: string
-}): Promise<{ posts: FeedPost[]; nextCursor: string | null; hasMore: boolean }> {
-  try {
-    const params = new URLSearchParams()
-    if (options?.limit) params.set("limit", String(options.limit))
-    if (options?.cursor) params.set("cursor", options.cursor)
-    if (options?.personaId) params.set("personaId", options.personaId)
-
-    const res = await fetch(`${SERVER_API_BASE_URL}/api/public/feed?${params}`, {
-      next: { revalidate: 30 },
-    })
-
-    if (!res.ok) {
-      console.error("Failed to fetch feed:", res.status)
-      return { posts: [], nextCursor: null, hasMore: false }
-    }
-
-    const json: ApiResponse<FeedResponse> = await res.json()
-    return json.success
-      ? {
-          posts: json.data?.posts || [],
-          nextCursor: json.data?.nextCursor || null,
-          hasMore: json.data?.hasMore || false,
-        }
-      : { posts: [], nextCursor: null, hasMore: false }
-  } catch (error) {
-    console.error("Error fetching feed:", error)
-    return { posts: [], nextCursor: null, hasMore: false }
-  }
-}
-
-// 페르소나 상세 조회
-export async function getPersonaById(id: string): Promise<PersonaFullDetail | null> {
-  try {
-    const res = await fetch(`${SERVER_API_BASE_URL}/api/public/personas/${id}`, {
-      next: { revalidate: 60 },
-    })
-
-    if (!res.ok) {
-      console.error("Failed to fetch persona:", res.status)
-      return null
-    }
-
-    const json: ApiResponse<PersonaFullDetail> = await res.json()
-    return json.success ? json.data || null : null
-  } catch (error) {
-    console.error("Error fetching persona:", error)
-    return null
-  }
-}
-
 // ── Client-side API (fetch) ─────────────────────────────────
+// 상대 경로 → next.config.ts rewrites가 engine-studio로 프록시
+// persona-world 미들웨어가 x-internal-token 헤더 주입
 
 export const clientApi = {
   // ── 피드 (3-Tier 매칭 기반 개인화) ───────────────────────
