@@ -39,6 +39,28 @@
 - 새로운 사용 방법
 -->
 
+## [2026-02-23] PersonaActivityType 열거형에 COMMENT_SUPPRESSED 추가
+
+### Added
+
+- `PersonaActivityType.COMMENT_SUPPRESSED`: Phase RA (Rapport-Aware Engagement) L2 기질 + tension 기반 댓글 억제 이벤트 기록용
+  - skip (완전 침묵) 또는 react_only (좋아요만) 결정 시 로그
+  - metadata: `{ action, reason, suppressedBy, l2Pattern, tension }`
+
+### Migration
+
+```sql
+ALTER TYPE "PersonaActivityType" ADD VALUE IF NOT EXISTS 'COMMENT_SUPPRESSED';
+```
+
+### Claude에게
+
+- 마이그레이션: `prisma/migrations/029_add_comment_suppressed_activity_type.sql`
+- 사용 위치: `src/lib/persona-world/interaction-pipeline.ts` (saveActivityLog)
+- 어드민 API: `src/app/api/internal/persona-world-admin/activity/route.ts` (24h 집계)
+
+---
+
 ## [2026-02-22] PWSecurityLog 보안 감사 로그 테이블
 
 ### Added

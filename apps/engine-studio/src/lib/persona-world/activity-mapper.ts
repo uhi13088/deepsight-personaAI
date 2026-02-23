@@ -161,23 +161,42 @@ export function computeVoiceParams(vectors: ThreeLayerVector): VoiceStyleParams 
 }
 
 /**
+ * postFrequency 값 → 활동 확률 배수.
+ *
+ * RARE=0.3, OCCASIONAL=0.5, MODERATE=1.0, ACTIVE=1.5, HYPERACTIVE=2.0
+ */
+const POST_FREQUENCY_MULTIPLIERS: Record<string, number> = {
+  RARE: 0.3,
+  OCCASIONAL: 0.5,
+  MODERATE: 1.0,
+  ACTIVE: 1.5,
+  HYPERACTIVE: 2.0,
+}
+
+/**
  * PersonaState 보정된 최종 활동 확률 계산.
  *
  * 설계서 §3.6 참조.
  *
- * adjustedPostProbability = base × energy × (0.5 + mood × 0.5)
+ * adjustedPostProbability = base × energy × (0.5 + mood × 0.5) × freqMultiplier
  * adjustedInteractionProbability = base × socialBattery × energy
  */
 export function computeActivityProbabilities(
   traits: ActivityTraitsV3,
-  state: PersonaStateData
+  state: PersonaStateData,
+  postFrequency?: string
 ): { postProbability: number; interactionProbability: number } {
   // base 확률: sociability가 높을수록 포스팅 확률 높음
   const basePostProbability = traits.sociability * traits.initiative
   // base 인터랙션: interactivity 기반
   const baseInteractionProbability = traits.interactivity * traits.sociability
 
-  const postProbability = clamp(basePostProbability * state.energy * (0.5 + state.mood * 0.5))
+  // postFrequency 배수 적용
+  const freqMultiplier = postFrequency ? (POST_FREQUENCY_MULTIPLIERS[postFrequency] ?? 1.0) : 1.0
+
+  const postProbability = clamp(
+    basePostProbability * state.energy * (0.5 + state.mood * 0.5) * freqMultiplier
+  )
 
   const interactionProbability = clamp(
     baseInteractionProbability * state.socialBattery * state.energy

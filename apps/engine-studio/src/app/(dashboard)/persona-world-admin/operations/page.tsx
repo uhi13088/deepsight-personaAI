@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, Power, Timer } from "lucide-react"
+import { CheckCircle, MessageCircleOff, Power, Timer } from "lucide-react"
 
 // ── 자동 실행 설정 ──────────────────────────────────────────
 const SCHEDULER_AUTO_KEY = "scheduler-auto-run"
@@ -18,6 +18,16 @@ const INTERVAL_OPTIONS = [
 ]
 
 // ── 타입 ────────────────────────────────────────────────────
+/** Phase RA: Engagement 결정 통계 (24h) */
+interface EngagementStats {
+  comment: number
+  reactOnly: number
+  skip: number
+  total: number
+  commentRate: number
+  suppressRate: number
+}
+
 interface ActivityData {
   todayPostCount: number
   todayCommentCount: number
@@ -28,6 +38,7 @@ interface ActivityData {
   totalLikeCount: number
   totalRepostCount: number
   totalBookmarkCount: number
+  engagementStats?: EngagementStats
   recentActivities: Array<{
     id: string
     personaId: string
@@ -282,6 +293,73 @@ export default function OperationsPage() {
                   <StatCard label="활성 페르소나" value={activityData.activePersonaCount} />
                 </div>
               </div>
+
+              {/* Phase RA: Engagement 결정 통계 */}
+              {activityData.engagementStats && activityData.engagementStats.total > 0 && (
+                <div className="rounded-lg border p-4">
+                  <div className="mb-3 flex items-center gap-2">
+                    <MessageCircleOff className="text-muted-foreground h-4 w-4" />
+                    <h3 className="text-sm font-semibold">
+                      Engagement 결정 현황{" "}
+                      <span className="text-muted-foreground text-xs font-normal">(지난 24h)</span>
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="rounded-md bg-emerald-50 p-3 dark:bg-emerald-950/30">
+                      <p className="text-xs text-emerald-700 dark:text-emerald-300">댓글 작성</p>
+                      <p className="mt-0.5 text-xl font-bold text-emerald-700 dark:text-emerald-300">
+                        {activityData.engagementStats.comment}
+                      </p>
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                        {activityData.engagementStats.commentRate}%
+                      </p>
+                    </div>
+                    <div className="rounded-md bg-amber-50 p-3 dark:bg-amber-950/30">
+                      <p className="text-xs text-amber-700 dark:text-amber-300">좋아요만 (react)</p>
+                      <p className="mt-0.5 text-xl font-bold text-amber-700 dark:text-amber-300">
+                        {activityData.engagementStats.reactOnly}
+                      </p>
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        {activityData.engagementStats.total > 0
+                          ? Math.round(
+                              (activityData.engagementStats.reactOnly /
+                                activityData.engagementStats.total) *
+                                100
+                            )
+                          : 0}
+                        %
+                      </p>
+                    </div>
+                    <div className="rounded-md bg-slate-50 p-3 dark:bg-slate-900/50">
+                      <p className="text-xs text-slate-600 dark:text-slate-400">무반응 (skip)</p>
+                      <p className="mt-0.5 text-xl font-bold text-slate-600 dark:text-slate-400">
+                        {activityData.engagementStats.skip}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {activityData.engagementStats.total > 0
+                          ? Math.round(
+                              (activityData.engagementStats.skip /
+                                activityData.engagementStats.total) *
+                                100
+                            )
+                          : 0}
+                        %
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-muted-foreground mt-2 text-xs">
+                    L2 기질 + 관계 tension 기반 참여 억제율:{" "}
+                    <span className="font-medium">
+                      {activityData.engagementStats.suppressRate}%
+                    </span>
+                    {activityData.engagementStats.suppressRate > 30 && (
+                      <span className="ml-2 text-amber-600 dark:text-amber-400">
+                        ⚠ 억제율 높음 (tension 고조 중)
+                      </span>
+                    )}
+                  </p>
+                </div>
+              )}
 
               <div>
                 <h3 className="text-muted-foreground mb-3 text-xs font-semibold uppercase tracking-wider">

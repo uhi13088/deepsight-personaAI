@@ -165,7 +165,8 @@ export function decideCommentTone(
   commenterState: PersonaStateData,
   relationship: RelationshipScore | null,
   paradoxScore: number,
-  matrix: CommentToneRule[] = COMMENT_TONE_MATRIX
+  matrix: CommentToneRule[] = COMMENT_TONE_MATRIX,
+  allowedTones?: string[]
 ): CommentToneDecision {
   const traits = computeActivityTraits(commenterVectors, paradoxScore)
 
@@ -190,19 +191,30 @@ export function decideCommentTone(
   }
 
   scored.sort((a, b) => b.score - a.score)
-  const best = scored[0]
+
+  // allowedTones 필터: 관계 프로토콜 허용 톤 우선 선택
+  // 허용 목록 내 최고 점수 후보, 없으면 전체 최고 후보로 폴백
+  const protocolFiltered =
+    allowedTones && allowedTones.length > 0
+      ? scored.filter((s) => allowedTones.includes(s.rule.tone))
+      : []
+  const protocolApplied = protocolFiltered.length > 0
+  const best = protocolApplied ? protocolFiltered[0] : scored[0]
 
   // confidence: 최고 점수를 정규화 (조건 수가 많을수록 보너스)
   const conditionBonus = Math.min(1, best.rule.conditions.length / 3)
-  const confidence = Math.min(1, best.score * (0.5 + 0.5 * conditionBonus))
+  const baseConfidence = Math.min(1, best.score * (0.5 + 0.5 * conditionBonus))
+  // 프로토콜 필터링 적용 시 confidence 소폭 감소 (차선책일 수 있음)
+  const confidence = protocolApplied ? baseConfidence * 0.9 : baseConfidence
 
   // reason 생성
   const condDesc = best.rule.conditions
     .map((c) => `${c.dimension}${c.operator}${c.threshold}`)
     .join(" + ")
+  const protocolNote = protocolApplied ? `[protocol] ` : ""
   const reason = condDesc
-    ? `${condDesc} → ${best.rule.tone}(score=${best.score.toFixed(3)})`
-    : `default → ${best.rule.tone}`
+    ? `${protocolNote}${condDesc} → ${best.rule.tone}(score=${best.score.toFixed(3)})`
+    : `${protocolNote}default → ${best.rule.tone}`
 
   return {
     tone: best.rule.tone,

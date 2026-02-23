@@ -92,8 +92,13 @@ export async function executePostCreation(
 ): Promise<PostCreationResult> {
   const postType = decision.postType ?? ("THOUGHT" as PersonaPostType)
 
-  // Step 1: 주제 선택
-  const topic = await dataProvider.selectTopic(persona.id, context.trigger)
+  // Step 1: 주제 선택 (knowledgeAreas 폴백: provider가 null 반환 시)
+  const providerTopic = await dataProvider.selectTopic(persona.id, context.trigger)
+  const topic =
+    providerTopic ??
+    (persona.knowledgeAreas && persona.knowledgeAreas.length > 0
+      ? persona.knowledgeAreas[Math.floor(Math.random() * persona.knowledgeAreas.length)]
+      : null)
 
   // Step 2: RAG 컨텍스트 구축 (간소화)
   const [recentTexts, consumptionMemory] = await Promise.all([

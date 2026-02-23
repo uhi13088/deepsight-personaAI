@@ -1213,11 +1213,48 @@
   - AC1: ✅ `kpis/route.ts` — 두 함수 모두 0 반환으로 변경 (추적 인프라 미구축 명시)
   - AC2: ✅ Build PASS
 
+### Phase RA: Rapport-Aware Engagement System (T191~T194)
+
+> 관계 tension + L2 기질 패턴 → "참여 여부" 먼저 결정, 이후 "어떻게 말할지" 결정.
+> 핵심 인사이트: 침묵도 행동이다 (Avoidant + 고갈등 → 댓글 없음이 자연스러운 반응).
+> 원칙: 기존 11종 tone 시스템 최소 변경, 앞단 참여 결정 + 뒤단 voice 보정만 추가.
+
+- [x] **T191: L2 Behavioral Pattern Classifier** ✅ 2026-02-23
+  - 배경: OCEAN 5D → 5가지 갈등 행동 패턴 분류. 패턴별로 tension 고조 시 다른 행동 발현
+  - AC1: ✅ `interactions/l2-pattern.ts` — `L2ConflictPattern` (Avoidant/Aggressive/Dominant/Anxious/Stable) + `classifyL2Pattern(temperament)` 순수 함수
+  - AC2: ✅ 분류 기준 — Dominant(agr≤0.4 AND ext≥0.6) > Aggressive(agr≤0.4 AND neu≥0.6) > Anxious(neu≥0.6 AND ext≤0.4) > Avoidant(agr≥0.6 AND ext≤0.4) > Stable
+  - AC3: ✅ `L2PatternResult` — { pattern, confidence: 0~1, reason }
+  - AC4: ✅ 단위 테스트 (rapport-engagement.test.ts, 경계값 포함) + Build PASS
+
+- [x] **T192: Engagement Decision Layer** ✅ 2026-02-23
+  - 배경: "댓글을 쓸지 말지" 결정하는 레이어. 기질 + tension → skip/react_only/comment 확률적 결정
+  - AC1: ✅ `interactions/engagement-decision.ts` — `EngagementAction` (skip/react_only/comment), `EngagementDecision` 타입
+  - AC2: ✅ tension 구간 × 5 기질 확률 테이블 (3×5=15 행) — low(<0.5)/mid(0.5~0.7)/high(>0.7) × Avoidant/Aggressive/Dominant/Anxious/Stable
+  - AC3: ✅ Avoidant+high: skip 70%, react_only 20%, comment 10% / Aggressive+high: comment 90%, react_only 5%, skip 5%
+  - AC4: ✅ `decideEngagement(pattern, tension, rand?)` — rand 파라미터로 결정론적 테스트 가능
+  - AC5: ✅ 단위 테스트 (rapport-engagement.test.ts, 48개) + Build PASS
+
+- [x] **T193: Voice Adjustment Layer** ✅ 2026-02-23
+  - 배경: comment 선택 시 기존 allowedTones + VoiceStyleParams 보정. tension < 0.5 → null (조정 없음)
+  - AC1: ✅ `interactions/voice-adjustment.ts` — `VoiceAdjustment` 타입 { toneFilter, styleOverride, lengthMultiplier, suppressEmotionWords }
+  - AC2: ✅ `computeVoiceAdjustment(pattern, tension)` — 기질별 스타일 조정 (Avoidant: 길이 0.2배+격식체, Aggressive: assertiveness↑, Dominant: 길이 1.5배, Anxious: 길이 0.3배+감정억제)
+  - AC3: ✅ `mergeAllowedTones(existing, adjustment)` — 기존 프로토콜 allowedTones와 toneFilter 교집합
+  - AC4: ✅ 단위 테스트 (rapport-engagement.test.ts) + Build PASS
+
+- [x] **T194: interaction-pipeline 통합 + PW Admin UI 연동** ✅ 2026-02-23
+  - 배경: T191~T193 모듈을 실제 파이프라인에 연결. engagement decision 로깅 + 관리자 UI 표시
+  - AC1: ✅ `interaction-pipeline.ts` — 루프 전 벡터 캐싱 + L2Pattern 분류. 댓글 결정부에 `decideEngagement()` 적용 (기존 `Math.random() < 0.3` 대체)
+  - AC2: ✅ skip/react_only → `COMMENT_SUPPRESSED` 활동 로그 저장 (engagementDecision 메타데이터 포함)
+  - AC3: ✅ comment → `computeVoiceAdjustment()` + `mergeAllowedTones()` 적용 후 `generateComment()` 호출
+  - AC4: ✅ `interactions/index.ts` barrel export 업데이트
+  - AC5: ✅ PW Admin Activity 대시보드 — engagement 결정 통계 카드 추가 (comment/react_only/skip 비율 지난 24h)
+  - AC6: ✅ 48 tests PASS + Build PASS + `PersonaActivityType.COMMENT_SUPPRESSED` schema 추가 (migration 029)
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
 
-(없음)
+없음 (T191~T194 완료 — Phase RA 전체 완료)
 
 ---
 

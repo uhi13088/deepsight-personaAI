@@ -116,6 +116,11 @@ export async function POST(request: NextRequest) {
               commentPrompt: p.commentPrompt,
               voiceSpec: p.voiceSpec,
               factbook: p.factbook,
+              postFrequency: p.postFrequency,
+              activeHours: p.activeHours,
+              peakHours: p.peakHours,
+              triggerMap: p.triggerMap,
+              knowledgeAreas: p.knowledgeAreas,
             },
           ]
         })

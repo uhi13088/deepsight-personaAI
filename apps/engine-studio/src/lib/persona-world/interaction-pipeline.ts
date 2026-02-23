@@ -22,6 +22,10 @@ import { updatePersonaState } from "./state-manager"
 import { buildVoiceAnchorFromProfile, parseVoiceProfile } from "./voice-anchor"
 import { computeInteractionProvenance } from "@/lib/security/data-provenance"
 import type { ProvenanceData } from "@/lib/security/data-provenance"
+import { computeRelationshipProfileWithDecay } from "./interactions/relationship-protocol"
+import { classifyL2Pattern } from "./interactions/l2-pattern"
+import { decideEngagement } from "./interactions/engagement-decision"
+import { computeVoiceAdjustment, mergeAllowedTones } from "./interactions/voice-adjustment"
 
 // ── 타입 정의 ────────────────────────────────────────────────
 
@@ -121,6 +125,12 @@ export async function executeInteractions(
     return { likes, comments, totalTokensUsed: 0 }
   }
 
+  // Phase RA: 루프 전 페르소나 벡터 캐싱 + L2 갈등 패턴 분류
+  // 포스트마다 벡터를 재조회하던 것을 한 번으로 통합
+  const personaVectors = await dataProvider.getPersonaVectors(persona.id)
+  const l2Result = classifyL2Pattern(personaVectors.temperament)
+  const l2Pattern = l2Result.pattern // L2ConflictPattern 문자열
+
   // Step 2-3: 각 포스트에 대해 인터랙션 판정
   for (const post of feedPosts) {
     // 자기 글 스킵
@@ -132,7 +142,10 @@ export async function executeInteractions(
       dataProvider.getRelationship(persona.id, post.authorId),
     ])
 
-    // 좋아요 확률 계산
+    // 관계 프로토콜 계산 (단계 + 유형 → 허용 톤 + 인터랙션 배수)
+    const relProfile = computeRelationshipProfileWithDecay(relationship ?? DEFAULT_RELATIONSHIP)
+
+    // 좋아요 확률 계산 + 관계 프로토콜 interactionBoost 적용
     const interactivity = 0.5 // 간소화: traits.interactivity 대체
     const likeResult = computeLikeProbability(
       matchScore,
@@ -141,9 +154,13 @@ export async function executeInteractions(
       isFollowingAuthor,
       relationship ?? DEFAULT_RELATIONSHIP
     )
+    const adjustedLikeProbability = Math.min(
+      1,
+      likeResult.probability * relProfile.protocol.interactionBoost
+    )
 
     // 좋아요 실행 (출처 태깅 포함)
-    if (Math.random() < likeResult.probability) {
+    if (Math.random() < adjustedLikeProbability) {
       const likeProvenance = computeInteractionProvenance({
         source: "SYSTEM",
         propagationDepth: 0,
@@ -166,91 +183,123 @@ export async function executeInteractions(
       })
     }
 
-    // 댓글 확률: 좋아요한 포스트 중 30% 정도에 댓글
-    const shouldComment = likes.some((l) => l.postId === post.id) && Math.random() < 0.3
+    // Phase RA: 댓글 여부 결정 — L2 기질 + tension 기반 Engagement Decision
+    // 기존: 좋아요한 포스트 중 30% 확률 (기질/갈등 무관)
+    // 변경: L2 패턴 + tension → skip/react_only/comment 확률적 결정
+    const liked = likes.some((l) => l.postId === post.id)
+    if (!liked) continue // 좋아요 없으면 댓글도 없음
 
-    if (shouldComment) {
-      const vectors = await dataProvider.getPersonaVectors(persona.id)
-      const rel = relationship ?? DEFAULT_RELATIONSHIP
+    const currentTension = (relationship ?? DEFAULT_RELATIONSHIP).tension
+    const engagementDecision = decideEngagement(l2Pattern, currentTension)
 
-      // Voice Anchor: DB VoiceProfile fallback (콜드스타트 해결)
-      let voiceAnchor = ""
-      if (dataProvider.getVoiceProfile) {
-        const rawProfile = await dataProvider.getVoiceProfile(persona.id)
-        const profile = parseVoiceProfile(rawProfile)
-        if (profile) {
-          voiceAnchor = buildVoiceAnchorFromProfile(profile)
-        }
-      }
-
-      const personaProfile: PersonaProfileSnapshot = {
-        name: persona.name,
-        role: persona.role,
-        expertise: persona.expertise,
-        description: persona.description,
-        speechPatterns: persona.speechPatterns,
-        quirks: persona.quirks,
-        commentPrompt: persona.commentPrompt,
-        voiceSpec: persona.voiceSpec,
-        factbook: persona.factbook,
-      }
-
-      const commentInput: CommentGenerationInput = {
-        commenterId: persona.id,
-        postId: post.id,
-        postAuthorId: post.authorId,
-        relationship: rel,
-        ragContext: {
-          voiceAnchor,
-          relationMemory: "",
-          interestContinuity: "",
-          consumptionMemory: "",
-        },
-        commenterState: state,
-        personaProfile,
-      }
-
-      const commentDataProvider: CommentDataProvider = {
-        getPostContent: async () => post.content,
-        getPersonaVectors: async () => vectors,
-        getParadoxScore: async () => persona.paradoxScore,
-        saveCommentLog: async () => {},
-      }
-
-      const commentResult: CommentResult = await generateComment(
-        commentInput,
-        vectors,
-        commentDataProvider,
-        commentLLMProvider
-      )
-
-      const commentProvenance = computeInteractionProvenance({
-        source: "SYSTEM",
-        propagationDepth: 0,
-      })
-
-      const saved = await dataProvider.saveComment(
-        persona.id,
-        post.id,
-        commentResult.content,
-        commentProvenance
-      )
-      comments.push({ postId: post.id, authorId: post.authorId, commentId: saved.id })
-
-      await dataProvider.updateRelationship(persona.id, post.authorId, "comment")
-
+    if (engagementDecision.action !== "comment") {
+      // skip 또는 react_only: 댓글 생략, 억제 이유 로깅
       await dataProvider.saveActivityLog({
         personaId: persona.id,
-        activityType: "POST_COMMENTED",
+        activityType: "COMMENT_SUPPRESSED",
         targetId: post.id,
         metadata: {
-          commentId: saved.id,
-          tone: commentResult.tone.tone,
-          expressApplied: commentResult.expressApplied,
-          provenance: commentProvenance,
+          action: engagementDecision.action,
+          reason: engagementDecision.reason,
+          suppressedBy: engagementDecision.suppressedBy,
+          l2Pattern,
+          tension: currentTension,
         },
       })
+      continue
     }
+
+    // engagement === "comment": Voice Adjustment 계산 후 댓글 생성
+    const voiceAdj = computeVoiceAdjustment(l2Pattern, currentTension)
+    const mergedTones = mergeAllowedTones(relProfile.protocol.allowedTones, voiceAdj)
+
+    const rel = relationship ?? DEFAULT_RELATIONSHIP
+
+    // Voice Anchor: DB VoiceProfile fallback (콜드스타트 해결)
+    let voiceAnchor = ""
+    if (dataProvider.getVoiceProfile) {
+      const rawProfile = await dataProvider.getVoiceProfile(persona.id)
+      const profile = parseVoiceProfile(rawProfile)
+      if (profile) {
+        voiceAnchor = buildVoiceAnchorFromProfile(profile)
+      }
+    }
+
+    const personaProfile: PersonaProfileSnapshot = {
+      name: persona.name,
+      role: persona.role,
+      expertise: persona.expertise,
+      description: persona.description,
+      speechPatterns: persona.speechPatterns,
+      quirks: persona.quirks,
+      commentPrompt: persona.commentPrompt,
+      voiceSpec: persona.voiceSpec,
+      factbook: persona.factbook,
+    }
+
+    const commentInput: CommentGenerationInput = {
+      commenterId: persona.id,
+      postId: post.id,
+      postAuthorId: post.authorId,
+      relationship: rel,
+      ragContext: {
+        voiceAnchor,
+        relationMemory: "",
+        interestContinuity: "",
+        consumptionMemory: "",
+      },
+      commenterState: state,
+      personaProfile,
+      allowedTones: mergedTones, // Phase RA: voice adjustment 적용된 톤 필터
+    }
+
+    const commentDataProvider: CommentDataProvider = {
+      getPostContent: async () => post.content,
+      getPersonaVectors: async () => personaVectors, // 캐시된 벡터 재사용
+      getParadoxScore: async () => persona.paradoxScore,
+      saveCommentLog: async () => {},
+    }
+
+    const commentResult: CommentResult = await generateComment(
+      commentInput,
+      personaVectors, // 캐시된 벡터 재사용
+      commentDataProvider,
+      commentLLMProvider
+    )
+
+    const commentProvenance = computeInteractionProvenance({
+      source: "SYSTEM",
+      propagationDepth: 0,
+    })
+
+    const saved = await dataProvider.saveComment(
+      persona.id,
+      post.id,
+      commentResult.content,
+      commentProvenance
+    )
+    comments.push({ postId: post.id, authorId: post.authorId, commentId: saved.id })
+
+    await dataProvider.updateRelationship(persona.id, post.authorId, "comment")
+
+    await dataProvider.saveActivityLog({
+      personaId: persona.id,
+      activityType: "POST_COMMENTED",
+      targetId: post.id,
+      metadata: {
+        commentId: saved.id,
+        tone: commentResult.tone.tone,
+        expressApplied: commentResult.expressApplied,
+        provenance: commentProvenance,
+        // Phase RA: engagement 결정 컨텍스트 메타데이터
+        engagementContext: {
+          l2Pattern,
+          tension: currentTension,
+          voiceAdjApplied: voiceAdj !== null,
+          tonesFiltered: mergedTones !== relProfile.protocol.allowedTones,
+        },
+      },
+    })
   }
 
   // Step 5: PersonaState 업데이트 (댓글 작성마다 state 갱신)
