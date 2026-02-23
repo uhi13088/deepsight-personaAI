@@ -204,10 +204,16 @@ export default function ProfilePage() {
         if (result.method === "oauth" && result.authUrl) {
           window.location.href = result.authUrl
         } else {
-          toast.error(`${SNS_PROVIDER_CONFIG[provider].label} OAuth 설정이 필요합니다`)
+          toast.info(`${SNS_PROVIDER_CONFIG[provider].label} OAuth 설정이 필요합니다`)
         }
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "SNS 연동에 실패했습니다")
+        const msg = err instanceof Error ? err.message : "SNS 연동에 실패했습니다"
+        // 환경변수 미설정은 에러가 아닌 안내 메시지로 표시
+        if (msg.includes("환경변수") || msg.includes("누락") || msg.includes("config")) {
+          toast.info(msg)
+        } else {
+          toast.error(msg)
+        }
       }
     },
     [profile?.id, connectSns, disconnectSns, setSnsAnalyzing]
@@ -735,8 +741,17 @@ export default function ProfilePage() {
             <div className="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="flex items-center gap-2 font-semibold text-gray-900">
-                  <Shield className="h-5 w-5 text-purple-500" />
-                  데이터 분석 동의
+                  {UPLOAD_PLATFORMS.has(consentProvider) ? (
+                    <>
+                      <span>{SNS_PROVIDER_CONFIG[consentProvider].emoji}</span>
+                      {SNS_PROVIDER_CONFIG[consentProvider].label} 파일 업로드
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="h-5 w-5 text-purple-500" />
+                      데이터 분석 동의
+                    </>
+                  )}
                 </h3>
                 <button
                   onClick={() => setConsentProvider(null)}
@@ -746,53 +761,126 @@ export default function ProfilePage() {
                 </button>
               </div>
 
-              <p className="mb-4 text-sm font-medium text-gray-700">
-                {SNS_PROVIDER_CONFIG[consentProvider].label} 데이터 분석 동의
-              </p>
+              {UPLOAD_PLATFORMS.has(consentProvider) ? (
+                /* ── 업로드 플랫폼 (Netflix) ── */
+                <>
+                  <p className="mb-3 text-sm text-gray-600">
+                    시청 기록 파일을 업로드하면 AI가 콘텐츠 취향을 분석합니다.
+                  </p>
 
-              <div className="mb-4 space-y-2">
-                <p className="text-xs font-medium text-gray-600">다음 데이터를 분석합니다:</p>
-                {[
-                  "공개 포스트/트윗 (최근 200개)",
-                  "좋아요/관심 표시 기록",
-                  "장르/카테고리 선호 패턴",
-                ].map((item) => (
-                  <div key={item} className="flex items-center gap-2 text-xs text-green-600">
-                    <Check className="h-3 w-3" />
-                    {item}
+                  <div className="mb-4 rounded-lg bg-gray-50 p-3">
+                    <p className="mb-2 text-xs font-semibold text-gray-700">
+                      📥 파일 받는 방법 (Netflix 기준)
+                    </p>
+                    <ol className="space-y-1.5 text-xs text-gray-600">
+                      <li className="flex gap-2">
+                        <span className="shrink-0 font-bold text-purple-500">1.</span>
+                        <span>netflix.com 로그인 → 우측 상단 프로필 아이콘 클릭</span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="shrink-0 font-bold text-purple-500">2.</span>
+                        <span>계정 → 보안 및 개인 정보 → 내 정보 다운로드</span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="shrink-0 font-bold text-purple-500">3.</span>
+                        <span>"시청 활동" 항목 요청 후 이메일로 받기</span>
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="shrink-0 font-bold text-purple-500">4.</span>
+                        <span>
+                          받은 파일 중{" "}
+                          <code className="rounded bg-gray-200 px-1 font-mono text-[10px]">
+                            NetflixViewingHistory.csv
+                          </code>{" "}
+                          업로드
+                        </span>
+                      </li>
+                    </ol>
                   </div>
-                ))}
-              </div>
 
-              <div className="mb-4 space-y-2">
-                <p className="text-xs font-medium text-gray-600">다음은 수집하지 않습니다:</p>
-                {["비공개 메시지 (DM)", "개인 식별 정보", "결제 정보"].map((item) => (
-                  <div key={item} className="flex items-center gap-2 text-xs text-red-500">
-                    <X className="h-3 w-3" />
-                    {item}
+                  <div className="mb-4 space-y-1.5">
+                    <p className="text-xs font-medium text-gray-600">분석 항목:</p>
+                    {["시청한 영화/드라마 목록", "장르별 선호 패턴", "시청 완료율 패턴"].map(
+                      (item) => (
+                        <div key={item} className="flex items-center gap-2 text-xs text-green-600">
+                          <Check className="h-3 w-3" />
+                          {item}
+                        </div>
+                      )
+                    )}
                   </div>
-                ))}
-              </div>
 
-              <p className="mb-6 text-xs text-gray-500">
-                분석된 결과는 매칭 정밀도 향상에만 사용되며, 원본 데이터는 분석 후 즉시 삭제됩니다.
-                동의는 언제든 철회할 수 있습니다.
-              </p>
+                  <p className="mb-6 text-xs text-gray-400">
+                    원본 파일은 분석 후 즉시 삭제됩니다. 개인 식별 정보는 수집하지 않습니다.
+                  </p>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setConsentProvider(null)}
-                  className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
-                >
-                  취소
-                </button>
-                <button
-                  onClick={() => handleSnsConnect(consentProvider)}
-                  className="flex-1 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
-                >
-                  동의하고 연동하기
-                </button>
-              </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setConsentProvider(null)}
+                      className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={() => handleSnsConnect(consentProvider)}
+                      className="flex-1 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                    >
+                      CSV 파일 선택하기
+                    </button>
+                  </div>
+                </>
+              ) : (
+                /* ── OAuth 플랫폼 ── */
+                <>
+                  <p className="mb-4 text-sm font-medium text-gray-700">
+                    {SNS_PROVIDER_CONFIG[consentProvider].label} 데이터 분석 동의
+                  </p>
+
+                  <div className="mb-4 space-y-2">
+                    <p className="text-xs font-medium text-gray-600">다음 데이터를 분석합니다:</p>
+                    {[
+                      "공개 포스트/콘텐츠 (최근 200개)",
+                      "좋아요/관심 표시 기록",
+                      "장르/카테고리 선호 패턴",
+                    ].map((item) => (
+                      <div key={item} className="flex items-center gap-2 text-xs text-green-600">
+                        <Check className="h-3 w-3" />
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mb-4 space-y-2">
+                    <p className="text-xs font-medium text-gray-600">다음은 수집하지 않습니다:</p>
+                    {["비공개 메시지 (DM)", "개인 식별 정보", "결제 정보"].map((item) => (
+                      <div key={item} className="flex items-center gap-2 text-xs text-red-500">
+                        <X className="h-3 w-3" />
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="mb-6 text-xs text-gray-500">
+                    분석된 결과는 매칭 정밀도 향상에만 사용되며, 원본 데이터는 분석 후 즉시
+                    삭제됩니다. 동의는 언제든 철회할 수 있습니다.
+                  </p>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setConsentProvider(null)}
+                      className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={() => handleSnsConnect(consentProvider)}
+                      className="flex-1 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                    >
+                      동의하고 연동하기
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}

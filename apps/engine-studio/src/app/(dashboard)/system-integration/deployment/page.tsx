@@ -24,6 +24,7 @@ import {
   Globe,
   Shield,
   Server,
+  Zap,
 } from "lucide-react"
 
 // ── 상수 ──────────────────────────────────────────────────────
@@ -87,6 +88,11 @@ export default function DeploymentPage() {
   // 선택된 환경
   const [selectedEnv, setSelectedEnv] = useState<EnvironmentConfig["environment"]>("development")
 
+  // 배포 가능한 알고리즘 버전 목록
+  const [availableVersions, setAvailableVersions] = useState<string[]>(["v1.2.0"])
+  const [selectedVersion, setSelectedVersion] = useState<string>("v1.2.0")
+  const [isAutoRunning, setIsAutoRunning] = useState(false)
+
   // Canary 에러 (UI 전용)
   const [canaryError, setCanaryError] = useState<string | null>(null)
 
@@ -117,6 +123,26 @@ export default function DeploymentPage() {
     fetchData()
   }, [fetchData])
 
+  // 알고리즘 버전 목록 로드 (버전 선택기용)
+  useEffect(() => {
+    fetch("/api/internal/system-integration/versions")
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success) {
+          const versionStrings: string[] = (
+            json.data.versions as Array<{ version: string; status: string }>
+          )
+            .filter((v) => v.status === "active" || v.status === "testing" || v.status === "draft")
+            .map((v) => v.version)
+          if (versionStrings.length > 0) {
+            setAvailableVersions(versionStrings)
+            setSelectedVersion(versionStrings[versionStrings.length - 1])
+          }
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   // ── 파생 상태 ───────────────────────────────────────────────
 
   const workflow = data?.workflows[data.workflows.length - 1] ?? null
@@ -134,7 +160,7 @@ export default function DeploymentPage() {
         body: JSON.stringify({
           action: "create_workflow",
           target: "algorithm",
-          targetVersion: "v1.2.0",
+          targetVersion: selectedVersion,
           environment: selectedEnv,
           createdBy: "admin",
         }),
@@ -148,7 +174,7 @@ export default function DeploymentPage() {
     } catch {
       // handle error silently
     }
-  }, [selectedEnv, fetchData])
+  }, [selectedEnv, selectedVersion, fetchData])
 
   // ── 단계 진행 (성공) ─────────────────────────────────────────
 
@@ -228,6 +254,66 @@ export default function DeploymentPage() {
     }
   }, [workflow, fetchData])
 
+  // ── 전체 자동 실행 (워크플로우 생성 → 전 단계 자동 통과 → Canary 시작) ──
+
+  const handleAutoRunAll = useCallback(async () => {
+    if (isAutoRunning) return
+    setIsAutoRunning(true)
+    setCanaryError(null)
+    try {
+      // 1. 워크플로우 생성
+      const createRes = await fetch("/api/internal/system-integration/deploy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create_workflow",
+          target: "algorithm",
+          targetVersion: selectedVersion,
+          environment: selectedEnv,
+          createdBy: "admin",
+        }),
+      })
+      const createJson = await createRes.json()
+      if (!createJson.success) return
+      const workflowId: string = createJson.data.id
+      setCurrentStageIdx(0)
+      await fetchData()
+
+      // 2. 각 단계 자동 통과 (700ms 간격)
+      const stages: DeployStage[] = ["build", "test", "deploy", "verify"]
+      for (let i = 0; i < stages.length; i++) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 700))
+        const stage = stages[i]
+        const stageRes = await fetch("/api/internal/system-integration/deploy", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "advance_stage",
+            workflowId,
+            stage,
+            success: true,
+            logs: [`[auto] ${stage} completed successfully`],
+          }),
+        })
+        const stageJson = await stageRes.json()
+        if (!stageJson.success) return
+        setCurrentStageIdx(i + 1)
+        await fetchData()
+      }
+
+      // 3. Canary 자동 시작
+      await new Promise<void>((resolve) => setTimeout(resolve, 500))
+      await fetch("/api/internal/system-integration/deploy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "create_canary", workflowId, durationMinutes: 30 }),
+      })
+      await fetchData()
+    } finally {
+      setIsAutoRunning(false)
+    }
+  }, [isAutoRunning, selectedEnv, selectedVersion, fetchData])
+
   // ── Canary 메트릭 업데이트 + 단계 진행 ───────────────────────
 
   const handleAdvanceCanary = useCallback(async () => {
@@ -288,7 +374,10 @@ export default function DeploymentPage() {
   if (loading) {
     return (
       <>
-        <Header title="Deployment Pipeline" description="API 배포 워크플로우 및 Canary Release" />
+        <Header
+          title="알고리즘 배포 파이프라인"
+          description="매칭 알고리즘 버전 선택 → 환경 배포 → Canary Release 자동화"
+        />
         <div className="flex items-center justify-center py-20">
           <div className="text-muted-foreground text-sm">로딩 중...</div>
         </div>
@@ -299,7 +388,10 @@ export default function DeploymentPage() {
   if (error) {
     return (
       <>
-        <Header title="Deployment Pipeline" description="API 배포 워크플로우 및 Canary Release" />
+        <Header
+          title="알고리즘 배포 파이프라인"
+          description="매칭 알고리즘 버전 선택 → 환경 배포 → Canary Release 자동화"
+        />
         <div className="flex items-center justify-center py-20">
           <div className="text-sm text-red-400">{error}</div>
         </div>
@@ -359,12 +451,48 @@ export default function DeploymentPage() {
 
         {/* ── 배포 워크플로우 ─────────────────────────── */}
         <div className="bg-card rounded-lg border p-4">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-medium">Deploy Workflow</h3>
-            <Button size="sm" onClick={handleCreateWorkflow}>
-              <Rocket className="mr-1.5 h-3.5 w-3.5" />
-              New Workflow
-            </Button>
+          <div className="mb-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium">매칭 알고리즘 배포 워크플로우</h3>
+              <div className="flex items-center gap-2">
+                {/* 버전 선택기 */}
+                <select
+                  value={selectedVersion}
+                  onChange={(e) => setSelectedVersion(e.target.value)}
+                  className="bg-card rounded border px-2 py-1 font-mono text-xs"
+                  disabled={isAutoRunning}
+                >
+                  {availableVersions.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+                {/* Auto Run: 생성 → 전 단계 자동 통과 → Canary 시작 */}
+                <Button size="sm" onClick={handleAutoRunAll} disabled={isAutoRunning}>
+                  {isAutoRunning ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Zap className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  {isAutoRunning ? "실행 중..." : "Auto Run"}
+                </Button>
+                {/* 수동 워크플로우 생성 */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCreateWorkflow}
+                  disabled={isAutoRunning}
+                >
+                  <Rocket className="mr-1.5 h-3.5 w-3.5" />
+                  수동 생성
+                </Button>
+              </div>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              <span className="font-medium text-amber-400">Auto Run</span>: 워크플로우 생성 →
+              Build/Test/Deploy/Verify 자동 통과 → Canary Release 시작까지 자동화
+            </p>
           </div>
 
           {workflow ? (

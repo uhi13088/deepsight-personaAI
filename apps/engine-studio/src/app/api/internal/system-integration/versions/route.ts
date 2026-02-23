@@ -173,12 +173,17 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           )
         }
-        const latest = versions[versions.length - 1]
+        const categoryVersions = versions.filter((v) => v.category === body.category)
+        const latest =
+          categoryVersions.length > 0 ? categoryVersions[categoryVersions.length - 1] : null
         if (!latest) {
           return NextResponse.json<ApiResponse<never>>(
             {
               success: false,
-              error: { code: "NOT_FOUND", message: "버전이 존재하지 않습니다" },
+              error: {
+                code: "NOT_FOUND",
+                message: `${body.category} 카테고리에 버전이 존재하지 않습니다`,
+              },
             },
             { status: 404 }
           )

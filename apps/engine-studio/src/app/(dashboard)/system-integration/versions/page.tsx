@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import type {
   AlgorithmVersion,
   AlgorithmVersionStatus,
+  AlgorithmCategory,
   VersionBumpType,
   VersionDiff,
   DiffChangeType,
@@ -22,6 +23,14 @@ import {
 } from "lucide-react"
 
 // ── 상수 ──────────────────────────────────────────────────────
+
+const CATEGORY_LABELS: Record<AlgorithmCategory, string> = {
+  matching: "매칭 알고리즘",
+  persona_generator: "페르소나 생성기",
+  user_profiler: "유저 프로파일러",
+}
+
+const CATEGORY_ORDER: AlgorithmCategory[] = ["matching", "persona_generator", "user_profiler"]
 
 const STATUS_BADGE: Record<
   AlgorithmVersionStatus,
@@ -56,6 +65,7 @@ export default function VersionsPage() {
   const [diff, setDiff] = useState<VersionDiff | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState<AlgorithmCategory>("matching")
 
   // ── 데이터 로드 ─────────────────────────────────────────────
 
@@ -90,7 +100,7 @@ export default function VersionsPage() {
           body: JSON.stringify({
             action: "bump",
             bumpType,
-            category: "matching",
+            category: selectedCategory,
           }),
         })
         const json = await res.json()
@@ -104,7 +114,7 @@ export default function VersionsPage() {
         setActionError("서버 연결 실패")
       }
     },
-    [fetchData]
+    [fetchData, selectedCategory]
   )
 
   // ── Diff 비교 ───────────────────────────────────────────────
@@ -244,7 +254,10 @@ export default function VersionsPage() {
   if (loading) {
     return (
       <>
-        <Header title="Version Control" description="알고리즘 버전 관리 및 롤백" />
+        <Header
+          title="알고리즘 버전 관리"
+          description="매칭·페르소나 생성기·유저 프로파일러 파라미터 버전 이력 관리"
+        />
         <div className="flex items-center justify-center py-20">
           <div className="text-muted-foreground text-sm">로딩 중...</div>
         </div>
@@ -255,7 +268,10 @@ export default function VersionsPage() {
   if (error) {
     return (
       <>
-        <Header title="Version Control" description="알고리즘 버전 관리 및 롤백" />
+        <Header
+          title="알고리즘 버전 관리"
+          description="매칭·페르소나 생성기·유저 프로파일러 파라미터 버전 이력 관리"
+        />
         <div className="flex items-center justify-center py-20">
           <div className="text-sm text-red-400">{error}</div>
         </div>
@@ -263,18 +279,55 @@ export default function VersionsPage() {
     )
   }
 
+  const filteredVersions = versions.filter((v) => v.category === selectedCategory)
+
   return (
     <>
-      <Header title="Version Control" description="알고리즘 버전 관리 및 롤백" />
+      <Header
+        title="알고리즘 버전 관리"
+        description="매칭·페르소나 생성기·유저 프로파일러 파라미터 버전 이력 관리"
+      />
 
       <div className="space-y-6 p-6">
+        {/* ── 카테고리 탭 ─────────────────────────────── */}
+        <div className="flex gap-1 rounded-lg border p-1">
+          {CATEGORY_ORDER.map((cat) => {
+            const count = versions.filter((v) => v.category === cat).length
+            return (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+                  selectedCategory === cat
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {CATEGORY_LABELS[cat]}
+                <span
+                  className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+                    selectedCategory === cat ? "bg-white/20" : "bg-muted"
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
         {/* ── Bump 컨트롤 ─────────────────────────────── */}
         <div className="bg-card rounded-lg border p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-medium">Semantic Version Bump</h3>
+            <h3 className="text-sm font-medium">
+              Semantic Version Bump
+              <span className="text-muted-foreground ml-2 font-normal">
+                — {CATEGORY_LABELS[selectedCategory]}
+              </span>
+            </h3>
             <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
               <Tag className="h-3.5 w-3.5" />
-              Latest: {versions[versions.length - 1]?.version ?? "N/A"}
+              Latest: {filteredVersions[filteredVersions.length - 1]?.version ?? "버전 없음"}
             </div>
           </div>
           <div className="flex gap-2">
@@ -306,10 +359,15 @@ export default function VersionsPage() {
             <h3 className="text-sm font-medium">Algorithm Versions</h3>
           </div>
           <div className="divide-y">
-            {versions.map((ver, idx) => {
+            {filteredVersions.length === 0 && (
+              <div className="text-muted-foreground py-10 text-center text-sm">
+                {CATEGORY_LABELS[selectedCategory]} 버전이 없습니다
+              </div>
+            )}
+            {filteredVersions.map((ver, idx) => {
               const statusInfo = STATUS_BADGE[ver.status]
               const isExpanded = expandedId === ver.id
-              const prevVersion = idx > 0 ? versions[idx - 1] : null
+              const prevVersion = idx > 0 ? filteredVersions[idx - 1] : null
 
               return (
                 <div key={ver.id}>

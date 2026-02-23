@@ -57,9 +57,10 @@ const PLATFORM_CONFIGS: Record<SNSPlatform, OAuthPlatformConfig> = {
   },
   INSTAGRAM: {
     platform: "INSTAGRAM",
-    authUrl: "https://api.instagram.com/oauth/authorize",
+    // 2024.09 Basic Display API deprecated → 새 Instagram Login API 사용
+    authUrl: "https://www.instagram.com/oauth/authorize",
     tokenUrl: "https://api.instagram.com/oauth/access_token",
-    scopes: ["user_profile", "user_media"],
+    scopes: ["instagram_business_basic"],
   },
   TWITTER: {
     platform: "TWITTER",
@@ -126,9 +127,17 @@ function getClientCredentials(platform: SNSPlatform): {
   return { clientId, clientSecret }
 }
 
-function getRedirectUri(platform: SNSPlatform): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? ""
-  return `${baseUrl}/api/persona-world/onboarding/sns/callback?platform=${platform.toLowerCase()}`
+export function getRedirectUri(platform: SNSPlatform): string {
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? process.env.APP_URL ?? ""
+  if (!baseUrl) {
+    console.error(
+      "[sns-oauth] NEXT_PUBLIC_APP_URL / NEXTAUTH_URL 환경변수가 설정되지 않았습니다. redirect_uri가 유효하지 않습니다."
+    )
+  }
+  // 쿼리 파라미터 대신 경로 기반으로 플랫폼 식별
+  // Google Cloud Console에 등록할 URI: {baseUrl}/api/persona-world/onboarding/sns/callback/youtube
+  return `${baseUrl}/api/persona-world/onboarding/sns/callback/${platform.toLowerCase()}`
 }
 
 // ── OAuth URL 빌드 ───────────────────────────────────────────
@@ -390,4 +399,15 @@ export function isOAuthSupported(platform: SNSPlatform): boolean {
  */
 export function getPlatformConfig(platform: SNSPlatform): OAuthPlatformConfig {
   return PLATFORM_CONFIGS[platform]
+}
+
+/**
+ * CLIENT_ID 환경변수가 설정된 플랫폼 목록 반환.
+ * 프론트엔드에서 "환경변수 설정됨 → 사용 가능" 여부 표시에 활용.
+ */
+export function getConfiguredPlatforms(): SNSPlatform[] {
+  return OAUTH_SUPPORTED_PLATFORMS.filter((platform) => {
+    const prefix = platform === "YOUTUBE" ? "GOOGLE" : platform.toUpperCase()
+    return !!process.env[`${prefix}_CLIENT_ID`]
+  })
 }
