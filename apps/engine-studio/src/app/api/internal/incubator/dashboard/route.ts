@@ -7,7 +7,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
 import type { ApiResponse } from "@/types"
-import { executePersonaGenerationPipeline } from "@/lib/persona-generation/pipeline"
 import {
   buildDashboard,
   type IncubatorDashboard,
@@ -23,6 +22,7 @@ import {
 import { calculateGoldenSampleMetrics } from "@/lib/incubator/golden-sample"
 import type { GoldenSample } from "@/lib/incubator/golden-sample"
 import type { IncubatorStatus } from "@/lib/incubator/batch-workflow"
+import { runIncubatorBatch } from "@/lib/incubator/run-batch"
 
 // ── GET: 인큐베이터 대시보드 (DB 기반) ────────────────────────
 
@@ -165,8 +165,25 @@ export async function GET() {
     // 날짜순 정렬 (최신 먼저)
     recentBatches.sort((a, b) => b.batchDate.getTime() - a.batchDate.getTime())
 
-    // 오늘 배치
-    const todayBatch = recentBatches.find((b) => b.batchDate >= todayStart) ?? null
+    // 오늘 배치 — 여러 번 실행된 경우 모두 합산
+    const todayBatchList = recentBatches.filter((b) => b.batchDate >= todayStart)
+    let todayBatch: BatchResult | null = null
+    if (todayBatchList.length > 0) {
+      const generatedCount = todayBatchList.reduce((s, b) => s + b.generatedCount, 0)
+      const passedCount = todayBatchList.reduce((s, b) => s + b.passedCount, 0)
+      const failedCount = todayBatchList.reduce((s, b) => s + b.failedCount, 0)
+      todayBatch = {
+        batchId: todayBatchList[0].batchId,
+        batchDate: todayBatchList[0].batchDate,
+        generatedCount,
+        passedCount,
+        failedCount,
+        passRate: generatedCount > 0 ? Math.round((passedCount / generatedCount) * 100) / 100 : 0,
+        estimatedCost: todayBatchList.reduce((s, b) => s + b.estimatedCost, 0),
+        logs: todayBatchList.flatMap((b) => b.logs),
+        durationMs: todayBatchList.reduce((s, b) => s + b.durationMs, 0),
+      }
+    }
 
     // costUsage는 이미 calculateMonthlyCostFromDB()로 조회됨 (실제 LLM 비용)
 
@@ -261,182 +278,11 @@ export async function POST(request: NextRequest) {
       const dailyLimit = (configMap.dailyLimit as number) ?? 10
       const passThreshold = (configMap.passThreshold as number) ?? 0.9
 
-      const batchId = `batch-manual-${Date.now()}`
-      const startTime = Date.now()
-      const results: Array<{
-        personaId: string
-        name: string
-        archetypeId: string | null
-        paradoxScore: number
-        status: string
-        failReason: string | null
-        source: "user_request" | "auto"
-      }> = []
-      const errors: string[] = []
-
-      // ── Phase 1: 사용자 페르소나 생성 요청 처리 (우선) ──────
-      const todayEnd = new Date()
-      todayEnd.setHours(23, 59, 59, 999)
-
-      const pendingRequests = await prisma.personaGenerationRequest
-        .findMany({
-          where: {
-            status: { in: ["PENDING", "SCHEDULED"] },
-            scheduledDate: { lte: todayEnd },
-          },
-          orderBy: { createdAt: "asc" },
-          take: dailyLimit,
-        })
-        .catch(() => [])
-
-      let userRequestsProcessed = 0
-
-      for (const req of pendingRequests) {
-        if (userRequestsProcessed >= dailyLimit) break
-
-        try {
-          // GENERATING 상태로 업데이트
-          await prisma.personaGenerationRequest.update({
-            where: { id: req.id },
-            data: { status: "GENERATING" },
-          })
-
-          const generated = await executePersonaGenerationPipeline({ status: "DRAFT" })
-
-          const p = generated.paradoxScore
-          const dimensionality = Math.exp(-((p - 0.35) ** 2) / (2 * 0.2 ** 2))
-          const passed = dimensionality >= passThreshold
-          const status = passed ? "PASSED" : "FAILED"
-          const failReason = passed ? null : computeFailReason(dimensionality, p, passThreshold)
-
-          results.push({
-            personaId: generated.id,
-            name: generated.name,
-            archetypeId: generated.archetypeId,
-            paradoxScore: generated.paradoxScore,
-            status,
-            failReason,
-            source: "user_request",
-          })
-
-          if (passed) {
-            await prisma.persona.update({
-              where: { id: generated.id },
-              data: { status: "ACTIVE", source: "USER_REQUEST" },
-            })
-
-            // 요청 완료 처리 — 생성된 페르소나 연결
-            await prisma.personaGenerationRequest.update({
-              where: { id: req.id },
-              data: {
-                status: "COMPLETED",
-                generatedPersonaId: generated.id,
-                completedAt: new Date(),
-              },
-            })
-          } else {
-            // 불합격 → 실패 처리
-            await prisma.personaGenerationRequest.update({
-              where: { id: req.id },
-              data: {
-                status: "FAILED",
-                failReason:
-                  failReason ?? `품질 미달 (dimensionality: ${dimensionality.toFixed(3)})`,
-                completedAt: new Date(),
-              },
-            })
-          }
-
-          // IncubatorLog 기록
-          await prisma.incubatorLog.create({
-            data: {
-              batchId,
-              batchDate: new Date(),
-              personaConfig: { archetypeId: generated.archetypeId, userRequestId: req.id },
-              generatedPrompt: generated.name,
-              testSampleIds: [],
-              consistencyScore: dimensionality,
-              vectorAlignmentScore: dimensionality,
-              toneMatchScore: p,
-              reasoningQualityScore: dimensionality,
-              status,
-              failReason,
-            },
-          })
-
-          userRequestsProcessed++
-        } catch (err) {
-          errors.push(err instanceof Error ? err.message : `UserRequest ${req.id} error`)
-          // 요청 실패 처리
-          await prisma.personaGenerationRequest
-            .update({
-              where: { id: req.id },
-              data: {
-                status: "FAILED",
-                failReason: err instanceof Error ? err.message : "Unknown pipeline error",
-                completedAt: new Date(),
-              },
-            })
-            .catch(() => {
-              /* ignore */
-            })
-        }
-      }
-
-      // ── Phase 2: 남은 슬롯에 자동 생성 ────────────────────
-      const remainingSlots = dailyLimit - userRequestsProcessed
-
-      for (let i = 0; i < remainingSlots; i++) {
-        try {
-          const generated = await executePersonaGenerationPipeline({ status: "DRAFT" })
-
-          const p = generated.paradoxScore
-          const dimensionality = Math.exp(-((p - 0.35) ** 2) / (2 * 0.2 ** 2))
-          const passed = dimensionality >= passThreshold
-
-          const status = passed ? "PASSED" : "FAILED"
-          const failReason = passed ? null : computeFailReason(dimensionality, p, passThreshold)
-
-          results.push({
-            personaId: generated.id,
-            name: generated.name,
-            archetypeId: generated.archetypeId,
-            paradoxScore: generated.paradoxScore,
-            status,
-            failReason,
-            source: "auto",
-          })
-
-          if (passed) {
-            await prisma.persona.update({
-              where: { id: generated.id },
-              data: { status: "ACTIVE" },
-            })
-          }
-
-          await prisma.incubatorLog.create({
-            data: {
-              batchId,
-              batchDate: new Date(),
-              personaConfig: { archetypeId: generated.archetypeId },
-              generatedPrompt: generated.name,
-              testSampleIds: [],
-              consistencyScore: dimensionality,
-              vectorAlignmentScore: dimensionality,
-              toneMatchScore: p,
-              reasoningQualityScore: dimensionality,
-              status,
-              failReason,
-            },
-          })
-        } catch (err) {
-          errors.push(err instanceof Error ? err.message : `Slot ${i} error`)
-        }
-      }
-
-      const passedCount = results.filter((r) => r.status === "PASSED").length
-      const failedCount = results.filter((r) => r.status === "FAILED").length
-      const durationMs = Date.now() - startTime
+      const result = await runIncubatorBatch({
+        dailyLimit,
+        passThreshold,
+        batchIdPrefix: "batch-manual",
+      })
 
       return NextResponse.json<
         ApiResponse<{
@@ -448,21 +294,12 @@ export async function POST(request: NextRequest) {
           errors: number
           userRequestsProcessed: number
           durationMs: number
-          results: typeof results
+          skipped: boolean
+          results: (typeof result)["results"]
         }>
       >({
         success: true,
-        data: {
-          batchId,
-          message: `배치 완료: ${results.length}개 생성 (사용자 요청 ${userRequestsProcessed}건 처리), ${passedCount}개 합격, ${failedCount}개 불합격`,
-          generated: results.length,
-          passed: passedCount,
-          failed: failedCount,
-          errors: errors.length,
-          userRequestsProcessed,
-          durationMs,
-          results,
-        },
+        data: result,
       })
     }
 
@@ -528,31 +365,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
-
-// ── 불합격 사유 계산 ────────────────────────────────────────
-
-function computeFailReason(
-  dimensionality: number,
-  paradoxScore: number,
-  passThreshold: number
-): string {
-  const reasons: string[] = []
-
-  // paradoxScore 기반 분석 (이상적 범위: 0.2 ~ 0.5)
-  if (paradoxScore < 0.15) {
-    reasons.push(`모순 점수 과소 (${paradoxScore.toFixed(3)})`)
-  } else if (paradoxScore > 0.6) {
-    reasons.push(`모순 점수 과다 (${paradoxScore.toFixed(3)})`)
-  }
-
-  // dimensionality 기반 분석
-  const gap = passThreshold - dimensionality
-  if (gap > 0.3) {
-    reasons.push(`차원성 크게 미달 (${dimensionality.toFixed(3)} < ${passThreshold})`)
-  } else if (gap > 0) {
-    reasons.push(`차원성 미달 (${dimensionality.toFixed(3)} < ${passThreshold})`)
-  }
-
-  return reasons.length > 0 ? reasons.join(", ") : `품질 미달 (${dimensionality.toFixed(3)})`
 }

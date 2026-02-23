@@ -6,5 +6,10 @@
   "outputDirectory": ".next",
   "regions": ["icn1"],
   "headers": [],
-  "crons": []
+  "crons": [
+    {
+      "path": "/api/cron/incubator-batch",
+      "schedule": "0 0 * * *"
+    }
+  ]
 }
