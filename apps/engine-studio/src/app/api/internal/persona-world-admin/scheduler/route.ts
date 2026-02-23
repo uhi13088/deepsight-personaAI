@@ -18,6 +18,8 @@ import {
 import { getConsumptionContext } from "@/lib/persona-world/consumption-manager"
 import { getPersonaState } from "@/lib/persona-world/state-manager"
 import { resolveMentions, notifyMentions } from "@/lib/persona-world/mention-service"
+import { triggerNewsReactionPosts, formatNewsArticleTopic } from "@/lib/persona-world/news"
+import type { NewsReactionDataProvider } from "@/lib/persona-world/news"
 
 export async function GET() {
   const { response } = await requireAuth()
@@ -239,6 +241,88 @@ export async function POST(request: NextRequest) {
           data: { action, personaId },
         })
 
+      case "trigger_news_article": {
+        // Phase NB: 특정 뉴스 기사 → 관심 페르소나 → NEWS_REACTION 포스트 생성
+        const { articleId } = body as { action: string; articleId?: string }
+        if (!articleId) {
+          return NextResponse.json(
+            { success: false, error: { code: "MISSING_PARAM", message: "articleId required" } },
+            { status: 400 }
+          )
+        }
+
+        const article = await prisma.newsArticle.findUnique({
+          where: { id: articleId },
+          select: { id: true, title: true, summary: true, topicTags: true },
+        })
+        if (!article) {
+          return NextResponse.json(
+            { success: false, error: { code: "NOT_FOUND", message: "NewsArticle not found" } },
+            { status: 404 }
+          )
+        }
+
+        const llmAvailable = isLLMConfigured()
+        const newsReactionProvider = createNewsReactionDataProvider()
+        const scheduled = await triggerNewsReactionPosts(article, newsReactionProvider)
+
+        // 각 선정된 페르소나에 대해 포스트 생성 실행
+        const createdPosts: Array<{ personaId: string; postId: string }> = []
+
+        for (const reaction of scheduled) {
+          try {
+            const schedulerPersonas =
+              await await createSchedulerDataProvider().getActiveStatusPersonas()
+            const persona = schedulerPersonas.find((p) => p.id === reaction.personaId)
+            if (!persona) continue
+
+            const state = await getPersonaState(persona.id)
+            const topic = formatNewsArticleTopic(article.title, article.summary)
+            const newsPostProvider = createNewsPostPipelineProvider(topic)
+            const llmProvider = llmAvailable ? createPostLLMProvider(persona.id) : undefined
+            if (!llmProvider) continue
+
+            const postResult = await executePostCreation(
+              persona,
+              {
+                shouldPost: true,
+                shouldInteract: false,
+                postType: "NEWS_REACTION" as PersonaPostType,
+              },
+              {
+                trigger: "TRENDING",
+                currentHour: new Date().getHours(),
+                triggerData: { topicId: articleId },
+              },
+              state,
+              llmProvider,
+              newsPostProvider
+            )
+
+            // 뉴스 기사와 포스트 연결
+            await prisma.personaPost.update({
+              where: { id: postResult.postId },
+              data: { newsArticleId: articleId },
+            })
+
+            createdPosts.push({ personaId: reaction.personaId, postId: postResult.postId })
+          } catch (err) {
+            console.error(`[NewsReaction] Post creation failed for ${reaction.personaId}:`, err)
+          }
+        }
+
+        return NextResponse.json({
+          success: true,
+          data: {
+            articleId,
+            articleTitle: article.title,
+            selectedPersonas: scheduled.length,
+            postsCreated: createdPosts,
+            llmAvailable,
+          },
+        })
+      }
+
       default:
         return NextResponse.json(
           { success: false, error: { code: "UNKNOWN_ACTION", message: `Unknown: ${action}` } },
@@ -376,6 +460,82 @@ function createPostPipelineProvider(
         select: { voiceProfile: true },
       })
       return persona?.voiceProfile ?? null
+    },
+  }
+}
+
+// ── Phase NB: News Reaction 전용 데이터 프로바이더 ─────────────
+
+function createNewsReactionDataProvider(): NewsReactionDataProvider {
+  return {
+    async getActivePersonas() {
+      const personas = await prisma.persona.findMany({
+        where: { status: { in: ["ACTIVE", "STANDARD"] } },
+        select: {
+          id: true,
+          role: true,
+          expertise: true,
+          layerVectors: {
+            where: { layerType: "TEMPERAMENT" },
+            select: { dim1: true, dim2: true, dim3: true, dim4: true, dim5: true },
+            take: 1,
+          },
+        },
+      })
+
+      return personas.map((p) => {
+        const l2 = p.layerVectors[0]
+        return {
+          id: p.id,
+          expertise: (p.expertise as string[]) ?? [],
+          role: p.role ?? null,
+          temperament: {
+            openness: Number(l2?.dim1 ?? 0.5),
+            conscientiousness: Number(l2?.dim2 ?? 0.5),
+            extraversion: Number(l2?.dim3 ?? 0.5),
+            agreeableness: Number(l2?.dim4 ?? 0.5),
+            neuroticism: Number(l2?.dim5 ?? 0.5),
+          },
+        }
+      })
+    },
+
+    async hasReactedToArticle(personaId, articleId) {
+      const existing = await prisma.personaPost.findFirst({
+        where: { personaId, newsArticleId: articleId },
+        select: { id: true },
+      })
+      return !!existing
+    },
+
+    async scheduleNewsReactionPost({ personaId, articleId, interestScore }) {
+      await prisma.personaActivityLog.create({
+        data: {
+          personaId,
+          activityType: "SYSTEM",
+          trigger: "TRENDING",
+          metadata: {
+            action: "news_reaction_scheduled",
+            newsArticleId: articleId,
+            interestScore,
+          } as Prisma.InputJsonValue,
+        },
+      })
+    },
+
+    async markArticleTriggered(_articleId, _triggerCount) {
+      // no-op (로그로 추적)
+    },
+  }
+}
+
+/** Phase NB: 뉴스 반응 포스트 생성용 PostPipelineDataProvider (topic 고정) */
+function createNewsPostPipelineProvider(newsTopic: string): PostPipelineDataProvider {
+  const base = createPostPipelineProvider("TRENDING")
+  return {
+    ...base,
+    async selectTopic(_personaId, _trigger) {
+      return newsTopic
     },
   }
 }

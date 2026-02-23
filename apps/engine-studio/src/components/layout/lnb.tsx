@@ -118,6 +118,7 @@ const navSections: NavSection[] = [
       { label: "Moderation", href: "/persona-world-admin/moderation" },
       { label: "Quality Monitor", href: "/persona-world-admin/quality" },
       { label: "Evolution", href: "/persona-world-admin/evolution" },
+      { label: "뉴스 반응", href: "/persona-world-admin/news" },
     ],
   },
   {

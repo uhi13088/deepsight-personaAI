@@ -45,6 +45,7 @@ const SEARCH_ITEMS: SearchItem[] = [
   { label: "Quality Monitor", href: "/persona-world-admin/quality", section: "PW Admin" },
   { label: "Scheduler Control", href: "/persona-world-admin/scheduler", section: "PW Admin" },
   { label: "Evolution", href: "/persona-world-admin/evolution", section: "PW Admin" },
+  { label: "뉴스 반응", href: "/persona-world-admin/news", section: "PW Admin" },
   { label: "Model Settings", href: "/global-config/model-settings", section: "Global Config" },
   { label: "Safety Filters", href: "/global-config/safety-filters", section: "Global Config" },
   { label: "API Endpoints", href: "/global-config/api-endpoints", section: "Global Config" },

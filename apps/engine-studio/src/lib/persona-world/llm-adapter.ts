@@ -347,6 +347,35 @@ function clamp(value: number, min = 0, max = 1): number {
   return Math.max(min, Math.min(max, value))
 }
 
+// ── Phase NB: News Analysis LLM Provider ─────────────────────
+
+import type { LLMProvider as NewsLLMProvider } from "./news/news-fetcher"
+
+/**
+ * 뉴스 기사 분석용 LLM Provider.
+ *
+ * Claude Haiku 기반 (저비용) + isLLMConfigured 체크.
+ */
+export function createNewsLLMProvider(): NewsLLMProvider | undefined {
+  if (!isLLMConfigured()) return undefined
+
+  return {
+    async generateText(params) {
+      const result = await generateText({
+        systemPrompt: params.systemPrompt,
+        userMessage: params.userPrompt,
+        maxTokens: params.maxTokens,
+        temperature: 0.3,
+        callType: "pw:news_analysis",
+      })
+      return {
+        text: result.text,
+        tokensUsed: result.inputTokens + result.outputTokens,
+      }
+    },
+  }
+}
+
 // ── 유틸리티: LLM 설정 확인 ──────────────────────────────────
 
 export { isLLMConfigured }

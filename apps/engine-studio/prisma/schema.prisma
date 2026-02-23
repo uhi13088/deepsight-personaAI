@@ -1142,6 +1142,10 @@ model PersonaPost {
   // 위치 태그 (페르소나 활동 지역 기반)
   locationTag String?         // 예: "서울 강남", "Berlin Kreuzberg"
 
+  // Phase NB: 뉴스 반응 포스트 연결 (NEWS_REACTION 타입일 때)
+  newsArticleId String?
+  newsArticle   NewsArticle? @relation(fields: [newsArticleId], references: [id])
+
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -1263,6 +1267,8 @@ enum PersonaPostType {
   PREDICTION
   ANNIVERSARY
   BEHIND_STORY
+  // Phase NB: 뉴스 반응 타입
+  NEWS_REACTION  // 외부 뉴스/이슈에 대한 페르소나 반응 포스트
 }
 
 enum ActivityTrigger {
@@ -2277,4 +2283,41 @@ enum CoinTransactionStatus {
   COMPLETED
   FAILED
   REFUNDED
+}
+
+// ============================================
+// Phase NB: News-Based Persona Reaction System
+// ============================================
+
+model NewsSource {
+  id          String        @id @default(cuid())
+  name        String
+  rssUrl      String        @unique
+  isActive    Boolean       @default(true)
+  lastFetchAt DateTime?
+  articles    NewsArticle[]
+  createdAt   DateTime      @default(now())
+
+  @@map("news_sources")
+}
+
+model NewsArticle {
+  id          String      @id @default(cuid())
+  sourceId    String
+  source      NewsSource  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  title       String
+  url         String      @unique
+  publishedAt DateTime
+  rawContent  String?     @db.Text      // 원문 발췌 (최대 2000자)
+  summary     String      @db.Text      // Claude 요약 (300자 이내)
+  topicTags   String[]                  // ["AI", "정치", "경제", ...]
+
+  // 반응 포스트 연결
+  reactingPosts PersonaPost[]
+
+  createdAt   DateTime    @default(now())
+
+  @@index([publishedAt])
+  @@map("news_articles")
 }
