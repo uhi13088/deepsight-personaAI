@@ -26,6 +26,8 @@ import { PERSONA_ROLES } from "@/types/persona-form"
 import { calculateVFinal, vFinalToVector } from "@/lib/vector/v-final"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
 import { buildAllPrompts } from "@/lib/prompt-builder"
+import { computeActivityTraits, computeActiveHours } from "@/lib/persona-world/activity-mapper"
+import type { ThreeLayerVector } from "@/types/persona-v3"
 import type { PersonaStatus } from "@/generated/prisma"
 import type {
   ApiResponse,
@@ -444,6 +446,9 @@ function OverviewTab({
         </div>
       </section>
 
+      {/* Active Hours */}
+      <ActiveHoursSection data={data} />
+
       {/* Timestamps */}
       <section className="space-y-2">
         <h3 className="text-sm font-semibold">타임스탬프</h3>
@@ -477,6 +482,104 @@ function ProfileField({ label, value }: { label: string; value: string | null | 
       <label className="text-muted-foreground mb-0.5 block text-xs">{label}</label>
       <p className="text-sm">{value || "-"}</p>
     </div>
+  )
+}
+
+// ── Active Hours Section ─────────────────────────────────────
+
+function ActiveHoursSection({ data }: { data: PersonaData }) {
+  const activeHours = useMemo(() => {
+    const l1 = data.vectors.l1
+    const l2 = data.vectors.l2
+    const l3 = data.vectors.l3
+    if (!l1 || !l2 || !l3) return null
+
+    const vectors: ThreeLayerVector = {
+      social: {
+        depth: l1.depth ?? 0.5,
+        lens: l1.lens ?? 0.5,
+        stance: l1.stance ?? 0.5,
+        scope: l1.scope ?? 0.5,
+        taste: l1.taste ?? 0.5,
+        purpose: l1.purpose ?? 0.5,
+        sociability: l1.sociability ?? 0.5,
+      },
+      temperament: {
+        openness: l2.openness ?? 0.5,
+        conscientiousness: l2.conscientiousness ?? 0.5,
+        extraversion: l2.extraversion ?? 0.5,
+        agreeableness: l2.agreeableness ?? 0.5,
+        neuroticism: l2.neuroticism ?? 0.5,
+      },
+      narrative: {
+        lack: l3.lack ?? 0.5,
+        moralCompass: l3.moralCompass ?? 0.5,
+        volatility: l3.volatility ?? 0.5,
+        growthArc: l3.growthArc ?? 0.5,
+      },
+    }
+
+    const traits = computeActivityTraits(vectors, data.paradoxScore ?? 0)
+    const hours = computeActiveHours(vectors, traits)
+
+    // peakHour 계산 (activity-mapper 로직 재현)
+    let peakHour = 12 + Math.round(l1.sociability * 10)
+    if ((l2.extraversion ?? 0.5) < 0.3 && (l2.neuroticism ?? 0.5) > 0.5) {
+      peakHour += 4
+    }
+    peakHour = peakHour % 24
+
+    return { hours, peakHour, traits }
+  }, [data.vectors, data.paradoxScore])
+
+  if (!activeHours) {
+    return (
+      <section className="space-y-2">
+        <h3 className="text-sm font-semibold">활동 시간대</h3>
+        <p className="text-muted-foreground text-xs">(벡터 데이터 없음)</p>
+      </section>
+    )
+  }
+
+  const { hours, peakHour } = activeHours
+  const HOUR_LABELS = Array.from({ length: 24 }, (_, i) => i)
+
+  return (
+    <section className="space-y-2">
+      <h3 className="text-sm font-semibold">활동 시간대</h3>
+      <p className="text-muted-foreground text-xs">벡터 기반 자동 계산 · 피크 시간 {peakHour}시</p>
+      <div className="flex gap-0.5">
+        {HOUR_LABELS.map((h) => {
+          const isActive = hours.includes(h)
+          const isPeak = h === peakHour
+          return (
+            <div key={h} className="flex flex-1 flex-col items-center gap-1">
+              <div
+                className={`h-6 w-full rounded-sm ${
+                  isPeak ? "bg-blue-500" : isActive ? "bg-blue-500/30" : "bg-muted"
+                }`}
+                title={`${h}시${isPeak ? " (피크)" : isActive ? " (활동)" : ""}`}
+              />
+              {h % 6 === 0 && <span className="text-muted-foreground text-[9px]">{h}</span>}
+            </div>
+          )
+        })}
+      </div>
+      <div className="text-muted-foreground flex items-center gap-3 text-[10px]">
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-2 w-2 rounded-sm bg-blue-500" /> 피크
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-2 w-2 rounded-sm bg-blue-500/30" /> 활동
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="bg-muted inline-block h-2 w-2 rounded-sm" /> 비활동
+        </span>
+        <span className="ml-auto">
+          활동 창: {Math.min(...hours)}시 ~ {Math.max(...hours)}시 ({hours.length}시간)
+        </span>
+      </div>
+    </section>
   )
 }
 
