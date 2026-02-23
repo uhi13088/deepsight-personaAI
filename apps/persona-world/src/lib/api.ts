@@ -337,19 +337,6 @@ export const clientApi = {
     return json.data!
   },
 
-  // ── SNS 지원 플랫폼 조회 ──────────────────────────────────
-  async getSnsAuthPlatforms() {
-    const res = await fetch(`/api/persona-world/onboarding/sns/auth`)
-    if (!res.ok) throw new Error("Failed to get SNS platforms")
-
-    const json: ApiResponse<{
-      oauthPlatforms: string[]
-      uploadPlatforms: string[]
-    }> = await res.json()
-    if (!json.success) throw new Error(json.error?.message || "Unknown error")
-    return json.data!
-  },
-
   // ── SNS 데이터 업로드 (Netflix/Letterboxd) ────────────────
   async uploadSnsData(userId: string, platform: string, uploadedData: Record<string, unknown>) {
     const res = await fetch(`/api/persona-world/onboarding/sns/upload`, {
@@ -538,23 +525,6 @@ export const clientApi = {
         totalCoins: number
       }
       packageId: string
-    }> = await res.json()
-    if (!json.success) throw new Error(json.error?.message || "Unknown error")
-    return json.data!
-  },
-
-  // ── SNS 재분석 비용 조회 ──────────────────────────────────
-  async getSnsReanalyzeCost(userId: string) {
-    const params = new URLSearchParams({ userId })
-    const res = await fetch(`/api/persona-world/onboarding/sns/reanalyze?${params}`)
-    if (!res.ok) throw new Error("Failed to fetch reanalyze cost")
-
-    const json: ApiResponse<{
-      cost: number
-      isFirstFree: boolean
-      currentBalance: number
-      canAfford: boolean
-      analysisCount: number
     }> = await res.json()
     if (!json.success) throw new Error(json.error?.message || "Unknown error")
     return json.data!
