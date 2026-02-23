@@ -43,6 +43,10 @@ function getRateLimitHeaders(apiKey: ValidatedApiKey) {
 // Vector Utilities
 // ============================================================================
 
+/** Neutral fallback vector (used when UserVector not found) */
+const NEUTRAL_L1 = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+const NEUTRAL_L2 = [0.5, 0.5, 0.5, 0.5, 0.5]
+
 function cosineSimilarity(v1: number[], v2: number[]): number {
   let dotProduct = 0
   let magnitude1 = 0
@@ -62,16 +66,91 @@ function cosineSimilarity(v1: number[], v2: number[]): number {
   return dotProduct / (magnitude1 * magnitude2)
 }
 
+/** Fetch real user vector from DB, fallback to neutral */
+async function getUserVector(
+  userId: string,
+  organizationId: string
+): Promise<{ l1: number[]; l2: number[] | null }> {
+  const uv = await prisma.userVector.findFirst({
+    where: { userId, organizationId },
+  })
+
+  if (!uv) {
+    return { l1: NEUTRAL_L1, l2: null }
+  }
+
+  const l1 = [
+    Number(uv.depth),
+    Number(uv.lens),
+    Number(uv.stance),
+    Number(uv.scope),
+    Number(uv.taste),
+    Number(uv.purpose),
+    Number(uv.sociability),
+  ]
+
+  const l2 =
+    uv.openness !== null
+      ? [
+          Number(uv.openness),
+          Number(uv.conscientiousness),
+          Number(uv.extraversion),
+          Number(uv.agreeableness),
+          Number(uv.neuroticism),
+        ]
+      : null
+
+  return { l1, l2 }
+}
+
+/** Batch-fetch user vectors for multiple user IDs */
+async function getUserVectorsMap(
+  userIds: string[],
+  organizationId: string
+): Promise<Map<string, { l1: number[]; l2: number[] | null }>> {
+  const uniqueIds = [...new Set(userIds)]
+  const vectors = await prisma.userVector.findMany({
+    where: { userId: { in: uniqueIds }, organizationId },
+  })
+
+  const map = new Map<string, { l1: number[]; l2: number[] | null }>()
+
+  for (const uv of vectors) {
+    const l1 = [
+      Number(uv.depth),
+      Number(uv.lens),
+      Number(uv.stance),
+      Number(uv.scope),
+      Number(uv.taste),
+      Number(uv.purpose),
+      Number(uv.sociability),
+    ]
+    const l2 =
+      uv.openness !== null
+        ? [
+            Number(uv.openness),
+            Number(uv.conscientiousness),
+            Number(uv.extraversion),
+            Number(uv.agreeableness),
+            Number(uv.neuroticism),
+          ]
+        : null
+    map.set(uv.userId, { l1, l2 })
+  }
+
+  return map
+}
+
 function computeScore(
   persona: {
     l1: number[]
     l2: number[] | null
     eps: number | null
   },
+  userVector: { l1: number[]; l2: number[] | null },
   tier: MatchingTier
 ): number {
-  const defaultL1 = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
-  const l1Score = cosineSimilarity(persona.l1, defaultL1)
+  const l1Score = cosineSimilarity(persona.l1, userVector.l1)
 
   if (tier === "basic") {
     return Math.round(l1Score * 1000) / 10
@@ -79,7 +158,8 @@ function computeScore(
 
   let l2Score = 0
   if (persona.l2) {
-    l2Score = cosineSimilarity(persona.l2, [0.5, 0.5, 0.5, 0.5, 0.5])
+    const userL2 = userVector.l2 ?? NEUTRAL_L2
+    l2Score = cosineSimilarity(persona.l2, userL2)
   }
 
   const eps = persona.eps ?? 0
@@ -190,6 +270,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Batch-fetch user vectors for all unique user IDs
+    const userIds = (items as BatchMatchItem[]).map((item) => item.user_id)
+    const userVectorsMap = await getUserVectorsMap(userIds, validation.apiKey.organizationId)
+    const neutralVector = { l1: NEUTRAL_L1, l2: null }
+
     // Fetch all active personas once (optimization)
     const personas = await prisma.persona.findMany({
       where: { active: true },
@@ -200,6 +285,9 @@ export async function POST(request: NextRequest) {
       const topN = Math.min(Math.max(item.options?.top_n || 5, 1), 20)
       const tier = item.options?.matching_tier || "basic"
       const includeScore = item.options?.include_score !== false
+
+      // Fetch real user vector (fallback to neutral if not found)
+      const userVector = userVectorsMap.get(item.user_id) ?? neutralVector
 
       // Filter personas by category if specified
       const filteredPersonas = item.context?.category
@@ -231,7 +319,7 @@ export async function POST(request: NextRequest) {
 
           const eps = persona.extendedParadoxScore ? Number(persona.extendedParadoxScore) : null
 
-          const score = computeScore({ l1, l2, eps }, tier)
+          const score = computeScore({ l1, l2, eps }, userVector, tier)
 
           return {
             persona_id: persona.id,
