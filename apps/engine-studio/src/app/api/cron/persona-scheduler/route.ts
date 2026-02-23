@@ -155,6 +155,15 @@ export async function GET(request: NextRequest) {
 
 function createSchedulerDataProvider(): SchedulerDataProvider {
   return {
+    async getLastActivityAt(personaId: string): Promise<Date | null> {
+      const log = await prisma.personaActivityLog.findFirst({
+        where: { personaId },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      })
+      return log?.createdAt ?? null
+    },
+
     async getActiveStatusPersonas(): Promise<SchedulerPersona[]> {
       const personas = await prisma.persona.findMany({
         where: { status: { in: ["ACTIVE", "STANDARD"] } },

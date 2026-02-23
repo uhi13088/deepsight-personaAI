@@ -17,6 +17,7 @@ vi.mock("@/lib/persona-world/state-manager", () => ({
     socialBattery: 0.7,
     paradoxTension: 0.2,
   }),
+  updatePersonaState: vi.fn().mockResolvedValue(undefined),
 }))
 
 // ── 테스트용 헬퍼 ──
@@ -74,6 +75,7 @@ const makeContext = (overrides?: Partial<SchedulerContext>): SchedulerContext =>
 
 const makeMockProvider = (personas: SchedulerPersona[] = []): SchedulerDataProvider => ({
   getActiveStatusPersonas: vi.fn().mockResolvedValue(personas),
+  getLastActivityAt: vi.fn().mockResolvedValue(null),
 })
 
 // ═══ decideActivity ═══

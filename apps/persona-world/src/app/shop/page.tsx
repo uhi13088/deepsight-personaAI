@@ -134,6 +134,9 @@ export default function ShopPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Toss Payments SDK */}
+      <Script src="https://js.tosspayments.com/v1/payment" strategy="afterInteractive" />
+
       {/* Header */}
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-gray-100 bg-white">
         <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-4">

@@ -6,6 +6,8 @@ import {
   DEFAULT_BUDGET_TOKENS,
   MIN_TURNS,
   MAX_TURNS_LIMIT,
+  MAX_PARTICIPANTS,
+  MIN_PARTICIPANTS,
   PROFILE_TOKEN_ESTIMATES,
 } from "@/lib/arena/arena-engine"
 import type { ProfileLoadLevel } from "@/lib/arena/arena-engine"
@@ -32,11 +34,15 @@ export async function GET() {
       },
     })
 
-    // 참가자 ID → 이름 매핑
+    // 참가자 ID → 이름 매핑 (extraParticipants 포함) — 필드는 schema 마이그레이션 후 Prisma 타입에 반영
+    type SessionWithExtra = (typeof sessions)[0] & { extraParticipants?: unknown }
     const personaIds = new Set<string>()
-    for (const s of sessions) {
+    for (const s of sessions as SessionWithExtra[]) {
       personaIds.add(s.participantA)
       personaIds.add(s.participantB)
+      if (Array.isArray(s.extraParticipants)) {
+        for (const id of s.extraParticipants as string[]) personaIds.add(id)
+      }
     }
     const personas = await prisma.persona.findMany({
       where: { id: { in: [...personaIds] } },
@@ -47,7 +53,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       data: {
-        sessions: sessions.map((s) => ({
+        sessions: (sessions as SessionWithExtra[]).map((s) => ({
           id: s.id,
           mode: s.mode,
           participantA: s.participantA,
@@ -56,6 +62,12 @@ export async function GET() {
           participantB: s.participantB,
           participantBName: personaMap.get(s.participantB)?.name ?? s.participantB,
           participantBRole: personaMap.get(s.participantB)?.role ?? null,
+          extraParticipants: Array.isArray(s.extraParticipants)
+            ? (s.extraParticipants as string[]).map((id) => ({
+                id,
+                name: personaMap.get(id)?.name ?? id,
+              }))
+            : [],
           profileLoadLevel: s.profileLoadLevel,
           topic: s.topic,
           maxTurns: s.maxTurns,
@@ -98,7 +110,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { participantA, participantB, topic, maxTurns, budgetTokens, profileLoadLevel } = body
+    const {
+      participantA,
+      participantB,
+      extraParticipants: rawExtra,
+      topic,
+      maxTurns,
+      budgetTokens,
+      profileLoadLevel,
+    } = body
 
     // 필수 필드 검증
     if (!participantA || typeof participantA !== "string") {
@@ -121,13 +141,44 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (participantA === participantB) {
+    // 추가 참가자 검증 (1:N)
+    const extraParticipants: string[] = Array.isArray(rawExtra)
+      ? rawExtra.filter((id): id is string => typeof id === "string")
+      : []
+
+    const allParticipantIds = [participantA, participantB, ...extraParticipants]
+    const uniqueIds = new Set(allParticipantIds)
+
+    if (uniqueIds.size !== allParticipantIds.length) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: "DUPLICATE_PARTICIPANTS", message: "참가자가 중복됩니다." },
+        },
+        { status: 400 }
+      )
+    }
+
+    if (allParticipantIds.length > MAX_PARTICIPANTS) {
       return NextResponse.json(
         {
           success: false,
           error: {
-            code: "SAME_PARTICIPANTS",
-            message: "두 참가자는 서로 달라야 합니다.",
+            code: "TOO_MANY_PARTICIPANTS",
+            message: `최대 ${MAX_PARTICIPANTS}명까지 참가 가능합니다.`,
+          },
+        },
+        { status: 400 }
+      )
+    }
+
+    if (allParticipantIds.length < MIN_PARTICIPANTS) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "TOO_FEW_PARTICIPANTS",
+            message: `최소 ${MIN_PARTICIPANTS}명이 필요합니다.`,
           },
         },
         { status: 400 }
@@ -160,13 +211,13 @@ export async function POST(request: NextRequest) {
 
     // 참가자 존재 여부 확인
     const participants = await prisma.persona.findMany({
-      where: { id: { in: [participantA, participantB] } },
+      where: { id: { in: allParticipantIds } },
       select: { id: true, name: true, status: true },
     })
 
-    if (participants.length !== 2) {
+    if (participants.length !== allParticipantIds.length) {
       const foundIds = new Set(participants.map((p) => p.id))
-      const missing = [participantA, participantB].filter((id) => !foundIds.has(id))
+      const missing = allParticipantIds.filter((id) => !foundIds.has(id))
       return NextResponse.json(
         {
           success: false,
@@ -179,14 +230,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // 모드 결정 — SPARRING_1VN은 schema 마이그레이션 후 enum에 추가됨, 현재는 cast로 처리
+    const mode = (allParticipantIds.length > 2 ? "SPARRING_1VN" : "SPARRING_1V1") as "SPARRING_1V1"
+
     // 예상 비용 계산
     const costEstimate = estimateSessionCost(level, resolvedMaxTurns, 0)
 
     // 세션 생성
     const session = await prisma.arenaSession.create({
       data: {
+        mode,
         participantA,
         participantB,
+        // extraParticipants는 schema 마이그레이션 후 활성화
+        // extraParticipants,
         topic: topic.trim(),
         maxTurns: resolvedMaxTurns,
         budgetTokens: resolvedBudget,
@@ -203,6 +260,7 @@ export async function POST(request: NextRequest) {
           mode: session.mode,
           participantA: session.participantA,
           participantB: session.participantB,
+          extraParticipants,
           profileLoadLevel: session.profileLoadLevel,
           topic: session.topic,
           maxTurns: session.maxTurns,

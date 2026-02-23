@@ -14,6 +14,7 @@ import { getPersonaState } from "./state-manager"
 import { selectPostType } from "./post-type-selector"
 import { decideParadoxActivity } from "./paradox-activity"
 import { ACTIVITY_THRESHOLDS } from "./constants"
+import { updatePersonaState } from "./state-manager"
 import type {
   ActivityDecision,
   ActivityTraitsV3,
@@ -43,6 +44,8 @@ export interface SchedulerPersona {
 export interface SchedulerDataProvider {
   /** 활성 상태 페르소나 목록 조회 */
   getActiveStatusPersonas(): Promise<SchedulerPersona[]>
+  /** 페르소나의 마지막 활동 시간 조회 (없으면 null) */
+  getLastActivityAt(personaId: string): Promise<Date | null>
 }
 
 /**
@@ -138,7 +141,17 @@ export async function getActivePersonas(
     // 3. 현재 시간이 활동 시간대에 포함되는지
     if (!activeHours.includes(currentHour)) continue
 
-    // 4. PersonaState 로드 + 에너지 체크
+    // 4. idle 시간 계산 → 에너지 회복 적용
+    const lastActivityAt = await provider.getLastActivityAt(persona.id)
+    const now = new Date()
+    const idleHours = lastActivityAt
+      ? (now.getTime() - lastActivityAt.getTime()) / (1000 * 60 * 60)
+      : 24 // 활동 기록 없으면 24시간 풀 회복
+    if (idleHours > 0) {
+      await updatePersonaState(persona.id, { type: "idle_period", hours: idleHours })
+    }
+
+    // 5. PersonaState 로드 + 에너지 체크
     const state = await getPersonaState(persona.id)
     if (state.energy <= ACTIVITY_THRESHOLDS.minEnergy) continue
 

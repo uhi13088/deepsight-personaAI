@@ -423,7 +423,7 @@ function OperationStatus({
   const statusLabel = isRunning ? "배치 실행 중" : autoRun ? "자동 실행 중" : "대기 중 (수동)"
 
   return (
-    <div className="rounded-xl border-2 border-dashed border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 p-5 dark:border-gray-700 dark:from-gray-900 dark:to-gray-800">
+    <div className="border-border bg-muted/50 rounded-xl border-2 border-dashed p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         {/* 왼쪽: 상태 + 지표 */}
         <div className="flex items-center gap-6">

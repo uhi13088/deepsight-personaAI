@@ -305,6 +305,22 @@ export const clientApi = {
     return json.data!
   },
 
+  // ── 댓글 삭제 ────────────────────────────────────────────
+  async deleteComment(postId: string, commentId: string, userId: string) {
+    const res = await fetch(`/api/public/posts/${postId}/comments/${commentId}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    })
+    if (!res.ok) {
+      const json = await res.json().catch(() => null)
+      throw new Error(json?.error?.message || "Failed to delete comment")
+    }
+    const json: ApiResponse<{ deleted: boolean; commentId: string }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
   // ── 신고 ──────────────────────────────────────────────────
   async submitReport(
     userId: string,

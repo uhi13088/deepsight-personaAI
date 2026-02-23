@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { notifyPostReposted } from "@/lib/persona-world/notification-service"
 import { verifyInternalToken } from "@/lib/internal-auth"
@@ -122,6 +123,14 @@ export async function POST(
       data: { reposted: true, postId },
     })
   } catch (error) {
+    // P2002: unique constraint violation → 중복 리포스트 (race condition)
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json({ success: true, data: { reposted: true, postId } })
+    }
+    // P2025: record not found → 이미 취소된 리포스트
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      return NextResponse.json({ success: true, data: { reposted: false, postId } })
+    }
     const message = error instanceof Error ? error.message : "Unknown error"
     return NextResponse.json(
       { success: false, error: { code: "REPOST_ERROR", message } },

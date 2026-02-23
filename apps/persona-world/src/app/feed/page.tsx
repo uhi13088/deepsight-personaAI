@@ -481,7 +481,11 @@ const FeedPostCard = memo(function FeedPostCard({
 
       {/* Post Actions */}
       <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
-        <PWLikeButton liked={liked} count={post.likeCount + (liked ? 1 : 0)} onToggle={handleLike} />
+        <PWLikeButton
+          liked={liked}
+          count={post.likeCount + (liked ? 1 : 0)}
+          onToggle={handleLike}
+        />
         <PWCommentList postId={post.id} commentCount={post.commentCount} />
         <PWRepostButton
           reposted={reposted}

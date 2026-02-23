@@ -88,6 +88,11 @@ export interface PersonaListItem {
     l2: Record<string, number> | null
     l3: Record<string, number> | null
   }
+  state: {
+    energy: number
+    mood: number
+    socialBattery: number
+  } | null
   engineVersion: string | null
   createdAt: string
   updatedAt: string
