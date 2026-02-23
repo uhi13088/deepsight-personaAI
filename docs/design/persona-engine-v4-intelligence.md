@@ -707,7 +707,7 @@ interface StyleBookPatch {
 | ----------------- | ----------------------------------------------- | ---------------------- |
 | confidence 임계값 | `confidence ≥ PATCH_CONFIDENCE_THRESHOLD (0.7)` | 패치 자동 거부         |
 | 과교정 감지       | 동일 카테고리 24시간 내 연속 교정 여부          | 패치 보류, 관리자 알림 |
-| 일일 교정 횟수    | `dailyCount < MAX_DAILY_CORRECTIONS (3)`        | 패치 큐 대기 (익일)    |
+| 일일 교정 횟수    | `dailyCount < MAX_DAILY_CORRECTIONS (5)`        | 패치 큐 대기 (익일)    |
 | 패치 충돌         | 동일 path에 대한 미승인 패치 존재 여부          | 이전 패치와 병합 시도  |
 
 **과교정 감지 (Over-Correction Detection)**
@@ -727,7 +727,7 @@ function detectOverCorrection(personaId: string, recentPatches: StyleBookPatch[]
 **관련 상수**
 
 ```typescript
-const MAX_DAILY_CORRECTIONS = 3
+const MAX_DAILY_CORRECTIONS = 5
 const PATCH_CONFIDENCE_THRESHOLD = 0.7
 ```
 

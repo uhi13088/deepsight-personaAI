@@ -90,8 +90,8 @@ export const MAX_OPERATIONS_PER_PATCH = 10
 /** 습관 표현 최대 갯수 */
 export const MAX_HABITUAL_EXPRESSIONS = 10
 
-/** confidence 하한 (이하 → 적용 불가) */
-export const MIN_CONFIDENCE_THRESHOLD = 0.3
+/** confidence 하한 — 설계서 §7.4 기준 0.7 (70% 확신 이상만 패치 수용) */
+export const MIN_CONFIDENCE_THRESHOLD = 0.7
 
 // ══════════════════════════════════════════════════════════════
 // 교정 제안 생성 (판정 이슈 → 제안)
