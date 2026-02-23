@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import Script from "next/script"
 import { toast } from "sonner"
 import { ArrowLeft, Coins, Check, Lock, Zap } from "lucide-react"
 import { PWLogoWithText, PWCard, PWButton, PWBottomNav } from "@/components/persona-world"
@@ -36,6 +37,7 @@ export default function ShopPage() {
   const [activeTab, setActiveTab] = useState<ShopCategory>("persona")
   const [confirm, setConfirm] = useState<ConfirmState>(null)
   const [coinLoading, setCoinLoading] = useState<string | null>(null)
+  const [tossReady, setTossReady] = useState(false)
 
   const [serverBalance, setServerBalance] = useState<number | null>(null)
   const balance = serverBalance ?? onboarding.creditsBalance
@@ -71,7 +73,7 @@ export default function ShopPage() {
       const tossPayments = (window as unknown as Record<string, unknown>).TossPayments as
         | TossWidget
         | undefined
-      if (!tossPayments) {
+      if (!tossReady || !tossPayments) {
         toast.error("결제 모듈을 로드하는 중입니다. 잠시 후 다시 시도해주세요.")
         return
       }
@@ -91,6 +93,7 @@ export default function ShopPage() {
         paymentInfo.orderId,
         paymentInfo.amount
       )
+      setServerBalance(confirmed.balance)
       toast.success(`${confirmed.coins} 코인이 충전되었습니다!`)
     } catch (error) {
       const msg = error instanceof Error ? error.message : "결제 실패"
@@ -370,6 +373,9 @@ export default function ShopPage() {
       )}
 
       <PWBottomNav />
+
+      {/* Toss Payments SDK */}
+      <Script src="https://js.tosspayments.com/v1/payment" onLoad={() => setTossReady(true)} />
     </div>
   )
 }
