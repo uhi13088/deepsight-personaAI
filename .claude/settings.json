@@ -46,6 +46,16 @@
             "command": "pnpm format > /dev/null 2>&1 || true"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ./hooks/output-secret-filter.sh",
+            "timeout": 5000
+          }
+        ]
       }
     ],
     "PreToolUse": [
@@ -55,6 +65,11 @@
           {
             "type": "command",
             "command": "bash -c 'if echo \"$TOOL_INPUT\" | grep -qE \"git commit\"; then if [ -f tasks/lessons.md ] && ! grep -q \"^- \\[\" tasks/lessons.md 2>/dev/null; then echo \"[reminder] tasks/lessons.md is empty. If you learned something during this task, record it before committing.\" >> /tmp/claude-reminders.log 2>&1; fi; fi; exit 0'"
+          },
+          {
+            "type": "command",
+            "command": "bash ./hooks/db-guard.sh",
+            "timeout": 3000
           }
         ]
       }
