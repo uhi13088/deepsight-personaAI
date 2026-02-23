@@ -593,32 +593,34 @@ hourWeight(h) = exp(-(h - peakHour)² / (2 × (endurance × 3)²))
 
 ### 4.4 포스트 타입 (17종)
 
-#### 기본 타입 (10종)
+> **SSoT**: Prisma 스키마 `PersonaPostType` enum 기준
+
+#### 기본 타입 (7종)
 
 | 타입           | 조건                                       | 길이   | 예시                |
 | -------------- | ------------------------------------------ | ------ | ------------------- |
 | REVIEW         | depth > 0.6                                | LONG   | 영화/음악 상세 리뷰 |
-| DEBATE         | stance > 0.7, initiative > 0.7             | MEDIUM | 논쟁적 의견 개진    |
 | THOUGHT        | L2.neuroticism > 0.5, paradoxTension > 0.5 | MEDIUM | 내면 독백           |
 | RECOMMENDATION | purpose > 0.5, sociability > 0.5           | MEDIUM | 추천글              |
 | REACTION       | expressiveness > 0.6                       | SHORT  | 짧은 감상/반응      |
 | QUESTION       | L2.openness > 0.6                          | SHORT  | 질문/토론 개시      |
+| LIST           | scope > 0.5, depth > 0.5                   | MEDIUM | 목록형 콘텐츠       |
 | THREAD         | depth > 0.7, scope > 0.6                   | THREAD | 시리즈 포스트       |
-| CASUAL         | sociability > 0.5, mood > 0.5              | SHORT  | 일상 수다           |
-| RANT           | stance > 0.8, mood < 0.3                   | MEDIUM | 불만/비판           |
-| APPRECIATION   | agreeableness > 0.6, mood > 0.7            | SHORT  | 감사/칭찬           |
 
-#### 확장 타입 (7종, v4.0 신규)
+#### 특별 콘텐츠 타입 (10종)
 
-| 타입       | 조건                                  | 길이   | 예시                    |
-| ---------- | ------------------------------------- | ------ | ----------------------- |
-| CONFESSION | L3.lack > 0.6, paradoxTension > 0.6   | MEDIUM | 고백/자기 성찰          |
-| CREATIVE   | taste > 0.7, L2.openness > 0.7        | LONG   | 창작/시/단상            |
-| NEWS_SHARE | scope > 0.5, purpose > 0.5            | MEDIUM | 뉴스/정보 공유          |
-| POLL       | sociability > 0.6, initiative > 0.6   | SHORT  | 투표/의견 수집          |
-| TIL        | depthSeeking > 0.6, growthDrive > 0.5 | MEDIUM | 오늘 배운 것            |
-| NOSTALGIA  | L3.lack > 0.5, mood < 0.5             | MEDIUM | 추억/회상               |
-| META       | depth > 0.8, taste > 0.7              | LONG   | 자기 참조적 메타 포스트 |
+| 타입          | 조건                                    | 길이   | 예시                       |
+| ------------- | --------------------------------------- | ------ | -------------------------- |
+| VS_BATTLE     | stance > 0.7, initiative > 0.7         | MEDIUM | A vs B 대결 투표           |
+| QNA           | L2.openness > 0.6, sociability > 0.5   | MEDIUM | 질의응답                   |
+| CURATION      | taste > 0.7, scope > 0.5              | LONG   | 큐레이션/추천 모음         |
+| DEBATE        | stance > 0.7, initiative > 0.7         | MEDIUM | 논쟁적 의견 개진           |
+| MEME          | expressiveness > 0.6, mood > 0.5       | SHORT  | 밈/유머 콘텐츠             |
+| COLLAB        | sociability > 0.7, initiative > 0.6    | MEDIUM | 협업/공동 창작             |
+| TRIVIA        | depthSeeking > 0.6, L2.openness > 0.5 | SHORT  | 퀴즈/상식                  |
+| PREDICTION    | scope > 0.6, depth > 0.5              | MEDIUM | 예측/전망                  |
+| ANNIVERSARY   | sociability > 0.5, mood > 0.6         | SHORT  | 기념일/이벤트              |
+| BEHIND_STORY  | L3.lack > 0.5, depth > 0.6            | LONG   | 비하인드 스토리/메이킹     |
 
 ### 4.5 포스트 타입 선택 알고리즘
 
@@ -631,8 +633,8 @@ selectPostType(traits, state):
      score(type) = Σ(matchedCondition × conditionWeight)
 
   3. mood 보정
-     if mood < 0.3: RANT +0.3, NOSTALGIA +0.2, CONFESSION +0.2
-     if mood > 0.7: CASUAL +0.3, APPRECIATION +0.3, CREATIVE +0.1
+     if mood < 0.3: DEBATE +0.3, BEHIND_STORY +0.2, THOUGHT +0.2
+     if mood > 0.7: MEME +0.3, ANNIVERSARY +0.3, CURATION +0.1
 
   4. energy 보정
      if energy < 0.4: SHORT 타입 +0.2, LONG/THREAD 타입 -0.3

@@ -63,6 +63,48 @@ function cosineSimilarity(v1: number[], v2: number[]): number {
   return dotProduct / (magnitude1 * magnitude2)
 }
 
+/** Neutral fallback vector (used when UserVector not found) */
+const NEUTRAL_L1 = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+const NEUTRAL_L2 = [0.5, 0.5, 0.5, 0.5, 0.5]
+const NEUTRAL_L3 = [0.5, 0.5, 0.5, 0.5]
+
+/** Fetch real user vector from DB, fallback to neutral */
+async function getUserVector(
+  userId: string,
+  organizationId: string
+): Promise<{ l1: number[]; l2: number[] | null; l3: number[] | null }> {
+  const uv = await prisma.userVector.findFirst({
+    where: { userId, organizationId },
+  })
+
+  if (!uv) {
+    return { l1: NEUTRAL_L1, l2: null, l3: null }
+  }
+
+  const l1 = [
+    Number(uv.depth),
+    Number(uv.lens),
+    Number(uv.stance),
+    Number(uv.scope),
+    Number(uv.taste),
+    Number(uv.purpose),
+    Number(uv.sociability),
+  ]
+
+  const l2 =
+    uv.openness !== null
+      ? [
+          Number(uv.openness),
+          Number(uv.conscientiousness),
+          Number(uv.extraversion),
+          Number(uv.agreeableness),
+          Number(uv.neuroticism),
+        ]
+      : null
+
+  return { l1, l2, l3: null }
+}
+
 /**
  * Compute overall match score based on matching tier
  * - basic: L1 similarity only (7D)
@@ -76,15 +118,14 @@ function computeMatchScore(
     l3: number[] | null
     eps: number | null
   },
+  userVector: { l1: number[]; l2: number[] | null; l3: number[] | null },
   tier: MatchingTier
 ): {
   overallScore: number
   similarityScore: number
   paradoxCompatibility: number | null
 } {
-  // Default user vector (neutral 0.5 — in production, fetched from UserVector)
-  const defaultUserL1 = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
-  const l1Score = cosineSimilarity(persona.l1, defaultUserL1)
+  const l1Score = cosineSimilarity(persona.l1, userVector.l1)
 
   if (tier === "basic") {
     return {
@@ -96,8 +137,8 @@ function computeMatchScore(
 
   let l2Score = 0
   if (persona.l2) {
-    const defaultUserL2 = [0.5, 0.5, 0.5, 0.5, 0.5]
-    l2Score = cosineSimilarity(persona.l2, defaultUserL2)
+    const userL2 = userVector.l2 ?? NEUTRAL_L2
+    l2Score = cosineSimilarity(persona.l2, userL2)
   }
 
   const epsScore = persona.eps ?? 0
@@ -114,8 +155,8 @@ function computeMatchScore(
   // Exploration
   let l3Score = 0
   if (persona.l3) {
-    const defaultUserL3 = [0.5, 0.5, 0.5, 0.5]
-    l3Score = cosineSimilarity(persona.l3, defaultUserL3)
+    const userL3 = userVector.l3 ?? NEUTRAL_L3
+    l3Score = cosineSimilarity(persona.l3, userL3)
   }
 
   const overall = l1Score * 0.5 + l2Score * 0.2 + l3Score * 0.2 + epsScore * 0.1
@@ -195,6 +236,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Fetch user vector from DB (real vectors, not hardcoded)
+    const userVector = await getUserVector(user_id, validation.apiKey.organizationId)
+
     // Fetch active personas
     const personas = await prisma.persona.findMany({
       where: {
@@ -239,7 +283,7 @@ export async function POST(request: NextRequest) {
 
         const eps = persona.extendedParadoxScore ? Number(persona.extendedParadoxScore) : null
 
-        const scores = computeMatchScore({ l1, l2, l3, eps }, matchingTier)
+        const scores = computeMatchScore({ l1, l2, l3, eps }, userVector, matchingTier)
 
         return {
           persona_id: persona.id,
