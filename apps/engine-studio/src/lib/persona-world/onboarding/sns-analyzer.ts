@@ -256,7 +256,7 @@ async function analyzeSpotify(accessToken: string): Promise<SnsAnalysisResult> {
 // ── Instagram 분석 ───────────────────────────────────────────
 
 async function analyzeInstagram(accessToken: string): Promise<SnsAnalysisResult> {
-  // Instagram Basic Display API
+  // Instagram Login API (신규, 2024.09 Basic Display API deprecated)
   const profileRes = await fetch(
     `https://graph.instagram.com/me?fields=id,username,media_count&access_token=${accessToken}`
   )

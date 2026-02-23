@@ -57,9 +57,10 @@ const PLATFORM_CONFIGS: Record<SNSPlatform, OAuthPlatformConfig> = {
   },
   INSTAGRAM: {
     platform: "INSTAGRAM",
-    authUrl: "https://api.instagram.com/oauth/authorize",
+    // 2024.09 Basic Display API deprecated → 새 Instagram Login API 사용
+    authUrl: "https://www.instagram.com/oauth/authorize",
     tokenUrl: "https://api.instagram.com/oauth/access_token",
-    scopes: ["user_profile", "user_media"],
+    scopes: ["instagram_business_basic"],
   },
   TWITTER: {
     platform: "TWITTER",
