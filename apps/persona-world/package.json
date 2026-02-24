@@ -14,6 +14,7 @@
     "clean": "rm -rf .next node_modules"
   },
   "dependencies": {
+    "@deepsight/config": "workspace:^",
     "@deepsight/shared-types": "workspace:^",
     "@deepsight/ui": "workspace:^",
     "@radix-ui/react-avatar": "^1.1.11",

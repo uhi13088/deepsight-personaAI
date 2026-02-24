@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@deepsight/auth": "workspace:^",
+    "@deepsight/config": "workspace:^",
     "@deepsight/shared-types": "workspace:^",
     "@deepsight/ui": "workspace:^",
     "@deepsight/vector-core": "workspace:^",
