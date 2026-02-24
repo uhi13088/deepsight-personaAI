@@ -57,8 +57,15 @@ interface CostSummary {
   monthCallCount: number
 }
 
+interface PresetSource {
+  name: string
+  rssUrl: string
+  region: string
+}
+
 interface PageData {
   sources: NewsSource[]
+  presets: PresetSource[]
   recentArticles: NewsArticle[]
   settings: NewsSettings
   costSummary: CostSummary
@@ -116,6 +123,7 @@ function Toggle({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean
 export default function NewsAdminPage() {
   const [data, setData] = useState<PageData>({
     sources: [],
+    presets: [],
     recentArticles: [],
     settings: { autoTriggerEnabled: true, dailyBudget: 20, maxPerPersona: 2 },
     costSummary: { todayCostUsd: 0, todayCallCount: 0, monthCostUsd: 0, monthCallCount: 0 },
@@ -124,6 +132,7 @@ export default function NewsAdminPage() {
   const [fetchingSource, setFetchingSource] = useState<string | null>(null)
   const [triggeringArticle, setTriggeringArticle] = useState<string | null>(null)
   const [addingSource, setAddingSource] = useState(false)
+  const [addingPresets, setAddingPresets] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [newSourceName, setNewSourceName] = useState("")
   const [newSourceUrl, setNewSourceUrl] = useState("")
@@ -155,6 +164,23 @@ export default function NewsAdminPage() {
   useEffect(() => {
     void loadData()
   }, [loadData])
+
+  // ── 프리셋 일괄 등록 ────────────────────────────────────────────
+
+  const handleAddPresets = async (urls?: string[]) => {
+    setAddingPresets(true)
+    try {
+      const res = await fetch("/api/internal/persona-world-admin/news", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "add_presets", ...(urls ? { urls } : {}) }),
+      })
+      const json = await res.json()
+      if (json.success) await loadData()
+    } finally {
+      setAddingPresets(false)
+    }
+  }
 
   // ── 소스 추가 ──────────────────────────────────────────────────
 
@@ -275,7 +301,7 @@ export default function NewsAdminPage() {
     )
   }
 
-  const { sources, recentArticles, settings, costSummary } = data
+  const { sources, presets, recentArticles, settings, costSummary } = data
 
   return (
     <div className="space-y-6 p-6">
@@ -434,10 +460,46 @@ export default function NewsAdminPage() {
 
       {/* 소스 관리 */}
       <div className="border-border bg-card space-y-3 rounded-lg border p-4">
-        <h2 className="text-sm font-medium">
-          RSS 소스 관리
-          <span className="text-muted-foreground ml-2 text-xs">({sources.length}/20)</span>
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium">
+            RSS 소스 관리
+            <span className="text-muted-foreground ml-2 text-xs">({sources.length}/20)</span>
+          </h2>
+          {presets.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleAddPresets()}
+              disabled={addingPresets || sources.length >= 20}
+              className="text-xs"
+            >
+              <Plus className="mr-1 h-3.5 w-3.5" />
+              {addingPresets ? "추가 중..." : `추천 소스 전체 추가 (${presets.length}개)`}
+            </Button>
+          )}
+        </div>
+
+        {/* 미등록 프리셋 빠른 추가 */}
+        {presets.length > 0 && (
+          <div className="rounded-lg border border-dashed p-3">
+            <p className="text-muted-foreground mb-2 text-xs font-medium">
+              추천 RSS 소스 — 클릭해서 개별 추가
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {presets.map((p) => (
+                <button
+                  key={p.rssUrl}
+                  onClick={() => handleAddPresets([p.rssUrl])}
+                  disabled={addingPresets || sources.length >= 20}
+                  className="border-border hover:bg-accent flex items-center gap-1 rounded-full border bg-transparent px-2.5 py-1 text-xs transition-colors disabled:opacity-40"
+                >
+                  <span className="text-muted-foreground">[{p.region}]</span>
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* 소스 추가 폼 */}
         <div className="flex flex-wrap gap-2">

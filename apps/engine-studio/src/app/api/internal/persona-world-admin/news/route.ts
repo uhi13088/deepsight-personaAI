@@ -20,6 +20,46 @@ const MAX_NEWS_SOURCES = 20
 /** T200-A: 소스당 최대 수집 기사 수 */
 const MAX_ARTICLES_PER_FETCH = 5
 
+/** 프리셋 RSS 소스 목록 (버튼 하나로 일괄 등록 가능) */
+const PRESET_SOURCES = [
+  // 글로벌
+  {
+    name: "Reuters Top News",
+    rssUrl: "https://feeds.reuters.com/reuters/topNews",
+    region: "GLOBAL",
+  },
+  { name: "BBC World News", rssUrl: "http://feeds.bbci.co.uk/news/world/rss.xml", region: "GB" },
+  { name: "Associated Press", rssUrl: "https://feeds.apnews.com/rss/topnews", region: "GLOBAL" },
+  // 테크
+  { name: "TechCrunch", rssUrl: "https://techcrunch.com/feed/", region: "US" },
+  { name: "The Verge", rssUrl: "https://www.theverge.com/rss/index.xml", region: "US" },
+  { name: "Hacker News", rssUrl: "https://news.ycombinator.com/rss", region: "US" },
+  { name: "Wired", rssUrl: "https://www.wired.com/feed/rss", region: "US" },
+  // 경제/비즈
+  {
+    name: "Bloomberg Markets",
+    rssUrl: "https://feeds.bloomberg.com/markets/news.rss",
+    region: "US",
+  },
+  { name: "Financial Times", rssUrl: "https://www.ft.com/rss/home", region: "GB" },
+  {
+    name: "The Economist",
+    rssUrl: "https://www.economist.com/the-world-this-week/rss.xml",
+    region: "GB",
+  },
+  // 한국
+  {
+    name: "연합뉴스 속보",
+    rssUrl: "https://www.yonhapnewstv.co.kr/category/news/newsflash/feed/",
+    region: "KR",
+  },
+  { name: "한겨레", rssUrl: "https://www.hani.co.kr/rss/", region: "KR" },
+  { name: "조선비즈", rssUrl: "https://biz.chosun.com/rss/", region: "KR" },
+  { name: "한국경제", rssUrl: "https://www.hankyung.com/feed/all-news", region: "KR" },
+  // 일본
+  { name: "NHK World", rssUrl: "https://www3.nhk.or.jp/rss/news/cat0.xml", region: "JP" },
+] as const
+
 // ── 설정 기본값 ─────────────────────────────────────────────────
 
 const NEWS_CONFIG_DEFAULTS = {
@@ -104,6 +144,10 @@ export async function GET() {
       }),
     ])
 
+    // 이미 등록된 RSS URL 목록으로 미등록 프리셋 필터링
+    const registeredUrls = new Set(sources.map((s) => s.rssUrl))
+    const availablePresets = PRESET_SOURCES.filter((p) => !registeredUrls.has(p.rssUrl))
+
     return NextResponse.json({
       success: true,
       data: {
@@ -116,6 +160,7 @@ export async function GET() {
           lastFetchAt: s.lastFetchAt?.toISOString() ?? null,
           articleCount: s._count.articles,
         })),
+        presets: availablePresets,
         recentArticles: recentArticles.map((a) => ({
           id: a.id,
           title: a.title,
@@ -299,6 +344,38 @@ export async function POST(request: NextRequest) {
 
         const totalNew = results.reduce((sum, r) => sum + r.newArticles, 0)
         return NextResponse.json({ success: true, data: { results, totalNew } })
+      }
+
+      // 프리셋 일괄 등록 (미등록 소스만 추가)
+      case "add_presets": {
+        const { urls } = body as { action: string; urls?: string[] }
+
+        const currentCount = await prisma.newsSource.count()
+        const registeredUrls = new Set(
+          (await prisma.newsSource.findMany({ select: { rssUrl: true } })).map((s) => s.rssUrl)
+        )
+
+        // urls가 없으면 전체 프리셋, 있으면 지정된 것만
+        const targets =
+          urls && urls.length > 0
+            ? PRESET_SOURCES.filter((p) => urls.includes(p.rssUrl))
+            : [...PRESET_SOURCES]
+
+        const toAdd = targets.filter((p) => !registeredUrls.has(p.rssUrl))
+        const available = Math.max(0, MAX_NEWS_SOURCES - currentCount)
+        const adding = toAdd.slice(0, available)
+
+        if (adding.length > 0) {
+          await prisma.newsSource.createMany({
+            data: adding.map((p) => ({ name: p.name, rssUrl: p.rssUrl, region: p.region })),
+            skipDuplicates: true,
+          })
+        }
+
+        return NextResponse.json({
+          success: true,
+          data: { added: adding.length, skipped: toAdd.length - adding.length },
+        })
       }
 
       // T200-B: 설정 저장
