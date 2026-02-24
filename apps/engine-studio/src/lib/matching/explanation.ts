@@ -1,9 +1,11 @@
 // ═══════════════════════════════════════════════════════════════
 // 매칭 설명 시스템 (XAI)
 // T58-AC2: 운영자용 분석 + 사용자용 자연어 설명
+// T215: Enrichment Layer 시그널 설명 추가
 // ═══════════════════════════════════════════════════════════════
 
 import type { SocialPersonaVector, SocialDimension } from "@/types"
+import type { ScoreAdjustment } from "./context-enricher"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
@@ -11,6 +13,15 @@ export interface TraitLevel {
   dimension: SocialDimension
   level: "very_high" | "high" | "neutral" | "low" | "very_low"
   value: number
+}
+
+/** Enrichment 시그널이 매칭에 미친 영향 설명 */
+export interface EnrichmentExplanation {
+  appliedSignals: string[] // 적용된 시그널 목록 (한글)
+  positiveFactors: string[] // 점수 상승 요인
+  negativeFactors: string[] // 점수 하락 요인
+  tierAdjustment?: string // 동적 Tier 가중치 변경 사유
+  experimentId?: string // A/B 실험 ID (있으면)
 }
 
 export interface OperatorExplanation {
@@ -25,6 +36,8 @@ export interface OperatorExplanation {
   }>
   strengthFactors: string[]
   weakFactors: string[]
+  /** Enrichment Layer 기여 분석 (있으면) */
+  enrichment?: EnrichmentExplanation
 }
 
 export interface UserExplanation {
@@ -293,6 +306,87 @@ export function generateCompoundExplanation(
   const matchDescription = PERSONA_MATCH_EXPRESSIONS[matchKey] ?? ""
 
   return `[${traitStr} 유저]\n${userDescription}!\n${matchDescription}.`
+}
+
+// ── Enrichment 설명 생성 ──────────────────────────────────────
+
+export function generateEnrichmentExplanation(
+  enrichment: ScoreAdjustment,
+  experimentId?: string
+): EnrichmentExplanation {
+  const appliedSignals: string[] = []
+  const positiveFactors: string[] = []
+  const negativeFactors: string[] = []
+
+  if (enrichment.voiceBonus !== 0) {
+    appliedSignals.push("보이스 유사도")
+    if (enrichment.voiceBonus > 0) {
+      positiveFactors.push(`보이스 스타일 유사 (+${enrichment.voiceBonus})`)
+    } else {
+      negativeFactors.push(`보이스 스타일 차이 (${enrichment.voiceBonus})`)
+    }
+  }
+
+  if (enrichment.relationshipBonus > 0) {
+    appliedSignals.push("관계 깊이")
+    positiveFactors.push(`관계 깊이 보너스 (+${enrichment.relationshipBonus})`)
+  }
+
+  if (enrichment.negativePenalty > 0) {
+    appliedSignals.push("네거티브 시그널")
+    negativeFactors.push(`네거티브 패널티 (-${round(enrichment.negativePenalty * 100)}%)`)
+  }
+
+  if (enrichment.engagementBonus > 0) {
+    appliedSignals.push("인게이지먼트")
+    positiveFactors.push(`인게이지먼트 부스트 (+${enrichment.engagementBonus})`)
+  }
+
+  if (enrichment.fatigueDecay < 1.0) {
+    appliedSignals.push("피로 감쇠")
+    negativeFactors.push(`노출 피로 감쇠 (×${enrichment.fatigueDecay})`)
+  }
+
+  if (enrichment.rediscoveryBoost > 0) {
+    appliedSignals.push("재발견")
+    positiveFactors.push(`재발견 부스트 (+${enrichment.rediscoveryBoost})`)
+  }
+
+  if (enrichment.qualityWeight < 1.0) {
+    appliedSignals.push("품질 가중")
+    negativeFactors.push(`품질 보정 (×${enrichment.qualityWeight})`)
+  }
+
+  if (enrichment.consumptionBonus > 0) {
+    appliedSignals.push("소비 패턴")
+    positiveFactors.push(`소비 패턴 일치 (+${enrichment.consumptionBonus})`)
+  }
+
+  if (enrichment.topologyModifier !== 0) {
+    appliedSignals.push("소셜 토폴로지")
+    if (enrichment.topologyModifier > 0) {
+      positiveFactors.push(`허브 노드 부스트 (+${enrichment.topologyModifier})`)
+    } else {
+      negativeFactors.push(`고립/주변부 패널티 (${enrichment.topologyModifier})`)
+    }
+  }
+
+  if (enrichment.emotionalModifier > 0) {
+    appliedSignals.push("감정 보정")
+    positiveFactors.push(`감정 기반 매칭 (+${enrichment.emotionalModifier})`)
+  }
+
+  if (enrichment.coldStartFactor < 1.0) {
+    appliedSignals.push("콜드스타트")
+    negativeFactors.push(`콜드스타트 보정 (×${enrichment.coldStartFactor})`)
+  }
+
+  return {
+    appliedSignals,
+    positiveFactors,
+    negativeFactors,
+    experimentId,
+  }
 }
 
 // ── 유틸 ─────────────────────────────────────────────────────

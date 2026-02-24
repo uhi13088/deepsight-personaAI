@@ -1,6 +1,6 @@
 # DeepSight v4.0 — TASK 관리
 
-> 마지막 업데이트: 2026-02-21
+> 마지막 업데이트: 2026-02-24
 
 ---
 
@@ -377,6 +377,21 @@
   - AC7: 설계서 §12.3 최신화 — Trust-Weighted Matching 공식/활성화 곡선/적용 범위 문서화
   - 변경: three-tier-engine.ts, persona-engine-v4.md
   - 테스트: matching.test.ts (+17 Trust 통합 테스트), consumer-journey.test.ts (breakdown 동기화), 145 PASS
+
+## DONE (v4.0 — 매칭 Enrichment Layer)
+
+- [x] **T215: MatchingContext Enrichment Layer — 매칭 시스템 고도화** ✅ 2026-02-24
+  - AC1: EnrichedMatchingContext 타입 시스템 — 12종 시그널 타입 (Relationship, Negative, Engagement, Consumption, Topology, Emotional, Session, Quality, Exposure, Experiment)
+  - AC2: 시그널 → 점수 변환 함수 12종 — computeVoiceSimilarity, computeRelationshipDepthScore, computeNegativePenalty, computeEngagementBoost, computeColdStartFactor, computeFatigueDecay, computeRediscoveryBoost, computeQualityWeight, computeConsumptionMatch, computeTopologyModifier, computeEmotionalModifier, computeDynamicPressure
+  - AC3: applyEnrichmentSignals — 모든 시그널을 종합하여 최종 점수 계산, A/B 기능 토글 지원
+  - AC4: computeDynamicTierWeights — 유저 세그먼트별(신규/이탈/숙련/일반) 동적 Tier 비율 조정
+  - AC5: three-tier-engine.ts 통합 — matchPersona/matchAll에 enrichment 파이프라인 주입, 블록/봇 사전 필터링
+  - AC6: XAI 확장 — EnrichmentExplanation 타입, generateEnrichmentExplanation 함수
+  - AC7: Analytics 확장 — ExperimentResult 타입, calculateExperimentUplift 함수, AnalyticsDashboard.experiments 필드
+  - AC8: 설계서 §12 최신화 — Enrichment Layer 아키텍처, 12개 시그널 테이블, 최종 점수 공식, 동적 Tier 가중치
+  - 신규: context-enricher.ts (479줄)
+  - 변경: three-tier-engine.ts, explanation.ts, analytics.ts, index.ts, persona-engine-v4.md
+  - 테스트: context-enricher.test.ts (71 테스트), 기존 matching.test.ts 78 PASS (하위 호환), 전체 263 매칭 PASS
 
 ## IN_PROGRESS
 

@@ -19,6 +19,7 @@ import { calculateVFinal } from "@/lib/vector/v-final"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
 import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
 import { DEFAULT_L1_VECTOR, DEFAULT_L2_VECTOR, DEFAULT_L3_VECTOR } from "@/constants/v3/dimensions"
+import { layerVectorsToMap } from "@/lib/vector/dim-maps"
 
 // ── DB에서 페르소나 로드 ─────────────────────────────────────
 
@@ -48,9 +49,10 @@ async function loadPersonasFromDB(): Promise<PersonaCandidate[]> {
   }
 
   return personas.map((p) => {
-    const socialVec = p.layerVectors.find((v) => v.layerType === "SOCIAL")
-    const tempVec = p.layerVectors.find((v) => v.layerType === "TEMPERAMENT")
-    const narrVec = p.layerVectors.find((v) => v.layerType === "NARRATIVE")
+    const layerMap = layerVectorsToMap(p.layerVectors)
+    const socialVec = layerMap.get("SOCIAL")
+    const tempVec = layerMap.get("TEMPERAMENT")
+    const narrVec = layerMap.get("NARRATIVE")
 
     const l1: SocialPersonaVector = socialVec
       ? (Object.fromEntries(

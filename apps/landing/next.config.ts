@@ -1,14 +1,5 @@
 import type { NextConfig } from "next"
-import { securityHeaders } from "@deepsight/config"
-
-function getEngineStudioUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_ENGINE_STUDIO_URL?.trim()
-  if (!raw) return "http://localhost:3000"
-  if (raw.startsWith("http://") || raw.startsWith("https://")) {
-    return raw.replace(/\/+$/, "")
-  }
-  return `https://${raw}`.replace(/\/+$/, "")
-}
+import { securityHeaders, getEngineStudioUrl } from "@deepsight/config"
 
 const ENGINE_STUDIO_URL = getEngineStudioUrl()
 

@@ -689,21 +689,82 @@ Anthropic API `cache_control` 블록 레벨 캐싱 활용.
 
 ### 12.1 3-Tier 전략
 
-| Tier        | 비율 | 알고리즘                                                          |
-| ----------- | ---- | ----------------------------------------------------------------- |
-| Basic       | 60%  | V_Final 코사인 유사도(70%) + Cross-Axis 프로필(30%)               |
-| Exploration | 30%  | Paradox 다양성(40%) + Cross-Axis 발산(40%) + 아키타입 신선도(20%) |
-| Advanced    | 10%  | V_Final(50%) + Cross-Axis(30%) + Paradox 호환성(20%)              |
+| Tier        | 기본 비율 | 알고리즘                                                          |
+| ----------- | --------- | ----------------------------------------------------------------- |
+| Basic       | 60%       | V_Final 코사인 유사도(70%) + Cross-Axis 프로필(30%)               |
+| Exploration | 30%       | Paradox 다양성(40%) + Cross-Axis 발산(40%) + 아키타입 신선도(20%) |
+| Advanced    | 10%       | V_Final(50%) + Cross-Axis(30%) + Paradox 호환성(20%)              |
 
-### 12.2 정성적 보너스
+**동적 Tier 가중치** (T215): 유저 세그먼트에 따라 Tier 비율이 자동 조정된다.
+
+| 유저 세그먼트 | Basic | Advanced | Exploration | 전략                |
+| ------------- | ----- | -------- | ----------- | ------------------- |
+| 신규 (< 10)   | 40%   | 10%      | 50%         | 탐색 우선           |
+| 이탈 위험     | 30%   | 10%      | 60%         | 세렌디피티로 재참여 |
+| 숙련 (50+)    | 40%   | 40%      | 20%         | 심층 추천           |
+| 일반 활성     | 60%   | 10%      | 30%         | 기본값              |
+
+### 12.2 MatchingContext Enrichment Layer (T215)
+
+매칭 엔진(`matchAll()`)은 순수 함수를 유지하되, 실행 전에 **Enrichment Layer**가
+DB/상태로부터 풍부한 컨텍스트를 조립하여 매칭에 주입한다.
 
 ```
-±0.1 조정:
-- voiceSimilarity: 유저 선호 포스트 vs 페르소나 보이스
-- narrativeCompatibility: 유저 온보딩 답변 vs 페르소나 L3
+┌──────────────────────────────────────────────┐
+│  Enrichment Layer (context-enricher.ts)      │
+│  DB 조회 → 시그널 조립 → EnrichedContext     │
+├──────────────────────────────────────────────┤
+│  matchAll(user, personas, config, context)   │
+│  ① 블록/봇 필터링                            │
+│  ② 동적 Tier 가중치                          │
+│  ③ Tier별 매칭 (raw score 계산)              │
+│  ④ applyEnrichmentSignals() (12개 시그널)    │
+│  ⑤ 중복 제거 → 최종 추천                     │
+└──────────────────────────────────────────────┘
 ```
 
-### 12.3 소셜 모듈 통합 (Trust-Weighted Matching)
+**12개 Enrichment 시그널**:
+
+| 시그널              | 적용 Tier        | 효과           | 범위          |
+| ------------------- | ---------------- | -------------- | ------------- |
+| voiceSimilarity     | Basic, Advanced  | ±0.05 보너스   | 6D 코사인     |
+| qualityWeight       | 전체             | ×0.7~1.0       | 품질 가중     |
+| negativeSignals     | 전체             | 0~100% 패널티  | 블록/봇       |
+| relationshipDepth   | Basic, Advanced  | +0~0.1 보너스  | 관계 깊이     |
+| fatiguePrevention   | 전체             | e^(-n/5) 감쇠  | 노출 피로     |
+| engagementBoost     | Basic, Advanced  | +0~0.05        | 인게이지먼트  |
+| coldStartStrategy   | 전체             | ×0.5~1.0       | 콜드스타트    |
+| consumptionPatterns | Basic, Advanced  | +0~0.05        | 소비 패턴     |
+| socialTopology      | Exploration only | +0.1 (HUB)     | 그래프 분류   |
+| emotionalContagion  | 전체             | +0~0.05        | 감정 보정     |
+| dynamicPressure     | 외부 계산        | P 동적 조정    | 세션 기반     |
+| dynamicTierWeights  | matchAll 레벨    | Tier 비율 변경 | 유저 세그먼트 |
+
+**최종 점수 공식**:
+
+```
+finalScore = clamp(
+  (rawScore + voiceBonus + relationshipBonus + engagementBonus
+   + consumptionBonus + topologyModifier + emotionalModifier + rediscoveryBoost)
+  × fatigueDecay × qualityWeight × coldStartFactor
+  × (1 - negativePenalty)
+)
+```
+
+**A/B 실험 인프라**: `EnrichmentFeature` 토글로 개별 시그널을 활성/비활성 가능.
+`ExperimentContext`에 experimentId, variant, enabledFeatures를 주입하여 기능별 A/B 테스트.
+
+### 12.3 정성적 보너스 (Voice Similarity)
+
+```
+voiceBonus = (cosineSim(userVoiceStyle, personaVoiceStyle) - 0.5) × 0.1
+```
+
+- 6차원 VoiceStyleParams (formality, humor, sentenceLength, emotionExpression, assertiveness, vocabularyLevel)의 코사인 유사도
+- Basic/Advanced Tier: ±0.05 범위로 적용
+- Exploration Tier: 미적용 (세렌디피티 보존)
+
+### 12.4 소셜 모듈 통합 (Trust-Weighted Matching)
 
 기존 `trust-score.ts`의 `computeTrustScore()`를 매칭 파이프라인에 통합하여,
 인터랙션 이력이 축적된 페르소나 쌍에 대해 관계 신뢰도를 매칭 점수에 반영한다.
@@ -740,10 +801,32 @@ TRUST_MAX_WEIGHT = 0.2 (최대 20% 영향)
 
 **Cold-Start**: λ sigmoid가 자연스럽게 처리. 인터랙션 0건 → trustWeight≈0 → 순수 벡터 매칭.
 
-**추가 통합** (미변경):
+### 12.5 네거티브 시그널 필터링 (T215)
 
-- 허브 페르소나 → 탐색 Tier 노출 증가
-- 봇 의심 → 추천에서 제외
+`matchAll()` 진입 시 블록/봇/고위험 페르소나를 사전 필터링:
+
+- `isBlocked = true` → 완전 제거
+- `isSuspectedBot = true` → 완전 제거
+- `negativePenalty ≥ 0.8` → 완전 제거
+
+나머지는 `applyEnrichmentSignals()`에서 점수 감산으로 처리.
+
+### 12.6 XAI 확장 (T215)
+
+`EnrichmentExplanation` 구조로 어떤 시그널이 매칭 점수에 영향을 미쳤는지 운영자에게 설명:
+
+- `appliedSignals`: 적용된 시그널 목록 (보이스 유사도, 관계 깊이, ...)
+- `positiveFactors`: 점수 상승 요인 리스트
+- `negativeFactors`: 점수 하락 요인 리스트
+- `experimentId`: A/B 실험 ID (있으면)
+
+### 12.7 Analytics 확장 (T215)
+
+`ExperimentResult` 타입으로 A/B 실험 결과 트래킹:
+
+- `uplift`: 대조군 대비 KPI 변화율
+- `significance`: p-value (< 0.05면 통계적 유의미)
+- `AnalyticsDashboard`에 `experiments` 필드 추가
 
 ---
 

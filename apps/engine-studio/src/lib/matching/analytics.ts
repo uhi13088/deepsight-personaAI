@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // 매칭 성과 분석 대시보드
 // T58-AC1: KPI, 세그먼트 분석, 이상 탐지
+// T215: A/B 실험 트래킹 추가
 // ═══════════════════════════════════════════════════════════════
 
 // ── 타입 정의 ─────────────────────────────────────────────────
@@ -19,12 +20,27 @@ export interface MatchingKPIs {
 export type TimeRange = "realtime" | "today" | "7d" | "30d" | "custom"
 export type SegmentType = "all" | "new_user" | "returning" | "archetype"
 
+/** A/B 실험 결과 */
+export interface ExperimentResult {
+  experimentId: string
+  variant: string
+  sampleSize: number
+  kpis: MatchingKPIs
+  uplift: Partial<Record<keyof MatchingKPIs, number>> // 대조군 대비 변화율
+  significance: number // p-value (< 0.05면 유의미)
+  startedAt: number
+  endedAt?: number
+}
+
 export interface SegmentFilter {
   timeRange: TimeRange
   segment: SegmentType
   archetypeId?: string
   personaId?: string
   customDateRange?: { start: number; end: number }
+  /** A/B 실험 필터 */
+  experimentId?: string
+  variant?: string
 }
 
 export interface SegmentAnalysis {
@@ -65,6 +81,7 @@ export interface AnalyticsDashboard {
   segments: SegmentAnalysis[]
   trends: TrendData[]
   anomalies: AnomalyEvent[]
+  experiments: ExperimentResult[]
   filter: SegmentFilter
   generatedAt: number
 }
@@ -270,7 +287,8 @@ export function buildAnalyticsDashboard(
   segments: SegmentAnalysis[] = [],
   trends: TrendData[] = [],
   historicalAccuracies: number[] = [],
-  filter: SegmentFilter = { timeRange: "7d", segment: "all" }
+  filter: SegmentFilter = { timeRange: "7d", segment: "all" },
+  experiments: ExperimentResult[] = []
 ): AnalyticsDashboard {
   const kpis = calculateMatchingKPIs(rawData)
   const anomalies = detectAnomalies(kpis, baselineKPIs, historicalAccuracies)
@@ -280,9 +298,38 @@ export function buildAnalyticsDashboard(
     segments,
     trends,
     anomalies,
+    experiments,
     filter,
     generatedAt: Date.now(),
   }
+}
+
+// ── A/B 실험 Uplift 계산 ──────────────────────────────────────
+
+export function calculateExperimentUplift(
+  controlKPIs: MatchingKPIs,
+  variantKPIs: MatchingKPIs
+): Partial<Record<keyof MatchingKPIs, number>> {
+  const uplift: Partial<Record<keyof MatchingKPIs, number>> = {}
+  const keys: (keyof MatchingKPIs)[] = [
+    "matchAccuracy",
+    "avgMatchScore",
+    "top1Accuracy",
+    "diversityIndex",
+    "ctr",
+    "avgDwellTime",
+    "returnRate",
+  ]
+
+  for (const key of keys) {
+    const control = controlKPIs[key]
+    const variant = variantKPIs[key]
+    if (control > 0) {
+      uplift[key] = round((variant - control) / control)
+    }
+  }
+
+  return uplift
 }
 
 // ── 유틸 ─────────────────────────────────────────────────────

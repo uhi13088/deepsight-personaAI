@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("[Auth] GET error:", error)
     return NextResponse.json(
-      { error: "Internal auth error", detail: error instanceof Error ? error.message : "Unknown" },
+      { success: false, error: { code: "INTERNAL_ERROR", message: "Internal auth error" } },
       { status: 500 }
     )
   }
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("[Auth] POST error:", error)
     return NextResponse.json(
-      { error: "Internal auth error", detail: error instanceof Error ? error.message : "Unknown" },
+      { success: false, error: { code: "INTERNAL_ERROR", message: "Internal auth error" } },
       { status: 500 }
     )
   }
