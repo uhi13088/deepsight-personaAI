@@ -361,12 +361,14 @@ export function createNewsLLMProvider(): NewsLLMProvider | undefined {
 
   return {
     async generateText(params) {
+      // Haiku: 기사 분석은 고품질 모델 불필요 → ~4x 비용 절감
       const result = await generateText({
         systemPrompt: params.systemPrompt,
         userMessage: params.userPrompt,
         maxTokens: params.maxTokens,
         temperature: 0.3,
         callType: "pw:news_analysis",
+        model: "claude-haiku-4-5-20251001",
       })
       return {
         text: result.text,
