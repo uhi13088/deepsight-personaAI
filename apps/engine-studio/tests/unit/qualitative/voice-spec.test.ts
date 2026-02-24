@@ -83,9 +83,12 @@ describe("generateGuardrails", () => {
 
   it("톤 경계 포함", () => {
     const guardrails = generateGuardrails(formalL1, introvertL2, stableL3)
-    expect(guardrails.toneBoundaries.maxFormality).toBeGreaterThan(0)
-    expect(guardrails.toneBoundaries.minFormality).toBeLessThan(1)
-    expect(guardrails.toneBoundaries.maxAggression).toBeGreaterThan(0)
+    // formalL1.lens=0.8 > 0.7 → maxFormality=0.95
+    expect(guardrails.toneBoundaries.maxFormality).toBe(0.95)
+    // introvertL2.extraversion=0.2 ≤ 0.7 → minFormality=0.2
+    expect(guardrails.toneBoundaries.minFormality).toBe(0.2)
+    // introvertL2.agreeableness=0.7 > 0.6 → maxAggression=0.4
+    expect(guardrails.toneBoundaries.maxAggression).toBe(0.4)
   })
 
   it("친화적 페르소나 → 낮은 공격성 상한", () => {
@@ -212,6 +215,14 @@ describe("applyAdaptations", () => {
       expect(val).toBeGreaterThanOrEqual(0)
       expect(val).toBeLessThanOrEqual(1)
     }
+    // Extreme low state should visibly shift params from base
+    // Low mood → emotionExpression increases, humor decreases
+    expect(result.emotionExpression).toBeGreaterThan(baseStyleParams.emotionExpression)
+    expect(result.humor).toBeLessThan(baseStyleParams.humor)
+    // Low energy → sentenceLength decreases
+    expect(result.sentenceLength).toBeLessThan(baseStyleParams.sentenceLength)
+    // Low socialBattery → formality increases
+    expect(result.formality).toBeGreaterThan(baseStyleParams.formality)
   })
 })
 
@@ -343,6 +354,10 @@ describe("computeVoiceStyleParams", () => {
     expect(params.emotionExpression).toBeDefined()
     expect(params.assertiveness).toBeDefined()
     expect(params.vocabularyLevel).toBeDefined()
+    // Formal + introverted + analytical vectors → high formality, low humor, high vocabulary
+    expect(params.formality).toBeGreaterThan(0.6)
+    expect(params.humor).toBeLessThan(0.5)
+    expect(params.vocabularyLevel).toBeGreaterThan(0.6)
   })
 
   it("모든 값 0~1 범위", () => {
@@ -351,6 +366,14 @@ describe("computeVoiceStyleParams", () => {
       expect(val).toBeGreaterThanOrEqual(0)
       expect(val).toBeLessThanOrEqual(1)
     }
+    // Also verify the casual vector produces different but still valid results
+    const casualParams = computeVoiceStyleParams(casualL1, extrovertL2, volatileL3)
+    for (const val of Object.values(casualParams)) {
+      expect(val).toBeGreaterThanOrEqual(0)
+      expect(val).toBeLessThanOrEqual(1)
+    }
+    // Casual should be distinctly less formal
+    expect(casualParams.formality).toBeLessThan(params.formality)
   })
 
   it("격식적 벡터 → 높은 formality", () => {
