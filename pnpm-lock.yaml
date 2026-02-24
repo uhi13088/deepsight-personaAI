@@ -32,6 +32,9 @@ importers:
       '@deepsight/shared-types':
         specifier: workspace:^
         version: link:../../packages/shared-types
+      '@deepsight/ui':
+        specifier: workspace:^
+        version: link:../../packages/ui
       '@deepsight/vector-core':
         specifier: workspace:^
         version: link:../../packages/vector-core
@@ -186,6 +189,9 @@ importers:
       '@deepsight/shared-types':
         specifier: workspace:^
         version: link:../../packages/shared-types
+      '@deepsight/ui':
+        specifier: workspace:^
+        version: link:../../packages/ui
       '@deepsight/vector-core':
         specifier: workspace:^
         version: link:../../packages/vector-core
@@ -361,6 +367,9 @@ importers:
 
   apps/landing:
     dependencies:
+      '@deepsight/ui':
+        specifier: workspace:^
+        version: link:../../packages/ui
       '@radix-ui/react-slot':
         specifier: ^1.1.0
         version: 1.2.4(@types/react@19.2.10)(react@19.2.3)
@@ -425,6 +434,9 @@ importers:
       '@deepsight/shared-types':
         specifier: workspace:^
         version: link:../../packages/shared-types
+      '@deepsight/ui':
+        specifier: workspace:^
+        version: link:../../packages/ui
       '@radix-ui/react-avatar':
         specifier: ^1.1.11
         version: 1.1.11(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -523,6 +535,43 @@ importers:
 
   packages/shared-types:
     devDependencies:
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
+  packages/ui:
+    dependencies:
+      '@radix-ui/react-select':
+        specifier: ^2.2.6
+        version: 2.2.6(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      '@radix-ui/react-slot':
+        specifier: ^1.2.4
+        version: 1.2.4(@types/react@19.2.10)(react@19.2.3)
+      '@radix-ui/react-tooltip':
+        specifier: ^1.2.8
+        version: 1.2.8(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      class-variance-authority:
+        specifier: ^0.7.1
+        version: 0.7.1
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      lucide-react:
+        specifier: ^0.562.0
+        version: 0.562.0(react@19.2.3)
+      react:
+        specifier: '>=18'
+        version: 19.2.3
+      react-dom:
+        specifier: '>=18'
+        version: 19.2.3(react@19.2.3)
+      tailwind-merge:
+        specifier: ^3.4.0
+        version: 3.4.0
+    devDependencies:
+      '@types/react':
+        specifier: ^19
+        version: 19.2.10
       typescript:
         specifier: ^5
         version: 5.9.3
