@@ -46,30 +46,7 @@ import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
 
 // ── Test Fixtures ──────────────────────────────────────────────
 
-const makeL1 = (base = 0.5): SocialPersonaVector => ({
-  depth: base,
-  lens: base + 0.1,
-  stance: base - 0.1,
-  scope: base,
-  taste: base + 0.05,
-  purpose: base,
-  sociability: base - 0.05,
-})
-
-const makeL2 = (base = 0.5): CoreTemperamentVector => ({
-  openness: base,
-  conscientiousness: base + 0.1,
-  extraversion: base - 0.1,
-  agreeableness: base,
-  neuroticism: base + 0.05,
-})
-
-const makeL3 = (base = 0.5): NarrativeDriveVector => ({
-  lack: base,
-  moralCompass: base + 0.1,
-  volatility: base - 0.1,
-  growthArc: base + 0.05,
-})
+import { makeL1, makeL2, makeL3 } from "../fixtures"
 
 function makePersonaCandidate(id: string, base = 0.5): PersonaCandidate {
   const l1 = makeL1(base)

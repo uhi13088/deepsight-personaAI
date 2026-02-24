@@ -11,50 +11,7 @@ import {
   expandPeakHours,
   generateStructuredFields,
 } from "@/lib/persona-generation/structured-fields"
-import type { SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector } from "@/types"
-
-// ── Fixtures ────────────────────────────────────────────────
-
-const MATURE_L1: SocialPersonaVector = {
-  depth: 0.85,
-  lens: 0.8,
-  stance: 0.7,
-  scope: 0.75,
-  taste: 0.2,
-  purpose: 0.85,
-  sociability: 0.3,
-}
-const MATURE_L2: CoreTemperamentVector = {
-  openness: 0.4,
-  conscientiousness: 0.85,
-  extraversion: 0.3,
-  agreeableness: 0.5,
-  neuroticism: 0.4,
-}
-
-const YOUNG_L1: SocialPersonaVector = {
-  depth: 0.3,
-  lens: 0.3,
-  stance: 0.3,
-  scope: 0.4,
-  taste: 0.9,
-  purpose: 0.2,
-  sociability: 0.85,
-}
-const YOUNG_L2: CoreTemperamentVector = {
-  openness: 0.85,
-  conscientiousness: 0.2,
-  extraversion: 0.8,
-  agreeableness: 0.7,
-  neuroticism: 0.3,
-}
-
-const DEFAULT_L3: NarrativeDriveVector = {
-  lack: 0.5,
-  moralCompass: 0.5,
-  volatility: 0.4,
-  growthArc: 0.5,
-}
+import { MATURE_L1, MATURE_L2, YOUNG_L1, YOUNG_L2, NEUTRAL_L3 as DEFAULT_L3 } from "../fixtures"
 
 // ═══════════════════════════════════════════════════════════════
 // AC1: birthDate 추론

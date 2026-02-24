@@ -5,6 +5,7 @@
 
 import { describe, it, expect } from "vitest"
 import type { SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector } from "@/types"
+import { QUALITY_L1 as testL1, QUALITY_L2 as testL2, QUALITY_L3 as testL3 } from "../fixtures"
 
 // ── Auto-Interview ─────────────────────────────────────────────
 
@@ -52,33 +53,6 @@ import {
   calculateReviewProgress,
   getReviewSummaryByCategory,
 } from "@/lib/quality/manual-review"
-
-// ── 테스트 데이터 ──────────────────────────────────────────────
-
-const testL1: SocialPersonaVector = {
-  depth: 0.8,
-  lens: 0.7,
-  stance: 0.6,
-  scope: 0.7,
-  taste: 0.5,
-  purpose: 0.8,
-  sociability: 0.3,
-}
-
-const testL2: CoreTemperamentVector = {
-  openness: 0.7,
-  conscientiousness: 0.8,
-  extraversion: 0.3,
-  agreeableness: 0.4,
-  neuroticism: 0.3,
-}
-
-const testL3: NarrativeDriveVector = {
-  lack: 0.4,
-  moralCompass: 0.7,
-  volatility: 0.2,
-  growthArc: 0.8,
-}
 
 // ═══════════════════════════════════════════════════════════════
 // Auto-Interview

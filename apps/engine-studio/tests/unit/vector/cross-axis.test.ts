@@ -1,31 +1,11 @@
 import { describe, it, expect } from "vitest"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
 import type { SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector } from "@/types"
-
-const L1_NEUTRAL: SocialPersonaVector = {
-  depth: 0.5,
-  lens: 0.5,
-  stance: 0.5,
-  scope: 0.5,
-  taste: 0.5,
-  purpose: 0.5,
-  sociability: 0.5,
-}
-
-const L2_NEUTRAL: CoreTemperamentVector = {
-  openness: 0.5,
-  conscientiousness: 0.5,
-  extraversion: 0.5,
-  agreeableness: 0.5,
-  neuroticism: 0.5,
-}
-
-const L3_NEUTRAL: NarrativeDriveVector = {
-  lack: 0.5,
-  moralCompass: 0.5,
-  volatility: 0.5,
-  growthArc: 0.5,
-}
+import {
+  NEUTRAL_L1 as L1_NEUTRAL,
+  NEUTRAL_L2 as L2_NEUTRAL,
+  NEUTRAL_L3 as L3_NEUTRAL,
+} from "../fixtures"
 
 describe("calculateCrossAxisProfile", () => {
   it("calculates all 83 axes", () => {

@@ -17,53 +17,16 @@ import type {
   NarrativeDriveVector,
 } from "@/types"
 import type { VoiceStyleParams, PersonaStateData } from "@/lib/persona-world/types"
+import {
+  FORMAL_L1 as formalL1,
+  INTROVERT_L2 as introvertL2,
+  STABLE_L3 as stableL3,
+  CASUAL_L1 as casualL1,
+  EXTROVERT_L2 as extrovertL2,
+  VOLATILE_L3 as volatileL3,
+} from "../fixtures"
 
 // ── 테스트 데이터 ────────────────────────────────────────────
-
-const formalL1: SocialPersonaVector = {
-  stance: 0.5,
-  depth: 0.8,
-  lens: 0.8,
-  scope: 0.5,
-  taste: 0.5,
-  sociability: 0.3,
-  purpose: 0.7,
-}
-const casualL1: SocialPersonaVector = {
-  stance: 0.3,
-  depth: 0.4,
-  lens: 0.3,
-  scope: 0.5,
-  taste: 0.6,
-  sociability: 0.7,
-  purpose: 0.4,
-}
-const introvertL2: CoreTemperamentVector = {
-  openness: 0.5,
-  conscientiousness: 0.6,
-  extraversion: 0.2,
-  agreeableness: 0.7,
-  neuroticism: 0.3,
-}
-const extrovertL2: CoreTemperamentVector = {
-  openness: 0.6,
-  conscientiousness: 0.4,
-  extraversion: 0.8,
-  agreeableness: 0.5,
-  neuroticism: 0.5,
-}
-const volatileL3: NarrativeDriveVector = {
-  lack: 0.4,
-  volatility: 0.7,
-  moralCompass: 0.5,
-  growthArc: 0.5,
-}
-const stableL3: NarrativeDriveVector = {
-  lack: 0.3,
-  volatility: 0.2,
-  moralCompass: 0.8,
-  growthArc: 0.6,
-}
 
 const baseProfile: VoiceProfile = {
   speechStyle: "정제된 학술적 어투",
