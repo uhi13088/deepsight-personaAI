@@ -45,21 +45,33 @@ export async function GET() {
       dailyLimitConfig,
     ] = await Promise.all([
       // 최근 7일 인큐베이터 로그
-      prisma.incubatorLog.findMany({
-        where: { batchDate: { gte: sevenDaysAgo } },
-        orderBy: { batchDate: "desc" },
-      }),
+      prisma.incubatorLog
+        .findMany({
+          where: { batchDate: { gte: sevenDaysAgo } },
+          orderBy: { batchDate: "desc" },
+        })
+        .catch((e: Error) => {
+          throw new Error(`incubatorLog 조회 실패: ${e.message}`)
+        }),
 
       // 골든 샘플 전체
-      prisma.goldenSample.findMany({
-        where: { isActive: true },
-      }),
+      prisma.goldenSample
+        .findMany({
+          where: { isActive: true },
+        })
+        .catch((e: Error) => {
+          throw new Error(`goldenSample 조회 실패: ${e.message}`)
+        }),
 
       // 페르소나 상태별 카운트
-      prisma.persona.groupBy({
-        by: ["status"],
-        _count: { status: true },
-      }),
+      prisma.persona
+        .groupBy({
+          by: ["status"],
+          _count: { status: true },
+        })
+        .catch((e: Error) => {
+          throw new Error(`persona.groupBy 실패: ${e.message}`)
+        }),
 
       // 이번 달 실제 LLM 비용 (LlmUsageLog 기반)
       calculateMonthlyCostFromDB(),
