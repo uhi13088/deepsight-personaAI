@@ -99,7 +99,10 @@ export default function PsychometricPage() {
   if (loading) {
     return (
       <>
-        <Header title="Psychometric Model" description="OCEAN→L1 매핑, 반전 탐지, 잠재 특성 분석" />
+        <Header
+          title="Psychometric Simulator"
+          description="OCEAN→L1 매핑, 반전 탐지, 잠재 특성 분석"
+        />
         <div className="flex items-center justify-center p-8">
           <div className="text-muted-foreground text-sm">데이터를 불러오는 중...</div>
         </div>
@@ -110,7 +113,10 @@ export default function PsychometricPage() {
   if (error) {
     return (
       <>
-        <Header title="Psychometric Model" description="OCEAN→L1 매핑, 반전 탐지, 잠재 특성 분석" />
+        <Header
+          title="Psychometric Simulator"
+          description="OCEAN→L1 매핑, 반전 탐지, 잠재 특성 분석"
+        />
         <div className="flex items-center justify-center p-8">
           <div className="text-sm text-red-400">{error}</div>
         </div>
@@ -124,7 +130,10 @@ export default function PsychometricPage() {
 
   return (
     <>
-      <Header title="Psychometric Model" description="OCEAN→L1 매핑, 반전 탐지, 잠재 특성 분석" />
+      <Header
+        title="Psychometric Simulator"
+        description="OCEAN→L1 매핑, 반전 탐지, 잠재 특성 분석"
+      />
 
       <div className="space-y-6 p-6">
         {/* OCEAN → L1 매핑 테이블 */}

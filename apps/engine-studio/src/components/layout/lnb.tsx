@@ -58,7 +58,7 @@ const navSections: NavSection[] = [
     basePath: "/user-insight",
     children: [
       { label: "Cold Start Strategy", href: "/user-insight/cold-start" },
-      { label: "Psychometric Model", href: "/user-insight/psychometric" },
+      { label: "Psychometric Simulator", href: "/user-insight/psychometric" },
       { label: "Archetype Manager", href: "/user-insight/archetype" },
     ],
   },
@@ -83,8 +83,8 @@ const navSections: NavSection[] = [
     icon: Link2,
     basePath: "/system-integration",
     children: [
-      { label: "알고리즘 배포 파이프라인", href: "/system-integration/deployment" },
-      { label: "알고리즘 버전 관리", href: "/system-integration/versions" },
+      { label: "Deployment Pipeline", href: "/system-integration/deployment" },
+      { label: "Version Management", href: "/system-integration/versions" },
     ],
   },
   {
@@ -93,7 +93,7 @@ const navSections: NavSection[] = [
     basePath: "/operations",
     children: [
       { label: "System Monitoring", href: "/operations/monitoring" },
-      { label: "LLM 비용", href: "/operations/llm-costs" },
+      { label: "LLM Costs", href: "/operations/llm-costs" },
       { label: "Incident Management", href: "/operations/incidents" },
       { label: "Backup & Recovery", href: "/operations/backup" },
     ],
@@ -118,7 +118,7 @@ const navSections: NavSection[] = [
       { label: "Moderation", href: "/persona-world-admin/moderation" },
       { label: "Quality Monitor", href: "/persona-world-admin/quality" },
       { label: "Evolution", href: "/persona-world-admin/evolution" },
-      { label: "뉴스 반응", href: "/persona-world-admin/news" },
+      { label: "News Reactions", href: "/persona-world-admin/news" },
     ],
   },
   {

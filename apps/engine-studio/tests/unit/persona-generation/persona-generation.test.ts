@@ -27,31 +27,7 @@ import {
 import { validateConsistency } from "@/lib/persona-generation/consistency-validator"
 import { generatePersona, generatePersonaBatch } from "@/lib/persona-generation"
 import type { SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector } from "@/types"
-
-// ── Test Fixtures ─────────────────────────────────────────────
-
-const IRONIC_L1: SocialPersonaVector = {
-  depth: 0.85,
-  lens: 0.9,
-  stance: 0.75,
-  scope: 0.8,
-  taste: 0.35,
-  purpose: 0.7,
-  sociability: 0.3,
-}
-const IRONIC_L2: CoreTemperamentVector = {
-  openness: 0.75,
-  conscientiousness: 0.6,
-  extraversion: 0.35,
-  agreeableness: 0.45,
-  neuroticism: 0.7,
-}
-const IRONIC_L3: NarrativeDriveVector = {
-  lack: 0.65,
-  moralCompass: 0.55,
-  volatility: 0.5,
-  growthArc: 0.6,
-}
+import { IRONIC_L1, IRONIC_L2, IRONIC_L3 } from "../fixtures"
 
 // ═══════════════════════════════════════════════════════════════
 // AC1: 아키타입 12종 템플릿
@@ -146,10 +122,13 @@ describe("Archetypes (AC1)", () => {
 describe("Vector Generator (AC2)", () => {
   it("should generate vectors without archetype", () => {
     const vectors = generateDiverseVectors({})
-    expect(vectors.l1.depth).toBeGreaterThanOrEqual(0)
-    expect(vectors.l1.depth).toBeLessThanOrEqual(1)
-    expect(vectors.l2.openness).toBeGreaterThanOrEqual(0)
-    expect(vectors.l3.lack).toBeGreaterThanOrEqual(0)
+    // Without archetype: L1/L2 range is [0.05, 0.95], L3 range is [0.0, 0.85]
+    expect(vectors.l1.depth).toBeGreaterThanOrEqual(0.05)
+    expect(vectors.l1.depth).toBeLessThanOrEqual(0.95)
+    expect(vectors.l2.openness).toBeGreaterThanOrEqual(0.05)
+    expect(vectors.l2.openness).toBeLessThanOrEqual(0.95)
+    expect(vectors.l3.lack).toBeGreaterThanOrEqual(0.0)
+    expect(vectors.l3.lack).toBeLessThanOrEqual(0.85)
   })
 
   it("should generate vectors within archetype ranges", () => {
@@ -168,8 +147,15 @@ describe("Vector Generator (AC2)", () => {
     const coverage = analyzeCoverage(personas)
 
     expect(coverage.l1.depth.avg).toBeCloseTo(0.85)
+    // Single persona with values clustered in high range → low coverage (not full spread)
     expect(coverage.overallCoverage).toBeGreaterThan(0)
-    expect(coverage.overallCoverage).toBeLessThanOrEqual(1)
+    expect(coverage.overallCoverage).toBeLessThan(0.5)
+    // L1 stats should match the single persona's exact values
+    expect(coverage.l1.depth.min).toBeCloseTo(IRONIC_L1.depth)
+    expect(coverage.l1.depth.max).toBeCloseTo(IRONIC_L1.depth)
+    expect(coverage.l1.lens.avg).toBeCloseTo(IRONIC_L1.lens)
+    expect(coverage.l2.openness.avg).toBeCloseTo(IRONIC_L2.openness)
+    expect(coverage.l3.lack.avg).toBeCloseTo(IRONIC_L3.lack)
   })
 
   it("analyzeCoverage should find empty regions", () => {
@@ -222,19 +208,41 @@ describe("Paradox Designer (AC3)", () => {
 
     expect(result.paradoxProfile.overall).toBeGreaterThanOrEqual(0)
     expect(result.paradoxProfile.overall).toBeLessThanOrEqual(1)
+    // IRONIC vectors have high depth/lens with low sociability → should have non-trivial paradox
+    expect(result.paradoxProfile.overall).toBeGreaterThan(0.1)
     expect(result.paradoxProfile.dimensionality).toBeGreaterThanOrEqual(0)
     expect(result.tensionMap).toHaveLength(7)
+    // Without archetype, adjusted vectors should equal the originals
+    expect(result.adjustedL1).toEqual(IRONIC_L1)
+    expect(result.adjustedL2).toEqual(IRONIC_L2)
   })
 
   it("should adjust vectors for archetype paradox range", () => {
     const arch = getArchetypeById("ironic-philosopher")!
     const result = designParadox(IRONIC_L1, IRONIC_L2, IRONIC_L3, arch)
 
-    // adjustedL1/L2 should still be valid
+    // adjustedL1/L2 should still be valid (within [0,1])
     expect(result.adjustedL1.depth).toBeGreaterThanOrEqual(0)
     expect(result.adjustedL1.depth).toBeLessThanOrEqual(1)
     expect(result.adjustedL2.openness).toBeGreaterThanOrEqual(0)
     expect(result.adjustedL2.openness).toBeLessThanOrEqual(1)
+
+    // Adjustment should move paradox closer to the expected range vs no archetype
+    const noArchResult = designParadox(IRONIC_L1, IRONIC_L2, IRONIC_L3)
+    const targetMid = (arch.expectedParadoxRange[0] + arch.expectedParadoxRange[1]) / 2
+    const distWithArch = Math.abs(result.paradoxProfile.overall - targetMid)
+    const distWithout = Math.abs(noArchResult.paradoxProfile.overall - targetMid)
+    expect(distWithArch).toBeLessThanOrEqual(distWithout + 0.01)
+
+    // withinExpectedRange flag should be correctly computed
+    const inRange =
+      result.paradoxProfile.overall >= arch.expectedParadoxRange[0] &&
+      result.paradoxProfile.overall <= arch.expectedParadoxRange[1]
+    expect(result.withinExpectedRange).toBe(inRange)
+
+    // Paradox profile should still be valid (positive, bounded)
+    expect(result.paradoxProfile.overall).toBeGreaterThan(0)
+    expect(result.paradoxProfile.overall).toBeLessThanOrEqual(1)
   })
 
   it("analyzeParadoxPatterns should find dominant paradox", () => {
@@ -266,10 +274,14 @@ describe("Character Generator (AC4)", () => {
     const character = generateCharacter(IRONIC_L1, IRONIC_L2, IRONIC_L3)
 
     expect(character.name).toBeTruthy()
+    expect(character.name.length).toBeGreaterThanOrEqual(2)
     expect(character.role).toBeTruthy()
+    expect(character.role.length).toBeGreaterThanOrEqual(2)
     expect(character.expertise.length).toBeGreaterThanOrEqual(1)
     expect(character.description).toBeTruthy()
+    expect(character.description.length).toBeGreaterThanOrEqual(10)
     expect(character.background).toBeTruthy()
+    expect(character.background.length).toBeGreaterThanOrEqual(10)
     expect(character.speechPatterns.length).toBeGreaterThanOrEqual(2)
     expect(character.quirks.length).toBeGreaterThanOrEqual(1)
     expect(character.habits.length).toBeGreaterThanOrEqual(2)
@@ -294,7 +306,9 @@ describe("Character Generator (AC4)", () => {
     for (const rel of character.relationships) {
       expect(validTypes).toContain(rel.type)
       expect(rel.description).toBeTruthy()
+      expect(rel.description.length).toBeGreaterThanOrEqual(5)
       expect(rel.dynamic).toBeTruthy()
+      expect(rel.dynamic.length).toBeGreaterThanOrEqual(5)
     }
   })
 })
@@ -354,7 +368,8 @@ describe("Consistency Validator (AC6)", () => {
     const result = validateConsistency(IRONIC_L1, IRONIC_L2, IRONIC_L3)
 
     expect(result.valid).toBe(true)
-    expect(result.overallScore).toBeGreaterThan(0)
+    // Valid, well-constructed vectors should score high on consistency
+    expect(result.overallScore).toBeGreaterThan(0.5)
     expect(result.overallScore).toBeLessThanOrEqual(1)
     expect(result.paradoxProfile).toBeDefined()
     expect(result.crossAxisProfile).toBeDefined()
@@ -455,11 +470,20 @@ describe("Consistency Validator (AC6)", () => {
 describe("Generation Pipeline (Integration)", () => {
   it("should generate complete persona with archetype", () => {
     const persona = generatePersona({ archetypeId: "ironic-philosopher" })
+    const arch = getArchetypeById("ironic-philosopher")!
 
     expect(persona.archetype?.id).toBe("ironic-philosopher")
-    expect(persona.vectors.l1.depth).toBeGreaterThanOrEqual(0)
-    expect(persona.paradox.paradoxProfile.overall).toBeGreaterThanOrEqual(0)
+    // Vector values should be near archetype ranges (paradox adjustment may nudge slightly)
+    // Using wider tolerance: archetype range ± 0.15 for adjustment headroom
+    expect(persona.vectors.l1.depth).toBeGreaterThanOrEqual(arch.layer1.depth[0] - 0.15)
+    expect(persona.vectors.l1.depth).toBeLessThanOrEqual(arch.layer1.depth[1] + 0.15)
+    expect(persona.vectors.l2.openness).toBeGreaterThanOrEqual(arch.layer2.openness[0] - 0.15)
+    expect(persona.vectors.l2.openness).toBeLessThanOrEqual(arch.layer2.openness[1] + 0.15)
+    // Paradox score should be positive and bounded (best-effort, may not reach expected range)
+    expect(persona.paradox.paradoxProfile.overall).toBeGreaterThan(0)
+    expect(persona.paradox.paradoxProfile.overall).toBeLessThanOrEqual(1)
     expect(persona.character.name).toBeTruthy()
+    expect(persona.character.name.length).toBeGreaterThanOrEqual(2)
     expect(persona.activity.postFrequency).toBeTruthy()
     expect(persona.content.preferredPostTypes.length).toBeGreaterThanOrEqual(1)
     expect(persona.validation.valid).toBe(true)
@@ -470,7 +494,11 @@ describe("Generation Pipeline (Integration)", () => {
     const persona = generatePersona({})
 
     expect(persona.archetype).toBeUndefined()
-    expect(persona.vectors.l1.depth).toBeGreaterThanOrEqual(0)
+    // Without archetype, vectors use expanded range [0.05, 0.95]
+    expect(persona.vectors.l1.depth).toBeGreaterThanOrEqual(0.05)
+    expect(persona.vectors.l1.depth).toBeLessThanOrEqual(0.95)
+    expect(persona.vectors.l2.openness).toBeGreaterThanOrEqual(0.05)
+    expect(persona.vectors.l2.openness).toBeLessThanOrEqual(0.95)
     expect(persona.validation.valid).toBe(true)
   })
 
@@ -493,6 +521,7 @@ describe("Generation Pipeline (Integration)", () => {
     for (const persona of batch) {
       expect(persona.validation.valid).toBe(true)
       expect(persona.character.name).toBeTruthy()
+      expect(persona.character.name.length).toBeGreaterThanOrEqual(2)
     }
 
     // Should have diversity (different archetype names)
@@ -505,9 +534,17 @@ describe("Generation Pipeline (Integration)", () => {
     for (const arch of ARCHETYPES) {
       const persona = generatePersona({ archetypeId: arch.id })
       expect(persona.validation.valid).toBe(true)
+      // Vectors should be within each archetype's defined ranges
+      for (const [key, [min, max]] of Object.entries(arch.layer1)) {
+        const val = persona.vectors.l1[key as keyof SocialPersonaVector]
+        expect(val).toBeGreaterThanOrEqual(min)
+        expect(val).toBeLessThanOrEqual(max)
+      }
+      // Quality scores should reflect meaningful paradox, not just [0,1]
       expect(persona.quality.paradoxScore).toBeGreaterThanOrEqual(0)
       expect(persona.quality.dimensionality).toBeGreaterThanOrEqual(0)
       expect(persona.quality.consistencyScore).toBeGreaterThan(0)
+      expect(persona.quality.consistencyScore).toBeLessThanOrEqual(1)
     }
   })
 })
@@ -610,8 +647,9 @@ describe("T161-AC2: 최소 거리 재생성", () => {
       diversityWeight: 0.5,
     })
 
-    // 생성은 항상 성공해야 함
-    expect(result.l1.depth).toBeGreaterThanOrEqual(0)
+    // 생성은 항상 성공해야 함 — without archetype, range is [0.05, 0.95]
+    expect(result.l1.depth).toBeGreaterThanOrEqual(0.05)
+    expect(result.l1.depth).toBeLessThanOrEqual(0.95)
     expect(result.retryCount).toBeGreaterThanOrEqual(0)
     expect(result.retryCount).toBeLessThanOrEqual(6) // MAX_RETRY + 1
   })

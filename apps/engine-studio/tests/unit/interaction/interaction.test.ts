@@ -37,28 +37,7 @@ import {
   DEFAULT_ENGINE_CONFIG,
 } from "@/lib/interaction"
 import type { SocialPersonaVector } from "@/types"
-
-// ── Fixtures ──────────────────────────────────────────────────
-
-const L1: SocialPersonaVector = {
-  depth: 0.5,
-  lens: 0.5,
-  stance: 0.5,
-  scope: 0.5,
-  taste: 0.5,
-  purpose: 0.5,
-  sociability: 0.5,
-}
-
-const HIGH_L1: SocialPersonaVector = {
-  depth: 0.8,
-  lens: 0.7,
-  stance: 0.85,
-  scope: 0.6,
-  taste: 0.4,
-  purpose: 0.75,
-  sociability: 0.3,
-}
+import { NEUTRAL_L1 as L1, HIGH_L1 } from "../fixtures"
 
 // ═══════════════════════════════════════════════════════════════
 // AC1: Init Algorithm

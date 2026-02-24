@@ -15,32 +15,11 @@ import type {
 } from "@/types"
 import type { VoiceSpec } from "@/lib/qualitative/voice-spec"
 import type { TriggerRuleDSL } from "@/lib/trigger/rule-dsl"
-
-// ── Test Fixtures ───────────────────────────────────────────
-const defaultL1: SocialPersonaVector = {
-  depth: 0.5,
-  lens: 0.5,
-  stance: 0.5,
-  scope: 0.5,
-  taste: 0.5,
-  purpose: 0.5,
-  sociability: 0.5,
-}
-
-const defaultL2: CoreTemperamentVector = {
-  openness: 0.5,
-  conscientiousness: 0.5,
-  extraversion: 0.5,
-  agreeableness: 0.5,
-  neuroticism: 0.5,
-}
-
-const defaultL3: NarrativeDriveVector = {
-  lack: 0.5,
-  moralCompass: 0.5,
-  volatility: 0.5,
-  growthArc: 0.5,
-}
+import {
+  NEUTRAL_L1 as defaultL1,
+  NEUTRAL_L2 as defaultL2,
+  NEUTRAL_L3 as defaultL3,
+} from "../fixtures"
 
 // v4 fixtures
 const mockVoiceSpec: VoiceSpec = {

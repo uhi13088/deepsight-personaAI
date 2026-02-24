@@ -6,31 +6,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { _internals } from "@/lib/persona-generation/llm-character-generator"
 import type { SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector } from "@/types"
-
-// ── Fixtures ──────────────────────────────────────────────────
-
-const L1: SocialPersonaVector = {
-  depth: 0.85,
-  lens: 0.9,
-  stance: 0.75,
-  scope: 0.8,
-  taste: 0.35,
-  purpose: 0.7,
-  sociability: 0.3,
-}
-const L2: CoreTemperamentVector = {
-  openness: 0.75,
-  conscientiousness: 0.6,
-  extraversion: 0.35,
-  agreeableness: 0.45,
-  neuroticism: 0.7,
-}
-const L3: NarrativeDriveVector = {
-  lack: 0.65,
-  moralCompass: 0.55,
-  volatility: 0.5,
-  growthArc: 0.6,
-}
+import { IRONIC_L1 as L1, IRONIC_L2 as L2, IRONIC_L3 as L3 } from "../fixtures"
 
 // ── 유효한 LLM 응답 샘플 ─────────────────────────────────────
 

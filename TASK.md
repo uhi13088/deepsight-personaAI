@@ -700,6 +700,59 @@
   - AC6: 각 index.ts는 re-export hub로 유지 (외부 import 경로 변경 0건)
   - AC7: ES Build PASS + 테스트 PASS
 
+### Phase TQ: 테스트 품질 개선 (T247~T251)
+
+> 테스트 커버리지 분석 결과 발견된 비효율성 일괄 해결. 픽스처 중복 제거 → 미테스트 함수 커버리지 → 단언 품질 → 부정 케이스 → 안정화.
+> 원칙: 기능 변경 없이 테스트만 개선 (pure test improvement). 기존 3964+ tests PASS 유지.
+
+#### P0: 테스트 인프라 (T247)
+
+- [x] **T247: 공유 테스트 픽스처 추출 — 13개 파일 중복 벡터 해소** ✅ 2026-02-24
+  - 배경: 21개 테스트 파일에서 L1/L2/L3 벡터 픽스처를 독립적으로 정의. ~500 LOC 중복
+  - AC1: `tests/unit/fixtures/vectors.ts` 생성 — IRONIC, NEUTRAL, MATURE, YOUNG 등 공통 벡터 정의
+  - AC2: `tests/unit/fixtures/factories.ts` 생성 — makeL1(), makeL2(), makeL3() 팩토리
+  - AC3: `tests/unit/fixtures/index.ts` 생성 — re-export hub
+  - AC4: 21개 테스트 파일 → 공유 픽스처 import로 전환 (로컬 중복 제거)
+  - AC5: 기존 matching/fixtures.ts 유지 (매칭 전용 픽스처는 분리 유지)
+  - AC6: 전체 테스트 PASS 유지
+
+#### P1: 커버리지 보강 (T248)
+
+- [x] **T248: structured-fields 미테스트 함수 8개 커버리지 추가** ✅ 2026-02-24
+  - 배경: 14개 exported 함수 중 8개 직접 테스트 없음 (inferTimezone, inferGender, inferNationality, inferEducationLevel, inferHeight, inferLanguages, inferKnowledgeAreas, generateDemographicFields)
+  - AC1: inferTimezone — 3 tests (지역별 타임존 매핑)
+  - AC2: inferGender — 2 tests (랜덤 분포 검증)
+  - AC3: inferNationality — 3 tests (지역 기반 국적 추론)
+  - AC4: inferEducationLevel — 3 tests (L1/L2 벡터 조합)
+  - AC5: inferHeight — 3 tests (성별/지역 조합)
+  - AC6: inferLanguages — 3 tests (국적+개방성 영향)
+  - AC7: inferKnowledgeAreas — 3 tests (depth/lens 영향)
+  - AC8: generateDemographicFields — 3 tests (통합 검증)
+  - AC9: 전체 테스트 PASS
+
+#### P2: 단언 품질 개선 (T249~T250)
+
+- [x] **T249: 과도한 범위 단언 → 비교 단언으로 개선** ✅ 2026-02-24
+  - 배경: `expect(x).toBeGreaterThanOrEqual(0)` + `toBeLessThanOrEqual(1)` 같은 항상-참 단언이 로직 검증 불가
+  - AC1: persona-generation.test.ts — 범위 단언을 아키타입 범위 비교로 전환
+  - AC2: qualitative.test.ts — high/low 입력 비교 단언 추가
+  - AC3: voice-spec.test.ts — 상태별 비교 단언 강화
+  - AC4: 전체 테스트 PASS
+
+- [x] **T250: 누락된 부정 테스트 케이스 추가** ✅ 2026-02-24
+  - 배경: onboarding, comment-utils, evolution 등에서 무효 입력 / 경계 위반 테스트 부재
+  - AC1: persona-world 주요 모듈에 "should reject/fail" 테스트 블록 추가
+  - AC2: 경계값 위반 케이스 추가 (0 미만, 1 초과 벡터)
+  - AC3: 전체 테스트 PASS
+
+#### P3: 안정화 (T251)
+
+- [x] **T251: 불안정 랜덤 테스트 안정화 — 반복 횟수 증가** ✅ 2026-02-24
+  - 배경: ~5개 테스트가 랜덤 결과 의존, 간헐 실패 가능
+  - AC1: structured-fields.test.ts — 랜덤 기반 테스트 반복 횟수 30→100 증가
+  - AC2: interaction.test.ts — 배치 다양성 테스트 반복 증가
+  - AC3: 전체 테스트 PASS
+
 ---
 
 ### 별도 작업 (설계 문서 + 데이터)
@@ -1441,6 +1494,33 @@
 ---
 
 ## ✅ DONE (최근 완료)
+
+- [x] **T252~T254: ES 프로토타입 메뉴 정리 + 인메모리 API DB 영속화 (3개 티켓 일괄)** ✅ 2026-02-24
+  - T252: ES 네비게이션 정리 — 검색 팔레트↔사이드바 동기화 + 레이블 통일
+    - AC1: ✅ 검색 팔레트에서 redirect 항목 제거 (Activity Dashboard, Scheduler Control)
+    - AC2: ✅ 검색 팔레트에 누락 항목 추가 (Security 4개, PW Admin Operations)
+    - AC3: ✅ 사이드바 한글 레이블 영문 통일 (알고리즘 배포→Deployment Pipeline, LLM 비용→LLM Costs, 뉴스 반응→News Reactions, 알고리즘 버전→Version Management)
+    - AC4: ✅ 검색 팔레트 레이블 사이드바와 동기화 (Version Control→Version Management)
+    - AC5: ✅ Psychometric Model → Psychometric Simulator 명칭 변경 (사이드바+검색+페이지 Header 3곳)
+    - AC6: ✅ 페이지 Header title 한/영 통일 (LLM 비용→LLM Costs, 알고리즘 버전 관리→Version Management, 뉴스 반응 관리→News Reactions)
+  - T253: Matching Lab Tuning API — 인메모리 → DB 영속화
+    - AC1: ✅ `let profileStore` 모듈 변수 → SystemConfig(MATCHING_TUNING/profile) DB 저장/로드
+    - AC2: ✅ GET: DB 로드 (없으면 기본값 seed), POST/PUT: DB 즉시 저장
+    - AC3: ✅ 프론트엔드 변경 없음 (API 인터페이스 유지)
+  - T254: System Integration Deploy API — 인메모리 → DB 영속화
+    - AC1: ✅ `const store: DeployStore` 인메모리 → SystemConfig(DEPLOY_PIPELINE/workflows, canaries) DB 저장/로드
+    - AC2: ✅ Map→Record 직렬화, 모든 POST 액션에서 DB 저장
+    - AC3: ✅ 프론트엔드 변경 없음 (API 인터페이스 유지)
+  - 변경파일: header.tsx, lnb.tsx, psychometric/page.tsx, llm-costs/page.tsx, versions/page.tsx, news/page.tsx, tuning/route.ts, deploy/route.ts
+  - 검증: Build PASS (109 static pages)
+
+- [x] **T247~T251: Phase TQ 테스트 품질 개선 (5개 티켓 일괄 완료)** ✅ 2026-02-24
+  - T247: 공유 테스트 픽스처 추출 (fixtures/vectors.ts + factories.ts, 13개 파일 중복 해소)
+  - T248: structured-fields 미테스트 함수 8개 커버리지 추가 (23개 신규 테스트)
+  - T249: 과도한 범위 단언 → 비교 단언 개선 (persona-generation, qualitative, voice-spec)
+  - T250: 누락된 부정 테스트 케이스 추가 (evolution, comment-utils, onboarding)
+  - T251: 불안정 랜덤 테스트 반복 횟수 증가 (30→100, 20→50)
+  - 검증: 100파일 4105 tests PASS (기존 4051 → 4105, 54개 추가)
 
 - [x] **T234~T246: Phase Y 모노레포 코드 품질 개선 (13개 티켓 일괄 완료)** ✅ 2026-02-24
   - T234: Landing 의존성 버전 통일 (Next.js 16, react 19.2.3, lucide/radix/tailwind-merge 최신화)

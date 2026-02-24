@@ -860,3 +860,159 @@ describe("v3 24문항 구조 통합", () => {
     }
   })
 })
+
+// ═══════════════════════════════════════════════════════════════
+// 경계값 및 에러 케이스
+// ═══════════════════════════════════════════════════════════════
+
+describe("경계값 및 에러 케이스", () => {
+  // ── 잘못된 답변 인덱스 (존재하지 않는 option key) ──────────────
+
+  it("computeL1Vector — 존재하지 않는 옵션 키(E) → 해당 답변 무시, 기본값 유지", () => {
+    const answers: OnboardingAnswer[] = [
+      { questionId: "p1-q1", value: "E" }, // A-D만 존재
+      { questionId: "p1-q2", value: "A" },
+    ]
+    const result = computeL1Vector(PHASE1_QUESTIONS, answers)
+
+    // q1 답변 "E"는 매칭 안 됨 → depth, lens 변화 없음
+    expect(result.depth).toBe(0.5)
+    expect(result.lens).toBe(0.5)
+    // q2 답변 "A"는 정상 반영
+    expect(result.sociability).toBe(0.7) // 0.5 + 0.2
+  })
+
+  it("computeL2Vector — 존재하지 않는 옵션 키 → 해당 답변 무시", () => {
+    const answers: OnboardingAnswer[] = [
+      { questionId: "p2-q1", value: "Z" }, // A-D만 존재
+    ]
+    const result = computeL2Vector(PHASE2_QUESTIONS, answers)
+
+    // 모든 값이 기본값 유지
+    expect(result.openness).toBe(0.5)
+    expect(result.extraversion).toBe(0.5)
+    expect(result.conscientiousness).toBe(0.5)
+    expect(result.agreeableness).toBe(0.5)
+    expect(result.neuroticism).toBe(0.5)
+  })
+
+  // ── 빈 답변 배열 ──────────────────────────────────────────────
+
+  it("processOnboardingAnswers — 빈 답변 배열 → 기본 벡터로 결과 반환 (LIGHT)", async () => {
+    const provider: OnboardingDataProvider = {
+      getQuestionsByPhase: vi.fn().mockResolvedValue(PHASE1_QUESTIONS),
+      saveOnboardingResult: vi.fn().mockResolvedValue(undefined),
+    }
+
+    const result = await processOnboardingAnswers([], "LIGHT", provider)
+
+    expect(result.l1Vector).toBeDefined()
+    expect(result.profileLevel).toBe("BASIC")
+    // 모든 L1 차원이 기본값(0.5)
+    expect(result.l1Vector.depth).toBe(0.5)
+    expect(result.l1Vector.lens).toBe(0.5)
+    expect(result.l1Vector.stance).toBe(0.5)
+    expect(result.l1Vector.scope).toBe(0.5)
+    expect(result.l1Vector.taste).toBe(0.5)
+    expect(result.l1Vector.purpose).toBe(0.5)
+    expect(result.l1Vector.sociability).toBe(0.5)
+  })
+
+  // ── 프로바이더가 빈 질문 반환 ──────────────────────────────────
+
+  it("processOnboardingAnswers — 프로바이더가 빈 질문 목록 반환 → 기본 벡터", async () => {
+    const emptyProvider: OnboardingDataProvider = {
+      getQuestionsByPhase: vi.fn().mockResolvedValue([]),
+      saveOnboardingResult: vi.fn().mockResolvedValue(undefined),
+    }
+
+    const answers: OnboardingAnswer[] = [{ questionId: "p1-q1", value: "A" }]
+
+    const result = await processOnboardingAnswers(answers, "LIGHT", emptyProvider)
+
+    expect(result.l1Vector).toBeDefined()
+    // 질문이 없으므로 답변이 매칭되지 않음 → 모두 기본값
+    expect(result.l1Vector.depth).toBe(0.5)
+    expect(result.l1Vector.sociability).toBe(0.5)
+  })
+
+  // ── 중복 답변 (같은 질문에 두 번 응답) ─────────────────────────
+
+  it("computeL1Vector — 동일 질문에 중복 답변 → 마지막 답변 기준으로 처리", () => {
+    const answers: OnboardingAnswer[] = [
+      { questionId: "p1-q1", value: "A" }, // depth +0.15, lens +0.05
+      { questionId: "p1-q1", value: "C" }, // stance +0.15
+    ]
+    const result = computeL1Vector(PHASE1_QUESTIONS, answers)
+
+    // Map은 같은 key 시 마지막 값 사용 → "C" 적용
+    expect(result.stance).toBe(0.65) // 0.5 + 0.15
+    // "A"의 depth +0.15는 무시됨
+    expect(result.depth).toBe(0.5)
+  })
+
+  // ── 답변이 질문과 매칭되지 않는 경우 ──────────────────────────
+
+  it("computeL1Vector — 다른 Phase 질문 ID로 답변 → 무시", () => {
+    const answers: OnboardingAnswer[] = [
+      { questionId: "p2-q1", value: "A" }, // Phase 2 질문 ID
+      { questionId: "nonexistent-q", value: "B" }, // 존재하지 않는 ID
+    ]
+    const result = computeL1Vector(PHASE1_QUESTIONS, answers)
+
+    // Phase 1 질문에 매칭되는 답변 없음 → 모두 기본값
+    expect(result.depth).toBe(0.5)
+    expect(result.lens).toBe(0.5)
+    expect(result.sociability).toBe(0.5)
+  })
+
+  // ── computeCompleteness 경계 케이스 ───────────────────────────
+
+  it("computeCompleteness — 답변이 질문과 전혀 매칭 안 됨 → 0", () => {
+    const questions = PHASE1_QUESTIONS // p1-q1, p1-q2, p1-q3
+    const answers: OnboardingAnswer[] = [
+      { questionId: "unknown-1", value: "A" },
+      { questionId: "unknown-2", value: "B" },
+    ]
+    expect(computeCompleteness(questions, answers)).toBe(0)
+  })
+
+  it("computeCompleteness — 중복 답변은 한 번만 카운트", () => {
+    const questions = PHASE1_QUESTIONS
+    const answers: OnboardingAnswer[] = [
+      { questionId: "p1-q1", value: "A" },
+      { questionId: "p1-q1", value: "B" }, // 같은 질문 중복
+    ]
+    // Set으로 중복 제거되므로 1/3
+    expect(computeCompleteness(questions, answers)).toBeCloseTo(1 / 3)
+  })
+
+  // ── crossValidate 경계 케이스 ─────────────────────────────────
+
+  it("crossValidate — 빈 Phase 3 질문/답변 → L1/L2 그대로 반환", () => {
+    const l1 = {
+      depth: 0.7,
+      lens: 0.6,
+      stance: 0.5,
+      scope: 0.5,
+      taste: 0.5,
+      purpose: 0.5,
+      sociability: 0.5,
+    }
+    const l2 = {
+      openness: 0.6,
+      conscientiousness: 0.5,
+      extraversion: 0.5,
+      agreeableness: 0.5,
+      neuroticism: 0.5,
+    }
+
+    const result = crossValidate(l1, l2, [], [])
+
+    // Phase 3 질문이 없으므로 L1/L2 조정 없음
+    expect(result.adjustedL1.depth).toBe(0.7)
+    expect(result.adjustedL1.lens).toBe(0.6)
+    expect(result.adjustedL2.openness).toBe(0.6)
+    expect(result.paradoxDetected).toBe(false) // 갭 없음
+  })
+})

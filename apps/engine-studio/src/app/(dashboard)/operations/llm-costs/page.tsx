@@ -129,7 +129,7 @@ export default function LlmCostsPage() {
 
   return (
     <div className="flex flex-1 flex-col">
-      <Header title="LLM 비용 모니터링" description="LLM API 호출 비용 및 사용량 실시간 대시보드" />
+      <Header title="LLM Costs" description="LLM API 호출 비용 및 사용량 실시간 대시보드" />
 
       <main className="flex-1 space-y-6 p-6">
         {/* 기간 선택 + 새로고침 */}
