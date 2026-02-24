@@ -55,7 +55,7 @@ describe("T162-AC1: birthDate 추론", () => {
   })
 
   it("inferBirthDate — 월은 0~11, 일은 1~28 범위", () => {
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 50; i++) {
       const date = inferBirthDate(YOUNG_L1, YOUNG_L2)
       expect(date.getMonth()).toBeGreaterThanOrEqual(0)
       expect(date.getMonth()).toBeLessThanOrEqual(11)
@@ -93,13 +93,13 @@ describe("T162-AC2: region 자동 매핑", () => {
       "Sydney, CBD",
     ]
 
-    // 10번 생성, 절반 이상이 대도시여야 함
+    // 50번 생성, 절반 이상이 대도시여야 함
     let metroCount = 0
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 50; i++) {
       const region = inferRegion(socialL1, socialL2)
       if (metro.includes(region)) metroCount++
     }
-    expect(metroCount).toBeGreaterThan(5)
+    expect(metroCount).toBeGreaterThan(10)
   })
 
   it("inferRegion — 높은 conscientiousness/purpose → 계획도시 지역", () => {
@@ -120,16 +120,16 @@ describe("T162-AC2: region 자동 매핑", () => {
     ]
 
     let plannedCount = 0
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 50; i++) {
       const region = inferRegion(plannedL1, plannedL2)
       if (planned.includes(region)) plannedCount++
     }
-    expect(plannedCount).toBeGreaterThan(5)
+    expect(plannedCount).toBeGreaterThan(10)
   })
 
   it("inferRegion — 다양한 지역 생성 (동일 입력 반복 시)", () => {
     const regions = new Set<string>()
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 100; i++) {
       regions.add(inferRegion(MATURE_L1, MATURE_L2))
     }
     // 같은 풀에서 최소 2개 이상 지역이 나와야 함
@@ -246,7 +246,7 @@ describe("T248-AC4: inferEducationLevel", () => {
     const selfTaughtL1 = { ...YOUNG_L1, taste: 0.9, depth: 0.2, purpose: 0.1 }
     const selfTaughtL2 = { ...YOUNG_L2, openness: 0.9, conscientiousness: 0.1 }
     const results = new Set<string>()
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 50; i++) {
       results.add(inferEducationLevel(selfTaughtL1, selfTaughtL2))
     }
     expect(results.has("SELF_TAUGHT")).toBe(true)
@@ -254,7 +254,7 @@ describe("T248-AC4: inferEducationLevel", () => {
 
   it("유효한 교육 수준 값만 반환", () => {
     const valid = ["HIGH_SCHOOL", "BACHELOR", "MASTER", "DOCTORATE", "SELF_TAUGHT"]
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 50; i++) {
       expect(valid).toContain(inferEducationLevel(MATURE_L1, MATURE_L2))
     }
   })
@@ -282,7 +282,7 @@ describe("T248-AC5: inferHeight", () => {
   })
 
   it("정수 반환", () => {
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 50; i++) {
       const h = inferHeight("MALE", "Tokyo, Shibuya")
       expect(Number.isInteger(h)).toBe(true)
     }
@@ -305,7 +305,7 @@ describe("T248-AC6: inferLanguages", () => {
   it("높은 openness → 추가 언어 가능", () => {
     const highOpenL2 = { ...YOUNG_L2, openness: 0.95 }
     let hasExtra = false
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 50; i++) {
       const langs = inferLanguages("Korean", highOpenL2)
       if (langs.length > 2) hasExtra = true
     }
@@ -324,7 +324,7 @@ describe("T248-AC7: inferKnowledgeAreas", () => {
     const socialL1 = { ...YOUNG_L1, sociability: 0.8 }
     const socialL2 = { ...YOUNG_L2, extraversion: 0.8 }
     const allAreas = new Set<string>()
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 50; i++) {
       inferKnowledgeAreas(socialL1, socialL2).forEach((a) => allAreas.add(a))
     }
     const socialPool = ["사회학", "심리학", "커뮤니케이션", "마케팅", "미디어학"]
@@ -333,7 +333,7 @@ describe("T248-AC7: inferKnowledgeAreas", () => {
   })
 
   it("결과에 중복이 없어야 함", () => {
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 50; i++) {
       const areas = inferKnowledgeAreas(MATURE_L1, MATURE_L2)
       expect(new Set(areas).size).toBe(areas.length)
     }
