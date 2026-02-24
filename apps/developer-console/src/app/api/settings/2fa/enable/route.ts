@@ -1,5 +1,18 @@
 import { NextResponse } from "next/server"
+import crypto from "crypto"
 import { requireAuth } from "@/lib/require-auth"
+
+// Base32 alphabet for TOTP secrets (RFC 4648)
+const BASE32_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+
+function generateBase32Secret(length = 20): string {
+  const bytes = crypto.randomBytes(length)
+  let result = ""
+  for (const byte of bytes) {
+    result += BASE32_CHARS[byte % 32]
+  }
+  return result
+}
 
 /**
  * POST /api/settings/2fa/enable - 2FA 활성화 (QR 코드 생성)
@@ -8,8 +21,7 @@ export async function POST() {
   const { response } = await requireAuth()
   if (response) return response
 
-  // TODO: In production, use `otplib` to generate real TOTP secrets
-  const secret = crypto.randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase()
+  const secret = generateBase32Secret(32)
   const issuer = "DeepSight"
   const accountName = "user"
 

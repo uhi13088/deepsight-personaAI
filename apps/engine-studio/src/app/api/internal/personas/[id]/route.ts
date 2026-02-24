@@ -11,58 +11,13 @@ import type {
   CoreTemperamentVector,
   NarrativeDriveVector,
 } from "@/types"
-
-// ── Dim Maps (same as list route) ────────────────────────────
-
-const L1_DIM_MAP: Record<string, string> = {
-  depth: "dim1",
-  lens: "dim2",
-  stance: "dim3",
-  scope: "dim4",
-  taste: "dim5",
-  purpose: "dim6",
-  sociability: "dim7",
-}
-
-const L2_DIM_MAP: Record<string, string> = {
-  openness: "dim1",
-  conscientiousness: "dim2",
-  extraversion: "dim3",
-  agreeableness: "dim4",
-  neuroticism: "dim5",
-}
-
-const L3_DIM_MAP: Record<string, string> = {
-  lack: "dim1",
-  moralCompass: "dim2",
-  volatility: "dim3",
-  growthArc: "dim4",
-}
-
-function layerVectorToRecord(
-  layerVector: {
-    dim1: unknown
-    dim2: unknown
-    dim3: unknown
-    dim4: unknown
-    dim5: unknown
-    dim6: unknown
-    dim7: unknown
-  },
-  dimMap: Record<string, string>
-): Record<string, number> {
-  const result: Record<string, number> = {}
-  for (const [dimName, dimCol] of Object.entries(dimMap)) {
-    const value = layerVector[dimCol as keyof typeof layerVector]
-    if (value !== null && value !== undefined) {
-      result[dimName] =
-        typeof value === "object" && "toNumber" in value
-          ? (value as { toNumber(): number }).toNumber()
-          : Number(value)
-    }
-  }
-  return result
-}
+import {
+  L1_DIM_MAP,
+  L2_DIM_MAP,
+  L3_DIM_MAP,
+  layerVectorToRecord,
+  layerVectorsToMap,
+} from "@/lib/vector/dim-maps"
 
 // ═══════════════════════════════════════════════════════════════
 // GET /api/internal/personas/[id]
@@ -92,9 +47,10 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    const l1Vector = persona.layerVectors.find((v) => v.layerType === "SOCIAL")
-    const l2Vector = persona.layerVectors.find((v) => v.layerType === "TEMPERAMENT")
-    const l3Vector = persona.layerVectors.find((v) => v.layerType === "NARRATIVE")
+    const layerMap = layerVectorsToMap(persona.layerVectors)
+    const l1Vector = layerMap.get("SOCIAL")
+    const l2Vector = layerMap.get("TEMPERAMENT")
+    const l3Vector = layerMap.get("NARRATIVE")
 
     const detail: PersonaDetail = {
       id: persona.id,
@@ -253,9 +209,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         const { l1, l2, l3 } = body.vectors
 
         // Upsert layer vectors
-        const existingL1 = existing.layerVectors.find((v) => v.layerType === "SOCIAL")
-        const existingL2 = existing.layerVectors.find((v) => v.layerType === "TEMPERAMENT")
-        const existingL3 = existing.layerVectors.find((v) => v.layerType === "NARRATIVE")
+        const existingLayerMap = layerVectorsToMap(existing.layerVectors)
+        const existingL1 = existingLayerMap.get("SOCIAL")
+        const existingL2 = existingLayerMap.get("TEMPERAMENT")
+        const existingL3 = existingLayerMap.get("NARRATIVE")
 
         if (existingL1) {
           await tx.personaLayerVector.update({

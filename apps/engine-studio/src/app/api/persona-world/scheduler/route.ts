@@ -18,6 +18,7 @@ import { getConsumptionContext } from "@/lib/persona-world/consumption-manager"
 import { getPersonaState } from "@/lib/persona-world/state-manager"
 import { resolveMentions, notifyMentions } from "@/lib/persona-world/mention-service"
 import { verifyInternalToken } from "@/lib/internal-auth"
+import { layerVectorsToMap } from "@/lib/vector/dim-maps"
 
 /**
  * POST /api/persona-world/scheduler
@@ -68,9 +69,10 @@ export async function POST(request: NextRequest) {
         })
 
         return personas.flatMap((p): SchedulerPersona[] => {
-          const l1 = p.layerVectors.find((v) => v.layerType === "SOCIAL")
-          const l2 = p.layerVectors.find((v) => v.layerType === "TEMPERAMENT")
-          const l3 = p.layerVectors.find((v) => v.layerType === "NARRATIVE")
+          const layerMap = layerVectorsToMap(p.layerVectors)
+          const l1 = layerMap.get("SOCIAL")
+          const l2 = layerMap.get("TEMPERAMENT")
+          const l3 = layerMap.get("NARRATIVE")
 
           if (!l1 || !l2 || !l3) return []
 
@@ -366,9 +368,10 @@ function createInteractionDataProvider(): InteractionPipelineDataProvider {
         where: { personaId },
       })
 
-      const l1 = vectors.find((v) => v.layerType === "SOCIAL")
-      const l2 = vectors.find((v) => v.layerType === "TEMPERAMENT")
-      const l3 = vectors.find((v) => v.layerType === "NARRATIVE")
+      const layerMap = layerVectorsToMap(vectors)
+      const l1 = layerMap.get("SOCIAL")
+      const l2 = layerMap.get("TEMPERAMENT")
+      const l3 = layerMap.get("NARRATIVE")
 
       return {
         social: {

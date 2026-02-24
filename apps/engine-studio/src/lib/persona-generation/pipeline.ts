@@ -21,6 +21,7 @@ import {
 import { generateExpressQuirksWithLLM } from "@/lib/interaction/llm-express-quirks"
 import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
+import { layerVectorsToMap } from "@/lib/vector/dim-maps"
 import {
   buildVoiceSpec,
   computeVoiceStyleParams,
@@ -333,9 +334,10 @@ async function executeAutoPipeline(options?: AutoPipelineInput): Promise<Generat
   const existingVectors = existingPersonas
     .filter((p) => p.layerVectors.length === 3)
     .map((p) => {
-      const social = p.layerVectors.find((v) => v.layerType === "SOCIAL")
-      const temp = p.layerVectors.find((v) => v.layerType === "TEMPERAMENT")
-      const narr = p.layerVectors.find((v) => v.layerType === "NARRATIVE")
+      const layerMap = layerVectorsToMap(p.layerVectors)
+      const social = layerMap.get("SOCIAL")
+      const temp = layerMap.get("TEMPERAMENT")
+      const narr = layerMap.get("NARRATIVE")
       if (!social || !temp || !narr) return null
       return {
         l1: {

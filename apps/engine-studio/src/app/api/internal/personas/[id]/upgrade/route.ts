@@ -9,6 +9,7 @@ import { buildInstructionLayer } from "@/lib/persona-generation/pipeline"
 import type { ApiResponse } from "@/types"
 import type { VoiceProfile, BackstoryDimension } from "@/types"
 import { Prisma } from "@/generated/prisma"
+import { layerVectorsToMap } from "@/lib/vector/dim-maps"
 
 const CURRENT_ENGINE_VERSION = "4.0"
 
@@ -65,9 +66,10 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     }
 
     // ── 레이어 벡터 로드 ─────────────────────────────────────
-    const l1Row = persona.layerVectors.find((v) => v.layerType === "SOCIAL")
-    const l2Row = persona.layerVectors.find((v) => v.layerType === "TEMPERAMENT")
-    const l3Row = persona.layerVectors.find((v) => v.layerType === "NARRATIVE")
+    const layerMap = layerVectorsToMap(persona.layerVectors)
+    const l1Row = layerMap.get("SOCIAL")
+    const l2Row = layerMap.get("TEMPERAMENT")
+    const l3Row = layerMap.get("NARRATIVE")
 
     const l1 = {
       depth: toNum(l1Row?.dim1),

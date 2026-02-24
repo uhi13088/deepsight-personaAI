@@ -12,6 +12,13 @@ import type {
 } from "@/types"
 import type { SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector } from "@/types"
 import type { Prisma } from "@/generated/prisma"
+import {
+  L1_DIM_MAP,
+  L2_DIM_MAP,
+  L3_DIM_MAP,
+  layerVectorToRecord,
+  layerVectorsToMap,
+} from "@/lib/vector/dim-maps"
 
 const MAX_LIMIT = 100
 const DEFAULT_LIMIT = 20
@@ -37,32 +44,6 @@ const VALID_SORT_FIELDS: Record<PersonaSortField, string> = {
   paradoxScore: "paradoxScore",
   validationScore: "validationScore",
   qualityScore: "qualityScore",
-}
-
-// ── L1/L2/L3 차원 → PersonaLayerVector dim 매핑 ───────────────
-const L1_DIM_MAP: Record<string, string> = {
-  depth: "dim1",
-  lens: "dim2",
-  stance: "dim3",
-  scope: "dim4",
-  taste: "dim5",
-  purpose: "dim6",
-  sociability: "dim7",
-}
-
-const L2_DIM_MAP: Record<string, string> = {
-  openness: "dim1",
-  conscientiousness: "dim2",
-  extraversion: "dim3",
-  agreeableness: "dim4",
-  neuroticism: "dim5",
-}
-
-const L3_DIM_MAP: Record<string, string> = {
-  lack: "dim1",
-  moralCompass: "dim2",
-  volatility: "dim3",
-  growthArc: "dim4",
 }
 
 function parseIntSafe(value: string | null, defaultValue: number): number {
@@ -124,32 +105,6 @@ function buildVectorRangeConditions(
 
   if (conditions.length === 0) return undefined
   return { some: { AND: conditions } }
-}
-
-// ── PersonaLayerVector → Record<string, number> 변환 ─────────
-function layerVectorToRecord(
-  layerVector: {
-    dim1: unknown
-    dim2: unknown
-    dim3: unknown
-    dim4: unknown
-    dim5: unknown
-    dim6: unknown
-    dim7: unknown
-  },
-  dimMap: Record<string, string>
-): Record<string, number> {
-  const result: Record<string, number> = {}
-  for (const [dimName, dimCol] of Object.entries(dimMap)) {
-    const value = layerVector[dimCol as keyof typeof layerVector]
-    if (value !== null && value !== undefined) {
-      result[dimName] =
-        typeof value === "object" && "toNumber" in value
-          ? (value as { toNumber(): number }).toNumber()
-          : Number(value)
-    }
-  }
-  return result
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -283,9 +238,10 @@ export async function GET(request: NextRequest) {
     const totalPages = Math.ceil(totalCount / limit)
 
     const personaList: PersonaListItem[] = personas.map((p) => {
-      const l1Vector = p.layerVectors.find((v) => v.layerType === "SOCIAL")
-      const l2Vector = p.layerVectors.find((v) => v.layerType === "TEMPERAMENT")
-      const l3Vector = p.layerVectors.find((v) => v.layerType === "NARRATIVE")
+      const layerMap = layerVectorsToMap(p.layerVectors)
+      const l1Vector = layerMap.get("SOCIAL")
+      const l2Vector = layerMap.get("TEMPERAMENT")
+      const l3Vector = layerMap.get("NARRATIVE")
 
       return {
         id: p.id,

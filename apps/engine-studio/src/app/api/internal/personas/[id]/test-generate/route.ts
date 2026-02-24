@@ -14,58 +14,13 @@ import type {
   CoreTemperamentVector,
   NarrativeDriveVector,
 } from "@/types"
-
-// ── Dim Maps ──────────────────────────────────────────────────
-
-const L1_DIM_MAP: Record<string, string> = {
-  depth: "dim1",
-  lens: "dim2",
-  stance: "dim3",
-  scope: "dim4",
-  taste: "dim5",
-  purpose: "dim6",
-  sociability: "dim7",
-}
-
-const L2_DIM_MAP: Record<string, string> = {
-  openness: "dim1",
-  conscientiousness: "dim2",
-  extraversion: "dim3",
-  agreeableness: "dim4",
-  neuroticism: "dim5",
-}
-
-const L3_DIM_MAP: Record<string, string> = {
-  lack: "dim1",
-  moralCompass: "dim2",
-  volatility: "dim3",
-  growthArc: "dim4",
-}
-
-function layerVectorToRecord(
-  layerVector: {
-    dim1: unknown
-    dim2: unknown
-    dim3: unknown
-    dim4: unknown
-    dim5: unknown
-    dim6: unknown
-    dim7: unknown
-  },
-  dimMap: Record<string, string>
-): Record<string, number> {
-  const result: Record<string, number> = {}
-  for (const [dimName, dimCol] of Object.entries(dimMap)) {
-    const value = layerVector[dimCol as keyof typeof layerVector]
-    if (value !== null && value !== undefined) {
-      result[dimName] =
-        typeof value === "object" && "toNumber" in value
-          ? (value as { toNumber(): number }).toNumber()
-          : Number(value)
-    }
-  }
-  return result
-}
+import {
+  L1_DIM_MAP,
+  L2_DIM_MAP,
+  L3_DIM_MAP,
+  layerVectorToRecord,
+  layerVectorsToMap,
+} from "@/lib/vector/dim-maps"
 
 // ── 타입 정의 ──────────────────────────────────────────────────
 
@@ -151,9 +106,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // 벡터 추출
-    const l1Raw = persona.layerVectors.find((v) => v.layerType === "SOCIAL")
-    const l2Raw = persona.layerVectors.find((v) => v.layerType === "TEMPERAMENT")
-    const l3Raw = persona.layerVectors.find((v) => v.layerType === "NARRATIVE")
+    const layerMap = layerVectorsToMap(persona.layerVectors)
+    const l1Raw = layerMap.get("SOCIAL")
+    const l2Raw = layerMap.get("TEMPERAMENT")
+    const l3Raw = layerMap.get("NARRATIVE")
 
     if (!l1Raw || !l2Raw || !l3Raw) {
       return NextResponse.json(
