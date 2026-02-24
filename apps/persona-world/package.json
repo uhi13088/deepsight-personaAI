@@ -9,9 +9,9 @@
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run --passWithNoTests --coverage",
     "clean": "rm -rf .next node_modules"
   },
   "dependencies": {
