@@ -92,11 +92,7 @@ export async function POST(request: NextRequest) {
       }
 
       case "daily_news": {
-        const {
-          dailyBudget = 20,
-          maxPerPersona = 2,
-          withinHours = 24,
-        } = body as {
+        const { dailyBudget, maxPerPersona, withinHours } = body as {
           action: string
           dailyBudget?: number
           maxPerPersona?: number

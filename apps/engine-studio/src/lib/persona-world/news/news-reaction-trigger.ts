@@ -20,6 +20,7 @@ export interface NewsArticleForTrigger {
   summary: string
   topicTags: string[]
   region: string // T199: "KR" | "JP" | "US" | "EU" | "CN" | "GLOBAL"
+  importanceScore: number // T200: 기사 중요도 (0-1)
 }
 
 export interface PersonaForTrigger {
@@ -86,6 +87,7 @@ export async function triggerNewsReactionPosts(
     topicTags: article.topicTags,
     summary: article.summary,
     region: article.region,
+    importanceScore: article.importanceScore,
   }
 
   // 수동 트리거 = 낮은 임계값 (0.25)
@@ -185,7 +187,12 @@ export async function runDailyNewsReactions(
   const pairs = allocateDailyReactions(
     articles.map((a) => ({
       id: a.id,
-      article: { topicTags: a.topicTags, summary: a.summary, region: a.region },
+      article: {
+        topicTags: a.topicTags,
+        summary: a.summary,
+        region: a.region,
+        importanceScore: a.importanceScore,
+      },
     })),
     personasForMatching,
     { threshold: AUTO_INTEREST_THRESHOLD, dailyBudget, maxPerPersona }

@@ -16,6 +16,7 @@ import type { InteractionPipelineDataProvider } from "@/lib/persona-world/intera
 import {
   createPostLLMProvider,
   createCommentLLMProvider,
+  createNewsReactionPostLLMProvider,
   isLLMConfigured,
 } from "@/lib/persona-world/llm-adapter"
 import { getConsumptionContext } from "@/lib/persona-world/consumption-manager"
@@ -251,26 +252,47 @@ export async function triggerNewsArticle(
 ): Promise<NewsArticleTriggerResult | null> {
   const article = await prisma.newsArticle.findUnique({
     where: { id: articleId },
-    select: { id: true, title: true, summary: true, topicTags: true, region: true },
+    select: {
+      id: true,
+      title: true,
+      summary: true,
+      topicTags: true,
+      region: true,
+      importanceScore: true, // T200-C
+    },
   })
   if (!article) return null
 
   const llmAvailable = isLLMConfigured()
   const newsReactionProvider = createNewsReactionDataProvider()
-  const scheduled = await triggerNewsReactionPosts(article, newsReactionProvider)
+  const allScheduled = await triggerNewsReactionPosts(
+    { ...article, importanceScore: article.importanceScore ?? 0.5 },
+    newsReactionProvider
+  )
+
+  // T200-A: 수동 트리거 최대 10명 제한
+  const MAX_MANUAL_REACTIONS = 10
+  const scheduled = allScheduled.slice(0, MAX_MANUAL_REACTIONS)
+
+  if (allScheduled.length > MAX_MANUAL_REACTIONS) {
+    console.log(
+      `[NewsReaction] 수동 트리거 상한 적용: ${allScheduled.length}명 → ${MAX_MANUAL_REACTIONS}명`
+    )
+  }
 
   const createdPosts: Array<{ personaId: string; postId: string }> = []
 
   for (const reaction of scheduled) {
     try {
-      const schedulerPersonas = await await createSchedulerDataProvider().getActiveStatusPersonas()
+      const schedulerPersonas = await createSchedulerDataProvider().getActiveStatusPersonas()
       const persona = schedulerPersonas.find((p) => p.id === reaction.personaId)
       if (!persona) continue
 
       const state = await getPersonaState(persona.id)
       const topic = formatNewsArticleTopic(article.title, article.summary)
       const newsPostProvider = createNewsPostPipelineProvider(topic)
-      const llmProvider = llmAvailable ? createPostLLMProvider(persona.id) : undefined
+      // T200-D: news_reaction callType으로 비용 대시보드 별도 추적
+      const llmProvider = llmAvailable ? createNewsReactionPostLLMProvider(persona.id) : undefined
       if (!llmProvider) continue
 
       const postResult = await executePostCreation(
@@ -314,15 +336,40 @@ export async function triggerNewsArticle(
 // ── POST: daily_news ────────────────────────────────────────────
 
 export interface DailyNewsOptions {
-  dailyBudget: number
-  maxPerPersona: number
-  withinHours: number
+  dailyBudget?: number
+  maxPerPersona?: number
+  withinHours?: number
+}
+
+export interface DailyNewsSkippedResult {
+  skipped: true
+  reason: string
 }
 
 export async function runDailyNewsReactionPipeline(
   options: DailyNewsOptions
-): Promise<DailyNewsResult> {
-  const { dailyBudget, maxPerPersona, withinHours } = options
+): Promise<DailyNewsResult | DailyNewsSkippedResult> {
+  // T200-B: SystemConfig NEWS.auto_trigger_enabled 확인
+  const autoConfig = await prisma.systemConfig.findUnique({
+    where: { category_key: { category: "NEWS", key: "auto_trigger_enabled" } },
+  })
+  if (autoConfig && autoConfig.value === false) {
+    return { skipped: true, reason: "자동 트리거가 비활성화 상태입니다 (NEWS 설정 참조)" }
+  }
+
+  // SystemConfig에서 budget 읽기 (body 파라미터로 override 가능)
+  const [budgetConfig, maxConfig] = await Promise.all([
+    prisma.systemConfig.findUnique({
+      where: { category_key: { category: "NEWS", key: "daily_budget" } },
+    }),
+    prisma.systemConfig.findUnique({
+      where: { category_key: { category: "NEWS", key: "max_per_persona" } },
+    }),
+  ])
+
+  const dailyBudget = options.dailyBudget ?? (budgetConfig?.value as number | undefined) ?? 20
+  const maxPerPersona = options.maxPerPersona ?? (maxConfig?.value as number | undefined) ?? 2
+  const withinHours = options.withinHours ?? 24
 
   const llmAvailable = isLLMConfigured()
   const dailyProvider = createDailyNewsDataProvider()
@@ -350,7 +397,8 @@ export async function runDailyNewsReactionPipeline(
       const state = await getPersonaState(persona.id)
       const topic = formatNewsArticleTopic(articleData.title, articleData.summary)
       const newsPostProvider = createNewsPostPipelineProvider(topic)
-      const llmProvider = llmAvailable ? createPostLLMProvider(persona.id) : undefined
+      // T200-D: news_reaction callType으로 비용 대시보드 별도 추적
+      const llmProvider = llmAvailable ? createNewsReactionPostLLMProvider(persona.id) : undefined
       if (!llmProvider) continue
 
       const postResult = await executePostCreation(
@@ -614,6 +662,7 @@ function createDailyNewsDataProvider(): DailyNewsDataProvider {
           summary: true,
           topicTags: true,
           region: true,
+          importanceScore: true, // T200-C
         },
         orderBy: { publishedAt: "desc" },
       })
@@ -623,6 +672,7 @@ function createDailyNewsDataProvider(): DailyNewsDataProvider {
         summary: a.summary ?? "",
         topicTags: (a.topicTags as string[]) ?? [],
         region: a.region ?? "GLOBAL",
+        importanceScore: a.importanceScore ?? 0.5,
       }))
     },
 
