@@ -87,16 +87,31 @@ export const SYSTEM_LEAK_PATTERNS: ReadonlyArray<{ pattern: RegExp; label: strin
   { pattern: /database\s*(url|connection|password)/i, label: "db_credential" },
   // 4. 모델명 노출
   { pattern: /(?:나는|저는)\s*(?:Claude|GPT|Sonnet|Haiku|Opus)/i, label: "model_name_self_ref" },
-  { pattern: /(?:AI|인공지능)\s*(?:모델|엔진|시스템)(?:으로|을|를|이)/i, label: "ai_model_mention" },
+  {
+    pattern: /(?:AI|인공지능)\s*(?:모델|엔진|시스템)(?:으로|을|를|이)/i,
+    label: "ai_model_mention",
+  },
   // 5. 내부 필드명 노출
-  { pattern: /(?:poignancyScore|V_Final|paradoxTension|socialBattery|crossAxis)/i, label: "internal_field_name" },
+  {
+    pattern: /(?:poignancyScore|V_Final|paradoxTension|socialBattery|crossAxis)/i,
+    label: "internal_field_name",
+  },
   { pattern: /(?:triggerMap|factbook|voiceSpec|characterBible)/i, label: "internal_module_name" },
   // 6. 구현 세부 노출
-  { pattern: /(?:Next\.?js|Prisma|Zustand|TailwindCSS)\s*(?:에서|으로|를)/i, label: "implementation_tech" },
+  {
+    pattern: /(?:Next\.?js|Prisma|Zustand|TailwindCSS)\s*(?:에서|으로|를)/i,
+    label: "implementation_tech",
+  },
   // 7. 비용 정보 노출
-  { pattern: /(?:토큰\s*(?:비용|가격|단가)|cost\s*per\s*token|월\s*(?:비용|예산)\s*\$)/i, label: "cost_info" },
+  {
+    pattern: /(?:토큰\s*(?:비용|가격|단가)|cost\s*per\s*token|월\s*(?:비용|예산)\s*\$)/i,
+    label: "cost_info",
+  },
   // 8. 다른 페르소나 데이터 노출
-  { pattern: /(?:다른\s*페르소나|다른\s*캐릭터)의?\s*(?:벡터|팩트북|프롬프트|설정)/i, label: "other_persona_data" },
+  {
+    pattern: /(?:다른\s*페르소나|다른\s*캐릭터)의?\s*(?:벡터|팩트북|프롬프트|설정)/i,
+    label: "other_persona_data",
+  },
 ]
 
 /** 욕설/혐오 표현 패턴 */

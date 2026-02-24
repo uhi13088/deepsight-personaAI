@@ -609,18 +609,18 @@ hourWeight(h) = exp(-(h - peakHour)² / (2 × (endurance × 3)²))
 
 #### 특별 콘텐츠 타입 (10종)
 
-| 타입          | 조건                                    | 길이   | 예시                       |
-| ------------- | --------------------------------------- | ------ | -------------------------- |
-| VS_BATTLE     | stance > 0.7, initiative > 0.7         | MEDIUM | A vs B 대결 투표           |
-| QNA           | L2.openness > 0.6, sociability > 0.5   | MEDIUM | 질의응답                   |
-| CURATION      | taste > 0.7, scope > 0.5              | LONG   | 큐레이션/추천 모음         |
-| DEBATE        | stance > 0.7, initiative > 0.7         | MEDIUM | 논쟁적 의견 개진           |
-| MEME          | expressiveness > 0.6, mood > 0.5       | SHORT  | 밈/유머 콘텐츠             |
-| COLLAB        | sociability > 0.7, initiative > 0.6    | MEDIUM | 협업/공동 창작             |
-| TRIVIA        | depthSeeking > 0.6, L2.openness > 0.5 | SHORT  | 퀴즈/상식                  |
-| PREDICTION    | scope > 0.6, depth > 0.5              | MEDIUM | 예측/전망                  |
-| ANNIVERSARY   | sociability > 0.5, mood > 0.6         | SHORT  | 기념일/이벤트              |
-| BEHIND_STORY  | L3.lack > 0.5, depth > 0.6            | LONG   | 비하인드 스토리/메이킹     |
+| 타입         | 조건                                  | 길이   | 예시                   |
+| ------------ | ------------------------------------- | ------ | ---------------------- |
+| VS_BATTLE    | stance > 0.7, initiative > 0.7        | MEDIUM | A vs B 대결 투표       |
+| QNA          | L2.openness > 0.6, sociability > 0.5  | MEDIUM | 질의응답               |
+| CURATION     | taste > 0.7, scope > 0.5              | LONG   | 큐레이션/추천 모음     |
+| DEBATE       | stance > 0.7, initiative > 0.7        | MEDIUM | 논쟁적 의견 개진       |
+| MEME         | expressiveness > 0.6, mood > 0.5      | SHORT  | 밈/유머 콘텐츠         |
+| COLLAB       | sociability > 0.7, initiative > 0.6   | MEDIUM | 협업/공동 창작         |
+| TRIVIA       | depthSeeking > 0.6, L2.openness > 0.5 | SHORT  | 퀴즈/상식              |
+| PREDICTION   | scope > 0.6, depth > 0.5              | MEDIUM | 예측/전망              |
+| ANNIVERSARY  | sociability > 0.5, mood > 0.6         | SHORT  | 기념일/이벤트          |
+| BEHIND_STORY | L3.lack > 0.5, depth > 0.6            | LONG   | 비하인드 스토리/메이킹 |
 
 ### 4.5 포스트 타입 선택 알고리즘
 
