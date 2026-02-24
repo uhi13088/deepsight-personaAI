@@ -25,6 +25,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",
     "@auth/prisma-adapter": "^2.11.1",
+    "@deepsight/auth": "workspace:^",
     "@deepsight/shared-types": "workspace:^",
     "@deepsight/ui": "workspace:^",
     "@deepsight/vector-core": "workspace:^",
