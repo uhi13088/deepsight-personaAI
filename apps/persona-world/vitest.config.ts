@@ -1,13 +1,4 @@
-import { defineConfig } from "vitest/config"
-import path from "path"
+import { defineConfig, mergeConfig } from "vitest/config"
+import { createVitestBase } from "@deepsight/config/vitest"
 
-export default defineConfig({
-  test: {
-    environment: "node",
-  },
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "src"),
-    },
-  },
-})
+export default mergeConfig(createVitestBase({ rootDir: __dirname }), defineConfig({}))

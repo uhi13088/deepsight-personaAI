@@ -588,6 +588,118 @@
   - AC3: ✅ CLAUDE.md 기존 패키지 테이블에 ui/auth/config 추가 + 중복 현황 DONE 표기
   - AC4: ✅ 중복 파일은 삭제 대신 re-export wrapper로 변환 (호환성 유지)
 
+### Phase Y: 모노레포 코드 품질 개선 (T234~T246)
+
+> 코드 구조 분석 결과 발견된 비효율성 일괄 해결. 의존성 통일 → 설정 중앙화 → 코드 추출 → 대형 파일 분리.
+> 원칙: 기능 변경 없이 구조만 정리 (pure refactor). 모든 앱 빌드 + 기존 테스트 PASS 유지.
+
+#### P0: 의존성 정리 (T234~T237)
+
+- [ ] **T234: Landing 의존성 버전 통일 — Next.js 16 + 공유 패키지 호환성**
+  - 배경: Landing만 Next.js 15, 나머지 3앱 Next.js 16. lucide-react/radix-ui/tailwind-merge도 버전 낙후
+  - AC1: next 15.1.12 → 16.1.6
+  - AC2: react/react-dom → 19.2.3 (exact pin, 다른 앱과 동일)
+  - AC3: lucide-react ^0.468.0 → ^0.562.0
+  - AC4: @radix-ui/react-slot ^1.1.0 → ^1.2.4 (@deepsight/ui 호환)
+  - AC5: tailwind-merge ^2.6.0 → ^3.4.0 (@deepsight/ui 호환)
+  - AC6: 4앱 Build PASS + 테스트 PASS
+
+- [ ] **T235: bcryptjs 메이저 버전 통일 — DC v2→v3**
+  - 배경: engine-studio bcryptjs@^3.0.3, developer-console bcryptjs@^2.4.3. 메이저 버전 차이 시 해시 호환성 리스크
+  - AC1: DC bcryptjs ^2.4.3 → ^3.0.3
+  - AC2: DC @types/bcryptjs도 v3 호환 확인/업데이트
+  - AC3: DC 빌드 PASS + 테스트 PASS
+
+- [ ] **T236: engine-studio 미사용 의존성 제거 — 5개 패키지**
+  - 배경: import 검색 결과 코드에서 사용하지 않는 의존성 5개 확인
+  - AC1: react-hook-form 제거 (import 0건)
+  - AC2: @hookform/resolvers 제거 (import 0건)
+  - AC3: @tanstack/react-query 제거 (import 0건)
+  - AC4: d3 + @types/d3 제거 (import 0건)
+  - AC5: recharts 제거 (import 0건)
+  - AC6: ES Build PASS + 테스트 PASS
+
+- [ ] **T237: next-auth 버전 통일 — 3앱 동일 버전**
+  - 배경: ES ^5.0.0-beta.30, DC ^5.0.0-beta.25, PW 5.0.0-beta.30(exact). 불일치 시 인증 동작 차이 가능
+  - AC1: 3앱 next-auth → ^5.0.0-beta.30 통일
+  - AC2: @auth/prisma-adapter 버전도 통일 확인
+  - AC3: 3앱 Build PASS
+
+#### P1: 설정 중앙화 + 코드 추출 (T238~T242)
+
+- [ ] **T238: tsconfig.base.json 생성 + 앱별 extends**
+  - 배경: 4앱 tsconfig.json이 거의 동일한 30줄 설정을 각자 관리. 루트 base 부재
+  - AC1: `/tsconfig.base.json` 생성 (target ES2017, strict, module bundler, skipLibCheck 등 공통)
+  - AC2: 4앱 tsconfig.json → `"extends": "../../tsconfig.base.json"` + 앱별 차이만 유지
+  - AC3: 6개 packages tsconfig.json도 base extends 적용
+  - AC4: JSX 설정 차이 유지 (landing: preserve, 나머지: react-jsx)
+  - AC5: 4앱 Build PASS + 테스트 PASS + tsc 클린
+
+- [ ] **T239: vitest.config 공유 base 생성 + PW coverage 추가**
+  - 배경: ES/DC vitest.config.ts 100% 동일 23줄. PW는 coverage 설정 누락
+  - AC1: `packages/config/src/vitest.base.ts` 생성 — createVitestConfig() 팩토리
+  - AC2: ES/DC vitest.config.ts → base import + extends
+  - AC3: PW vitest.config.ts에 coverage 설정 추가
+  - AC4: 3앱 테스트 PASS
+  - AC5: CLAUDE.md `@deepsight/config` 설명 업데이트
+
+- [ ] **T240: getEngineStudioUrl() → @deepsight/config 추출**
+  - 배경: landing/next.config.ts와 persona-world/next.config.ts에 동일 URL 파싱 함수 복붙
+  - AC1: `packages/config/src/env.ts`에 `getEngineStudioUrl()` 추출
+  - AC2: landing + PW next.config.ts → import로 전환
+  - AC3: 2앱 Build PASS
+
+- [ ] **T241: DIM_MAP / layerVectorToRecord 유틸 추출 + O(n) .find() → Map 변환**
+  - 배경: personas/route.ts와 personas/[id]/route.ts에 DIM_MAP + layerVectorToRecord 동일 코드 복붙. 스케줄러 등 3곳에서 O(n) .find() 반복
+  - AC1: `src/lib/vector/dim-maps.ts` 생성 — DIM_MAP 상수 + layerVectorToRecord() 추출
+  - AC2: personas/route.ts, personas/[id]/route.ts → import로 전환
+  - AC3: layerVectors .find() 패턴 → Map 기반 O(1) 룩업으로 변환 (scheduler, cron, matching-lab)
+  - AC4: ES Build PASS + 테스트 PASS
+
+- [ ] **T242: ESLint 설정 통일 + package.json 스크립트 정리**
+  - 배경: landing만 `next lint` 사용, 나머지 3앱 `eslint`. lint:fix 스크립트도 landing만 누락
+  - AC1: landing lint 스크립트 `next lint` → `eslint`로 통일
+  - AC2: landing에 lint:fix 스크립트 추가
+  - AC3: 4앱 lint 실행 PASS
+
+#### P2: 코드 품질 개선 (T243~T245)
+
+- [ ] **T243: API 응답 포맷 표준화 + TODO 구현**
+  - 배경: auth 라우트가 `{ error, detail }` 비표준 포맷 사용. team/members에 이메일 초대 TODO, 2FA에 하드코딩 시크릿
+  - AC1: auth 라우트 응답 → `{ success, error: { code, message } }` 표준 포맷 전환
+  - AC2: team/members 이메일 초대 TODO → 구현 또는 명시적 주석으로 사유 기록
+  - AC3: 2FA enable 하드코딩 시크릿 → otplib 또는 crypto 기반 실제 TOTP 생성
+  - AC4: ES Build PASS + 테스트 PASS
+
+- [ ] **T244: 과대 API 라우트 서비스 레이어 분리 — 5파일 300줄+**
+  - 배경: persona-world-admin/scheduler(834줄), operations/incidents(613줄), cron/persona-scheduler(444줄) 등 비즈니스 로직이 라우트에 직접 구현
+  - AC1: scheduler/route.ts → scheduler-service.ts 분리 (라우트는 파싱+위임만)
+  - AC2: incidents/route.ts → incidents-service.ts 분리
+  - AC3: cron/persona-scheduler/route.ts → cron-scheduler-service.ts 분리
+  - AC4: persona-world/scheduler/route.ts → pw-scheduler-service.ts 분리
+  - AC5: DC v1/personas/filter/route.ts → filter-service.ts 분리
+  - AC6: Build PASS + 테스트 PASS
+
+- [ ] **T245: 과대 페이지 컴포넌트 분리 — 3파일 1000줄+**
+  - 배경: persona-studio/edit(1752줄), arena(1320줄), incubator(1151줄)이 모놀리식
+  - AC1: edit/[id]/page.tsx → PersonaDimensionEditor, PersonaMetadataForm, PersonaLifecycleActions 컴포넌트 분리
+  - AC2: arena/page.tsx → ArenaSessionList, ArenaRunner, ArenaResults 컴포넌트 분리
+  - AC3: incubator/page.tsx → IncubatorBatchPanel, IncubatorProgress, IncubatorResults 분리
+  - AC4: 각 page.tsx < 400줄 목표
+  - AC5: ES Build PASS + 테스트 PASS
+
+#### P3: 대형 라이브러리 모듈 분할 (T246)
+
+- [ ] **T246: 과대 lib 파일 모듈 분할 — 5파일 1400줄+**
+  - 배경: rag-llm(2515줄), system-integration(2489줄), operations(1704줄), consumer-journey(1662줄), global-config(1495줄) 모놀리식
+  - AC1: rag-llm/index.ts → rag-engine.ts + llm-strategy.ts + quality-feedback.ts 분리
+  - AC2: system-integration/index.ts → deployment.ts + versioning.ts + event-bus.ts 분리
+  - AC3: operations/index.ts → monitoring.ts + incidents.ts + backup.ts 분리
+  - AC4: consumer-journey/index.ts → journey-tracker.ts + stage-analyzer.ts + journey-metrics.ts 분리
+  - AC5: global-config/index.ts → model-config.ts + safety-config.ts + api-config.ts 분리
+  - AC6: 각 index.ts는 re-export hub로 유지 (외부 import 경로 변경 0건)
+  - AC7: ES Build PASS + 테스트 PASS
+
 ---
 
 ### 별도 작업 (설계 문서 + 데이터)
@@ -1324,7 +1436,7 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-없음 (T195~T198 완료 — Phase NB 전체 완료)
+- [ ] **T234: Landing 의존성 버전 통일** — Phase Y 시작
 
 ---
 
