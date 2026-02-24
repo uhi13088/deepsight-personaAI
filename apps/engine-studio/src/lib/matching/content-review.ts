@@ -4,6 +4,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import type { SocialPersonaVector } from "@/types"
+import { round } from "./utils"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
@@ -59,7 +60,7 @@ export interface ReviewGenerationConfig {
 export interface CacheStats {
   totalEntries: number
   hitRate: number // 0~1
-  esTimatedMonthlyCost: number
+  estimatedMonthlyCost: number
 }
 
 // ── 12종 리뷰 스타일 정의 ───────────────────────────────────
@@ -310,12 +311,6 @@ export function calculateCacheStats(
   return {
     totalEntries: cache.length,
     hitRate: totalLookups > 0 ? round(cacheHits / totalLookups) : 0,
-    esTimatedMonthlyCost: round(cache.length * 0.002), // 초기 생성 비용
+    estimatedMonthlyCost: round(cache.length * 0.002), // 초기 생성 비용
   }
-}
-
-// ── 유틸 ─────────────────────────────────────────────────────
-
-function round(v: number): number {
-  return Math.round(v * 100) / 100
 }

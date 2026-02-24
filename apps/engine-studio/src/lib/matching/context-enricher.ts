@@ -5,6 +5,8 @@
 // ═══════════════════════════════════════════════════════════════
 
 import type { VoiceStyleParams } from "@/lib/persona-world/types"
+import { cosineSimilarity } from "@/lib/vector/utils"
+import { round, clamp } from "./utils"
 
 // ── 확장 시그널 타입 ────────────────────────────────────────
 
@@ -142,7 +144,7 @@ export function computeVoiceSimilarity(
 ): number {
   const uVec = voiceStyleToVector(userStyle)
   const pVec = voiceStyleToVector(personaStyle)
-  return cosineSim(uVec, pVec)
+  return cosineSimilarity(uVec, pVec)
 }
 
 /** 관계 깊이 점수 (0~1) */
@@ -454,25 +456,4 @@ function voiceStyleToVector(style: VoiceStyleParams): number[] {
     style.assertiveness,
     style.vocabularyLevel,
   ]
-}
-
-function cosineSim(a: number[], b: number[]): number {
-  let dot = 0
-  let magA = 0
-  let magB = 0
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i]
-    magA += a[i] * a[i]
-    magB += b[i] * b[i]
-  }
-  const denom = Math.sqrt(magA) * Math.sqrt(magB)
-  return denom > 0 ? dot / denom : 0
-}
-
-function clamp(v: number, min = 0, max = 1): number {
-  return Math.max(min, Math.min(max, v))
-}
-
-function round(v: number): number {
-  return Math.round(v * 100) / 100
 }

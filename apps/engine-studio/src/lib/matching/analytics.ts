@@ -4,6 +4,8 @@
 // T215: A/B 실험 트래킹 추가
 // ═══════════════════════════════════════════════════════════════
 
+import { round } from "./utils"
+
 // ── 타입 정의 ─────────────────────────────────────────────────
 
 export interface MatchingKPIs {
@@ -330,10 +332,4 @@ export function calculateExperimentUplift(
   }
 
   return uplift
-}
-
-// ── 유틸 ─────────────────────────────────────────────────────
-
-function round(v: number): number {
-  return Math.round(v * 100) / 100
 }

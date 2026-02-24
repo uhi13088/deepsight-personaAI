@@ -18,6 +18,7 @@ import type {
   MatchingConfig,
 } from "./three-tier-engine"
 import { matchAll, DEFAULT_MATCHING_CONFIG } from "./three-tier-engine"
+import { round, SOCIAL_DIM_LABELS } from "./utils"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
@@ -250,16 +251,6 @@ export function generateDimensionExplanations(
   userL1: SocialPersonaVector,
   personaL1: SocialPersonaVector
 ): DimensionExplanation[] {
-  const dimLabels: Record<string, string> = {
-    depth: "분석 깊이",
-    lens: "판단 렌즈",
-    stance: "비평 태도",
-    scope: "디테일 수준",
-    taste: "취향 성향",
-    purpose: "목적 지향",
-    sociability: "소통 성향",
-  }
-
   const dims: SocialDimension[] = [
     "depth",
     "lens",
@@ -273,16 +264,10 @@ export function generateDimensionExplanations(
   return dims
     .map((dim) => ({
       dimension: dim,
-      label: dimLabels[dim] ?? dim,
+      label: SOCIAL_DIM_LABELS[dim] ?? dim,
       userValue: round(userL1[dim]),
       personaValue: round(personaL1[dim]),
       similarity: round(1 - Math.abs(userL1[dim] - personaL1[dim])),
     }))
     .sort((a, b) => b.similarity - a.similarity)
-}
-
-// ── 유틸 ─────────────────────────────────────────────────────
-
-function round(v: number): number {
-  return Math.round(v * 100) / 100
 }

@@ -27,6 +27,7 @@ import {
   computeDynamicTierWeights,
   computeNegativePenalty,
 } from "./context-enricher"
+import { round, SOCIAL_DIM_LABELS } from "./utils"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
@@ -51,6 +52,17 @@ export interface SocialSignal {
   trustScore: number
   /** 활성화 가중치 (0.0~1.0, computeTrustScore().lambda) */
   trustLambda: number
+}
+
+/**
+ * Enrichment 옵션 — Trust 시그널 + 풍부한 컨텍스트를
+ * Tier 함수 및 matchPersona에 전달하는 옵션 객체.
+ */
+export interface EnrichmentOptions {
+  socialSignal?: SocialSignal
+  personaSignals?: PersonaEnrichedSignals
+  userContext?: UserEnrichedContext
+  enabledFeatures?: Set<EnrichmentFeature>
 }
 
 /**
@@ -130,10 +142,7 @@ export function calculateBasicScore(
   personaCAP: CrossAxisProfile,
   userEPS?: ParadoxProfile,
   personaEPS?: ParadoxProfile,
-  socialSignal?: SocialSignal,
-  personaSignals?: PersonaEnrichedSignals,
-  userContext?: UserEnrichedContext,
-  enabledFeatures?: Set<EnrichmentFeature>
+  options?: EnrichmentOptions
 ): { score: number; breakdown: MatchBreakdown } {
   const vectorScore = Math.max(0, cosineSimilarity(userVFinal, personaVFinal))
   const crossAxisScore = calculateCrossAxisSimilarity(userCAP, personaCAP)
@@ -149,8 +158,8 @@ export function calculateBasicScore(
     : 0.7 * vectorScore + 0.3 * crossAxisScore
 
   // Trust 블렌딩: (1 - trustWeight) × rawScore + trustWeight × trustScore
-  const trustWeight = computeTrustWeight(socialSignal)
-  const trustBoostValue = socialSignal?.trustScore ?? 0
+  const trustWeight = computeTrustWeight(options?.socialSignal)
+  const trustBoostValue = options?.socialSignal?.trustScore ?? 0
 
   const trustBlended =
     trustWeight > 0 ? (1 - trustWeight) * rawScore + trustWeight * trustBoostValue : rawScore
@@ -159,9 +168,9 @@ export function calculateBasicScore(
   const enrichment = applyEnrichmentSignals(
     trustBlended,
     "basic",
-    personaSignals,
-    userContext,
-    enabledFeatures
+    options?.personaSignals,
+    options?.userContext,
+    options?.enabledFeatures
   )
 
   return {
@@ -186,10 +195,7 @@ export function calculateAdvancedScore(
   personaCAP: CrossAxisProfile,
   userEPS: ParadoxProfile,
   personaEPS: ParadoxProfile,
-  socialSignal?: SocialSignal,
-  personaSignals?: PersonaEnrichedSignals,
-  userContext?: UserEnrichedContext,
-  enabledFeatures?: Set<EnrichmentFeature>
+  options?: EnrichmentOptions
 ): { score: number; breakdown: MatchBreakdown } {
   const vectorScore = Math.max(0, cosineSimilarity(userVFinal, personaVFinal))
   const crossAxisScore = calculateCrossAxisSimilarity(userCAP, personaCAP)
@@ -198,8 +204,8 @@ export function calculateAdvancedScore(
   const rawScore = 0.5 * vectorScore + 0.3 * crossAxisScore + 0.2 * paradoxCompat
 
   // Trust 블렌딩
-  const trustWeight = computeTrustWeight(socialSignal)
-  const trustBoostValue = socialSignal?.trustScore ?? 0
+  const trustWeight = computeTrustWeight(options?.socialSignal)
+  const trustBoostValue = options?.socialSignal?.trustScore ?? 0
 
   const trustBlended =
     trustWeight > 0 ? (1 - trustWeight) * rawScore + trustWeight * trustBoostValue : rawScore
@@ -208,9 +214,9 @@ export function calculateAdvancedScore(
   const enrichment = applyEnrichmentSignals(
     trustBlended,
     "advanced",
-    personaSignals,
-    userContext,
-    enabledFeatures
+    options?.personaSignals,
+    options?.userContext,
+    options?.enabledFeatures
   )
 
   return {
@@ -237,9 +243,7 @@ export function calculateExplorationScore(
   personaId: string,
   personaArchetype?: string,
   recentArchetypes: string[] = [],
-  personaSignals?: PersonaEnrichedSignals,
-  userContext?: UserEnrichedContext,
-  enabledFeatures?: Set<EnrichmentFeature>
+  options?: EnrichmentOptions
 ): { score: number; breakdown: MatchBreakdown } {
   const paradoxDiversity = calculateParadoxDiversity(userEPS, personaEPS)
   const crossAxisDivergence = calculateCrossAxisDivergence(userCAP, personaCAP)
@@ -256,9 +260,9 @@ export function calculateExplorationScore(
   const enrichment = applyEnrichmentSignals(
     rawScore,
     "exploration",
-    personaSignals,
-    userContext,
-    enabledFeatures
+    options?.personaSignals,
+    options?.userContext,
+    options?.enabledFeatures
   )
 
   return {
@@ -365,21 +369,11 @@ export function generateExplanation(
   similarities.sort((a, b) => b.similarity - a.similarity)
   const topDims = similarities.slice(0, 3)
 
-  const dimLabels: Record<string, string> = {
-    depth: "분석 깊이",
-    lens: "판단 렌즈",
-    stance: "비평 태도",
-    scope: "디테일 수준",
-    taste: "취향 성향",
-    purpose: "목적 지향",
-    sociability: "소통 성향",
-  }
-
   const trustSuffix = breakdown.trustBoost > 0 ? ` (신뢰 보정: +${breakdown.trustBoost})` : ""
 
   if (tier === "basic") {
     const dimExplanations = topDims
-      .map((d) => `${dimLabels[d.dim] ?? d.dim} 일치도: ${d.similarity}`)
+      .map((d) => `${SOCIAL_DIM_LABELS[d.dim] ?? d.dim} 일치도: ${d.similarity}`)
       .join(", ")
     return `표면적 성향 매칭 — ${dimExplanations}${trustSuffix}`
   }
@@ -397,10 +391,7 @@ export function matchPersona(
   user: UserProfile,
   persona: PersonaCandidate,
   tier: MatchingTier,
-  socialSignal?: SocialSignal,
-  personaSignals?: PersonaEnrichedSignals,
-  userContext?: UserEnrichedContext,
-  enabledFeatures?: Set<EnrichmentFeature>
+  options?: EnrichmentOptions
 ): MatchResult {
   const personaVFinal = calculateVFinal(persona.l1, persona.l2, persona.l3)
 
@@ -415,10 +406,7 @@ export function matchPersona(
         persona.crossAxisProfile,
         user.paradoxProfile,
         persona.paradoxProfile,
-        socialSignal,
-        personaSignals,
-        userContext,
-        enabledFeatures
+        options
       )
       break
     case "advanced":
@@ -429,10 +417,7 @@ export function matchPersona(
         persona.crossAxisProfile,
         user.paradoxProfile,
         persona.paradoxProfile,
-        socialSignal,
-        personaSignals,
-        userContext,
-        enabledFeatures
+        options
       )
       break
     case "exploration":
@@ -446,9 +431,7 @@ export function matchPersona(
         persona.id,
         persona.archetype,
         [],
-        personaSignals,
-        userContext,
-        enabledFeatures
+        options
       )
       break
   }
@@ -492,42 +475,62 @@ export function matchAll(
   const dynamicWeights = computeDynamicTierWeights(userContext?.session)
   const tierWeights = dynamicWeights ?? config.tierWeights
 
+  // Pre-compute: 유저 L1 벡터 (설명 생성용, 불변이므로 1회만)
+  const userL1 = vFinalToVector(user.vFinal)
+
   const allResults: MatchResult[] = []
 
   // 3. 각 Tier별로 매칭 실행
   for (const persona of filteredPersonas) {
     const signal = context?.socialSignals?.get(persona.id)
     const pSignals = enrichment?.personaSignals?.get(persona.id)
+    const opts: EnrichmentOptions = {
+      socialSignal: signal,
+      personaSignals: pSignals,
+      userContext,
+      enabledFeatures,
+    }
 
-    const basicResult = matchPersona(
-      user,
-      persona,
-      "basic",
-      signal,
-      pSignals,
-      userContext,
-      enabledFeatures
-    )
-    const advancedResult = matchPersona(
-      user,
-      persona,
-      "advanced",
-      signal,
-      pSignals,
-      userContext,
-      enabledFeatures
-    )
-    const explorationResult = matchPersona(
-      user,
-      persona,
-      "exploration",
-      undefined,
-      pSignals,
-      userContext,
-      enabledFeatures
-    )
+    // Pre-compute: 페르소나 VFinal (Basic/Advanced에서 공유, 1회만 계산)
+    const personaVFinal = calculateVFinal(persona.l1, persona.l2, persona.l3)
 
-    allResults.push(basicResult, advancedResult, explorationResult)
+    // Basic
+    const basicResult = calculateBasicScore(
+      user.vFinal.vector,
+      personaVFinal.vector,
+      user.crossAxisProfile,
+      persona.crossAxisProfile,
+      user.paradoxProfile,
+      persona.paradoxProfile,
+      opts
+    )
+    allResults.push(toMatchResult(persona.id, "basic", basicResult, userL1, persona.l1))
+
+    // Advanced
+    const advancedResult = calculateAdvancedScore(
+      user.vFinal.vector,
+      personaVFinal.vector,
+      user.crossAxisProfile,
+      persona.crossAxisProfile,
+      user.paradoxProfile,
+      persona.paradoxProfile,
+      opts
+    )
+    allResults.push(toMatchResult(persona.id, "advanced", advancedResult, userL1, persona.l1))
+
+    // Exploration (VFinal 불필요 — 교차축/역설/신선도만 사용)
+    const explorationResult = calculateExplorationScore(
+      user.crossAxisProfile,
+      persona.crossAxisProfile,
+      user.paradoxProfile,
+      persona.paradoxProfile,
+      user.recentPersonaIds ?? [],
+      persona.id,
+      persona.archetype,
+      [],
+      { personaSignals: pSignals, userContext, enabledFeatures }
+    )
+    allResults.push(toMatchResult(persona.id, "exploration", explorationResult, userL1, persona.l1))
   }
 
   // 4. Tier별 상위 N개 선택 (동적 가중치 적용)
@@ -546,6 +549,22 @@ export function matchAll(
 
   // 5. 다양성 적용: 같은 페르소나 중복 제거
   return deduplicateByPersona(selected)
+}
+
+function toMatchResult(
+  personaId: string,
+  tier: MatchingTier,
+  result: { score: number; breakdown: MatchBreakdown },
+  userL1: SocialPersonaVector,
+  personaL1: SocialPersonaVector
+): MatchResult {
+  return {
+    personaId,
+    score: result.score,
+    tier,
+    breakdown: result.breakdown,
+    explanation: generateExplanation(tier, result.breakdown, userL1, personaL1),
+  }
 }
 
 function groupByTier(results: MatchResult[]): Record<MatchingTier, MatchResult[]> {
@@ -590,10 +609,4 @@ function deduplicateByPersona(results: MatchResult[]): MatchResult[] {
 export function computeTrustWeight(socialSignal?: SocialSignal): number {
   if (!socialSignal) return 0
   return Math.min(TRUST_MAX_WEIGHT, socialSignal.trustLambda * TRUST_MAX_WEIGHT)
-}
-
-// ── 유틸 ─────────────────────────────────────────────────────
-
-function round(v: number): number {
-  return Math.round(v * 100) / 100
 }

@@ -3,6 +3,8 @@
 // T57-AC4: 안전 장치, 자동 롤백, 유의미성 판정
 // ═══════════════════════════════════════════════════════════════
 
+import { round } from "./utils"
+
 // ── 타입 정의 ─────────────────────────────────────────────────
 
 export type ABTestType = "tier" | "weight" | "threshold" | "persona" | "layer"
@@ -282,10 +284,4 @@ export function evaluateABTestResult(
 
 export function shouldAutoRollback(checkResult: GuardrailCheckResult): boolean {
   return checkResult.violations.some((v) => v.severity === "critical")
-}
-
-// ── 유틸 ─────────────────────────────────────────────────────
-
-function round(v: number): number {
-  return Math.round(v * 100) / 100
 }

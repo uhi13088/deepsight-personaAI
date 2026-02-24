@@ -4,6 +4,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import type { MatchingKPIs, SegmentAnalysis, AnomalyEvent, TrendData } from "./analytics"
+import { round } from "./utils"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
@@ -276,10 +277,4 @@ export function csvRowsToString(rows: CsvRow[]): string {
     lines.push(headers.map((h) => String(row[h] ?? "")).join(","))
   }
   return lines.join("\n")
-}
-
-// ── 유틸 ─────────────────────────────────────────────────────
-
-function round(v: number): number {
-  return Math.round(v * 100) / 100
 }
