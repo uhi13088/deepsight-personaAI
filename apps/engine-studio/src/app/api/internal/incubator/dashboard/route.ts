@@ -79,11 +79,13 @@ export async function GET() {
       // 7일간 일별 실제 LLM 비용
       getDailyCostsFromDB(7),
 
-      // 대기 중인 사용자 페르소나 생성 요청
-      prisma.personaGenerationRequest
-        .count({
-          where: { status: { in: ["PENDING", "SCHEDULED"] } },
-        })
+      // 대기 중인 사용자 페르소나 생성 요청 (구버전 Prisma 클라이언트 안전 처리)
+      Promise.resolve()
+        .then(() =>
+          prisma.personaGenerationRequest.count({
+            where: { status: { in: ["PENDING", "SCHEDULED"] } },
+          })
+        )
         .catch(() => 0),
 
       // 일일 생성 한도
