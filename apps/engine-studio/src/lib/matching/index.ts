@@ -4,6 +4,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 export * from "./three-tier-engine"
+export * from "./context-enricher"
 export * from "./simulator"
 export * from "./tuning"
 export * from "./guardrails"

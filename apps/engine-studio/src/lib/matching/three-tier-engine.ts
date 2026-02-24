@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // 3-Tier 매칭 엔진
 // T57-AC1: Basic(60%) + Advanced(10%) + Exploration(30%)
+// T215: MatchingContext Enrichment Layer 통합
 // ═══════════════════════════════════════════════════════════════
 
 import type {
@@ -14,6 +15,18 @@ import type {
 import { cosineSimilarity } from "@/lib/vector/utils"
 import { calculateVFinal, vFinalToVector } from "@/lib/vector/v-final"
 import { L1_DIM_ORDER } from "@/lib/vector/projection"
+import type {
+  EnrichedMatchingContext,
+  PersonaEnrichedSignals,
+  UserEnrichedContext,
+  ScoreAdjustment,
+  EnrichmentFeature,
+} from "./context-enricher"
+import {
+  applyEnrichmentSignals,
+  computeDynamicTierWeights,
+  computeNegativePenalty,
+} from "./context-enricher"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
@@ -23,8 +36,10 @@ export interface MatchBreakdown {
   vectorScore: number // V_Final 코사인 유사도
   crossAxisScore: number // 83축 유사도/발산도
   paradoxCompatibility: number // 역설 호환성 (Advanced)
-  qualitativeBonus: number // 비정량적 보정 (±0.1)
+  qualitativeBonus: number // 비정량적 보정 (±0.1) — Voice 유사도 + Enrichment
   trustBoost: number // 신뢰 기반 소셜 시그널 (Basic/Advanced only, 0.0~1.0)
+  /** Enrichment Layer 적용 상세 (있으면 사용) */
+  enrichment?: ScoreAdjustment
 }
 
 /**
@@ -39,12 +54,14 @@ export interface SocialSignal {
 }
 
 /**
- * 매칭 컨텍스트 — 소셜 시그널 등 부가 데이터.
- * matchAll()에 전달하여 페르소나별 소셜 신호를 주입.
+ * 매칭 컨텍스트 — 소셜 시그널 + Enrichment Layer.
+ * matchAll()에 전달하여 페르소나별 소셜 신호 및 풍부한 컨텍스트를 주입.
  */
 export interface MatchingContext {
   /** personaId → SocialSignal 매핑. 이력 없는 페르소나는 미포함. */
   socialSignals?: Map<string, SocialSignal>
+  /** Enrichment Layer 확장 컨텍스트 */
+  enrichment?: EnrichedMatchingContext
 }
 
 export interface MatchResult {
@@ -113,7 +130,10 @@ export function calculateBasicScore(
   personaCAP: CrossAxisProfile,
   userEPS?: ParadoxProfile,
   personaEPS?: ParadoxProfile,
-  socialSignal?: SocialSignal
+  socialSignal?: SocialSignal,
+  personaSignals?: PersonaEnrichedSignals,
+  userContext?: UserEnrichedContext,
+  enabledFeatures?: Set<EnrichmentFeature>
 ): { score: number; breakdown: MatchBreakdown } {
   const vectorScore = Math.max(0, cosineSimilarity(userVFinal, personaVFinal))
   const crossAxisScore = calculateCrossAxisSimilarity(userCAP, personaCAP)
@@ -132,19 +152,27 @@ export function calculateBasicScore(
   const trustWeight = computeTrustWeight(socialSignal)
   const trustBoostValue = socialSignal?.trustScore ?? 0
 
-  const score =
-    trustWeight > 0
-      ? round((1 - trustWeight) * rawScore + trustWeight * trustBoostValue)
-      : round(rawScore)
+  const trustBlended =
+    trustWeight > 0 ? (1 - trustWeight) * rawScore + trustWeight * trustBoostValue : rawScore
+
+  // Enrichment Layer 적용
+  const enrichment = applyEnrichmentSignals(
+    trustBlended,
+    "basic",
+    personaSignals,
+    userContext,
+    enabledFeatures
+  )
 
   return {
-    score,
+    score: round(enrichment.finalScore),
     breakdown: {
       vectorScore: round(vectorScore),
       crossAxisScore: round(crossAxisScore),
       paradoxCompatibility: round(paradoxCompat),
-      qualitativeBonus: 0,
+      qualitativeBonus: enrichment.voiceBonus,
       trustBoost: round(trustBoostValue),
+      enrichment,
     },
   }
 }
@@ -158,7 +186,10 @@ export function calculateAdvancedScore(
   personaCAP: CrossAxisProfile,
   userEPS: ParadoxProfile,
   personaEPS: ParadoxProfile,
-  socialSignal?: SocialSignal
+  socialSignal?: SocialSignal,
+  personaSignals?: PersonaEnrichedSignals,
+  userContext?: UserEnrichedContext,
+  enabledFeatures?: Set<EnrichmentFeature>
 ): { score: number; breakdown: MatchBreakdown } {
   const vectorScore = Math.max(0, cosineSimilarity(userVFinal, personaVFinal))
   const crossAxisScore = calculateCrossAxisSimilarity(userCAP, personaCAP)
@@ -170,19 +201,27 @@ export function calculateAdvancedScore(
   const trustWeight = computeTrustWeight(socialSignal)
   const trustBoostValue = socialSignal?.trustScore ?? 0
 
-  const score =
-    trustWeight > 0
-      ? round((1 - trustWeight) * rawScore + trustWeight * trustBoostValue)
-      : round(rawScore)
+  const trustBlended =
+    trustWeight > 0 ? (1 - trustWeight) * rawScore + trustWeight * trustBoostValue : rawScore
+
+  // Enrichment Layer 적용
+  const enrichment = applyEnrichmentSignals(
+    trustBlended,
+    "advanced",
+    personaSignals,
+    userContext,
+    enabledFeatures
+  )
 
   return {
-    score,
+    score: round(enrichment.finalScore),
     breakdown: {
       vectorScore: round(vectorScore),
       crossAxisScore: round(crossAxisScore),
       paradoxCompatibility: round(paradoxCompat),
-      qualitativeBonus: 0,
+      qualitativeBonus: enrichment.voiceBonus,
       trustBoost: round(trustBoostValue),
+      enrichment,
     },
   }
 }
@@ -197,7 +236,10 @@ export function calculateExplorationScore(
   recentPersonaIds: string[],
   personaId: string,
   personaArchetype?: string,
-  recentArchetypes: string[] = []
+  recentArchetypes: string[] = [],
+  personaSignals?: PersonaEnrichedSignals,
+  userContext?: UserEnrichedContext,
+  enabledFeatures?: Set<EnrichmentFeature>
 ): { score: number; breakdown: MatchBreakdown } {
   const paradoxDiversity = calculateParadoxDiversity(userEPS, personaEPS)
   const crossAxisDivergence = calculateCrossAxisDivergence(userCAP, personaCAP)
@@ -208,16 +250,26 @@ export function calculateExplorationScore(
     recentArchetypes
   )
 
-  const score = round(0.4 * paradoxDiversity + 0.4 * crossAxisDivergence + 0.2 * freshness)
+  const rawScore = 0.4 * paradoxDiversity + 0.4 * crossAxisDivergence + 0.2 * freshness
+
+  // Enrichment Layer 적용 (exploration tier)
+  const enrichment = applyEnrichmentSignals(
+    rawScore,
+    "exploration",
+    personaSignals,
+    userContext,
+    enabledFeatures
+  )
 
   return {
-    score,
+    score: round(enrichment.finalScore),
     breakdown: {
       vectorScore: 0,
       crossAxisScore: round(crossAxisDivergence),
       paradoxCompatibility: round(paradoxDiversity),
       qualitativeBonus: round(freshness),
       trustBoost: 0, // Exploration Tier는 Trust 미적용 (세렌디피티 보존)
+      enrichment,
     },
   }
 }
@@ -345,7 +397,10 @@ export function matchPersona(
   user: UserProfile,
   persona: PersonaCandidate,
   tier: MatchingTier,
-  socialSignal?: SocialSignal
+  socialSignal?: SocialSignal,
+  personaSignals?: PersonaEnrichedSignals,
+  userContext?: UserEnrichedContext,
+  enabledFeatures?: Set<EnrichmentFeature>
 ): MatchResult {
   const personaVFinal = calculateVFinal(persona.l1, persona.l2, persona.l3)
 
@@ -360,7 +415,10 @@ export function matchPersona(
         persona.crossAxisProfile,
         user.paradoxProfile,
         persona.paradoxProfile,
-        socialSignal
+        socialSignal,
+        personaSignals,
+        userContext,
+        enabledFeatures
       )
       break
     case "advanced":
@@ -371,7 +429,10 @@ export function matchPersona(
         persona.crossAxisProfile,
         user.paradoxProfile,
         persona.paradoxProfile,
-        socialSignal
+        socialSignal,
+        personaSignals,
+        userContext,
+        enabledFeatures
       )
       break
     case "exploration":
@@ -383,7 +444,11 @@ export function matchPersona(
         persona.paradoxProfile,
         user.recentPersonaIds ?? [],
         persona.id,
-        persona.archetype
+        persona.archetype,
+        [],
+        personaSignals,
+        userContext,
+        enabledFeatures
       )
       break
   }
@@ -408,24 +473,69 @@ export function matchAll(
   config: MatchingConfig = DEFAULT_MATCHING_CONFIG,
   context?: MatchingContext
 ): MatchResult[] {
+  const enrichment = context?.enrichment
+  const userContext = enrichment?.userContext
+  const enabledFeatures = enrichment?.experiment?.enabledFeatures
+
+  // 1. 블록된 페르소나 사전 필터링
+  const filteredPersonas = personas.filter((persona) => {
+    const signals = enrichment?.personaSignals?.get(persona.id)
+    if (!signals?.negative) return true
+    // isBlocked: 완전 제거, isSuspectedBot: 완전 제거
+    if (signals.negative.isBlocked || signals.negative.isSuspectedBot) return false
+    // high penalty(≥0.8): 제거
+    if (computeNegativePenalty(signals.negative) >= 0.8) return false
+    return true
+  })
+
+  // 2. 동적 Tier 가중치 (유저 세그먼트 기반)
+  const dynamicWeights = computeDynamicTierWeights(userContext?.session)
+  const tierWeights = dynamicWeights ?? config.tierWeights
+
   const allResults: MatchResult[] = []
 
-  // 각 Tier별로 매칭 실행
-  for (const persona of personas) {
+  // 3. 각 Tier별로 매칭 실행
+  for (const persona of filteredPersonas) {
     const signal = context?.socialSignals?.get(persona.id)
-    const basicResult = matchPersona(user, persona, "basic", signal)
-    const advancedResult = matchPersona(user, persona, "advanced", signal)
-    const explorationResult = matchPersona(user, persona, "exploration") // Trust 미적용
+    const pSignals = enrichment?.personaSignals?.get(persona.id)
+
+    const basicResult = matchPersona(
+      user,
+      persona,
+      "basic",
+      signal,
+      pSignals,
+      userContext,
+      enabledFeatures
+    )
+    const advancedResult = matchPersona(
+      user,
+      persona,
+      "advanced",
+      signal,
+      pSignals,
+      userContext,
+      enabledFeatures
+    )
+    const explorationResult = matchPersona(
+      user,
+      persona,
+      "exploration",
+      undefined,
+      pSignals,
+      userContext,
+      enabledFeatures
+    )
 
     allResults.push(basicResult, advancedResult, explorationResult)
   }
 
-  // Tier별 상위 N개 선택
+  // 4. Tier별 상위 N개 선택 (동적 가중치 적용)
   const byTier = groupByTier(allResults)
   const topN = config.topN
 
-  const basicCount = Math.max(1, Math.round(topN * config.tierWeights.basic))
-  const explorationCount = Math.max(1, Math.round(topN * config.tierWeights.exploration))
+  const basicCount = Math.max(1, Math.round(topN * tierWeights.basic))
+  const explorationCount = Math.max(1, Math.round(topN * tierWeights.exploration))
   const advancedCount = Math.max(1, topN - basicCount - explorationCount)
 
   const selected: MatchResult[] = [
@@ -434,7 +544,7 @@ export function matchAll(
     ...selectTopN(byTier.exploration, explorationCount, 0), // 탐색은 threshold 미적용
   ]
 
-  // 다양성 적용: 같은 페르소나 중복 제거
+  // 5. 다양성 적용: 같은 페르소나 중복 제거
   return deduplicateByPersona(selected)
 }
 
