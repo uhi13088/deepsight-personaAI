@@ -595,7 +595,7 @@
 
 #### P0: 의존성 정리 (T234~T237)
 
-- [ ] **T234: Landing 의존성 버전 통일 — Next.js 16 + 공유 패키지 호환성**
+- [x] **T234: Landing 의존성 버전 통일 — Next.js 16 + 공유 패키지 호환성** ✅ 2026-02-24
   - 배경: Landing만 Next.js 15, 나머지 3앱 Next.js 16. lucide-react/radix-ui/tailwind-merge도 버전 낙후
   - AC1: next 15.1.12 → 16.1.6
   - AC2: react/react-dom → 19.2.3 (exact pin, 다른 앱과 동일)
@@ -604,13 +604,13 @@
   - AC5: tailwind-merge ^2.6.0 → ^3.4.0 (@deepsight/ui 호환)
   - AC6: 4앱 Build PASS + 테스트 PASS
 
-- [ ] **T235: bcryptjs 메이저 버전 통일 — DC v2→v3**
+- [x] **T235: bcryptjs 메이저 버전 통일 — DC v2→v3** ✅ 2026-02-24
   - 배경: engine-studio bcryptjs@^3.0.3, developer-console bcryptjs@^2.4.3. 메이저 버전 차이 시 해시 호환성 리스크
   - AC1: DC bcryptjs ^2.4.3 → ^3.0.3
   - AC2: DC @types/bcryptjs도 v3 호환 확인/업데이트
   - AC3: DC 빌드 PASS + 테스트 PASS
 
-- [ ] **T236: engine-studio 미사용 의존성 제거 — 5개 패키지**
+- [x] **T236: engine-studio 미사용 의존성 제거 — 5개 패키지** ✅ 2026-02-24
   - 배경: import 검색 결과 코드에서 사용하지 않는 의존성 5개 확인
   - AC1: react-hook-form 제거 (import 0건)
   - AC2: @hookform/resolvers 제거 (import 0건)
@@ -619,7 +619,7 @@
   - AC5: recharts 제거 (import 0건)
   - AC6: ES Build PASS + 테스트 PASS
 
-- [ ] **T237: next-auth 버전 통일 — 3앱 동일 버전**
+- [x] **T237: next-auth 버전 통일 — 3앱 동일 버전** ✅ 2026-02-24
   - 배경: ES ^5.0.0-beta.30, DC ^5.0.0-beta.25, PW 5.0.0-beta.30(exact). 불일치 시 인증 동작 차이 가능
   - AC1: 3앱 next-auth → ^5.0.0-beta.30 통일
   - AC2: @auth/prisma-adapter 버전도 통일 확인
@@ -627,7 +627,7 @@
 
 #### P1: 설정 중앙화 + 코드 추출 (T238~T242)
 
-- [ ] **T238: tsconfig.base.json 생성 + 앱별 extends**
+- [x] **T238: tsconfig.base.json 생성 + 앱별 extends** ✅ 2026-02-24
   - 배경: 4앱 tsconfig.json이 거의 동일한 30줄 설정을 각자 관리. 루트 base 부재
   - AC1: `/tsconfig.base.json` 생성 (target ES2017, strict, module bundler, skipLibCheck 등 공통)
   - AC2: 4앱 tsconfig.json → `"extends": "../../tsconfig.base.json"` + 앱별 차이만 유지
@@ -635,7 +635,7 @@
   - AC4: JSX 설정 차이 유지 (landing: preserve, 나머지: react-jsx)
   - AC5: 4앱 Build PASS + 테스트 PASS + tsc 클린
 
-- [ ] **T239: vitest.config 공유 base 생성 + PW coverage 추가**
+- [x] **T239: vitest.config 공유 base 생성 + PW coverage 추가** ✅ 2026-02-24
   - 배경: ES/DC vitest.config.ts 100% 동일 23줄. PW는 coverage 설정 누락
   - AC1: `packages/config/src/vitest.base.ts` 생성 — createVitestConfig() 팩토리
   - AC2: ES/DC vitest.config.ts → base import + extends
@@ -643,20 +643,20 @@
   - AC4: 3앱 테스트 PASS
   - AC5: CLAUDE.md `@deepsight/config` 설명 업데이트
 
-- [ ] **T240: getEngineStudioUrl() → @deepsight/config 추출**
+- [x] **T240: getEngineStudioUrl() → @deepsight/config 추출** ✅ 2026-02-24
   - 배경: landing/next.config.ts와 persona-world/next.config.ts에 동일 URL 파싱 함수 복붙
   - AC1: `packages/config/src/env.ts`에 `getEngineStudioUrl()` 추출
   - AC2: landing + PW next.config.ts → import로 전환
   - AC3: 2앱 Build PASS
 
-- [ ] **T241: DIM_MAP / layerVectorToRecord 유틸 추출 + O(n) .find() → Map 변환**
+- [x] **T241: DIM_MAP / layerVectorToRecord 유틸 추출 + O(n) .find() → Map 변환** ✅ 2026-02-24
   - 배경: personas/route.ts와 personas/[id]/route.ts에 DIM_MAP + layerVectorToRecord 동일 코드 복붙. 스케줄러 등 3곳에서 O(n) .find() 반복
   - AC1: `src/lib/vector/dim-maps.ts` 생성 — DIM_MAP 상수 + layerVectorToRecord() 추출
   - AC2: personas/route.ts, personas/[id]/route.ts → import로 전환
   - AC3: layerVectors .find() 패턴 → Map 기반 O(1) 룩업으로 변환 (scheduler, cron, matching-lab)
   - AC4: ES Build PASS + 테스트 PASS
 
-- [ ] **T242: ESLint 설정 통일 + package.json 스크립트 정리**
+- [x] **T242: ESLint 설정 통일 + package.json 스크립트 정리** ✅ 2026-02-24
   - 배경: landing만 `next lint` 사용, 나머지 3앱 `eslint`. lint:fix 스크립트도 landing만 누락
   - AC1: landing lint 스크립트 `next lint` → `eslint`로 통일
   - AC2: landing에 lint:fix 스크립트 추가
@@ -664,14 +664,14 @@
 
 #### P2: 코드 품질 개선 (T243~T245)
 
-- [ ] **T243: API 응답 포맷 표준화 + TODO 구현**
+- [x] **T243: API 응답 포맷 표준화 + TODO 구현** ✅ 2026-02-24
   - 배경: auth 라우트가 `{ error, detail }` 비표준 포맷 사용. team/members에 이메일 초대 TODO, 2FA에 하드코딩 시크릿
   - AC1: auth 라우트 응답 → `{ success, error: { code, message } }` 표준 포맷 전환
   - AC2: team/members 이메일 초대 TODO → 구현 또는 명시적 주석으로 사유 기록
   - AC3: 2FA enable 하드코딩 시크릿 → otplib 또는 crypto 기반 실제 TOTP 생성
   - AC4: ES Build PASS + 테스트 PASS
 
-- [ ] **T244: 과대 API 라우트 서비스 레이어 분리 — 5파일 300줄+**
+- [x] **T244: 과대 API 라우트 서비스 레이어 분리 — 5파일 300줄+** ✅ 2026-02-24
   - 배경: persona-world-admin/scheduler(834줄), operations/incidents(613줄), cron/persona-scheduler(444줄) 등 비즈니스 로직이 라우트에 직접 구현
   - AC1: scheduler/route.ts → scheduler-service.ts 분리 (라우트는 파싱+위임만)
   - AC2: incidents/route.ts → incidents-service.ts 분리
@@ -680,7 +680,7 @@
   - AC5: DC v1/personas/filter/route.ts → filter-service.ts 분리
   - AC6: Build PASS + 테스트 PASS
 
-- [ ] **T245: 과대 페이지 컴포넌트 분리 — 3파일 1000줄+**
+- [x] **T245: 과대 페이지 컴포넌트 분리 — 3파일 1000줄+** ✅ 2026-02-24
   - 배경: persona-studio/edit(1752줄), arena(1320줄), incubator(1151줄)이 모놀리식
   - AC1: edit/[id]/page.tsx → PersonaDimensionEditor, PersonaMetadataForm, PersonaLifecycleActions 컴포넌트 분리
   - AC2: arena/page.tsx → ArenaSessionList, ArenaRunner, ArenaResults 컴포넌트 분리
@@ -690,7 +690,7 @@
 
 #### P3: 대형 라이브러리 모듈 분할 (T246)
 
-- [ ] **T246: 과대 lib 파일 모듈 분할 — 5파일 1400줄+**
+- [x] **T246: 과대 lib 파일 모듈 분할 — 5파일 1400줄+** ✅ 2026-02-24
   - 배경: rag-llm(2515줄), system-integration(2489줄), operations(1704줄), consumer-journey(1662줄), global-config(1495줄) 모놀리식
   - AC1: rag-llm/index.ts → rag-engine.ts + llm-strategy.ts + quality-feedback.ts 분리
   - AC2: system-integration/index.ts → deployment.ts + versioning.ts + event-bus.ts 분리
@@ -1436,11 +1436,27 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-- [ ] **T234: Landing 의존성 버전 통일** — Phase Y 시작
+(없음)
 
 ---
 
 ## ✅ DONE (최근 완료)
+
+- [x] **T234~T246: Phase Y 모노레포 코드 품질 개선 (13개 티켓 일괄 완료)** ✅ 2026-02-24
+  - T234: Landing 의존성 버전 통일 (Next.js 16, react 19.2.3, lucide/radix/tailwind-merge 최신화)
+  - T235: DC bcryptjs v2→v3 메이저 업그레이드
+  - T236: ES 미사용 의존성 5개 제거 (react-hook-form, @tanstack/react-query, d3, recharts 등)
+  - T237: next-auth ^5.0.0-beta.30 3앱+패키지 통일
+  - T238: tsconfig.base.json 생성 + 10개 tsconfig extends 적용
+  - T239: vitest.config 공유 base 팩토리 (createVitestBase) + PW coverage 추가
+  - T240: getEngineStudioUrl() → @deepsight/config 추출
+  - T241: DIM_MAP/layerVectorToRecord 유틸 추출 + O(n)→O(1) Map 변환 (9파일)
+  - T242: Landing ESLint 통일 + lint:fix/test:coverage 스크립트 정리
+  - T243: auth 응답 표준화 + 2FA TOTP Base32 시크릿 생성 + team/members TODO 정리
+  - T244: 과대 API 라우트 5개 서비스 레이어 분리
+  - T245: 과대 페이지 3개 컴포넌트 분리 (edit/arena/incubator)
+  - T246: 과대 lib 5개 모듈 분할 (re-export hub 유지)
+  - 검증: 4앱 Build PASS, 3964 tests PASS
 
 - [x] **T176: 프로덕션 DB 마이그레이션 미적용 수정** ✅ 2026-02-22
   - AC1: ✅ 마이그레이션 023 테이블명 오타 수정 (`"Persona"` → `"personas"`)
