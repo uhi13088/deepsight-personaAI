@@ -891,8 +891,10 @@ Content-Type: application/json
 | `level`                         | `string`           | ✅   | `QUICK` \| `STANDARD` \| `DEEP`                                 |
 | `responses`                     | `array`            | ✅   | 질문 응답 목록 (최소 응답 수: QUICK 12 / STANDARD 30 / DEEP 60) |
 | `responses[].question_id`       | `string`           | ✅   | 질문 ID                                                         |
-| `responses[].answer`            | `string \| number` | ✅   | 응답 값                                                         |
-| `responses[].target_dimensions` | `string[]`         | -    | 이 응답이 반영되는 벡터 차원                                    |
+| `responses[].answer`            | `string \| number` | ✅   | 응답 값 (옵션 key 또는 0.0~1.0)                                 |
+| `responses[].target_dimensions` | `string[]`         | -    | 이 응답이 반영되는 L1 벡터 차원 (legacy, l1_weights 미사용 시)  |
+| `responses[].l1_weights`        | `object`           | -    | L1 차원별 가중치 (e.g. `{"depth": 0.25}`) — 질문 옵션에서 제공  |
+| `responses[].l2_weights`        | `object`           | -    | L2 OCEAN 차원별 가중치 (e.g. `{"openness": 0.2}`)               |
 | `consent.data_collection`       | `boolean`          | ✅   | 데이터 수집 동의 (필수)                                         |
 | `consent.sns_analysis`          | `boolean`          | -    | SNS 분석 동의                                                   |
 | `consent.third_party_sharing`   | `boolean`          | -    | 제3자 공유 동의                                                 |
@@ -900,11 +902,11 @@ Content-Type: application/json
 
 **온보딩 레벨별 최소 응답 수**
 
-| 레벨       | 최소 응답 | 프로파일 품질 | 정밀도 추정 |
-| ---------- | --------- | ------------- | ----------- |
-| `QUICK`    | 12개      | BASIC         | ~45%        |
-| `STANDARD` | 30개      | STANDARD      | ~62%        |
-| `DEEP`     | 60개      | ADVANCED      | ~75%        |
+| 레벨       | 최소 응답 | 프로파일 품질 | 정밀도 추정 (L1 only) | 정밀도 추정 (L1+L2) |
+| ---------- | --------- | ------------- | --------------------- | ------------------- |
+| `QUICK`    | 12개      | BASIC         | ~45%                  | ~65%                |
+| `STANDARD` | 30개      | STANDARD      | ~62%                  | ~80%                |
+| `DEEP`     | 60개      | ADVANCED      | ~75%                  | ~93%                |
 
 **요청 예시**
 
@@ -913,14 +915,16 @@ Content-Type: application/json
   "level": "STANDARD",
   "responses": [
     {
-      "question_id": "q_001",
+      "question_id": "v3-q01-depth-openness",
       "answer": "A",
-      "target_dimensions": ["depth", "lens"]
+      "l1_weights": { "depth": 0.25 },
+      "l2_weights": { "openness": 0.2 }
     },
     {
-      "question_id": "q_002",
-      "answer": 0.7,
-      "target_dimensions": ["sociability"]
+      "question_id": "v3-q02-lens-neuroticism",
+      "answer": "B",
+      "l1_weights": { "lens": -0.15 },
+      "l2_weights": { "neuroticism": 0.2 }
     }
   ],
   "consent": {
@@ -931,6 +935,10 @@ Content-Type: application/json
   }
 }
 ```
+
+> **참고**: `l1_weights` / `l2_weights`는 질문 옵션에 정의된 가중치를 그대로 전달합니다.
+> 제공 시 설계서 §9.2 기준으로 정밀한 벡터 산출이 이루어지며, L2 (OCEAN) 벡터도 생성됩니다.
+> 미제공 시 `target_dimensions` 기반의 간이 heuristic이 적용됩니다 (하위 호환).
 
 **응답 (200 OK)**
 
@@ -952,9 +960,15 @@ Content-Type: application/json
         "purpose": 0.5,
         "sociability": 0.7
       },
-      "l2_temperament": null
+      "l2_temperament": {
+        "openness": 0.65,
+        "conscientiousness": 0.5,
+        "extraversion": 0.42,
+        "agreeableness": 0.58,
+        "neuroticism": 0.35
+      }
     },
-    "precision_estimate": 0.62,
+    "precision_estimate": 0.8,
     "next_steps": {
       "daily_check_available": true,
       "sns_connection_suggested": true,
@@ -967,6 +981,9 @@ Content-Type: application/json
   }
 }
 ```
+
+> `l2_temperament`는 `l2_weights`가 포함된 응답이 있을 때만 생성됩니다.
+> `l2_weights`가 없는 경우 `null`이 반환됩니다.
 
 ---
 

@@ -425,11 +425,11 @@ paths:
         온보딩 응답을 제출하고 유저 벡터 프로필을 생성합니다.
 
         ### 온보딩 레벨별 최소 응답 수
-        | 레벨 | 최소 응답 | 프로파일 품질 | 정밀도 추정 |
-        |------|---------|------------|----------|
-        | `QUICK` | 12개 | BASIC | ~45% |
-        | `STANDARD` | 30개 | STANDARD | ~62% |
-        | `DEEP` | 60개 | ADVANCED | ~75% |
+        | 레벨 | 최소 응답 | 프로파일 품질 | 정밀도 (L1 only) | 정밀도 (L1+L2) |
+        |------|---------|------------|----------------|---------------|
+        | `QUICK` | 12개 | BASIC | ~45% | ~65% |
+        | `STANDARD` | 30개 | STANDARD | ~62% | ~80% |
+        | `DEEP` | 60개 | ADVANCED | ~75% | ~93% |
 
         > 이미 온보딩을 완료한 사용자에게 호출하면 `CONFLICT` (409) 에러가 반환됩니다.
       parameters:
@@ -447,16 +447,18 @@ paths:
               $ref: "#/components/schemas/OnboardingRequest"
             examples:
               standard:
-                summary: STANDARD 레벨 온보딩
+                summary: STANDARD 레벨 온보딩 (L1+L2)
                 value:
                   level: "STANDARD"
                   responses:
-                    - question_id: "q_001"
+                    - question_id: "v3-q01-depth-openness"
                       answer: "A"
-                      target_dimensions: ["depth", "lens"]
-                    - question_id: "q_002"
-                      answer: 0.7
-                      target_dimensions: ["sociability"]
+                      l1_weights: { "depth": 0.25 }
+                      l2_weights: { "openness": 0.2 }
+                    - question_id: "v3-q02-lens-neuroticism"
+                      answer: "B"
+                      l1_weights: { "lens": -0.15 }
+                      l2_weights: { "neuroticism": 0.2 }
                   consent:
                     data_collection: true
                     sns_analysis: false
@@ -1347,7 +1349,7 @@ components:
       properties:
         question_id:
           type: string
-          example: "q_001"
+          example: "v3-q01-depth-openness"
         answer:
           oneOf:
             - type: string
@@ -1357,7 +1359,20 @@ components:
           type: array
           items:
             type: string
+          description: "Legacy — l1_weights 미사용 시 L1 차원 매핑"
           example: ["depth", "lens"]
+        l1_weights:
+          type: object
+          additionalProperties:
+            type: number
+          description: "L1 차원별 가중치 (질문 옵션에서 제공)"
+          example: { "depth": 0.25 }
+        l2_weights:
+          type: object
+          additionalProperties:
+            type: number
+          description: "L2 OCEAN 차원별 가중치 (질문 옵션에서 제공)"
+          example: { "openness": 0.2 }
 
     OnboardingRequest:
       type: object
@@ -1413,9 +1428,12 @@ components:
                   $ref: "#/components/schemas/L1Vector"
                 l2_temperament:
                   nullable: true
+                  allOf:
+                    - $ref: "#/components/schemas/L2Vector"
+                  description: "l2_weights 제공 시 생성, 미제공 시 null"
             precision_estimate:
               type: number
-              example: 0.62
+              example: 0.80
             next_steps:
               type: object
               properties:
