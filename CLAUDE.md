@@ -94,6 +94,48 @@ pnpm --filter engine-studio build  # 앱별 빌드
 - 훅 로그: `~/.claude/logs/security.log`
 - 훅 수정 시 `.claude/settings.json`의 hooks 섹션도 함께 확인
 
+## 공유 패키지 (packages/) — 작업 전 필수 확인
+
+> **새 유틸/컴포넌트/타입 추가 시 아래 목록을 먼저 확인하고, 이미 존재하면 재구현하지 말 것.**
+> **앱 간 동일 코드를 발견하면 공유 패키지로 추출하는 티켓을 등록할 것.**
+
+### 기존 패키지
+
+| 패키지 | 경로 | 용도 | 사용처 |
+| --- | --- | --- | --- |
+| `@deepsight/shared-types` | `packages/shared-types/` | 3-Layer 벡터 타입, API 응답 타입, 에러 코드, 빌링 타입 | engine-studio, developer-console, persona-world, sdk, vector-core |
+| `@deepsight/vector-core` | `packages/vector-core/` | L1/L2/L3 벡터 계산, 온보딩 질문 타입, clamp 함수 | engine-studio, persona-world |
+| `@deepsight/sdk` | `packages/sdk/` | 외부 고객용 JavaScript SDK (DeepSight API 클라이언트) | 퍼블리시 전용 (앱 내부 미사용) |
+
+### 패키지 컨벤션
+
+- **내부 패키지**: `private: true`, 빌드 없이 `main: "./src/index.ts"` 직접 참조
+- **퍼블리시 패키지**: `tsup`으로 CJS+ESM 듀얼 빌드, `dist/` 출력
+- **워크스페이스 참조**: `"@deepsight/shared-types": "workspace:*"` 프로토콜 사용
+- **tsconfig**: `target: ES2020`, `moduleResolution: bundler`, `strict: true`
+
+### 앱 간 중복 현황 (추출 대상)
+
+> 아래 항목들은 현재 앱마다 복사되어 있음. 공유 패키지 추출 작업 시 참고.
+
+| 중복 항목 | 위치 | 상태 | 우선순위 |
+| --- | --- | --- | --- |
+| **shadcn/ui 컴포넌트** (button, badge, input, select, tooltip 등) | `apps/*/src/components/ui/` | select, tooltip은 동일. button, badge는 앱별 변형 있음 | HIGH |
+| **`cn()` 유틸** | `apps/*/src/lib/utils.ts` | 4앱 모두 동일 (clsx + twMerge) | HIGH |
+| **`requireAuth()`** | `apps/{developer-console,engine-studio}/src/lib/require-auth.ts` | 100% 동일 (57줄) | HIGH |
+| **Prisma 싱글턴** | `apps/{developer-console,engine-studio}/src/lib/prisma.ts` | DC가 더 견고 (로깅 설정 포함) | MEDIUM |
+| **Next.js 보안 헤더** | `apps/*/next.config.ts` | 4앱 동일 패턴 (XSS, MIME, Clickjacking, Referrer, Permissions) | MEDIUM |
+| **Auth 미들웨어** (쿠키 체크) | `apps/{developer-console,engine-studio}/middleware.ts` | 핵심 로직 동일, 라우트만 다름 | MEDIUM |
+| **API 응답 타입** (`ApiResponse<T>`, `ApiError`) | `apps/developer-console/src/services/api-client.ts` | DC에만 존재, 다른 앱은 인라인 정의 | LOW |
+| **Theme Provider** | `apps/{developer-console,engine-studio}/src/components/` | 구현 방식 다름 (Zustand vs next-themes) — 통일 필요 | LOW |
+
+### 앱별 고유 항목 (공유 불필요)
+
+- **persona-world**: `pw-*` 커스텀 디자인 시스템 (pw-badge, pw-button 등) — PW 전용 브랜딩
+- **developer-console**: API 키 마스킹, HTTP 상태 색상 등 콘솔 전용 유틸
+- **engine-studio**: 페르소나 관련 hooks (use-personas, use-archetypes 등)
+- **landing**: 로딩 스피너 button, 브랜드 그래디언트 CSS — 랜딩 전용
+
 ## 참조 문서
 
 ### v4 설계/구현 (Active)
