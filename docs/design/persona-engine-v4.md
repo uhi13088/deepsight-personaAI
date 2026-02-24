@@ -703,9 +703,45 @@ Anthropic API `cache_control` 블록 레벨 캐싱 활용.
 - narrativeCompatibility: 유저 온보딩 답변 vs 페르소나 L3
 ```
 
-### 12.3 소셜 모듈 통합
+### 12.3 소셜 모듈 통합 (Trust-Weighted Matching)
 
-- 친밀도(warmth) 높은 관계 → 추천 가중치 부스트
+기존 `trust-score.ts`의 `computeTrustScore()`를 매칭 파이프라인에 통합하여,
+인터랙션 이력이 축적된 페르소나 쌍에 대해 관계 신뢰도를 매칭 점수에 반영한다.
+
+**적용 범위**: Basic/Advanced Tier만. Exploration Tier는 세렌디피티 보존을 위해 제외.
+
+**SocialSignal 구조**:
+
+```
+SocialSignal {
+  trustScore: number   // λ-가중 신뢰 점수 (0.0~1.0)
+  trustLambda: number  // 활성화 가중치 (0.0~1.0)
+}
+```
+
+**블렌딩 공식**:
+
+```
+trustWeight = min(TRUST_MAX_WEIGHT, trustLambda × TRUST_MAX_WEIGHT)
+finalScore = (1 - trustWeight) × rawScore + trustWeight × trustScore
+
+TRUST_MAX_WEIGHT = 0.2 (최대 20% 영향)
+```
+
+**활성화 곡선** (trust-score.ts의 λ sigmoid 활용):
+
+| 세션 수 | λ      | trustWeight | 벡터:Trust 비율 |
+| ------- | ------ | ----------- | --------------- |
+| 0       | ≈0.007 | ≈0.00       | 100:0           |
+| 10      | ≈0.03  | ≈0.01       | 99:1            |
+| 30      | 0.50   | 0.10        | 90:10           |
+| 50      | ≈0.97  | ≈0.19       | 81:19           |
+| 100     | ≈0.99  | ≈0.20       | 80:20           |
+
+**Cold-Start**: λ sigmoid가 자연스럽게 처리. 인터랙션 0건 → trustWeight≈0 → 순수 벡터 매칭.
+
+**추가 통합** (미변경):
+
 - 허브 페르소나 → 탐색 Tier 노출 증가
 - 봇 의심 → 추천에서 제외
 

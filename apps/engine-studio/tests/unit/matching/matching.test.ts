@@ -27,9 +27,11 @@ import {
   generateExplanation,
   matchPersona,
   matchAll,
+  computeTrustWeight,
   DEFAULT_MATCHING_CONFIG,
+  TRUST_MAX_WEIGHT,
 } from "@/lib/matching/three-tier-engine"
-import type { PersonaCandidate, UserProfile } from "@/lib/matching/three-tier-engine"
+import type { PersonaCandidate, UserProfile, SocialSignal } from "@/lib/matching/three-tier-engine"
 
 // ── Simulator ────────────────────────────────────────────────
 
@@ -276,6 +278,7 @@ describe("Three-Tier Engine", () => {
         crossAxisScore: 0.7,
         paradoxCompatibility: 0,
         qualitativeBonus: 0,
+        trustBoost: 0,
       }
       const ex = generateExplanation("basic", breakdown, sampleL1, sampleL1)
       expect(ex.length).toBeGreaterThan(0)
@@ -326,6 +329,160 @@ describe("Three-Tier Engine", () => {
       const results = matchAll(user, personas)
       const personaIds = results.map((r) => r.personaId)
       expect(new Set(personaIds).size).toBe(personaIds.length)
+    })
+
+    it("MatchingContext로 소셜 시그널 전달", () => {
+      const user = makeUserProfile()
+      const personas = [makePersonaCandidate("p1"), makePersonaCandidate("p2")]
+      const context = {
+        socialSignals: new Map<string, SocialSignal>([
+          ["p1", { trustScore: 0.9, trustLambda: 1.0 }],
+        ]),
+      }
+      const withTrust = matchAll(user, personas, DEFAULT_MATCHING_CONFIG, context)
+      const withoutTrust = matchAll(user, personas)
+
+      // p1은 Trust 보정을 받으므로 점수가 달라야 함
+      const p1WithTrust = withTrust.find((r) => r.personaId === "p1")
+      const p1WithoutTrust = withoutTrust.find((r) => r.personaId === "p1")
+      expect(p1WithTrust).toBeDefined()
+      expect(p1WithoutTrust).toBeDefined()
+      // Trust가 높으면 점수에 영향 (같거나 다를 수 있지만, breakdown에 trustBoost 있음)
+      expect(p1WithTrust!.breakdown.trustBoost).toBeGreaterThan(0)
+      expect(p1WithoutTrust!.breakdown.trustBoost).toBe(0)
+    })
+  })
+
+  // ── Trust 통합 테스트 ──────────────────────────────────────
+
+  describe("Trust Integration", () => {
+    it("computeTrustWeight: 시그널 없으면 0", () => {
+      expect(computeTrustWeight()).toBe(0)
+      expect(computeTrustWeight(undefined)).toBe(0)
+    })
+
+    it("computeTrustWeight: λ=0이면 0", () => {
+      expect(computeTrustWeight({ trustScore: 0.9, trustLambda: 0 })).toBe(0)
+    })
+
+    it("computeTrustWeight: λ=0.5이면 TRUST_MAX_WEIGHT/2", () => {
+      const weight = computeTrustWeight({ trustScore: 0.8, trustLambda: 0.5 })
+      expect(weight).toBeCloseTo(TRUST_MAX_WEIGHT * 0.5, 5)
+    })
+
+    it("computeTrustWeight: λ=1.0이면 TRUST_MAX_WEIGHT", () => {
+      const weight = computeTrustWeight({ trustScore: 0.8, trustLambda: 1.0 })
+      expect(weight).toBe(TRUST_MAX_WEIGHT)
+    })
+
+    it("computeTrustWeight: λ>1이면 TRUST_MAX_WEIGHT로 클램프", () => {
+      const weight = computeTrustWeight({ trustScore: 0.8, trustLambda: 5.0 })
+      expect(weight).toBe(TRUST_MAX_WEIGHT)
+    })
+
+    it("Basic: 높은 Trust → 점수 상승", () => {
+      const v = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+      const cap = makeCrossAxisProfile()
+      const signal: SocialSignal = { trustScore: 1.0, trustLambda: 1.0 }
+
+      const { score: withoutTrust } = calculateBasicScore(v, v, cap, cap)
+      const { score: withTrust } = calculateBasicScore(v, v, cap, cap, undefined, undefined, signal)
+
+      // trustScore=1.0은 rawScore보다 높을 수 있으므로 점수 상승
+      expect(withTrust).toBeGreaterThanOrEqual(withoutTrust)
+    })
+
+    it("Basic: Trust 없으면 기존 동작과 동일", () => {
+      const v = [0.7, 0.8, 0.6, 0.7, 0.4, 0.6, 0.3]
+      const cap = makeCrossAxisProfile()
+      const eps = makeParadoxProfile()
+
+      const { score: noSignal } = calculateBasicScore(v, v, cap, cap, eps, eps)
+      const { score: undefinedSignal } = calculateBasicScore(v, v, cap, cap, eps, eps, undefined)
+
+      expect(noSignal).toBe(undefinedSignal)
+    })
+
+    it("Basic: 낮은 Trust → 점수 하락", () => {
+      const v = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+      const cap = makeCrossAxisProfile()
+      const signal: SocialSignal = { trustScore: 0.0, trustLambda: 1.0 }
+
+      const { score: withoutTrust } = calculateBasicScore(v, v, cap, cap)
+      const { score: withTrust } = calculateBasicScore(v, v, cap, cap, undefined, undefined, signal)
+
+      // trustScore=0 → 점수를 끌어내림
+      expect(withTrust).toBeLessThan(withoutTrust)
+    })
+
+    it("Advanced: Trust 블렌딩 적용", () => {
+      const v = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+      const cap = makeCrossAxisProfile()
+      const eps = makeParadoxProfile()
+      const signal: SocialSignal = { trustScore: 0.9, trustLambda: 1.0 }
+
+      const { breakdown } = calculateAdvancedScore(v, v, cap, cap, eps, eps, signal)
+      expect(breakdown.trustBoost).toBe(0.9)
+    })
+
+    it("Exploration: Trust 미적용 (trustBoost = 0)", () => {
+      const cap = makeCrossAxisProfile()
+      const eps = makeParadoxProfile()
+
+      const { breakdown } = calculateExplorationScore(cap, cap, eps, eps, [], "p1")
+      expect(breakdown.trustBoost).toBe(0)
+    })
+
+    it("matchPersona: socialSignal 전달 시 Basic에만 적용", () => {
+      const user = makeUserProfile()
+      const persona = makePersonaCandidate("p1")
+      const signal: SocialSignal = { trustScore: 0.8, trustLambda: 1.0 }
+
+      const basicResult = matchPersona(user, persona, "basic", signal)
+      expect(basicResult.breakdown.trustBoost).toBe(0.8)
+
+      const explorationResult = matchPersona(user, persona, "exploration", signal)
+      expect(explorationResult.breakdown.trustBoost).toBe(0)
+    })
+
+    it("Trust 가중치는 0~TRUST_MAX_WEIGHT 범위 보장", () => {
+      const extremeSignals: SocialSignal[] = [
+        { trustScore: 0, trustLambda: 0 },
+        { trustScore: 1.0, trustLambda: 0.5 },
+        { trustScore: 0.5, trustLambda: 1.0 },
+        { trustScore: 1.0, trustLambda: 1.0 },
+        { trustScore: 1.0, trustLambda: 10.0 },
+      ]
+
+      for (const signal of extremeSignals) {
+        const weight = computeTrustWeight(signal)
+        expect(weight).toBeGreaterThanOrEqual(0)
+        expect(weight).toBeLessThanOrEqual(TRUST_MAX_WEIGHT)
+      }
+    })
+
+    it("generateExplanation: Trust 있으면 신뢰 보정 표시", () => {
+      const breakdown = {
+        vectorScore: 0.8,
+        crossAxisScore: 0.7,
+        paradoxCompatibility: 0,
+        qualitativeBonus: 0,
+        trustBoost: 0.75,
+      }
+      const ex = generateExplanation("basic", breakdown, sampleL1, sampleL1)
+      expect(ex).toContain("신뢰 보정")
+    })
+
+    it("generateExplanation: Trust 없으면 신뢰 보정 미표시", () => {
+      const breakdown = {
+        vectorScore: 0.8,
+        crossAxisScore: 0.7,
+        paradoxCompatibility: 0,
+        qualitativeBonus: 0,
+        trustBoost: 0,
+      }
+      const ex = generateExplanation("basic", breakdown, sampleL1, sampleL1)
+      expect(ex).not.toContain("신뢰 보정")
     })
   })
 })
@@ -807,6 +964,7 @@ describe("Scenario", () => {
             crossAxisScore: 0.7,
             paradoxCompatibility: 0,
             qualitativeBonus: 0,
+            trustBoost: 0,
           },
           explanation: "test",
         },
