@@ -3,6 +3,8 @@ import crypto from "crypto"
 import prisma from "@/lib/prisma"
 import { validateApiKey, type ValidatedApiKey } from "@/lib/api-key-validator"
 import { trackApiUsage } from "@/lib/usage-tracker"
+import { computeVectorsFromApiResponses } from "@deepsight/vector-core"
+import type { OnboardingApiResponse } from "@deepsight/vector-core"
 
 // ============================================================================
 // Types & Constants
@@ -16,16 +18,6 @@ const ONBOARDING_LEVELS = {
 
 type OnboardingLevel = keyof typeof ONBOARDING_LEVELS
 
-interface OnboardingResponse {
-  question_id: string
-  answer: string | number
-  target_dimensions?: string[]
-  /** Structured L1 weights from question option (e.g. {"depth": 0.25, "lens": -0.15}) */
-  l1_weights?: Record<string, number>
-  /** Structured L2 weights from question option (e.g. {"openness": 0.2}) */
-  l2_weights?: Record<string, number>
-}
-
 // ============================================================================
 // Rate Limit Helpers
 // ============================================================================
@@ -38,112 +30,6 @@ function getRateLimitHeaders(apiKey: ValidatedApiKey) {
     "X-RateLimit-Remaining": String(Math.max(0, limit - 1)),
     "X-RateLimit-Reset": String(resetTime),
   }
-}
-
-// ============================================================================
-// Vector computation from onboarding responses
-// ============================================================================
-
-const L1_DIMS = ["depth", "lens", "stance", "scope", "taste", "purpose", "sociability"] as const
-const L2_DIMS = [
-  "openness",
-  "conscientiousness",
-  "extraversion",
-  "agreeableness",
-  "neuroticism",
-] as const
-
-function clamp(v: number): number {
-  return Math.round(Math.max(0, Math.min(1, v)) * 100) / 100
-}
-
-/**
- * Compute L1 + L2 vectors from onboarding responses.
- *
- * 설계서 §9.2:
- * - l1_weights / l2_weights가 제공되면: base(0.5)에 delta 누적 후 clamp
- * - target_dimensions만 제공되면: 기존 heuristic (하위 호환)
- * - STANDARD/DEEP 레벨에서 l2_weights가 제공되면 L2 벡터도 생성
- */
-function computeVectorFromResponses(
-  responses: OnboardingResponse[],
-  level: OnboardingLevel
-): {
-  l1: Record<string, number>
-  l2: Record<string, number> | null
-  hasL2: boolean
-  profileQuality: "BASIC" | "STANDARD" | "ADVANCED"
-} {
-  // Initialize base vectors (neutral 0.5)
-  const l1: Record<string, number> = {}
-  const l2: Record<string, number> = {}
-  const l1Delta: Record<string, number> = {}
-  const l2Delta: Record<string, number> = {}
-  const l1Counts: Record<string, number> = {}
-  let hasStructuredL1 = false
-  let hasL2Data = false
-
-  for (const dim of L1_DIMS) {
-    l1[dim] = 0.5
-    l1Delta[dim] = 0
-    l1Counts[dim] = 0
-  }
-  for (const dim of L2_DIMS) {
-    l2[dim] = 0.5
-    l2Delta[dim] = 0
-  }
-
-  for (const resp of responses) {
-    // Structured weights path: use l1_weights/l2_weights from question options
-    if (resp.l1_weights) {
-      hasStructuredL1 = true
-      for (const [dim, weight] of Object.entries(resp.l1_weights)) {
-        if (L1_DIMS.includes(dim as (typeof L1_DIMS)[number])) {
-          l1Delta[dim] = (l1Delta[dim] ?? 0) + weight
-        }
-      }
-    } else if (resp.target_dimensions) {
-      // Legacy path: simple heuristic (backward compat)
-      const dims = resp.target_dimensions
-      for (const dim of dims) {
-        if (L1_DIMS.includes(dim as (typeof L1_DIMS)[number])) {
-          const val =
-            typeof resp.answer === "number" ? resp.answer : resp.answer === "A" ? 0.3 : 0.7
-          l1[dim] = (l1[dim] * l1Counts[dim] + val) / (l1Counts[dim] + 1)
-          l1Counts[dim]++
-        }
-      }
-    }
-
-    // L2 weights (only from structured weights)
-    if (resp.l2_weights) {
-      hasL2Data = true
-      for (const [dim, weight] of Object.entries(resp.l2_weights)) {
-        if (L2_DIMS.includes(dim as (typeof L2_DIMS)[number])) {
-          l2Delta[dim] = (l2Delta[dim] ?? 0) + weight
-        }
-      }
-    }
-  }
-
-  // Apply structured L1 deltas (base 0.5 + accumulated delta)
-  if (hasStructuredL1) {
-    for (const dim of L1_DIMS) {
-      l1[dim] = clamp(0.5 + l1Delta[dim])
-    }
-  }
-
-  // Apply L2 deltas
-  const l2Result: Record<string, number> | null = hasL2Data ? {} : null
-  if (hasL2Data && l2Result) {
-    for (const dim of L2_DIMS) {
-      l2Result[dim] = clamp(0.5 + l2Delta[dim])
-    }
-  }
-
-  const profileQuality = level === "DEEP" ? "ADVANCED" : level === "STANDARD" ? "STANDARD" : "BASIC"
-
-  return { l1, l2: l2Result, hasL2: hasL2Data, profileQuality }
 }
 
 // ============================================================================
@@ -273,11 +159,29 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    // Compute vectors from responses
-    const { l1, l2, hasL2, profileQuality } = computeVectorFromResponses(
-      responses as OnboardingResponse[],
-      onboardingLevel
-    )
+    // Compute vectors from responses (delegated to @deepsight/vector-core)
+    const apiResponses: OnboardingApiResponse[] = (
+      responses as {
+        question_id: string
+        answer: string | number
+        target_dimensions?: string[]
+        l1_weights?: Record<string, number>
+        l2_weights?: Record<string, number>
+      }[]
+    ).map((r) => ({
+      question_id: r.question_id,
+      answer: r.answer,
+      target_dimensions: r.target_dimensions,
+      l1_weights: r.l1_weights,
+      l2_weights: r.l2_weights,
+    }))
+    const { l1, l2, hasL2 } = computeVectorsFromApiResponses(apiResponses)
+    const profileQuality =
+      onboardingLevel === "DEEP"
+        ? ("ADVANCED" as const)
+        : onboardingLevel === "STANDARD"
+          ? ("STANDARD" as const)
+          : ("BASIC" as const)
 
     // Create user vector (L1 + optional L2)
     const userVector = await prisma.userVector.create({
