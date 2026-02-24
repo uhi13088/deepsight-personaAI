@@ -1495,6 +1495,25 @@
 
 ## ✅ DONE (최근 완료)
 
+- [x] **T252~T254: ES 프로토타입 메뉴 정리 + 인메모리 API DB 영속화 (3개 티켓 일괄)** ✅ 2026-02-24
+  - T252: ES 네비게이션 정리 — 검색 팔레트↔사이드바 동기화 + 레이블 통일
+    - AC1: ✅ 검색 팔레트에서 redirect 항목 제거 (Activity Dashboard, Scheduler Control)
+    - AC2: ✅ 검색 팔레트에 누락 항목 추가 (Security 4개, PW Admin Operations)
+    - AC3: ✅ 사이드바 한글 레이블 영문 통일 (알고리즘 배포→Deployment Pipeline, LLM 비용→LLM Costs, 뉴스 반응→News Reactions, 알고리즘 버전→Version Management)
+    - AC4: ✅ 검색 팔레트 레이블 사이드바와 동기화 (Version Control→Version Management)
+    - AC5: ✅ Psychometric Model → Psychometric Simulator 명칭 변경 (사이드바+검색+페이지 Header 3곳)
+    - AC6: ✅ 페이지 Header title 한/영 통일 (LLM 비용→LLM Costs, 알고리즘 버전 관리→Version Management, 뉴스 반응 관리→News Reactions)
+  - T253: Matching Lab Tuning API — 인메모리 → DB 영속화
+    - AC1: ✅ `let profileStore` 모듈 변수 → SystemConfig(MATCHING_TUNING/profile) DB 저장/로드
+    - AC2: ✅ GET: DB 로드 (없으면 기본값 seed), POST/PUT: DB 즉시 저장
+    - AC3: ✅ 프론트엔드 변경 없음 (API 인터페이스 유지)
+  - T254: System Integration Deploy API — 인메모리 → DB 영속화
+    - AC1: ✅ `const store: DeployStore` 인메모리 → SystemConfig(DEPLOY_PIPELINE/workflows, canaries) DB 저장/로드
+    - AC2: ✅ Map→Record 직렬화, 모든 POST 액션에서 DB 저장
+    - AC3: ✅ 프론트엔드 변경 없음 (API 인터페이스 유지)
+  - 변경파일: header.tsx, lnb.tsx, psychometric/page.tsx, llm-costs/page.tsx, versions/page.tsx, news/page.tsx, tuning/route.ts, deploy/route.ts
+  - 검증: Build PASS (109 static pages)
+
 - [x] **T247~T251: Phase TQ 테스트 품질 개선 (5개 티켓 일괄 완료)** ✅ 2026-02-24
   - T247: 공유 테스트 픽스처 추출 (fixtures/vectors.ts + factories.ts, 13개 파일 중복 해소)
   - T248: structured-fields 미테스트 함수 8개 커버리지 추가 (23개 신규 테스트)

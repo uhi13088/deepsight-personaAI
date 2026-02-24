@@ -255,7 +255,7 @@ export default function VersionsPage() {
     return (
       <>
         <Header
-          title="알고리즘 버전 관리"
+          title="Version Management"
           description="매칭·페르소나 생성기·유저 프로파일러 파라미터 버전 이력 관리"
         />
         <div className="flex items-center justify-center py-20">
@@ -269,7 +269,7 @@ export default function VersionsPage() {
     return (
       <>
         <Header
-          title="알고리즘 버전 관리"
+          title="Version Management"
           description="매칭·페르소나 생성기·유저 프로파일러 파라미터 버전 이력 관리"
         />
         <div className="flex items-center justify-center py-20">
@@ -284,7 +284,7 @@ export default function VersionsPage() {
   return (
     <>
       <Header
-        title="알고리즘 버전 관리"
+        title="Version Management"
         description="매칭·페르소나 생성기·유저 프로파일러 파라미터 버전 이력 관리"
       />
 

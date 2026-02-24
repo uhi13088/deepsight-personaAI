@@ -309,7 +309,7 @@ export default function NewsAdminPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Rss className="h-5 w-5 text-orange-500" />
-          <h1 className="text-xl font-semibold">뉴스 반응 관리</h1>
+          <h1 className="text-xl font-semibold">News Reactions</h1>
           <Badge variant="outline" className="text-xs">
             Phase NB
           </Badge>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/require-auth"
+import { prisma } from "@/lib/prisma"
 import type { ApiResponse } from "@/types"
 import {
   createDeployWorkflow,
@@ -20,15 +21,44 @@ import type {
   CanaryMetrics,
 } from "@/lib/system-integration"
 
-// ── In-memory Store ────────────────────────────────────────────
-interface DeployStore {
-  workflows: DeployWorkflow[]
-  canaries: Map<string, CanaryRelease>
+// ── Prisma Helpers ────────────────────────────────────────────
+
+const DEPLOY_CATEGORY = "DEPLOY_PIPELINE"
+
+async function loadWorkflows(): Promise<DeployWorkflow[]> {
+  const row = await prisma.systemConfig.findUnique({
+    where: { category_key: { category: DEPLOY_CATEGORY, key: "workflows" } },
+  })
+  if (!row) return []
+  return row.value as unknown as DeployWorkflow[]
 }
 
-const store: DeployStore = {
-  workflows: [],
-  canaries: new Map(),
+async function saveWorkflows(workflows: DeployWorkflow[]): Promise<void> {
+  await prisma.systemConfig.upsert({
+    where: { category_key: { category: DEPLOY_CATEGORY, key: "workflows" } },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    update: { value: workflows as any },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    create: { category: DEPLOY_CATEGORY, key: "workflows", value: workflows as any },
+  })
+}
+
+async function loadCanaries(): Promise<Record<string, CanaryRelease>> {
+  const row = await prisma.systemConfig.findUnique({
+    where: { category_key: { category: DEPLOY_CATEGORY, key: "canaries" } },
+  })
+  if (!row) return {}
+  return row.value as unknown as Record<string, CanaryRelease>
+}
+
+async function saveCanaries(canaries: Record<string, CanaryRelease>): Promise<void> {
+  await prisma.systemConfig.upsert({
+    where: { category_key: { category: DEPLOY_CATEGORY, key: "canaries" } },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    update: { value: canaries as any },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    create: { category: DEPLOY_CATEGORY, key: "canaries", value: canaries as any },
+  })
 }
 
 // ── Response Types ─────────────────────────────────────────────
@@ -45,14 +75,17 @@ export async function GET() {
   if (response) return response
 
   try {
+    const workflows = await loadWorkflows()
+    const canaries = await loadCanaries()
+
     // 가장 최근 워크플로우에 연결된 canary 찾기
-    const latestWorkflow = store.workflows[store.workflows.length - 1] ?? null
-    const canary = latestWorkflow ? (store.canaries.get(latestWorkflow.id) ?? null) : null
+    const latestWorkflow = workflows[workflows.length - 1] ?? null
+    const canary = latestWorkflow ? (canaries[latestWorkflow.id] ?? null) : null
 
     return NextResponse.json<ApiResponse<DeployDataResponse>>({
       success: true,
       data: {
-        workflows: store.workflows,
+        workflows,
         environments: ENVIRONMENT_CONFIGS,
         canary,
         rollbackTriggers: DEFAULT_CANARY_ROLLBACK_TRIGGERS,
@@ -117,7 +150,9 @@ export async function POST(request: NextRequest) {
           body.environment,
           body.createdBy
         )
-        store.workflows.push(workflow)
+        const workflows = await loadWorkflows()
+        workflows.push(workflow)
+        await saveWorkflows(workflows)
         return NextResponse.json<ApiResponse<DeployWorkflow>>({
           success: true,
           data: workflow,
@@ -125,7 +160,8 @@ export async function POST(request: NextRequest) {
       }
 
       case "advance_stage": {
-        const wfIdx = store.workflows.findIndex((w) => w.id === body.workflowId)
+        const workflows = await loadWorkflows()
+        const wfIdx = workflows.findIndex((w) => w.id === body.workflowId)
         if (wfIdx === -1) {
           return NextResponse.json<ApiResponse<never>>(
             {
@@ -136,13 +172,14 @@ export async function POST(request: NextRequest) {
           )
         }
         const updated = advanceDeployStage(
-          store.workflows[wfIdx],
+          workflows[wfIdx],
           body.stage,
           body.success,
           body.logs ?? [],
           body.error ?? null
         )
-        store.workflows[wfIdx] = updated
+        workflows[wfIdx] = updated
+        await saveWorkflows(workflows)
         return NextResponse.json<ApiResponse<DeployWorkflow>>({
           success: true,
           data: updated,
@@ -150,7 +187,8 @@ export async function POST(request: NextRequest) {
       }
 
       case "create_canary": {
-        const wf = store.workflows.find((w) => w.id === body.workflowId)
+        const workflows = await loadWorkflows()
+        const wf = workflows.find((w) => w.id === body.workflowId)
         if (!wf) {
           return NextResponse.json<ApiResponse<never>>(
             {
@@ -161,7 +199,9 @@ export async function POST(request: NextRequest) {
           )
         }
         const canary = createCanaryRelease(wf.id, body.durationMinutes ?? 30)
-        store.canaries.set(wf.id, canary)
+        const canaries = await loadCanaries()
+        canaries[wf.id] = canary
+        await saveCanaries(canaries)
         return NextResponse.json<ApiResponse<CanaryRelease>>({
           success: true,
           data: canary,
@@ -169,7 +209,8 @@ export async function POST(request: NextRequest) {
       }
 
       case "advance_canary": {
-        const existingCanary = store.canaries.get(body.workflowId)
+        const canaries = await loadCanaries()
+        const existingCanary = canaries[body.workflowId]
         if (!existingCanary) {
           return NextResponse.json<ApiResponse<never>>(
             { success: false, error: { code: "NOT_FOUND", message: "카나리를 찾을 수 없습니다" } },
@@ -183,7 +224,8 @@ export async function POST(request: NextRequest) {
           matchingSatisfactionScore: 72,
         })
         const advanced = advanceCanaryPhase(withMetrics)
-        store.canaries.set(body.workflowId, advanced)
+        canaries[body.workflowId] = advanced
+        await saveCanaries(canaries)
         return NextResponse.json<ApiResponse<CanaryRelease>>({
           success: true,
           data: advanced,
@@ -191,7 +233,8 @@ export async function POST(request: NextRequest) {
       }
 
       case "update_canary_metrics": {
-        const c = store.canaries.get(body.workflowId)
+        const canaries = await loadCanaries()
+        const c = canaries[body.workflowId]
         if (!c) {
           return NextResponse.json<ApiResponse<never>>(
             { success: false, error: { code: "NOT_FOUND", message: "카나리를 찾을 수 없습니다" } },
@@ -199,7 +242,8 @@ export async function POST(request: NextRequest) {
           )
         }
         const withMetrics = updateCanaryMetrics(c, body.metrics)
-        store.canaries.set(body.workflowId, withMetrics)
+        canaries[body.workflowId] = withMetrics
+        await saveCanaries(canaries)
         return NextResponse.json<ApiResponse<CanaryRelease>>({
           success: true,
           data: withMetrics,
@@ -207,7 +251,8 @@ export async function POST(request: NextRequest) {
       }
 
       case "simulate_rollback_trigger": {
-        const canaryForSim = store.canaries.get(body.workflowId)
+        const canaries = await loadCanaries()
+        const canaryForSim = canaries[body.workflowId]
         if (!canaryForSim) {
           return NextResponse.json<ApiResponse<never>>(
             { success: false, error: { code: "NOT_FOUND", message: "카나리를 찾을 수 없습니다" } },
@@ -219,7 +264,8 @@ export async function POST(request: NextRequest) {
           avgResponseTimeMs: 350,
           matchingSatisfactionScore: -15,
         })
-        store.canaries.set(body.workflowId, withBadMetrics)
+        canaries[body.workflowId] = withBadMetrics
+        await saveCanaries(canaries)
         const evaluation = evaluateCanaryRollback(withBadMetrics)
         return NextResponse.json<
           ApiResponse<{

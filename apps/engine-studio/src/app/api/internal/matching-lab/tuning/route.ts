@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/require-auth"
+import { prisma } from "@/lib/prisma"
 import type { ApiResponse } from "@/types"
 import type { SocialDimension } from "@/types"
 import {
@@ -13,19 +14,36 @@ import {
 } from "@/lib/matching/tuning"
 import type { TuningProfile, HyperParameter, GenreWeightTable } from "@/lib/matching/tuning"
 
-// ── Module-level store (persists during server session) ─────────
+// ── Prisma Helpers ──────────────────────────────────────────────
 
-let profileStore: TuningProfile | null = null
+const TUNING_CATEGORY = "MATCHING_TUNING"
+const TUNING_KEY = "profile"
 
-function getProfileStore(): TuningProfile {
-  if (!profileStore) {
-    profileStore = createTuningProfile(
-      "기본 프로필",
-      DEFAULT_HYPERPARAMETERS,
-      DEFAULT_GENRE_WEIGHTS
-    )
-  }
-  return profileStore
+async function loadProfile(): Promise<TuningProfile | null> {
+  const row = await prisma.systemConfig.findUnique({
+    where: { category_key: { category: TUNING_CATEGORY, key: TUNING_KEY } },
+  })
+  if (!row) return null
+  return row.value as unknown as TuningProfile
+}
+
+async function saveProfile(profile: TuningProfile): Promise<void> {
+  await prisma.systemConfig.upsert({
+    where: { category_key: { category: TUNING_CATEGORY, key: TUNING_KEY } },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    update: { value: profile as any },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    create: { category: TUNING_CATEGORY, key: TUNING_KEY, value: profile as any },
+  })
+}
+
+async function getOrCreateProfile(): Promise<TuningProfile> {
+  const existing = await loadProfile()
+  if (existing) return existing
+
+  const profile = createTuningProfile("기본 프로필", DEFAULT_HYPERPARAMETERS, DEFAULT_GENRE_WEIGHTS)
+  await saveProfile(profile)
+  return profile
 }
 
 // ── Types ───────────────────────────────────────────────────────
@@ -55,12 +73,22 @@ export async function GET() {
   const { response } = await requireAuth()
   if (response) return response
 
-  const profile = getProfileStore()
+  try {
+    const profile = await getOrCreateProfile()
 
-  return NextResponse.json<ApiResponse<TuningResponse>>({
-    success: true,
-    data: { profile },
-  })
+    return NextResponse.json<ApiResponse<TuningResponse>>({
+      success: true,
+      data: { profile },
+    })
+  } catch {
+    return NextResponse.json<ApiResponse<never>>(
+      {
+        success: false,
+        error: { code: "INTERNAL_ERROR", message: "튜닝 프로필 조회 실패" },
+      },
+      { status: 500 }
+    )
+  }
 }
 
 // ── POST — 커스텀 튜닝 프로필 생성 ─────────────────────────────
@@ -88,8 +116,7 @@ export async function POST(request: NextRequest) {
       body.genreWeights ?? DEFAULT_GENRE_WEIGHTS
     )
 
-    // Update the store with the new profile
-    profileStore = profile
+    await saveProfile(profile)
 
     return NextResponse.json<ApiResponse<TuningResponse>>(
       {
@@ -117,7 +144,7 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = (await request.json()) as UpdateTuningRequest
-    let profile = getProfileStore()
+    let profile = await getOrCreateProfile()
 
     switch (body.action) {
       case "update_parameter": {
@@ -182,7 +209,7 @@ export async function PUT(request: NextRequest) {
         )
     }
 
-    profileStore = profile
+    await saveProfile(profile)
 
     return NextResponse.json<ApiResponse<TuningResponse>>({
       success: true,
