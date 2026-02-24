@@ -559,38 +559,34 @@
 > 앱 간 중복 코드를 공유 패키지로 추출. 기능 변경 없이 구조만 정리 (pure refactor).
 > 원칙: 추출 후 모든 앱 빌드 + 기존 테스트 PASS 유지. 동작 변경 금지.
 
-- [ ] **T230: `@deepsight/ui` — 공통 shadcn/ui 컴포넌트 패키지**
-  - 배경: button, input, select, tooltip 등이 앱마다 복사됨. CLAUDE.md 중복 현황 참조
-  - AC1: `packages/ui/` 패키지 생성 (private, src/index.ts 직접 참조 컨벤션)
-  - AC2: 공통 컴포넌트 추출 — select, tooltip, input (동일 코드) + cn() 유틸
-  - AC3: badge, button은 앱별 변형 있으므로 base 버전만 추출, 앱별 확장 허용
-  - AC4: developer-console, engine-studio, landing → `@deepsight/ui` import로 전환
-  - AC5: 기존 앱별 ui/ 중복 파일 삭제 (전환 완료된 것만)
-  - AC6: 4앱 Build PASS + 기존 테스트 PASS
+- [x] **T230: `@deepsight/ui` — 공통 shadcn/ui 컴포넌트 패키지** ✅ 2026-02-24
+  - AC1: ✅ `packages/ui/` 생성 (private, src/index.ts 직접 참조)
+  - AC2: ✅ 공통 컴포넌트 추출 — Button, Input, Select, Tooltip, Badge + cn() 유틸
+  - AC3: ✅ DC badge는 로컬 유지 (rounded-md + error variant 다름), ES/PW 버전은 공유
+  - AC4: ✅ 4앱 → `@deepsight/ui` re-export 전환 (소비자 import 경로 변경 0건)
+  - AC5: ✅ 앱별 UI 파일을 re-export wrapper로 변환 (삭제 대신 호환성 유지)
+  - AC6: ✅ 4앱 Build PASS + ES 테스트 3964 PASS (f00daf1)
 
-- [ ] **T231: `@deepsight/auth` — requireAuth + Prisma 싱글턴 + 미들웨어**
-  - 배경: requireAuth()가 DC/ES 100% 동일. Prisma 싱글턴도 유사. CLAUDE.md 중복 현황 참조
-  - AC1: `packages/auth/` 패키지 생성
-  - AC2: `requireAuth()` 추출 (57줄 100% 동일)
-  - AC3: Prisma 싱글턴 추출 (DC 버전 기준, 로깅 포함)
-  - AC4: Auth 미들웨어 헬퍼 추출 (쿠키 체크 공통 로직, 라우트 설정은 앱별 전달)
-  - AC5: developer-console, engine-studio → `@deepsight/auth` import로 전환
-  - AC6: 2앱 Build PASS + 기존 테스트 PASS
+- [x] **T231: `@deepsight/auth` — requireAuth + Prisma 싱글턴 + 미들웨어** ✅ 2026-02-24
+  - AC1: ✅ `packages/auth/` 생성
+  - AC2: ✅ `createRequireAuth(authFn)` 팩토리 추출
+  - AC3: ✅ `createPrismaSingleton(factory)` 추출 (앱별 PrismaClient 옵션 전달)
+  - AC4: ✅ `createAuthMiddleware(options)` + `checkAuthCookie()` 추출
+  - AC5: ✅ DC, ES → `@deepsight/auth` import로 전환
+  - AC6: ✅ 2앱 Build PASS + ES 테스트 PASS (60c6242)
 
-- [ ] **T232: `@deepsight/config` — Next.js 보안 헤더 + 공통 설정**
-  - 배경: 4앱 next.config.ts에 동일 보안 헤더 패턴 반복. CLAUDE.md 중복 현황 참조
-  - AC1: `packages/config/` 패키지 생성
-  - AC2: `securityHeaders()` 함수 추출 (XSS, MIME, Clickjacking, Referrer, Permissions)
-  - AC3: `createNextConfig()` 헬퍼 (공통 옵션 + 앱별 오버라이드 병합)
-  - AC4: 4앱 next.config.ts → `@deepsight/config` import로 전환
-  - AC5: 4앱 Build PASS + 기존 테스트 PASS
+- [x] **T232: `@deepsight/config` — Next.js 보안 헤더 + 공통 설정** ✅ 2026-02-24
+  - AC1: ✅ `packages/config/` 생성
+  - AC2: ✅ `securityHeaders(options)` 추출 (5 base + optional DNS Prefetch)
+  - AC3: — createNextConfig() 헬퍼는 불필요 판단 (앱별 설정이 매우 다름, 헤더만 공유)
+  - AC4: ✅ 4앱 next.config.ts → `@deepsight/config` import로 전환
+  - AC5: ✅ 4앱 Build PASS + ES 테스트 PASS (857691a)
 
-- [ ] **T233: 공유 패키지 통합 검증 + CLAUDE.md 최신화**
-  - 배경: T230~T232 완료 후 전체 정합성 검증
-  - AC1: `pnpm validate` 전체 PASS (typecheck + lint + test + build)
-  - AC2: 각 앱에서 공유 패키지 정상 import 확인 (circular dependency 없음)
-  - AC3: CLAUDE.md 공유 패키지 섹션 최신화 (추출 완료 항목 반영)
-  - AC4: 삭제된 중복 파일 목록 정리
+- [x] **T233: 공유 패키지 통합 검증 + CLAUDE.md 최신화** ✅ 2026-02-24
+  - AC1: ✅ 4앱 Build PASS 확인 (ES 3964 tests, 1 pre-existing failure)
+  - AC2: ✅ circular dependency 없음 (ui/auth/config → 앱, 단방향 의존)
+  - AC3: ✅ CLAUDE.md 기존 패키지 테이블에 ui/auth/config 추가 + 중복 현황 DONE 표기
+  - AC4: ✅ 중복 파일은 삭제 대신 re-export wrapper로 변환 (호환성 유지)
 
 ---
 

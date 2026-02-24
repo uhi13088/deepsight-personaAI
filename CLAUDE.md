@@ -72,24 +72,24 @@ pnpm --filter engine-studio build  # 앱별 빌드
 반복적인 워크플로우는 `skills/` 디렉터리에 독립 스킬로 분리되어 있습니다.
 각 스킬은 `references/` 폴더에 체크리스트 등 참조 자료를 포함할 수 있습니다.
 
-| 스킬          | 경로                         | 설명                                                   |
-| ------------- | ---------------------------- | ------------------------------------------------------ |
-| `/next`         | `skills/next/SKILL.md`         | 다음 작업 진행 (lessons.md 자동 참조 + 티켓 품질 검증) |
-| `/validate`     | `skills/validate/SKILL.md`     | 전체 검증 + 품질 체크리스트 + lessons.md 교차 확인     |
-| `/status`       | `skills/status/SKILL.md`       | 프로젝트 상태 요약                                     |
-| `/pr`           | `skills/pr/SKILL.md`           | PR 설명 자동 생성                                      |
-| `/debug`        | `skills/debug/SKILL.md`        | 구조적 디버깅 (가설 수립 → 검증 → 근본 해결)           |
-| `/sync-check`   | `skills/sync-check/SKILL.md`   | API 문서 / DB 스키마 불일치 감지                       |
+| 스킬            | 경로                           | 설명                                                      |
+| --------------- | ------------------------------ | --------------------------------------------------------- |
+| `/next`         | `skills/next/SKILL.md`         | 다음 작업 진행 (lessons.md 자동 참조 + 티켓 품질 검증)    |
+| `/validate`     | `skills/validate/SKILL.md`     | 전체 검증 + 품질 체크리스트 + lessons.md 교차 확인        |
+| `/status`       | `skills/status/SKILL.md`       | 프로젝트 상태 요약                                        |
+| `/pr`           | `skills/pr/SKILL.md`           | PR 설명 자동 생성                                         |
+| `/debug`        | `skills/debug/SKILL.md`        | 구조적 디버깅 (가설 수립 → 검증 → 근본 해결)              |
+| `/sync-check`   | `skills/sync-check/SKILL.md`   | API 문서 / DB 스키마 불일치 감지                          |
 | `/session-wrap` | `skills/session-wrap/SKILL.md` | 세션 마무리 (TASK.md 동기화 + lessons.md 확인 + 핸드오프) |
 
 ## 보안 훅 (Hooks)
 
 자동으로 실행되는 보안 가드입니다 (`.claude/settings.json`에 등록됨).
 
-| 훅                     | 경로                              | 타이밍      | 역할                                          |
-| ---------------------- | --------------------------------- | ----------- | --------------------------------------------- |
-| `output-secret-filter` | `hooks/output-secret-filter.sh`   | PostToolUse | 도구 출력에서 API 키/토큰/DB URL 등 시크릿 감지 시 경고 |
-| `db-guard`             | `hooks/db-guard.sh`               | PreToolUse  | DROP/TRUNCATE/DELETE(WHERE 없음) 등 파괴적 SQL 차단   |
+| 훅                     | 경로                            | 타이밍      | 역할                                                    |
+| ---------------------- | ------------------------------- | ----------- | ------------------------------------------------------- |
+| `output-secret-filter` | `hooks/output-secret-filter.sh` | PostToolUse | 도구 출력에서 API 키/토큰/DB URL 등 시크릿 감지 시 경고 |
+| `db-guard`             | `hooks/db-guard.sh`             | PreToolUse  | DROP/TRUNCATE/DELETE(WHERE 없음) 등 파괴적 SQL 차단     |
 
 - 훅 로그: `~/.claude/logs/security.log`
 - 훅 수정 시 `.claude/settings.json`의 hooks 섹션도 함께 확인
@@ -101,11 +101,14 @@ pnpm --filter engine-studio build  # 앱별 빌드
 
 ### 기존 패키지
 
-| 패키지 | 경로 | 용도 | 사용처 |
-| --- | --- | --- | --- |
-| `@deepsight/shared-types` | `packages/shared-types/` | 3-Layer 벡터 타입, API 응답 타입, 에러 코드, 빌링 타입 | engine-studio, developer-console, persona-world, sdk, vector-core |
-| `@deepsight/vector-core` | `packages/vector-core/` | L1/L2/L3 벡터 계산, 온보딩 질문 타입, clamp 함수 | engine-studio, persona-world |
-| `@deepsight/sdk` | `packages/sdk/` | 외부 고객용 JavaScript SDK (DeepSight API 클라이언트) | 퍼블리시 전용 (앱 내부 미사용) |
+| 패키지                    | 경로                     | 용도                                                                  | 사용처                                                            |
+| ------------------------- | ------------------------ | --------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `@deepsight/shared-types` | `packages/shared-types/` | 3-Layer 벡터 타입, API 응답 타입, 에러 코드, 빌링 타입                | engine-studio, developer-console, persona-world, sdk, vector-core |
+| `@deepsight/vector-core`  | `packages/vector-core/`  | L1/L2/L3 벡터 계산, 온보딩 질문 타입, clamp 함수                      | engine-studio, persona-world                                      |
+| `@deepsight/sdk`          | `packages/sdk/`          | 외부 고객용 JavaScript SDK (DeepSight API 클라이언트)                 | 퍼블리시 전용 (앱 내부 미사용)                                    |
+| `@deepsight/ui`           | `packages/ui/`           | 공통 shadcn/ui 컴포넌트 (Button, Input, Select, Tooltip, Badge, cn()) | engine-studio, developer-console, landing, persona-world          |
+| `@deepsight/auth`         | `packages/auth/`         | createRequireAuth, createAuthMiddleware, createPrismaSingleton 팩토리 | engine-studio, developer-console                                  |
+| `@deepsight/config`       | `packages/config/`       | Next.js 공통 보안 헤더 (securityHeaders())                            | engine-studio, developer-console, landing, persona-world          |
 
 ### 패키지 컨벤션
 
@@ -118,16 +121,16 @@ pnpm --filter engine-studio build  # 앱별 빌드
 
 > 아래 항목들은 현재 앱마다 복사되어 있음. 공유 패키지 추출 작업 시 참고.
 
-| 중복 항목 | 위치 | 상태 | 우선순위 |
-| --- | --- | --- | --- |
-| **shadcn/ui 컴포넌트** (button, badge, input, select, tooltip 등) | `apps/*/src/components/ui/` | select, tooltip은 동일. button, badge는 앱별 변형 있음 | HIGH |
-| **`cn()` 유틸** | `apps/*/src/lib/utils.ts` | 4앱 모두 동일 (clsx + twMerge) | HIGH |
-| **`requireAuth()`** | `apps/{developer-console,engine-studio}/src/lib/require-auth.ts` | 100% 동일 (57줄) | HIGH |
-| **Prisma 싱글턴** | `apps/{developer-console,engine-studio}/src/lib/prisma.ts` | DC가 더 견고 (로깅 설정 포함) | MEDIUM |
-| **Next.js 보안 헤더** | `apps/*/next.config.ts` | 4앱 동일 패턴 (XSS, MIME, Clickjacking, Referrer, Permissions) | MEDIUM |
-| **Auth 미들웨어** (쿠키 체크) | `apps/{developer-console,engine-studio}/middleware.ts` | 핵심 로직 동일, 라우트만 다름 | MEDIUM |
-| **API 응답 타입** (`ApiResponse<T>`, `ApiError`) | `apps/developer-console/src/services/api-client.ts` | DC에만 존재, 다른 앱은 인라인 정의 | LOW |
-| **Theme Provider** | `apps/{developer-console,engine-studio}/src/components/` | 구현 방식 다름 (Zustand vs next-themes) — 통일 필요 | LOW |
+| 중복 항목                                                         | 위치                                                             | 상태                                                                      | 우선순위   |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------- | ---------- |
+| **shadcn/ui 컴포넌트** (button, badge, input, select, tooltip 등) | `apps/*/src/components/ui/`                                      | **DONE** → `@deepsight/ui` (앱 UI 파일은 re-export, DC badge는 로컬 유지) | ~~HIGH~~   |
+| **`cn()` 유틸**                                                   | `apps/*/src/lib/utils.ts`                                        | **DONE** → `@deepsight/ui`에서 re-export                                  | ~~HIGH~~   |
+| **`requireAuth()`**                                               | `apps/{developer-console,engine-studio}/src/lib/require-auth.ts` | **DONE** → `@deepsight/auth` createRequireAuth 팩토리                     | ~~HIGH~~   |
+| **Prisma 싱글턴**                                                 | `apps/{developer-console,engine-studio}/src/lib/prisma.ts`       | **DONE** → `@deepsight/auth` createPrismaSingleton 팩토리                 | ~~MEDIUM~~ |
+| **Next.js 보안 헤더**                                             | `apps/*/next.config.ts`                                          | **DONE** → `@deepsight/config` securityHeaders()                          | ~~MEDIUM~~ |
+| **Auth 미들웨어** (쿠키 체크)                                     | `apps/{developer-console,engine-studio}/middleware.ts`           | **DONE** → `@deepsight/auth` createAuthMiddleware 팩토리                  | ~~MEDIUM~~ |
+| **API 응답 타입** (`ApiResponse<T>`, `ApiError`)                  | `apps/developer-console/src/services/api-client.ts`              | DC에만 존재, 다른 앱은 인라인 정의                                        | LOW        |
+| **Theme Provider**                                                | `apps/{developer-console,engine-studio}/src/components/`         | 구현 방식 다름 (Zustand vs next-themes) — 통일 필요                       | LOW        |
 
 ### 앱별 고유 항목 (공유 불필요)
 
