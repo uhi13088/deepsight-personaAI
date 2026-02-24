@@ -27,7 +27,14 @@ async function loadVersions(): Promise<AlgorithmVersion[]> {
     where: { category_key: { category: "ALGORITHM_VERSION", key: "versions" } },
   })
   if (!row) return []
-  return row.value as unknown as AlgorithmVersion[]
+  const versions = row.value as unknown as AlgorithmVersion[]
+  // 중복 ID 제거 (Date.now() 기반 ID가 같은 밀리초에 생성된 경우 대비)
+  const seen = new Set<string>()
+  return versions.filter((v) => {
+    if (seen.has(v.id)) return false
+    seen.add(v.id)
+    return true
+  })
 }
 
 async function saveVersions(versions: AlgorithmVersion[]): Promise<void> {

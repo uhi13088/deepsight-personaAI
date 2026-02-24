@@ -655,7 +655,7 @@ export function createVersion(
   parseVersion(version)
 
   return {
-    id: `algo_${category}_${Date.now()}`,
+    id: `algo_${category}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     category,
     version,
     parentVersion,
