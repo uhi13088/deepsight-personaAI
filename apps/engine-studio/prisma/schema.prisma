@@ -334,7 +334,7 @@ enum PostFrequency {
 model UserVector {
   id              String   @id @default(cuid())
   userId          String   @unique
-  onboardingLevel OnboardingLevel @default(LIGHT)
+  onboardingLevel OnboardingLevel @default(QUICK)
 
   // 6D Vector (L1 기본)
   depth           Decimal  @db.Decimal(3, 2)
@@ -397,9 +397,9 @@ model Archetype {
 }
 
 enum OnboardingLevel {
-  LIGHT   // Quick Mode: 12 questions, 2min
-  MEDIUM  // Standard Mode: 30 questions, 5min
-  DEEP    // Deep Mode: 60 questions, 15min
+  QUICK     // Quick Mode: 12 questions, 2min
+  STANDARD  // Standard Mode: 30 questions, 5min
+  DEEP      // Deep Mode: 60 questions, 15min
 }
 
 // ============================================
@@ -1392,8 +1392,8 @@ model SNSConnection {
 }
 
 enum ProfileQuality {
-  BASIC     // Cold Start LIGHT
-  STANDARD  // Cold Start MEDIUM 또는 SNS 1개
+  BASIC     // Cold Start QUICK
+  STANDARD  // Cold Start STANDARD 또는 SNS 1개
   ADVANCED  // Cold Start DEEP 또는 SNS 2개+
   PREMIUM   // Cold Start + SNS 복합
 }

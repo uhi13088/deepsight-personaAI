@@ -274,12 +274,12 @@ describe("processOnboardingAnswers", () => {
       { questionId: "p1-q2", value: "B" },
     ]
 
-    const result = await processOnboardingAnswers(answers, "LIGHT", provider)
+    const result = await processOnboardingAnswers(answers, "QUICK", provider)
 
     expect(result.l1Vector).toBeDefined()
     expect(result.l2Vector).toBeUndefined()
     expect(result.profileLevel).toBe("BASIC")
-    expect(result.confidence).toBe(ONBOARDING_CONFIDENCE.LIGHT)
+    expect(result.confidence).toBe(ONBOARDING_CONFIDENCE.QUICK)
     expect(provider.getQuestionsByPhase).toHaveBeenCalledWith(1)
     expect(provider.getQuestionsByPhase).not.toHaveBeenCalledWith(2)
   })
@@ -291,12 +291,12 @@ describe("processOnboardingAnswers", () => {
       { questionId: "p2-q1", value: "A" },
     ]
 
-    const result = await processOnboardingAnswers(answers, "MEDIUM", provider)
+    const result = await processOnboardingAnswers(answers, "STANDARD", provider)
 
     expect(result.l1Vector).toBeDefined()
     expect(result.l2Vector).toBeDefined()
     expect(result.profileLevel).toBe("STANDARD")
-    expect(result.confidence).toBe(ONBOARDING_CONFIDENCE.MEDIUM)
+    expect(result.confidence).toBe(ONBOARDING_CONFIDENCE.STANDARD)
     expect(provider.getQuestionsByPhase).toHaveBeenCalledWith(1)
     expect(provider.getQuestionsByPhase).toHaveBeenCalledWith(2)
   })
@@ -325,10 +325,10 @@ describe("processOnboardingAnswers", () => {
 
 describe("getRequiredPhases", () => {
   it("LIGHT → [1]", () => {
-    expect(getRequiredPhases("LIGHT")).toEqual([1])
+    expect(getRequiredPhases("QUICK")).toEqual([1])
   })
   it("MEDIUM → [1, 2]", () => {
-    expect(getRequiredPhases("MEDIUM")).toEqual([1, 2])
+    expect(getRequiredPhases("STANDARD")).toEqual([1, 2])
   })
   it("DEEP → [1, 2, 3]", () => {
     expect(getRequiredPhases("DEEP")).toEqual([1, 2, 3])
@@ -496,8 +496,8 @@ describe("processSnsData", () => {
 
 describe("ONBOARDING_CONFIDENCE", () => {
   it("LIGHT < MEDIUM < DEEP", () => {
-    expect(ONBOARDING_CONFIDENCE.LIGHT).toBeLessThan(ONBOARDING_CONFIDENCE.MEDIUM)
-    expect(ONBOARDING_CONFIDENCE.MEDIUM).toBeLessThan(ONBOARDING_CONFIDENCE.DEEP)
+    expect(ONBOARDING_CONFIDENCE.QUICK).toBeLessThan(ONBOARDING_CONFIDENCE.STANDARD)
+    expect(ONBOARDING_CONFIDENCE.STANDARD).toBeLessThan(ONBOARDING_CONFIDENCE.DEEP)
   })
 })
 
@@ -904,7 +904,7 @@ describe("경계값 및 에러 케이스", () => {
       saveOnboardingResult: vi.fn().mockResolvedValue(undefined),
     }
 
-    const result = await processOnboardingAnswers([], "LIGHT", provider)
+    const result = await processOnboardingAnswers([], "QUICK", provider)
 
     expect(result.l1Vector).toBeDefined()
     expect(result.profileLevel).toBe("BASIC")
@@ -928,7 +928,7 @@ describe("경계값 및 에러 케이스", () => {
 
     const answers: OnboardingAnswer[] = [{ questionId: "p1-q1", value: "A" }]
 
-    const result = await processOnboardingAnswers(answers, "LIGHT", emptyProvider)
+    const result = await processOnboardingAnswers(answers, "QUICK", emptyProvider)
 
     expect(result.l1Vector).toBeDefined()
     // 질문이 없으므로 답변이 매칭되지 않음 → 모두 기본값

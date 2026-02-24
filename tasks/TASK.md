@@ -428,6 +428,19 @@
 
 ---
 
+## DONE (v4.0 — Enum 통일)
+
+- [x] **T177: Enum 이름 통일 마이그레이션** ✅ 2026-02-24
+  - AC1: OnboardingLevel — LIGHT→QUICK, MEDIUM→STANDARD (engine-studio Prisma + 코드 + 마이그레이션 SQL)
+  - AC2: PostSource — 설계서를 구현값(FEED_INSPIRED/ARENA_TEST/SCHEDULED) 기준으로 동기화
+  - AC3: ArenaSessionStatus — 설계서를 구현값(PENDING/RUNNING/COMPLETED/CANCELLED) 기준으로 동기화
+  - AC4: ReportReason — public.md/openapi를 스키마 기준(SPAM/INAPPROPRIATE/HARASSMENT/MISINFORMATION/OTHER)으로 통일
+  - 변경: schema.prisma, supabase-init.sql, 033 마이그레이션, onboarding-engine.ts, cold-start routes(3), api.ts(PW), reports/route.ts
+  - 설계서: persona-engine-v4-impl.md, persona-engine-v4-intelligence.md, persona-world-v4-core.md, public.md, public.openapi.yaml
+  - gap-analysis.md 업데이트: 5개 Enum 불일치 → 4개 해결, 1개 의도적 확장(PersonaStatus)
+
+---
+
 ## IN_PROGRESS
 
 (없음)
@@ -443,12 +456,11 @@
   - AC4: PIS 통합 점수 계산 + 5등급 판정 + 자동 조치 연동
   - 참고: quality-integration.ts에 PIS 기본 구조 존재, 독립 모듈로 분리 필요
 
-- [ ] **T177: Enum 이름 통일 — engine-studio → developer-console 기준 마이그레이션**
-  - OnboardingLevel: LIGHT/MEDIUM → QUICK/STANDARD (developer-console 기준)
-  - PostSource: 설계서 → 구현(AUTONOMOUS/FEED_INSPIRED/ARENA_TEST/SCHEDULED) 기준으로 통일
-  - ArenaSessionStatus: 구현(PENDING/RUNNING/COMPLETED/CANCELLED) 기준으로 설계서 업데이트
-  - ReportReason: 스키마 기준으로 docs/api/public.md 업데이트
-  - Prisma 마이그레이션 SQL 생성 필요
+- [ ] **T224: Developer Console 미완성 UI 완성**
+  - AC1: Logs 페이지 — API 호출 로그 뷰어 (필터링, 검색, 페이지네이션)
+  - AC2: Webhooks 관리 — CRUD + 이벤트 구독 설정 + 전송 이력
+  - AC3: Team 관리 — 멤버 초대/삭제/역할 변경 (OWNER/ADMIN/MEMBER)
+  - 참고: developer-console에 기본 라우트/모델은 존재, UI 완성 필요
 
 ---
 

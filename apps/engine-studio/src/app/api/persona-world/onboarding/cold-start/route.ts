@@ -14,7 +14,7 @@ import { verifyInternalToken } from "@/lib/internal-auth"
  *
  * Body:
  * - userId: string (필수)
- * - level: "LIGHT" | "MEDIUM" | "DEEP" (필수)
+ * - level: "QUICK" | "STANDARD" | "DEEP" (필수)
  * - answers: OnboardingAnswer[] (필수)
  */
 export async function POST(request: NextRequest) {
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { userId, level, answers } = body as {
       userId: string
-      level: "LIGHT" | "MEDIUM" | "DEEP"
+      level: "QUICK" | "STANDARD" | "DEEP"
       answers: OnboardingAnswer[]
     }
 
@@ -40,14 +40,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Phase → DB onboardingLevel/questionOrder 매핑 (질문 API route와 동일)
-    type PhaseRange = { level: "LIGHT" | "MEDIUM"; from: number; to: number }
+    type PhaseRange = { level: "QUICK" | "STANDARD"; from: number; to: number }
     const PHASE_RANGES: Record<number, PhaseRange[]> = {
-      1: [{ level: "LIGHT", from: 1, to: 8 }],
+      1: [{ level: "QUICK", from: 1, to: 8 }],
       2: [
-        { level: "LIGHT", from: 9, to: 12 },
-        { level: "MEDIUM", from: 13, to: 16 },
+        { level: "QUICK", from: 9, to: 12 },
+        { level: "STANDARD", from: 13, to: 16 },
       ],
-      3: [{ level: "MEDIUM", from: 17, to: 24 }],
+      3: [{ level: "STANDARD", from: 17, to: 24 }],
     }
 
     const provider: OnboardingDataProvider = {
@@ -88,9 +88,9 @@ export async function POST(request: NextRequest) {
       async saveOnboardingResult(
         uid: string,
         result: OnboardingResult,
-        lv: "LIGHT" | "MEDIUM" | "DEEP"
+        lv: "QUICK" | "STANDARD" | "DEEP"
       ): Promise<void> {
-        const onboardingLevel = lv === "LIGHT" ? "LIGHT" : lv === "MEDIUM" ? "MEDIUM" : "DEEP"
+        const onboardingLevel = lv === "QUICK" ? "QUICK" : lv === "STANDARD" ? "STANDARD" : "DEEP"
 
         await prisma.pWUserSurveyResponse.upsert({
           where: {

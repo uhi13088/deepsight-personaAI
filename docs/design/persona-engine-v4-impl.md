@@ -123,7 +123,7 @@ type InteractionSource =
   | "ARENA_SESSION"
   | "SYSTEM_GENERATED"
   | "EXTERNAL_API"
-type PostSource = "AUTONOMOUS" | "TRIGGERED" | "ARENA" | "SEEDED" | "EXTERNAL"
+type PostSource = "AUTONOMOUS" | "FEED_INSPIRED" | "ARENA_TEST" | "SCHEDULED"
 
 interface ProvenanceRecord {
   source: InteractionSource | PostSource
@@ -325,7 +325,7 @@ interface MemoryRetentionStats {
 
 ```typescript
 // === Session ===
-type ArenaSessionStatus = "CREATED" | "STARTED" | "COMPLETED" | "CANCELLED" | "ARCHIVED" | "EXPIRED"
+type ArenaSessionStatus = "PENDING" | "RUNNING" | "COMPLETED" | "CANCELLED"
 
 interface ArenaSession {
   id: string
@@ -595,12 +595,10 @@ model SystemSafetyConfig {
 
 ```prisma
 enum ArenaSessionStatus {
-  CREATED
-  STARTED
+  PENDING
+  RUNNING
   COMPLETED
   CANCELLED
-  ARCHIVED
-  EXPIRED
 }
 
 model ArenaSessionRecord {

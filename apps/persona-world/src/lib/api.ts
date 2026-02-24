@@ -104,12 +104,12 @@ export const clientApi = {
   // ── 온보딩: 답변 제출 (Cold Start 벡터 생성) ─────────────
   async submitOnboardingAnswers(userId: string, phase: number, answers: OnboardingAnswer[]) {
     // phase → level 매핑
-    const levelMap: Record<number, "LIGHT" | "MEDIUM" | "DEEP"> = {
-      1: "LIGHT",
-      2: "MEDIUM",
+    const levelMap: Record<number, "QUICK" | "STANDARD" | "DEEP"> = {
+      1: "QUICK",
+      2: "STANDARD",
       3: "DEEP",
     }
-    const level = levelMap[phase] ?? "LIGHT"
+    const level = levelMap[phase] ?? "QUICK"
     const creditsMap: Record<number, number> = { 1: 100, 2: 150, 3: 200 }
 
     const res = await fetch(`/api/persona-world/onboarding/cold-start`, {

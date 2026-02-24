@@ -193,7 +193,7 @@
 
 ### 4.2 Internal API
 
-- 44/45+ 엔드포인트 구현 (`POST /personas/generate-random` 미확인)
+- 45/45+ 엔드포인트 구현 (`POST /personas/generate-random` ✅ 확인 완료)
 - External API v1은 `meta` 필드 (request_id, processing_time_ms) 이미 포함
 - Internal API는 프로젝트 표준 `{ success, data, error }` 형식 사용 (내부 용도에 적합)
 
@@ -203,20 +203,20 @@
 | -------------------------- | ---- | ---- | ----------------------------------------------------------------- |
 | GET /explore               | ✅   | ✅   | `explore-engine.ts` 구현 (역할 클러스터 + hot topics + debates)   |
 | GET/POST /persona-requests | ✅   | ✅   | 유저 페르소나 생성 요청 구현                                      |
-| GET /personas/:id          | ✅   | ⚠️   | `recentPosts` 필드 누락                                           |
+| GET /personas/:id          | ✅   | ✅   | `recentPosts` 10건 포함 (2026-02-24 재확인)                       |
 | GET /feed                  | ✅   | ✅   | 3-tier 매칭 기반 (60% following + 30% recommended + 10% trending) |
 
 ---
 
 ## 5. DB 스키마 vs 설계서 Enum 불일치
 
-| 항목                | 설계서                                                                 | Prisma Schema                                               | 상태      |
-| ------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------- | --------- |
-| PersonaStatus enum  | DRAFT→REVIEW→ACTIVE→PAUSED→ARCHIVED                                    | + STANDARD, LEGACY, DEPRECATED 추가                         | ⚠️ 확장됨 |
-| ArenaSession status | CREATED→STARTED→COMPLETED→ARCHIVED→EXPIRED                             | PENDING→RUNNING→COMPLETED→CANCELLED                         | ⚠️ 불일치 |
-| PostSource enum     | AUTONOMOUS/TRIGGERED/ARENA/SEEDED/EXTERNAL                             | AUTONOMOUS/FEED_INSPIRED/ARENA_TEST/SCHEDULED               | ⚠️ 불일치 |
-| OnboardingLevel     | LIGHT/MEDIUM/DEEP (engine-studio) vs QUICK/STANDARD/DEEP (dev-console) | 두 스키마 간 이름 불일치                                    | ⚠️ 불일치 |
-| ReportReason        | INAPPROPRIATE_CONTENT 등 6종 (public.md)                               | SPAM/INAPPROPRIATE/HARASSMENT/MISINFORMATION/OTHER (schema) | ⚠️ 불일치 |
+| 항목                | 설계서                                             | Prisma Schema                       | 상태                              |
+| ------------------- | -------------------------------------------------- | ----------------------------------- | --------------------------------- |
+| PersonaStatus enum  | DRAFT→REVIEW→ACTIVE→PAUSED→ARCHIVED                | + STANDARD, LEGACY, DEPRECATED 추가 | ⚠️ 확장됨 (의도적)                |
+| ArenaSession status | PENDING→RUNNING→COMPLETED→CANCELLED                | PENDING→RUNNING→COMPLETED→CANCELLED | ✅ T177 동기화 완료               |
+| PostSource enum     | AUTONOMOUS/FEED_INSPIRED/ARENA_TEST/SCHEDULED      | 동일                                | ✅ T177 설계서 동기화 완료        |
+| OnboardingLevel     | QUICK/STANDARD/DEEP                                | QUICK/STANDARD/DEEP                 | ✅ T177 마이그레이션 완료         |
+| ReportReason        | SPAM/INAPPROPRIATE/HARASSMENT/MISINFORMATION/OTHER | 동일                                | ✅ T177 API 문서+코드 동기화 완료 |
 
 ---
 
@@ -232,14 +232,23 @@
 
 4. ~~**아레나 심판 차원 정합**~~ → ✅ 구현 체계 채택, 설계서 동기화 완료
 5. ~~**킬 스위치 토글 이름 통일**~~ → ✅ 구현 토글 채택, 설계서 동기화 완료
-6. **Enum 이름 통일** → T177 티켓 등록 (developer-console 기준 마이그레이션 예정)
+6. ~~**Enum 이름 통일**~~ → ✅ T177 마이그레이션 완료 (OnboardingLevel/PostSource/ArenaSessionStatus/ReportReason)
 7. ~~**설계서 Post Type 명세 업데이트**~~ → ✅ 스키마 enum 기준 재작성 완료
 
 ### P2 — 후속 작업
 
 8. **PIS (Persona Integrity Score) 구현** → T176 티켓 등록 (신규 개발)
-9. **Developer Console** — logs, webhooks, team 관리 UI 완성
-10. **Public API /personas/:id** — `recentPosts` 필드 추가
+9. **Developer Console** — logs, webhooks, team 관리 UI 완성 → T224 티켓 등록
+10. ~~**Public API /personas/:id** — `recentPosts` 필드 추가~~ → ✅ 이미 구현됨 (2026-02-24 재확인)
+
+### P3 — 페르소나 품질 개선 (2026-02-24 추가)
+
+11. ~~**T216: API 벡터 누적 포화**~~ → ✅ delta/N 정규화 수정 완료
+12. ~~**T217: Cold-Start confidence 부풀림**~~ → ✅ 독립 관측 기반 정규화 완료
+13. ~~**T218: 3-Tier 스코어 범위 미보장**~~ → ✅ [0,1] clamp 적용 완료
+14. ~~**T219: 장르 가중치 비대칭 편향**~~ → ✅ 중심 기준 스케일링 완료
+15. ~~**T220: Balancer 과잉 분류**~~ → ✅ 거리 기반 보너스로 변경 완료
+16. ~~**T221: Psychometric↔Projection 매핑 불일치**~~ → ✅ 매핑 보강 완료
 
 ---
 
@@ -249,23 +258,31 @@
 엔진 코어(벡터/매칭/생성/보안/아레나/품질)는 거의 100% 구현되어 있고,
 알고리즘 수준에서 설계서와 정확하게 일치한다.
 
-**본 리포트를 통해 해결된 전체 항목 (16건)**:
+**본 리포트를 통해 해결된 전체 항목 (29건)**:
 
-A. 재조사로 확인된 오판 수정 (7건):
+A. 재조사로 확인된 오판 수정 (9건):
 
 - ✅ Consent API → developer-console에 이미 완전 구현 (GET/POST 모두)
 - ✅ UserVector 하드코딩 → DB 실조회로 수정 완료
 - ✅ /explore, /persona-requests → 이미 구현됨
 - ✅ Feed 개인화 → 3-tier 매칭 기반으로 이미 구현
 - ✅ Gate Guard 12종, Output Sentinel 8카테고리 → 일치/확장 완료
+- ✅ Public API /personas/:id recentPosts → 이미 구현됨 (2026-02-24 재확인)
+- ✅ Internal API POST /personas/generate-random → 이미 구현됨 (2026-02-24 재확인)
 
-B. 코드 수정 (5건):
+B. 코드 수정 (11건):
 
 - ✅ match API UserVector → DB 실조회 연동
 - ✅ batch-match API UserVector → DB 실조회 연동 (배치 최적화 포함)
 - ✅ Output Sentinel 시스템 유출 패턴 8→18종 확장
 - ✅ Confidence threshold 0.3→0.7 상향
 - ✅ Onboarding 벡터 계산 → L1+L2 구조화 가중치 지원 (하위 호환 유지)
+- ✅ T216: API 벡터 누적 포화 수정 (delta/N 정규화)
+- ✅ T217: Cold-Start confidence 독립 관측 기반 정규화
+- ✅ T218: 3-Tier 매칭 스코어 [0,1] clamp 적용
+- ✅ T219: 장르 가중치 중심 기준 스케일링
+- ✅ T220: Balancer 아키타입 분류 로직 개선
+- ✅ T221: Psychometric↔Projection L2→L1 매핑 보강
 
 C. 설계 결정 + 동기화 (4건):
 
@@ -274,7 +291,15 @@ C. 설계 결정 + 동기화 (4건):
 - ✅ Kill Switch → 구현 토글 채택, 설계서 동기화
 - ✅ Post Type → 스키마 기준 재작성
 
+D. Enum 통일 — T177 (5건):
+
+- ✅ OnboardingLevel: LIGHT/MEDIUM → QUICK/STANDARD (Prisma 마이그레이션 + 코드)
+- ✅ PostSource: 설계서 → 구현값(FEED_INSPIRED/ARENA_TEST/SCHEDULED) 동기화
+- ✅ ArenaSessionStatus: 설계서 → 구현값(PENDING/RUNNING/COMPLETED/CANCELLED) 동기화
+- ✅ ReportReason: API 문서 + 코드를 스키마 기준(SPAM/INAPPROPRIATE/...) 통일
+- ✅ T224 등록: Developer Console 미완성 UI 티켓
+
 **후속 작업 (티켓 등록 완료)**:
 
 - T176: PIS (Persona Integrity Score) 엔진 구현 (신규 개발)
-- T177: Enum 이름 통일 마이그레이션 (OnboardingLevel, PostSource 등)
+- T224: Developer Console 미완성 UI (logs, webhooks, team 관리)

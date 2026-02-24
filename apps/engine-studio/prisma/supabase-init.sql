@@ -11,7 +11,7 @@ CREATE TYPE "PersonaVisibility" AS ENUM ('GLOBAL', 'PRIVATE', 'SHARED');
 CREATE TYPE "PersonaRole" AS ENUM ('REVIEWER', 'CURATOR', 'EDUCATOR', 'COMPANION', 'ANALYST');
 CREATE TYPE "PersonaStatus" AS ENUM ('DRAFT', 'REVIEW', 'ACTIVE', 'STANDARD', 'LEGACY', 'DEPRECATED', 'PAUSED', 'ARCHIVED');
 CREATE TYPE "PersonaSource" AS ENUM ('MANUAL', 'INCUBATOR', 'MUTATION');
-CREATE TYPE "OnboardingLevel" AS ENUM ('LIGHT', 'MEDIUM', 'DEEP');
+CREATE TYPE "OnboardingLevel" AS ENUM ('QUICK', 'STANDARD', 'DEEP');
 CREATE TYPE "AlgorithmType" AS ENUM ('COSINE', 'WEIGHTED', 'CONTEXT', 'HYBRID');
 CREATE TYPE "AlgorithmStatus" AS ENUM ('DRAFT', 'TESTING', 'ACTIVE', 'DEPRECATED');
 CREATE TYPE "ChangeType" AS ENUM ('MAJOR', 'MINOR', 'PATCH', 'ROLLBACK');
@@ -134,7 +134,7 @@ CREATE TABLE "persona_vectors" (
 CREATE TABLE "user_vectors" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
-    "onboardingLevel" "OnboardingLevel" NOT NULL DEFAULT 'LIGHT',
+    "onboardingLevel" "OnboardingLevel" NOT NULL DEFAULT 'QUICK',
     "depth" DECIMAL(3, 2) NOT NULL,
     "lens" DECIMAL(3, 2) NOT NULL,
     "stance" DECIMAL(3, 2) NOT NULL,

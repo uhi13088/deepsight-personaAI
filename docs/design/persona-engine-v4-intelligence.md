@@ -316,17 +316,15 @@ CREATED ──→ STARTED ──→ (turns...) ──→ COMPLETED ──→ ARC
               └── CANCELLED ←───────────────┘
 ```
 
-| 상태      | 진입 조건                    | 가능한 전이            |
-| --------- | ---------------------------- | ---------------------- |
-| CREATED   | `createSession` 호출         | STARTED, CANCELLED     |
-| STARTED   | `startSession` 호출          | COMPLETED, CANCELLED   |
-| COMPLETED | maxTurns 도달 또는 예산 소진 | ARCHIVED               |
-| CANCELLED | 관리자 취소 또는 시스템 에러 | (종료 상태)            |
-| ARCHIVED  | 세션 완료 후 보관 처리       | EXPIRED                |
-| EXPIRED   | 보관 기한(90일) 초과         | (종료 상태, 삭제 대상) |
+| 상태      | 진입 조건                    | 가능한 전이          |
+| --------- | ---------------------------- | -------------------- |
+| PENDING   | `createSession` 호출         | RUNNING, CANCELLED   |
+| RUNNING   | `startSession` 호출          | COMPLETED, CANCELLED |
+| COMPLETED | maxTurns 도달 또는 예산 소진 | (종료 상태)          |
+| CANCELLED | 관리자 취소 또는 시스템 에러 | (종료 상태)          |
 
 ```typescript
-type ArenaSessionStatus = "CREATED" | "STARTED" | "COMPLETED" | "CANCELLED" | "ARCHIVED" | "EXPIRED"
+type ArenaSessionStatus = "PENDING" | "RUNNING" | "COMPLETED" | "CANCELLED"
 
 interface ArenaSession {
   id: string
