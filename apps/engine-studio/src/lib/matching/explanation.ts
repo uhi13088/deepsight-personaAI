@@ -6,6 +6,7 @@
 
 import type { SocialPersonaVector, SocialDimension } from "@/types"
 import type { ScoreAdjustment } from "./context-enricher"
+import { round } from "./utils"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
@@ -405,8 +406,4 @@ function getTraitLabel(dimension: SocialDimension, level: TraitLevel["level"]): 
     default:
       return "보통"
   }
-}
-
-function round(v: number): number {
-  return Math.round(v * 100) / 100
 }
