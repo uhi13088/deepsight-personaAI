@@ -1250,11 +1250,47 @@
   - AC5: ✅ PW Admin Activity 대시보드 — engagement 결정 통계 카드 추가 (comment/react_only/skip 비율 지난 24h)
   - AC6: ✅ 48 tests PASS + Build PASS + `PersonaActivityType.COMMENT_SUPPRESSED` schema 추가 (migration 029)
 
+### Phase NB: News-Based Persona Reaction System (T195~T198)
+
+> 뉴스를 씨앗으로 심으면, 페르소나들이 성향에 따라 자연스럽게 반응하는 SNS 구조.
+> Arena/논쟁 없음. 관심 있는 페르소나가 피드에 반응 포스트 → 다른 페르소나들이
+> Phase RA 기반으로 알아서 댓글/침묵/좋아요 결정. 기존 파이프라인 최소 변경.
+
+- [x] **T195: 뉴스 수집 인프라 (DB 모델 + RSS 페처 + Claude 분석)** ✅ 2026-02-23
+  - 배경: 외부 RSS 피드 → NewsArticle 저장 + Claude로 요약/태그 추출
+  - AC1: ✅ Prisma — `NewsSource`, `NewsArticle` 모델 + `PersonaPostType.NEWS_REACTION` enum + `PersonaPost.newsArticleId` FK
+  - AC2: ✅ `lib/persona-world/news/news-fetcher.ts` — `fetchArticlesFromRss(rssUrl)` + `analyzeArticleWithClaude(title, content)`
+  - AC3: ✅ Claude 분석 결과: `{ summary: string, topicTags: string[] }` (요약 300자 이내, LLM 없으면 fallback)
+  - AC4: ✅ `content-generator.ts` — `NEWS_REACTION` 타입 길이/스타일 가이드 추가
+  - AC5: ✅ 마이그레이션 030 + Build PASS
+
+- [x] **T196: 뉴스-페르소나 관심도 매칭 엔진** ✅ 2026-02-23
+  - 배경: 주어진 뉴스에 "누가 반응할 것인가" 결정. 입장(찬/반) 아닌 순수 관심도 점수
+  - AC1: ✅ `lib/persona-world/news/news-interest-matcher.ts` — `computeNewsInterestScore(article, persona)` → 0~1
+  - AC2: ✅ 점수 계산: tagOverlap(40%) + L2 openness(30%) + L2 extraversion(30%)
+  - AC3: ✅ `selectPersonasForArticle(article, personas, topN)` — threshold(0.25) 초과 + 상위 N명 반환
+  - AC4: ✅ 단위 테스트 15개 PASS (news-interest-matcher.test.ts) + Build PASS
+
+- [x] **T197: 뉴스 반응 포스트 자동 생성 파이프라인** ✅ 2026-02-23
+  - 배경: 관심 있는 페르소나들이 TRENDING 트리거로 NEWS_REACTION 포스트 자동 생성
+  - AC1: ✅ `lib/persona-world/news/news-reaction-trigger.ts` — `triggerNewsReactionPosts()` + `formatNewsArticleTopic()`
+  - AC2: ✅ `triggerData.topicId` = newsArticleId (기존 TRENDING 트리거 인터페이스 재사용)
+  - AC3: ✅ `createNewsPostPipelineProvider(topic)` — selectTopic()이 뉴스 요약 반환
+  - AC4: ✅ 스케줄러 API `trigger_news_article` 액션 추가 + `createNewsReactionDataProvider()` 헬퍼
+  - AC5: ✅ Build PASS
+
+- [x] **T198: Admin UI — 뉴스 소스 관리 + 반응 현황 대시보드** ✅ 2026-02-23
+  - 배경: 관리자가 RSS 소스 추가/수집 트리거 + 반응 현황 확인
+  - AC1: ✅ `app/api/internal/persona-world-admin/news/route.ts` — GET/POST(add_source/fetch_source/fetch_all)/PUT
+  - AC2: ✅ `app/(dashboard)/persona-world-admin/news/page.tsx` — 소스 관리 + 기사 목록 + 반응 트리거 버튼
+  - AC3: ✅ LNB + header에 "뉴스 반응" 메뉴 추가
+  - AC4: ✅ Build PASS (109 static pages)
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
 
-없음 (T191~T194 완료 — Phase RA 전체 완료)
+없음 (T195~T198 완료 — Phase NB 전체 완료)
 
 ---
 

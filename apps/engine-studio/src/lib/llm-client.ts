@@ -25,6 +25,11 @@ export interface LLMGenerateParams {
    * 지정 시 systemPrompt은 동적 suffix로 취급됨.
    */
   systemPromptPrefix?: string
+  /**
+   * 사용할 모델 ID (미지정 시 DEFAULT_MODEL).
+   * 비용 절감용: "claude-haiku-4-5-20251001" 지정 가능.
+   */
+  model?: string
 }
 
 export interface LLMGenerateResult {
@@ -178,7 +183,7 @@ const DEFAULT_TEMPERATURE = 0.7
 
 export async function generateText(params: LLMGenerateParams): Promise<LLMGenerateResult> {
   const client = getClient()
-  const model = DEFAULT_MODEL
+  const model = params.model ?? DEFAULT_MODEL
   const maxTokens = params.maxTokens ?? DEFAULT_MAX_TOKENS
   const temperature = params.temperature ?? DEFAULT_TEMPERATURE
 

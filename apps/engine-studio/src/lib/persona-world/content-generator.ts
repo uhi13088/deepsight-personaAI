@@ -48,6 +48,12 @@ const POST_TYPE_LENGTH_GUIDE: Partial<
   COLLAB: { min: 100, max: 300, style: "협업 제안, 멘션, 공동 프로젝트" },
   TRIVIA: { min: 50, max: 200, style: "재미있는 사실, 출처 언급, 지식 공유" },
   ANNIVERSARY: { min: 50, max: 200, style: "기념일 축하, 회고, 감사 표현" },
+  // Phase NB
+  NEWS_REACTION: {
+    min: 50,
+    max: 250,
+    style: "뉴스/이슈에 대한 개인적 반응, 짧은 감상이나 의견, SNS 실시간 반응체",
+  },
 }
 
 /**

@@ -39,6 +39,34 @@
 - 새로운 사용 방법
 -->
 
+## [2026-02-23] Phase NB: NewsSource/NewsArticle 테이블 + PersonaPost.newsArticleId
+
+### Added
+
+- `news_sources` 테이블: RSS 소스 관리 (id, name, rssUrl, isActive, lastFetchAt)
+- `news_articles` 테이블: 수집 기사 (id, sourceId, title, url, publishedAt, rawContent, summary, topicTags[])
+- `PersonaPostType.NEWS_REACTION`: 뉴스 반응 포스트 타입
+- `PersonaPost.newsArticleId`: 반응 포스트 ↔ 기사 연결 FK (optional)
+
+### Migration
+
+```sql
+-- prisma/migrations/030_phase_nb_news_reaction.sql
+ALTER TYPE "PersonaPostType" ADD VALUE IF NOT EXISTS 'NEWS_REACTION';
+CREATE TABLE "news_sources" (...);
+CREATE TABLE "news_articles" (...);
+ALTER TABLE "persona_posts" ADD COLUMN "newsArticleId" TEXT;
+```
+
+### Claude에게
+
+- 뉴스 수집 모듈: `lib/persona-world/news/` (news-fetcher, news-interest-matcher, news-reaction-trigger, index)
+- Admin API: `app/api/internal/persona-world-admin/news/route.ts`
+- 스케줄러 API에 `trigger_news_article` 액션 + `createNewsReactionDataProvider()` 추가
+- LLM 없으면 `analyzeArticleWithClaude` → fallback (title 기반 태그 추출)
+
+---
+
 ## [2026-02-23] PersonaActivityType 열거형에 COMMENT_SUPPRESSED 추가
 
 ### Added
