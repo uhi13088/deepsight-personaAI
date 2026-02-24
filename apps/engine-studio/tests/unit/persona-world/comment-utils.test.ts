@@ -433,3 +433,174 @@ describe("classifyToneWithVectors", () => {
     expect(tone).toBe("light_reaction")
   })
 })
+
+// ═══════════════════════════════════════════════════════════════
+// 경계값 및 에러 케이스
+// ═══════════════════════════════════════════════════════════════
+
+describe("경계값 및 에러 케이스", () => {
+  // ── classifyTone: 특수 입력 ──────────────────────────────────
+
+  describe("classifyTone — 특수 입력", () => {
+    it("특수문자만 포함된 입력 → supportive fallback", () => {
+      expect(classifyTone("!@#$%^&*()")).toBe("supportive")
+    })
+
+    it("매우 긴 문자열에서도 키워드 감지 동작", () => {
+      const longPrefix = "가".repeat(5000)
+      expect(classifyTone(longPrefix + " 반대 의견입니다")).toBe("direct_rebuttal")
+    })
+
+    it("숫자만 포함된 입력 → supportive fallback", () => {
+      expect(classifyTone("123456789")).toBe("supportive")
+    })
+  })
+
+  // ── softThreshold: 극단값 ───────────────────────────────────
+
+  describe("softThreshold — 극단값", () => {
+    it("NaN 입력 → NaN 반환 (크래시 없음)", () => {
+      const result = softThreshold(NaN, 0.5, ">")
+      expect(typeof result).toBe("number")
+      // sigmoid(NaN) = NaN — 함수 자체는 크래시하지 않음
+    })
+
+    it("매우 큰 값 → 1.0에 수렴 (오버플로 없음)", () => {
+      const result = softThreshold(1000, 0.5, ">")
+      expect(result).toBeGreaterThanOrEqual(0.99)
+      expect(Number.isFinite(result)).toBe(true)
+    })
+
+    it("매우 작은 음수 → 0.0에 수렴 (언더플로 없음)", () => {
+      const result = softThreshold(-1000, 0.5, ">")
+      expect(result).toBeLessThanOrEqual(0.01)
+      expect(Number.isFinite(result)).toBe(true)
+    })
+
+    it("threshold와 value 모두 0 → ~0.5 (>)", () => {
+      const result = softThreshold(0, 0, ">")
+      expect(result).toBeGreaterThan(0.45)
+      expect(result).toBeLessThan(0.55)
+    })
+  })
+
+  // ── decideCommentTone: 극단 벡터 ──────────────────────────────
+
+  describe("decideCommentTone — 극단 벡터", () => {
+    const neutralState: PersonaStateData = {
+      mood: 0.5,
+      energy: 0.5,
+      socialBattery: 0.5,
+      paradoxTension: 0,
+    }
+
+    it("모든 벡터가 0인 경우 → 크래시 없이 톤 반환", () => {
+      const zeroVectors: ThreeLayerVector = {
+        social: { depth: 0, lens: 0, stance: 0, scope: 0, taste: 0, purpose: 0, sociability: 0 },
+        temperament: {
+          openness: 0,
+          conscientiousness: 0,
+          extraversion: 0,
+          agreeableness: 0,
+          neuroticism: 0,
+        },
+        narrative: { lack: 0, moralCompass: 0, volatility: 0, growthArc: 0 },
+      }
+      const decision = decideCommentTone(zeroVectors, neutralState, null, 0)
+      expect(typeof decision.tone).toBe("string")
+      expect(decision.confidence).toBeGreaterThanOrEqual(0)
+      expect(decision.confidence).toBeLessThanOrEqual(1)
+    })
+
+    it("모든 벡터가 1인 경우 → 크래시 없이 톤 반환", () => {
+      const maxVectors: ThreeLayerVector = {
+        social: { depth: 1, lens: 1, stance: 1, scope: 1, taste: 1, purpose: 1, sociability: 1 },
+        temperament: {
+          openness: 1,
+          conscientiousness: 1,
+          extraversion: 1,
+          agreeableness: 1,
+          neuroticism: 1,
+        },
+        narrative: { lack: 1, moralCompass: 1, volatility: 1, growthArc: 1 },
+      }
+      const decision = decideCommentTone(maxVectors, neutralState, null, 0)
+      expect(typeof decision.tone).toBe("string")
+      expect(decision.confidence).toBeGreaterThanOrEqual(0)
+      expect(decision.confidence).toBeLessThanOrEqual(1)
+    })
+
+    it("paradoxScore가 매우 높아도 크래시 없음", () => {
+      const baseVectors: ThreeLayerVector = {
+        social: {
+          depth: 0.5,
+          lens: 0.5,
+          stance: 0.5,
+          scope: 0.5,
+          taste: 0.5,
+          purpose: 0.5,
+          sociability: 0.5,
+        },
+        temperament: {
+          openness: 0.5,
+          conscientiousness: 0.5,
+          extraversion: 0.5,
+          agreeableness: 0.5,
+          neuroticism: 0.5,
+        },
+        narrative: { lack: 0.5, moralCompass: 0.5, volatility: 0.5, growthArc: 0.5 },
+      }
+      const decision = decideCommentTone(baseVectors, neutralState, null, 100)
+      expect(typeof decision.tone).toBe("string")
+      expect(decision.paradoxInfluence).toBe(true)
+    })
+
+    it("빈 매트릭스 → supportive fallback", () => {
+      const baseVectors: ThreeLayerVector = {
+        social: {
+          depth: 0.5,
+          lens: 0.5,
+          stance: 0.5,
+          scope: 0.5,
+          taste: 0.5,
+          purpose: 0.5,
+          sociability: 0.5,
+        },
+        temperament: {
+          openness: 0.5,
+          conscientiousness: 0.5,
+          extraversion: 0.5,
+          agreeableness: 0.5,
+          neuroticism: 0.5,
+        },
+        narrative: { lack: 0.5, moralCompass: 0.5, volatility: 0.5, growthArc: 0.5 },
+      }
+      const decision = decideCommentTone(baseVectors, neutralState, null, 0, [])
+      expect(decision.tone).toBe("supportive")
+      expect(decision.confidence).toBe(0.3)
+    })
+  })
+
+  // ── buildUserThreeLayerVector: 극단값 ──────────────────────────
+
+  describe("buildUserThreeLayerVector — 극단값", () => {
+    it("범위 외 값(>1, <0) 입력 시 그대로 통과 (Number 변환만 수행)", () => {
+      const result = buildUserThreeLayerVector({
+        depth: 1.5,
+        lens: -0.3,
+      })
+      // buildUserThreeLayerVector는 Number() 변환만 하므로 범위 제한 없음
+      expect(result.social.depth).toBe(1.5)
+      expect(result.social.lens).toBe(-0.3)
+    })
+
+    it("null 값 → 0.5 기본값", () => {
+      const result = buildUserThreeLayerVector({
+        depth: null,
+        lens: null,
+      })
+      expect(result.social.depth).toBe(0.5)
+      expect(result.social.lens).toBe(0.5)
+    })
+  })
+})

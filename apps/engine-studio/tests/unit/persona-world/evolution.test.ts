@@ -525,3 +525,129 @@ describe("runEvolutionBatch", () => {
     expect(daysDiff).toBe(7)
   })
 })
+
+// ═══════════════════════════════════════════════════════════════
+// 5. 경계값 및 에러 케이스
+// ═══════════════════════════════════════════════════════════════
+
+describe("경계값 및 에러 케이스", () => {
+  const baseL3: NarrativeDriveVector = {
+    lack: 0.6,
+    moralCompass: 0.5,
+    volatility: 0.4,
+    growthArc: 0.3,
+  }
+
+  it("L3 벡터 값이 0~1 범위를 벗어나도 결과는 0~1로 클램프", () => {
+    const outOfBoundsL3: NarrativeDriveVector = {
+      lack: 1.5,
+      moralCompass: -0.3,
+      volatility: 2.0,
+      growthArc: -1.0,
+    }
+    const logs = createLogs(15, {
+      types: ["POST_CREATED", "POST_COMMENTED", "POST_LIKED", "VIEW"],
+    })
+    const trend = analyzeEvolutionTrend(logs, 7)
+    const result = computeL3Evolution(outOfBoundsL3, trend, 60)
+
+    // newL3 값이 0~1로 클램프되어야 함
+    expect(result.newL3.growthArc).toBeGreaterThanOrEqual(0)
+    expect(result.newL3.growthArc).toBeLessThanOrEqual(1)
+    expect(result.newL3.volatility).toBeGreaterThanOrEqual(0)
+    expect(result.newL3.volatility).toBeLessThanOrEqual(1)
+    expect(result.newL3.lack).toBeGreaterThanOrEqual(0)
+    expect(result.newL3.lack).toBeLessThanOrEqual(1)
+    expect(result.newL3.moralCompass).toBeGreaterThanOrEqual(0)
+    expect(result.newL3.moralCompass).toBeLessThanOrEqual(1)
+  })
+
+  it("빈 상호작용 이력 → 안전한 기본값 반환", () => {
+    const trend = analyzeEvolutionTrend([], 7)
+
+    expect(trend.totalActivities).toBe(0)
+    expect(trend.activityDiversity).toBe(0)
+    expect(trend.growthIndicator).toBe(0)
+    expect(trend.postFrequency).toBe(0)
+    expect(trend.interactionFrequency).toBe(0)
+    expect(trend.averageState.mood).toBe(0.5)
+    expect(trend.stateTrends.mood).toBe(0)
+    expect(trend.stateTrends.energy).toBe(0)
+
+    // 빈 이력으로 진화 시도 → 활동 부족으로 진화 안 함
+    const result = computeL3Evolution(baseL3, trend, 60)
+    expect(result.evolved).toBe(false)
+    expect(result.newL3).toEqual(baseL3)
+  })
+
+  it("매우 큰 시간 간격(수년)에도 오버플로 없이 처리", () => {
+    const logs = createLogs(15, {
+      types: ["POST_CREATED", "POST_COMMENTED", "POST_LIKED", "VIEW"],
+    })
+    const trend = analyzeEvolutionTrend(logs, 365 * 5) // 5년
+
+    expect(Number.isFinite(trend.postFrequency)).toBe(true)
+    expect(Number.isFinite(trend.interactionFrequency)).toBe(true)
+    expect(Number.isFinite(trend.growthIndicator)).toBe(true)
+    expect(trend.postFrequency).toBeGreaterThanOrEqual(0)
+
+    // 매우 오래된 페르소나도 정상 처리
+    const result = computeL3Evolution(baseL3, trend, 365 * 5)
+    expect(Number.isFinite(result.newL3.growthArc)).toBe(true)
+    expect(Number.isFinite(result.newL3.volatility)).toBe(true)
+    expect(Number.isFinite(result.newL3.lack)).toBe(true)
+    expect(Number.isFinite(result.newL3.moralCompass)).toBe(true)
+  })
+
+  it("음수 periodDays에도 안전하게 처리 (0 나누기 방지)", () => {
+    const logs = createLogs(10)
+    const trend = analyzeEvolutionTrend(logs, -5)
+
+    expect(Number.isFinite(trend.postFrequency)).toBe(true)
+    expect(Number.isFinite(trend.interactionFrequency)).toBe(true)
+    // periodDays는 원본값 보존하되, 빈도 계산에서 0나누기 방지
+    expect(trend.totalActivities).toBe(10)
+  })
+
+  it("getEvolutionStage — NaN 입력 시에도 안전 처리", () => {
+    // NaN → Math.max(0, Math.min(1, NaN)) = NaN → 마지막 스테이지 fallback
+    const stage = getEvolutionStage(NaN)
+    expect(stage).toBeDefined()
+    expect(typeof stage.id).toBe("string")
+  })
+
+  it("hasStageTransition — 동일 극단값(0, 0) → 전이 없음", () => {
+    const result = hasStageTransition(0, 0)
+    expect(result.transitioned).toBe(false)
+    expect(result.from.id).toBe(result.to.id)
+  })
+
+  it("hasStageTransition — 동일 극단값(1, 1) → 전이 없음", () => {
+    const result = hasStageTransition(1, 1)
+    expect(result.transitioned).toBe(false)
+    expect(result.from.id).toBe(result.to.id)
+  })
+
+  it("daysSinceCreation이 0일 때 (방금 생성된 페르소나) → 정상 처리", () => {
+    const logs = createLogs(15, {
+      types: ["POST_CREATED", "POST_COMMENTED", "POST_LIKED", "VIEW"],
+    })
+    const trend = analyzeEvolutionTrend(logs, 7)
+    const result = computeL3Evolution(baseL3, trend, 0)
+
+    // daysSinceCreation=0 < 30 → 초기 보너스 적용 (1.5x)
+    expect(result.deltas).toBeDefined()
+    expect(Number.isFinite(result.newL3.growthArc)).toBe(true)
+  })
+
+  it("daysSinceCreation이 음수여도 크래시 없이 처리", () => {
+    const logs = createLogs(15, {
+      types: ["POST_CREATED", "POST_COMMENTED", "POST_LIKED", "VIEW"],
+    })
+    const trend = analyzeEvolutionTrend(logs, 7)
+    const result = computeL3Evolution(baseL3, trend, -10)
+
+    expect(result.deltas).toBeDefined()
+    expect(Number.isFinite(result.newL3.growthArc)).toBe(true)
+  })
+})
