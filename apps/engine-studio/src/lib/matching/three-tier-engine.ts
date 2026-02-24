@@ -27,7 +27,7 @@ import {
   computeDynamicTierWeights,
   computeNegativePenalty,
 } from "./context-enricher"
-import { round, SOCIAL_DIM_LABELS } from "./utils"
+import { round, clamp, SOCIAL_DIM_LABELS } from "./utils"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
@@ -174,7 +174,7 @@ export function calculateBasicScore(
   )
 
   return {
-    score: round(enrichment.finalScore),
+    score: clamp(round(enrichment.finalScore)),
     breakdown: {
       vectorScore: round(vectorScore),
       crossAxisScore: round(crossAxisScore),
@@ -220,7 +220,7 @@ export function calculateAdvancedScore(
   )
 
   return {
-    score: round(enrichment.finalScore),
+    score: clamp(round(enrichment.finalScore)),
     breakdown: {
       vectorScore: round(vectorScore),
       crossAxisScore: round(crossAxisScore),
@@ -266,7 +266,7 @@ export function calculateExplorationScore(
   )
 
   return {
-    score: round(enrichment.finalScore),
+    score: clamp(round(enrichment.finalScore)),
     breakdown: {
       vectorScore: 0,
       crossAxisScore: round(crossAxisDivergence),

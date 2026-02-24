@@ -310,14 +310,19 @@ export function classifyUser(
 
     const distance = euclideanDistance(vectorRecord, archetype.referenceVector)
 
-    // 밸런서 특수 처리
+    // T220: 밸런서 특수 처리 — 거리 기반 보너스로 변경 (강제 distance=0.1 제거)
     if (archetype.id === "balancer") {
       const isBalanced = isBalancedVector(vectorRecord)
+      // 균형 벡터면 distance에 0.7x 보너스 (다른 아키타입보다 항상 우선하지 않도록)
+      const balancerDistance = isBalanced ? round(distance * 0.7) : distance
+      const balancerConfidence = isBalanced
+        ? round(Math.max(0, 1 - balancerDistance) * 0.6 + 0.4)
+        : round(Math.max(0, 1 - distance))
       scores.push({
         archetypeId: archetype.id,
         archetypeName: archetype.nameKo,
-        distance: isBalanced ? 0.1 : distance,
-        confidence: isBalanced ? 0.9 : round(Math.max(0, 1 - distance)),
+        distance: balancerDistance,
+        confidence: balancerConfidence,
         matchedThresholds: isBalanced ? 1 : 0,
         totalThresholds: 1,
       })
