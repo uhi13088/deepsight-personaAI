@@ -18,11 +18,13 @@ import type {
 const AI_ARTICLE: ArticleForMatching = {
   topicTags: ["AI", "규제", "기술정책"],
   summary: "인공지능 기본법이 국회를 통과했다. AI 개발자들의 반응은 엇갈린다.",
+  region: "KR",
 }
 
 const POLITICS_ARTICLE: ArticleForMatching = {
   topicTags: ["정치", "선거", "국회"],
   summary: "내년 대선을 앞두고 여야가 경선 일정을 확정했다.",
+  region: "KR",
 }
 
 // 전문 분야: AI/기술
@@ -30,6 +32,8 @@ const AI_EXPERT: PersonaForMatching = {
   id: "persona-ai",
   expertise: ["AI", "machine learning", "tech policy"],
   role: "AI Researcher",
+  country: "KR",
+  languages: ["ko", "en"],
   temperament: {
     openness: 0.8,
     conscientiousness: 0.6,
@@ -44,6 +48,8 @@ const POLITICS_PERSONA: PersonaForMatching = {
   id: "persona-politics",
   expertise: ["politics", "social issues", "governance"],
   role: "Political Analyst",
+  country: "KR",
+  languages: ["ko", "en"],
   temperament: {
     openness: 0.6,
     conscientiousness: 0.7,
@@ -58,6 +64,8 @@ const INTROVERT_PERSONA: PersonaForMatching = {
   id: "persona-introvert",
   expertise: ["cooking", "food culture"],
   role: "Food Blogger",
+  country: "JP",
+  languages: ["ja"],
   temperament: {
     openness: 0.2,
     conscientiousness: 0.5,
@@ -108,11 +116,12 @@ describe("computeNewsInterestScore", () => {
       }
     })
 
-    it("breakdown 3가지 요소 포함", () => {
+    it("breakdown 4가지 요소 포함 (T199: regionalRelevance 추가)", () => {
       const result = computeNewsInterestScore(AI_ARTICLE, AI_EXPERT)
       expect(result.breakdown).toHaveProperty("tagOverlap")
       expect(result.breakdown).toHaveProperty("openness")
       expect(result.breakdown).toHaveProperty("extraversion")
+      expect(result.breakdown).toHaveProperty("regionalRelevance")
       expect(result.breakdown.openness).toBe(AI_EXPERT.temperament.openness)
       expect(result.breakdown.extraversion).toBe(AI_EXPERT.temperament.extraversion)
     })
@@ -125,7 +134,11 @@ describe("computeNewsInterestScore", () => {
     })
 
     it("빈 태그 기사 → 최소 기본 관심도(0.1) 반환", () => {
-      const emptyTagArticle: ArticleForMatching = { topicTags: [], summary: "테스트" }
+      const emptyTagArticle: ArticleForMatching = {
+        topicTags: [],
+        summary: "테스트",
+        region: "GLOBAL",
+      }
       const result = computeNewsInterestScore(emptyTagArticle, AI_EXPERT)
       // tagOverlap = 0.1 (최소값)
       expect(result.breakdown.tagOverlap).toBe(0.1)
@@ -147,42 +160,43 @@ describe("selectPersonasForArticle", () => {
   const allPersonas = [AI_EXPERT, POLITICS_PERSONA, INTROVERT_PERSONA]
 
   it("AI 뉴스 → AI 전문가가 상위에 선정됨", () => {
-    const results = selectPersonasForArticle(AI_ARTICLE, allPersonas, 3)
+    const results = selectPersonasForArticle(AI_ARTICLE, allPersonas, INTEREST_THRESHOLD)
     // AI 전문가가 첫 번째여야 함
     expect(results[0].personaId).toBe("persona-ai")
   })
 
   it("결과가 점수 내림차순으로 정렬됨", () => {
-    const results = selectPersonasForArticle(AI_ARTICLE, allPersonas, 3)
+    const results = selectPersonasForArticle(AI_ARTICLE, allPersonas, INTEREST_THRESHOLD)
     for (let i = 1; i < results.length; i++) {
       expect(results[i - 1].score).toBeGreaterThanOrEqual(results[i].score)
     }
   })
 
   it("threshold 미만 페르소나 제외됨", () => {
-    const results = selectPersonasForArticle(AI_ARTICLE, allPersonas, 10)
+    const results = selectPersonasForArticle(AI_ARTICLE, allPersonas, INTEREST_THRESHOLD)
     // 모든 결과가 threshold 이상이어야 함
     for (const r of results) {
       expect(r.score).toBeGreaterThanOrEqual(INTEREST_THRESHOLD)
     }
   })
 
-  it("topN 제한 적용됨", () => {
-    const results = selectPersonasForArticle(AI_ARTICLE, allPersonas, 1)
-    expect(results.length).toBeLessThanOrEqual(1)
+  it("매우 높은 임계값에서는 결과 없음", () => {
+    // threshold = 0.99 → 사실상 불가능한 점수 → 빈 배열
+    const results = selectPersonasForArticle(AI_ARTICLE, allPersonas, 0.99)
+    expect(results).toHaveLength(0)
   })
 
   it("페르소나 없으면 빈 배열 반환", () => {
-    const results = selectPersonasForArticle(AI_ARTICLE, [], 5)
+    const results = selectPersonasForArticle(AI_ARTICLE, [], INTEREST_THRESHOLD)
     expect(results).toHaveLength(0)
   })
 
   it("모든 페르소나가 threshold 미달이면 빈 배열", () => {
-    // 태그 없는 기사 + 내향적 전문분야 불일치 페르소나들
-    const emptyArticle: ArticleForMatching = { topicTags: [], summary: "" }
+    // 태그 없는 GLOBAL 기사 + 내향적 전문분야 불일치 페르소나
+    const emptyArticle: ArticleForMatching = { topicTags: [], summary: "", region: "GLOBAL" }
     // 내향적 페르소나만 사용
-    const results = selectPersonasForArticle(emptyArticle, [INTROVERT_PERSONA], 5)
-    // score = 0.1 * 0.4 + 0.2 * 0.3 + 0.1 * 0.3 = 0.04 + 0.06 + 0.03 = 0.13 < 0.25
+    const results = selectPersonasForArticle(emptyArticle, [INTROVERT_PERSONA], INTEREST_THRESHOLD)
+    // score = 0.1*0.35 + 0.2*0.25 + 0.1*0.25 + 0.3*0.15 = 0.035+0.05+0.025+0.045 = 0.155 < 0.25
     expect(results).toHaveLength(0)
   })
 })
