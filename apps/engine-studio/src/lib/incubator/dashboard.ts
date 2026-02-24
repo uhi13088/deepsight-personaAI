@@ -192,18 +192,37 @@ export function buildDashboard(params: {
     }
   }
 
-  const dailyTrend: DailyMetric[] = params.recentBatches.map((b) => {
+  // 같은 날짜 배치가 여러 개일 수 있으므로 날짜별로 집계
+  const dailyAgg = new Map<
+    string,
+    { generated: number; passed: number; failed: number; batchCost: number }
+  >()
+  for (const b of params.recentBatches) {
     const dateStr = b.batchDate.toISOString().slice(0, 10)
-    return {
-      date: dateStr,
-      generated: b.generatedCount,
-      passed: b.passedCount,
-      failed: b.failedCount,
-      passRate: b.passRate,
-      // 실제 일별 LLM 비용이 있으면 사용, 없으면 배치 비용 사용
-      costKRW: dailyCostMap.get(dateStr) ?? b.estimatedCost,
+    const existing = dailyAgg.get(dateStr)
+    if (existing) {
+      existing.generated += b.generatedCount
+      existing.passed += b.passedCount
+      existing.failed += b.failedCount
+      existing.batchCost += b.estimatedCost
+    } else {
+      dailyAgg.set(dateStr, {
+        generated: b.generatedCount,
+        passed: b.passedCount,
+        failed: b.failedCount,
+        batchCost: b.estimatedCost,
+      })
     }
-  })
+  }
+  const dailyTrend: DailyMetric[] = [...dailyAgg.entries()].map(([date, d]) => ({
+    date,
+    generated: d.generated,
+    passed: d.passed,
+    failed: d.failed,
+    passRate: d.generated > 0 ? d.passed / d.generated : 0,
+    // dailyCostMap에 해당 날짜 비용이 있으면 우선 사용 (배치 합산보다 정확)
+    costKRW: dailyCostMap.get(date) ?? d.batchCost,
+  }))
 
   // 품질 메트릭 계산 (최근 배치의 평균)
   const allLogs = params.recentBatches.flatMap((b) => b.logs)
