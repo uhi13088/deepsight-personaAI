@@ -15,6 +15,7 @@ export interface RawArticle {
 export interface ArticleAnalysis {
   summary: string // 300자 이내 요약
   topicTags: string[] // 주제 태그 (최대 5개)
+  importanceScore: number // 기사 중요도 0-1 (글로벌 이슈=0.9, 지역 소식=0.3)
 }
 
 export interface LLMProvider {
@@ -131,12 +132,17 @@ export async function fetchArticlesFromRss(rssUrl: string): Promise<RawArticle[]
 // ── Claude 분석 ──────────────────────────────────────────────────
 
 const ANALYSIS_SYSTEM_PROMPT = `당신은 뉴스 기사를 분석하는 전문가입니다.
-주어진 기사 제목과 내용을 바탕으로 다음 두 가지를 JSON 형식으로 출력하세요:
+주어진 기사 제목과 내용을 바탕으로 다음 세 가지를 JSON 형식으로 출력하세요:
 1. summary: 300자 이내의 핵심 요약 (한국어)
 2. topicTags: 주제 태그 배열 (최대 5개, 짧은 키워드, 예: ["AI", "규제", "기술정책"])
+3. importanceScore: 기사 중요도 (0.0~1.0)
+   - 0.9: 전 세계에 영향을 미치는 대형 이슈 (전쟁, 금융위기, 팬데믹)
+   - 0.7: 국가 단위의 주요 이슈 (대선, 경제정책, 대형사고)
+   - 0.5: 일반 뉴스 (산업 동향, 기업 발표)
+   - 0.3: 지역·소규모 뉴스 (지방 행사, 단신)
 
 반드시 아래 JSON만 출력하세요:
-{"summary":"...","topicTags":["...",...]}
+{"summary":"...","topicTags":["...",...], "importanceScore":0.7}
 `
 
 /**
@@ -168,6 +174,7 @@ export async function analyzeArticleWithClaude(
     const parsed = JSON.parse(jsonMatch[0]) as {
       summary?: string
       topicTags?: unknown
+      importanceScore?: unknown
     }
 
     const summary = typeof parsed.summary === "string" ? parsed.summary.slice(0, 300) : title
@@ -176,8 +183,12 @@ export async function analyzeArticleWithClaude(
           .filter((t): t is string => typeof t === "string")
           .slice(0, 5)
       : extractTagsFromTitle(title)
+    const importanceScore =
+      typeof parsed.importanceScore === "number"
+        ? Math.max(0, Math.min(1, parsed.importanceScore))
+        : 0.5
 
-    return { summary, topicTags }
+    return { summary, topicTags, importanceScore }
   } catch (err) {
     console.warn("[news-fetcher] Claude analysis failed:", err)
     return fallbackAnalysis(title)
@@ -188,6 +199,7 @@ function fallbackAnalysis(title: string): ArticleAnalysis {
   return {
     summary: title,
     topicTags: extractTagsFromTitle(title),
+    importanceScore: 0.5,
   }
 }
 

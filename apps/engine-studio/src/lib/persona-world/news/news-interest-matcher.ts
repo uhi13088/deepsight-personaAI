@@ -12,6 +12,7 @@ export interface ArticleForMatching {
   topicTags: string[] // ["AI", "규제", ...]
   summary: string
   region: string // "KR" | "JP" | "US" | "EU" | "CN" | "GLOBAL"
+  importanceScore: number // T200: 기사 중요도 (0-1, Claude 분석)
 }
 
 export interface PersonaForMatching {
@@ -244,8 +245,14 @@ export function allocateDailyReactions(
     }
   }
 
-  // 점수 내림차순 정렬
-  allPairs.sort((a, b) => b.score - a.score)
+  // 중요도 가중 점수로 내림차순 정렬
+  // adjustedScore = interestScore × (0.6 + 0.4 × importanceScore)
+  // → 중요 기사가 예산 우선권 확보, 동일 관심도면 중요 기사 우선
+  allPairs.sort((a, b) => {
+    const adjA = a.score * (0.6 + 0.4 * a.article.importanceScore)
+    const adjB = b.score * (0.6 + 0.4 * b.article.importanceScore)
+    return adjB - adjA
+  })
 
   // 예산 내 선택 (페르소나당 maxPerPersona 제한)
   const personaCount = new Map<string, number>()

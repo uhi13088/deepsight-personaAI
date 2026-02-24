@@ -2313,9 +2313,11 @@ model NewsArticle {
   publishedAt DateTime
   rawContent  String?     @db.Text      // 원문 발췌 (최대 2000자)
   summary     String      @db.Text      // Claude 요약 (300자 이내)
-  topicTags   String[]                  // ["AI", "정치", "경제", ...]
+  topicTags       String[]              // ["AI", "정치", "경제", ...]
   // T199: source.region 비정규화 (매칭 시 조인 불필요)
-  region      String      @default("GLOBAL")
+  region          String      @default("GLOBAL")
+  // T200: Claude 분석 중요도 (0-1). 글로벌 이슈=0.9, 지역 소식=0.3
+  importanceScore Float       @default(0.5)
 
   // 반응 포스트 연결
   reactingPosts PersonaPost[]

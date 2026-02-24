@@ -347,6 +347,33 @@ function clamp(value: number, min = 0, max = 1): number {
   return Math.max(min, Math.min(max, value))
 }
 
+// ── Phase NB: News Reaction Post LLM Provider ────────────────
+
+/**
+ * 뉴스 반응 포스트 생성용 LLM Provider.
+ * callType="pw:news_reaction" → 비용 대시보드에서 별도 추적 가능.
+ */
+export function createNewsReactionPostLLMProvider(personaId: string): LLMProvider {
+  return {
+    async generateText(params) {
+      const { prefix, suffix } = splitSystemPromptForCache(params.systemPrompt)
+      const result = await generateText({
+        systemPrompt: suffix,
+        systemPromptPrefix: prefix || undefined,
+        userMessage: params.userPrompt,
+        maxTokens: params.maxTokens,
+        temperature: 0.8,
+        callType: "pw:news_reaction",
+        personaId,
+      })
+      return {
+        text: result.text,
+        tokensUsed: result.inputTokens + result.outputTokens,
+      }
+    },
+  }
+}
+
 // ── Phase NB: News Analysis LLM Provider ─────────────────────
 
 import type { LLMProvider as NewsLLMProvider } from "./news/news-fetcher"
