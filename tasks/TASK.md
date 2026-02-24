@@ -441,20 +441,24 @@
 
 ---
 
+## DONE (v4.0 — PIS 엔진)
+
+- [x] **T176: PIS (Persona Integrity Score) 엔진 구현** ✅ 2026-02-24
+  - AC1: ContextRecall — 기억 보유율 기반 정확도 측정 (recentMemoryAccuracy, mediumTermAccuracy, coreMemoryRetention)
+  - AC2: SettingConsistency — 품질 로그 기반 준수도 측정 (factbookCompliance, voiceSpecAdherence, vectorBehaviorAlign)
+  - AC3: CharacterStability — VoiceStyle 드리프트 + 톤 분산 + GrowthArc 정합 (persona-drift.ts 연동)
+  - AC4: PIS 통합 — measurePIS() + measurePISBatch() + DI Provider + 데이터 품질 추적
+  - 신규: pis-engine.ts (PISDataProvider, 3개 측정 함수, 통합 파이프라인, 배치 측정)
+  - 변경: index.ts (배럴 익스포트), quality-pw.test.ts (+69 테스트)
+  - 테스트: 4147 PASS (101 파일), Build PASS
+
+---
+
 ## IN_PROGRESS
 
 (없음)
 
 ## QUEUE
-
-- [ ] **T176: PIS (Persona Integrity Score) 엔진 구현**
-  - 설계서: `persona-engine-v4-operations.md:1134-1161`
-  - PIS = ContextRecall × 0.35 + SettingConsistency × 0.35 + CharacterStability × 0.30
-  - AC1: ContextRecall — 기억 검색 정확도 측정 (RAG 기반)
-  - AC2: SettingConsistency — 설정/팩트북 준수도 측정
-  - AC3: CharacterStability — 벡터 드리프트 기반 안정성 (drift-correction 연동)
-  - AC4: PIS 통합 점수 계산 + 5등급 판정 + 자동 조치 연동
-  - 참고: quality-integration.ts에 PIS 기본 구조 존재, 독립 모듈로 분리 필요
 
 - [ ] **T224: Developer Console 미완성 UI 완성**
   - AC1: Logs 페이지 — API 호출 로그 뷰어 (필터링, 검색, 페이지네이션)

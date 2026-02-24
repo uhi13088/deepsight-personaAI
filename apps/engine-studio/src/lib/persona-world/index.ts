@@ -250,6 +250,26 @@ export { buildVoiceAnchorFromProfile, parseVoiceProfile } from "./voice-anchor"
 export { runPeriodicQualityCheck } from "./quality-runner"
 export type { QualityRunnerDataProvider, QualityCheckSummary } from "./quality-runner"
 
+// PIS Engine (Phase 6-B)
+export {
+  measureContextRecall,
+  measureSettingConsistency,
+  measureCharacterStability,
+  computeToneVariance,
+  measurePIS,
+  measurePISBatch,
+} from "./quality/pis-engine"
+export type {
+  PISDataProvider,
+  MemoryRetentionStats,
+  QualityLogStats,
+  VoiceStyleSnapshot,
+  PISMeasurement,
+  PISDataQuality,
+  PISBatchResult,
+  PISBatchSummary,
+} from "./quality/pis-engine"
+
 // Phase 5: Quality Monitor
 export {
   checkVoiceConsistency,

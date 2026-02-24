@@ -1382,3 +1382,462 @@ describe("selectQualityCheckTargets", () => {
     expect(targets).toContain("new-1")
   })
 })
+
+// ═══ PIS Engine ═══
+
+import {
+  measureContextRecall,
+  measureSettingConsistency,
+  measureCharacterStability,
+  computeToneVariance,
+  measurePIS,
+  measurePISBatch,
+  type PISDataProvider,
+  type MemoryRetentionStats,
+  type QualityLogStats,
+  type VoiceStyleSnapshot,
+  type PISMeasurement,
+} from "@/lib/persona-world/quality/pis-engine"
+import type { VoiceStyleParams } from "@/lib/persona-world/types"
+
+// ── Mock Provider ──
+
+function createMockProvider(overrides?: Partial<PISDataProvider>): PISDataProvider {
+  const savedResults: PISMeasurement[] = []
+
+  return {
+    getMemoryRetentionStats: async () => ({
+      recentCount: 20,
+      recentRetained: 18,
+      mediumCount: 30,
+      mediumRetained: 24,
+      coreCount: 5,
+      coreRetained: 5,
+    }),
+    getQualityLogStats: async () => ({
+      posts: { total: 15, factbookCompliant: 14, voiceSpecAdherent: 13 },
+      comments: { total: 25, toneAligned: 22 },
+    }),
+    getVoiceStyleParams: async () => ({
+      baseline: {
+        formality: 0.7,
+        humor: 0.3,
+        sentenceLength: 0.5,
+        emotionExpression: 0.6,
+        assertiveness: 0.4,
+        vocabularyLevel: 0.8,
+      },
+      current: {
+        formality: 0.65,
+        humor: 0.35,
+        sentenceLength: 0.5,
+        emotionExpression: 0.55,
+        assertiveness: 0.45,
+        vocabularyLevel: 0.75,
+      },
+    }),
+    getGrowthArcAlignment: async () => 0.85,
+    getPreviousPIS: async () => 0.88,
+    savePISResult: async (_id, result) => {
+      savedResults.push(result)
+    },
+    ...overrides,
+  }
+}
+
+// ── AC1: ContextRecall ──
+
+describe("PIS Engine — measureContextRecall", () => {
+  it("정상 데이터 → 비율 기반 정확도 계산", () => {
+    const details = measureContextRecall({
+      recentCount: 20,
+      recentRetained: 18,
+      mediumCount: 30,
+      mediumRetained: 24,
+      coreCount: 5,
+      coreRetained: 5,
+    })
+    expect(details.recentMemoryAccuracy).toBeCloseTo(0.9, 2)
+    expect(details.mediumTermAccuracy).toBeCloseTo(0.8, 2)
+    expect(details.coreMemoryRetention).toBe(1.0)
+  })
+
+  it("기억 없는 윈도우 → 기본값 1.0 (감점 없음)", () => {
+    const details = measureContextRecall({
+      recentCount: 0,
+      recentRetained: 0,
+      mediumCount: 0,
+      mediumRetained: 0,
+      coreCount: 0,
+      coreRetained: 0,
+    })
+    expect(details.recentMemoryAccuracy).toBe(1.0)
+    expect(details.mediumTermAccuracy).toBe(1.0)
+    expect(details.coreMemoryRetention).toBe(1.0)
+  })
+
+  it("핵심 기억 일부 손실 → 유지율 반영", () => {
+    const details = measureContextRecall({
+      recentCount: 10,
+      recentRetained: 10,
+      mediumCount: 10,
+      mediumRetained: 8,
+      coreCount: 4,
+      coreRetained: 3,
+    })
+    expect(details.recentMemoryAccuracy).toBe(1.0)
+    expect(details.mediumTermAccuracy).toBe(0.8)
+    expect(details.coreMemoryRetention).toBe(0.75)
+  })
+
+  it("retained > count → 1.0으로 클램핑", () => {
+    const details = measureContextRecall({
+      recentCount: 5,
+      recentRetained: 10,
+      mediumCount: 5,
+      mediumRetained: 5,
+      coreCount: 3,
+      coreRetained: 3,
+    })
+    expect(details.recentMemoryAccuracy).toBe(1.0)
+  })
+})
+
+// ── AC2: SettingConsistency ──
+
+describe("PIS Engine — measureSettingConsistency", () => {
+  it("정상 데이터 → 준수율 계산", () => {
+    const details = measureSettingConsistency({
+      posts: { total: 20, factbookCompliant: 18, voiceSpecAdherent: 16 },
+      comments: { total: 30, toneAligned: 27 },
+    })
+    expect(details.factbookCompliance).toBeCloseTo(0.9, 2)
+    expect(details.voiceSpecAdherence).toBeCloseTo(0.8, 2)
+    expect(details.vectorBehaviorAlign).toBeCloseTo(0.9, 2)
+  })
+
+  it("데이터 없음 → 기본값 1.0", () => {
+    const details = measureSettingConsistency({
+      posts: { total: 0, factbookCompliant: 0, voiceSpecAdherent: 0 },
+      comments: { total: 0, toneAligned: 0 },
+    })
+    expect(details.factbookCompliance).toBe(1.0)
+    expect(details.voiceSpecAdherence).toBe(1.0)
+    expect(details.vectorBehaviorAlign).toBe(1.0)
+  })
+
+  it("완벽한 준수 → 모든 값 1.0", () => {
+    const details = measureSettingConsistency({
+      posts: { total: 10, factbookCompliant: 10, voiceSpecAdherent: 10 },
+      comments: { total: 20, toneAligned: 20 },
+    })
+    expect(details.factbookCompliance).toBe(1.0)
+    expect(details.voiceSpecAdherence).toBe(1.0)
+    expect(details.vectorBehaviorAlign).toBe(1.0)
+  })
+
+  it("다수 위반 → 낮은 준수율", () => {
+    const details = measureSettingConsistency({
+      posts: { total: 20, factbookCompliant: 5, voiceSpecAdherent: 8 },
+      comments: { total: 30, toneAligned: 9 },
+    })
+    expect(details.factbookCompliance).toBe(0.25)
+    expect(details.voiceSpecAdherence).toBe(0.4)
+    expect(details.vectorBehaviorAlign).toBe(0.3)
+  })
+})
+
+// ── AC3: CharacterStability ──
+
+describe("PIS Engine — measureCharacterStability", () => {
+  const baselineVoice: VoiceStyleParams = {
+    formality: 0.7,
+    humor: 0.3,
+    sentenceLength: 0.5,
+    emotionExpression: 0.6,
+    assertiveness: 0.4,
+    vocabularyLevel: 0.8,
+  }
+
+  it("VoiceStyle 없음 → drift=0, variance=0", () => {
+    const details = measureCharacterStability(null, 0.8)
+    expect(details.weeklyDrift).toBe(0)
+    expect(details.toneVariance).toBe(0)
+    expect(details.growthArcAlignment).toBe(0.8)
+  })
+
+  it("동일 VoiceStyle → drift 0 근방", () => {
+    const snapshot: VoiceStyleSnapshot = {
+      baseline: baselineVoice,
+      current: { ...baselineVoice },
+    }
+    const details = measureCharacterStability(snapshot, 0.9)
+    expect(details.weeklyDrift).toBe(0)
+    expect(details.toneVariance).toBe(0)
+    expect(details.growthArcAlignment).toBe(0.9)
+  })
+
+  it("약간 이탈 → 낮은 drift/variance", () => {
+    const snapshot: VoiceStyleSnapshot = {
+      baseline: baselineVoice,
+      current: {
+        formality: 0.65,
+        humor: 0.35,
+        sentenceLength: 0.5,
+        emotionExpression: 0.55,
+        assertiveness: 0.45,
+        vocabularyLevel: 0.75,
+      },
+    }
+    const details = measureCharacterStability(snapshot, 0.85)
+    expect(details.weeklyDrift).toBeLessThan(0.15) // STABLE 범위
+    expect(details.toneVariance).toBeLessThan(0.1)
+    expect(details.growthArcAlignment).toBe(0.85)
+  })
+
+  it("큰 이탈 → 높은 drift/variance", () => {
+    const snapshot: VoiceStyleSnapshot = {
+      baseline: baselineVoice,
+      current: {
+        formality: 0.1,
+        humor: 0.9,
+        sentenceLength: 0.1,
+        emotionExpression: 0.1,
+        assertiveness: 0.9,
+        vocabularyLevel: 0.2,
+      },
+    }
+    const details = measureCharacterStability(snapshot, 0.3)
+    expect(details.weeklyDrift).toBeGreaterThan(0.3) // CRITICAL 범위
+    expect(details.toneVariance).toBeGreaterThan(0.3)
+    expect(details.growthArcAlignment).toBe(0.3)
+  })
+
+  it("growthArcAlignment 클램핑", () => {
+    const details = measureCharacterStability(null, 1.5)
+    expect(details.growthArcAlignment).toBe(1.0)
+    const details2 = measureCharacterStability(null, -0.5)
+    expect(details2.growthArcAlignment).toBe(0)
+  })
+})
+
+describe("computeToneVariance", () => {
+  it("동일 파라미터 → 0", () => {
+    const params: VoiceStyleParams = {
+      formality: 0.5,
+      humor: 0.5,
+      sentenceLength: 0.5,
+      emotionExpression: 0.5,
+      assertiveness: 0.5,
+      vocabularyLevel: 0.5,
+    }
+    expect(computeToneVariance(params, params)).toBe(0)
+  })
+
+  it("하나만 차이 → 차이/6", () => {
+    const a: VoiceStyleParams = {
+      formality: 0.5,
+      humor: 0.5,
+      sentenceLength: 0.5,
+      emotionExpression: 0.5,
+      assertiveness: 0.5,
+      vocabularyLevel: 0.5,
+    }
+    const b: VoiceStyleParams = { ...a, formality: 0.8 }
+    // |0.5 - 0.8| / 6 = 0.3 / 6 = 0.05
+    expect(computeToneVariance(a, b)).toBeCloseTo(0.05, 2)
+  })
+
+  it("모든 차원 동일 차이 → 차이값", () => {
+    const a: VoiceStyleParams = {
+      formality: 0.5,
+      humor: 0.5,
+      sentenceLength: 0.5,
+      emotionExpression: 0.5,
+      assertiveness: 0.5,
+      vocabularyLevel: 0.5,
+    }
+    const b: VoiceStyleParams = {
+      formality: 0.7,
+      humor: 0.7,
+      sentenceLength: 0.7,
+      emotionExpression: 0.7,
+      assertiveness: 0.7,
+      vocabularyLevel: 0.7,
+    }
+    // 모두 0.2 차이 → 평균 0.2
+    expect(computeToneVariance(a, b)).toBeCloseTo(0.2, 2)
+  })
+})
+
+// ── AC4: measurePIS 통합 ──
+
+describe("PIS Engine — measurePIS", () => {
+  it("정상 데이터 → EXCELLENT/GOOD 등급", async () => {
+    const provider = createMockProvider()
+    const result = await measurePIS(provider, "p1")
+
+    expect(result.pis.overall).toBeGreaterThanOrEqual(0.8)
+    expect(["EXCELLENT", "GOOD"]).toContain(result.pis.grade)
+    expect(result.action.type).not.toBe("PAUSE_ACTIVITY")
+    expect(result.dataQuality.insufficientData).toBe(false)
+    expect(result.dataQuality.hasMemoryData).toBe(true)
+    expect(result.dataQuality.hasQualityLogs).toBe(true)
+    expect(result.dataQuality.hasVoiceData).toBe(true)
+  })
+
+  it("데이터 없음 → 기본값 1.0 기반 계산 + insufficientData", async () => {
+    const provider = createMockProvider({
+      getMemoryRetentionStats: async () => ({
+        recentCount: 0,
+        recentRetained: 0,
+        mediumCount: 0,
+        mediumRetained: 0,
+        coreCount: 0,
+        coreRetained: 0,
+      }),
+      getQualityLogStats: async () => ({
+        posts: { total: 0, factbookCompliant: 0, voiceSpecAdherent: 0 },
+        comments: { total: 0, toneAligned: 0 },
+      }),
+      getVoiceStyleParams: async () => null,
+      getGrowthArcAlignment: async () => 1.0,
+    })
+
+    const result = await measurePIS(provider, "p-new")
+    // 모든 기본값 1.0 → overall 높음
+    expect(result.pis.overall).toBeGreaterThanOrEqual(0.9)
+    expect(result.pis.grade).toBe("EXCELLENT")
+    expect(result.dataQuality.insufficientData).toBe(true)
+    expect(result.dataQuality.hasMemoryData).toBe(false)
+    expect(result.dataQuality.hasVoiceData).toBe(false)
+  })
+
+  it("낮은 품질 데이터 → CRITICAL/QUARANTINE 등급 + 트리거", async () => {
+    const provider = createMockProvider({
+      getMemoryRetentionStats: async () => ({
+        recentCount: 20,
+        recentRetained: 4,
+        mediumCount: 30,
+        mediumRetained: 6,
+        coreCount: 5,
+        coreRetained: 1,
+      }),
+      getQualityLogStats: async () => ({
+        posts: { total: 20, factbookCompliant: 4, voiceSpecAdherent: 5 },
+        comments: { total: 30, toneAligned: 6 },
+      }),
+      getVoiceStyleParams: async () => ({
+        baseline: {
+          formality: 0.7,
+          humor: 0.3,
+          sentenceLength: 0.5,
+          emotionExpression: 0.6,
+          assertiveness: 0.4,
+          vocabularyLevel: 0.8,
+        },
+        current: {
+          formality: 0.1,
+          humor: 0.9,
+          sentenceLength: 0.1,
+          emotionExpression: 0.1,
+          assertiveness: 0.9,
+          vocabularyLevel: 0.2,
+        },
+      }),
+      getGrowthArcAlignment: async () => 0.1,
+      getPreviousPIS: async () => 0.85,
+    })
+
+    const result = await measurePIS(provider, "p-bad")
+    expect(result.pis.overall).toBeLessThan(0.6)
+    expect(["CRITICAL", "QUARANTINE"]).toContain(result.pis.grade)
+    // PIS_DROP_SUDDEN 트리거 (0.85 → <0.6 은 drop > 0.1)
+    expect(result.triggers.length).toBeGreaterThan(0)
+  })
+
+  it("이전 PIS 없음 → 트리거에 previousPIS 미포함", async () => {
+    const provider = createMockProvider({
+      getPreviousPIS: async () => null,
+    })
+    const result = await measurePIS(provider, "p1")
+    // PIS_DROP_SUDDEN 트리거 없음 (이전 값 없으므로)
+    expect(result.triggers.filter((t) => t.type === "PIS_DROP_SUDDEN")).toHaveLength(0)
+  })
+
+  it("savePISResult 호출 확인", async () => {
+    let savedPersonaId: string | null = null
+    let savedResult: PISMeasurement | null = null
+
+    const provider = createMockProvider({
+      savePISResult: async (id, result) => {
+        savedPersonaId = id
+        savedResult = result
+      },
+    })
+
+    await measurePIS(provider, "p-save-test")
+
+    expect(savedPersonaId).toBe("p-save-test")
+    expect(savedResult).not.toBeNull()
+    expect(savedResult!.pis.overall).toBeGreaterThan(0)
+  })
+})
+
+// ── measurePISBatch ──
+
+describe("PIS Engine — measurePISBatch", () => {
+  it("여러 페르소나 일괄 측정", async () => {
+    const provider = createMockProvider()
+    const result = await measurePISBatch(provider, ["p1", "p2", "p3"])
+
+    expect(result.measured).toBe(3)
+    expect(result.failed).toBe(0)
+    expect(result.results).toHaveLength(3)
+    expect(result.summary.averagePIS).toBeGreaterThan(0)
+  })
+
+  it("빈 목록 → 빈 결과", async () => {
+    const provider = createMockProvider()
+    const result = await measurePISBatch(provider, [])
+
+    expect(result.measured).toBe(0)
+    expect(result.failed).toBe(0)
+    expect(result.summary.averagePIS).toBe(0)
+  })
+
+  it("개별 실패 → 에러 기록 + 나머지 계속", async () => {
+    let callCount = 0
+    const provider = createMockProvider({
+      getMemoryRetentionStats: async (personaId) => {
+        callCount++
+        if (personaId === "p-fail") throw new Error("DB error")
+        return {
+          recentCount: 10,
+          recentRetained: 9,
+          mediumCount: 10,
+          mediumRetained: 8,
+          coreCount: 3,
+          coreRetained: 3,
+        }
+      },
+    })
+
+    const result = await measurePISBatch(provider, ["p1", "p-fail", "p3"])
+
+    expect(result.measured).toBe(2)
+    expect(result.failed).toBe(1)
+    expect(result.errors[0].personaId).toBe("p-fail")
+    expect(result.errors[0].error).toContain("DB error")
+    expect(callCount).toBe(3)
+  })
+
+  it("등급 분포 집계", async () => {
+    const provider = createMockProvider()
+    const result = await measurePISBatch(provider, ["p1", "p2"])
+
+    expect(result.summary.gradeDistribution).toBeDefined()
+    const totalInDist = Object.values(result.summary.gradeDistribution).reduce((s, n) => s + n, 0)
+    expect(totalInDist).toBe(2)
+  })
+})
