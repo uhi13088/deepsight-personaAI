@@ -369,10 +369,11 @@ export function applyGenreWeights(
     "purpose",
     "sociability",
   ]
+  // T219: 중심 기준(0.5) 스케일링 — 고차원/저차원 비대칭 편향 방지
   return vector.map((v, i) => {
     const dim = dims[i]
     if (!dim) return v
     const weight = entry.weights[dim] ?? 1.0
-    return Math.max(0, Math.min(1, v * weight))
+    return Math.max(0, Math.min(1, 0.5 + (v - 0.5) * weight))
   })
 }

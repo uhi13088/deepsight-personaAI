@@ -624,10 +624,11 @@ describe("Tuning", () => {
   })
 
   describe("applyGenreWeights", () => {
-    it("장르 가중치 적용", () => {
+    it("장르 가중치 적용 (중심 기준 스케일링)", () => {
       const vector = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
       const result = applyGenreWeights(vector, "thriller", DEFAULT_GENRE_WEIGHTS)
-      expect(result[0]).toBeCloseTo(0.5 * 1.2) // depth * 1.2
+      // T219: 중심 기준 0.5 + (0.5 - 0.5) * weight = 0.5 (중립값은 불변)
+      expect(result[0]).toBeCloseTo(0.5)
     })
 
     it("없는 장르면 원본 반환", () => {

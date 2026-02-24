@@ -188,18 +188,20 @@ export function computeVectorsFromApiResponses(responses: OnboardingApiResponse[
     }
   }
 
-  // Build L1 result
+  // Build L1 result — delta를 응답 수(N)로 나누어 포화 방지 (T216)
   const l1 = {} as Record<SocialDimension, number>
+  const l1ResponseCount = responses.filter((r) => r.l1_weights).length || 1
   for (const dim of L1_DIMS) {
-    l1[dim] = hasStructuredL1 ? clamp(0.5 + l1Delta[dim]) : clamp(l1Values[dim])
+    l1[dim] = hasStructuredL1 ? clamp(0.5 + l1Delta[dim] / l1ResponseCount) : clamp(l1Values[dim])
   }
 
-  // Build L2 result
+  // Build L2 result — delta를 응답 수(N)로 나누어 포화 방지 (T216)
   let l2: Record<TemperamentDimension, number> | null = null
+  const l2ResponseCount = responses.filter((r) => r.l2_weights).length || 1
   if (hasL2Data) {
     l2 = {} as Record<TemperamentDimension, number>
     for (const dim of L2_DIMS) {
-      l2[dim] = clamp(0.5 + l2Delta[dim])
+      l2[dim] = clamp(0.5 + l2Delta[dim] / l2ResponseCount)
     }
   }
 

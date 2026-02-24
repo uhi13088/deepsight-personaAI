@@ -393,6 +393,41 @@
   - 변경: three-tier-engine.ts, explanation.ts, analytics.ts, index.ts, persona-engine-v4.md
   - 테스트: context-enricher.test.ts (71 테스트), 기존 matching.test.ts 78 PASS (하위 호환), 전체 263 매칭 PASS
 
+## DONE (v4.0 — 페르소나 품질 개선)
+
+- [x] **T216: API 벡터 누적 포화 수정 (CRITICAL)** ✅ 2026-02-24
+  - AC1: `computeVectorsFromApiResponses()`에서 l1Delta/l2Delta를 응답 수(N)로 나누어 포화 방지
+  - AC2: 단위 테스트 — 30개 응답 시 포화 안 됨 검증 (3 tests PASS)
+  - 변경: compute.ts
+
+- [x] **T217: Cold-Start confidence 정규화 (HIGH)** ✅ 2026-02-24
+  - AC1: confidence 계산 시 `targetDimensions` 기반 독립 관측 수로 계산 (복합질문 부풀림 방지)
+  - AC2: 단위 테스트 — 복합질문 시나리오에서 confidence 정확도 검증 (2 tests PASS)
+  - 변경: cold-start.ts
+
+- [x] **T218: 3-Tier 매칭 스코어 [0,1] 범위 보장 (MEDIUM)** ✅ 2026-02-24
+  - AC1: Basic/Advanced/Exploration 3개 Tier 함수 반환 시 `clamp()` 적용
+  - AC2: 단위 테스트 — [0,1] 범위 검증 (3 tests PASS)
+  - 변경: three-tier-engine.ts
+
+- [x] **T219: 장르 가중치 중심 기준 스케일링 (MEDIUM)** ✅ 2026-02-24
+  - AC1: `0.5 + (v - 0.5) * weight` 중심 기준 스케일링으로 변경 (원점 곱셈 편향 제거)
+  - AC2: 단위 테스트 — 대칭성 검증 + 고차원 비포화 검증 (3 tests PASS)
+  - 변경: tuning.ts, matching.test.ts
+
+- [x] **T220: Balancer 아키타입 분류 로직 개선 (MEDIUM)** ✅ 2026-02-24
+  - AC1: Balancer distance를 강제값(0.1) 대신 실제 거리×0.7 보너스로 변경
+  - AC2: 단위 테스트 — 균형 벡터 + 경계 케이스 검증 (2 tests PASS)
+  - 변경: user-archetype.ts
+
+- [x] **T221: Psychometric↔Projection L2→L1 매핑 정합성 (MEDIUM)** ✅ 2026-02-24
+  - AC1: `OCEAN_L1_MAPPINGS`에 projection-coefficients.ts와 일치하는 매핑 보강 (neuroticism→lens, conscientiousness→purpose 추가)
+  - AC2: 단위 테스트 — 5개 L2 매핑 존재 + predictL1FromL2 방향 검증 (4 tests PASS)
+  - 변경: psychometric.ts
+  - 테스트: quality-fixes.test.ts (+17 신규), 전체 4122 PASS (101 파일), Build PASS
+
+---
+
 ## IN_PROGRESS
 
 (없음)

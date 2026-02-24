@@ -163,11 +163,24 @@ export function inferVectorsFromAnswers(
     sums[dim] = { total: 0, count: 0 }
   }
 
+  // T217: 독립 관측 수 추적 — targetDimensions 기반으로 해당 차원을 직접 타겟한 질문만 카운트
+  const independentObservations: Record<string, number> = {}
+  for (const dim of [...l1Dims, ...l2Dims]) {
+    independentObservations[dim] = 0
+  }
+
   for (const answer of answers) {
     const question = questions.find((q) => q.id === answer.questionId)
     if (!question) continue
     const option = question.options.find((o) => o.id === answer.selectedOptionId)
     if (!option) continue
+
+    // 독립 관측 수: 질문의 targetDimensions에 명시된 차원만 카운트
+    for (const dim of question.targetDimensions) {
+      if (independentObservations[dim] != null) {
+        independentObservations[dim]++
+      }
+    }
 
     // L1 + L2 가중치를 각각 적용 (복합질문: 동시 측정)
     for (const [dim, delta] of Object.entries(option.l1Weights)) {
@@ -198,10 +211,10 @@ export function inferVectorsFromAnswers(
       )
     : null
 
-  // 신뢰도: 질문 수 기반 (0~1)
+  // T217: 신뢰도 — targetDimensions 기반 독립 관측 수로 계산 (복합질문 부풀림 방지)
   const confidence: Record<string, number> = {}
   for (const dim of [...l1Dims, ...l2Dims]) {
-    const count = sums[dim].count
+    const count = independentObservations[dim]
     confidence[dim] = round(Math.min(count / 8, 1)) // 8문항이면 max confidence
   }
 

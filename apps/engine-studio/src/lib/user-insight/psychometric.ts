@@ -48,40 +48,72 @@ export interface LatentTrait {
 
 // ── OCEAN → L1 매핑 ─────────────────────────────────────────────
 
+// T221: projection-coefficients.ts의 L2→L1 매핑과 정합성 보장
+// projection: depth→openness, lens→neuroticism(inv), stance→agreeableness(inv),
+//   scope→conscientiousness, taste→openness, purpose→conscientiousness, sociability→extraversion
 export const OCEAN_L1_MAPPINGS: PsychometricMapping[] = [
   {
     l2Dimension: "openness",
     l1Correlations: [
-      { dimension: "taste", coefficient: 0.7, description: "개방성 → 실험적 취향" },
-      { dimension: "depth", coefficient: 0.4, description: "개방성 → 심층 분석 경향" },
+      {
+        dimension: "depth",
+        coefficient: 0.5,
+        description: "개방성 → 심층 분석 경향 (projection primary)",
+      },
+      {
+        dimension: "taste",
+        coefficient: 0.7,
+        description: "개방성 → 실험적 취향 (projection secondary)",
+      },
       { dimension: "purpose", coefficient: 0.3, description: "개방성 → 의미 추구" },
     ],
   },
   {
     l2Dimension: "conscientiousness",
     l1Correlations: [
-      { dimension: "depth", coefficient: 0.6, description: "성실성 → 체계적 분석" },
-      { dimension: "scope", coefficient: 0.5, description: "성실성 → 디테일 지향" },
-      { dimension: "lens", coefficient: 0.4, description: "성실성 → 논리적 평가" },
+      {
+        dimension: "scope",
+        coefficient: 0.6,
+        description: "성실성 → 디테일 지향 (projection primary)",
+      },
+      {
+        dimension: "purpose",
+        coefficient: 0.5,
+        description: "성실성 → 목표 실천 (projection secondary)",
+      },
+      { dimension: "depth", coefficient: 0.4, description: "성실성 → 체계적 분석" },
     ],
   },
   {
     l2Dimension: "extraversion",
     l1Correlations: [
-      { dimension: "sociability", coefficient: 0.8, description: "외향성 → 소통 지향" },
+      {
+        dimension: "sociability",
+        coefficient: 0.8,
+        description: "외향성 → 소통 지향 (projection primary)",
+      },
       { dimension: "stance", coefficient: -0.3, description: "외향성 → 수용적 태도" },
     ],
   },
   {
     l2Dimension: "agreeableness",
     l1Correlations: [
-      { dimension: "stance", coefficient: -0.7, description: "우호성 → 비판 회피" },
+      {
+        dimension: "stance",
+        coefficient: -0.7,
+        description: "우호성 → 비판 회피 (projection primary, inverse)",
+      },
       { dimension: "sociability", coefficient: 0.4, description: "우호성 → 소통 선호" },
     ],
   },
   {
     l2Dimension: "neuroticism",
     l1Correlations: [
+      {
+        dimension: "lens",
+        coefficient: -0.6,
+        description: "신경성 → 감성적 판단 (projection primary, inverse)",
+      },
       { dimension: "purpose", coefficient: 0.3, description: "신경성 → 의미 민감" },
       { dimension: "taste", coefficient: -0.2, description: "신경성 → 검증된 선호" },
     ],
