@@ -1,4 +1,5 @@
 import type { NextConfig } from "next"
+import { securityHeaders } from "@deepsight/config"
 
 /**
  * Next.js Configuration - 금융업계 수준 보안 설정
@@ -8,38 +9,7 @@ const nextConfig: NextConfig = {
   headers: async () => [
     {
       source: "/:path*",
-      headers: [
-        // XSS 방지
-        {
-          key: "X-XSS-Protection",
-          value: "1; mode=block",
-        },
-        // MIME 타입 스니핑 방지
-        {
-          key: "X-Content-Type-Options",
-          value: "nosniff",
-        },
-        // 클릭재킹 방지
-        {
-          key: "X-Frame-Options",
-          value: "DENY",
-        },
-        // Referrer 정책
-        {
-          key: "Referrer-Policy",
-          value: "strict-origin-when-cross-origin",
-        },
-        // 권한 정책 (민감한 기능 제한)
-        {
-          key: "Permissions-Policy",
-          value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
-        },
-        // DNS Prefetch 제어
-        {
-          key: "X-DNS-Prefetch-Control",
-          value: "on",
-        },
-      ],
+      headers: securityHeaders({ dnsPrefetchControl: true }),
     },
     // Public API CORS — 허용된 오리진만 (next.config는 동적 Origin 불가하므로 미들웨어에서 처리)
     // 여기서는 Methods/Headers만 선언, Origin은 미들웨어에서 동적 검증

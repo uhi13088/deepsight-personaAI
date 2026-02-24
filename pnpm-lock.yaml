@@ -10,7 +10,7 @@ importers:
     devDependencies:
       '@commitlint/cli':
         specifier: ^19.6.1
-        version: 19.8.1(@types/node@20.19.30)(typescript@5.9.3)
+        version: 19.8.1(@types/node@22.19.11)(typescript@5.9.3)
       '@commitlint/config-conventional':
         specifier: ^19.6.0
         version: 19.8.1
@@ -29,9 +29,18 @@ importers:
 
   apps/developer-console:
     dependencies:
+      '@deepsight/auth':
+        specifier: workspace:^
+        version: link:../../packages/auth
+      '@deepsight/config':
+        specifier: workspace:^
+        version: link:../../packages/config
       '@deepsight/shared-types':
         specifier: workspace:^
         version: link:../../packages/shared-types
+      '@deepsight/ui':
+        specifier: workspace:^
+        version: link:../../packages/ui
       '@deepsight/vector-core':
         specifier: workspace:^
         version: link:../../packages/vector-core
@@ -183,9 +192,18 @@ importers:
       '@auth/prisma-adapter':
         specifier: ^2.11.1
         version: 2.11.1(@prisma/client@5.22.0(prisma@5.22.0))
+      '@deepsight/auth':
+        specifier: workspace:^
+        version: link:../../packages/auth
+      '@deepsight/config':
+        specifier: workspace:^
+        version: link:../../packages/config
       '@deepsight/shared-types':
         specifier: workspace:^
         version: link:../../packages/shared-types
+      '@deepsight/ui':
+        specifier: workspace:^
+        version: link:../../packages/ui
       '@deepsight/vector-core':
         specifier: workspace:^
         version: link:../../packages/vector-core
@@ -361,6 +379,12 @@ importers:
 
   apps/landing:
     dependencies:
+      '@deepsight/config':
+        specifier: workspace:^
+        version: link:../../packages/config
+      '@deepsight/ui':
+        specifier: workspace:^
+        version: link:../../packages/ui
       '@radix-ui/react-slot':
         specifier: ^1.1.0
         version: 1.2.4(@types/react@19.2.10)(react@19.2.3)
@@ -422,9 +446,15 @@ importers:
 
   apps/persona-world:
     dependencies:
+      '@deepsight/config':
+        specifier: workspace:^
+        version: link:../../packages/config
       '@deepsight/shared-types':
         specifier: workspace:^
         version: link:../../packages/shared-types
+      '@deepsight/ui':
+        specifier: workspace:^
+        version: link:../../packages/ui
       '@radix-ui/react-avatar':
         specifier: ^1.1.11
         version: 1.1.11(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -505,6 +535,31 @@ importers:
         specifier: ^4.0.18
         version: 4.0.18(@types/node@20.19.30)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
 
+  packages/auth:
+    dependencies:
+      next:
+        specifier: 16.1.6
+        version: 16.1.6(@babel/core@7.29.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      next-auth:
+        specifier: 5.0.0-beta.30
+        version: 5.0.0-beta.30(next@16.1.6(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react@19.2.3)
+    devDependencies:
+      '@types/node':
+        specifier: ^22
+        version: 22.19.11
+      '@types/react':
+        specifier: ^19
+        version: 19.2.10
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
+  packages/config:
+    devDependencies:
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
   packages/sdk:
     dependencies:
       '@deepsight/shared-types':
@@ -519,10 +574,47 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^1.0.0
-        version: 1.6.1(@types/node@20.19.30)(lightningcss@1.30.2)
+        version: 1.6.1(@types/node@22.19.11)(lightningcss@1.30.2)
 
   packages/shared-types:
     devDependencies:
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
+  packages/ui:
+    dependencies:
+      '@radix-ui/react-select':
+        specifier: ^2.2.6
+        version: 2.2.6(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      '@radix-ui/react-slot':
+        specifier: ^1.2.4
+        version: 1.2.4(@types/react@19.2.10)(react@19.2.3)
+      '@radix-ui/react-tooltip':
+        specifier: ^1.2.8
+        version: 1.2.8(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      class-variance-authority:
+        specifier: ^0.7.1
+        version: 0.7.1
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      lucide-react:
+        specifier: ^0.562.0
+        version: 0.562.0(react@19.2.3)
+      react:
+        specifier: '>=18'
+        version: 19.2.3
+      react-dom:
+        specifier: '>=18'
+        version: 19.2.3(react@19.2.3)
+      tailwind-merge:
+        specifier: ^3.4.0
+        version: 3.4.0
+    devDependencies:
+      '@types/react':
+        specifier: ^19
+        version: 19.2.10
       typescript:
         specifier: ^5
         version: 5.9.3
@@ -2582,6 +2674,9 @@ packages:
 
   '@types/node@20.19.30':
     resolution: {integrity: sha512-WJtwWJu7UdlvzEAUm484QNg5eAoq5QR08KDNx7g45Usrs2NtOPiX8ugDqmKdXkyL03rBqU5dYNYVQetEpBHq2g==}
+
+  '@types/node@22.19.11':
+    resolution: {integrity: sha512-BH7YwL6rA93ReqeQS1c4bsPpcfOmJasG+Fkr6Y59q83f9M1WcBRHR2vM+P9eOisYRcN3ujQoiZY8uk5W+1WL8w==}
 
   '@types/offscreencanvas@2019.7.3':
     resolution: {integrity: sha512-ieXiYmgSRXUDeOntE1InxjWyvEelZGP63M+cGuquuRLuIKKT1osnkXjxev9B7d1nXSug5vpunx+gNlbVxMlC9A==}
@@ -5706,11 +5801,11 @@ snapshots:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
 
-  '@commitlint/cli@19.8.1(@types/node@20.19.30)(typescript@5.9.3)':
+  '@commitlint/cli@19.8.1(@types/node@22.19.11)(typescript@5.9.3)':
     dependencies:
       '@commitlint/format': 19.8.1
       '@commitlint/lint': 19.8.1
-      '@commitlint/load': 19.8.1(@types/node@20.19.30)(typescript@5.9.3)
+      '@commitlint/load': 19.8.1(@types/node@22.19.11)(typescript@5.9.3)
       '@commitlint/read': 19.8.1
       '@commitlint/types': 19.8.1
       tinyexec: 1.0.2
@@ -5757,7 +5852,7 @@ snapshots:
       '@commitlint/rules': 19.8.1
       '@commitlint/types': 19.8.1
 
-  '@commitlint/load@19.8.1(@types/node@20.19.30)(typescript@5.9.3)':
+  '@commitlint/load@19.8.1(@types/node@22.19.11)(typescript@5.9.3)':
     dependencies:
       '@commitlint/config-validator': 19.8.1
       '@commitlint/execute-rule': 19.8.1
@@ -5765,7 +5860,7 @@ snapshots:
       '@commitlint/types': 19.8.1
       chalk: 5.6.2
       cosmiconfig: 9.0.0(typescript@5.9.3)
-      cosmiconfig-typescript-loader: 6.2.0(@types/node@20.19.30)(cosmiconfig@9.0.0(typescript@5.9.3))(typescript@5.9.3)
+      cosmiconfig-typescript-loader: 6.2.0(@types/node@22.19.11)(cosmiconfig@9.0.0(typescript@5.9.3))(typescript@5.9.3)
       lodash.isplainobject: 4.0.6
       lodash.merge: 4.6.2
       lodash.uniq: 4.5.0
@@ -7417,6 +7512,10 @@ snapshots:
     dependencies:
       undici-types: 6.21.0
 
+  '@types/node@22.19.11':
+    dependencies:
+      undici-types: 6.21.0
+
   '@types/offscreencanvas@2019.7.3': {}
 
   '@types/react-dom@19.2.3(@types/react@19.2.10)':
@@ -8035,9 +8134,9 @@ snapshots:
 
   convert-source-map@2.0.0: {}
 
-  cosmiconfig-typescript-loader@6.2.0(@types/node@20.19.30)(cosmiconfig@9.0.0(typescript@5.9.3))(typescript@5.9.3):
+  cosmiconfig-typescript-loader@6.2.0(@types/node@22.19.11)(cosmiconfig@9.0.0(typescript@5.9.3))(typescript@5.9.3):
     dependencies:
-      '@types/node': 20.19.30
+      '@types/node': 22.19.11
       cosmiconfig: 9.0.0(typescript@5.9.3)
       jiti: 2.6.1
       typescript: 5.9.3
@@ -10473,13 +10572,13 @@ snapshots:
       d3-time: 3.1.0
       d3-timer: 3.0.1
 
-  vite-node@1.6.1(@types/node@20.19.30)(lightningcss@1.30.2):
+  vite-node@1.6.1(@types/node@22.19.11)(lightningcss@1.30.2):
     dependencies:
       cac: 6.7.14
       debug: 4.4.3
       pathe: 1.1.2
       picocolors: 1.1.1
-      vite: 5.4.21(@types/node@20.19.30)(lightningcss@1.30.2)
+      vite: 5.4.21(@types/node@22.19.11)(lightningcss@1.30.2)
     transitivePeerDependencies:
       - '@types/node'
       - less
@@ -10491,13 +10590,13 @@ snapshots:
       - supports-color
       - terser
 
-  vite@5.4.21(@types/node@20.19.30)(lightningcss@1.30.2):
+  vite@5.4.21(@types/node@22.19.11)(lightningcss@1.30.2):
     dependencies:
       esbuild: 0.21.5
       postcss: 8.5.6
       rollup: 4.57.1
     optionalDependencies:
-      '@types/node': 20.19.30
+      '@types/node': 22.19.11
       fsevents: 2.3.3
       lightningcss: 1.30.2
 
@@ -10517,7 +10616,7 @@ snapshots:
       tsx: 4.21.0
       yaml: 2.8.2
 
-  vitest@1.6.1(@types/node@20.19.30)(lightningcss@1.30.2):
+  vitest@1.6.1(@types/node@22.19.11)(lightningcss@1.30.2):
     dependencies:
       '@vitest/expect': 1.6.1
       '@vitest/runner': 1.6.1
@@ -10536,11 +10635,11 @@ snapshots:
       strip-literal: 2.1.1
       tinybench: 2.9.0
       tinypool: 0.8.4
-      vite: 5.4.21(@types/node@20.19.30)(lightningcss@1.30.2)
-      vite-node: 1.6.1(@types/node@20.19.30)(lightningcss@1.30.2)
+      vite: 5.4.21(@types/node@22.19.11)(lightningcss@1.30.2)
+      vite-node: 1.6.1(@types/node@22.19.11)(lightningcss@1.30.2)
       why-is-node-running: 2.3.0
     optionalDependencies:
-      '@types/node': 20.19.30
+      '@types/node': 22.19.11
     transitivePeerDependencies:
       - less
       - lightningcss

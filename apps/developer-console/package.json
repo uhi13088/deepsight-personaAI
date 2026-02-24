@@ -18,7 +18,10 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@deepsight/auth": "workspace:^",
+    "@deepsight/config": "workspace:^",
     "@deepsight/shared-types": "workspace:^",
+    "@deepsight/ui": "workspace:^",
     "@deepsight/vector-core": "workspace:^",
     "@prisma/client": "5.22.0",
     "@radix-ui/react-accordion": "^1.2.12",

@@ -1,4 +1,5 @@
 import type { NextConfig } from "next"
+import { securityHeaders } from "@deepsight/config"
 
 function getEngineStudioUrl(): string {
   const raw = process.env.NEXT_PUBLIC_ENGINE_STUDIO_URL?.trim()
@@ -28,16 +29,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/:path*",
-        headers: [
-          { key: "X-XSS-Protection", value: "1; mode=block" },
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "DENY" },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          {
-            key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
-          },
-        ],
+        headers: securityHeaders(),
       },
     ]
   },
