@@ -24,6 +24,27 @@ export interface MatchBreakdown {
   crossAxisScore: number // 83축 유사도/발산도
   paradoxCompatibility: number // 역설 호환성 (Advanced)
   qualitativeBonus: number // 비정량적 보정 (±0.1)
+  trustBoost: number // 신뢰 기반 소셜 시그널 (Basic/Advanced only, 0.0~1.0)
+}
+
+/**
+ * 소셜 신뢰 시그널 (trust-score.ts의 computeTrustScore 결과에서 추출).
+ * 매칭 시 관계 데이터가 있는 페르소나 쌍에만 적용.
+ */
+export interface SocialSignal {
+  /** λ-가중 신뢰 점수 (0.0~1.0, computeTrustScore().score) */
+  trustScore: number
+  /** 활성화 가중치 (0.0~1.0, computeTrustScore().lambda) */
+  trustLambda: number
+}
+
+/**
+ * 매칭 컨텍스트 — 소셜 시그널 등 부가 데이터.
+ * matchAll()에 전달하여 페르소나별 소셜 신호를 주입.
+ */
+export interface MatchingContext {
+  /** personaId → SocialSignal 매핑. 이력 없는 페르소나는 미포함. */
+  socialSignals?: Map<string, SocialSignal>
 }
 
 export interface MatchResult {
@@ -72,6 +93,17 @@ export const DEFAULT_MATCHING_CONFIG: MatchingConfig = {
   diversityFactor: 0.3,
 }
 
+/**
+ * Trust 최대 가중치 (20%).
+ *
+ * 매칭 점수에서 Trust가 차지할 수 있는 최대 비율.
+ * 실제 가중치 = min(TRUST_MAX_WEIGHT, socialSignal.trustLambda × TRUST_MAX_WEIGHT)
+ * - 0세션: trustWeight ≈ 0 (순수 벡터 매칭)
+ * - 30세션: trustWeight ≈ 0.10 (벡터 90% + Trust 10%)
+ * - 50세션+: trustWeight ≈ 0.20 (벡터 80% + Trust 20%)
+ */
+export const TRUST_MAX_WEIGHT = 0.2
+
 // ── Tier 1: Basic Matching ───────────────────────────────────
 
 export function calculateBasicScore(
@@ -80,7 +112,8 @@ export function calculateBasicScore(
   userCAP: CrossAxisProfile,
   personaCAP: CrossAxisProfile,
   userEPS?: ParadoxProfile,
-  personaEPS?: ParadoxProfile
+  personaEPS?: ParadoxProfile,
+  socialSignal?: SocialSignal
 ): { score: number; breakdown: MatchBreakdown } {
   const vectorScore = Math.max(0, cosineSimilarity(userVFinal, personaVFinal))
   const crossAxisScore = calculateCrossAxisSimilarity(userCAP, personaCAP)
@@ -91,9 +124,18 @@ export function calculateBasicScore(
   const hasParadox = userEPS && personaEPS
 
   // V_Final 65% + 교차축 30% + Paradox 5% (Paradox 없으면 V_Final 70% + 교차축 30%)
-  const score = hasParadox
-    ? round(0.65 * vectorScore + 0.3 * crossAxisScore + 0.05 * paradoxCompat)
-    : round(0.7 * vectorScore + 0.3 * crossAxisScore)
+  const rawScore = hasParadox
+    ? 0.65 * vectorScore + 0.3 * crossAxisScore + 0.05 * paradoxCompat
+    : 0.7 * vectorScore + 0.3 * crossAxisScore
+
+  // Trust 블렌딩: (1 - trustWeight) × rawScore + trustWeight × trustScore
+  const trustWeight = computeTrustWeight(socialSignal)
+  const trustBoostValue = socialSignal?.trustScore ?? 0
+
+  const score =
+    trustWeight > 0
+      ? round((1 - trustWeight) * rawScore + trustWeight * trustBoostValue)
+      : round(rawScore)
 
   return {
     score,
@@ -102,6 +144,7 @@ export function calculateBasicScore(
       crossAxisScore: round(crossAxisScore),
       paradoxCompatibility: round(paradoxCompat),
       qualitativeBonus: 0,
+      trustBoost: round(trustBoostValue),
     },
   }
 }
@@ -114,13 +157,23 @@ export function calculateAdvancedScore(
   userCAP: CrossAxisProfile,
   personaCAP: CrossAxisProfile,
   userEPS: ParadoxProfile,
-  personaEPS: ParadoxProfile
+  personaEPS: ParadoxProfile,
+  socialSignal?: SocialSignal
 ): { score: number; breakdown: MatchBreakdown } {
   const vectorScore = Math.max(0, cosineSimilarity(userVFinal, personaVFinal))
   const crossAxisScore = calculateCrossAxisSimilarity(userCAP, personaCAP)
   const paradoxCompat = calculateParadoxCompatibility(userEPS, personaEPS)
 
-  const score = round(0.5 * vectorScore + 0.3 * crossAxisScore + 0.2 * paradoxCompat)
+  const rawScore = 0.5 * vectorScore + 0.3 * crossAxisScore + 0.2 * paradoxCompat
+
+  // Trust 블렌딩
+  const trustWeight = computeTrustWeight(socialSignal)
+  const trustBoostValue = socialSignal?.trustScore ?? 0
+
+  const score =
+    trustWeight > 0
+      ? round((1 - trustWeight) * rawScore + trustWeight * trustBoostValue)
+      : round(rawScore)
 
   return {
     score,
@@ -129,6 +182,7 @@ export function calculateAdvancedScore(
       crossAxisScore: round(crossAxisScore),
       paradoxCompatibility: round(paradoxCompat),
       qualitativeBonus: 0,
+      trustBoost: round(trustBoostValue),
     },
   }
 }
@@ -163,6 +217,7 @@ export function calculateExplorationScore(
       crossAxisScore: round(crossAxisDivergence),
       paradoxCompatibility: round(paradoxDiversity),
       qualitativeBonus: round(freshness),
+      trustBoost: 0, // Exploration Tier는 Trust 미적용 (세렌디피티 보존)
     },
   }
 }
@@ -268,15 +323,17 @@ export function generateExplanation(
     sociability: "소통 성향",
   }
 
+  const trustSuffix = breakdown.trustBoost > 0 ? ` (신뢰 보정: +${breakdown.trustBoost})` : ""
+
   if (tier === "basic") {
     const dimExplanations = topDims
       .map((d) => `${dimLabels[d.dim] ?? d.dim} 일치도: ${d.similarity}`)
       .join(", ")
-    return `표면적 성향 매칭 — ${dimExplanations}`
+    return `표면적 성향 매칭 — ${dimExplanations}${trustSuffix}`
   }
 
   if (tier === "advanced") {
-    return `심층 매칭 — 역설 호환성: ${breakdown.paradoxCompatibility}, 벡터 유사도: ${breakdown.vectorScore}`
+    return `심층 매칭 — 역설 호환성: ${breakdown.paradoxCompatibility}, 벡터 유사도: ${breakdown.vectorScore}${trustSuffix}`
   }
 
   return `세렌디피티 추천 — 새로운 관점 탐색 (교차축 발산: ${breakdown.crossAxisScore})`
@@ -287,7 +344,8 @@ export function generateExplanation(
 export function matchPersona(
   user: UserProfile,
   persona: PersonaCandidate,
-  tier: MatchingTier
+  tier: MatchingTier,
+  socialSignal?: SocialSignal
 ): MatchResult {
   const personaVFinal = calculateVFinal(persona.l1, persona.l2, persona.l3)
 
@@ -301,7 +359,8 @@ export function matchPersona(
         user.crossAxisProfile,
         persona.crossAxisProfile,
         user.paradoxProfile,
-        persona.paradoxProfile
+        persona.paradoxProfile,
+        socialSignal
       )
       break
     case "advanced":
@@ -311,10 +370,12 @@ export function matchPersona(
         user.crossAxisProfile,
         persona.crossAxisProfile,
         user.paradoxProfile,
-        persona.paradoxProfile
+        persona.paradoxProfile,
+        socialSignal
       )
       break
     case "exploration":
+      // Exploration Tier는 Trust 미적용 — 세렌디피티 보존
       result = calculateExplorationScore(
         user.crossAxisProfile,
         persona.crossAxisProfile,
@@ -344,15 +405,17 @@ export function matchPersona(
 export function matchAll(
   user: UserProfile,
   personas: PersonaCandidate[],
-  config: MatchingConfig = DEFAULT_MATCHING_CONFIG
+  config: MatchingConfig = DEFAULT_MATCHING_CONFIG,
+  context?: MatchingContext
 ): MatchResult[] {
   const allResults: MatchResult[] = []
 
   // 각 Tier별로 매칭 실행
   for (const persona of personas) {
-    const basicResult = matchPersona(user, persona, "basic")
-    const advancedResult = matchPersona(user, persona, "advanced")
-    const explorationResult = matchPersona(user, persona, "exploration")
+    const signal = context?.socialSignals?.get(persona.id)
+    const basicResult = matchPersona(user, persona, "basic", signal)
+    const advancedResult = matchPersona(user, persona, "advanced", signal)
+    const explorationResult = matchPersona(user, persona, "exploration") // Trust 미적용
 
     allResults.push(basicResult, advancedResult, explorationResult)
   }
@@ -402,6 +465,21 @@ function deduplicateByPersona(results: MatchResult[]): MatchResult[] {
   }
 
   return unique
+}
+
+// ── Trust 가중치 계산 ────────────────────────────────────────
+
+/**
+ * SocialSignal로부터 실제 매칭 가중치 계산.
+ *
+ * trustWeight = min(TRUST_MAX_WEIGHT, trustLambda × TRUST_MAX_WEIGHT)
+ * - λ=0 (0세션): trustWeight=0 → 순수 벡터 매칭
+ * - λ=0.5 (30세션): trustWeight=0.10
+ * - λ=1.0 (50세션+): trustWeight=0.20
+ */
+export function computeTrustWeight(socialSignal?: SocialSignal): number {
+  if (!socialSignal) return 0
+  return Math.min(TRUST_MAX_WEIGHT, socialSignal.trustLambda * TRUST_MAX_WEIGHT)
 }
 
 // ── 유틸 ─────────────────────────────────────────────────────

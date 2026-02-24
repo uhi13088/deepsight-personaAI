@@ -365,6 +365,19 @@
 
 ---
 
+## DONE (v4.0 — 매칭 고도화)
+
+- [x] **T178: Trust-Weighted Matching — 기존 TrustScore를 매칭 파이프라인에 통합** ✅ 2026-02-24
+  - AC1: SocialSignal 인터페이스 + MatchingContext — trust-score.ts 결과를 매칭에 주입하는 타입 정의
+  - AC2: Basic/Advanced Tier Trust 블렌딩 — `finalScore = (1 - trustWeight) × rawScore + trustWeight × trustScore`, TRUST_MAX_WEIGHT=0.2
+  - AC3: Exploration Tier 제외 — 세렌디피티 보존, trustBoost=0 고정
+  - AC4: computeTrustWeight 함수 — `min(TRUST_MAX_WEIGHT, trustLambda × TRUST_MAX_WEIGHT)`, Cold-Start 자동 처리 (λ sigmoid)
+  - AC5: matchPersona/matchAll 확장 — optional SocialSignal/MatchingContext 파라미터, 하위 호환 유지
+  - AC6: MatchBreakdown.trustBoost 필드 + generateExplanation 신뢰 보정 표시
+  - AC7: 설계서 §12.3 최신화 — Trust-Weighted Matching 공식/활성화 곡선/적용 범위 문서화
+  - 변경: three-tier-engine.ts, persona-engine-v4.md
+  - 테스트: matching.test.ts (+17 Trust 통합 테스트), consumer-journey.test.ts (breakdown 동기화), 145 PASS
+
 ## IN_PROGRESS
 
 (없음)
