@@ -5,20 +5,28 @@ export type { RawArticle, ArticleAnalysis, LLMProvider } from "./news-fetcher"
 
 export {
   computeNewsInterestScore,
+  computeRegionalRelevance,
   selectPersonasForArticle,
+  allocateDailyReactions,
   INTEREST_THRESHOLD,
-  DEFAULT_MAX_REACTORS,
+  AUTO_INTEREST_THRESHOLD,
 } from "./news-interest-matcher"
 export type {
   ArticleForMatching,
   PersonaForMatching,
   NewsInterestResult,
+  ArticleReactionPair,
 } from "./news-interest-matcher"
 
-export { triggerNewsReactionPosts, formatNewsArticleTopic } from "./news-reaction-trigger"
+export {
+  triggerNewsReactionPosts,
+  runDailyNewsReactions,
+  formatNewsArticleTopic,
+} from "./news-reaction-trigger"
 export type {
   NewsArticleForTrigger,
   PersonaForTrigger,
   ScheduledReaction,
   NewsReactionDataProvider,
+  DailyNewsDataProvider,
 } from "./news-reaction-trigger"

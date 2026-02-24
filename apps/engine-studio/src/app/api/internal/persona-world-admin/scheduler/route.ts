@@ -18,8 +18,12 @@ import {
 import { getConsumptionContext } from "@/lib/persona-world/consumption-manager"
 import { getPersonaState } from "@/lib/persona-world/state-manager"
 import { resolveMentions, notifyMentions } from "@/lib/persona-world/mention-service"
-import { triggerNewsReactionPosts, formatNewsArticleTopic } from "@/lib/persona-world/news"
-import type { NewsReactionDataProvider } from "@/lib/persona-world/news"
+import {
+  triggerNewsReactionPosts,
+  runDailyNewsReactions,
+  formatNewsArticleTopic,
+} from "@/lib/persona-world/news"
+import type { NewsReactionDataProvider, DailyNewsDataProvider } from "@/lib/persona-world/news"
 
 export async function GET() {
   const { response } = await requireAuth()
@@ -253,7 +257,7 @@ export async function POST(request: NextRequest) {
 
         const article = await prisma.newsArticle.findUnique({
           where: { id: articleId },
-          select: { id: true, title: true, summary: true, topicTags: true },
+          select: { id: true, title: true, summary: true, topicTags: true, region: true },
         })
         if (!article) {
           return NextResponse.json(
@@ -318,6 +322,101 @@ export async function POST(request: NextRequest) {
             articleTitle: article.title,
             selectedPersonas: scheduled.length,
             postsCreated: createdPosts,
+            llmAvailable,
+          },
+        })
+      }
+
+      case "daily_news": {
+        // T199: 일일 자동 뉴스 반응 파이프라인
+        // 점수 분포 기반으로 반응 인원 결정 — 하드코딩 상한 없음
+        const {
+          dailyBudget = 20,
+          maxPerPersona = 2,
+          withinHours = 24,
+        } = body as {
+          action: string
+          dailyBudget?: number
+          maxPerPersona?: number
+          withinHours?: number
+        }
+
+        const llmAvailable = isLLMConfigured()
+        const dailyProvider = createDailyNewsDataProvider()
+        const scheduled = await runDailyNewsReactions(dailyProvider, {
+          dailyBudget,
+          maxPerPersona,
+          withinHours,
+        })
+
+        const createdPosts: Array<{ personaId: string; postId: string; articleId: string }> = []
+        const schedulerDP = createSchedulerDataProvider()
+
+        for (const reaction of scheduled) {
+          try {
+            const schedulerPersonas = await schedulerDP.getActiveStatusPersonas()
+            const persona = schedulerPersonas.find((p) => p.id === reaction.personaId)
+            if (!persona) continue
+
+            const articleData = await prisma.newsArticle.findUnique({
+              where: { id: reaction.articleId },
+              select: { title: true, summary: true },
+            })
+            if (!articleData) continue
+
+            const state = await getPersonaState(persona.id)
+            const topic = formatNewsArticleTopic(articleData.title, articleData.summary)
+            const newsPostProvider = createNewsPostPipelineProvider(topic)
+            const llmProvider = llmAvailable ? createPostLLMProvider(persona.id) : undefined
+            if (!llmProvider) continue
+
+            const postResult = await executePostCreation(
+              persona,
+              {
+                shouldPost: true,
+                shouldInteract: false,
+                postType: "NEWS_REACTION" as PersonaPostType,
+              },
+              {
+                trigger: "TRENDING",
+                currentHour: new Date().getHours(),
+                triggerData: { topicId: reaction.articleId },
+              },
+              state,
+              llmProvider,
+              newsPostProvider
+            )
+
+            await prisma.personaPost.update({
+              where: { id: postResult.postId },
+              data: { newsArticleId: reaction.articleId },
+            })
+
+            createdPosts.push({
+              personaId: reaction.personaId,
+              postId: postResult.postId,
+              articleId: reaction.articleId,
+            })
+          } catch (err) {
+            console.error(`[DailyNews] Post creation failed for ${reaction.personaId}:`, err)
+          }
+        }
+
+        // 기사별 반응 집계
+        const byArticle = createdPosts.reduce(
+          (acc, p) => {
+            acc[p.articleId] = (acc[p.articleId] ?? 0) + 1
+            return acc
+          },
+          {} as Record<string, number>
+        )
+
+        return NextResponse.json({
+          success: true,
+          data: {
+            scheduledReactions: scheduled.length,
+            postsCreated: createdPosts.length,
+            byArticle,
             llmAvailable,
           },
         })
@@ -475,6 +574,8 @@ function createNewsReactionDataProvider(): NewsReactionDataProvider {
           id: true,
           role: true,
           expertise: true,
+          country: true,
+          languages: true,
           layerVectors: {
             where: { layerType: "TEMPERAMENT" },
             select: { dim1: true, dim2: true, dim3: true, dim4: true, dim5: true },
@@ -489,6 +590,8 @@ function createNewsReactionDataProvider(): NewsReactionDataProvider {
           id: p.id,
           expertise: (p.expertise as string[]) ?? [],
           role: p.role ?? null,
+          country: p.country ?? "KR",
+          languages: (p.languages as string[]) ?? [],
           temperament: {
             openness: Number(l2?.dim1 ?? 0.5),
             conscientiousness: Number(l2?.dim2 ?? 0.5),
@@ -525,6 +628,48 @@ function createNewsReactionDataProvider(): NewsReactionDataProvider {
 
     async markArticleTriggered(_articleId, _triggerCount) {
       // no-op (로그로 추적)
+    },
+  }
+}
+
+/** T199: Daily 자동 뉴스 반응용 데이터 프로바이더 */
+function createDailyNewsDataProvider(): DailyNewsDataProvider {
+  const base = createNewsReactionDataProvider()
+  return {
+    ...base,
+
+    async getRecentArticles(withinHours) {
+      const since = new Date(Date.now() - withinHours * 60 * 60 * 1000)
+      const articles = await prisma.newsArticle.findMany({
+        where: { publishedAt: { gte: since } },
+        select: {
+          id: true,
+          title: true,
+          summary: true,
+          topicTags: true,
+          region: true,
+        },
+        orderBy: { publishedAt: "desc" },
+      })
+      return articles.map((a) => ({
+        id: a.id,
+        title: a.title,
+        summary: a.summary ?? "",
+        topicTags: (a.topicTags as string[]) ?? [],
+        region: a.region ?? "GLOBAL",
+      }))
+    },
+
+    async getPersonaNewsReactionCountToday(personaId) {
+      const todayStart = new Date()
+      todayStart.setHours(0, 0, 0, 0)
+      return prisma.personaPost.count({
+        where: {
+          personaId,
+          type: "NEWS_REACTION",
+          createdAt: { gte: todayStart },
+        },
+      })
     },
   }
 }
