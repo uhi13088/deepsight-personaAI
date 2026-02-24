@@ -19,12 +19,14 @@ const AI_ARTICLE: ArticleForMatching = {
   topicTags: ["AI", "규제", "기술정책"],
   summary: "인공지능 기본법이 국회를 통과했다. AI 개발자들의 반응은 엇갈린다.",
   region: "KR",
+  importanceScore: 0.7,
 }
 
 const POLITICS_ARTICLE: ArticleForMatching = {
   topicTags: ["정치", "선거", "국회"],
   summary: "내년 대선을 앞두고 여야가 경선 일정을 확정했다.",
   region: "KR",
+  importanceScore: 0.6,
 }
 
 // 전문 분야: AI/기술
@@ -138,6 +140,7 @@ describe("computeNewsInterestScore", () => {
         topicTags: [],
         summary: "테스트",
         region: "GLOBAL",
+        importanceScore: 0.5,
       }
       const result = computeNewsInterestScore(emptyTagArticle, AI_EXPERT)
       // tagOverlap = 0.1 (최소값)
@@ -193,7 +196,12 @@ describe("selectPersonasForArticle", () => {
 
   it("모든 페르소나가 threshold 미달이면 빈 배열", () => {
     // 태그 없는 GLOBAL 기사 + 내향적 전문분야 불일치 페르소나
-    const emptyArticle: ArticleForMatching = { topicTags: [], summary: "", region: "GLOBAL" }
+    const emptyArticle: ArticleForMatching = {
+      topicTags: [],
+      summary: "",
+      region: "GLOBAL",
+      importanceScore: 0.5,
+    }
     // 내향적 페르소나만 사용
     const results = selectPersonasForArticle(emptyArticle, [INTROVERT_PERSONA], INTEREST_THRESHOLD)
     // score = 0.1*0.35 + 0.2*0.25 + 0.1*0.25 + 0.3*0.15 = 0.035+0.05+0.025+0.045 = 0.155 < 0.25
