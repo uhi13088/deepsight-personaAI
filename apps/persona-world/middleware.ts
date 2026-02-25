@@ -6,10 +6,20 @@ import { getToken } from "next-auth/jwt"
  *
  * 1. 페이지 라우트: 세션 쿠키 없으면 로그인 페이지로 리다이렉트
  * 2. API 프록시 라우트: 세션 쿠키 검증 + X-Internal-Token + X-Authenticated-Email 헤더 주입
- *    → engine-studio에 전달되어 서비스간 인증 + 유저 소유권 검증으로 사용
+ *    → NextResponse.rewrite()로 engine-studio에 직접 프록시
+ *    → next.config.ts rewrites 대신 미들웨어에서 처리하여 헤더 전달 보장
  */
+
+function getEngineStudioUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_ENGINE_STUDIO_URL?.trim()
+  if (!raw) return "http://localhost:3000"
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw.replace(/\/+$/, "")
+  return `https://${raw}`.replace(/\/+$/, "")
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+  const engineUrl = getEngineStudioUrl()
 
   // NextAuth v5 JWT 세션 쿠키 확인
   const sessionToken =
@@ -18,9 +28,19 @@ export async function middleware(request: NextRequest) {
     request.cookies.get("__Secure-next-auth.session-token")?.value ||
     request.cookies.get("next-auth.session-token")?.value
 
-  // ── /api/public/auth/*: 로그인 전 호출되므로 인증 완전 제외 ──
+  // ── /api/public/auth/*: 로그인 전 호출되므로 인증 완전 제외, 내부 토큰만 주입 ──
   if (pathname.startsWith("/api/public/auth/")) {
-    return NextResponse.next()
+    const requestHeaders = new Headers(request.headers)
+
+    const internalSecret = process.env.INTERNAL_API_SECRET
+    if (internalSecret) {
+      requestHeaders.set("x-internal-token", internalSecret)
+    }
+
+    const destination = new URL(pathname + request.nextUrl.search, engineUrl)
+    return NextResponse.rewrite(destination, {
+      request: { headers: requestHeaders },
+    })
   }
 
   // ── /api/public/*: 공개 API — 세션 불필요, 내부 토큰만 주입 ──
@@ -48,7 +68,8 @@ export async function middleware(request: NextRequest) {
       }
     }
 
-    return NextResponse.next({
+    const destination = new URL(pathname + request.nextUrl.search, engineUrl)
+    return NextResponse.rewrite(destination, {
       request: { headers: requestHeaders },
     })
   }
@@ -81,7 +102,8 @@ export async function middleware(request: NextRequest) {
       // JWT 디코딩 실패 시에도 요청은 통과 (x-internal-token 검증은 별도)
     }
 
-    return NextResponse.next({
+    const destination = new URL(pathname + request.nextUrl.search, engineUrl)
+    return NextResponse.rewrite(destination, {
       request: { headers: requestHeaders },
     })
   }
