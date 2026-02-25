@@ -1,5 +1,7 @@
 import type { NextConfig } from "next"
-import { securityHeaders } from "@deepsight/config"
+import { securityHeaders, getEngineStudioUrl } from "@deepsight/config"
+
+const ENGINE_STUDIO_URL = getEngineStudioUrl({ appName: "persona-world" })
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -13,8 +15,18 @@ const nextConfig: NextConfig = {
       },
     ]
   },
-  // API 프록시는 middleware.ts에서 NextResponse.rewrite()로 처리
-  // → 헤더 주입(x-internal-token, x-authenticated-email)이 rewrite와 함께 보장됨
+  async rewrites() {
+    return [
+      {
+        source: "/api/persona-world/:path*",
+        destination: `${ENGINE_STUDIO_URL}/api/persona-world/:path*`,
+      },
+      {
+        source: "/api/public/:path*",
+        destination: `${ENGINE_STUDIO_URL}/api/public/:path*`,
+      },
+    ]
+  },
 }
 
 export default nextConfig
