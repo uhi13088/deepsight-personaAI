@@ -11,6 +11,7 @@ import {
   evaluateFilter,
   createModelConfig,
   resolveModelForCallType,
+  buildDefaultCallTypeOverrides,
 } from "@/lib/global-config"
 import type { SafetyFilter, FilterAction, ModelConfig } from "@/lib/global-config"
 import type { Prisma } from "@/generated/prisma"
@@ -127,6 +128,9 @@ async function loadModelConfigCached(): Promise<ModelConfig> {
 
     const configMap = Object.fromEntries(rows.map((r) => [r.key, r.value]))
     const defaults = createModelConfig()
+    // DB에 저장된 오버라이드와 추천 기본값 병합 (DB 값 우선)
+    const dbOverrides = (configMap.callTypeOverrides ?? {}) as ModelConfig["callTypeOverrides"]
+    const mergedOverrides = { ...buildDefaultCallTypeOverrides(), ...dbOverrides }
     const config: ModelConfig = {
       models: (configMap.models ?? defaults.models) as ModelConfig["models"],
       routingRules: (configMap.routingRules ??
@@ -134,8 +138,7 @@ async function loadModelConfigCached(): Promise<ModelConfig> {
       defaultModel: (configMap.defaultModel ??
         defaults.defaultModel) as ModelConfig["defaultModel"],
       budget: (configMap.budget ?? defaults.budget) as ModelConfig["budget"],
-      callTypeOverrides: (configMap.callTypeOverrides ??
-        defaults.callTypeOverrides) as ModelConfig["callTypeOverrides"],
+      callTypeOverrides: mergedOverrides,
     }
     _modelConfigCache = { config, loadedAt: now }
     return config

@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/require-auth"
 import type { ApiResponse } from "@/types"
-import { createModelConfig, getBudgetStatus, KNOWN_CALL_TYPES } from "@/lib/global-config"
+import {
+  createModelConfig,
+  getBudgetStatus,
+  KNOWN_CALL_TYPES,
+  buildDefaultCallTypeOverrides,
+} from "@/lib/global-config"
 import type {
   ModelConfig,
   RoutingRule,
@@ -20,13 +25,15 @@ async function loadModelConfig(): Promise<ModelConfig> {
 
   const configMap = Object.fromEntries(rows.map((r) => [r.key, r.value]))
   const defaults = createModelConfig()
+  // DB에 저장된 오버라이드와 추천 기본값 병합 (DB 값 우선)
+  const dbOverrides = (configMap.callTypeOverrides ?? {}) as ModelConfig["callTypeOverrides"]
+  const mergedOverrides = { ...buildDefaultCallTypeOverrides(), ...dbOverrides }
   return {
     models: (configMap.models ?? defaults.models) as ModelConfig["models"],
     routingRules: (configMap.routingRules ?? defaults.routingRules) as ModelConfig["routingRules"],
     defaultModel: (configMap.defaultModel ?? defaults.defaultModel) as ModelConfig["defaultModel"],
     budget: (configMap.budget ?? defaults.budget) as ModelConfig["budget"],
-    callTypeOverrides: (configMap.callTypeOverrides ??
-      defaults.callTypeOverrides) as ModelConfig["callTypeOverrides"],
+    callTypeOverrides: mergedOverrides,
   }
 }
 
