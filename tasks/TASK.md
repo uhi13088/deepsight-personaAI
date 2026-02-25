@@ -497,16 +497,22 @@
 
 ---
 
+## DONE (v4.0 — 오케스트레이션 테스트)
+
+- [x] **T229: 핵심 오케스트레이션 테스트 추가** ✅ 2026-02-25
+  - AC1: cron-scheduler-service.ts 테스트 — 11 테스트 (포스트/인터랙션 오케스트레이션, LLM 미설정 스킵, 감정 전염 Kill Switch ON/OFF, 에러 graceful degradation, 멘션 알림)
+  - AC2: interaction-pipeline.ts 테스트 — 13 테스트 (빈 피드 early return, 자기 글 스킵, 좋아요 확률, 댓글 engagement 결정, 벡터 캐싱, voice anchor, 관계 프로토콜)
+  - AC3: post-pipeline.ts 테스트 — 15 테스트 (주제 선택 fallback, voice anchor 3단계, voice critical 재생성, emotionalState 설명, poignancy/postSource)
+  - 변경: cron-scheduler-service.test.ts(신규), interaction-pipeline.test.ts(신규), post-pipeline.test.ts(신규)
+  - 테스트: 4186 PASS (104 파일), Build PASS
+
+---
+
 ## IN_PROGRESS
 
 (없음)
 
 ## QUEUE
-
-- [ ] **T229: 핵심 오케스트레이션 테스트 추가**
-  - AC1: cron-scheduler-service.ts 테스트 (감정 전염 게이트 포함)
-  - AC2: interaction-pipeline.ts 테스트
-  - AC3: post-pipeline.ts 테스트
 
 - [ ] **T230: 프롬프트 캐싱 실적용 검증**
   - AC1: Anthropic SDK 호출부에서 cache_control 블록 실제 적용 여부 확인
