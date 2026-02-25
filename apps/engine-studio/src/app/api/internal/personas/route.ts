@@ -209,19 +209,33 @@ export async function GET(request: NextRequest) {
     }
 
     // ── Execute queries ──────────────────────────────────────
-    const [personas, totalCount, statusCounts] = await Promise.all([
+    // include 쿼리 실패 시 (테이블 미존재 등) 단독 조회 폴백
+    const fullQuery = () =>
       prisma.persona.findMany({
         where,
         orderBy,
         skip,
         take: limit,
         include: {
-          layerVectors: {
-            orderBy: { version: "desc" },
-          },
+          layerVectors: { orderBy: { version: "desc" as const } },
           personaState: true,
         },
-      }),
+      })
+    type PersonaWithRelations = Awaited<ReturnType<typeof fullQuery>>[number]
+
+    let personas: PersonaWithRelations[]
+    try {
+      personas = await fullQuery()
+    } catch {
+      const base = await prisma.persona.findMany({ where, orderBy, skip, take: limit })
+      personas = base.map((p) => ({
+        ...p,
+        layerVectors: [],
+        personaState: null,
+      })) as PersonaWithRelations[]
+    }
+
+    const [totalCount, statusCounts] = await Promise.all([
       prisma.persona.count({ where }),
       prisma.persona.groupBy({
         by: ["status"],
