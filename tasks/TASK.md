@@ -516,6 +516,19 @@
   - 기존 테스트: llm-client.test.ts 8테스트 + llm-adapter.test.ts 18테스트에서 캐시 분리 검증 완료
   - 코드 변경 없음 (검증만 수행)
 
+## DONE (v4.0 — Arena ↔ Quality 루프)
+
+- [x] **T231: Arena ↔ Quality 양방향 루프 완성** ✅ 2026-02-25
+  - AC1: Arena 결과 → correction-loop.ts 패치 → Instruction Layer(voiceProfile/styleParams/factbook) 반영 경로 검증 완료
+  - AC2: arena-feedback.ts 신규 생성 — 양방향 브릿지:
+    - Arena→Quality: `applyAndTrackCorrection()` — `executeCorrectionLoop()` 전체 파이프라인 + CorrectionTracking 생성
+    - Quality→Arena: `processQualityTriggers()` — 트리거 처리 + CRITICAL 카운트
+    - 피드백 루프: `evaluatePendingCorrections()` — 전후 PIS 비교 → verdict (EFFECTIVE/PARTIAL/INEFFECTIVE/REGRESSED)
+    - 효과 요약: `summarizeCorrectionEffectiveness()` — successRate + avgImprovement
+  - 신규: arena-feedback.ts, arena-feedback.test.ts (17 테스트)
+  - 변경: persona-world/index.ts (배럴 익스포트)
+  - 테스트: 4203 PASS (105 파일), Build PASS
+
 ---
 
 ## IN_PROGRESS
@@ -524,9 +537,7 @@
 
 ## QUEUE
 
-- [ ] **T231: Arena ↔ Quality 양방향 루프 완성**
-  - AC1: Arena 결과 → 패치 → Instruction Layer 반영 경로 검증
-  - AC2: 누락 시 arena-feedback.ts 연결 코드 추가
+(없음)
 
 ---
 
