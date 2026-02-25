@@ -3,6 +3,10 @@
 export { fetchArticlesFromRss, parseRssXml, analyzeArticleWithClaude } from "./news-fetcher"
 export type { RawArticle, ArticleAnalysis, LLMProvider } from "./news-fetcher"
 
+// T256: Auto-fetch
+export { ensurePresetsSeeded, executeNewsAutoFetch, PRESET_SOURCES } from "./news-auto-fetch"
+export type { NewsAutoFetchDataProvider, AutoFetchResult } from "./news-auto-fetch"
+
 export {
   computeNewsInterestScore,
   computeRegionalRelevance,

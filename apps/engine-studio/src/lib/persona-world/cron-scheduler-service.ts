@@ -35,6 +35,10 @@ import type {
   ContagionSensitivity,
   NodeTopology,
 } from "@/lib/persona-world/emotional-contagion"
+import { executeNewsAutoFetch } from "@/lib/persona-world/news"
+import type { NewsAutoFetchDataProvider, AutoFetchResult } from "@/lib/persona-world/news"
+import { createNewsLLMProvider } from "@/lib/persona-world/llm-adapter"
+import { runDailyNewsReactionPipeline } from "@/lib/persona-world/admin/scheduler-service"
 
 // ── Result type ──────────────────────────────────────────────────
 
@@ -45,6 +49,7 @@ export interface CronSchedulerResult {
   interactions: number
   llmAvailable: boolean
   contagion?: ContagionRoundLog | { skipped: true; reason: string }
+  newsAutoFetch?: AutoFetchResult | { skipped: true; reason: string }
   details: {
     execution: {
       postsCreated: Array<{ personaId: string; postId: string; postType: string }>
@@ -177,6 +182,23 @@ export async function executeCronScheduler(): Promise<CronSchedulerResult> {
     }
   }
 
+  // ── T256: 뉴스 자동 수집 + 반응 트리거 ───────────────────
+  let newsAutoFetch: CronSchedulerResult["newsAutoFetch"]
+
+  try {
+    const newsProvider = createNewsAutoFetchDataProvider()
+    const newsLlm = llmAvailable ? (createNewsLLMProvider() ?? null) : null
+    const reactionRunner = async () => runDailyNewsReactionPipeline({})
+
+    newsAutoFetch = await executeNewsAutoFetch(newsProvider, newsLlm, reactionRunner)
+  } catch (err) {
+    console.error("[Cron/NewsAutoFetch] News auto-fetch failed:", err)
+    newsAutoFetch = {
+      skipped: true,
+      reason: `Error: ${err instanceof Error ? err.message : "Unknown"}`,
+    }
+  }
+
   return {
     executedAt: new Date().toISOString(),
     decisions: schedulerResult.decisions.length,
@@ -184,6 +206,7 @@ export async function executeCronScheduler(): Promise<CronSchedulerResult> {
     interactions: interactionResults.length,
     llmAvailable,
     contagion,
+    newsAutoFetch,
     details: {
       ...schedulerResult,
       execution: { postsCreated: postResults, interactions: interactionResults },
@@ -640,6 +663,80 @@ function createInteractionProvider(): InteractionPipelineDataProvider {
         select: { voiceProfile: true },
       })
       return persona?.voiceProfile ?? null
+    },
+  }
+}
+
+// ── T256: News Auto-Fetch Data Provider ──────────────────────
+
+function createNewsAutoFetchDataProvider(): NewsAutoFetchDataProvider {
+  return {
+    async getSourceCount() {
+      return prisma.newsSource.count()
+    },
+
+    async seedPresets(presets) {
+      const result = await prisma.newsSource.createMany({
+        data: presets.map((p) => ({
+          name: p.name,
+          rssUrl: p.rssUrl,
+          region: p.region,
+          isActive: true,
+        })),
+        skipDuplicates: true,
+      })
+      return { added: result.count }
+    },
+
+    async getActiveSources() {
+      return prisma.newsSource.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true, rssUrl: true, region: true },
+      })
+    },
+
+    async articleExists(url) {
+      const article = await prisma.newsArticle.findUnique({
+        where: { url },
+        select: { id: true },
+      })
+      return !!article
+    },
+
+    async saveArticle(data) {
+      await prisma.newsArticle.create({ data })
+    },
+
+    async markSourceSuccess(sourceId) {
+      await prisma.newsSource.update({
+        where: { id: sourceId },
+        data: { lastFetchAt: new Date(), consecutiveFailures: 0, lastError: null },
+      })
+    },
+
+    async markSourceFailure(sourceId, error) {
+      const updated = await prisma.newsSource.update({
+        where: { id: sourceId },
+        data: {
+          consecutiveFailures: { increment: 1 },
+          lastError: error.slice(0, 500),
+        },
+      })
+      return updated.consecutiveFailures
+    },
+
+    async disableSource(sourceId) {
+      await prisma.newsSource.update({
+        where: { id: sourceId },
+        data: { isActive: false },
+      })
+    },
+
+    async getConfig(key) {
+      const config = await prisma.systemConfig.findUnique({
+        where: { category_key: { category: "NEWS", key } },
+      })
+      return config?.value ?? null
     },
   }
 }

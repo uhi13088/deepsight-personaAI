@@ -63,6 +63,7 @@ const PRESET_SOURCES = [
 // ── 설정 기본값 ─────────────────────────────────────────────────
 
 const NEWS_CONFIG_DEFAULTS = {
+  autoFetchEnabled: true,
   autoTriggerEnabled: true,
   dailyBudget: 20,
   maxPerPersona: 2,
@@ -75,6 +76,10 @@ async function loadNewsSettings(): Promise<typeof NEWS_CONFIG_DEFAULTS> {
   const configs = await prisma.systemConfig.findMany({ where: { category: "NEWS" } })
   const map = Object.fromEntries(configs.map((c) => [c.key, c.value]))
   return {
+    autoFetchEnabled:
+      typeof map.auto_fetch_enabled === "boolean"
+        ? map.auto_fetch_enabled
+        : NEWS_CONFIG_DEFAULTS.autoFetchEnabled,
     autoTriggerEnabled:
       typeof map.auto_trigger_enabled === "boolean"
         ? map.auto_trigger_enabled
@@ -96,6 +101,23 @@ async function loadNewsSettings(): Promise<typeof NEWS_CONFIG_DEFAULTS> {
   }
 }
 
+/** T256: 프리셋 자동 시드 — 뉴스 소스 0건이면 프리셋 삽입 */
+async function autoSeedPresetsIfEmpty(): Promise<number> {
+  const count = await prisma.newsSource.count()
+  if (count > 0) return 0
+
+  const result = await prisma.newsSource.createMany({
+    data: PRESET_SOURCES.map((p) => ({
+      name: p.name,
+      rssUrl: p.rssUrl,
+      region: p.region,
+      isActive: true,
+    })),
+    skipDuplicates: true,
+  })
+  return result.count
+}
+
 // ── GET: 소스 목록 + 최근 기사 + 설정 + 비용 ─────────────────
 
 export async function GET() {
@@ -103,6 +125,9 @@ export async function GET() {
   if (response) return response
 
   try {
+    // T256: 소스 0건이면 프리셋 자동 시드
+    await autoSeedPresetsIfEmpty()
+
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0)
 
@@ -170,6 +195,9 @@ export async function GET() {
           region: s.region,
           lastFetchAt: s.lastFetchAt?.toISOString() ?? null,
           articleCount: s._count.articles,
+          // T256: 오류 추적
+          consecutiveFailures: s.consecutiveFailures,
+          lastError: s.lastError,
         })),
         presets: availablePresets,
         recentArticles: recentArticles.map((a) => ({
@@ -389,9 +417,10 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      // T200-B + T255: 설정 저장
+      // T200-B + T255 + T256: 설정 저장
       case "save_settings": {
         const {
+          autoFetchEnabled,
           autoTriggerEnabled,
           dailyBudget,
           maxPerPersona,
@@ -399,6 +428,7 @@ export async function POST(request: NextRequest) {
           commentThrottlePerArticle,
         } = body as {
           action: string
+          autoFetchEnabled?: boolean
           autoTriggerEnabled?: boolean
           dailyBudget?: number
           maxPerPersona?: number
@@ -407,6 +437,22 @@ export async function POST(request: NextRequest) {
         }
 
         const upserts: Array<Promise<unknown>> = []
+
+        // T256: 자동 수집 ON/OFF
+        if (autoFetchEnabled !== undefined) {
+          upserts.push(
+            prisma.systemConfig.upsert({
+              where: { category_key: { category: "NEWS", key: "auto_fetch_enabled" } },
+              update: { value: autoFetchEnabled as Prisma.InputJsonValue },
+              create: {
+                category: "NEWS",
+                key: "auto_fetch_enabled",
+                value: autoFetchEnabled as Prisma.InputJsonValue,
+                description: "T256: cron 뉴스 자동 수집 ON/OFF",
+              },
+            })
+          )
+        }
 
         if (autoTriggerEnabled !== undefined) {
           upserts.push(

@@ -17,6 +17,7 @@ import {
   createPostLLMProvider,
   createCommentLLMProvider,
   createNewsReactionPostLLMProvider,
+  createNewsLLMProvider,
   isLLMConfigured,
 } from "@/lib/persona-world/llm-adapter"
 import { getConsumptionContext } from "@/lib/persona-world/consumption-manager"
@@ -26,8 +27,14 @@ import {
   triggerNewsReactionPosts,
   runDailyNewsReactions,
   formatNewsArticleTopic,
+  executeNewsAutoFetch,
 } from "@/lib/persona-world/news"
-import type { NewsReactionDataProvider, DailyNewsDataProvider } from "@/lib/persona-world/news"
+import type {
+  NewsReactionDataProvider,
+  DailyNewsDataProvider,
+  NewsAutoFetchDataProvider,
+  AutoFetchResult,
+} from "@/lib/persona-world/news"
 import { layerVectorsToMap } from "@/lib/vector/dim-maps"
 import { isFeatureEnabled, createDefaultConfig } from "@/lib/security/kill-switch"
 import type { SystemSafetyConfig } from "@/lib/security/kill-switch"
@@ -1038,6 +1045,88 @@ function createInteractionProvider(
         select: { voiceProfile: true },
       })
       return persona?.voiceProfile ?? null
+    },
+  }
+}
+
+// ── T256: 뉴스 자동 수집 수동 트리거 ──────────────────────────
+
+export async function runNewsAutoFetchManual(): Promise<AutoFetchResult> {
+  const provider = createNewsAutoFetchPrismaProvider()
+  const llm = isLLMConfigured() ? (createNewsLLMProvider() ?? null) : null
+  const reactionRunner = async () => runDailyNewsReactionPipeline({})
+
+  return executeNewsAutoFetch(provider, llm, reactionRunner)
+}
+
+function createNewsAutoFetchPrismaProvider(): NewsAutoFetchDataProvider {
+  return {
+    async getSourceCount() {
+      return prisma.newsSource.count()
+    },
+
+    async seedPresets(presets) {
+      const result = await prisma.newsSource.createMany({
+        data: presets.map((p) => ({
+          name: p.name,
+          rssUrl: p.rssUrl,
+          region: p.region,
+          isActive: true,
+        })),
+        skipDuplicates: true,
+      })
+      return { added: result.count }
+    },
+
+    async getActiveSources() {
+      return prisma.newsSource.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true, rssUrl: true, region: true },
+      })
+    },
+
+    async articleExists(url) {
+      const article = await prisma.newsArticle.findUnique({
+        where: { url },
+        select: { id: true },
+      })
+      return !!article
+    },
+
+    async saveArticle(data) {
+      await prisma.newsArticle.create({ data })
+    },
+
+    async markSourceSuccess(sourceId) {
+      await prisma.newsSource.update({
+        where: { id: sourceId },
+        data: { lastFetchAt: new Date(), consecutiveFailures: 0, lastError: null },
+      })
+    },
+
+    async markSourceFailure(sourceId, error) {
+      const updated = await prisma.newsSource.update({
+        where: { id: sourceId },
+        data: {
+          consecutiveFailures: { increment: 1 },
+          lastError: error.slice(0, 500),
+        },
+      })
+      return updated.consecutiveFailures
+    },
+
+    async disableSource(sourceId) {
+      await prisma.newsSource.update({
+        where: { id: sourceId },
+        data: { isActive: false },
+      })
+    },
+
+    async getConfig(key) {
+      const config = await prisma.systemConfig.findUnique({
+        where: { category_key: { category: "NEWS", key } },
+      })
+      return config?.value ?? null
     },
   }
 }
