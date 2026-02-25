@@ -77,3 +77,8 @@
   - **경로 3 (긴 대화 중 발생, messages.75 등)**: Claude Code 내부 컨텍스트 컴팩션 버그로 tool_use 블록이 중복 삽입됨. 외부에서 수정 불가능. 대화를 짧게 유지하거나 에러 발생 시 새 세션 시작.
   - **훅 stdout 주의**: PostToolUse 훅(pnpm format)의 stdout이 Claude Code에 피드백으로 주입되면 추가 메시지가 대화에 삽입됨. `> /dev/null 2>&1`로 출력 전체 억제 필요. PreToolUse 훅의 echo도 마찬가지로 stdout 대신 로그 파일로 리디렉션.
   - **응급 처치**: 에러 발생 시 → 해당 대화 닫기 → 세션 파일 삭제(~/.claude/projects/...) → 새 대화 시작. 기존 깨진 세션은 수정 불가, 새 시작이 유일한 해결책.
+  - **[2026-02-25 추가] 훅 최적화로 발생 빈도 완화**:
+    - `pnpm format`(전체 프로젝트 스캔) → `format-changed-file.sh`(변경 파일 1개만 포맷)으로 교체
+    - `output-secret-filter.sh`: 11개 패턴 개별 grep → 단일 정규식 1회 검사 + 입력 4KB 제한
+    - `db-guard.sh`: SQL 무관 명령(git, pnpm 등) 즉시 통과하는 early-exit 추가
+    - 목적: 훅 실행 시간/출력 줄여서 Claude Code 내부 메시지 누적 속도 감소
