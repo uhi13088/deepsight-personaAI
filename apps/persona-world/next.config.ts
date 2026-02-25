@@ -1,7 +1,5 @@
 import type { NextConfig } from "next"
-import { securityHeaders, getEngineStudioUrl } from "@deepsight/config"
-
-const ENGINE_STUDIO_URL = getEngineStudioUrl({ appName: "persona-world" })
+import { securityHeaders } from "@deepsight/config"
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -15,18 +13,9 @@ const nextConfig: NextConfig = {
       },
     ]
   },
-  async rewrites() {
-    return [
-      {
-        source: "/api/persona-world/:path*",
-        destination: `${ENGINE_STUDIO_URL}/api/persona-world/:path*`,
-      },
-      {
-        source: "/api/public/:path*",
-        destination: `${ENGINE_STUDIO_URL}/api/public/:path*`,
-      },
-    ]
-  },
+  // API 프록시는 route handler에서 fetch()로 처리
+  // → middleware가 주입한 x-internal-token, x-authenticated-email 헤더가
+  //   engine-studio에 정확히 전달됨 (next.config.ts rewrites는 미들웨어 헤더 미전달)
 }
 
 export default nextConfig
