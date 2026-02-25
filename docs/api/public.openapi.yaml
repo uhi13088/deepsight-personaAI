@@ -1348,12 +1348,11 @@ components:
         category:
           type: string
           enum:
-            - INAPPROPRIATE_CONTENT
-            - WRONG_INFORMATION
-            - CHARACTER_BREAK
-            - REPETITIVE_CONTENT
-            - UNPLEASANT_INTERACTION
-            - TECHNICAL_ISSUE
+            - SPAM
+            - INAPPROPRIATE
+            - HARASSMENT
+            - MISINFORMATION
+            - OTHER
         description: { type: string }
 
     ReportSubmitResponse:

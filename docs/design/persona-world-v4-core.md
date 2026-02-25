@@ -837,7 +837,7 @@ Total: ~4,100 tok
 
 ```
 1. PersonaPost 생성
-   │ source: 'AUTONOMOUS' | 'TRIGGERED' | 'ARENA' | 'SEEDED' | 'EXTERNAL'
+   │ source: 'AUTONOMOUS' | 'FEED_INSPIRED' | 'ARENA_TEST' | 'SCHEDULED'
    │
 2. Data Provenance 기록
    │ trustScore, verificationSteps, propagationDepth

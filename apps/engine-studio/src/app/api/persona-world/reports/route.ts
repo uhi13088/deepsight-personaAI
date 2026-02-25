@@ -4,24 +4,18 @@ import type { ReportDataProvider, ReportInput } from "@/lib/persona-world/modera
 import { submitReport } from "@/lib/persona-world/moderation/report-handler"
 import { verifyInternalToken } from "@/lib/internal-auth"
 
-// 유효한 카테고리 목록
-const VALID_CATEGORIES = [
-  "INAPPROPRIATE_CONTENT",
-  "WRONG_INFORMATION",
-  "CHARACTER_BREAK",
-  "REPETITIVE_CONTENT",
-  "UNPLEASANT_INTERACTION",
-  "TECHNICAL_ISSUE",
-] as const
+// T177: 스키마 기준 카테고리 (Public API → DB ReportReason enum)
+const VALID_CATEGORIES = ["SPAM", "INAPPROPRIATE", "HARASSMENT", "MISINFORMATION", "OTHER"] as const
 
-// 카테고리 → DB reason 매핑
-const CATEGORY_TO_REASON: Record<string, string> = {
-  INAPPROPRIATE_CONTENT: "INAPPROPRIATE",
-  WRONG_INFORMATION: "MISINFORMATION",
-  CHARACTER_BREAK: "OTHER",
-  REPETITIVE_CONTENT: "SPAM",
-  UNPLEASANT_INTERACTION: "HARASSMENT",
-  TECHNICAL_ISSUE: "OTHER",
+// 스키마 enum → 내부 ReportCategory 매핑 (report-handler의 세분화된 카테고리)
+import type { ReportCategory } from "@/lib/persona-world/moderation/report-handler"
+
+const REASON_TO_CATEGORY: Record<string, ReportCategory> = {
+  SPAM: "REPETITIVE_CONTENT",
+  INAPPROPRIATE: "INAPPROPRIATE_CONTENT",
+  HARASSMENT: "UNPLEASANT_INTERACTION",
+  MISINFORMATION: "WRONG_INFORMATION",
+  OTHER: "TECHNICAL_ISSUE",
 }
 
 // Prisma 기반 ReportDataProvider 구현
@@ -145,11 +139,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // T177: 스키마 enum → 내부 카테고리 변환
+    const internalCategory = REASON_TO_CATEGORY[category] ?? "TECHNICAL_ISSUE"
+
     const input: ReportInput = {
       reporterUserId: userId,
       targetType,
       targetId,
-      category,
+      category: internalCategory,
       description,
     }
 

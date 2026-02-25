@@ -2,7 +2,7 @@
 // PersonaWorld v3 — Onboarding Engine
 // 구현계획서 §8, 설계서 §9.2
 // Cold Start 질문 기반 벡터 생성
-// LIGHT → L1, MEDIUM → L1+L2, DEEP → L1+L2+메타
+// QUICK → L1, STANDARD → L1+L2, DEEP → L1+L2+메타
 // ═══════════════════════════════════════════════════════════════
 
 import type { OnboardingAnswer, OnboardingResult } from "../types"
@@ -25,7 +25,7 @@ export interface OnboardingDataProvider extends OnboardingQuestionsProvider {
   saveOnboardingResult(
     userId: string,
     result: OnboardingResult,
-    level: "LIGHT" | "MEDIUM" | "DEEP"
+    level: "QUICK" | "STANDARD" | "DEEP"
   ): Promise<void>
 }
 
@@ -33,24 +33,24 @@ export interface OnboardingDataProvider extends OnboardingQuestionsProvider {
  * Cold Start 질문 기반 벡터 생성.
  *
  * 설계서 §9.2:
- * - LIGHT (Phase 1) → L1 7D → BASIC
- * - MEDIUM (Phase 1+2) → L1 7D + L2 5D → STANDARD
+ * - QUICK (Phase 1) → L1 7D → BASIC
+ * - STANDARD (Phase 1+2) → L1 7D + L2 5D → STANDARD
  * - DEEP (Phase 1+2+3) → L1 7D + L2 5D + 교차검증 → ADVANCED
  */
 export async function processOnboardingAnswers(
   answers: OnboardingAnswer[],
-  level: "LIGHT" | "MEDIUM" | "DEEP",
+  level: "QUICK" | "STANDARD" | "DEEP",
   provider: OnboardingDataProvider
 ): Promise<OnboardingResult> {
   // Phase 1: L1 벡터 산출
   const phase1Questions = await provider.getQuestionsByPhase(1)
   const l1Vector = computeL1Vector(phase1Questions, answers)
 
-  if (level === "LIGHT") {
+  if (level === "QUICK") {
     return {
       l1Vector,
       profileLevel: "BASIC",
-      confidence: ONBOARDING_CONFIDENCE.LIGHT,
+      confidence: ONBOARDING_CONFIDENCE.QUICK,
     }
   }
 
@@ -60,13 +60,13 @@ export async function processOnboardingAnswers(
   const l2Vector = computeL2Vector(allPhase12, answers)
   const l3Vector = computeL3Vector(allPhase12, answers)
 
-  if (level === "MEDIUM") {
+  if (level === "STANDARD") {
     return {
       l1Vector,
       l2Vector,
       l3Vector,
       profileLevel: "STANDARD",
-      confidence: ONBOARDING_CONFIDENCE.MEDIUM,
+      confidence: ONBOARDING_CONFIDENCE.STANDARD,
     }
   }
 
@@ -93,11 +93,11 @@ export async function processOnboardingAnswers(
 /**
  * 레벨별 필요한 Phase 반환.
  */
-export function getRequiredPhases(level: "LIGHT" | "MEDIUM" | "DEEP"): (1 | 2 | 3)[] {
+export function getRequiredPhases(level: "QUICK" | "STANDARD" | "DEEP"): (1 | 2 | 3)[] {
   switch (level) {
-    case "LIGHT":
+    case "QUICK":
       return [1]
-    case "MEDIUM":
+    case "STANDARD":
       return [1, 2]
     case "DEEP":
       return [1, 2, 3]

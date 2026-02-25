@@ -1,6 +1,6 @@
 # DeepSight v4.0 — TASK 관리
 
-> 마지막 업데이트: 2026-02-24
+> 마지막 업데이트: 2026-02-25
 
 ---
 
@@ -428,27 +428,88 @@
 
 ---
 
+## DONE (v4.0 — Enum 통일)
+
+- [x] **T177: Enum 이름 통일 마이그레이션** ✅ 2026-02-24
+  - AC1: OnboardingLevel — LIGHT→QUICK, MEDIUM→STANDARD (engine-studio Prisma + 코드 + 마이그레이션 SQL)
+  - AC2: PostSource — 설계서를 구현값(FEED_INSPIRED/ARENA_TEST/SCHEDULED) 기준으로 동기화
+  - AC3: ArenaSessionStatus — 설계서를 구현값(PENDING/RUNNING/COMPLETED/CANCELLED) 기준으로 동기화
+  - AC4: ReportReason — public.md/openapi를 스키마 기준(SPAM/INAPPROPRIATE/HARASSMENT/MISINFORMATION/OTHER)으로 통일
+  - 변경: schema.prisma, supabase-init.sql, 033 마이그레이션, onboarding-engine.ts, cold-start routes(3), api.ts(PW), reports/route.ts
+  - 설계서: persona-engine-v4-impl.md, persona-engine-v4-intelligence.md, persona-world-v4-core.md, public.md, public.openapi.yaml
+  - gap-analysis.md 업데이트: 5개 Enum 불일치 → 4개 해결, 1개 의도적 확장(PersonaStatus)
+
+---
+
+## DONE (v4.0 — PIS 엔진)
+
+- [x] **T176: PIS (Persona Integrity Score) 엔진 구현** ✅ 2026-02-24
+  - AC1: ContextRecall — 기억 보유율 기반 정확도 측정 (recentMemoryAccuracy, mediumTermAccuracy, coreMemoryRetention)
+  - AC2: SettingConsistency — 품질 로그 기반 준수도 측정 (factbookCompliance, voiceSpecAdherence, vectorBehaviorAlign)
+  - AC3: CharacterStability — VoiceStyle 드리프트 + 톤 분산 + GrowthArc 정합 (persona-drift.ts 연동)
+  - AC4: PIS 통합 — measurePIS() + measurePISBatch() + DI Provider + 데이터 품질 추적
+  - 신규: pis-engine.ts (PISDataProvider, 3개 측정 함수, 통합 파이프라인, 배치 측정)
+  - 변경: index.ts (배럴 익스포트), quality-pw.test.ts (+69 테스트)
+  - 테스트: 4147 PASS (101 파일), Build PASS
+
+## DONE (v4.0 — Developer Console)
+
+- [x] **T224: Developer Console 미완성 UI 완성** ✅ 2026-02-25
+  - AC1: Logs 페이지 — 1025줄, 3탭 (로그/에러대시보드/알림), 고급 필터링, CSV/JSON/JSONL 내보내기
+  - AC2: Webhooks 관리 — 732줄, 3탭 (엔드포인트/전송이력/이벤트), CRUD, 테스트 전송, SSRF 방어
+  - AC3: Team 관리 — 663줄, 3탭 (멤버/초대/권한), 초대/삭제/역할변경, CSV 내보내기
+  - 백엔드: API 라우트 전체 구현 (logs 6개, webhooks 7개, team 6개) + Prisma DB 연결
+  - 서비스: logs-service.ts, webhooks-service.ts, team-service.ts 완료
+  - 참고: 이전 작업에서 이미 구현 완료되어 있었음 (TASK.md 미반영 상태)
+  - 테스트: 4147 PASS (101 파일), Build PASS
+
+---
+
+## DONE (v4.0 — 감정 전염 + P0 버그)
+
+- [x] **T225: 감정 전염 시스템 연결 + Engine Studio 제어** ✅ 2026-02-25
+  - AC1: emotional-contagion.ts → persona-world/ 이동 + barrel 익스포트
+  - AC2: contagion-integration.ts (DI 기반 DB 로드→실행→반영→안전 검사)
+  - AC3: cron-scheduler 연동 (Kill Switch 게이트, 기본 OFF)
+  - AC4: admin scheduler API trigger_contagion 수동 실행
+  - AC5: 기존 53 테스트 PASS, 전체 4147 PASS, Build PASS
+  - 변경: emotional-contagion.ts(이동), contagion-integration.ts(신규), cron-scheduler-service.ts, scheduler-service.ts, scheduler/route.ts, persona-world/index.ts
+
+- [x] **T227: postCount 하드코딩 수정 (GET /personas)** ✅ 2026-02-25
+  - AC1: personas 목록 API에서 `postCount: 0` → `p._count.posts` 실제 카운트 조회
+  - 변경: personas/route.ts (`_count.posts` select 추가, 응답 매핑 수정)
+
+- [x] **T228: register 응답 벡터에 sociability 추가** ✅ 2026-02-25
+  - AC1: POST /auth/register 응답에 sociability 필드 포함 (7D 반환)
+  - AC2: PersonaWorldUser 스키마에 sociability 컬럼 추가 (6D→7D)
+  - 변경: register/route.ts, schema.prisma, 034_pw_user_sociability.sql(신규)
+
+---
+
 ## IN_PROGRESS
 
 (없음)
 
 ## QUEUE
 
-- [ ] **T176: PIS (Persona Integrity Score) 엔진 구현**
-  - 설계서: `persona-engine-v4-operations.md:1134-1161`
-  - PIS = ContextRecall × 0.35 + SettingConsistency × 0.35 + CharacterStability × 0.30
-  - AC1: ContextRecall — 기억 검색 정확도 측정 (RAG 기반)
-  - AC2: SettingConsistency — 설정/팩트북 준수도 측정
-  - AC3: CharacterStability — 벡터 드리프트 기반 안정성 (drift-correction 연동)
-  - AC4: PIS 통합 점수 계산 + 5등급 판정 + 자동 조치 연동
-  - 참고: quality-integration.ts에 PIS 기본 구조 존재, 독립 모듈로 분리 필요
+- [ ] **T226: API 문서 최신화 (미문서화 11개 + 인증/응답 불일치)**
+  - AC1: public.md/openapi — 댓글 삭제, credits 3개, SNS 인증 4개, notifications 2개 추가
+  - AC2: internal.md/openapi — activity, evolution, news, quality 4개 admin 엔드포인트 추가
+  - AC3: 인증 요구사항 명시 (public API 중 내부 토큰 필요한 6개 표기)
+  - AC4: 응답 타입 불일치 수정 (feed source 4종, register sociability 추가)
 
-- [ ] **T177: Enum 이름 통일 — engine-studio → developer-console 기준 마이그레이션**
-  - OnboardingLevel: LIGHT/MEDIUM → QUICK/STANDARD (developer-console 기준)
-  - PostSource: 설계서 → 구현(AUTONOMOUS/FEED_INSPIRED/ARENA_TEST/SCHEDULED) 기준으로 통일
-  - ArenaSessionStatus: 구현(PENDING/RUNNING/COMPLETED/CANCELLED) 기준으로 설계서 업데이트
-  - ReportReason: 스키마 기준으로 docs/api/public.md 업데이트
-  - Prisma 마이그레이션 SQL 생성 필요
+- [ ] **T229: 핵심 오케스트레이션 테스트 추가**
+  - AC1: cron-scheduler-service.ts 테스트 (감정 전염 게이트 포함)
+  - AC2: interaction-pipeline.ts 테스트
+  - AC3: post-pipeline.ts 테스트
+
+- [ ] **T230: 프롬프트 캐싱 실적용 검증**
+  - AC1: Anthropic SDK 호출부에서 cache_control 블록 실제 적용 여부 확인
+  - AC2: 미적용 시 llm-adapter.ts에 cache_control 추가
+
+- [ ] **T231: Arena ↔ Quality 양방향 루프 완성**
+  - AC1: Arena 결과 → 패치 → Instruction Layer 반영 경로 검증
+  - AC2: 누락 시 arena-feedback.ts 연결 코드 추가
 
 ---
 

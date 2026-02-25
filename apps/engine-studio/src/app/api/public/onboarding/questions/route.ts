@@ -7,20 +7,20 @@ import { prisma } from "@/lib/prisma"
  * 온보딩 Phase별 질문 8개를 반환한다.
  *
  * Phase 매핑:
- *   Phase 1 = LIGHT Q1~Q8   (L1: depth/lens/stance/scope)
- *   Phase 2 = LIGHT Q9~Q12 + MEDIUM Q13~Q16 (L1: taste/purpose + 교차)
- *   Phase 3 = MEDIUM Q17~Q24 (교차검증 + 심층)
+ *   Phase 1 = QUICK Q1~Q8   (L1: depth/lens/stance/scope)
+ *   Phase 2 = QUICK Q9~Q12 + STANDARD Q13~Q16 (L1: taste/purpose + 교차)
+ *   Phase 3 = STANDARD Q17~Q24 (교차검증 + 심층)
  */
 
-type PhaseRange = { level: "LIGHT" | "MEDIUM" | "DEEP"; from: number; to: number }
+type PhaseRange = { level: "QUICK" | "STANDARD" | "DEEP"; from: number; to: number }
 
 const PHASE_RANGES: Record<number, PhaseRange[]> = {
-  1: [{ level: "LIGHT", from: 1, to: 8 }],
+  1: [{ level: "QUICK", from: 1, to: 8 }],
   2: [
-    { level: "LIGHT", from: 9, to: 12 },
-    { level: "MEDIUM", from: 13, to: 16 },
+    { level: "QUICK", from: 9, to: 12 },
+    { level: "STANDARD", from: 13, to: 16 },
   ],
-  3: [{ level: "MEDIUM", from: 17, to: 24 }],
+  3: [{ level: "STANDARD", from: 17, to: 24 }],
 }
 
 export async function GET(request: NextRequest) {

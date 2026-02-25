@@ -29,6 +29,19 @@ import {
 } from "@/lib/persona-world/news"
 import type { NewsReactionDataProvider, DailyNewsDataProvider } from "@/lib/persona-world/news"
 import { layerVectorsToMap } from "@/lib/vector/dim-maps"
+import { isFeatureEnabled, createDefaultConfig } from "@/lib/security/kill-switch"
+import type { SystemSafetyConfig } from "@/lib/security/kill-switch"
+import { executeContagionRound } from "@/lib/persona-world/contagion-integration"
+import type {
+  ContagionDataProvider,
+  ContagionRoundLog,
+} from "@/lib/persona-world/contagion-integration"
+import type {
+  ContagionPersonaState,
+  ContagionEdge,
+  ContagionSensitivity,
+  NodeTopology,
+} from "@/lib/persona-world/emotional-contagion"
 
 // ── Result types ─────────────────────────────────────────────────
 
@@ -243,6 +256,173 @@ export async function pausePersona(
     data: { status: "PAUSED" },
   })
   return { action: "pause_persona", personaId }
+}
+
+// ── POST: trigger_contagion ────────────────────────────────────
+
+export interface ContagionTriggerResult {
+  message: string
+  log: ContagionRoundLog
+  requiresKillSwitch: boolean
+}
+
+export async function triggerContagionManual(): Promise<ContagionTriggerResult> {
+  // Kill Switch 확인
+  const safetyConfig = await loadSafetyConfigForAdmin()
+  if (!isFeatureEnabled(safetyConfig, "emotionalContagion")) {
+    throw new Error(
+      "emotionalContagion이 Kill Switch에 의해 비활성화되어 있습니다. 보안 대시보드에서 활성화 후 재시도하세요."
+    )
+  }
+
+  const provider = createAdminContagionDataProvider()
+  const result = await executeContagionRound(provider)
+
+  return {
+    message: result.requiresKillSwitch
+      ? `감정 전염 실행 — 집단 mood 위험 감지: ${result.log.safetyReason}`
+      : `감정 전염 실행 완료 — ${result.log.affectedCount}명 영향`,
+    log: result.log,
+    requiresKillSwitch: result.requiresKillSwitch,
+  }
+}
+
+async function loadSafetyConfigForAdmin(): Promise<SystemSafetyConfig> {
+  const row = await prisma.systemSafetyConfig.findUnique({
+    where: { id: "singleton" },
+  })
+  if (!row) return createDefaultConfig("system")
+
+  return {
+    emergencyFreeze: row.emergencyFreeze,
+    freezeReason: row.freezeReason ?? undefined,
+    freezeAt: row.freezeAt ? row.freezeAt.getTime() : undefined,
+    featureToggles: row.featureToggles as unknown as SystemSafetyConfig["featureToggles"],
+    autoTriggers: row.autoTriggers as unknown as SystemSafetyConfig["autoTriggers"],
+    updatedAt: row.updatedAt.getTime(),
+    updatedBy: row.updatedBy,
+  }
+}
+
+function createAdminContagionDataProvider(): ContagionDataProvider {
+  return {
+    async getActivePersonaStates(): Promise<ContagionPersonaState[]> {
+      const states = await prisma.personaState.findMany({
+        where: {
+          persona: { status: { in: ["ACTIVE", "STANDARD"] } },
+        },
+        select: {
+          personaId: true,
+          mood: true,
+          energy: true,
+          socialBattery: true,
+          paradoxTension: true,
+        },
+      })
+      return states.map((s) => ({
+        personaId: s.personaId,
+        mood: Number(s.mood),
+        energy: Number(s.energy),
+        socialBattery: Number(s.socialBattery),
+        paradoxTension: Number(s.paradoxTension),
+      }))
+    },
+
+    async getRelationshipEdges(): Promise<ContagionEdge[]> {
+      const rels = await prisma.personaRelationship.findMany({
+        select: {
+          personaAId: true,
+          personaBId: true,
+          warmth: true,
+          tension: true,
+          frequency: true,
+        },
+      })
+      const edges: ContagionEdge[] = []
+      for (const r of rels) {
+        edges.push({
+          sourceId: r.personaAId,
+          targetId: r.personaBId,
+          warmth: Number(r.warmth),
+          tension: Number(r.tension),
+          frequency: Number(r.frequency),
+        })
+        edges.push({
+          sourceId: r.personaBId,
+          targetId: r.personaAId,
+          warmth: Number(r.warmth),
+          tension: Number(r.tension),
+          frequency: Number(r.frequency),
+        })
+      }
+      return edges
+    },
+
+    async getSensitivities(personaIds: string[]): Promise<Map<string, ContagionSensitivity>> {
+      const vectors = await prisma.personaLayerVector.findMany({
+        where: { personaId: { in: personaIds }, layerType: "TEMPERAMENT" },
+        select: { personaId: true, dim3: true, dim4: true, dim5: true },
+      })
+      const map = new Map<string, ContagionSensitivity>()
+      for (const v of vectors) {
+        map.set(v.personaId, {
+          moodSensitivity: 0.5 + Number(v.dim5 ?? 0.5),
+          socialOpenness: Number(v.dim3 ?? 0.5),
+          agreeableness: Number(v.dim4 ?? 0.5),
+        })
+      }
+      return map
+    },
+
+    async getTopologies(personaIds: string[]): Promise<Map<string, NodeTopology>> {
+      const rels = await prisma.personaRelationship.findMany({
+        where: { OR: [{ personaAId: { in: personaIds } }, { personaBId: { in: personaIds } }] },
+        select: { personaAId: true, personaBId: true },
+      })
+      const degreeMap = new Map<string, Set<string>>()
+      for (const id of personaIds) degreeMap.set(id, new Set())
+      for (const r of rels) {
+        degreeMap.get(r.personaAId)?.add(r.personaBId)
+        degreeMap.get(r.personaBId)?.add(r.personaAId)
+      }
+      const map = new Map<string, NodeTopology>()
+      const degrees = [...degreeMap.values()].map((s) => s.size)
+      const avgDegree = degrees.length > 0 ? degrees.reduce((a, b) => a + b, 0) / degrees.length : 0
+      const hubThreshold = Math.max(avgDegree * 2, 5)
+      for (const [id, neighbors] of degreeMap) {
+        const totalDegree = neighbors.size
+        let triangles = 0
+        const arr = [...neighbors]
+        for (let i = 0; i < arr.length; i++) {
+          for (let j = i + 1; j < arr.length; j++) {
+            if (degreeMap.get(arr[i])?.has(arr[j])) triangles++
+          }
+        }
+        const possible = (totalDegree * (totalDegree - 1)) / 2
+        map.set(id, {
+          personaId: id,
+          totalDegree,
+          clusteringCoefficient: possible > 0 ? triangles / possible : 0,
+          isHub: totalDegree >= hubThreshold,
+        })
+      }
+      return map
+    },
+
+    async updateMood(personaId: string, newMood: number): Promise<void> {
+      await prisma.personaState.update({
+        where: { personaId },
+        data: { mood: newMood },
+      })
+    },
+
+    async logContagionRound(log: ContagionRoundLog): Promise<void> {
+      console.log(
+        `[Contagion/Admin] Round: ${log.personaCount} personas, ${log.affectedCount} affected, ` +
+          `mood ${log.averageMoodBefore.toFixed(3)}→${log.averageMoodAfter.toFixed(3)}, safety: ${log.safetyStatus}`
+      )
+    },
+  }
 }
 
 // ── POST: trigger_news_article ──────────────────────────────────

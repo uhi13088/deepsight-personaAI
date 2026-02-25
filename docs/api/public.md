@@ -997,18 +997,18 @@ GET /api/public/persona-requests?userId=user_001
   "userId": "user_001",
   "targetType": "POST",
   "targetId": "post_123",
-  "category": "INAPPROPRIATE_CONTENT",
+  "category": "INAPPROPRIATE",
   "description": "부적절한 콘텐츠입니다"
 }
 ```
 
-| 파라미터      | 타입     | 필수 | 설명                                                                                                                                    |
-| ------------- | -------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `userId`      | `string` | ✅   | 신고자 ID                                                                                                                               |
-| `targetType`  | `string` | ✅   | `"POST"` 또는 `"COMMENT"`                                                                                                               |
-| `targetId`    | `string` | ✅   | 신고 대상 ID                                                                                                                            |
-| `category`    | `string` | ✅   | `INAPPROPRIATE_CONTENT` · `WRONG_INFORMATION` · `CHARACTER_BREAK` · `REPETITIVE_CONTENT` · `UNPLEASANT_INTERACTION` · `TECHNICAL_ISSUE` |
-| `description` | `string` |      | 추가 설명 (선택)                                                                                                                        |
+| 파라미터      | 타입     | 필수 | 설명                                                                 |
+| ------------- | -------- | ---- | -------------------------------------------------------------------- |
+| `userId`      | `string` | ✅   | 신고자 ID                                                            |
+| `targetType`  | `string` | ✅   | `"POST"` 또는 `"COMMENT"`                                            |
+| `targetId`    | `string` | ✅   | 신고 대상 ID                                                         |
+| `category`    | `string` | ✅   | `SPAM` · `INAPPROPRIATE` · `HARASSMENT` · `MISINFORMATION` · `OTHER` |
+| `description` | `string` |      | 추가 설명 (선택)                                                     |
 
 **응답 (200 OK)**
 

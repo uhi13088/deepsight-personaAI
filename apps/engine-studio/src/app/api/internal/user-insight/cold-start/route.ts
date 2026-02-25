@@ -38,20 +38,20 @@ function resolveLayer(dimension: string): "L1" | "L2" {
 // Deep   = Phase 1+2+3 (Q1-Q24)
 
 interface PhaseRange {
-  level: "LIGHT" | "MEDIUM"
+  level: "QUICK" | "STANDARD"
   from: number
   to: number
 }
 
 const MODE_PHASE_RANGES: Record<OnboardingMode, PhaseRange[]> = {
-  quick: [{ level: "LIGHT", from: 1, to: 8 }],
+  quick: [{ level: "QUICK", from: 1, to: 8 }],
   standard: [
-    { level: "LIGHT", from: 1, to: 12 },
-    { level: "MEDIUM", from: 13, to: 16 },
+    { level: "QUICK", from: 1, to: 12 },
+    { level: "STANDARD", from: 13, to: 16 },
   ],
   deep: [
-    { level: "LIGHT", from: 1, to: 12 },
-    { level: "MEDIUM", from: 13, to: 24 },
+    { level: "QUICK", from: 1, to: 12 },
+    { level: "STANDARD", from: 13, to: 24 },
   ],
 }
 

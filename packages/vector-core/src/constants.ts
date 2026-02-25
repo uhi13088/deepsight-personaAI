@@ -69,7 +69,7 @@ export const L3_BASE: NarrativeDriveVector = {
 // ── 온보딩 신뢰도 (설계서 §9.2) ─────────────────────────────
 
 export const ONBOARDING_CONFIDENCE = {
-  LIGHT: 0.65,
-  MEDIUM: 0.8,
+  QUICK: 0.65,
+  STANDARD: 0.8,
   DEEP: 0.93,
 } as const

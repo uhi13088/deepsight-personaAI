@@ -250,6 +250,26 @@ export { buildVoiceAnchorFromProfile, parseVoiceProfile } from "./voice-anchor"
 export { runPeriodicQualityCheck } from "./quality-runner"
 export type { QualityRunnerDataProvider, QualityCheckSummary } from "./quality-runner"
 
+// PIS Engine (Phase 6-B)
+export {
+  measureContextRecall,
+  measureSettingConsistency,
+  measureCharacterStability,
+  computeToneVariance,
+  measurePIS,
+  measurePISBatch,
+} from "./quality/pis-engine"
+export type {
+  PISDataProvider,
+  MemoryRetentionStats,
+  QualityLogStats,
+  VoiceStyleSnapshot,
+  PISMeasurement,
+  PISDataQuality,
+  PISBatchResult,
+  PISBatchSummary,
+} from "./quality/pis-engine"
+
 // Phase 5: Quality Monitor
 export {
   checkVoiceConsistency,
@@ -428,3 +448,38 @@ export type {
   CostDataProvider,
   CostDashboard,
 } from "./cost"
+
+// Emotional Contagion (T156 — Kill Switch 기본 OFF)
+export {
+  DEFAULT_CONTAGION_CONFIG,
+  RELATIONSHIP_WEIGHTS,
+  computeRelationshipWeight,
+  computeResistance,
+  canReceiveContagion,
+  computeSingleEffect,
+  runContagionRound,
+  applyContagionResult,
+  applyContagionRound,
+  hasConverged,
+  computeContagionStats,
+  checkMoodSafety,
+} from "./emotional-contagion"
+export type {
+  ContagionPersonaState,
+  ContagionEdge,
+  ContagionSensitivity,
+  ContagionConfig,
+  NodeTopology,
+  ContagionEffect,
+  PersonaContagionResult,
+  ContagionRoundResult,
+  ContagionStats,
+} from "./emotional-contagion"
+
+// Emotional Contagion Integration (T225 — DB 연동)
+export { executeContagionRound } from "./contagion-integration"
+export type {
+  ContagionDataProvider,
+  ContagionRoundLog,
+  ContagionExecutionResult,
+} from "./contagion-integration"
