@@ -72,22 +72,11 @@ export async function proxyToEngineStudio(
 
   const targetUrl = url.toString()
 
-  if (!internalSecret) {
-    console.warn(
-      `[api-proxy] INTERNAL_API_SECRET is not set — engine-studio may reject with 401. Target: ${request.method} ${targetPath}`
-    )
-  }
-
   const response = await fetch(targetUrl, init)
 
   if (!response.ok) {
-    // 에러 응답 시 body를 텍스트로 읽어서 로그에 출력 (디버깅용)
     const errorBody = await response.text()
-    console.error(
-      `[api-proxy] ${response.status} from engine-studio: ${request.method} ${targetPath} → ${targetUrl}`,
-      `\n  INTERNAL_API_SECRET set: ${!!internalSecret}`,
-      `\n  Response body: ${errorBody.slice(0, 500)}`
-    )
+    console.error(`[api-proxy] ${response.status}: ${request.method} ${targetPath}`)
 
     const responseHeaders = new Headers(response.headers)
     responseHeaders.delete("transfer-encoding")

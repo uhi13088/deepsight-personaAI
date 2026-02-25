@@ -14,6 +14,10 @@ import type { Comment } from "@/lib/types"
 interface PWCommentListProps {
   postId: string
   commentCount: number
+  /** true면 토글 버튼 없이 항상 열린 상태로 렌더링 (부모가 visibility 제어) */
+  alwaysOpen?: boolean
+  /** 댓글 수 변경 시 부모에 알림 */
+  onCountChange?: (count: number) => void
 }
 
 /**
@@ -21,8 +25,13 @@ interface PWCommentListProps {
  *
  * 포스트 하단에 노출, 댓글 토글 시 API 호출
  */
-export function PWCommentList({ postId, commentCount }: PWCommentListProps) {
-  const [open, setOpen] = useState(false)
+export function PWCommentList({
+  postId,
+  commentCount,
+  alwaysOpen,
+  onCountChange,
+}: PWCommentListProps) {
+  const [open, setOpen] = useState(alwaysOpen ?? false)
   const [comments, setComments] = useState<Comment[]>([])
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -54,12 +63,43 @@ export function PWCommentList({ postId, commentCount }: PWCommentListProps) {
 
   const handleCommentPosted = (newComment: Comment) => {
     setComments((prev) => [newComment, ...prev])
-    setDisplayCount((c) => c + 1)
+    const next = displayCount + 1
+    setDisplayCount(next)
+    onCountChange?.(next)
   }
 
   const handleCommentDeleted = (commentId: string) => {
     setComments((prev) => prev.filter((c) => c.id !== commentId))
-    setDisplayCount((c) => Math.max(0, c - 1))
+    const next = Math.max(0, displayCount - 1)
+    setDisplayCount(next)
+    onCountChange?.(next)
+  }
+
+  // alwaysOpen 모드: 토글 버튼 없이 댓글 영역만 렌더링 (부모가 visibility 제어)
+  if (alwaysOpen) {
+    return (
+      <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+        {loading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-5 w-5 animate-spin text-purple-500" />
+          </div>
+        ) : comments.length > 0 ? (
+          <div className="space-y-2">
+            {comments.map((comment) => (
+              <CommentItem
+                key={comment.id}
+                comment={comment}
+                postId={postId}
+                onDeleted={handleCommentDeleted}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="py-3 text-center text-sm text-gray-400">아직 댓글이 없습니다</p>
+        )}
+        <CommentInput postId={postId} onPosted={handleCommentPosted} />
+      </div>
+    )
   }
 
   return (
@@ -76,7 +116,6 @@ export function PWCommentList({ postId, commentCount }: PWCommentListProps) {
       {/* 댓글 영역 */}
       {open && (
         <div className="mt-3 space-y-2">
-          {/* 댓글 목록 */}
           {loading ? (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="h-5 w-5 animate-spin text-purple-500" />
@@ -95,8 +134,6 @@ export function PWCommentList({ postId, commentCount }: PWCommentListProps) {
           ) : (
             <p className="py-3 text-center text-sm text-gray-400">아직 댓글이 없습니다</p>
           )}
-
-          {/* 댓글 입력 — 목록 아래 배치 */}
           <CommentInput postId={postId} onPosted={handleCommentPosted} />
         </div>
       )}

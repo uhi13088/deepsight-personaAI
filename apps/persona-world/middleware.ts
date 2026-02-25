@@ -17,28 +17,19 @@ export async function middleware(request: NextRequest) {
     request.cookies.get("__Secure-next-auth.session-token")?.value ||
     request.cookies.get("next-auth.session-token")?.value
 
-  // ── /api/public/auth/*: 로그인 전 호출되므로 인증 완전 제외 ──
-  if (pathname.startsWith("/api/public/auth/")) {
-    console.log(`[middleware] /api/public/auth/* → pass through: ${pathname}`)
-    return NextResponse.next()
-  }
-
   // ── /api/public/*: 공개 API — 세션 불필요, 프록시 route handler가 처리 ──
   if (pathname.startsWith("/api/public/")) {
-    console.log(`[middleware] /api/public/* → pass through: ${pathname}`)
     return NextResponse.next()
   }
 
   // ── /api/persona-world/*: 인증 필수, 프록시 route handler가 헤더 주입 처리 ──
   if (pathname.startsWith("/api/persona-world/")) {
     if (!sessionToken) {
-      console.log(`[middleware] /api/persona-world/* → 401 (no session): ${pathname}`)
       return NextResponse.json(
         { success: false, error: { code: "UNAUTHORIZED", message: "인증이 필요합니다." } },
         { status: 401 }
       )
     }
-    console.log(`[middleware] /api/persona-world/* → pass through: ${pathname}`)
     return NextResponse.next()
   }
 

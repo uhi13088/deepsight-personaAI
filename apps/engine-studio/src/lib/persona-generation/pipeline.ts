@@ -286,6 +286,7 @@ async function savePersonaToDb(params: SavePersonaParams) {
 export interface ManualPipelineInput {
   mode: "manual"
   name: string
+  handle?: string
   role: PersonaRole
   expertise: string[]
   description: string | null
@@ -430,7 +431,7 @@ async function executeAutoPipeline(options?: AutoPipelineInput): Promise<Generat
   // Stage 7: DB 저장
   const persona = await savePersonaToDb({
     name: character.name,
-    handle: `@${character.name.replace(/\s+/g, "_").toLowerCase()}`,
+    handle: character.handle ?? `@${character.name.replace(/\s+/g, "_").toLowerCase()}`,
     tagline: character.description,
     role,
     expertise: character.expertise,
@@ -540,7 +541,7 @@ async function executeManualPipeline(input: ManualPipelineInput): Promise<Genera
   // DB 저장
   const persona = await savePersonaToDb({
     name: input.name,
-    handle: `@${input.name.replace(/\s+/g, "_").toLowerCase()}`,
+    handle: input.handle ?? `@${input.name.replace(/\s+/g, "_").toLowerCase()}`,
     tagline: input.description,
     role: input.role,
     expertise: input.expertise,
