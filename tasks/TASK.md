@@ -508,15 +508,21 @@
 
 ---
 
+## DONE (v4.0 — 프롬프트 캐싱 검증)
+
+- [x] **T230: 프롬프트 캐싱 실적용 검증** ✅ 2026-02-25
+  - AC1: cache_control 이미 전 호출에 적용 확인 — buildSystemBlocks() → cache_control:{type:"ephemeral"} 블록 생성, generateText()에서 Anthropic SDK에 전달, 응답 cache 토큰 추출+DB 로깅 완료
+  - AC2: 미적용 경로 없음 — Post/Comment/Consumption/UserInteraction/NewsReaction 5종 LLM 어댑터 모두 systemPromptPrefix 사용, News Analysis만 의도적 미적용(Haiku 저비용)
+  - 기존 테스트: llm-client.test.ts 8테스트 + llm-adapter.test.ts 18테스트에서 캐시 분리 검증 완료
+  - 코드 변경 없음 (검증만 수행)
+
+---
+
 ## IN_PROGRESS
 
 (없음)
 
 ## QUEUE
-
-- [ ] **T230: 프롬프트 캐싱 실적용 검증**
-  - AC1: Anthropic SDK 호출부에서 cache_control 블록 실제 적용 여부 확인
-  - AC2: 미적용 시 llm-adapter.ts에 cache_control 추가
 
 - [ ] **T231: Arena ↔ Quality 양방향 루프 완성**
   - AC1: Arena 결과 → 패치 → Instruction Layer 반영 경로 검증
