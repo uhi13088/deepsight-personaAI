@@ -38,7 +38,10 @@ import type {
 import { executeNewsAutoFetch } from "@/lib/persona-world/news"
 import type { NewsAutoFetchDataProvider, AutoFetchResult } from "@/lib/persona-world/news"
 import { createNewsLLMProvider } from "@/lib/persona-world/llm-adapter"
-import { runDailyNewsReactionPipeline } from "@/lib/persona-world/admin/scheduler-service"
+import {
+  runDailyNewsReactionPipeline,
+  isSchedulerEnabled,
+} from "@/lib/persona-world/admin/scheduler-service"
 
 // ── Result type ──────────────────────────────────────────────────
 
@@ -62,6 +65,20 @@ export interface CronSchedulerResult {
 // ── Main execution ──────────────────────────────────────────────
 
 export async function executeCronScheduler(): Promise<CronSchedulerResult> {
+  // 스케줄러 비활성화 상태면 즉시 반환
+  const enabled = await isSchedulerEnabled()
+  if (!enabled) {
+    console.log("[CronScheduler] 스케줄러가 비활성화 상태입니다. 실행 건너뜀.")
+    return {
+      executedAt: new Date().toISOString(),
+      decisions: 0,
+      postsCreated: 0,
+      interactions: 0,
+      llmAvailable: false,
+      details: { execution: { postsCreated: [], interactions: [] } },
+    }
+  }
+
   const context: SchedulerContext = {
     trigger: "SCHEDULED",
     currentHour: new Date().getHours(),
