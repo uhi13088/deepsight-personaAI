@@ -28,10 +28,19 @@ export async function proxyToEngineStudio(
     url.searchParams.append(key, value)
   })
 
-  const headers = new Headers(request.headers)
-  headers.delete("host")
+  // engine-studio로 보낼 헤더를 새로 구성한다.
+  // persona-world의 쿠키를 그대로 전달하면, engine-studio의 NextAuth가
+  // 다른 secret으로 암호화된 세션 쿠키를 디코딩하려다 {"error":"Unauthorized"} 반환.
+  // → cookie 제거 후 커스텀 헤더로만 인증 정보 전달.
+  const headers = new Headers()
+  // 필수 요청 헤더만 복사
+  const forwardHeaders = ["content-type", "accept", "user-agent", "accept-language"]
+  for (const name of forwardHeaders) {
+    const value = request.headers.get(name)
+    if (value) headers.set(name, value)
+  }
 
-  // 직접 x-internal-token 주입 (middleware 헤더 수정은 route handler에 미반영)
+  // 직접 x-internal-token 주입
   const internalSecret = process.env.INTERNAL_API_SECRET
   if (internalSecret) {
     headers.set("x-internal-token", internalSecret)
