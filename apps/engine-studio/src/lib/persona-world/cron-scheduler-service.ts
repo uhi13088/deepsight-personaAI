@@ -22,6 +22,19 @@ import { getConsumptionContext } from "@/lib/persona-world/consumption-manager"
 import { getPersonaState } from "@/lib/persona-world/state-manager"
 import { resolveMentions, notifyMentions } from "@/lib/persona-world/mention-service"
 import { layerVectorsToMap } from "@/lib/vector/dim-maps"
+import { isFeatureEnabled } from "@/lib/security/kill-switch"
+import type { SystemSafetyConfig } from "@/lib/security/kill-switch"
+import { executeContagionRound } from "@/lib/persona-world/contagion-integration"
+import type {
+  ContagionDataProvider,
+  ContagionRoundLog,
+} from "@/lib/persona-world/contagion-integration"
+import type {
+  ContagionPersonaState,
+  ContagionEdge,
+  ContagionSensitivity,
+  NodeTopology,
+} from "@/lib/persona-world/emotional-contagion"
 
 // ── Result type ──────────────────────────────────────────────────
 
@@ -31,6 +44,7 @@ export interface CronSchedulerResult {
   postsCreated: number
   interactions: number
   llmAvailable: boolean
+  contagion?: ContagionRoundLog | { skipped: true; reason: string }
   details: {
     execution: {
       postsCreated: Array<{ personaId: string; postId: string; postType: string }>
@@ -137,15 +151,213 @@ export async function executeCronScheduler(): Promise<CronSchedulerResult> {
     }
   }
 
+  // ── 감정 전염 스텝 (Kill Switch 게이트) ──────────────────
+  let contagion: CronSchedulerResult["contagion"]
+
+  try {
+    const safetyConfig = await loadSafetyConfig()
+    if (!isFeatureEnabled(safetyConfig, "emotionalContagion")) {
+      contagion = { skipped: true, reason: "emotionalContagion Kill Switch OFF" }
+    } else {
+      const contagionProvider = createContagionDataProvider()
+      const result = await executeContagionRound(contagionProvider)
+      contagion = result.log
+
+      if (result.requiresKillSwitch) {
+        console.warn(
+          `[Cron/Contagion] CRITICAL: 집단 mood 위험 — ${result.log.safetyReason}. Kill Switch 트리거 권고.`
+        )
+      }
+    }
+  } catch (err) {
+    console.error("[Cron/Contagion] Emotional contagion failed:", err)
+    contagion = {
+      skipped: true,
+      reason: `Error: ${err instanceof Error ? err.message : "Unknown"}`,
+    }
+  }
+
   return {
     executedAt: new Date().toISOString(),
     decisions: schedulerResult.decisions.length,
     postsCreated: postResults.length,
     interactions: interactionResults.length,
     llmAvailable,
+    contagion,
     details: {
       ...schedulerResult,
       execution: { postsCreated: postResults, interactions: interactionResults },
+    },
+  }
+}
+
+// ── Safety Config 로더 ──────────────────────────────────────
+
+async function loadSafetyConfig(): Promise<SystemSafetyConfig> {
+  const { createDefaultConfig } = await import("@/lib/security/kill-switch")
+
+  const row = await prisma.systemSafetyConfig.findUnique({
+    where: { id: "singleton" },
+  })
+
+  if (!row) return createDefaultConfig("system")
+
+  return {
+    emergencyFreeze: row.emergencyFreeze,
+    freezeReason: row.freezeReason ?? undefined,
+    freezeAt: row.freezeAt ? row.freezeAt.getTime() : undefined,
+    featureToggles: row.featureToggles as unknown as SystemSafetyConfig["featureToggles"],
+    autoTriggers: row.autoTriggers as unknown as SystemSafetyConfig["autoTriggers"],
+    updatedAt: row.updatedAt.getTime(),
+    updatedBy: row.updatedBy,
+  }
+}
+
+// ── Contagion Data Provider ─────────────────────────────────
+
+function createContagionDataProvider(): ContagionDataProvider {
+  return {
+    async getActivePersonaStates(): Promise<ContagionPersonaState[]> {
+      const states = await prisma.personaState.findMany({
+        where: {
+          persona: { status: { in: ["ACTIVE", "STANDARD"] } },
+        },
+        select: {
+          personaId: true,
+          mood: true,
+          energy: true,
+          socialBattery: true,
+          paradoxTension: true,
+        },
+      })
+      return states.map((s) => ({
+        personaId: s.personaId,
+        mood: Number(s.mood),
+        energy: Number(s.energy),
+        socialBattery: Number(s.socialBattery),
+        paradoxTension: Number(s.paradoxTension),
+      }))
+    },
+
+    async getRelationshipEdges(): Promise<ContagionEdge[]> {
+      const rels = await prisma.personaRelationship.findMany({
+        select: {
+          personaAId: true,
+          personaBId: true,
+          warmth: true,
+          tension: true,
+          frequency: true,
+        },
+      })
+      // 양방향 엣지 생성
+      const edges: ContagionEdge[] = []
+      for (const r of rels) {
+        edges.push({
+          sourceId: r.personaAId,
+          targetId: r.personaBId,
+          warmth: Number(r.warmth),
+          tension: Number(r.tension),
+          frequency: Number(r.frequency),
+        })
+        edges.push({
+          sourceId: r.personaBId,
+          targetId: r.personaAId,
+          warmth: Number(r.warmth),
+          tension: Number(r.tension),
+          frequency: Number(r.frequency),
+        })
+      }
+      return edges
+    },
+
+    async getSensitivities(personaIds: string[]): Promise<Map<string, ContagionSensitivity>> {
+      const vectors = await prisma.personaLayerVector.findMany({
+        where: { personaId: { in: personaIds }, layerType: "TEMPERAMENT" },
+        select: {
+          personaId: true,
+          dim3: true, // extraversion
+          dim4: true, // agreeableness
+          dim5: true, // neuroticism
+        },
+      })
+
+      const map = new Map<string, ContagionSensitivity>()
+      for (const v of vectors) {
+        const neuroticism = Number(v.dim5 ?? 0.5)
+        const extraversion = Number(v.dim3 ?? 0.5)
+        const agreeableness = Number(v.dim4 ?? 0.5)
+        map.set(v.personaId, {
+          moodSensitivity: 0.5 + neuroticism,
+          socialOpenness: extraversion,
+          agreeableness,
+        })
+      }
+      return map
+    },
+
+    async getTopologies(personaIds: string[]): Promise<Map<string, NodeTopology>> {
+      // 간단한 degree 기반 위상 계산
+      const rels = await prisma.personaRelationship.findMany({
+        where: {
+          OR: [{ personaAId: { in: personaIds } }, { personaBId: { in: personaIds } }],
+        },
+        select: { personaAId: true, personaBId: true },
+      })
+
+      const degreeMap = new Map<string, Set<string>>()
+      for (const id of personaIds) {
+        degreeMap.set(id, new Set())
+      }
+      for (const r of rels) {
+        degreeMap.get(r.personaAId)?.add(r.personaBId)
+        degreeMap.get(r.personaBId)?.add(r.personaAId)
+      }
+
+      const map = new Map<string, NodeTopology>()
+      const degrees = [...degreeMap.values()].map((s) => s.size)
+      const avgDegree = degrees.length > 0 ? degrees.reduce((a, b) => a + b, 0) / degrees.length : 0
+      const hubThreshold = Math.max(avgDegree * 2, 5)
+
+      for (const [id, neighbors] of degreeMap) {
+        const totalDegree = neighbors.size
+
+        // 클러스터링 계수: 이웃 간 연결 비율
+        let triangles = 0
+        const neighborArr = [...neighbors]
+        for (let i = 0; i < neighborArr.length; i++) {
+          for (let j = i + 1; j < neighborArr.length; j++) {
+            if (degreeMap.get(neighborArr[i])?.has(neighborArr[j])) {
+              triangles++
+            }
+          }
+        }
+        const possibleTriangles = (totalDegree * (totalDegree - 1)) / 2
+        const clusteringCoefficient = possibleTriangles > 0 ? triangles / possibleTriangles : 0
+
+        map.set(id, {
+          personaId: id,
+          totalDegree,
+          clusteringCoefficient,
+          isHub: totalDegree >= hubThreshold,
+        })
+      }
+
+      return map
+    },
+
+    async updateMood(personaId: string, newMood: number): Promise<void> {
+      await prisma.personaState.update({
+        where: { personaId },
+        data: { mood: newMood },
+      })
+    },
+
+    async logContagionRound(log: ContagionRoundLog): Promise<void> {
+      console.log(
+        `[Contagion] Round: ${log.personaCount} personas, ${log.affectedCount} affected, ` +
+          `mood ${log.averageMoodBefore.toFixed(3)}→${log.averageMoodAfter.toFixed(3)}, ` +
+          `safety: ${log.safetyStatus}`
+      )
     },
   }
 }

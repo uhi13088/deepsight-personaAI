@@ -25,7 +25,7 @@ import {
   type ContagionEffect,
   type PersonaContagionResult,
   type ContagionRoundResult,
-} from "@/lib/emotional-contagion"
+} from "@/lib/persona-world/emotional-contagion"
 
 // ── 헬퍼 ──────────────────────────────────────────────────────
 

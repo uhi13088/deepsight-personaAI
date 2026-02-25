@@ -7,6 +7,7 @@ import {
   pausePersona,
   triggerNewsArticle,
   runDailyNewsReactionPipeline,
+  triggerContagionManual,
 } from "@/lib/persona-world/admin/scheduler-service"
 
 export async function GET() {
@@ -89,6 +90,11 @@ export async function POST(request: NextRequest) {
         }
 
         return NextResponse.json({ success: true, data: result })
+      }
+
+      case "trigger_contagion": {
+        const data = await triggerContagionManual()
+        return NextResponse.json({ success: true, data })
       }
 
       case "daily_news": {

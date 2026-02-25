@@ -448,3 +448,38 @@ export type {
   CostDataProvider,
   CostDashboard,
 } from "./cost"
+
+// Emotional Contagion (T156 — Kill Switch 기본 OFF)
+export {
+  DEFAULT_CONTAGION_CONFIG,
+  RELATIONSHIP_WEIGHTS,
+  computeRelationshipWeight,
+  computeResistance,
+  canReceiveContagion,
+  computeSingleEffect,
+  runContagionRound,
+  applyContagionResult,
+  applyContagionRound,
+  hasConverged,
+  computeContagionStats,
+  checkMoodSafety,
+} from "./emotional-contagion"
+export type {
+  ContagionPersonaState,
+  ContagionEdge,
+  ContagionSensitivity,
+  ContagionConfig,
+  NodeTopology,
+  ContagionEffect,
+  PersonaContagionResult,
+  ContagionRoundResult,
+  ContagionStats,
+} from "./emotional-contagion"
+
+// Emotional Contagion Integration (T225 — DB 연동)
+export { executeContagionRound } from "./contagion-integration"
+export type {
+  ContagionDataProvider,
+  ContagionRoundLog,
+  ContagionExecutionResult,
+} from "./contagion-integration"

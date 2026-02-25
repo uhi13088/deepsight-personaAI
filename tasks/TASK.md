@@ -467,11 +467,42 @@
 
 ## IN_PROGRESS
 
-(없음)
+- [ ] **T225: 감정 전염 시스템 연결 + Engine Studio 제어**
+  - AC1: emotional-contagion.ts → persona-world/ 이동 + barrel 익스포트
+  - AC2: contagion-integration.ts (DI 기반 DB 로드→실행→반영→안전 검사)
+  - AC3: cron-scheduler 연동 (Kill Switch 게이트, 기본 OFF)
+  - AC4: admin scheduler API trigger_contagion 수동 실행
+  - AC5: 기존 53 테스트 PASS, 전체 4147 PASS, Build PASS
+  - 변경: emotional-contagion.ts(이동), contagion-integration.ts(신규), cron-scheduler-service.ts, scheduler-service.ts, scheduler/route.ts, persona-world/index.ts
 
 ## QUEUE
 
-(없음)
+- [ ] **T226: API 문서 최신화 (미문서화 11개 + 인증/응답 불일치)**
+  - AC1: public.md/openapi — 댓글 삭제, credits 3개, SNS 인증 4개, notifications 2개 추가
+  - AC2: internal.md/openapi — activity, evolution, news, quality 4개 admin 엔드포인트 추가
+  - AC3: 인증 요구사항 명시 (public API 중 내부 토큰 필요한 6개 표기)
+  - AC4: 응답 타입 불일치 수정 (feed source 4종, register sociability 추가)
+
+- [ ] **T227: postCount 하드코딩 수정 (GET /personas)**
+  - AC1: personas 목록 API에서 postCount: 0 → 실제 \_count 조회
+  - AC2: 단위 테스트
+
+- [ ] **T228: register 응답 벡터에 sociability 추가**
+  - AC1: POST /auth/register 응답에 sociability 필드 포함 (7D 반환)
+  - AC2: 단위 테스트
+
+- [ ] **T229: 핵심 오케스트레이션 테스트 추가**
+  - AC1: cron-scheduler-service.ts 테스트 (감정 전염 게이트 포함)
+  - AC2: interaction-pipeline.ts 테스트
+  - AC3: post-pipeline.ts 테스트
+
+- [ ] **T230: 프롬프트 캐싱 실적용 검증**
+  - AC1: Anthropic SDK 호출부에서 cache_control 블록 실제 적용 여부 확인
+  - AC2: 미적용 시 llm-adapter.ts에 cache_control 추가
+
+- [ ] **T231: Arena ↔ Quality 양방향 루프 완성**
+  - AC1: Arena 결과 → 패치 → Instruction Layer 반영 경로 검증
+  - AC2: 누락 시 arena-feedback.ts 연결 코드 추가
 
 ---
 
