@@ -1,6 +1,6 @@
 # DeepSight v4.0 — TASK 관리
 
-> 마지막 업데이트: 2026-02-24
+> 마지막 업데이트: 2026-02-25
 
 ---
 
@@ -465,15 +465,30 @@
 
 ---
 
-## IN_PROGRESS
+## DONE (v4.0 — 감정 전염 + P0 버그)
 
-- [ ] **T225: 감정 전염 시스템 연결 + Engine Studio 제어**
+- [x] **T225: 감정 전염 시스템 연결 + Engine Studio 제어** ✅ 2026-02-25
   - AC1: emotional-contagion.ts → persona-world/ 이동 + barrel 익스포트
   - AC2: contagion-integration.ts (DI 기반 DB 로드→실행→반영→안전 검사)
   - AC3: cron-scheduler 연동 (Kill Switch 게이트, 기본 OFF)
   - AC4: admin scheduler API trigger_contagion 수동 실행
   - AC5: 기존 53 테스트 PASS, 전체 4147 PASS, Build PASS
   - 변경: emotional-contagion.ts(이동), contagion-integration.ts(신규), cron-scheduler-service.ts, scheduler-service.ts, scheduler/route.ts, persona-world/index.ts
+
+- [x] **T227: postCount 하드코딩 수정 (GET /personas)** ✅ 2026-02-25
+  - AC1: personas 목록 API에서 `postCount: 0` → `p._count.posts` 실제 카운트 조회
+  - 변경: personas/route.ts (`_count.posts` select 추가, 응답 매핑 수정)
+
+- [x] **T228: register 응답 벡터에 sociability 추가** ✅ 2026-02-25
+  - AC1: POST /auth/register 응답에 sociability 필드 포함 (7D 반환)
+  - AC2: PersonaWorldUser 스키마에 sociability 컬럼 추가 (6D→7D)
+  - 변경: register/route.ts, schema.prisma, 034_pw_user_sociability.sql(신규)
+
+---
+
+## IN_PROGRESS
+
+(없음)
 
 ## QUEUE
 
@@ -482,14 +497,6 @@
   - AC2: internal.md/openapi — activity, evolution, news, quality 4개 admin 엔드포인트 추가
   - AC3: 인증 요구사항 명시 (public API 중 내부 토큰 필요한 6개 표기)
   - AC4: 응답 타입 불일치 수정 (feed source 4종, register sociability 추가)
-
-- [ ] **T227: postCount 하드코딩 수정 (GET /personas)**
-  - AC1: personas 목록 API에서 postCount: 0 → 실제 \_count 조회
-  - AC2: 단위 테스트
-
-- [ ] **T228: register 응답 벡터에 sociability 추가**
-  - AC1: POST /auth/register 응답에 sociability 필드 포함 (7D 반환)
-  - AC2: 단위 테스트
 
 - [ ] **T229: 핵심 오케스트레이션 테스트 추가**
   - AC1: cron-scheduler-service.ts 테스트 (감정 전염 게이트 포함)

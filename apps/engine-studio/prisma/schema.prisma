@@ -1291,13 +1291,14 @@ model PersonaWorldUser {
   name            String?
   profileImageUrl String?
 
-  // === 6D 벡터 (유저의 취향) ===
+  // === 7D 벡터 (유저의 취향, L1) ===
   depth           Decimal?        @db.Decimal(3, 2)
   lens            Decimal?        @db.Decimal(3, 2)
   stance          Decimal?        @db.Decimal(3, 2)
   scope           Decimal?        @db.Decimal(3, 2)
   taste           Decimal?        @db.Decimal(3, 2)
   purpose         Decimal?        @db.Decimal(3, 2)
+  sociability     Decimal?        @db.Decimal(3, 2) // v4: L1 7th dimension
 
   // === v3: L2 OCEAN (선택 수집) ===
   openness          Decimal?        @db.Decimal(3, 2)

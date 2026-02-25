@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
               scope: user.scope ? Number(user.scope) : null,
               taste: user.taste ? Number(user.taste) : null,
               purpose: user.purpose ? Number(user.purpose) : null,
+              sociability: user.sociability ? Number(user.sociability) : null,
             }
           : null,
         createdAt: user.createdAt.toISOString(),
