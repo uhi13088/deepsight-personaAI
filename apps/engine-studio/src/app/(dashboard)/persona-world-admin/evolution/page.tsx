@@ -241,7 +241,7 @@ export default function EvolutionPage() {
                   {data.personaStages.length === 0 && (
                     <tr>
                       <td colSpan={4} className="text-muted-foreground px-2 py-4 text-center">
-                        ACTIVE 페르소나가 없습니다
+                        페르소나가 없습니다
                       </td>
                     </tr>
                   )}

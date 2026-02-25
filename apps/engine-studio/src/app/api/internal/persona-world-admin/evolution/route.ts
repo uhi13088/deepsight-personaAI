@@ -55,9 +55,7 @@ export async function GET() {
 
     for (const p of personas) {
       const narr = p.layerVectors[0]
-      if (!narr) continue
-
-      const growthArc = Number(narr.dim4 ?? 0.5)
+      const growthArc = narr ? Number(narr.dim4 ?? 0.5) : 0.5
       const stage = getEvolutionStage(growthArc)
       stageDistribution[stage.id] = (stageDistribution[stage.id] ?? 0) + 1
       personaStages.push({
@@ -65,7 +63,7 @@ export async function GET() {
         name: p.name,
         growthArc,
         stage: stage.id,
-        version: narr.version,
+        version: narr?.version ?? 0,
       })
     }
 
