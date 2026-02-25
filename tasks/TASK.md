@@ -486,30 +486,58 @@
 
 ---
 
+## DONE (v4.0 — API 문서)
+
+- [x] **T226: API 문서 최신화 (미문서화 11개 + 인증/응답 불일치)** ✅ 2026-02-25
+  - AC1: public.md/openapi — GET /follows, DELETE /comments/:id, credits 3개, notifications 4개, SNS 4개, cold-start 추가
+  - AC2: internal.md/openapi — activity, evolution, news, quality 4개 admin 엔드포인트 추가
+  - AC3: 인증 요구사항 표 추가 (공개 7개 / Internal Token 필요 8개 구분)
+  - AC4: register vector 6D→7D (sociability), SixDVector→SevenDVector, 온보딩 벡터 설명
+  - 변경: public.md, public.openapi.yaml, internal.md, internal.openapi.yaml, TASK.md
+
+---
+
+## DONE (v4.0 — 오케스트레이션 테스트)
+
+- [x] **T229: 핵심 오케스트레이션 테스트 추가** ✅ 2026-02-25
+  - AC1: cron-scheduler-service.ts 테스트 — 11 테스트 (포스트/인터랙션 오케스트레이션, LLM 미설정 스킵, 감정 전염 Kill Switch ON/OFF, 에러 graceful degradation, 멘션 알림)
+  - AC2: interaction-pipeline.ts 테스트 — 13 테스트 (빈 피드 early return, 자기 글 스킵, 좋아요 확률, 댓글 engagement 결정, 벡터 캐싱, voice anchor, 관계 프로토콜)
+  - AC3: post-pipeline.ts 테스트 — 15 테스트 (주제 선택 fallback, voice anchor 3단계, voice critical 재생성, emotionalState 설명, poignancy/postSource)
+  - 변경: cron-scheduler-service.test.ts(신규), interaction-pipeline.test.ts(신규), post-pipeline.test.ts(신규)
+  - 테스트: 4186 PASS (104 파일), Build PASS
+
+---
+
+## DONE (v4.0 — 프롬프트 캐싱 검증)
+
+- [x] **T230: 프롬프트 캐싱 실적용 검증** ✅ 2026-02-25
+  - AC1: cache_control 이미 전 호출에 적용 확인 — buildSystemBlocks() → cache_control:{type:"ephemeral"} 블록 생성, generateText()에서 Anthropic SDK에 전달, 응답 cache 토큰 추출+DB 로깅 완료
+  - AC2: 미적용 경로 없음 — Post/Comment/Consumption/UserInteraction/NewsReaction 5종 LLM 어댑터 모두 systemPromptPrefix 사용, News Analysis만 의도적 미적용(Haiku 저비용)
+  - 기존 테스트: llm-client.test.ts 8테스트 + llm-adapter.test.ts 18테스트에서 캐시 분리 검증 완료
+  - 코드 변경 없음 (검증만 수행)
+
+## DONE (v4.0 — Arena ↔ Quality 루프)
+
+- [x] **T231: Arena ↔ Quality 양방향 루프 완성** ✅ 2026-02-25
+  - AC1: Arena 결과 → correction-loop.ts 패치 → Instruction Layer(voiceProfile/styleParams/factbook) 반영 경로 검증 완료
+  - AC2: arena-feedback.ts 신규 생성 — 양방향 브릿지:
+    - Arena→Quality: `applyAndTrackCorrection()` — `executeCorrectionLoop()` 전체 파이프라인 + CorrectionTracking 생성
+    - Quality→Arena: `processQualityTriggers()` — 트리거 처리 + CRITICAL 카운트
+    - 피드백 루프: `evaluatePendingCorrections()` — 전후 PIS 비교 → verdict (EFFECTIVE/PARTIAL/INEFFECTIVE/REGRESSED)
+    - 효과 요약: `summarizeCorrectionEffectiveness()` — successRate + avgImprovement
+  - 신규: arena-feedback.ts, arena-feedback.test.ts (17 테스트)
+  - 변경: persona-world/index.ts (배럴 익스포트)
+  - 테스트: 4203 PASS (105 파일), Build PASS
+
+---
+
 ## IN_PROGRESS
 
 (없음)
 
 ## QUEUE
 
-- [ ] **T226: API 문서 최신화 (미문서화 11개 + 인증/응답 불일치)**
-  - AC1: public.md/openapi — 댓글 삭제, credits 3개, SNS 인증 4개, notifications 2개 추가
-  - AC2: internal.md/openapi — activity, evolution, news, quality 4개 admin 엔드포인트 추가
-  - AC3: 인증 요구사항 명시 (public API 중 내부 토큰 필요한 6개 표기)
-  - AC4: 응답 타입 불일치 수정 (feed source 4종, register sociability 추가)
-
-- [ ] **T229: 핵심 오케스트레이션 테스트 추가**
-  - AC1: cron-scheduler-service.ts 테스트 (감정 전염 게이트 포함)
-  - AC2: interaction-pipeline.ts 테스트
-  - AC3: post-pipeline.ts 테스트
-
-- [ ] **T230: 프롬프트 캐싱 실적용 검증**
-  - AC1: Anthropic SDK 호출부에서 cache_control 블록 실제 적용 여부 확인
-  - AC2: 미적용 시 llm-adapter.ts에 cache_control 추가
-
-- [ ] **T231: Arena ↔ Quality 양방향 루프 완성**
-  - AC1: Arena 결과 → 패치 → Instruction Layer 반영 경로 검증
-  - AC2: 누락 시 arena-feedback.ts 연결 코드 추가
+(없음)
 
 ---
 

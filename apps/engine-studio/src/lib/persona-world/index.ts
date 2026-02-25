@@ -270,6 +270,21 @@ export type {
   PISBatchSummary,
 } from "./quality/pis-engine"
 
+// T231: Arena ↔ Quality Feedback Loop
+export {
+  applyAndTrackCorrection,
+  processQualityTriggers,
+  evaluatePendingCorrections,
+  summarizeCorrectionEffectiveness,
+} from "./quality/arena-feedback"
+export type {
+  ArenaFeedbackDataProvider,
+  ApplyCorrectionResult,
+  TriggerProcessingResult,
+  EvaluationResult,
+  CorrectionEffectivenessSummary,
+} from "./quality/arena-feedback"
+
 // Phase 5: Quality Monitor
 export {
   checkVoiceConsistency,
