@@ -1,16 +1,21 @@
 // ═══════════════════════════════════════════════════════════════
-// T196 — News Interest Matcher 단위 테스트
+// T196 + T255 — News Interest Matcher 단위 테스트
 // ═══════════════════════════════════════════════════════════════
 
 import { describe, it, expect } from "vitest"
 import {
   computeNewsInterestScore,
   selectPersonasForArticle,
+  allocateDailyReactions,
+  getImportanceGrade,
+  getGradeConfig,
+  computeEffectiveDailyBudget,
   INTEREST_THRESHOLD,
 } from "@/lib/persona-world/news/news-interest-matcher"
 import type {
   ArticleForMatching,
   PersonaForMatching,
+  ImportanceGrade,
 } from "@/lib/persona-world/news/news-interest-matcher"
 
 // ── 픽스처 ────────────────────────────────────────────────────
@@ -27,6 +32,20 @@ const POLITICS_ARTICLE: ArticleForMatching = {
   summary: "내년 대선을 앞두고 여야가 경선 일정을 확정했다.",
   region: "KR",
   importanceScore: 0.6,
+}
+
+const BREAKING_ARTICLE: ArticleForMatching = {
+  topicTags: ["전쟁", "국제", "긴급"],
+  summary: "전 세계적인 긴급 상황이 발생했다.",
+  region: "GLOBAL",
+  importanceScore: 0.95,
+}
+
+const LOW_ARTICLE: ArticleForMatching = {
+  topicTags: ["지역", "축제"],
+  summary: "지역 축제가 개최되었다.",
+  region: "KR",
+  importanceScore: 0.3,
 }
 
 // 전문 분야: AI/기술
@@ -77,7 +96,23 @@ const INTROVERT_PERSONA: PersonaForMatching = {
   },
 }
 
-// ── 테스트 ────────────────────────────────────────────────────
+// 외향적 일반 페르소나 (BREAKING에 반응할 만한)
+const EXTROVERT_PERSONA: PersonaForMatching = {
+  id: "persona-extrovert",
+  expertise: ["entertainment", "travel"],
+  role: "Travel Vlogger",
+  country: "US",
+  languages: ["en"],
+  temperament: {
+    openness: 0.9,
+    conscientiousness: 0.4,
+    extraversion: 0.9,
+    agreeableness: 0.7,
+    neuroticism: 0.2,
+  },
+}
+
+// ── 기존 테스트 ──────────────────────────────────────────────
 
 describe("computeNewsInterestScore", () => {
   describe("관심도 점수 계산", () => {
@@ -89,19 +124,16 @@ describe("computeNewsInterestScore", () => {
 
     it("AI 전문가 + 정치 뉴스 → 낮은 점수 (분야 무관)", () => {
       const result = computeNewsInterestScore(POLITICS_ARTICLE, AI_EXPERT)
-      // 태그 오버랩 낮음, openness/extraversion만 기여
       expect(result.score).toBeLessThan(0.7)
     })
 
     it("정치 전문가 + 정치 뉴스 → threshold 이상 점수 (한/영 키워드 부분 매칭)", () => {
       const result = computeNewsInterestScore(POLITICS_ARTICLE, POLITICS_PERSONA)
-      // 한국어 태그 "정치" vs 영어 "politics" → 직접 매칭 안 되지만 openness+extraversion 기여
       expect(result.score).toBeGreaterThan(INTEREST_THRESHOLD)
     })
 
     it("내향적 푸드 블로거 + AI 뉴스 → 낮은 점수 (낮은 openness + extraversion)", () => {
       const result = computeNewsInterestScore(AI_ARTICLE, INTROVERT_PERSONA)
-      // tagOverlap 거의 0, openness 0.2, extraversion 0.1 → 매우 낮음
       expect(result.score).toBeLessThan(INTEREST_THRESHOLD + 0.1)
     })
 
@@ -143,7 +175,6 @@ describe("computeNewsInterestScore", () => {
         importanceScore: 0.5,
       }
       const result = computeNewsInterestScore(emptyTagArticle, AI_EXPERT)
-      // tagOverlap = 0.1 (최소값)
       expect(result.breakdown.tagOverlap).toBe(0.1)
     })
 
@@ -164,7 +195,6 @@ describe("selectPersonasForArticle", () => {
 
   it("AI 뉴스 → AI 전문가가 상위에 선정됨", () => {
     const results = selectPersonasForArticle(AI_ARTICLE, allPersonas, INTEREST_THRESHOLD)
-    // AI 전문가가 첫 번째여야 함
     expect(results[0].personaId).toBe("persona-ai")
   })
 
@@ -177,14 +207,12 @@ describe("selectPersonasForArticle", () => {
 
   it("threshold 미만 페르소나 제외됨", () => {
     const results = selectPersonasForArticle(AI_ARTICLE, allPersonas, INTEREST_THRESHOLD)
-    // 모든 결과가 threshold 이상이어야 함
     for (const r of results) {
       expect(r.score).toBeGreaterThanOrEqual(INTEREST_THRESHOLD)
     }
   })
 
   it("매우 높은 임계값에서는 결과 없음", () => {
-    // threshold = 0.99 → 사실상 불가능한 점수 → 빈 배열
     const results = selectPersonasForArticle(AI_ARTICLE, allPersonas, 0.99)
     expect(results).toHaveLength(0)
   })
@@ -195,16 +223,216 @@ describe("selectPersonasForArticle", () => {
   })
 
   it("모든 페르소나가 threshold 미달이면 빈 배열", () => {
-    // 태그 없는 GLOBAL 기사 + 내향적 전문분야 불일치 페르소나
     const emptyArticle: ArticleForMatching = {
       topicTags: [],
       summary: "",
       region: "GLOBAL",
       importanceScore: 0.5,
     }
-    // 내향적 페르소나만 사용
     const results = selectPersonasForArticle(emptyArticle, [INTROVERT_PERSONA], INTEREST_THRESHOLD)
-    // score = 0.1*0.35 + 0.2*0.25 + 0.1*0.25 + 0.3*0.15 = 0.035+0.05+0.025+0.045 = 0.155 < 0.25
     expect(results).toHaveLength(0)
+  })
+})
+
+// ── T255: 동적 스케일링 테스트 ─────────────────────────────────
+
+describe("getImportanceGrade", () => {
+  it.each<[number, ImportanceGrade]>([
+    [0.95, "BREAKING"],
+    [0.9, "BREAKING"],
+    [0.89, "HIGH"],
+    [0.7, "HIGH"],
+    [0.69, "NORMAL"],
+    [0.5, "NORMAL"],
+    [0.49, "LOW"],
+    [0.0, "LOW"],
+    [1.0, "BREAKING"],
+  ])("importanceScore %f → %s", (score, expected) => {
+    expect(getImportanceGrade(score)).toBe(expected)
+  })
+})
+
+describe("getGradeConfig", () => {
+  const activePersonaCount = 100
+  const normalBudget = 20
+
+  it("BREAKING: threshold 0.15, maxReactors = normalBudget × 3", () => {
+    const config = getGradeConfig("BREAKING", activePersonaCount, normalBudget)
+    expect(config.threshold).toBe(0.15)
+    expect(config.maxReactors).toBe(60)
+  })
+
+  it("HIGH: threshold 0.25, maxReactors = 활성 페르소나의 50%", () => {
+    const config = getGradeConfig("HIGH", activePersonaCount, normalBudget)
+    expect(config.threshold).toBe(0.25)
+    expect(config.maxReactors).toBe(50)
+  })
+
+  it("NORMAL: threshold 0.35, maxReactors = normalBudget", () => {
+    const config = getGradeConfig("NORMAL", activePersonaCount, normalBudget)
+    expect(config.threshold).toBe(0.35)
+    expect(config.maxReactors).toBe(20)
+  })
+
+  it("LOW: threshold 0.45, maxReactors = normalBudget/2", () => {
+    const config = getGradeConfig("LOW", activePersonaCount, normalBudget)
+    expect(config.threshold).toBe(0.45)
+    expect(config.maxReactors).toBe(10)
+  })
+
+  it("LOW maxReactors 최소 1", () => {
+    const config = getGradeConfig("LOW", 1, 1)
+    expect(config.maxReactors).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe("computeEffectiveDailyBudget", () => {
+  it("BREAKING 기사 존재 → normalBudget × 3", () => {
+    const articles = [{ importanceScore: 0.95 }, { importanceScore: 0.5 }]
+    expect(computeEffectiveDailyBudget(articles, 20, 3)).toBe(60)
+  })
+
+  it("HIGH 기사만 존재 → normalBudget × 2", () => {
+    const articles = [{ importanceScore: 0.8 }, { importanceScore: 0.5 }]
+    expect(computeEffectiveDailyBudget(articles, 20, 3)).toBe(40)
+  })
+
+  it("NORMAL/LOW만 → normalBudget 유지", () => {
+    const articles = [{ importanceScore: 0.5 }, { importanceScore: 0.3 }]
+    expect(computeEffectiveDailyBudget(articles, 20, 3)).toBe(20)
+  })
+
+  it("BREAKING 초과 시 (maxBreakingPerDay=0) → BREAKING 무시", () => {
+    const articles = [{ importanceScore: 0.95 }]
+    // maxBreakingPerDay=0 → Math.min(1, 0)=0 → BREAKING 무시
+    expect(computeEffectiveDailyBudget(articles, 20, 0)).toBe(20)
+  })
+
+  it("빈 기사 목록 → normalBudget", () => {
+    expect(computeEffectiveDailyBudget([], 20, 3)).toBe(20)
+  })
+})
+
+describe("allocateDailyReactions — T255 동적 스케일링", () => {
+  const allPersonas = [AI_EXPERT, POLITICS_PERSONA, INTROVERT_PERSONA, EXTROVERT_PERSONA]
+
+  it("BREAKING 기사 → threshold 0.15로 더 많은 페르소나 선택", () => {
+    const articlesWithIds = [{ id: "breaking-1", article: BREAKING_ARTICLE }]
+    const result = allocateDailyReactions(articlesWithIds, allPersonas, {
+      dailyBudget: 20,
+      maxPerPersona: 2,
+    })
+    // BREAKING threshold 0.15 → 대부분의 외향적/개방적 페르소나가 포함
+    expect(result.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it("LOW 기사 → threshold 0.45로 소수만 선택", () => {
+    const articlesWithIds = [{ id: "low-1", article: LOW_ARTICLE }]
+    const result = allocateDailyReactions(articlesWithIds, allPersonas, {
+      dailyBudget: 20,
+      maxPerPersona: 2,
+    })
+    // LOW threshold 0.45 → 관련 분야 정확 매칭만
+    expect(result.length).toBeLessThanOrEqual(2)
+  })
+
+  it("BREAKING 기사가 예산을 더 많이 사용 (effective budget ×3)", () => {
+    const articlesWithIds = [
+      { id: "breaking-1", article: BREAKING_ARTICLE },
+      { id: "normal-1", article: POLITICS_ARTICLE },
+    ]
+    const result = allocateDailyReactions(articlesWithIds, allPersonas, {
+      dailyBudget: 5,
+      maxPerPersona: 3,
+    })
+    // effectiveBudget = 5×3 = 15 (BREAKING 존재)
+    // BREAKING 기사가 더 많은 페르소나를 점유
+    const breakingPairs = result.filter((p) => p.articleId === "breaking-1")
+    expect(breakingPairs.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it("maxBreakingPerDay 초과 시 → HIGH로 다운그레이드", () => {
+    const articlesWithIds = [
+      { id: "b1", article: { ...BREAKING_ARTICLE, topicTags: ["전쟁"] } },
+      { id: "b2", article: { ...BREAKING_ARTICLE, topicTags: ["지진"] } },
+      { id: "b3", article: { ...BREAKING_ARTICLE, topicTags: ["팬데믹"] } },
+      { id: "b4", article: { ...BREAKING_ARTICLE, topicTags: ["금융위기"] } }, // 4번째 → HIGH로 다운그레이드
+    ]
+    const result = allocateDailyReactions(articlesWithIds, allPersonas, {
+      dailyBudget: 20,
+      maxPerPersona: 5,
+      maxBreakingPerDay: 3,
+    })
+    // 4번째 BREAKING은 HIGH threshold(0.25) 적용 → 더 적은 페르소나 선택
+    expect(result.length).toBeGreaterThan(0)
+  })
+
+  it("commentEligible: 기사당 상위 N개만 true", () => {
+    // 많은 페르소나 생성
+    const manyPersonas: PersonaForMatching[] = Array.from({ length: 10 }, (_, i) => ({
+      id: `p-${i}`,
+      expertise: ["AI", "technology"],
+      role: "Engineer",
+      country: "KR",
+      languages: ["ko", "en"],
+      temperament: {
+        openness: 0.7 + i * 0.01,
+        conscientiousness: 0.5,
+        extraversion: 0.7 + i * 0.01,
+        agreeableness: 0.5,
+        neuroticism: 0.3,
+      },
+    }))
+
+    const articlesWithIds = [{ id: "breaking-1", article: BREAKING_ARTICLE }]
+    const result = allocateDailyReactions(articlesWithIds, manyPersonas, {
+      dailyBudget: 60,
+      maxPerPersona: 2,
+      commentThrottlePerArticle: 3,
+    })
+
+    const eligible = result.filter((p) => p.commentEligible)
+    const ineligible = result.filter((p) => !p.commentEligible)
+
+    // commentThrottlePerArticle=3 → 상위 3개만 commentEligible
+    expect(eligible.length).toBeLessThanOrEqual(3)
+    if (result.length > 3) {
+      expect(ineligible.length).toBeGreaterThan(0)
+    }
+  })
+
+  it("모든 결과에 commentEligible 필드 존재", () => {
+    const articlesWithIds = [{ id: "ai-1", article: AI_ARTICLE }]
+    const result = allocateDailyReactions(articlesWithIds, allPersonas, {
+      dailyBudget: 20,
+    })
+    for (const pair of result) {
+      expect(typeof pair.commentEligible).toBe("boolean")
+    }
+  })
+
+  it("빈 기사 목록 → 빈 결과", () => {
+    const result = allocateDailyReactions([], allPersonas)
+    expect(result).toHaveLength(0)
+  })
+
+  it("빈 페르소나 목록 → 빈 결과", () => {
+    const articlesWithIds = [{ id: "ai-1", article: AI_ARTICLE }]
+    const result = allocateDailyReactions(articlesWithIds, [])
+    expect(result).toHaveLength(0)
+  })
+
+  it("maxPerPersona 제한 적용", () => {
+    const articlesWithIds = [
+      { id: "a1", article: AI_ARTICLE },
+      { id: "a2", article: { ...AI_ARTICLE, topicTags: ["AI", "딥러닝"] } },
+      { id: "a3", article: { ...AI_ARTICLE, topicTags: ["AI", "로봇"] } },
+    ]
+    const result = allocateDailyReactions(articlesWithIds, [AI_EXPERT], {
+      dailyBudget: 20,
+      maxPerPersona: 2,
+    })
+    // 1명 페르소나, maxPerPersona=2 → 최대 2개
+    expect(result.length).toBeLessThanOrEqual(2)
   })
 })

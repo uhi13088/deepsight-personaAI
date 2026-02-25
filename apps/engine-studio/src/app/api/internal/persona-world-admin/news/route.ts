@@ -66,6 +66,9 @@ const NEWS_CONFIG_DEFAULTS = {
   autoTriggerEnabled: true,
   dailyBudget: 20,
   maxPerPersona: 2,
+  // T255: 동적 스케일링 설정
+  maxBreakingPerDay: 3,
+  commentThrottlePerArticle: 5,
 }
 
 async function loadNewsSettings(): Promise<typeof NEWS_CONFIG_DEFAULTS> {
@@ -82,6 +85,14 @@ async function loadNewsSettings(): Promise<typeof NEWS_CONFIG_DEFAULTS> {
       typeof map.max_per_persona === "number"
         ? map.max_per_persona
         : NEWS_CONFIG_DEFAULTS.maxPerPersona,
+    maxBreakingPerDay:
+      typeof map.max_breaking_per_day === "number"
+        ? map.max_breaking_per_day
+        : NEWS_CONFIG_DEFAULTS.maxBreakingPerDay,
+    commentThrottlePerArticle:
+      typeof map.comment_throttle_per_article === "number"
+        ? map.comment_throttle_per_article
+        : NEWS_CONFIG_DEFAULTS.commentThrottlePerArticle,
   }
 }
 
@@ -169,7 +180,7 @@ export async function GET() {
           summary: a.summary,
           topicTags: a.topicTags,
           sourceId: a.sourceId,
-          importanceScore: a.importanceScore,
+          importanceScore: Number(a.importanceScore),
           region: a.region,
           reactionCount: a._count.reactingPosts,
           createdAt: a.createdAt.toISOString(),
@@ -378,13 +389,21 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      // T200-B: 설정 저장
+      // T200-B + T255: 설정 저장
       case "save_settings": {
-        const { autoTriggerEnabled, dailyBudget, maxPerPersona } = body as {
+        const {
+          autoTriggerEnabled,
+          dailyBudget,
+          maxPerPersona,
+          maxBreakingPerDay,
+          commentThrottlePerArticle,
+        } = body as {
           action: string
           autoTriggerEnabled?: boolean
           dailyBudget?: number
           maxPerPersona?: number
+          maxBreakingPerDay?: number
+          commentThrottlePerArticle?: number
         }
 
         const upserts: Array<Promise<unknown>> = []
@@ -413,7 +432,7 @@ export async function POST(request: NextRequest) {
                 category: "NEWS",
                 key: "daily_budget",
                 value: dailyBudget as Prisma.InputJsonValue,
-                description: "일일 뉴스 반응 포스트 최대 수",
+                description: "일일 뉴스 반응 포스트 최대 수 (기본 예산)",
               },
             })
           )
@@ -429,6 +448,37 @@ export async function POST(request: NextRequest) {
                 key: "max_per_persona",
                 value: maxPerPersona as Prisma.InputJsonValue,
                 description: "페르소나당 하루 최대 뉴스 반응 수",
+              },
+            })
+          )
+        }
+
+        // T255: 동적 스케일링 설정
+        if (maxBreakingPerDay !== undefined) {
+          upserts.push(
+            prisma.systemConfig.upsert({
+              where: { category_key: { category: "NEWS", key: "max_breaking_per_day" } },
+              update: { value: maxBreakingPerDay as Prisma.InputJsonValue },
+              create: {
+                category: "NEWS",
+                key: "max_breaking_per_day",
+                value: maxBreakingPerDay as Prisma.InputJsonValue,
+                description: "T255: BREAKING 등급 일일 최대 횟수 (초과 시 HIGH로 다운그레이드)",
+              },
+            })
+          )
+        }
+
+        if (commentThrottlePerArticle !== undefined) {
+          upserts.push(
+            prisma.systemConfig.upsert({
+              where: { category_key: { category: "NEWS", key: "comment_throttle_per_article" } },
+              update: { value: commentThrottlePerArticle as Prisma.InputJsonValue },
+              create: {
+                category: "NEWS",
+                key: "comment_throttle_per_article",
+                value: commentThrottlePerArticle as Prisma.InputJsonValue,
+                description: "T255: 기사당 댓글 허용 포스트 수 (비용 쓰로틀링)",
               },
             })
           )

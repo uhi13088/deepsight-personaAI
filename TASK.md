@@ -1528,6 +1528,21 @@
 
 ## ✅ DONE (최근 완료)
 
+- [x] **T255: 뉴스 반응 동적 스케일링 — importance 기반 reactor 인원 결정** ✅ 2026-02-25
+  - AC1: ✅ importanceScore Float→Decimal @db.Decimal(3,2) 마이그레이션 + Number() 래핑
+  - AC2: ✅ ImportanceGrade(BREAKING/HIGH/NORMAL/LOW) 등급별 동적 threshold/cap 로직
+    - BREAKING(≥0.9): threshold 0.15, cap=budget×3
+    - HIGH(0.7~0.9): threshold 0.25, cap=50%
+    - NORMAL(0.5~0.7): threshold 0.35, cap=budget
+    - LOW(<0.5): threshold 0.45, cap=budget/2
+  - AC3: ✅ 비용 안전장치 3중
+    - 배치 처리(20건씩) + budget-alert CRITICAL 시 중단
+    - 댓글 쓰로틀링(기사당 상위 5개만 commentEligible)
+    - BREAKING 일일 최대 3회(초과 시 HIGH 다운그레이드)
+  - AC4: ✅ Admin UI 설정 패널에 maxBreakingPerDay, commentThrottlePerArticle + 등급별 규칙 안내
+  - AC5: ✅ 105파일 4231 tests PASS, Build 106 pages PASS
+  - 변경파일: schema.prisma, news-interest-matcher.ts, news-reaction-trigger.ts, index.ts, scheduler-service.ts, route.ts, page.tsx, news-interest-matcher.test.ts
+
 - [x] **T252~T254: ES 프로토타입 메뉴 정리 + 인메모리 API DB 영속화 (3개 티켓 일괄)** ✅ 2026-02-24
   - T252: ES 네비게이션 정리 — 검색 팔레트↔사이드바 동기화 + 레이블 통일
     - AC1: ✅ 검색 팔레트에서 redirect 항목 제거 (Activity Dashboard, Scheduler Control)
