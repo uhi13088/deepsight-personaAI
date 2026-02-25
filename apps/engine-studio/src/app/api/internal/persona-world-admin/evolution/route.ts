@@ -17,8 +17,21 @@ export async function GET() {
   if (response) return response
 
   try {
-    const personas = await prisma.persona
-      .findMany({
+    // 1단계: 페르소나 조회 (layerVectors join 실패 시 단독 조회 폴백)
+    let personas: Array<{
+      id: string
+      name: string
+      layerVectors: Array<{
+        dim1: unknown
+        dim2: unknown
+        dim3: unknown
+        dim4: unknown
+        version: number
+      }>
+    }>
+
+    try {
+      personas = await prisma.persona.findMany({
         where: { status: { in: ["ACTIVE", "STANDARD"] } },
         include: {
           layerVectors: {
@@ -28,20 +41,14 @@ export async function GET() {
           },
         },
       })
-      .catch(
-        () =>
-          [] as Array<{
-            id: string
-            name: string
-            layerVectors: Array<{
-              dim1: unknown
-              dim2: unknown
-              dim3: unknown
-              dim4: unknown
-              version: number
-            }>
-          }>
-      )
+    } catch {
+      // layerVectors 테이블이 없거나 relation 오류 → 벡터 없이 조회
+      const base = await prisma.persona.findMany({
+        where: { status: { in: ["ACTIVE", "STANDARD"] } },
+        select: { id: true, name: true },
+      })
+      personas = base.map((p) => ({ ...p, layerVectors: [] }))
+    }
 
     // 2. 스테이지 분포 집계
     const stageDistribution: Record<string, number> = {}
