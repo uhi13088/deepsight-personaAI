@@ -338,6 +338,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(response)
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error"
+    const stack = error instanceof Error ? error.stack : undefined
+    console.error("[personas API] Error:", message, stack)
     const response: ApiResponse<never> = {
       success: false,
       error: {
