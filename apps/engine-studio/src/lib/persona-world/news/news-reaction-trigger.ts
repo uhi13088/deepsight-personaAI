@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// Phase NB — News Reaction Trigger (T199: 지역 기반 확장)
+// Phase NB — News Reaction Trigger (T255: 동적 스케일링 + 비용 안전장치)
 // 뉴스 기사 → 관심 페르소나 선정 → TRENDING 트리거로 포스트 생성 예약
 // ═══════════════════════════════════════════════════════════════
 
@@ -7,10 +7,15 @@ import type { CoreTemperamentVector } from "@/types/persona-v3"
 import {
   selectPersonasForArticle,
   allocateDailyReactions,
+  getImportanceGrade,
   INTEREST_THRESHOLD,
-  AUTO_INTEREST_THRESHOLD,
 } from "./news-interest-matcher"
-import type { PersonaForMatching, ArticleForMatching } from "./news-interest-matcher"
+import type {
+  PersonaForMatching,
+  ArticleForMatching,
+  AllocateDailyReactionsOptions,
+} from "./news-interest-matcher"
+import { checkDailyBudget } from "../cost/budget-alert"
 
 // ── 타입 ────────────────────────────────────────────────────────
 
@@ -20,7 +25,7 @@ export interface NewsArticleForTrigger {
   summary: string
   topicTags: string[]
   region: string // T199: "KR" | "JP" | "US" | "EU" | "CN" | "GLOBAL"
-  importanceScore: number // T200: 기사 중요도 (0-1)
+  importanceScore: number // T255: 기사 중요도 (0.00~1.00)
 }
 
 export interface PersonaForTrigger {
@@ -37,6 +42,8 @@ export interface ScheduledReaction {
   articleId: string
   interestScore: number
   scheduledAt: Date
+  /** T255: 이 포스트에 댓글 허용 여부 (기사당 상위 N개만 true) */
+  commentEligible: boolean
 }
 
 export interface NewsReactionDataProvider {
@@ -53,6 +60,7 @@ export interface NewsReactionDataProvider {
     articleTitle: string
     articleSummary: string
     interestScore: number
+    commentEligible: boolean
   }): Promise<void>
 
   /** 기사 트리거 횟수 기록 */
@@ -114,6 +122,7 @@ export async function triggerNewsReactionPosts(
       articleTitle: article.title,
       articleSummary: article.summary,
       interestScore: result.score,
+      commentEligible: true, // 수동 트리거는 모두 댓글 허용
     })
 
     reactions.push({
@@ -121,6 +130,7 @@ export async function triggerNewsReactionPosts(
       articleId: article.id,
       interestScore: result.score,
       scheduledAt: new Date(),
+      commentEligible: true,
     })
   }
 
@@ -144,28 +154,42 @@ export interface DailyNewsDataProvider extends NewsReactionDataProvider {
   getPersonaNewsReactionCountToday(personaId: string): Promise<number>
 }
 
+/** T255: 비용 체크 콜백 (배치 간 budget-alert 연동) */
+export interface CostCheckProvider {
+  /** 오늘 현재까지 지출 (USD) */
+  getTodaySpending(): Promise<number>
+  /** 일일 비용 예산 (USD) */
+  getDailyBudgetUsd(): Promise<number>
+}
+
+/** T255: 배치 크기 */
+const BATCH_SIZE = 20
+
 /**
- * 일일 자동 뉴스 반응 파이프라인.
+ * T255: 일일 자동 뉴스 반응 파이프라인 (동적 스케일링 + 비용 안전장치).
  *
  * 설계 원칙:
- * - 하드코딩 상한 없음 → allocateDailyReactions()의 점수 기반 분배
- * - 대형 이슈 → 자연스럽게 많은 페르소나가 임계값 초과 → 많이 반응
- * - 소형 뉴스 → 소수 반응
- * - dailyBudget(20)이 총량 상한, maxPerPersona(2)가 1인당 상한
- *
- * @param withinHours 최근 몇 시간 이내 기사 대상 (기본 24h)
+ * - importance 등급별 동적 threshold/cap (BREAKING→×3, HIGH→×2)
+ * - BREAKING 일일 최대 횟수 제한 (초과 시 HIGH로 다운그레이드)
+ * - 배치 처리(20건씩) + 배치 간 budget-alert 체크 (CRITICAL 시 중단)
+ * - 기사당 댓글 허용 포스트 제한 (commentEligible)
  */
 export async function runDailyNewsReactions(
   dataProvider: DailyNewsDataProvider,
   options: {
-    withinHours?: number // 수집 대상 기간 (기본 24h)
-    dailyBudget?: number // 하루 총 포스트 수 상한 (기본 20)
-    maxPerPersona?: number // 페르소나당 최대 (기본 2)
+    withinHours?: number
+    dailyBudget?: number
+    maxPerPersona?: number
+    maxBreakingPerDay?: number
+    commentThrottlePerArticle?: number
+    costCheck?: CostCheckProvider
   } = {}
 ): Promise<ScheduledReaction[]> {
   const withinHours = options.withinHours ?? 24
   const dailyBudget = options.dailyBudget ?? 20
   const maxPerPersona = options.maxPerPersona ?? 2
+  const maxBreakingPerDay = options.maxBreakingPerDay ?? 3
+  const commentThrottlePerArticle = options.commentThrottlePerArticle ?? 5
 
   const [articles, personas] = await Promise.all([
     dataProvider.getRecentArticles(withinHours),
@@ -183,7 +207,14 @@ export async function runDailyNewsReactions(
     temperament: p.temperament,
   }))
 
-  // allocateDailyReactions: 점수 기반으로 예산 내 최적 쌍 선택
+  // T255: 동적 스케일링 옵션
+  const allocOptions: AllocateDailyReactionsOptions = {
+    dailyBudget,
+    maxPerPersona,
+    maxBreakingPerDay,
+    commentThrottlePerArticle,
+  }
+
   const pairs = allocateDailyReactions(
     articles.map((a) => ({
       id: a.id,
@@ -195,12 +226,26 @@ export async function runDailyNewsReactions(
       },
     })),
     personasForMatching,
-    { threshold: AUTO_INTEREST_THRESHOLD, dailyBudget, maxPerPersona }
+    allocOptions
   )
 
+  // T255: 배치 처리 + budget-alert 연동
   const reactions: ScheduledReaction[] = []
+  let batchCount = 0
 
   for (const pair of pairs) {
+    // 배치 경계마다 비용 체크
+    if (options.costCheck && reactions.length > 0 && reactions.length % BATCH_SIZE === 0) {
+      batchCount++
+      const isBudgetExceeded = await checkCostBudget(options.costCheck)
+      if (isBudgetExceeded) {
+        console.log(
+          `[daily-news] 비용 CRITICAL — 배치 ${batchCount}에서 중단 (${reactions.length}건 처리)`
+        )
+        break
+      }
+    }
+
     const alreadyReacted = await dataProvider.hasReactedToArticle(pair.personaId, pair.articleId)
     if (alreadyReacted) continue
 
@@ -213,6 +258,7 @@ export async function runDailyNewsReactions(
       articleTitle: article.title,
       articleSummary: article.summary,
       interestScore: pair.score,
+      commentEligible: pair.commentEligible,
     })
 
     reactions.push({
@@ -220,6 +266,7 @@ export async function runDailyNewsReactions(
       articleId: pair.articleId,
       interestScore: pair.score,
       scheduledAt: new Date(),
+      commentEligible: pair.commentEligible,
     })
   }
 
@@ -235,11 +282,42 @@ export async function runDailyNewsReactions(
     await dataProvider.markArticleTriggered(articleId, count)
   }
 
+  // T255: 등급별 로그 출력
+  const gradeDistribution = articles.reduce(
+    (acc, a) => {
+      const g = getImportanceGrade(a.importanceScore)
+      acc[g] = (acc[g] ?? 0) + 1
+      return acc
+    },
+    {} as Record<string, number>
+  )
+
   console.log(
-    `[daily-news] ${articles.length}개 기사 × ${personas.length}명 페르소나 → ${reactions.length}개 반응 예약`
+    `[daily-news] ${articles.length}개 기사 (${formatGradeDist(gradeDistribution)}) × ` +
+      `${personas.length}명 페르소나 → ${reactions.length}개 반응 예약`
   )
 
   return reactions
+}
+
+// ── 비용 체크 헬퍼 ──────────────────────────────────────────────
+
+/**
+ * T255: 배치 간 비용 체크. CRITICAL 이상이면 true 반환.
+ */
+async function checkCostBudget(costCheck: CostCheckProvider): Promise<boolean> {
+  const [spending, budget] = await Promise.all([
+    costCheck.getTodaySpending(),
+    costCheck.getDailyBudgetUsd(),
+  ])
+  const alert = checkDailyBudget(spending, budget)
+  return alert !== null && (alert.level === "CRITICAL" || alert.level === "EMERGENCY")
+}
+
+function formatGradeDist(dist: Record<string, number>): string {
+  return Object.entries(dist)
+    .map(([g, n]) => `${g}:${n}`)
+    .join(" ")
 }
 
 // ── 토픽 포맷터 ─────────────────────────────────────────────────

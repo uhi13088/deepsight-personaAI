@@ -48,6 +48,9 @@ interface NewsSettings {
   autoTriggerEnabled: boolean
   dailyBudget: number
   maxPerPersona: number
+  // T255: 동적 스케일링 설정
+  maxBreakingPerDay: number
+  commentThrottlePerArticle: number
 }
 
 interface CostSummary {
@@ -125,7 +128,13 @@ export default function NewsAdminPage() {
     sources: [],
     presets: [],
     recentArticles: [],
-    settings: { autoTriggerEnabled: true, dailyBudget: 20, maxPerPersona: 2 },
+    settings: {
+      autoTriggerEnabled: true,
+      dailyBudget: 20,
+      maxPerPersona: 2,
+      maxBreakingPerDay: 3,
+      commentThrottlePerArticle: 5,
+    },
     costSummary: { todayCostUsd: 0, todayCallCount: 0, monthCostUsd: 0, monthCallCount: 0 },
   })
   const [loading, setLoading] = useState(true)
@@ -144,6 +153,8 @@ export default function NewsAdminPage() {
     autoTriggerEnabled: true,
     dailyBudget: 20,
     maxPerPersona: 2,
+    maxBreakingPerDay: 3,
+    commentThrottlePerArticle: 5,
   })
 
   const loadData = useCallback(async () => {
@@ -431,6 +442,79 @@ export default function NewsAdminPage() {
             />
           </div>
 
+          {/* T255: 동적 스케일링 설정 */}
+          <div className="border-border space-y-3 border-t pt-3">
+            <div className="text-muted-foreground text-xs font-medium">
+              T255: Importance 기반 동적 스케일링
+            </div>
+
+            {/* BREAKING 일일 최대 */}
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium">BREAKING 일일 최대</div>
+                <div className="text-muted-foreground text-xs">
+                  초과 시 HIGH로 다운그레이드 (기본 3)
+                </div>
+              </div>
+              <Input
+                type="number"
+                min={1}
+                max={10}
+                value={localSettings.maxBreakingPerDay}
+                onChange={(e) =>
+                  setLocalSettings((s) => ({ ...s, maxBreakingPerDay: Number(e.target.value) }))
+                }
+                className="w-20 text-right text-sm"
+              />
+            </div>
+
+            {/* 댓글 쓰로틀링 */}
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium">댓글 허용 포스트 수 (기사당)</div>
+                <div className="text-muted-foreground text-xs">
+                  동일 기사 반응 포스트 중 상위 N개만 댓글 허용 (기본 5)
+                </div>
+              </div>
+              <Input
+                type="number"
+                min={1}
+                max={20}
+                value={localSettings.commentThrottlePerArticle}
+                onChange={(e) =>
+                  setLocalSettings((s) => ({
+                    ...s,
+                    commentThrottlePerArticle: Number(e.target.value),
+                  }))
+                }
+                className="w-20 text-right text-sm"
+              />
+            </div>
+
+            {/* 등급별 동적 cap 안내 (읽기 전용) */}
+            <div className="bg-muted/50 rounded-md p-3 text-xs">
+              <div className="text-muted-foreground mb-1.5 font-medium">등급별 자동 적용 규칙</div>
+              <div className="text-muted-foreground space-y-1">
+                <div>
+                  <strong className="text-red-600">BREAKING</strong> (score &ge; 0.9): threshold
+                  0.15, cap = 예산 &times; 3 ({localSettings.dailyBudget * 3}명)
+                </div>
+                <div>
+                  <strong className="text-orange-600">HIGH</strong> (0.7~0.9): threshold 0.25, cap =
+                  활성 페르소나의 50%
+                </div>
+                <div>
+                  <strong>NORMAL</strong> (0.5~0.7): threshold 0.35, cap = 기본 예산 (
+                  {localSettings.dailyBudget}명)
+                </div>
+                <div>
+                  <strong className="text-gray-400">LOW</strong> (&lt; 0.5): threshold 0.45, cap =
+                  예산의 50% ({Math.floor(localSettings.dailyBudget * 0.5)}명)
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* 고정 안전장치 안내 */}
           <div className="bg-muted/50 flex items-start gap-2 rounded-md p-3 text-xs">
             <AlertCircle className="text-muted-foreground mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
@@ -443,6 +527,9 @@ export default function NewsAdminPage() {
               </div>
               <div>
                 소스당 수집: 최대 <strong>5기사</strong> (고정)
+              </div>
+              <div>
+                배치 처리: <strong>20건</strong>씩 비용 체크 (CRITICAL 시 중단)
               </div>
             </div>
           </div>

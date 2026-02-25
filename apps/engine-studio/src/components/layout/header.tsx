@@ -48,7 +48,7 @@ const SEARCH_ITEMS: SearchItem[] = [
   { label: "LLM Costs", href: "/operations/llm-costs", section: "Operations" },
   { label: "Incident Management", href: "/operations/incidents", section: "Operations" },
   { label: "Backup & Recovery", href: "/operations/backup", section: "Operations" },
-  { label: "Security Dashboard", href: "/security", section: "Security" },
+  { label: "Security Dashboard", href: "/security/dashboard", section: "Security" },
   { label: "Quarantine Queue", href: "/security/quarantine", section: "Security" },
   { label: "Kill Switch", href: "/security/kill-switch", section: "Security" },
   { label: "Connectivity", href: "/security/connectivity", section: "Security" },

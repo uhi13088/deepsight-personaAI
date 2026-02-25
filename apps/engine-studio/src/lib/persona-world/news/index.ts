@@ -8,6 +8,9 @@ export {
   computeRegionalRelevance,
   selectPersonasForArticle,
   allocateDailyReactions,
+  getImportanceGrade,
+  getGradeConfig,
+  computeEffectiveDailyBudget,
   INTEREST_THRESHOLD,
   AUTO_INTEREST_THRESHOLD,
 } from "./news-interest-matcher"
@@ -16,6 +19,9 @@ export type {
   PersonaForMatching,
   NewsInterestResult,
   ArticleReactionPair,
+  AllocateDailyReactionsOptions,
+  ImportanceGrade,
+  DynamicGradeConfig,
 } from "./news-interest-matcher"
 
 export {
@@ -29,4 +35,5 @@ export type {
   ScheduledReaction,
   NewsReactionDataProvider,
   DailyNewsDataProvider,
+  CostCheckProvider,
 } from "./news-reaction-trigger"

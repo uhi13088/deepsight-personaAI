@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// Phase NB — News Interest Matcher (T199: 지역 기반 확장)
+// Phase NB — News Interest Matcher (T255: 동적 스케일링)
 // 뉴스 기사 × 페르소나 → 관심도 점수 (입장/찬반 아님)
 // "이 뉴스에 얼마나 관심을 가질 것인가"
 // ═══════════════════════════════════════════════════════════════
@@ -12,7 +12,7 @@ export interface ArticleForMatching {
   topicTags: string[] // ["AI", "규제", ...]
   summary: string
   region: string // "KR" | "JP" | "US" | "EU" | "CN" | "GLOBAL"
-  importanceScore: number // T200: 기사 중요도 (0-1, Claude 분석)
+  importanceScore: number // T255: 기사 중요도 (0.00~1.00, Claude 분석)
 }
 
 export interface PersonaForMatching {
@@ -35,12 +35,89 @@ export interface NewsInterestResult {
   }
 }
 
+// ── T255: Importance 등급 ─────────────────────────────────────
+
+export type ImportanceGrade = "BREAKING" | "HIGH" | "NORMAL" | "LOW"
+
+export interface DynamicGradeConfig {
+  grade: ImportanceGrade
+  threshold: number // 관심도 임계값
+  maxReactors: number // 이 기사에 반응 가능한 최대 페르소나 수
+}
+
+/**
+ * importanceScore → 등급 판정.
+ *
+ * BREAKING (≥0.9): 전쟁, 팬데믹, 금융위기 등 전 세계적 이슈
+ * HIGH (0.7~0.9): 국가 단위 주요 이슈 (대선, 대형사고)
+ * NORMAL (0.5~0.7): 일반 뉴스 (산업 동향, 기업 발표)
+ * LOW (<0.5): 지역·소규모 뉴스
+ */
+export function getImportanceGrade(score: number): ImportanceGrade {
+  if (score >= 0.9) return "BREAKING"
+  if (score >= 0.7) return "HIGH"
+  if (score >= 0.5) return "NORMAL"
+  return "LOW"
+}
+
+/**
+ * 등급별 동적 threshold + maxReactors 결정.
+ *
+ * BREAKING: threshold 0.15 (거의 모든 페르소나 참여), cap = normalBudget×3
+ * HIGH:     threshold 0.25, cap = 활성 페르소나의 50%
+ * NORMAL:   threshold 0.35, cap = normalBudget
+ * LOW:      threshold 0.45 (정확 매칭만), cap = normalBudget/2
+ */
+export function getGradeConfig(
+  grade: ImportanceGrade,
+  activePersonaCount: number,
+  normalBudget: number
+): DynamicGradeConfig {
+  switch (grade) {
+    case "BREAKING":
+      return { grade, threshold: 0.15, maxReactors: normalBudget * 3 }
+    case "HIGH":
+      return { grade, threshold: 0.25, maxReactors: Math.floor(activePersonaCount * 0.5) }
+    case "NORMAL":
+      return { grade, threshold: 0.35, maxReactors: normalBudget }
+    case "LOW":
+      return { grade, threshold: 0.45, maxReactors: Math.max(1, Math.floor(normalBudget * 0.5)) }
+  }
+}
+
+/**
+ * 기사 목록 기반 effective daily budget 결정.
+ *
+ * BREAKING 기사 존재 → normalBudget×3
+ * HIGH 기사 존재 → normalBudget×2
+ * 그 외 → normalBudget
+ *
+ * BREAKING 일일 최대 횟수 초과 시 무시.
+ */
+export function computeEffectiveDailyBudget(
+  articles: Array<{ importanceScore: number }>,
+  normalBudget: number,
+  maxBreakingPerDay: number
+): number {
+  let breakingCount = 0
+  let hasHigh = false
+
+  for (const a of articles) {
+    if (a.importanceScore >= 0.9) breakingCount++
+    else if (a.importanceScore >= 0.7) hasHigh = true
+  }
+
+  if (Math.min(breakingCount, maxBreakingPerDay) > 0) return normalBudget * 3
+  if (hasHigh) return normalBudget * 2
+  return normalBudget
+}
+
 // ── 상수 ────────────────────────────────────────────────────────
 
 /** 수동 트리거 임계값 */
 export const INTEREST_THRESHOLD = 0.25
 
-/** 자동 daily_news 모드 임계값 (더 엄격) */
+/** 자동 daily_news 모드 임계값 (더 엄격) — T255 이전 기본값, 하위호환 */
 export const AUTO_INTEREST_THRESHOLD = 0.35
 
 /** 지역 코드 → 언어 코드 매핑 */
@@ -210,60 +287,105 @@ export interface ArticleReactionPair {
   article: ArticleForMatching
   personaId: string
   score: number
+  /** T255: 이 포스트에 다른 페르소나가 댓글을 달 수 있는지 (기사당 상위 N개만 true) */
+  commentEligible: boolean
+}
+
+export interface AllocateDailyReactionsOptions {
+  /** @deprecated T255 이전 호환용. 동적 스케일링이 기사별 threshold를 결정하므로 무시됨 */
+  threshold?: number
+  /** 기본 일일 예산 (기본 20). BREAKING/HIGH 시 자동 증액 */
+  dailyBudget?: number
+  /** 페르소나당 최대 반응 수 (기본 2) */
+  maxPerPersona?: number
+  /** T255: BREAKING 일일 최대 횟수 (기본 3). 초과 시 HIGH로 다운그레이드 */
+  maxBreakingPerDay?: number
+  /** T255: 기사당 댓글 허용 포스트 수 (기본 5) */
+  commentThrottlePerArticle?: number
 }
 
 /**
- * 여러 기사 × 여러 페르소나 → 일일 예산 내 최적 반응 쌍 선정.
+ * T255: 여러 기사 × 여러 페르소나 → importance 등급 기반 동적 할당.
  *
  * 알고리즘:
- * 1. 모든 (기사, 페르소나) 조합 점수 계산
- * 2. 점수 내림차순 정렬
- * 3. 페르소나당 최대 maxPerPersona 반응 허용
- * 4. 총 dailyBudget 내에서 상위 쌍 선택
- *
- * 결과: 대형 이슈 → 많은 쌍이 선택, 소형 뉴스 → 적게 선택.
+ * 1. 기사별 ImportanceGrade 판정 (BREAKING/HIGH/NORMAL/LOW)
+ * 2. 등급별 동적 threshold + maxReactors 적용
+ * 3. BREAKING 일일 제한(maxBreakingPerDay) 초과 시 HIGH로 다운그레이드
+ * 4. 전체 effectiveDailyBudget 내에서 importance 가중 점수 순 선택
+ * 5. 기사당 상위 N개만 commentEligible (댓글 연쇄 비용 제어)
  */
 export function allocateDailyReactions(
   articlesWithIds: Array<{ id: string; article: ArticleForMatching }>,
   personas: PersonaForMatching[],
-  options: {
-    threshold?: number // 기본 0.35 (자동 모드)
-    dailyBudget?: number // 하루 총 포스트 수 상한 (기본 20)
-    maxPerPersona?: number // 페르소나당 최대 반응 수 (기본 2)
-  } = {}
+  options: AllocateDailyReactionsOptions = {}
 ): ArticleReactionPair[] {
-  const threshold = options.threshold ?? AUTO_INTEREST_THRESHOLD
-  const dailyBudget = options.dailyBudget ?? 20
+  const normalBudget = options.dailyBudget ?? 20
   const maxPerPersona = options.maxPerPersona ?? 2
+  const maxBreakingPerDay = options.maxBreakingPerDay ?? 3
+  const commentThrottlePerArticle = options.commentThrottlePerArticle ?? 5
 
-  // 모든 쌍 계산
+  // T255: effective daily budget (BREAKING→×3, HIGH→×2)
+  const effectiveBudget = computeEffectiveDailyBudget(
+    articlesWithIds.map((a) => a.article),
+    normalBudget,
+    maxBreakingPerDay
+  )
+
+  // T255: 기사별 동적 threshold + cap으로 후보 쌍 계산
+  let breakingCount = 0
   const allPairs: ArticleReactionPair[] = []
+
   for (const { id, article } of articlesWithIds) {
-    const results = selectPersonasForArticle(article, personas, threshold)
-    for (const r of results) {
-      allPairs.push({ articleId: id, article, personaId: r.personaId, score: r.score })
+    let grade = getImportanceGrade(article.importanceScore)
+
+    // BREAKING 일일 제한: 초과 시 HIGH로 다운그레이드
+    if (grade === "BREAKING") {
+      breakingCount++
+      if (breakingCount > maxBreakingPerDay) grade = "HIGH"
+    }
+
+    const config = getGradeConfig(grade, personas.length, normalBudget)
+    const results = selectPersonasForArticle(article, personas, config.threshold)
+
+    // 기사별 maxReactors cap 적용
+    const capped = results.slice(0, config.maxReactors)
+    for (const r of capped) {
+      allPairs.push({
+        articleId: id,
+        article,
+        personaId: r.personaId,
+        score: r.score,
+        commentEligible: true, // 임시, 아래에서 재계산
+      })
     }
   }
 
   // 중요도 가중 점수로 내림차순 정렬
   // adjustedScore = interestScore × (0.6 + 0.4 × importanceScore)
-  // → 중요 기사가 예산 우선권 확보, 동일 관심도면 중요 기사 우선
   allPairs.sort((a, b) => {
     const adjA = a.score * (0.6 + 0.4 * a.article.importanceScore)
     const adjB = b.score * (0.6 + 0.4 * b.article.importanceScore)
     return adjB - adjA
   })
 
-  // 예산 내 선택 (페르소나당 maxPerPersona 제한)
+  // 전체 예산 내 선택 (페르소나당 maxPerPersona 제한)
   const personaCount = new Map<string, number>()
   const selected: ArticleReactionPair[] = []
 
   for (const pair of allPairs) {
-    if (selected.length >= dailyBudget) break
+    if (selected.length >= effectiveBudget) break
     const count = personaCount.get(pair.personaId) ?? 0
     if (count >= maxPerPersona) continue
     personaCount.set(pair.personaId, count + 1)
     selected.push(pair)
+  }
+
+  // T255: 댓글 쓰로틀링 — 기사당 상위 N개만 commentEligible
+  const articlePostCount = new Map<string, number>()
+  for (const pair of selected) {
+    const count = articlePostCount.get(pair.articleId) ?? 0
+    pair.commentEligible = count < commentThrottlePerArticle
+    articlePostCount.set(pair.articleId, count + 1)
   }
 
   return selected

@@ -446,7 +446,7 @@ export async function triggerNewsArticle(
   const llmAvailable = isLLMConfigured()
   const newsReactionProvider = createNewsReactionDataProvider()
   const allScheduled = await triggerNewsReactionPosts(
-    { ...article, importanceScore: article.importanceScore ?? 0.5 },
+    { ...article, importanceScore: Number(article.importanceScore ?? 0.5) },
     newsReactionProvider
   )
 
@@ -538,18 +538,27 @@ export async function runDailyNewsReactionPipeline(
   }
 
   // SystemConfig에서 budget 읽기 (body 파라미터로 override 가능)
-  const [budgetConfig, maxConfig] = await Promise.all([
+  const [budgetConfig, maxConfig, breakingConfig, commentThrottleConfig] = await Promise.all([
     prisma.systemConfig.findUnique({
       where: { category_key: { category: "NEWS", key: "daily_budget" } },
     }),
     prisma.systemConfig.findUnique({
       where: { category_key: { category: "NEWS", key: "max_per_persona" } },
     }),
+    // T255: 새 설정
+    prisma.systemConfig.findUnique({
+      where: { category_key: { category: "NEWS", key: "max_breaking_per_day" } },
+    }),
+    prisma.systemConfig.findUnique({
+      where: { category_key: { category: "NEWS", key: "comment_throttle_per_article" } },
+    }),
   ])
 
   const dailyBudget = options.dailyBudget ?? (budgetConfig?.value as number | undefined) ?? 20
   const maxPerPersona = options.maxPerPersona ?? (maxConfig?.value as number | undefined) ?? 2
   const withinHours = options.withinHours ?? 24
+  const maxBreakingPerDay = (breakingConfig?.value as number | undefined) ?? 3
+  const commentThrottlePerArticle = (commentThrottleConfig?.value as number | undefined) ?? 5
 
   const llmAvailable = isLLMConfigured()
   const dailyProvider = createDailyNewsDataProvider()
@@ -557,6 +566,8 @@ export async function runDailyNewsReactionPipeline(
     dailyBudget,
     maxPerPersona,
     withinHours,
+    maxBreakingPerDay,
+    commentThrottlePerArticle,
   })
 
   const createdPosts: Array<{ personaId: string; postId: string; articleId: string }> = []
@@ -805,7 +816,7 @@ function createNewsReactionDataProvider(): NewsReactionDataProvider {
       return !!existing
     },
 
-    async scheduleNewsReactionPost({ personaId, articleId, interestScore }) {
+    async scheduleNewsReactionPost({ personaId, articleId, interestScore, commentEligible }) {
       await prisma.personaActivityLog.create({
         data: {
           personaId,
@@ -815,6 +826,7 @@ function createNewsReactionDataProvider(): NewsReactionDataProvider {
             action: "news_reaction_scheduled",
             newsArticleId: articleId,
             interestScore,
+            commentEligible, // T255: 댓글 쓰로틀링
           } as Prisma.InputJsonValue,
         },
       })
@@ -852,7 +864,7 @@ function createDailyNewsDataProvider(): DailyNewsDataProvider {
         summary: a.summary ?? "",
         topicTags: (a.topicTags as string[]) ?? [],
         region: a.region ?? "GLOBAL",
-        importanceScore: a.importanceScore ?? 0.5,
+        importanceScore: Number(a.importanceScore ?? 0.5),
       }))
     },
 

@@ -1485,6 +1485,39 @@
   - AC3: ✅ LNB + header에 "뉴스 반응" 메뉴 추가
   - AC4: ✅ Build PASS (109 static pages)
 
+### Phase NB-B: 뉴스 반응 시스템 개선 (T255~T256)
+
+> Phase NB(T195~T198)에서 구축한 뉴스 반응 시스템의 설계 결함 2건 수정.
+> (1) 자동 트리거 일일 예산 고정 → importance 기반 동적 스케일링
+> (2) RSS 소스 완전 수동 관리 → 자동 등록 + cron 수집
+
+- [ ] **T255: 뉴스 반응 동적 스케일링 — importance 기반 reactor 인원 결정**
+  - 배경: 현재 자동 트리거는 dailyBudget=20, maxPerPersona=2로 하드캡. 전 세계적 대형 뉴스(전쟁, 대지진 등)에도 최대 10명만 반응 → 부자연스러움. 페르소나 100명 중 10명만 언급하는 SNS는 현실감 없음
+  - AC1: `NewsArticle` 모델에 `importanceScore Decimal @db.Decimal(3,2)` 필드 추가 + Claude 분석 시 importance 자동 산출 (0.0~1.0)
+  - AC2: importance 등급별 동적 cap 로직 (`allocateDailyReactions` 개선):
+    - BREAKING (≥0.9): normalBudget × 3 cap, 관심도 threshold 0.15로 낮춤 → 최대 60명 참여 가능
+    - HIGH (0.7~0.9): active 페르소나의 50%까지, threshold 0.25
+    - NORMAL (0.5~0.7): 기존대로 threshold 0.35, budget 내 상위 선발
+    - LOW (<0.5): threshold 0.45, 관심 분야 정확 매칭만
+  - AC3: BREAKING/HIGH 시 dailyBudget 증액 + 비용 안전장치:
+    - 증액: BREAKING → normalBudget × 3 (기본 20→60), HIGH → × 2 (20→40)
+    - 안전장치 ①: dailyCostCeiling 연동 — 포스트 생성을 배치(20명씩)로 나누고, 각 배치 후 budget-alert 체크. CRITICAL 도달 시 즉시 중단
+    - 안전장치 ②: 뉴스 반응 포스트 댓글 쓰로틀링 — 동일 뉴스 기사 관련 포스트끼리 댓글 중복 방지 (commentDedup: articleId 기준). 100개 포스트에 각각 댓글 달지 않고 대표 포스트 3~5개에만 댓글 허용
+    - 안전장치 ③: BREAKING 일일 최대 횟수 제한 (maxBreakingPerDay: 3). 초과 시 HIGH 등급으로 다운그레이드
+  - AC4: Admin UI 설정 패널에 importance 등급별 cap 설정 UI 추가
+  - AC5: 테스트 + Build PASS
+
+- [ ] **T256: RSS 소스 자동화 — 프리셋 자동 등록 + cron 기반 수집**
+  - 배경: 현재 RSS 소스 관리가 완전 수동 (소스 추가, 개별 수집 버튼, 토글). 관리자가 매번 "전체 수집" 누르는 구조. 자동화 약속 미이행
+  - AC1: 프리셋 RSS 소스 자동 시드 — 최초 앱 기동 시 (또는 NewsSource 0건 시) 프리셋 목록 자동 INSERT + `isActive: true`
+  - AC2: cron 기반 자동 수집 — 스케줄러 API에 `news_auto_fetch` 액션 추가, 설정된 주기(기본 1시간)로 전체 active 소스 자동 수집
+  - AC3: 수집 후 자동 반응 트리거 — `autoTriggerEnabled=true`일 때 신규 기사 수집 즉시 `runDailyNewsReactions()` 연쇄 호출
+  - AC4: Admin UI 역할 전환 — "소스 추가/수집" 중심 → "모니터링/예외 처리" 중심:
+    - 자동 수집 상태 표시 (마지막 수집 시각, 다음 예정, 성공/실패 카운트)
+    - 오류 소스 하이라이트 (3회 연속 실패 시 자동 비활성화 + 경고)
+    - 수동 "전체 수집" 버튼은 유지하되 보조 역할로 이동
+  - AC5: 테스트 + Build PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
@@ -1494,6 +1527,21 @@
 ---
 
 ## ✅ DONE (최근 완료)
+
+- [x] **T255: 뉴스 반응 동적 스케일링 — importance 기반 reactor 인원 결정** ✅ 2026-02-25
+  - AC1: ✅ importanceScore Float→Decimal @db.Decimal(3,2) 마이그레이션 + Number() 래핑
+  - AC2: ✅ ImportanceGrade(BREAKING/HIGH/NORMAL/LOW) 등급별 동적 threshold/cap 로직
+    - BREAKING(≥0.9): threshold 0.15, cap=budget×3
+    - HIGH(0.7~0.9): threshold 0.25, cap=50%
+    - NORMAL(0.5~0.7): threshold 0.35, cap=budget
+    - LOW(<0.5): threshold 0.45, cap=budget/2
+  - AC3: ✅ 비용 안전장치 3중
+    - 배치 처리(20건씩) + budget-alert CRITICAL 시 중단
+    - 댓글 쓰로틀링(기사당 상위 5개만 commentEligible)
+    - BREAKING 일일 최대 3회(초과 시 HIGH 다운그레이드)
+  - AC4: ✅ Admin UI 설정 패널에 maxBreakingPerDay, commentThrottlePerArticle + 등급별 규칙 안내
+  - AC5: ✅ 105파일 4231 tests PASS, Build 106 pages PASS
+  - 변경파일: schema.prisma, news-interest-matcher.ts, news-reaction-trigger.ts, index.ts, scheduler-service.ts, route.ts, page.tsx, news-interest-matcher.test.ts
 
 - [x] **T252~T254: ES 프로토타입 메뉴 정리 + 인메모리 API DB 영속화 (3개 티켓 일괄)** ✅ 2026-02-24
   - T252: ES 네비게이션 정리 — 검색 팔레트↔사이드바 동기화 + 레이블 통일
