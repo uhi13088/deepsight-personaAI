@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/require-auth"
 import type { ApiResponse } from "@/types"
-import { createModelConfig, getBudgetStatus } from "@/lib/global-config"
-import type { ModelConfig, RoutingRule, SupportedModel } from "@/lib/global-config"
+import { createModelConfig, getBudgetStatus, KNOWN_CALL_TYPES } from "@/lib/global-config"
+import type {
+  ModelConfig,
+  RoutingRule,
+  SupportedModel,
+  CallTypeModelOverrides,
+} from "@/lib/global-config"
+import { invalidateModelConfigCache } from "@/lib/llm-client"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@/generated/prisma"
 
@@ -19,6 +25,8 @@ async function loadModelConfig(): Promise<ModelConfig> {
     routingRules: (configMap.routingRules ?? defaults.routingRules) as ModelConfig["routingRules"],
     defaultModel: (configMap.defaultModel ?? defaults.defaultModel) as ModelConfig["defaultModel"],
     budget: (configMap.budget ?? defaults.budget) as ModelConfig["budget"],
+    callTypeOverrides: (configMap.callTypeOverrides ??
+      defaults.callTypeOverrides) as ModelConfig["callTypeOverrides"],
   }
 }
 
@@ -70,6 +78,8 @@ interface ModelConfigResponse {
   defaultModel: ModelConfig["defaultModel"]
   budget: ModelConfig["budget"]
   budgetStatus: ReturnType<typeof getBudgetStatus>
+  callTypeOverrides: CallTypeModelOverrides
+  knownCallTypes: typeof KNOWN_CALL_TYPES
 }
 
 function serialize(config: ModelConfig): ModelConfigResponse {
@@ -79,6 +89,8 @@ function serialize(config: ModelConfig): ModelConfigResponse {
     defaultModel: config.defaultModel,
     budget: config.budget,
     budgetStatus: getBudgetStatus(config.budget),
+    callTypeOverrides: config.callTypeOverrides,
+    knownCallTypes: KNOWN_CALL_TYPES,
   }
 }
 
@@ -112,6 +124,7 @@ type PostAction =
   | { action: "toggleModel"; modelId: SupportedModel }
   | { action: "updateBudgetLimit"; limitUsd: number }
   | { action: "syncBudget" }
+  | { action: "updateCallTypeOverrides"; overrides: CallTypeModelOverrides }
 
 export async function POST(request: NextRequest) {
   const { response } = await requireAuth()
@@ -129,6 +142,7 @@ export async function POST(request: NextRequest) {
           m.id === body.modelId ? { ...m, enabled: !m.enabled } : m
         )
         await saveModelConfigField("models", models)
+        invalidateModelConfigCache()
         updated = { ...config, models }
         break
       }
@@ -144,7 +158,14 @@ export async function POST(request: NextRequest) {
       }
       case "updateRoutingRules": {
         await saveModelConfigField("routingRules", body.routingRules)
+        invalidateModelConfigCache()
         updated = { ...config, routingRules: body.routingRules }
+        break
+      }
+      case "updateCallTypeOverrides": {
+        await saveModelConfigField("callTypeOverrides", body.overrides)
+        invalidateModelConfigCache()
+        updated = { ...config, callTypeOverrides: body.overrides }
         break
       }
       default: {

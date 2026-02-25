@@ -5,9 +5,16 @@ import { Header } from "@/components/layout/header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
-import { DollarSign, Cpu, ArrowRightLeft } from "lucide-react"
+import { DollarSign, Cpu, ArrowRightLeft, Settings2 } from "lucide-react"
 import { estimateCost } from "@/lib/global-config"
-import type { ModelConfig, ModelSpec, SupportedModel, MonthlyBudget } from "@/lib/global-config"
+import type {
+  ModelConfig,
+  ModelSpec,
+  SupportedModel,
+  MonthlyBudget,
+  CallTypeInfo,
+  CallTypeModelOverrides,
+} from "@/lib/global-config"
 
 // ── API response shape ───────────────────────────────────────
 interface BudgetStatus {
@@ -23,6 +30,8 @@ interface ModelConfigData {
   defaultModel: SupportedModel
   budget: MonthlyBudget
   budgetStatus: BudgetStatus
+  callTypeOverrides: CallTypeModelOverrides
+  knownCallTypes: CallTypeInfo[]
 }
 
 export default function ModelSettingsPage() {
@@ -111,6 +120,33 @@ export default function ModelSettingsPage() {
     }
   }, [])
 
+  // ── CallType model override ─────────────────────────────────
+  const handleCallTypeModelChange = useCallback(
+    async (callType: string, modelId: SupportedModel | "") => {
+      if (!data) return
+      const newOverrides = { ...data.callTypeOverrides }
+      if (modelId === "") {
+        delete newOverrides[callType]
+      } else {
+        newOverrides[callType] = modelId
+      }
+      try {
+        const res = await fetch("/api/internal/global-config/models", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "updateCallTypeOverrides", overrides: newOverrides }),
+        })
+        const json = await res.json()
+        if (json.success && json.data) {
+          setData(json.data)
+        }
+      } catch {
+        // silently fail
+      }
+    },
+    [data]
+  )
+
   // ── Cost estimation helper ───────────────────────────────────
   const getCostPer1k = useCallback((model: ModelSpec) => {
     return estimateCost(model, 1000, 1000)
@@ -154,7 +190,15 @@ export default function ModelSettingsPage() {
     )
   }
 
-  const { models: config_models, routingRules, budget, budgetStatus } = data
+  const {
+    models: config_models,
+    routingRules,
+    budget,
+    budgetStatus,
+    callTypeOverrides,
+    knownCallTypes,
+  } = data
+  const enabledModels = config_models.filter((m) => m.enabled)
 
   const progressPercent = Math.min(budgetStatus.usagePercent, 100)
   const progressColor = budgetStatus.exceeded
@@ -284,6 +328,81 @@ export default function ModelSettingsPage() {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* ── Feature Model Mapping ─────────────────────────────── */}
+        <div className="bg-card rounded-lg border p-4">
+          <div className="mb-1 flex items-center gap-2">
+            <Settings2 className="text-muted-foreground h-4 w-4" />
+            <h3 className="text-sm font-medium">Feature Model Mapping</h3>
+          </div>
+          <p className="text-muted-foreground mb-4 text-xs">
+            기능별로 사용할 LLM 모델을 선택합니다. &quot;Default&quot;는 기본 모델(
+            {data.defaultModel})을 사용합니다.
+          </p>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-border border-b">
+                  <th className="text-muted-foreground px-3 py-2 text-left font-medium">Feature</th>
+                  <th className="text-muted-foreground px-3 py-2 text-left font-medium">
+                    Description
+                  </th>
+                  <th className="text-muted-foreground px-3 py-2 text-left font-medium">Model</th>
+                  <th className="text-muted-foreground px-3 py-2 text-center font-medium">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {(knownCallTypes ?? []).map((ct) => {
+                  const currentModel = callTypeOverrides?.[ct.callType] ?? ""
+                  const resolvedName = currentModel
+                    ? (config_models.find((m) => m.id === currentModel)?.displayName ??
+                      currentModel)
+                    : (config_models.find((m) => m.id === data.defaultModel)?.displayName ??
+                      data.defaultModel)
+                  return (
+                    <tr key={ct.callType} className="border-border border-b last:border-0">
+                      <td className="px-3 py-2">
+                        <div className="font-medium">{ct.displayName}</div>
+                        <code className="text-muted-foreground text-[10px]">{ct.callType}</code>
+                      </td>
+                      <td className="text-muted-foreground px-3 py-2">{ct.description}</td>
+                      <td className="px-3 py-2">
+                        <select
+                          value={currentModel}
+                          onChange={(e) =>
+                            handleCallTypeModelChange(
+                              ct.callType,
+                              e.target.value as SupportedModel | ""
+                            )
+                          }
+                          className="bg-background border-border w-full rounded border px-2 py-1.5 text-xs"
+                        >
+                          <option value="">
+                            Default (
+                            {config_models.find((m) => m.id === data.defaultModel)?.displayName})
+                          </option>
+                          {enabledModels.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.displayName}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <Badge variant={currentModel ? "info" : "muted"} className="text-[10px]">
+                          {currentModel ? resolvedName : "Default"}
+                        </Badge>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

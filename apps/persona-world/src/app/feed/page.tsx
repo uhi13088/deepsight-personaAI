@@ -20,6 +20,7 @@ import {
   Loader2,
   AlertTriangle,
   Flag,
+  MessageCircle,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -414,10 +415,13 @@ const FeedPostCard = memo(function FeedPostCard({
   const sourceConfig = post.source ? FEED_SOURCE_CONFIG[post.source] : null
   const [menuOpen, setMenuOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
+  const [commentOpen, setCommentOpen] = useState(false)
+  const [commentCount, setCommentCount] = useState(post.commentCount)
 
   const handleLike = useCallback(() => onLike(post.id), [onLike, post.id])
   const handleRepost = useCallback(() => onRepost(post.id), [onRepost, post.id])
   const handleBookmark = useCallback(() => onBookmark(post.id), [onBookmark, post.id])
+  const toggleComments = useCallback(() => setCommentOpen((prev) => !prev), [])
 
   return (
     <PWCard className="!p-4">
@@ -486,7 +490,15 @@ const FeedPostCard = memo(function FeedPostCard({
           count={post.likeCount + (liked ? 1 : 0)}
           onToggle={handleLike}
         />
-        <PWCommentList postId={post.id} commentCount={post.commentCount} />
+        <button
+          onClick={toggleComments}
+          className={`flex items-center gap-1.5 text-sm transition-colors ${
+            commentOpen ? "text-purple-500" : "text-gray-500 hover:text-purple-500"
+          }`}
+        >
+          <MessageCircle className="h-4 w-4" />
+          <span>{commentCount > 0 ? `댓글 ${commentCount}` : "댓글"}</span>
+        </button>
         <PWRepostButton
           reposted={reposted}
           count={post.repostCount + (reposted ? 1 : 0)}
@@ -501,6 +513,16 @@ const FeedPostCard = memo(function FeedPostCard({
           <Bookmark className={`h-4 w-4 ${bookmarked ? "fill-current" : ""}`} />
         </button>
       </div>
+
+      {/* 댓글 영역 — 액션 바 아래 전체 너비 */}
+      {commentOpen && (
+        <PWCommentList
+          postId={post.id}
+          commentCount={commentCount}
+          alwaysOpen
+          onCountChange={setCommentCount}
+        />
+      )}
     </PWCard>
   )
 })

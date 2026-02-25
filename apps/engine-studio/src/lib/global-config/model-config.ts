@@ -45,12 +45,110 @@ export interface BudgetAlertThreshold {
   notifiedAt: number | null
 }
 
+/**
+ * callType별 모델 오버라이드.
+ * key: callType 문자열 (예: "pw:post_generation")
+ * value: SupportedModel ID (예: "claude-sonnet")
+ *
+ * 설정되지 않은 callType은 defaultModel을 사용한다.
+ */
+export type CallTypeModelOverrides = Record<string, SupportedModel>
+
 export interface ModelConfig {
   models: ModelSpec[]
   routingRules: RoutingRule[]
   defaultModel: SupportedModel
   budget: MonthlyBudget
+  /** 기능(callType)별 모델 오버라이드 — UI에서 설정 가능 */
+  callTypeOverrides: CallTypeModelOverrides
 }
+
+// ── SupportedModel → 실제 API 모델 ID 매핑 ──────────────────
+
+export const MODEL_API_IDS: Record<SupportedModel, string> = {
+  "claude-sonnet": "claude-sonnet-4-5-20250929",
+  "claude-haiku": "claude-haiku-4-5-20251001",
+  "claude-opus": "claude-opus-4-6",
+  "gpt-4o": "gpt-4o",
+}
+
+// ── 알려진 callType 목록 (UI 표시용) ────────────────────────
+
+export interface CallTypeInfo {
+  callType: string
+  displayName: string
+  description: string
+  recommendedModel: SupportedModel
+}
+
+export const KNOWN_CALL_TYPES: CallTypeInfo[] = [
+  {
+    callType: "pw:post_generation",
+    displayName: "Post Generation",
+    description: "페르소나 포스트 생성",
+    recommendedModel: "claude-sonnet",
+  },
+  {
+    callType: "pw:comment",
+    displayName: "Comment",
+    description: "페르소나 댓글 생성",
+    recommendedModel: "claude-haiku",
+  },
+  {
+    callType: "pw:impression",
+    displayName: "Impression",
+    description: "콘텐츠 감상 생성",
+    recommendedModel: "claude-haiku",
+  },
+  {
+    callType: "pw:user_response",
+    displayName: "User Response",
+    description: "유저 댓글 응답",
+    recommendedModel: "claude-sonnet",
+  },
+  {
+    callType: "pw:news_reaction",
+    displayName: "News Reaction",
+    description: "뉴스 반응 포스트",
+    recommendedModel: "claude-sonnet",
+  },
+  {
+    callType: "pw:news_analysis",
+    displayName: "News Analysis",
+    description: "뉴스 기사 분석",
+    recommendedModel: "claude-haiku",
+  },
+  {
+    callType: "pw:sns_analysis",
+    displayName: "SNS Analysis",
+    description: "SNS 온보딩 분석",
+    recommendedModel: "claude-sonnet",
+  },
+  {
+    callType: "persona:character_gen",
+    displayName: "Character Gen",
+    description: "페르소나 캐릭터 생성",
+    recommendedModel: "claude-sonnet",
+  },
+  {
+    callType: "qualitative",
+    displayName: "Qualitative",
+    description: "정성적 매칭 분석",
+    recommendedModel: "claude-sonnet",
+  },
+  {
+    callType: "arena_judgment",
+    displayName: "Arena Judge",
+    description: "아레나 판정",
+    recommendedModel: "claude-sonnet",
+  },
+  {
+    callType: "cold_start_summary",
+    displayName: "Cold Start",
+    description: "콜드스타트 요약",
+    recommendedModel: "claude-haiku",
+  },
+]
 
 // ── 기본 모델 정의 ────────────────────────────────────────────
 
@@ -147,6 +245,7 @@ export function createModelConfig(overrides?: Partial<ModelConfig>): ModelConfig
         { percent: 100, notified: false, notifiedAt: null },
       ],
     },
+    callTypeOverrides: overrides?.callTypeOverrides ?? {},
   }
 }
 
@@ -173,6 +272,30 @@ export function resolveModel(config: ModelConfig, taskType: TaskType): ModelSpec
   throw new Error(
     `태스크 '${taskType}'에 사용 가능한 모델이 없습니다. 기본: ${rule.primaryModel}, 대체: ${rule.fallbackModel ?? "없음"}`
   )
+}
+
+/**
+ * callType 기반으로 실제 API 모델 ID를 해석한다.
+ *
+ * 우선순위:
+ * 1. callTypeOverrides[callType] (UI 설정)
+ * 2. defaultModel (글로벌 기본)
+ *
+ * @returns 실제 API 모델 ID (예: "claude-sonnet-4-5-20250929")
+ */
+export function resolveModelForCallType(config: ModelConfig, callType: string | undefined): string {
+  const overrideModel = callType ? config.callTypeOverrides[callType] : undefined
+
+  if (overrideModel) {
+    // 모델이 enabled 상태인지 확인
+    const spec = config.models.find((m) => m.id === overrideModel)
+    if (spec?.enabled) {
+      return MODEL_API_IDS[overrideModel]
+    }
+    // disabled면 defaultModel로 폴백
+  }
+
+  return MODEL_API_IDS[config.defaultModel] ?? MODEL_API_IDS["claude-sonnet"]
 }
 
 // ── 비용 계산 ─────────────────────────────────────────────────

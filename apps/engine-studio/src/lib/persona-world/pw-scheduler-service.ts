@@ -194,13 +194,18 @@ function createSchedulerDataProvider(): SchedulerDataProvider {
         },
       })
 
-      return personas.flatMap((p): SchedulerPersona[] => {
+      let missingVectors = 0
+
+      const result = personas.flatMap((p): SchedulerPersona[] => {
         const layerMap = layerVectorsToMap(p.layerVectors)
         const l1 = layerMap.get("SOCIAL")
         const l2 = layerMap.get("TEMPERAMENT")
         const l3 = layerMap.get("NARRATIVE")
 
-        if (!l1 || !l2 || !l3) return []
+        if (!l1 || !l2 || !l3) {
+          missingVectors++
+          return []
+        }
 
         const vectors: ThreeLayerVector = {
           social: {
@@ -252,6 +257,15 @@ function createSchedulerDataProvider(): SchedulerDataProvider {
           },
         ]
       })
+
+      if (personas.length > 0 || missingVectors > 0) {
+        console.log(
+          `[Scheduler] DB 조회: ACTIVE/STANDARD ${personas.length}명, ` +
+            `벡터 완비 ${result.length}명, 벡터 미완 ${missingVectors}명`
+        )
+      }
+
+      return result
     },
   }
 }

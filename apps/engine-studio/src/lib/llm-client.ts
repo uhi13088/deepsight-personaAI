@@ -6,8 +6,13 @@
 
 import Anthropic from "@anthropic-ai/sdk"
 import { prisma } from "@/lib/prisma"
-import { createSafetyFilter, evaluateFilter } from "@/lib/global-config"
-import type { SafetyFilter, FilterAction } from "@/lib/global-config"
+import {
+  createSafetyFilter,
+  evaluateFilter,
+  createModelConfig,
+  resolveModelForCallType,
+} from "@/lib/global-config"
+import type { SafetyFilter, FilterAction, ModelConfig } from "@/lib/global-config"
 import type { Prisma } from "@/generated/prisma"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
@@ -101,6 +106,50 @@ export function isLLMConfigured(): boolean {
   return !!process.env.ANTHROPIC_API_KEY
 }
 
+// ── 모델 설정 캐시 (DB 읽기 최소화) ──────────────────────────
+
+let _modelConfigCache: { config: ModelConfig; loadedAt: number } | null = null
+const MODEL_CONFIG_CACHE_TTL = 60_000 // 1분
+
+async function loadModelConfigCached(): Promise<ModelConfig> {
+  const now = Date.now()
+  if (_modelConfigCache && now - _modelConfigCache.loadedAt < MODEL_CONFIG_CACHE_TTL) {
+    return _modelConfigCache.config
+  }
+
+  try {
+    const rows = await prisma.systemConfig.findMany({ where: { category: "MODEL" } })
+    if (rows.length === 0) {
+      const config = createModelConfig()
+      _modelConfigCache = { config, loadedAt: now }
+      return config
+    }
+
+    const configMap = Object.fromEntries(rows.map((r) => [r.key, r.value]))
+    const defaults = createModelConfig()
+    const config: ModelConfig = {
+      models: (configMap.models ?? defaults.models) as ModelConfig["models"],
+      routingRules: (configMap.routingRules ??
+        defaults.routingRules) as ModelConfig["routingRules"],
+      defaultModel: (configMap.defaultModel ??
+        defaults.defaultModel) as ModelConfig["defaultModel"],
+      budget: (configMap.budget ?? defaults.budget) as ModelConfig["budget"],
+      callTypeOverrides: (configMap.callTypeOverrides ??
+        defaults.callTypeOverrides) as ModelConfig["callTypeOverrides"],
+    }
+    _modelConfigCache = { config, loadedAt: now }
+    return config
+  } catch {
+    // DB 오류 시 기본값 사용
+    return createModelConfig()
+  }
+}
+
+/** 모델 설정 캐시 무효화 (설정 변경 시 호출) */
+export function invalidateModelConfigCache(): void {
+  _modelConfigCache = null
+}
+
 // ── 시스템 프롬프트 빌더 ─────────────────────────────────────
 
 type SystemBlock = Anthropic.TextBlockParam & {
@@ -183,9 +232,17 @@ const DEFAULT_TEMPERATURE = 0.7
 
 export async function generateText(params: LLMGenerateParams): Promise<LLMGenerateResult> {
   const client = getClient()
-  const model = params.model ?? DEFAULT_MODEL
   const maxTokens = params.maxTokens ?? DEFAULT_MAX_TOKENS
   const temperature = params.temperature ?? DEFAULT_TEMPERATURE
+
+  // 모델 결정: params.model(명시적) → DB callTypeOverrides → DEFAULT_MODEL
+  let model: string
+  if (params.model) {
+    model = params.model
+  } else {
+    const modelConfig = await loadModelConfigCached()
+    model = resolveModelForCallType(modelConfig, params.callType)
+  }
 
   const startTime = Date.now()
   let result: LLMGenerateResult
