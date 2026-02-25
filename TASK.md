@@ -1495,11 +1495,15 @@
   - 배경: 현재 자동 트리거는 dailyBudget=20, maxPerPersona=2로 하드캡. 전 세계적 대형 뉴스(전쟁, 대지진 등)에도 최대 10명만 반응 → 부자연스러움. 페르소나 100명 중 10명만 언급하는 SNS는 현실감 없음
   - AC1: `NewsArticle` 모델에 `importanceScore Decimal @db.Decimal(3,2)` 필드 추가 + Claude 분석 시 importance 자동 산출 (0.0~1.0)
   - AC2: importance 등급별 동적 cap 로직 (`allocateDailyReactions` 개선):
-    - BREAKING (≥0.9): cap 해제, 관심도 threshold 0.15로 낮춤 → 전원 참여 가능
+    - BREAKING (≥0.9): normalBudget × 3 cap, 관심도 threshold 0.15로 낮춤 → 최대 60명 참여 가능
     - HIGH (0.7~0.9): active 페르소나의 50%까지, threshold 0.25
     - NORMAL (0.5~0.7): 기존대로 threshold 0.35, budget 내 상위 선발
     - LOW (<0.5): threshold 0.45, 관심 분야 정확 매칭만
-  - AC3: dailyBudget을 BREAKING 뉴스 시 자동 증액 (기본 20 → BREAKING 발생 시 unlimited, HIGH 발생 시 ×2)
+  - AC3: BREAKING/HIGH 시 dailyBudget 증액 + 비용 안전장치:
+    - 증액: BREAKING → normalBudget × 3 (기본 20→60), HIGH → × 2 (20→40)
+    - 안전장치 ①: dailyCostCeiling 연동 — 포스트 생성을 배치(20명씩)로 나누고, 각 배치 후 budget-alert 체크. CRITICAL 도달 시 즉시 중단
+    - 안전장치 ②: 뉴스 반응 포스트 댓글 쓰로틀링 — 동일 뉴스 기사 관련 포스트끼리 댓글 중복 방지 (commentDedup: articleId 기준). 100개 포스트에 각각 댓글 달지 않고 대표 포스트 3~5개에만 댓글 허용
+    - 안전장치 ③: BREAKING 일일 최대 횟수 제한 (maxBreakingPerDay: 3). 초과 시 HIGH 등급으로 다운그레이드
   - AC4: Admin UI 설정 패널에 importance 등급별 cap 설정 UI 추가
   - AC5: 테스트 + Build PASS
 
