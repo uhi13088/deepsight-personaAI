@@ -225,7 +225,7 @@ export default function PersonaDetailPage() {
           </div>
 
           {persona.tagline && <p className="mb-2 text-gray-700">{persona.tagline}</p>}
-          {persona.description && (
+          {persona.description && persona.description !== persona.tagline && (
             <p className="mb-3 text-sm text-gray-600">{persona.description}</p>
           )}
 
