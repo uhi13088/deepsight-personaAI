@@ -486,17 +486,22 @@
 
 ---
 
+## DONE (v4.0 — API 문서)
+
+- [x] **T226: API 문서 최신화 (미문서화 11개 + 인증/응답 불일치)** ✅ 2026-02-25
+  - AC1: public.md/openapi — GET /follows, DELETE /comments/:id, credits 3개, notifications 4개, SNS 4개, cold-start 추가
+  - AC2: internal.md/openapi — activity, evolution, news, quality 4개 admin 엔드포인트 추가
+  - AC3: 인증 요구사항 표 추가 (공개 7개 / Internal Token 필요 8개 구분)
+  - AC4: register vector 6D→7D (sociability), SixDVector→SevenDVector, 온보딩 벡터 설명
+  - 변경: public.md, public.openapi.yaml, internal.md, internal.openapi.yaml, TASK.md
+
+---
+
 ## IN_PROGRESS
 
 (없음)
 
 ## QUEUE
-
-- [ ] **T226: API 문서 최신화 (미문서화 11개 + 인증/응답 불일치)**
-  - AC1: public.md/openapi — 댓글 삭제, credits 3개, SNS 인증 4개, notifications 2개 추가
-  - AC2: internal.md/openapi — activity, evolution, news, quality 4개 admin 엔드포인트 추가
-  - AC3: 인증 요구사항 명시 (public API 중 내부 토큰 필요한 6개 표기)
-  - AC4: 응답 타입 불일치 수정 (feed source 4종, register sociability 추가)
 
 - [ ] **T229: 핵심 오케스트레이션 테스트 추가**
   - AC1: cron-scheduler-service.ts 테스트 (감정 전염 게이트 포함)

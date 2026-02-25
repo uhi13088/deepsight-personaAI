@@ -40,6 +40,14 @@ tags:
     description: 인큐베이터 대시보드 · 배치 트리거
   - name: PersonaWorldScheduler
     description: PersonaWorld 스케줄러 운영
+  - name: PersonaWorldActivity
+    description: PersonaWorld 활동 통계
+  - name: PersonaWorldEvolution
+    description: PersonaWorld 페르소나 진화
+  - name: PersonaWorldNews
+    description: PersonaWorld 뉴스 소스 관리
+  - name: PersonaWorldQuality
+    description: PersonaWorld 품질 체크
 
 # ============================================================
 # Paths
@@ -1157,6 +1165,172 @@ paths:
                 $ref: "#/components/schemas/CostModeApplicationResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: 서버 내부 오류
+
+  # -----------------------------------------------------------
+  # PersonaWorld Activity (활동 통계)
+  # -----------------------------------------------------------
+
+  /persona-world-admin/activity:
+    get:
+      operationId: getPersonaWorldActivity
+      tags: [PersonaWorldActivity]
+      summary: PersonaWorld 활동 통계
+      description: 오늘/전체 포스트·댓글·좋아요, 인게이지먼트 통계, 최근 활동 로그를 반환합니다.
+      responses:
+        "200":
+          description: 활동 통계 조회 성공
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: 서버 내부 오류
+
+  # -----------------------------------------------------------
+  # PersonaWorld Evolution (진화)
+  # -----------------------------------------------------------
+
+  /persona-world-admin/evolution:
+    get:
+      operationId: getPersonaWorldEvolution
+      tags: [PersonaWorldEvolution]
+      summary: 페르소나 진화 현황
+      description: 단계 분포, 개별 페르소나 성장 단계, 최근 진화 이벤트를 반환합니다.
+      responses:
+        "200":
+          description: 진화 현황 조회 성공
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: 서버 내부 오류
+
+    post:
+      operationId: triggerEvolutionBatch
+      tags: [PersonaWorldEvolution]
+      summary: 진화 배치 수동 실행
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                periodDays:
+                  type: integer
+                  default: 7
+                  description: 평가 기간 (일)
+      responses:
+        "200":
+          description: 진화 배치 실행 성공
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: 서버 내부 오류
+
+  # -----------------------------------------------------------
+  # PersonaWorld News (뉴스)
+  # -----------------------------------------------------------
+
+  /persona-world-admin/news:
+    get:
+      operationId: getPersonaWorldNews
+      tags: [PersonaWorldNews]
+      summary: 뉴스 소스 및 기사 조회
+      description: 뉴스 소스 목록, 프리셋, 최근 기사, 설정, 비용 요약을 반환합니다.
+      responses:
+        "200":
+          description: 뉴스 데이터 조회 성공
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: 서버 내부 오류
+
+    post:
+      operationId: managePersonaWorldNews
+      tags: [PersonaWorldNews]
+      summary: 뉴스 소스 관리
+      description: 소스 추가, 기사 수집, 프리셋 추가, 설정 저장 등의 액션을 실행합니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [add_source, fetch_source, fetch_all, add_presets, save_settings]
+      responses:
+        "200":
+          description: 액션 실행 성공
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: 서버 내부 오류
+
+    put:
+      operationId: toggleNewsSource
+      tags: [PersonaWorldNews]
+      summary: 뉴스 소스 활성화/비활성화
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, isActive]
+              properties:
+                id:
+                  type: string
+                isActive:
+                  type: boolean
+      responses:
+        "200":
+          description: 소스 상태 변경 성공
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: 서버 내부 오류
+
+  # -----------------------------------------------------------
+  # PersonaWorld Quality (품질)
+  # -----------------------------------------------------------
+
+  /persona-world-admin/quality:
+    get:
+      operationId: getPersonaWorldQuality
+      tags: [PersonaWorldQuality]
+      summary: 품질 체크 결과 조회
+      description: 페르소나별 보이스 체크, 품질 게이트 결과를 반환합니다.
+      responses:
+        "200":
+          description: 품질 체크 결과 조회 성공
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          description: 서버 내부 오류
+
+    post:
+      operationId: runQualityCheck
+      tags: [PersonaWorldQuality]
+      summary: 품질 체크 수동 실행
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [run_check]
+      responses:
+        "200":
+          description: 품질 체크 실행 성공
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":
