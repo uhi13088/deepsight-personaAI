@@ -28,6 +28,9 @@ interface NewsSource {
   region: string
   lastFetchAt: string | null
   articleCount: number
+  // T256: 오류 추적
+  consecutiveFailures: number
+  lastError: string | null
 }
 
 interface NewsArticle {
@@ -45,6 +48,7 @@ interface NewsArticle {
 }
 
 interface NewsSettings {
+  autoFetchEnabled: boolean
   autoTriggerEnabled: boolean
   dailyBudget: number
   maxPerPersona: number
@@ -129,6 +133,7 @@ export default function NewsAdminPage() {
     presets: [],
     recentArticles: [],
     settings: {
+      autoFetchEnabled: true,
       autoTriggerEnabled: true,
       dailyBudget: 20,
       maxPerPersona: 2,
@@ -140,6 +145,7 @@ export default function NewsAdminPage() {
   const [loading, setLoading] = useState(true)
   const [fetchingSource, setFetchingSource] = useState<string | null>(null)
   const [triggeringArticle, setTriggeringArticle] = useState<string | null>(null)
+  const [autoFetching, setAutoFetching] = useState(false)
   const [addingSource, setAddingSource] = useState(false)
   const [addingPresets, setAddingPresets] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
@@ -150,6 +156,7 @@ export default function NewsAdminPage() {
 
   // 로컬 설정 임시 상태
   const [localSettings, setLocalSettings] = useState<NewsSettings>({
+    autoFetchEnabled: true,
     autoTriggerEnabled: true,
     dailyBudget: 20,
     maxPerPersona: 2,
@@ -282,6 +289,22 @@ export default function NewsAdminPage() {
     }
   }
 
+  // ── T256: 자동 수집 수동 트리거 ────────────────────────────────
+
+  const handleAutoFetch = async () => {
+    setAutoFetching(true)
+    try {
+      await fetch("/api/internal/persona-world-admin/scheduler", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "news_auto_fetch" }),
+      })
+      await loadData()
+    } finally {
+      setAutoFetching(false)
+    }
+  }
+
   // ── 설정 저장 ──────────────────────────────────────────────────
 
   const handleSaveSettings = async () => {
@@ -313,6 +336,8 @@ export default function NewsAdminPage() {
   }
 
   const { sources, presets, recentArticles, settings, costSummary } = data
+  const errorSources = sources.filter((s) => s.consecutiveFailures > 0)
+  const disabledByError = sources.filter((s) => !s.isActive && s.consecutiveFailures >= 3)
 
   return (
     <div className="space-y-6 p-6">
@@ -335,29 +360,40 @@ export default function NewsAdminPage() {
             variant="outline"
             onClick={handleFetchAll}
             disabled={fetchingSource === "all"}
+            className="text-xs"
           >
             <RefreshCw
-              className={`mr-2 h-4 w-4 ${fetchingSource === "all" ? "animate-spin" : ""}`}
+              className={`mr-1 h-3.5 w-3.5 ${fetchingSource === "all" ? "animate-spin" : ""}`}
             />
-            전체 수집
+            수동 수집
+          </Button>
+          <Button size="sm" onClick={handleAutoFetch} disabled={autoFetching}>
+            <Zap className={`mr-1 h-3.5 w-3.5 ${autoFetching ? "animate-pulse" : ""}`} />
+            {autoFetching ? "수집+반응 중..." : "수집+반응 트리거"}
           </Button>
         </div>
       </div>
 
-      {/* 비용 요약 */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {/* T256: 자동화 상태 요약 */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {[
+          {
+            label: "자동 수집",
+            value: settings.autoFetchEnabled ? "ON" : "OFF",
+            sub: settings.autoFetchEnabled ? "매 시간 cron 실행" : "수동 전용",
+            color: settings.autoFetchEnabled ? "text-emerald-500" : "text-gray-400",
+          },
+          {
+            label: "자동 반응",
+            value: settings.autoTriggerEnabled ? "ON" : "OFF",
+            sub: settings.autoTriggerEnabled ? "수집 후 자동 반응" : "수동 전용",
+            color: settings.autoTriggerEnabled ? "text-emerald-500" : "text-gray-400",
+          },
           {
             label: "오늘 비용",
             value: formatUsd(costSummary.todayCostUsd),
             sub: `${costSummary.todayCallCount}회 호출`,
             color: "text-green-500",
-          },
-          {
-            label: "이번 달",
-            value: formatUsd(costSummary.monthCostUsd),
-            sub: `${costSummary.monthCallCount}회 호출`,
-            color: "text-blue-500",
           },
           {
             label: "일일 예산",
@@ -366,10 +402,10 @@ export default function NewsAdminPage() {
             color: "text-amber-500",
           },
           {
-            label: "자동 트리거",
-            value: settings.autoTriggerEnabled ? "ON" : "OFF",
-            sub: settings.autoTriggerEnabled ? "매일 실행 중" : "수동 전용",
-            color: settings.autoTriggerEnabled ? "text-emerald-500" : "text-gray-400",
+            label: "소스 상태",
+            value: errorSources.length > 0 ? `${errorSources.length} 오류` : "정상",
+            sub: `${sources.filter((s) => s.isActive).length}개 활성 / ${sources.length}개 등록`,
+            color: errorSources.length > 0 ? "text-red-500" : "text-emerald-500",
           },
         ].map((card) => (
           <div key={card.label} className="border-border bg-card rounded-lg border p-3">
@@ -380,6 +416,21 @@ export default function NewsAdminPage() {
         ))}
       </div>
 
+      {/* T256: 오류 소스 경고 */}
+      {disabledByError.length > 0 && (
+        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950">
+          <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-500" />
+          <div>
+            <div className="text-sm font-medium text-red-700 dark:text-red-400">
+              {disabledByError.length}개 소스 자동 비활성화
+            </div>
+            <div className="mt-0.5 text-xs text-red-600 dark:text-red-500">
+              3회 연속 수집 실패로 비활성화됨: {disabledByError.map((s) => s.name).join(", ")}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* T200-B: 설정 패널 (인큐베이터 스타일) */}
       {showSettings && (
         <div className="border-border bg-card space-y-4 rounded-lg border p-4">
@@ -388,12 +439,26 @@ export default function NewsAdminPage() {
             뉴스 반응 설정
           </h2>
 
+          {/* T256: 자동 수집 ON/OFF */}
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium">자동 수집</div>
+              <div className="text-muted-foreground text-xs">
+                매 시간 cron → 전체 활성 소스 RSS 기사 자동 수집
+              </div>
+            </div>
+            <Toggle
+              enabled={localSettings.autoFetchEnabled}
+              onChange={(v) => setLocalSettings((s) => ({ ...s, autoFetchEnabled: v }))}
+            />
+          </div>
+
           {/* 자동 트리거 ON/OFF */}
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium">자동 트리거</div>
+              <div className="text-sm font-medium">자동 반응</div>
               <div className="text-muted-foreground text-xs">
-                매일 cron → 헤드라인 수집 → 자동 반응 포스트 생성
+                수집 후 자동으로 페르소나 반응 포스트 생성
               </div>
             </div>
             <Toggle
@@ -631,7 +696,16 @@ export default function NewsAdminPage() {
         ) : (
           <div className="divide-border divide-y">
             {sources.map((source) => (
-              <div key={source.id} className="flex items-center justify-between py-2.5">
+              <div
+                key={source.id}
+                className={`flex items-center justify-between py-2.5 ${
+                  source.consecutiveFailures >= 3
+                    ? "rounded bg-red-50 px-2 dark:bg-red-950"
+                    : source.consecutiveFailures > 0
+                      ? "rounded bg-amber-50 px-2 dark:bg-amber-950"
+                      : ""
+                }`}
+              >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">{source.name}</span>
@@ -641,20 +715,38 @@ export default function NewsAdminPage() {
                     <Badge variant="outline" className="text-xs">
                       {source.articleCount}개
                     </Badge>
-                    {!source.isActive && (
+                    {!source.isActive && source.consecutiveFailures >= 3 && (
+                      <Badge className="bg-red-100 text-xs text-red-700">자동 비활성화</Badge>
+                    )}
+                    {!source.isActive && source.consecutiveFailures < 3 && (
                       <Badge variant="secondary" className="text-xs">
                         비활성
+                      </Badge>
+                    )}
+                    {source.consecutiveFailures > 0 && source.consecutiveFailures < 3 && (
+                      <Badge className="bg-amber-100 text-xs text-amber-700">
+                        실패 {source.consecutiveFailures}회
                       </Badge>
                     )}
                   </div>
                   <p className="text-muted-foreground mt-0.5 max-w-sm truncate text-xs">
                     {source.rssUrl}
                   </p>
-                  {source.lastFetchAt && (
-                    <p className="text-muted-foreground text-xs">
-                      마지막 수집: {new Date(source.lastFetchAt).toLocaleString("ko-KR")}
-                    </p>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {source.lastFetchAt && (
+                      <p className="text-muted-foreground text-xs">
+                        마지막 수집: {new Date(source.lastFetchAt).toLocaleString("ko-KR")}
+                      </p>
+                    )}
+                    {source.lastError && (
+                      <p
+                        className="max-w-xs truncate text-xs text-red-500"
+                        title={source.lastError}
+                      >
+                        오류: {source.lastError}
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <div className="ml-4 flex items-center gap-2">
                   <Button

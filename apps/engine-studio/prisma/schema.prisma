@@ -2291,15 +2291,18 @@ enum CoinTransactionStatus {
 // ============================================
 
 model NewsSource {
-  id          String        @id @default(cuid())
-  name        String
-  rssUrl      String        @unique
-  isActive    Boolean       @default(true)
+  id                  String        @id @default(cuid())
+  name                String
+  rssUrl              String        @unique
+  isActive            Boolean       @default(true)
   // T199: 지역 코드 — "KR" | "JP" | "US" | "EU" | "CN" | "GLOBAL"
-  region      String        @default("GLOBAL")
-  lastFetchAt DateTime?
-  articles    NewsArticle[]
-  createdAt   DateTime      @default(now())
+  region              String        @default("GLOBAL")
+  lastFetchAt         DateTime?
+  // T256: 오류 추적 — 3회 연속 실패 시 자동 비활성화
+  consecutiveFailures Int           @default(0)
+  lastError           String?
+  articles            NewsArticle[]
+  createdAt           DateTime      @default(now())
 
   @@map("news_sources")
 }

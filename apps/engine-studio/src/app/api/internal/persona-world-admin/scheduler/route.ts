@@ -8,6 +8,7 @@ import {
   triggerNewsArticle,
   runDailyNewsReactionPipeline,
   triggerContagionManual,
+  runNewsAutoFetchManual,
 } from "@/lib/persona-world/admin/scheduler-service"
 
 export async function GET() {
@@ -110,6 +111,12 @@ export async function POST(request: NextRequest) {
           maxPerPersona,
           withinHours,
         })
+        return NextResponse.json({ success: true, data })
+      }
+
+      // T256: 뉴스 자동 수집 수동 트리거
+      case "news_auto_fetch": {
+        const data = await runNewsAutoFetchManual()
         return NextResponse.json({ success: true, data })
       }
 

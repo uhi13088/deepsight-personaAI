@@ -511,48 +511,44 @@
 > 온보딩/데일리 질문으로 획득한 코인을 사용할 수 있는 상점 시스템
 > 카테고리: 페르소나 관련 + 프로필 꾸미기
 
-- [ ] **T157: 크레딧 상점 페이지 + 구매 시스템**
-  - 배경: 현재 코인이 쌓이기만 하고 사용처가 없음. 상점을 통해 코인 소비 경로 제공
-  - AC1: `shop.ts` — ShopItem 타입 + SHOP_ITEMS 정적 데이터 (페르소나 4종 + 프로필 7종, 반복구매 플래그)
-  - AC2: `user-store.ts` — purchasedItems 상태 + purchaseItem(크레딧 차감+아이템 추가) + hasPurchased 헬퍼
-  - AC3: `/shop` 페이지 — 코인 잔액 표시 + 카테고리 탭(페르소나/프로필) + 아이템 그리드 + 구매 확인 다이얼로그
-  - AC4: 프로필 페이지 연동 — 코인 옆 "상점" 링크 + 구매한 배지/프레임/닉네임 그라데이션 렌더링
-  - AC5: middleware.ts `/shop` 라우트 추가
-  - AC6: Build PASS + 테스트 PASS
+- [x] **T157: 크레딧 상점 페이지 + 구매 시스템** ✅ 2026-02-25
+  - AC1: ✅ `shop.ts` — ShopItem 타입 + SHOP_ITEMS 정적 데이터 (페르소나 4종 + 프로필 7종, 반복구매 플래그)
+  - AC2: ✅ `user-store.ts` — purchasedItems 상태 + purchaseItem(크레딧 차감+아이템 추가) + hasPurchased 헬퍼
+  - AC3: ✅ `/shop` 페이지 — 코인 잔액 표시 + 카테고리 탭(페르소나/프로필) + 아이템 그리드 + 구매 확인 다이얼로그
+  - AC4: ✅ 프로필 페이지 연동 — 코인 옆 "상점" 링크 + 구매한 배지/프레임/닉네임 그라데이션 렌더링
+  - AC5: ✅ middleware.ts `/shop` 라우트 추가
+  - AC6: ✅ Build PASS + 105파일 4231 tests PASS
 
 ### Phase PW-F: PersonaWorld 설정 + 실결제 시스템 (T164~T166)
 
 > 알림 제어 + 코인 실결제 + 설정 페이지 통합
 > Toss Payments 연동 (developer-console 패턴 재사용)
 
-- [ ] **T164: 알림 환경설정 — 유형별 ON/OFF + 방해금지 모드**
-  - 배경: 현재 8종 알림이 모두 자동 전송되며 유저가 제어할 수 없음
-  - AC1: Prisma `PWNotificationPreference` 모델 (userId 1:1, 8종 boolean, quietHoursStart/End Int?) + SQL 마이그레이션
-  - AC2: `notification-preference.ts` — getPreferences, updatePreferences, shouldDeliver(type, userId) 체크 로직
-  - AC3: API — `GET/PUT /api/persona-world/notification-preferences` (userId 기반)
-  - AC4: `/settings/notifications` 페이지 — 8종 토글 스위치 + 방해금지 시간대 선택 (시작/종료 시간)
-  - AC5: middleware.ts `/settings` 라우트 추가
-  - AC6: Build PASS + 테스트 PASS
+- [x] **T164: 알림 환경설정 — 유형별 ON/OFF + 방해금지 모드** ✅ 2026-02-25
+  - AC1: ✅ Prisma `PWNotificationPreference` 모델 + SQL 마이그레이션
+  - AC2: ✅ `notification-preference.ts` — getPreferences, updatePreferences, shouldDeliver 체크 로직
+  - AC3: ✅ API — `GET/PUT /api/persona-world/notification-preferences`
+  - AC4: ✅ `/settings/notifications` 페이지 — 8종 토글 스위치 + 방해금지 시간대
+  - AC5: ✅ middleware.ts `/settings` 라우트 추가
+  - AC6: ✅ Build PASS + 테스트 PASS
 
-- [ ] **T165: 크레딧 실결제 — Toss Payments 연동 코인 충전**
-  - 배경: 현재 코인이 온보딩/데일리로만 획득. 실결제로 추가 구매 필요
-  - AC1: Prisma `CoinTransaction` 모델 (userId, type: EARN/PURCHASE/SPEND, amount, balanceAfter, orderId?, paymentKey?, status) + SQL 마이그레이션
-  - AC2: `coin-packages.ts` — 코인 패키지 4종 (100코인 ₩1,100 / 500코인 ₩4,900 / 1,000코인 ₩8,900 / 3,000코인 ₩23,900) + 보너스율
-  - AC3: `credit-service.ts` — getBalance(userId), addCredits(userId, amount, type), spendCredits(userId, amount, reason), getTransactionHistory(userId)
-  - AC4: API — `POST /api/persona-world/credits/purchase` (Toss 결제 요청) + `POST /api/persona-world/credits/toss-confirm` (결제 확인 + 코인 충전)
-  - AC5: `/shop` 페이지에 "코인 충전" 섹션 추가 — 패키지 카드 4종 + Toss 결제 위젯 연동
-  - AC6: `user-store.ts` — creditsBalance DB 동기화 (fetchBalance, 구매 후 갱신)
-  - AC7: 환경변수: `NEXT_PUBLIC_TOSS_CLIENT_KEY` (PW), `TOSS_CLIENT_KEY` + `TOSS_SECRET_KEY` (ES)
-  - AC8: Build PASS + 테스트 PASS
+- [x] **T165: 크레딧 실결제 — Toss Payments 연동 코인 충전** ✅ 2026-02-25
+  - AC1: ✅ Prisma `CoinTransaction` 모델 + SQL 마이그레이션
+  - AC2: ✅ `coin-packages.ts` — 코인 패키지 4종 + 보너스율
+  - AC3: ✅ `credit-service.ts` — getBalance, addCredits, spendCredits, getTransactionHistory
+  - AC4: ✅ API — credits/route.ts + credits/toss-confirm/route.ts
+  - AC5: ✅ `/shop` 페이지에 "코인 충전" 섹션 — 패키지 카드 4종 + Toss SDK 연동
+  - AC6: ✅ `user-store.ts` — creditsBalance DB 동기화 (fetchBalance, 구매 후 갱신)
+  - AC7: ✅ 환경변수 NEXT_PUBLIC_TOSS_CLIENT_KEY, TOSS_CLIENT_KEY, TOSS_SECRET_KEY
+  - AC8: ✅ Build PASS + 테스트 PASS
 
-- [ ] **T166: 프로필 설정 페이지 — 계정/알림/결제 통합**
-  - 배경: 현재 프로필에 "데이터 초기화"와 "로그아웃"만 있음. 설정 전용 페이지 필요
-  - AC1: `/settings` 페이지 라우트 — 3탭 (계정, 알림, 결제)
-  - AC2: 계정 탭 — 닉네임 변경, 데이터 초기화, 로그아웃
-  - AC3: 알림 탭 — T164 알림 설정 컴포넌트 임베드
-  - AC4: 결제 탭 — 코인 잔액, 충전 내역 (CoinTransaction 목록), 상점 바로가기
-  - AC5: 프로필 페이지 톱니바퀴 → `/settings` 링크로 변경
-  - AC6: Build PASS + 테스트 PASS
+- [x] **T166: 프로필 설정 페이지 — 계정/알림/결제 통합** ✅ 2026-02-25
+  - AC1: ✅ `/settings` 페이지 라우트 — 3탭 (계정, 알림, 결제)
+  - AC2: ✅ 계정 탭 — 닉네임 변경, 데이터 초기화, 로그아웃
+  - AC3: ✅ 알림 탭 — T164 알림 설정 컴포넌트 임베드
+  - AC4: ✅ 결제 탭 — 코인 잔액, 충전 내역 (CoinTransaction 목록), 상점 바로가기
+  - AC5: ✅ 프로필 페이지 톱니바퀴 → `/settings` 링크로 변경
+  - AC6: ✅ Build PASS + 테스트 PASS
 
 ### Phase X: 모노레포 공유 패키지 추출 (T230~T233)
 
@@ -1491,32 +1487,11 @@
 > (1) 자동 트리거 일일 예산 고정 → importance 기반 동적 스케일링
 > (2) RSS 소스 완전 수동 관리 → 자동 등록 + cron 수집
 
-- [ ] **T255: 뉴스 반응 동적 스케일링 — importance 기반 reactor 인원 결정**
-  - 배경: 현재 자동 트리거는 dailyBudget=20, maxPerPersona=2로 하드캡. 전 세계적 대형 뉴스(전쟁, 대지진 등)에도 최대 10명만 반응 → 부자연스러움. 페르소나 100명 중 10명만 언급하는 SNS는 현실감 없음
-  - AC1: `NewsArticle` 모델에 `importanceScore Decimal @db.Decimal(3,2)` 필드 추가 + Claude 분석 시 importance 자동 산출 (0.0~1.0)
-  - AC2: importance 등급별 동적 cap 로직 (`allocateDailyReactions` 개선):
-    - BREAKING (≥0.9): normalBudget × 3 cap, 관심도 threshold 0.15로 낮춤 → 최대 60명 참여 가능
-    - HIGH (0.7~0.9): active 페르소나의 50%까지, threshold 0.25
-    - NORMAL (0.5~0.7): 기존대로 threshold 0.35, budget 내 상위 선발
-    - LOW (<0.5): threshold 0.45, 관심 분야 정확 매칭만
-  - AC3: BREAKING/HIGH 시 dailyBudget 증액 + 비용 안전장치:
-    - 증액: BREAKING → normalBudget × 3 (기본 20→60), HIGH → × 2 (20→40)
-    - 안전장치 ①: dailyCostCeiling 연동 — 포스트 생성을 배치(20명씩)로 나누고, 각 배치 후 budget-alert 체크. CRITICAL 도달 시 즉시 중단
-    - 안전장치 ②: 뉴스 반응 포스트 댓글 쓰로틀링 — 동일 뉴스 기사 관련 포스트끼리 댓글 중복 방지 (commentDedup: articleId 기준). 100개 포스트에 각각 댓글 달지 않고 대표 포스트 3~5개에만 댓글 허용
-    - 안전장치 ③: BREAKING 일일 최대 횟수 제한 (maxBreakingPerDay: 3). 초과 시 HIGH 등급으로 다운그레이드
-  - AC4: Admin UI 설정 패널에 importance 등급별 cap 설정 UI 추가
-  - AC5: 테스트 + Build PASS
+- [x] **T255: 뉴스 반응 동적 스케일링 — importance 기반 reactor 인원 결정** ✅ 2026-02-25
+  - (DONE 섹션에 상세 기록)
 
-- [ ] **T256: RSS 소스 자동화 — 프리셋 자동 등록 + cron 기반 수집**
-  - 배경: 현재 RSS 소스 관리가 완전 수동 (소스 추가, 개별 수집 버튼, 토글). 관리자가 매번 "전체 수집" 누르는 구조. 자동화 약속 미이행
-  - AC1: 프리셋 RSS 소스 자동 시드 — 최초 앱 기동 시 (또는 NewsSource 0건 시) 프리셋 목록 자동 INSERT + `isActive: true`
-  - AC2: cron 기반 자동 수집 — 스케줄러 API에 `news_auto_fetch` 액션 추가, 설정된 주기(기본 1시간)로 전체 active 소스 자동 수집
-  - AC3: 수집 후 자동 반응 트리거 — `autoTriggerEnabled=true`일 때 신규 기사 수집 즉시 `runDailyNewsReactions()` 연쇄 호출
-  - AC4: Admin UI 역할 전환 — "소스 추가/수집" 중심 → "모니터링/예외 처리" 중심:
-    - 자동 수집 상태 표시 (마지막 수집 시각, 다음 예정, 성공/실패 카운트)
-    - 오류 소스 하이라이트 (3회 연속 실패 시 자동 비활성화 + 경고)
-    - 수동 "전체 수집" 버튼은 유지하되 보조 역할로 이동
-  - AC5: 테스트 + Build PASS
+- [x] **T256: RSS 소스 자동화 — 프리셋 자동 등록 + cron 기반 수집** ✅ 2026-02-25
+  - (DONE 섹션에 상세 기록)
 
 ---
 
@@ -1527,6 +1502,20 @@
 ---
 
 ## ✅ DONE (최근 완료)
+
+- [x] **T256: RSS 소스 자동화 — 프리셋 자동 등록 + cron 기반 수집** ✅ 2026-02-25
+  - AC1: ✅ 스키마에 `consecutiveFailures`, `lastError` 필드 추가 + 마이그레이션 036
+  - AC2: ✅ `news-auto-fetch.ts` 서비스 (프리셋 15개 자동 시드 + executeNewsAutoFetch 전체 수집)
+    - 소스별 오류 추적: 3회 연속 실패 시 자동 비활성화
+    - cron-scheduler-service에 통합 (매 시간 자동 실행)
+    - scheduler route에 `news_auto_fetch` 액션 추가
+  - AC3: ✅ 수집 후 자동 반응 트리거 — `autoTriggerEnabled !== false`일 때 reactionRunner 연쇄 호출
+  - AC4: ✅ Admin UI 모니터링 전환
+    - 5-card 모니터링 대시보드 (자동수집, 자동반응, 비용, 예산, 소스상태)
+    - 오류 소스 하이라이트 (amber/red) + 경고 배너
+    - autoFetchEnabled 설정 토글 추가
+  - AC5: ✅ 106파일 4248 tests PASS, Build 106 pages PASS
+  - 변경파일: schema.prisma, 036_news_source_error_tracking.sql, news-auto-fetch.ts, news/index.ts, cron-scheduler-service.ts, scheduler-service.ts, scheduler/route.ts, news/route.ts, news/page.tsx, news-auto-fetch.test.ts
 
 - [x] **T255: 뉴스 반응 동적 스케일링 — importance 기반 reactor 인원 결정** ✅ 2026-02-25
   - AC1: ✅ importanceScore Float→Decimal @db.Decimal(3,2) 마이그레이션 + Number() 래핑
