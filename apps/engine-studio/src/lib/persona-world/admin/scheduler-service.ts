@@ -50,10 +50,46 @@ import type {
   NodeTopology,
 } from "@/lib/persona-world/emotional-contagion"
 
+// ── Scheduler enabled flag (DB-backed) ──────────────────────────
+
+const SCHEDULER_CONFIG_CATEGORY = "SCHEDULER"
+const SCHEDULER_ENABLED_KEY = "enabled"
+
+/** DB에서 스케줄러 활성화 상태 조회 (기본: false — 명시적으로 켜야 동작) */
+export async function isSchedulerEnabled(): Promise<boolean> {
+  try {
+    const row = await prisma.systemConfig.findUnique({
+      where: {
+        category_key: { category: SCHEDULER_CONFIG_CATEGORY, key: SCHEDULER_ENABLED_KEY },
+      },
+    })
+    return row?.value === true
+  } catch {
+    return false
+  }
+}
+
+/** DB에 스케줄러 활성화 상태 저장 */
+export async function setSchedulerEnabled(enabled: boolean): Promise<void> {
+  await prisma.systemConfig.upsert({
+    where: {
+      category_key: { category: SCHEDULER_CONFIG_CATEGORY, key: SCHEDULER_ENABLED_KEY },
+    },
+    update: { value: enabled },
+    create: {
+      category: SCHEDULER_CONFIG_CATEGORY,
+      key: SCHEDULER_ENABLED_KEY,
+      value: enabled,
+    },
+  })
+}
+
 // ── Result types ─────────────────────────────────────────────────
 
 export interface SchedulerStatusData {
   isActive: boolean
+  /** 서버 스케줄러가 DB에서 활성화되어 있는지 */
+  schedulerEnabled: boolean
   activePersonaCount: number
   pausedPersonas: Array<{ id: string; name: string }>
   todayPostCount: number
@@ -110,8 +146,10 @@ export async function getSchedulerStatus(): Promise<SchedulerStatusData> {
     createdAt: Date
   }> = []
 
+  let enabled = false
+
   try {
-    ;[activePersonaCount, pausedPersonas, todayPostCount, recentLogs] = await Promise.all([
+    ;[activePersonaCount, pausedPersonas, todayPostCount, recentLogs, enabled] = await Promise.all([
       prisma.persona.count({ where: { status: { in: ["ACTIVE", "STANDARD"] } } }),
       prisma.persona.findMany({
         where: { status: "PAUSED" },
@@ -123,6 +161,7 @@ export async function getSchedulerStatus(): Promise<SchedulerStatusData> {
         orderBy: { createdAt: "desc" },
         take: 20,
       }),
+      isSchedulerEnabled(),
     ])
   } catch {
     // DB not ready — return empty data
@@ -132,6 +171,7 @@ export async function getSchedulerStatus(): Promise<SchedulerStatusData> {
 
   return {
     isActive: activePersonaCount > 0,
+    schedulerEnabled: enabled,
     activePersonaCount,
     pausedPersonas,
     todayPostCount,

@@ -22,6 +22,7 @@ import { getConsumptionContext } from "@/lib/persona-world/consumption-manager"
 import { getPersonaState } from "@/lib/persona-world/state-manager"
 import { resolveMentions, notifyMentions } from "@/lib/persona-world/mention-service"
 import { layerVectorsToMap } from "@/lib/vector/dim-maps"
+import { isSchedulerEnabled } from "@/lib/persona-world/admin/scheduler-service"
 
 // ── Input/Result types ──────────────────────────────────────────
 
@@ -49,6 +50,18 @@ export interface PwSchedulerResult {
 // ── Main execution ──────────────────────────────────────────────
 
 export async function executePwScheduler(input: PwSchedulerInput): Promise<PwSchedulerResult> {
+  // 스케줄러 비활성화 상태면 즉시 반환 (수동 트리거 제외)
+  if (input.trigger === "SCHEDULED") {
+    const enabled = await isSchedulerEnabled()
+    if (!enabled) {
+      console.log("[Scheduler] 스케줄러가 비활성화 상태입니다. 실행 건너뜀.")
+      return {
+        decisions: [],
+        execution: { postsCreated: [], interactions: [], llmAvailable: false },
+      }
+    }
+  }
+
   const context: SchedulerContext = {
     trigger: input.trigger,
     currentHour: input.currentHour,
