@@ -40,7 +40,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q01-depth-openness',
   'Q01-depth↔openness-탐구 스타일',
-  'LIGHT', 1,
+  'QUICK', 1,
   '3일간 자유 시간이 주어졌습니다. 어떤 프로젝트에 몰두하고 싶나요?',
   'MULTIPLE_CHOICE',
   '[
@@ -60,7 +60,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q02-lens-neuroticism',
   'Q02-lens↔neuroticism-결정 방식',
-  'LIGHT', 2,
+  'QUICK', 2,
   '인생의 중요한 결정(이직, 이사 등)을 앞두고 있습니다. 당신의 접근 방식은?',
   'MULTIPLE_CHOICE',
   '[
@@ -80,7 +80,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q03-stance-agreeableness',
   'Q03-stance↔agreeableness-팀 의사결정',
-  'LIGHT', 3,
+  'QUICK', 3,
   '팀 회의에서 다수의 의견이 당신의 분석과 충돌합니다. 당신은?',
   'MULTIPLE_CHOICE',
   '[
@@ -100,7 +100,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q04-scope-conscientiousness',
   'Q04-scope↔conscientiousness-프로젝트 접근',
-  'LIGHT', 4,
+  'QUICK', 4,
   '새로운 프로젝트를 시작할 때 당신의 접근 방식은?',
   'MULTIPLE_CHOICE',
   '[
@@ -120,7 +120,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q05-taste-openness',
   'Q05-taste↔openness-문화생활 태도',
-  'LIGHT', 5,
+  'QUICK', 5,
   '문화생활(음악, 영화, 전시 등)에 대한 당신의 태도는?',
   'MULTIPLE_CHOICE',
   '[
@@ -140,7 +140,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q06-purpose-conscientiousness',
   'Q06-purpose↔conscientiousness-소비 패턴',
-  'LIGHT', 6,
+  'QUICK', 6,
   '콘텐츠 소비 패턴에 가장 가까운 것은?',
   'MULTIPLE_CHOICE',
   '[
@@ -160,7 +160,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q07-sociability-extraversion',
   'Q07-sociability↔extraversion-공유 성향',
-  'LIGHT', 7,
+  'QUICK', 7,
   '인상 깊은 경험을 한 후 당신의 반응은?',
   'MULTIPLE_CHOICE',
   '[
@@ -179,7 +179,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q08-complex-cross',
   'Q08-복합-평론 갈등 상황',
-  'LIGHT', 8,
+  'QUICK', 8,
   '기대하던 영화가 평론가 호평과 관객 혹평으로 갈렸습니다. 당신의 반응은?',
   'MULTIPLE_CHOICE',
   '[
@@ -203,7 +203,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q09-openness-taste-l3',
   'Q09-openness+taste+L3-전환 기회',
-  'LIGHT', 9,
+  'QUICK', 9,
   '만약 지금과 전혀 다른 분야로 전환할 기회가 주어진다면?',
   'MULTIPLE_CHOICE',
   '[
@@ -222,7 +222,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q10-conscientiousness-scope-l3',
   'Q10-conscientiousness+scope+L3-마감 압박',
-  'LIGHT', 10,
+  'QUICK', 10,
   '프로젝트 마감 3일 전, 결과물 품질이 기대에 못 미칩니다. 당신은?',
   'MULTIPLE_CHOICE',
   '[
@@ -241,7 +241,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q11-extraversion-sociability-l3',
   'Q11-extraversion+sociability+L3-연휴 계획',
-  'LIGHT', 11,
+  'QUICK', 11,
   '긴 연휴가 주어졌을 때, 가장 하고 싶은 것은?',
   'MULTIPLE_CHOICE',
   '[
@@ -260,7 +260,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q12-agreeableness-stance-l3',
   'Q12-agreeableness+stance+L3-도덕 딜레마',
-  'LIGHT', 12,
+  'QUICK', 12,
   '존경하던 사람의 도덕적 문제가 밝혀졌을 때, 당신은?',
   'MULTIPLE_CHOICE',
   '[
@@ -279,7 +279,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q13-neuroticism-lens-l3',
   'Q13-neuroticism+lens+L3-실패 반응',
-  'MEDIUM', 13,
+  'STANDARD', 13,
   '큰 실패를 경험한 직후, 당신의 반응은?',
   'MULTIPLE_CHOICE',
   '[
@@ -298,7 +298,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q14-openness-extraversion-l3',
   'Q14-openness+extraversion+L3-커뮤니티 참여',
-  'MEDIUM', 14,
+  'STANDARD', 14,
   '완전히 새로운 분야의 커뮤니티에 초대받았을 때?',
   'MULTIPLE_CHOICE',
   '[
@@ -317,7 +317,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q15-conscientiousness-agreeableness-l3',
   'Q15-conscientiousness+agreeableness+L3-팀원 발견',
-  'MEDIUM', 15,
+  'STANDARD', 15,
   '팀원이 의도적으로 일을 대충 하는 것을 발견했을 때?',
   'MULTIPLE_CHOICE',
   '[
@@ -336,7 +336,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q16-neuroticism-openness-l3',
   'Q16-neuroticism+openness+L3-인생관 충격',
-  'MEDIUM', 16,
+  'STANDARD', 16,
   '인생관을 뒤흔드는 콘텐츠(책, 영화, 강연)를 접했을 때?',
   'MULTIPLE_CHOICE',
   '[
@@ -361,7 +361,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q17-paradox-depth-openness',
   'Q17-역설검증-depth↔openness',
-  'MEDIUM', 17,
+  'STANDARD', 17,
   '이상적인 학습 방식을 하나만 고른다면?',
   'MULTIPLE_CHOICE',
   '[
@@ -381,7 +381,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q18-paradox-lens-neuroticism',
   'Q18-역설검증-lens↔neuroticism',
-  'MEDIUM', 18,
+  'STANDARD', 18,
   '감정적으로 힘든 친구의 고민을 들을 때, 당신의 방식은?',
   'MULTIPLE_CHOICE',
   '[
@@ -401,7 +401,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q19-paradox-stance-agreeableness',
   'Q19-역설검증-stance↔agreeableness',
-  'MEDIUM', 19,
+  'STANDARD', 19,
   '존경하는 사람이 당신과 정반대 의견을 강하게 주장합니다.',
   'MULTIPLE_CHOICE',
   '[
@@ -421,7 +421,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q20-paradox-scope-conscientiousness',
   'Q20-역설검증-scope↔conscientiousness',
-  'MEDIUM', 20,
+  'STANDARD', 20,
   '대규모 이벤트(여행, 프로젝트)를 준비할 때 당신은?',
   'MULTIPLE_CHOICE',
   '[
@@ -441,7 +441,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q21-paradox-taste-openness',
   'Q21-역설검증-taste↔openness',
-  'MEDIUM', 21,
+  'STANDARD', 21,
   '음식, 음악, 패션 등 취향과 실제 생활방식을 비교하면?',
   'MULTIPLE_CHOICE',
   '[
@@ -461,7 +461,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q22-paradox-purpose-conscientiousness',
   'Q22-역설검증-purpose↔conscientiousness',
-  'MEDIUM', 22,
+  'STANDARD', 22,
   '하루 일과를 돌아보면, 콘텐츠는 주로 어떤 역할인가요?',
   'MULTIPLE_CHOICE',
   '[
@@ -481,7 +481,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q23-paradox-sociability-extraversion',
   'Q23-역설검증-sociability↔extraversion',
-  'MEDIUM', 23,
+  'STANDARD', 23,
   '새로운 사교 모임에 가게 되었을 때, 당신의 패턴은?',
   'MULTIPLE_CHOICE',
   '[
@@ -501,7 +501,7 @@ INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder
 VALUES (
   'v3-q24-l3-comprehensive',
   'Q24-L3종합-삶의 태도',
-  'MEDIUM', 24,
+  'STANDARD', 24,
   '가장 공감되는 삶의 태도는?',
   'MULTIPLE_CHOICE',
   '[

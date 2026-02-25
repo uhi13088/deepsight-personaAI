@@ -28,7 +28,7 @@ DO $$ BEGIN CREATE TYPE "PersonaSource" AS ENUM ('MANUAL', 'INCUBATOR', 'MUTATIO
 DO $$ BEGIN CREATE TYPE "ExpertiseLevel" AS ENUM ('CASUAL', 'ENTHUSIAST', 'EXPERT', 'CRITIC'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE "PostFrequency" AS ENUM ('RARE', 'OCCASIONAL', 'MODERATE', 'ACTIVE', 'HYPERACTIVE'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE "LayerType" AS ENUM ('SOCIAL', 'TEMPERAMENT', 'NARRATIVE'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "OnboardingLevel" AS ENUM ('LIGHT', 'MEDIUM', 'DEEP'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "OnboardingLevel" AS ENUM ('QUICK', 'STANDARD', 'DEEP'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 매칭 알고리즘
 DO $$ BEGIN CREATE TYPE "AlgorithmType" AS ENUM ('COSINE', 'WEIGHTED', 'CONTEXT', 'HYBRID'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
@@ -380,7 +380,7 @@ CREATE INDEX IF NOT EXISTS "persona_layer_vectors_layerType_idx"
 CREATE TABLE IF NOT EXISTS "user_vectors" (
   "id" TEXT NOT NULL,
   "userId" TEXT NOT NULL,
-  "onboardingLevel" "OnboardingLevel" NOT NULL DEFAULT 'LIGHT',
+  "onboardingLevel" "OnboardingLevel" NOT NULL DEFAULT 'QUICK',
   "depth" DECIMAL(3,2) NOT NULL,
   "lens" DECIMAL(3,2) NOT NULL,
   "stance" DECIMAL(3,2) NOT NULL,

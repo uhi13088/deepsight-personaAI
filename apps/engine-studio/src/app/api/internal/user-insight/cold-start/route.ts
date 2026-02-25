@@ -174,7 +174,8 @@ export async function GET() {
       success: true,
       data: { sets: s.sets },
     })
-  } catch {
+  } catch (err) {
+    console.error("[Cold Start GET] 데이터 조회 실패:", err)
     return NextResponse.json<ApiResponse<never>>(
       {
         success: false,
@@ -318,7 +319,8 @@ export async function POST(request: NextRequest) {
       },
       { status: 400 }
     )
-  } catch {
+  } catch (err) {
+    console.error("[Cold Start POST] 작업 실패:", err)
     return NextResponse.json<ApiResponse<never>>(
       {
         success: false,
