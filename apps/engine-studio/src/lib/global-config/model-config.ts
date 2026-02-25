@@ -222,6 +222,13 @@ export const DEFAULT_ROUTING_RULES: RoutingRule[] = [
   },
 ]
 
+// ── 추천 모델 기반 기본 callTypeOverrides ──────────────────────
+
+/** KNOWN_CALL_TYPES의 recommendedModel을 기반으로 기본 오버라이드 생성 */
+export function buildDefaultCallTypeOverrides(): CallTypeModelOverrides {
+  return Object.fromEntries(KNOWN_CALL_TYPES.map((ct) => [ct.callType, ct.recommendedModel]))
+}
+
 // ── 모델 설정 생성 ────────────────────────────────────────────
 
 export function createModelConfig(overrides?: Partial<ModelConfig>): ModelConfig {
@@ -245,7 +252,7 @@ export function createModelConfig(overrides?: Partial<ModelConfig>): ModelConfig
         { percent: 100, notified: false, notifiedAt: null },
       ],
     },
-    callTypeOverrides: overrides?.callTypeOverrides ?? {},
+    callTypeOverrides: overrides?.callTypeOverrides ?? buildDefaultCallTypeOverrides(),
   }
 }
 
