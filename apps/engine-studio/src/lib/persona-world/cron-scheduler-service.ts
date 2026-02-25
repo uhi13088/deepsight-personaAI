@@ -613,15 +613,27 @@ function createInteractionProvider(): InteractionPipelineDataProvider {
     },
 
     async saveLike(personaId, postId) {
-      await prisma.personaPostLike.create({
-        data: { personaId, postId },
-      })
+      await prisma.$transaction([
+        prisma.personaPostLike.create({
+          data: { personaId, postId },
+        }),
+        prisma.personaPost.update({
+          where: { id: postId },
+          data: { likeCount: { increment: 1 } },
+        }),
+      ])
     },
 
     async saveComment(personaId, postId, content) {
-      const comment = await prisma.personaComment.create({
-        data: { personaId, postId, content },
-      })
+      const [comment] = await prisma.$transaction([
+        prisma.personaComment.create({
+          data: { personaId, postId, content },
+        }),
+        prisma.personaPost.update({
+          where: { id: postId },
+          data: { commentCount: { increment: 1 } },
+        }),
+      ])
       return { id: comment.id }
     },
 

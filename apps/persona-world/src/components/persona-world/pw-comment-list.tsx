@@ -43,9 +43,10 @@ export function PWCommentList({
     try {
       const data = await clientApi.getComments(postId)
       setComments(data.comments)
-      // 서버에서 받은 댓글 수가 더 많으면 카운트 동기화 (다른 세션에서 추가된 경우)
-      if (data.total > displayCount) {
+      // 서버 실제 댓글 수와 동기화 (숨김/삭제된 댓글 반영)
+      if (data.total !== displayCount) {
         setDisplayCount(data.total)
+        onCountChange?.(data.total)
       }
       setLoaded(true)
     } catch (error) {

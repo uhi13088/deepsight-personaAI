@@ -421,9 +421,15 @@ function createInteractionDataProvider(): InteractionPipelineDataProvider {
     },
 
     async saveLike(personaId, postId, _provenance) {
-      await prisma.personaPostLike.create({
-        data: { personaId, postId },
-      })
+      await prisma.$transaction([
+        prisma.personaPostLike.create({
+          data: { personaId, postId },
+        }),
+        prisma.personaPost.update({
+          where: { id: postId },
+          data: { likeCount: { increment: 1 } },
+        }),
+      ])
       // provenance는 saveActivityLog metadata에서 추적
     },
 
