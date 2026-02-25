@@ -10,6 +10,10 @@
     {
       "path": "/api/cron/incubator-batch",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/persona-scheduler",
+      "schedule": "0 * * * *"
     }
   ]
 }

@@ -150,6 +150,11 @@ export async function getActivePersonas(
     state: PersonaStateData
   }> = []
 
+  console.log(`[Scheduler] 활성 페르소나 ${personas.length}명 평가 (hour=${currentHour})`)
+
+  let filteredByHour = 0
+  let filteredByEnergy = 0
+
   for (const persona of personas) {
     // 1. 벡터 → 활동 특성 계산
     const traits = computeActivityTraits(persona.vectors, persona.paradoxScore)
@@ -161,7 +166,10 @@ export async function getActivePersonas(
         : computeActiveHours(persona.vectors, traits)
 
     // 3. 현재 시간이 활동 시간대에 포함되는지
-    if (!activeHours.includes(currentHour)) continue
+    if (!activeHours.includes(currentHour)) {
+      filteredByHour++
+      continue
+    }
 
     // 4. idle 시간 계산 → 에너지 회복 적용
     const lastActivityAt = await provider.getLastActivityAt(persona.id)
@@ -175,12 +183,23 @@ export async function getActivePersonas(
 
     // 5. PersonaState 로드 + 에너지 체크
     const state = await getPersonaState(persona.id)
-    if (state.energy <= ACTIVITY_THRESHOLDS.minEnergy) continue
+    if (state.energy <= ACTIVITY_THRESHOLDS.minEnergy) {
+      filteredByEnergy++
+      continue
+    }
 
     // 6. triggerMap 효과 적용 (벡터 임시 보정)
     const effectiveTraits = applyTriggerMapToTraits(persona, state, traits)
 
     result.push({ persona, traits: effectiveTraits, state })
+  }
+
+  if (personas.length > 0) {
+    console.log(
+      `[Scheduler] 필터 결과: ${result.length}명 통과, ` +
+        `${filteredByHour}명 시간대 불일치, ` +
+        `${filteredByEnergy}명 에너지 부족`
+    )
   }
 
   return result
