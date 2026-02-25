@@ -452,6 +452,17 @@
   - 변경: index.ts (배럴 익스포트), quality-pw.test.ts (+69 테스트)
   - 테스트: 4147 PASS (101 파일), Build PASS
 
+## DONE (v4.0 — Developer Console)
+
+- [x] **T224: Developer Console 미완성 UI 완성** ✅ 2026-02-25
+  - AC1: Logs 페이지 — 1025줄, 3탭 (로그/에러대시보드/알림), 고급 필터링, CSV/JSON/JSONL 내보내기
+  - AC2: Webhooks 관리 — 732줄, 3탭 (엔드포인트/전송이력/이벤트), CRUD, 테스트 전송, SSRF 방어
+  - AC3: Team 관리 — 663줄, 3탭 (멤버/초대/권한), 초대/삭제/역할변경, CSV 내보내기
+  - 백엔드: API 라우트 전체 구현 (logs 6개, webhooks 7개, team 6개) + Prisma DB 연결
+  - 서비스: logs-service.ts, webhooks-service.ts, team-service.ts 완료
+  - 참고: 이전 작업에서 이미 구현 완료되어 있었음 (TASK.md 미반영 상태)
+  - 테스트: 4147 PASS (101 파일), Build PASS
+
 ---
 
 ## IN_PROGRESS
@@ -460,11 +471,7 @@
 
 ## QUEUE
 
-- [ ] **T224: Developer Console 미완성 UI 완성**
-  - AC1: Logs 페이지 — API 호출 로그 뷰어 (필터링, 검색, 페이지네이션)
-  - AC2: Webhooks 관리 — CRUD + 이벤트 구독 설정 + 전송 이력
-  - AC3: Team 관리 — 멤버 초대/삭제/역할 변경 (OWNER/ADMIN/MEMBER)
-  - 참고: developer-console에 기본 라우트/모델은 존재, UI 완성 필요
+(없음)
 
 ---
 
