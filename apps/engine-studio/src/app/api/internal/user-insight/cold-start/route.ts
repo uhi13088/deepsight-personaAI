@@ -106,22 +106,37 @@ async function loadQuestionsFromDb(mode: OnboardingMode): Promise<ColdStartQuest
   const questions: ColdStartQuestion[] = []
 
   for (const range of ranges) {
-    const rows = await prisma.psychProfileTemplate.findMany({
-      where: {
-        onboardingLevel: range.level,
-        questionOrder: { gte: range.from, lte: range.to },
-      },
-      orderBy: { questionOrder: "asc" },
-      select: {
-        id: true,
-        questionText: true,
-        questionOrder: true,
-        targetDimensions: true,
-        options: true,
-      },
-    })
-    for (const row of rows) {
-      questions.push(dbToColdStartQuestion(row, mode))
+    try {
+      const rows = await prisma.psychProfileTemplate.findMany({
+        where: {
+          onboardingLevel: range.level,
+          questionOrder: { gte: range.from, lte: range.to },
+        },
+        orderBy: { questionOrder: "asc" },
+        select: {
+          id: true,
+          questionText: true,
+          questionOrder: true,
+          targetDimensions: true,
+          options: true,
+        },
+      })
+      for (const row of rows) {
+        questions.push(dbToColdStartQuestion(row, mode))
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(
+        `[Cold Start] DB 조회 실패 (mode=${mode}, level=${range.level}, range=${range.from}-${range.to}):`,
+        msg
+      )
+      // enum 불일치 감지 시 명확한 에러 메시지
+      if (msg.includes("enum") || msg.includes("OnboardingLevel")) {
+        throw new Error(
+          `DB OnboardingLevel enum 값 불일치 — migration 033 적용 필요: ${msg}`
+        )
+      }
+      throw err
     }
   }
 
@@ -138,6 +153,10 @@ let store: ColdStartStore | null = null
 
 async function getStore(): Promise<ColdStartStore> {
   if (!store) {
+    // DB 연결 + 테이블 존재 확인
+    const totalCount = await prisma.psychProfileTemplate.count()
+    console.info(`[Cold Start] psych_profile_templates 테이블 레코드 수: ${totalCount}`)
+
     const [quickQuestions, standardQuestions, deepQuestions] = await Promise.all([
       loadQuestionsFromDb("quick"),
       loadQuestionsFromDb("standard"),
@@ -175,11 +194,18 @@ export async function GET() {
       data: { sets: s.sets },
     })
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err)
     console.error("[Cold Start GET] 데이터 조회 실패:", err)
     return NextResponse.json<ApiResponse<never>>(
       {
         success: false,
-        error: { code: "INTERNAL_ERROR", message: "콜드 스타트 데이터 조회 실패" },
+        error: {
+          code: "INTERNAL_ERROR",
+          message:
+            process.env.NODE_ENV === "development"
+              ? `콜드 스타트 데이터 조회 실패: ${errMsg}`
+              : "콜드 스타트 데이터 조회 실패",
+        },
       },
       { status: 500 }
     )
