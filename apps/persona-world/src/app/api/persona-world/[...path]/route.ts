@@ -3,6 +3,9 @@ import { proxyToEngineStudio } from "@/lib/api-proxy"
 
 async function handler(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params
+  console.log(
+    `[route-handler] /api/persona-world/[...path] hit: ${request.method} /api/persona-world/${path.join("/")}`
+  )
   return proxyToEngineStudio(request, "/api/persona-world", path)
 }
 
