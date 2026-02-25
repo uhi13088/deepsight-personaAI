@@ -36,7 +36,7 @@ DELETE FROM psych_profile_templates WHERE id LIKE 'seed-q-%';
 
 -- Q01: depth↔openness (aligned) — "지적 호기심의 역설"
 -- 직교: A(depth↑open↑) B(depth↑open↓=역설) C(depth↓open↑=역설) D(depth↓open↓)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q01-depth-openness',
   'Q01-depth↔openness-탐구 스타일',
@@ -51,12 +51,13 @@ VALUES (
   ]'::jsonb,
   ARRAY['depth', 'openness'],
   '{"type": "orthogonal", "phase": 1, "pair": "depth↔openness", "direction": "aligned"}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q02: lens↔neuroticism (inverse) — "감성/불안의 역설"
 -- inverse 직교: A(lens↑neuro↓=일관) B(lens↑neuro↑=역설) C(lens↓neuro↓=역설) D(lens↓neuro↑=일관)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q02-lens-neuroticism',
   'Q02-lens↔neuroticism-결정 방식',
@@ -71,12 +72,13 @@ VALUES (
   ]'::jsonb,
   ARRAY['lens', 'neuroticism'],
   '{"type": "orthogonal", "phase": 1, "pair": "lens↔neuroticism", "direction": "inverse"}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q03: stance↔agreeableness (inverse) — "태도의 역설 (츤데레)"
 -- inverse 직교: A(stance↑agree↓=일관) B(stance↑agree↑=역설/츤데레) C(stance↓agree↓=역설) D(stance↓agree↑=일관)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q03-stance-agreeableness',
   'Q03-stance↔agreeableness-팀 의사결정',
@@ -91,12 +93,13 @@ VALUES (
   ]'::jsonb,
   ARRAY['stance', 'agreeableness'],
   '{"type": "orthogonal", "phase": 1, "pair": "stance↔agreeableness", "direction": "inverse"}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q04: scope↔conscientiousness (aligned) — "게으른 완벽주의자"
 -- 직교: A(scope↑consc↑) B(scope↑consc↓=역설) C(scope↓consc↑=역설) D(scope↓consc↓)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q04-scope-conscientiousness',
   'Q04-scope↔conscientiousness-프로젝트 접근',
@@ -111,12 +114,13 @@ VALUES (
   ]'::jsonb,
   ARRAY['scope', 'conscientiousness'],
   '{"type": "orthogonal", "phase": 1, "pair": "scope↔conscientiousness", "direction": "aligned"}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q05: taste↔openness (aligned) — "보수적 힙스터"
 -- 직교: A(taste↑open↑) B(taste↑open↓=역설) C(taste↓open↑=역설) D(taste↓open↓)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q05-taste-openness',
   'Q05-taste↔openness-문화생활 태도',
@@ -131,12 +135,13 @@ VALUES (
   ]'::jsonb,
   ARRAY['taste', 'openness'],
   '{"type": "orthogonal", "phase": 1, "pair": "taste↔openness", "direction": "aligned"}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q06: purpose↔conscientiousness (aligned) — "목표/실천의 역설"
 -- 직교: A(purpose↑consc↑) B(purpose↑consc↓=역설) C(purpose↓consc↑=역설) D(purpose↓consc↓)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q06-purpose-conscientiousness',
   'Q06-purpose↔conscientiousness-소비 패턴',
@@ -151,12 +156,13 @@ VALUES (
   ]'::jsonb,
   ARRAY['purpose', 'conscientiousness'],
   '{"type": "orthogonal", "phase": 1, "pair": "purpose↔conscientiousness", "direction": "aligned"}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q07: sociability↔extraversion (aligned) — "사교적 내향인"
 -- 직교: A(soc↑extra↑) B(soc↑extra↓=역설) C(soc↓extra↑=역설) D(soc↓extra↓)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q07-sociability-extraversion',
   'Q07-sociability↔extraversion-공유 성향',
@@ -171,11 +177,12 @@ VALUES (
   ]'::jsonb,
   ARRAY['sociability', 'extraversion'],
   '{"type": "orthogonal", "phase": 1, "pair": "sociability↔extraversion", "direction": "aligned"}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q08: 복합 교차 (depth+lens ↔ neuroticism+openness) — 다차원 직교
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q08-complex-cross',
   'Q08-복합-평론 갈등 상황',
@@ -190,7 +197,8 @@ VALUES (
   ]'::jsonb,
   ARRAY['depth', 'lens', 'neuroticism', 'openness'],
   '{"type": "orthogonal", "phase": 1, "pair": "complex_cross"}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- ============================================
@@ -199,7 +207,7 @@ VALUES (
 -- ============================================
 
 -- Q09: openness + taste + L3(growthArc, lack)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q09-openness-taste-l3',
   'Q09-openness+taste+L3-전환 기회',
@@ -214,11 +222,12 @@ VALUES (
   ]'::jsonb,
   ARRAY['openness', 'taste', 'growthArc', 'lack'],
   '{"type": "mapped", "phase": 2, "layers": ["L2", "L1", "L3"]}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q10: conscientiousness + scope + L3(moralCompass, volatility)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q10-conscientiousness-scope-l3',
   'Q10-conscientiousness+scope+L3-마감 압박',
@@ -233,11 +242,12 @@ VALUES (
   ]'::jsonb,
   ARRAY['conscientiousness', 'scope', 'moralCompass', 'volatility'],
   '{"type": "mapped", "phase": 2, "layers": ["L2", "L1", "L3"]}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q11: extraversion + sociability + L3(lack, growthArc)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q11-extraversion-sociability-l3',
   'Q11-extraversion+sociability+L3-연휴 계획',
@@ -252,11 +262,12 @@ VALUES (
   ]'::jsonb,
   ARRAY['extraversion', 'sociability', 'lack', 'growthArc'],
   '{"type": "mapped", "phase": 2, "layers": ["L2", "L1", "L3"]}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q12: agreeableness + stance + L3(moralCompass, volatility)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q12-agreeableness-stance-l3',
   'Q12-agreeableness+stance+L3-도덕 딜레마',
@@ -271,11 +282,12 @@ VALUES (
   ]'::jsonb,
   ARRAY['agreeableness', 'stance', 'moralCompass', 'volatility'],
   '{"type": "mapped", "phase": 2, "layers": ["L2", "L1", "L3"]}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q13: neuroticism + lens + L3(volatility, lack)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q13-neuroticism-lens-l3',
   'Q13-neuroticism+lens+L3-실패 반응',
@@ -290,11 +302,12 @@ VALUES (
   ]'::jsonb,
   ARRAY['neuroticism', 'lens', 'volatility', 'lack'],
   '{"type": "mapped", "phase": 2, "layers": ["L2", "L1", "L3"]}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q14: openness+extraversion + purpose + L3(growthArc)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q14-openness-extraversion-l3',
   'Q14-openness+extraversion+L3-커뮤니티 참여',
@@ -309,11 +322,12 @@ VALUES (
   ]'::jsonb,
   ARRAY['openness', 'extraversion', 'purpose', 'growthArc'],
   '{"type": "mapped", "phase": 2, "layers": ["L2", "L1", "L3"]}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q15: conscientiousness+agreeableness + depth + L3(moralCompass)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q15-conscientiousness-agreeableness-l3',
   'Q15-conscientiousness+agreeableness+L3-팀원 발견',
@@ -328,11 +342,12 @@ VALUES (
   ]'::jsonb,
   ARRAY['conscientiousness', 'agreeableness', 'depth', 'moralCompass'],
   '{"type": "mapped", "phase": 2, "layers": ["L2", "L1", "L3"]}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q16: neuroticism+openness + taste + L3(volatility, growthArc)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q16-neuroticism-openness-l3',
   'Q16-neuroticism+openness+L3-인생관 충격',
@@ -347,7 +362,8 @@ VALUES (
   ]'::jsonb,
   ARRAY['neuroticism', 'openness', 'taste', 'volatility', 'growthArc'],
   '{"type": "mapped", "phase": 2, "layers": ["L2", "L1", "L3"]}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- ============================================
@@ -357,7 +373,7 @@ VALUES (
 
 -- Q17: depth↔openness (aligned) — 역설 검증
 -- 직교: A(depth↑open↑) B(depth↑open↓) C(depth↓open↑) D(depth↓open↓)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q17-paradox-depth-openness',
   'Q17-역설검증-depth↔openness',
@@ -372,12 +388,13 @@ VALUES (
   ]'::jsonb,
   ARRAY['depth', 'openness'],
   '{"type": "orthogonal", "phase": 3, "purpose": "paradox_verification", "pair": "depth↔openness"}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q18: lens↔neuroticism (inverse) — 역설 검증
 -- inverse 직교: A(lens↑neuro↓=일관) B(lens↑neuro↑=역설) C(lens↓neuro↓=역설) D(lens↓neuro↑=일관)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q18-paradox-lens-neuroticism',
   'Q18-역설검증-lens↔neuroticism',
@@ -392,12 +409,13 @@ VALUES (
   ]'::jsonb,
   ARRAY['lens', 'neuroticism'],
   '{"type": "orthogonal", "phase": 3, "purpose": "paradox_verification", "pair": "lens↔neuroticism"}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q19: stance↔agreeableness (inverse) — 역설 검증
 -- inverse 직교: A(stance↑agree↓=일관) B(stance↑agree↑=역설/츤데레) C(stance↓agree↓=역설) D(stance↓agree↑=일관)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q19-paradox-stance-agreeableness',
   'Q19-역설검증-stance↔agreeableness',
@@ -412,12 +430,13 @@ VALUES (
   ]'::jsonb,
   ARRAY['stance', 'agreeableness'],
   '{"type": "orthogonal", "phase": 3, "purpose": "paradox_verification", "pair": "stance↔agreeableness"}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q20: scope↔conscientiousness (aligned) — 역설 검증
 -- 직교: A(scope↑consc↑) B(scope↑consc↓=역설) C(scope↓consc↑=역설) D(scope↓consc↓)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q20-paradox-scope-conscientiousness',
   'Q20-역설검증-scope↔conscientiousness',
@@ -432,12 +451,13 @@ VALUES (
   ]'::jsonb,
   ARRAY['scope', 'conscientiousness'],
   '{"type": "orthogonal", "phase": 3, "purpose": "paradox_verification", "pair": "scope↔conscientiousness"}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q21: taste↔openness (aligned) — 역설 검증
 -- 직교: A(taste↑open↑) B(taste↑open↓=역설) C(taste↓open↑=역설) D(taste↓open↓)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q21-paradox-taste-openness',
   'Q21-역설검증-taste↔openness',
@@ -452,12 +472,13 @@ VALUES (
   ]'::jsonb,
   ARRAY['taste', 'openness'],
   '{"type": "orthogonal", "phase": 3, "purpose": "paradox_verification", "pair": "taste↔openness"}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q22: purpose↔conscientiousness (aligned) — 역설 검증
 -- 직교: A(purpose↑consc↑) B(purpose↑consc↓=역설) C(purpose↓consc↑=역설) D(purpose↓consc↓)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q22-paradox-purpose-conscientiousness',
   'Q22-역설검증-purpose↔conscientiousness',
@@ -472,12 +493,13 @@ VALUES (
   ]'::jsonb,
   ARRAY['purpose', 'conscientiousness'],
   '{"type": "orthogonal", "phase": 3, "purpose": "paradox_verification", "pair": "purpose↔conscientiousness"}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q23: sociability↔extraversion (aligned) — 역설 검증
 -- 직교: A(soc↑extra↑) B(soc↑extra↓=역설) C(soc↓extra↑=역설) D(soc↓extra↓)
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q23-paradox-sociability-extraversion',
   'Q23-역설검증-sociability↔extraversion',
@@ -492,12 +514,13 @@ VALUES (
   ]'::jsonb,
   ARRAY['sociability', 'extraversion'],
   '{"type": "orthogonal", "phase": 3, "purpose": "paradox_verification", "pair": "sociability↔extraversion"}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Q24: L3 종합 + 교차 레이어 통합
 -- L3 4차원(lack, moralCompass, volatility, growthArc)을 직접 탐색 + L1/L2 교차
-INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired")
+INSERT INTO psych_profile_templates (id, name, "onboardingLevel", "questionOrder", "questionText", "questionType", options, "targetDimensions", "weightFormula", "isRequired", "createdAt", "updatedAt")
 VALUES (
   'v3-q24-l3-comprehensive',
   'Q24-L3종합-삶의 태도',
@@ -512,5 +535,6 @@ VALUES (
   ]'::jsonb,
   ARRAY['lack', 'moralCompass', 'volatility', 'growthArc', 'depth', 'purpose', 'taste', 'stance', 'scope', 'lens', 'sociability'],
   '{"type": "orthogonal", "phase": 3, "purpose": "l3_comprehensive", "layers": ["L3", "L1", "L2"]}'::jsonb,
-  true
+  true,
+  NOW(), NOW()
 ) ON CONFLICT (id) DO NOTHING;
