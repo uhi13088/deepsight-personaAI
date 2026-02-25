@@ -21,7 +21,8 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:run-sql": "tsx prisma/run-migration.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",
