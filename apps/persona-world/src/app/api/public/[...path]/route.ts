@@ -3,6 +3,9 @@ import { proxyToEngineStudio } from "@/lib/api-proxy"
 
 async function handler(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params
+  console.log(
+    `[route-handler] /api/public/[...path] hit: ${request.method} /api/public/${path.join("/")}`
+  )
   return proxyToEngineStudio(request, "/api/public", path)
 }
 

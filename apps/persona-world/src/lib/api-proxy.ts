@@ -61,10 +61,28 @@ export async function proxyToEngineStudio(
     init.duplex = "half"
   }
 
-  const response = await fetch(url.toString(), init)
+  const targetUrl = url.toString()
+
+  if (!internalSecret) {
+    console.warn(
+      `[api-proxy] INTERNAL_API_SECRET is not set — engine-studio may reject with 401. Target: ${request.method} ${targetPath}`
+    )
+  }
+
+  const response = await fetch(targetUrl, init)
+
+  if (response.status === 401) {
+    console.error(
+      `[api-proxy] 401 from engine-studio: ${request.method} ${targetPath} → ${targetUrl} (INTERNAL_API_SECRET set: ${!!internalSecret})`
+    )
+  }
 
   const responseHeaders = new Headers(response.headers)
   responseHeaders.delete("transfer-encoding")
+  // Node.js fetch가 자동으로 gzip 디코딩하므로 content-encoding도 제거해야 함
+  // 그렇지 않으면 브라우저가 이미 디코딩된 바디를 다시 디코딩하려 해서 ERR_CONTENT_DECODING_FAILED 발생
+  responseHeaders.delete("content-encoding")
+  responseHeaders.delete("content-length")
 
   return new NextResponse(response.body, {
     status: response.status,
