@@ -1485,6 +1485,35 @@
   - AC3: ✅ LNB + header에 "뉴스 반응" 메뉴 추가
   - AC4: ✅ Build PASS (109 static pages)
 
+### Phase NB-B: 뉴스 반응 시스템 개선 (T255~T256)
+
+> Phase NB(T195~T198)에서 구축한 뉴스 반응 시스템의 설계 결함 2건 수정.
+> (1) 자동 트리거 일일 예산 고정 → importance 기반 동적 스케일링
+> (2) RSS 소스 완전 수동 관리 → 자동 등록 + cron 수집
+
+- [ ] **T255: 뉴스 반응 동적 스케일링 — importance 기반 reactor 인원 결정**
+  - 배경: 현재 자동 트리거는 dailyBudget=20, maxPerPersona=2로 하드캡. 전 세계적 대형 뉴스(전쟁, 대지진 등)에도 최대 10명만 반응 → 부자연스러움. 페르소나 100명 중 10명만 언급하는 SNS는 현실감 없음
+  - AC1: `NewsArticle` 모델에 `importanceScore Decimal @db.Decimal(3,2)` 필드 추가 + Claude 분석 시 importance 자동 산출 (0.0~1.0)
+  - AC2: importance 등급별 동적 cap 로직 (`allocateDailyReactions` 개선):
+    - BREAKING (≥0.9): cap 해제, 관심도 threshold 0.15로 낮춤 → 전원 참여 가능
+    - HIGH (0.7~0.9): active 페르소나의 50%까지, threshold 0.25
+    - NORMAL (0.5~0.7): 기존대로 threshold 0.35, budget 내 상위 선발
+    - LOW (<0.5): threshold 0.45, 관심 분야 정확 매칭만
+  - AC3: dailyBudget을 BREAKING 뉴스 시 자동 증액 (기본 20 → BREAKING 발생 시 unlimited, HIGH 발생 시 ×2)
+  - AC4: Admin UI 설정 패널에 importance 등급별 cap 설정 UI 추가
+  - AC5: 테스트 + Build PASS
+
+- [ ] **T256: RSS 소스 자동화 — 프리셋 자동 등록 + cron 기반 수집**
+  - 배경: 현재 RSS 소스 관리가 완전 수동 (소스 추가, 개별 수집 버튼, 토글). 관리자가 매번 "전체 수집" 누르는 구조. 자동화 약속 미이행
+  - AC1: 프리셋 RSS 소스 자동 시드 — 최초 앱 기동 시 (또는 NewsSource 0건 시) 프리셋 목록 자동 INSERT + `isActive: true`
+  - AC2: cron 기반 자동 수집 — 스케줄러 API에 `news_auto_fetch` 액션 추가, 설정된 주기(기본 1시간)로 전체 active 소스 자동 수집
+  - AC3: 수집 후 자동 반응 트리거 — `autoTriggerEnabled=true`일 때 신규 기사 수집 즉시 `runDailyNewsReactions()` 연쇄 호출
+  - AC4: Admin UI 역할 전환 — "소스 추가/수집" 중심 → "모니터링/예외 처리" 중심:
+    - 자동 수집 상태 표시 (마지막 수집 시각, 다음 예정, 성공/실패 카운트)
+    - 오류 소스 하이라이트 (3회 연속 실패 시 자동 비활성화 + 경고)
+    - 수동 "전체 수집" 버튼은 유지하되 보조 역할로 이동
+  - AC5: 테스트 + Build PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
