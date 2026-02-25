@@ -71,16 +71,29 @@ export async function proxyToEngineStudio(
 
   const response = await fetch(targetUrl, init)
 
-  if (response.status === 401) {
+  if (!response.ok) {
+    // 에러 응답 시 body를 텍스트로 읽어서 로그에 출력 (디버깅용)
+    const errorBody = await response.text()
     console.error(
-      `[api-proxy] 401 from engine-studio: ${request.method} ${targetPath} → ${targetUrl} (INTERNAL_API_SECRET set: ${!!internalSecret})`
+      `[api-proxy] ${response.status} from engine-studio: ${request.method} ${targetPath} → ${targetUrl}`,
+      `\n  INTERNAL_API_SECRET set: ${!!internalSecret}`,
+      `\n  Response body: ${errorBody.slice(0, 500)}`
     )
+
+    const responseHeaders = new Headers(response.headers)
+    responseHeaders.delete("transfer-encoding")
+    responseHeaders.delete("content-encoding")
+    responseHeaders.delete("content-length")
+
+    return new NextResponse(errorBody, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: responseHeaders,
+    })
   }
 
   const responseHeaders = new Headers(response.headers)
   responseHeaders.delete("transfer-encoding")
-  // Node.js fetch가 자동으로 gzip 디코딩하므로 content-encoding도 제거해야 함
-  // 그렇지 않으면 브라우저가 이미 디코딩된 바디를 다시 디코딩하려 해서 ERR_CONTENT_DECODING_FAILED 발생
   responseHeaders.delete("content-encoding")
   responseHeaders.delete("content-length")
 
