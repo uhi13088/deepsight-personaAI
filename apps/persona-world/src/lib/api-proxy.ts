@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { getToken } from "next-auth/jwt"
 
 function getEngineStudioUrl(): string {
   const raw = process.env.NEXT_PUBLIC_ENGINE_STUDIO_URL?.trim()
@@ -10,9 +11,9 @@ function getEngineStudioUrl(): string {
 /**
  * API 요청을 engine-studio로 프록시한다.
  *
- * middleware가 주입한 x-internal-token, x-authenticated-email 헤더를
- * 그대로 engine-studio에 전달하기 위해 route handler에서 fetch() 프록시를 수행한다.
- * (next.config.ts rewrites는 middleware 수정 헤더를 외부 URL에 전달하지 않음)
+ * middleware의 NextResponse.next({ request: { headers } })는
+ * 라우트 핸들러의 request.headers에 반영되지 않으므로,
+ * 프록시에서 직접 x-internal-token과 x-authenticated-email을 주입한다.
  */
 export async function proxyToEngineStudio(
   request: NextRequest,
@@ -29,6 +30,25 @@ export async function proxyToEngineStudio(
 
   const headers = new Headers(request.headers)
   headers.delete("host")
+
+  // 직접 x-internal-token 주입 (middleware 헤더 수정은 route handler에 미반영)
+  const internalSecret = process.env.INTERNAL_API_SECRET
+  if (internalSecret) {
+    headers.set("x-internal-token", internalSecret)
+  }
+
+  // JWT에서 이메일 추출하여 x-authenticated-email 주입
+  try {
+    const token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
+    })
+    if (token?.email) {
+      headers.set("x-authenticated-email", token.email as string)
+    }
+  } catch {
+    // JWT 디코딩 실패 무시
+  }
 
   const init: RequestInit = {
     method: request.method,
