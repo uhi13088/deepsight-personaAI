@@ -103,7 +103,7 @@ const navSections: NavSection[] = [
     icon: Shield,
     basePath: "/security",
     children: [
-      { label: "Dashboard", href: "/security" },
+      { label: "Dashboard", href: "/security/dashboard" },
       { label: "Quarantine Queue", href: "/security/quarantine" },
       { label: "Kill Switch", href: "/security/kill-switch" },
       { label: "Connectivity", href: "/security/connectivity" },
