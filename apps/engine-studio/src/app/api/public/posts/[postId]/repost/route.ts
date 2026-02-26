@@ -54,6 +54,23 @@ export async function POST(
       )
     }
 
+    // 유저/페르소나 존재 확인 (게스트 유저는 DB에 없으므로 FK 위반 방지)
+    if (userId) {
+      const user = await prisma.personaWorldUser.findUnique({
+        where: { id: userId },
+        select: { id: true },
+      })
+      if (!user) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "USER_NOT_FOUND", message: "로그인이 필요합니다" },
+          },
+          { status: 401 }
+        )
+      }
+    }
+
     // 기존 리포스트 확인
     const existing = personaId
       ? await prisma.personaRepost.findUnique({

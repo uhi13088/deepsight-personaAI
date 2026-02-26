@@ -379,13 +379,29 @@ async function executeAutoPipeline(options?: AutoPipelineInput): Promise<Generat
 
   const { l1, l2, l3 } = generated.vectors
 
-  // Stage 2.5: 캐릭터 LLM 생성 (LLM 우선, 실패 시 패턴매칭 fallback)
+  // Stage 2.1: 지역/국적 먼저 결정 (캐릭터 이름과 일관성 보장)
+  const activity = inferActivitySettings(l1, l2, l3)
+  const structured = generateStructuredFields(l1, l2, l3, activity.activeHours, activity.peakHours)
+  const demographics = generateDemographicFields(l1, l2, structured.region)
+
+  // Stage 2.5: 캐릭터 LLM 생성 (국적/성별 전달 → 이름 일관성 보장)
   let character = generated.character
   try {
-    character = await generateCharacterWithLLM(l1, l2, l3, generated.archetype, existingNames)
+    character = await generateCharacterWithLLM(
+      l1,
+      l2,
+      l3,
+      generated.archetype,
+      existingNames,
+      demographics.nationality,
+      structured.region
+    )
   } catch {
     // LLM 실패 시 기존 패턴매칭 결과 사용
   }
+
+  // 캐릭터에서 성별 동기화 (이름 기반 성별이 정확)
+  demographics.gender = character.gender
 
   // Stage 3~4: 공통 처리
   const archetype = generated.archetype
@@ -394,13 +410,6 @@ async function executeAutoPipeline(options?: AutoPipelineInput): Promise<Generat
 
   // Stage 5.5: warmth 계산
   const warmth = Math.round((l2.agreeableness * 0.6 + l1.sociability * 0.4) * 100) / 100
-
-  // Stage 5.6: T162 구조화 필드 생성 (birthDate, region, activeHours, peakHours)
-  const activity = inferActivitySettings(l1, l2, l3)
-  const structured = generateStructuredFields(l1, l2, l3, activity.activeHours, activity.peakHours)
-
-  // Stage 5.7: T174 인구통계 필드 생성
-  const demographics = generateDemographicFields(l1, l2, structured.region)
 
   // Stage 5: 프롬프트 5종 자동 빌드 (v4: VoiceSpec/Factbook/TriggerRules + demographics 포함)
   const role = inferPersonaRole(l1, l2)

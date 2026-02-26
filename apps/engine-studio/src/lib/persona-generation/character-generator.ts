@@ -14,6 +14,8 @@ import type {
 
 export interface CharacterProfile {
   name: string
+  /** 이름에서 파생된 성별 */
+  gender: "MALE" | "FEMALE" | "NON_BINARY"
   /** 영어 SNS 핸들 (예: @midnight_critic). LLM이 생성하거나 이름에서 파생 */
   handle?: string
   role: string
@@ -32,110 +34,170 @@ export interface RelationshipSeed {
   dynamic: string
 }
 
-// ── 이름 풀 (다국적 풀네임) ────────────────────────────────────
+// ── 이름 메타데이터 (문화권 + 성별) ──────────────────────────
 
-const NAME_POOLS = {
-  analytical: [
-    "Sophia Chen",
-    "Liam O'Brien",
-    "Yuki Tanaka",
-    "Amir Patel",
-    "Elena Volkov",
-    "Marcus Webb",
-    "Hana Nakamura",
-    "Raj Sharma",
-    "Nadia Petrova",
-    "Isaac Thornton",
-    "Claire Dubois",
-    "Daniel Kwon",
-    "Ava Laurent",
-    "Owen Blackwell",
-    "Maya Lin",
-    "Ethan Reis",
-    "Vera Ostrova",
-    "Simon Park",
-    "Iris Nakano",
-    "Leo Castellano",
-    "Zoe Hartmann",
-    "Theo Ashford",
-    "Naomi Sato",
-  ],
-  emotional: [
-    "Mia Santos",
-    "Oliver Kim",
-    "Sakura Mori",
-    "Priya Nair",
-    "Luna Park",
-    "Felix Andersen",
-    "Mei Lin Zhang",
-    "Amara Okafor",
-    "Chloe Rivera",
-    "Jasper Moon",
-    "Aria Delgado",
-    "Kai Sørensen",
-    "Esmé Laurent",
-    "Rowan Blake",
-    "Noa Vidal",
-    "Sena Yamada",
-    "Ezra Flynn",
-    "Lila Achebe",
-    "Juno Reyes",
-    "Remy Chae",
-    "Stella Novak",
-    "Atlas Yoon",
-    "Ivy Moreau",
-  ],
-  critical: [
-    "James Wright",
-    "Akira Sato",
-    "David Lee",
-    "Fatima Al-Hassan",
-    "Viktor Petrov",
-    "Nina Torres",
-    "Kenji Ito",
-    "Hassan Ahmed",
-    "Grant Holloway",
-    "Vera Sinclair",
-    "Max Keller",
-    "Diane Choi",
-    "Roman Volkov",
-    "Tessa Crane",
-    "Jude Alvarez",
-    "Ingrid Nystrom",
-    "Callum Drake",
-    "Sonya Mirza",
-    "Dorian Hale",
-    "Eva Lindqvist",
-    "Oscar Brandt",
-    "Leona Takeda",
-    "Miles Ashworth",
-  ],
-  social: [
-    "Emma Garcia",
-    "Lucas Kim",
-    "Yuna Hayashi",
-    "Zara Khan",
-    "Sofia Reyes",
-    "Noah Chen",
-    "Rin Takahashi",
-    "Leila Mansouri",
-    "Harper Diaz",
-    "Dylan Cha",
-    "Mina Rossi",
-    "Jamie Torres",
-    "Sasha Oduya",
-    "Alex Fontaine",
-    "Dani Herrera",
-    "Riley Kato",
-    "Jules Moreno",
-    "Poppy Wan",
-    "Finn O'Connell",
-    "Talia Adeyemi",
-    "Charlie Sung",
-    "Wren Nakagawa",
-    "Eliot Ramos",
-  ],
-} as const
+interface NameMeta {
+  name: string
+  culture: string // NATIONALITY_CULTURE_MAP 값과 매칭
+  gender: "MALE" | "FEMALE"
+  personality: "analytical" | "emotional" | "critical" | "social"
+}
+
+/** 국적 → 문화권 그룹 매핑 */
+const NATIONALITY_CULTURE_MAP: Record<string, string> = {
+  Korean: "korean",
+  Japanese: "japanese",
+  Chinese: "chinese",
+  Taiwanese: "chinese",
+  Indian: "indian",
+  American: "western",
+  British: "western",
+  Canadian: "western",
+  Australian: "western",
+  French: "french",
+  German: "german",
+  Dutch: "german",
+  Swiss: "german",
+  Danish: "scandinavian",
+  Finnish: "scandinavian",
+  Spanish: "latin",
+  Brazilian: "latin",
+  Peruvian: "latin",
+  Italian: "italian",
+  Czech: "slavic",
+  Turkish: "middleeast",
+  Emirati: "middleeast",
+  Egyptian: "middleeast",
+  Moroccan: "middleeast",
+  Thai: "southeast_asian",
+  Vietnamese: "southeast_asian",
+  Singaporean: "southeast_asian",
+  Nigerian: "african",
+  Kenyan: "african",
+}
+
+const ALL_NAMES: NameMeta[] = [
+  // ── Korean ────────────────────────────────
+  { name: "Daniel Kwon", culture: "korean", gender: "MALE", personality: "analytical" },
+  { name: "Simon Park", culture: "korean", gender: "MALE", personality: "analytical" },
+  { name: "Oliver Kim", culture: "korean", gender: "MALE", personality: "emotional" },
+  { name: "Lucas Kim", culture: "korean", gender: "MALE", personality: "social" },
+  { name: "Dylan Cha", culture: "korean", gender: "MALE", personality: "social" },
+  { name: "David Lee", culture: "korean", gender: "MALE", personality: "critical" },
+  { name: "Diane Choi", culture: "korean", gender: "FEMALE", personality: "critical" },
+  { name: "Luna Park", culture: "korean", gender: "FEMALE", personality: "emotional" },
+  { name: "Remy Chae", culture: "korean", gender: "MALE", personality: "emotional" },
+  { name: "Atlas Yoon", culture: "korean", gender: "MALE", personality: "emotional" },
+  { name: "Charlie Sung", culture: "korean", gender: "MALE", personality: "social" },
+
+  // ── Japanese ──────────────────────────────
+  { name: "Yuki Tanaka", culture: "japanese", gender: "FEMALE", personality: "analytical" },
+  { name: "Hana Nakamura", culture: "japanese", gender: "FEMALE", personality: "analytical" },
+  { name: "Iris Nakano", culture: "japanese", gender: "FEMALE", personality: "analytical" },
+  { name: "Naomi Sato", culture: "japanese", gender: "FEMALE", personality: "analytical" },
+  { name: "Sakura Mori", culture: "japanese", gender: "FEMALE", personality: "emotional" },
+  { name: "Sena Yamada", culture: "japanese", gender: "FEMALE", personality: "emotional" },
+  { name: "Akira Sato", culture: "japanese", gender: "MALE", personality: "critical" },
+  { name: "Kenji Ito", culture: "japanese", gender: "MALE", personality: "critical" },
+  { name: "Leona Takeda", culture: "japanese", gender: "FEMALE", personality: "critical" },
+  { name: "Yuna Hayashi", culture: "japanese", gender: "FEMALE", personality: "social" },
+  { name: "Rin Takahashi", culture: "japanese", gender: "FEMALE", personality: "social" },
+  { name: "Riley Kato", culture: "japanese", gender: "MALE", personality: "social" },
+  { name: "Wren Nakagawa", culture: "japanese", gender: "FEMALE", personality: "social" },
+
+  // ── Chinese ───────────────────────────────
+  { name: "Sophia Chen", culture: "chinese", gender: "FEMALE", personality: "analytical" },
+  { name: "Maya Lin", culture: "chinese", gender: "FEMALE", personality: "analytical" },
+  { name: "Mei Lin Zhang", culture: "chinese", gender: "FEMALE", personality: "emotional" },
+  { name: "Noah Chen", culture: "chinese", gender: "MALE", personality: "social" },
+  { name: "Poppy Wan", culture: "chinese", gender: "FEMALE", personality: "social" },
+
+  // ── Indian ────────────────────────────────
+  { name: "Amir Patel", culture: "indian", gender: "MALE", personality: "analytical" },
+  { name: "Raj Sharma", culture: "indian", gender: "MALE", personality: "analytical" },
+  { name: "Priya Nair", culture: "indian", gender: "FEMALE", personality: "emotional" },
+  { name: "Zara Khan", culture: "indian", gender: "FEMALE", personality: "social" },
+  { name: "Sonya Mirza", culture: "indian", gender: "FEMALE", personality: "critical" },
+
+  // ── Western (US/UK/CA/AU) ─────────────────
+  { name: "Liam O'Brien", culture: "western", gender: "MALE", personality: "analytical" },
+  { name: "Marcus Webb", culture: "western", gender: "MALE", personality: "analytical" },
+  { name: "Isaac Thornton", culture: "western", gender: "MALE", personality: "analytical" },
+  { name: "Owen Blackwell", culture: "western", gender: "MALE", personality: "analytical" },
+  { name: "Theo Ashford", culture: "western", gender: "MALE", personality: "analytical" },
+  { name: "Rowan Blake", culture: "western", gender: "MALE", personality: "emotional" },
+  { name: "Ezra Flynn", culture: "western", gender: "MALE", personality: "emotional" },
+  { name: "James Wright", culture: "western", gender: "MALE", personality: "critical" },
+  { name: "Grant Holloway", culture: "western", gender: "MALE", personality: "critical" },
+  { name: "Vera Sinclair", culture: "western", gender: "FEMALE", personality: "critical" },
+  { name: "Callum Drake", culture: "western", gender: "MALE", personality: "critical" },
+  { name: "Dorian Hale", culture: "western", gender: "MALE", personality: "critical" },
+  { name: "Miles Ashworth", culture: "western", gender: "MALE", personality: "critical" },
+  { name: "Tessa Crane", culture: "western", gender: "FEMALE", personality: "critical" },
+  { name: "Finn O'Connell", culture: "western", gender: "MALE", personality: "social" },
+  { name: "Harper Diaz", culture: "western", gender: "FEMALE", personality: "social" },
+  { name: "Jasper Moon", culture: "western", gender: "MALE", personality: "emotional" },
+  { name: "Chloe Rivera", culture: "western", gender: "FEMALE", personality: "emotional" },
+
+  // ── French ────────────────────────────────
+  { name: "Claire Dubois", culture: "french", gender: "FEMALE", personality: "analytical" },
+  { name: "Ava Laurent", culture: "french", gender: "FEMALE", personality: "analytical" },
+  { name: "Esmé Laurent", culture: "french", gender: "FEMALE", personality: "emotional" },
+  { name: "Ivy Moreau", culture: "french", gender: "FEMALE", personality: "emotional" },
+  { name: "Alex Fontaine", culture: "french", gender: "MALE", personality: "social" },
+
+  // ── German/Dutch/Swiss ────────────────────
+  { name: "Zoe Hartmann", culture: "german", gender: "FEMALE", personality: "analytical" },
+  { name: "Ethan Reis", culture: "german", gender: "MALE", personality: "analytical" },
+  { name: "Max Keller", culture: "german", gender: "MALE", personality: "critical" },
+  { name: "Oscar Brandt", culture: "german", gender: "MALE", personality: "critical" },
+  { name: "Stella Novak", culture: "german", gender: "FEMALE", personality: "emotional" },
+
+  // ── Scandinavian ──────────────────────────
+  { name: "Felix Andersen", culture: "scandinavian", gender: "MALE", personality: "emotional" },
+  { name: "Kai Sørensen", culture: "scandinavian", gender: "MALE", personality: "emotional" },
+  { name: "Ingrid Nystrom", culture: "scandinavian", gender: "FEMALE", personality: "critical" },
+  { name: "Eva Lindqvist", culture: "scandinavian", gender: "FEMALE", personality: "critical" },
+
+  // ── Latin (Spanish/Portuguese) ────────────
+  { name: "Mia Santos", culture: "latin", gender: "FEMALE", personality: "emotional" },
+  { name: "Aria Delgado", culture: "latin", gender: "FEMALE", personality: "emotional" },
+  { name: "Noa Vidal", culture: "latin", gender: "FEMALE", personality: "emotional" },
+  { name: "Juno Reyes", culture: "latin", gender: "FEMALE", personality: "emotional" },
+  { name: "Nina Torres", culture: "latin", gender: "FEMALE", personality: "critical" },
+  { name: "Jude Alvarez", culture: "latin", gender: "MALE", personality: "critical" },
+  { name: "Emma Garcia", culture: "latin", gender: "FEMALE", personality: "social" },
+  { name: "Sofia Reyes", culture: "latin", gender: "FEMALE", personality: "social" },
+  { name: "Dani Herrera", culture: "latin", gender: "MALE", personality: "social" },
+  { name: "Jamie Torres", culture: "latin", gender: "MALE", personality: "social" },
+  { name: "Jules Moreno", culture: "latin", gender: "MALE", personality: "social" },
+  { name: "Eliot Ramos", culture: "latin", gender: "MALE", personality: "social" },
+  { name: "Leo Castellano", culture: "latin", gender: "MALE", personality: "analytical" },
+
+  // ── Italian ───────────────────────────────
+  { name: "Mina Rossi", culture: "italian", gender: "FEMALE", personality: "social" },
+
+  // ── Slavic (Russian/Czech) ────────────────
+  { name: "Elena Volkov", culture: "slavic", gender: "FEMALE", personality: "analytical" },
+  { name: "Nadia Petrova", culture: "slavic", gender: "FEMALE", personality: "analytical" },
+  { name: "Vera Ostrova", culture: "slavic", gender: "FEMALE", personality: "analytical" },
+  { name: "Viktor Petrov", culture: "slavic", gender: "MALE", personality: "critical" },
+  { name: "Roman Volkov", culture: "slavic", gender: "MALE", personality: "critical" },
+
+  // ── Middle East ───────────────────────────
+  { name: "Fatima Al-Hassan", culture: "middleeast", gender: "FEMALE", personality: "critical" },
+  { name: "Hassan Ahmed", culture: "middleeast", gender: "MALE", personality: "critical" },
+  { name: "Leila Mansouri", culture: "middleeast", gender: "FEMALE", personality: "social" },
+
+  // ── Southeast Asian ───────────────────────
+  // (적은 풀 — 필요시 추가)
+
+  // ── African ───────────────────────────────
+  { name: "Amara Okafor", culture: "african", gender: "FEMALE", personality: "emotional" },
+  { name: "Lila Achebe", culture: "african", gender: "FEMALE", personality: "emotional" },
+  { name: "Sasha Oduya", culture: "african", gender: "FEMALE", personality: "social" },
+  { name: "Talia Adeyemi", culture: "african", gender: "FEMALE", personality: "social" },
+]
 
 // ── 전문분야 풀 ───────────────────────────────────────────────
 
@@ -232,9 +294,10 @@ export function generateCharacter(
   l2: CoreTemperamentVector,
   l3: NarrativeDriveVector,
   archetype?: PersonaArchetype,
-  existingNames: string[] = []
+  existingNames: string[] = [],
+  nationality?: string
 ): CharacterProfile {
-  const name = generateName(l1, l2, existingNames)
+  const { name, gender } = generateName(l1, l2, existingNames, nationality)
   const role = generateRole(l1, l2, archetype)
   const expertise = generateExpertise(l1)
   const description = generateDescription(l1, l2, l3, archetype)
@@ -246,6 +309,7 @@ export function generateCharacter(
 
   return {
     name,
+    gender,
     role,
     expertise,
     description,
@@ -257,56 +321,69 @@ export function generateCharacter(
   }
 }
 
-// ── 이름 생성 ─────────────────────────────────────────────────
+// ── 이름 생성 (국적 + 성격 일관성 보장) ──────────────────────
+
+function getPersonalityType(
+  l1: SocialPersonaVector,
+  l2: CoreTemperamentVector
+): NameMeta["personality"] {
+  if (l1.lens > 0.6 && l1.depth > 0.6) return "analytical"
+  if (l1.lens < 0.4) return "emotional"
+  if (l1.stance > 0.6) return "critical"
+  if (l1.sociability > 0.6 || l2.extraversion > 0.6) return "social"
+  return "analytical" // 기본
+}
 
 function generateName(
   l1: SocialPersonaVector,
   l2: CoreTemperamentVector,
-  existingNames: string[] = []
-): string {
-  let pool: readonly string[]
-
-  if (l1.lens > 0.6 && l1.depth > 0.6) {
-    pool = NAME_POOLS.analytical
-  } else if (l1.lens < 0.4) {
-    pool = NAME_POOLS.emotional
-  } else if (l1.stance > 0.6) {
-    pool = NAME_POOLS.critical
-  } else if (l1.sociability > 0.6 || l2.extraversion > 0.6) {
-    pool = NAME_POOLS.social
-  } else {
-    const allNames = [
-      ...NAME_POOLS.analytical,
-      ...NAME_POOLS.emotional,
-      ...NAME_POOLS.critical,
-      ...NAME_POOLS.social,
-    ]
-    pool = allNames
-  }
-
-  // 중복 방지: 기존 이름과 겹치지 않도록 최대 10회 시도
+  existingNames: string[] = [],
+  nationality?: string
+): { name: string; gender: "MALE" | "FEMALE" } {
   const existingSet = new Set(existingNames)
-  const available = pool.filter((n) => !existingSet.has(n))
+  const personalityType = getPersonalityType(l1, l2)
+  const culture = nationality ? (NATIONALITY_CULTURE_MAP[nationality] ?? null) : null
 
-  if (available.length > 0) {
-    return available[Math.floor(Math.random() * available.length)]
+  // 1단계: 국적 문화권 + 성격 일치
+  if (culture) {
+    const cultureAndPersonality = ALL_NAMES.filter(
+      (n) => n.culture === culture && n.personality === personalityType && !existingSet.has(n.name)
+    )
+    if (cultureAndPersonality.length > 0) {
+      const pick = cultureAndPersonality[Math.floor(Math.random() * cultureAndPersonality.length)]
+      return { name: pick.name, gender: pick.gender }
+    }
+
+    // 2단계: 국적 문화권만 일치 (성격 무관)
+    const cultureOnly = ALL_NAMES.filter((n) => n.culture === culture && !existingSet.has(n.name))
+    if (cultureOnly.length > 0) {
+      const pick = cultureOnly[Math.floor(Math.random() * cultureOnly.length)]
+      return { name: pick.name, gender: pick.gender }
+    }
   }
 
-  // 선호 풀이 모두 소진되면 전체 풀에서 재시도
-  const allNames = [
-    ...NAME_POOLS.analytical,
-    ...NAME_POOLS.emotional,
-    ...NAME_POOLS.critical,
-    ...NAME_POOLS.social,
-  ]
-  const allAvailable = allNames.filter((n) => !existingSet.has(n))
-
-  if (allAvailable.length > 0) {
-    return allAvailable[Math.floor(Math.random() * allAvailable.length)]
+  // 3단계: 성격만 일치 (국적 풀 소진 or 국적 미지정)
+  const personalityOnly = ALL_NAMES.filter(
+    (n) => n.personality === personalityType && !existingSet.has(n.name)
+  )
+  if (personalityOnly.length > 0) {
+    const pick = personalityOnly[Math.floor(Math.random() * personalityOnly.length)]
+    return { name: pick.name, gender: pick.gender }
   }
 
-  // 64개 전부 사용 시 접미사로 구분
-  return pool[Math.floor(Math.random() * pool.length)] + String(Math.floor(Math.random() * 100))
+  // 4단계: 전체 풀
+  const anyAvailable = ALL_NAMES.filter((n) => !existingSet.has(n.name))
+  if (anyAvailable.length > 0) {
+    const pick = anyAvailable[Math.floor(Math.random() * anyAvailable.length)]
+    return { name: pick.name, gender: pick.gender }
+  }
+
+  // 전부 소진 시 접미사로 구분
+  const fallback = ALL_NAMES[Math.floor(Math.random() * ALL_NAMES.length)]
+  return {
+    name: fallback.name + String(Math.floor(Math.random() * 100)),
+    gender: fallback.gender,
+  }
 }
 
 // ── 역할 생성 ─────────────────────────────────────────────────

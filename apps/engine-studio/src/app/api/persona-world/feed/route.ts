@@ -42,6 +42,17 @@ export async function POST(request: NextRequest) {
 
     const feedLimit = Math.min(limit ?? 20, 50)
 
+    // ── following 탭: 팔로우한 페르소나 글만 ────────────────
+    if (tab === "following") {
+      return handleFollowingTab(userId, feedLimit, cursor)
+    }
+
+    // ── explore 탭: 팔로우하지 않는 페르소나 + 인기순 ──────
+    if (tab === "explore") {
+      return handleExploreTab(userId, feedLimit, cursor)
+    }
+
+    // ── for-you: 3-Tier 매칭 피드 엔진 ─────────────────────
     const provider: FeedDataProvider = {
       async getFollowingPersonaIds(uid: string): Promise<string[]> {
         const follows = await prisma.personaFollow.findMany({
@@ -389,4 +400,137 @@ export async function POST(request: NextRequest) {
 
 function round(v: number): number {
   return Math.round(v * 100) / 100
+}
+
+// ── 공통 select ───────────────────────────────────────────────
+
+const feedPostSelect = {
+  id: true,
+  type: true,
+  content: true,
+  contentId: true,
+  metadata: true,
+  locationTag: true,
+  likeCount: true,
+  commentCount: true,
+  repostCount: true,
+  createdAt: true,
+  persona: {
+    select: {
+      id: true,
+      name: true,
+      handle: true,
+      tagline: true,
+      role: true,
+      profileImageUrl: true,
+      warmth: true,
+    },
+  },
+} as const
+
+type FeedPostRow = Awaited<
+  ReturnType<typeof prisma.personaPost.findMany<{ select: typeof feedPostSelect }>>
+>[number]
+
+function buildTabResponse(posts: FeedPostRow[], limit: number, source: string): NextResponse {
+  const hasMore = posts.length > limit
+  const sliced = hasMore ? posts.slice(0, limit) : posts
+  const nextCursor = hasMore ? (sliced[sliced.length - 1]?.id ?? null) : null
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      posts: sliced.map((p) => ({
+        id: p.id,
+        type: p.type,
+        content: p.content,
+        contentId: p.contentId,
+        metadata: p.metadata,
+        locationTag: p.locationTag,
+        likeCount: p.likeCount,
+        commentCount: p.commentCount,
+        repostCount: p.repostCount,
+        createdAt: p.createdAt.toISOString(),
+        source,
+        persona: {
+          id: p.persona.id,
+          name: p.persona.name,
+          handle: p.persona.handle ?? "",
+          tagline: p.persona.tagline,
+          role: p.persona.role,
+          profileImageUrl: p.persona.profileImageUrl,
+          warmth: p.persona.warmth ? Number(p.persona.warmth) : 0.5,
+        },
+      })),
+      nextCursor,
+      hasMore,
+    },
+  })
+}
+
+// ── Following 탭 ──────────────────────────────────────────────
+
+async function handleFollowingTab(
+  userId: string,
+  limit: number,
+  cursor?: string
+): Promise<NextResponse> {
+  const follows = await prisma.personaFollow.findMany({
+    where: { followerUserId: userId },
+    select: { followingPersonaId: true },
+  })
+  const followingIds = follows.map((f) => f.followingPersonaId)
+
+  if (followingIds.length === 0) {
+    return NextResponse.json({
+      success: true,
+      data: { posts: [], nextCursor: null, hasMore: false },
+    })
+  }
+
+  const posts = await prisma.personaPost.findMany({
+    where: {
+      isHidden: false,
+      personaId: { in: followingIds },
+      persona: { status: { in: ["ACTIVE", "STANDARD"] } },
+    },
+    orderBy: { createdAt: "desc" as const },
+    take: limit + 1,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    select: feedPostSelect,
+  })
+
+  return buildTabResponse(posts, limit, "FOLLOWING")
+}
+
+// ── Explore 탭 ────────────────────────────────────────────────
+
+async function handleExploreTab(
+  userId: string,
+  limit: number,
+  cursor?: string
+): Promise<NextResponse> {
+  const follows = await prisma.personaFollow.findMany({
+    where: { followerUserId: userId },
+    select: { followingPersonaId: true },
+  })
+  const excludeIds = follows.map((f) => f.followingPersonaId)
+
+  const where: Record<string, unknown> = {
+    isHidden: false,
+    persona: { status: { in: ["ACTIVE", "STANDARD"] } },
+  }
+  if (excludeIds.length > 0) {
+    where.personaId = { notIn: excludeIds }
+  }
+
+  const posts = await prisma.personaPost.findMany({
+    where,
+    orderBy: [{ likeCount: "desc" as const }, { createdAt: "desc" as const }],
+    take: limit + 1,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    select: feedPostSelect,
+  })
+
+  return buildTabResponse(posts, limit, "TRENDING")
 }
