@@ -79,10 +79,22 @@ export async function POST(request: NextRequest) {
               data: { isHidden: true },
             })
           } else if (report.targetType === "COMMENT") {
-            await prisma.personaComment.update({
+            const comment = await prisma.personaComment.findUnique({
               where: { id: report.targetId },
-              data: { isHidden: true },
+              select: { postId: true, isHidden: true },
             })
+            if (comment && !comment.isHidden) {
+              await prisma.$transaction([
+                prisma.personaComment.update({
+                  where: { id: report.targetId },
+                  data: { isHidden: true },
+                }),
+                prisma.personaPost.update({
+                  where: { id: comment.postId },
+                  data: { commentCount: { decrement: 1 } },
+                }),
+              ])
+            }
           }
           await prisma.personaWorldReport.update({
             where: { id: reportId },
@@ -115,11 +127,23 @@ export async function POST(request: NextRequest) {
               /* already deleted */
             })
           } else if (targetReport.targetType === "COMMENT") {
-            await prisma.personaComment
-              .delete({ where: { id: targetReport.targetId } })
-              .catch(() => {
-                /* already deleted */
-              })
+            const commentToDelete = await prisma.personaComment.findUnique({
+              where: { id: targetReport.targetId },
+              select: { postId: true },
+            })
+            if (commentToDelete) {
+              await prisma
+                .$transaction([
+                  prisma.personaComment.delete({ where: { id: targetReport.targetId } }),
+                  prisma.personaPost.update({
+                    where: { id: commentToDelete.postId },
+                    data: { commentCount: { decrement: 1 } },
+                  }),
+                ])
+                .catch(() => {
+                  /* already deleted */
+                })
+            }
           }
           await prisma.personaWorldReport.update({
             where: { id: reportId },

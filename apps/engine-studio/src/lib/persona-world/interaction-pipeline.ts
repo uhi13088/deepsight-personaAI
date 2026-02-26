@@ -3,6 +3,7 @@
 // 스케줄러 인터랙션 결정 → 대상 선택 → 좋아요/댓글/팔로우 실행
 // ═══════════════════════════════════════════════════════════════
 
+import { Prisma } from "@/generated/prisma"
 import type { ThreeLayerVector } from "@/types/persona-v3"
 import type {
   PersonaStateData,
@@ -78,6 +79,9 @@ export interface InteractionPipelineDataProvider {
     targetId: string
     metadata: Record<string, unknown>
   }): Promise<void>
+
+  /** 특정 포스트에 이미 댓글을 달았는지 확인 */
+  hasCommented?(personaId: string, postId: string): Promise<boolean>
 
   /** DB에서 페르소나 voiceProfile JSON 조회 (콜드스타트 fallback용) */
   getVoiceProfile?(personaId: string): Promise<unknown | null>
@@ -160,34 +164,51 @@ export async function executeInteractions(
     )
 
     // 좋아요 실행 (출처 태깅 포함)
+    // P2002(unique constraint) 방어: 이미 좋아요한 포스트면 중복 저장 스킵하고 liked로 처리
+    let alreadyLiked = false
     if (Math.random() < adjustedLikeProbability) {
       const likeProvenance = computeInteractionProvenance({
         source: "SYSTEM",
         propagationDepth: 0,
       })
 
-      await dataProvider.saveLike(persona.id, post.id, likeProvenance)
-      likes.push({ postId: post.id, authorId: post.authorId })
+      try {
+        await dataProvider.saveLike(persona.id, post.id, likeProvenance)
+        likes.push({ postId: post.id, authorId: post.authorId })
 
-      await dataProvider.updateRelationship(persona.id, post.authorId, "like")
+        await dataProvider.updateRelationship(persona.id, post.authorId, "like")
 
-      await dataProvider.saveActivityLog({
-        personaId: persona.id,
-        activityType: "POST_LIKED",
-        targetId: post.id,
-        metadata: {
-          probability: likeResult.probability,
-          matchScore,
-          provenance: likeProvenance,
-        },
-      })
+        await dataProvider.saveActivityLog({
+          personaId: persona.id,
+          activityType: "POST_LIKED",
+          targetId: post.id,
+          metadata: {
+            probability: likeResult.probability,
+            matchScore,
+            provenance: likeProvenance,
+          },
+        })
+      } catch (error) {
+        // P2002: 이미 좋아요한 포스트 — 중복 무시하고 댓글 단계로 진행
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+          alreadyLiked = true
+        } else {
+          throw error
+        }
+      }
     }
 
     // Phase RA: 댓글 여부 결정 — L2 기질 + tension 기반 Engagement Decision
     // 기존: 좋아요한 포스트 중 30% 확률 (기질/갈등 무관)
     // 변경: L2 패턴 + tension → skip/react_only/comment 확률적 결정
-    const liked = likes.some((l) => l.postId === post.id)
+    const liked = alreadyLiked || likes.some((l) => l.postId === post.id)
     if (!liked) continue // 좋아요 없으면 댓글도 없음
+
+    // 이미 이 포스트에 댓글을 달았으면 스킵 (중복 댓글 방지)
+    if (dataProvider.hasCommented) {
+      const already = await dataProvider.hasCommented(persona.id, post.id)
+      if (already) continue
+    }
 
     const currentTension = (relationship ?? DEFAULT_RELATIONSHIP).tension
     const engagementDecision = decideEngagement(l2Pattern, currentTension)

@@ -433,6 +433,14 @@ function createInteractionDataProvider(): InteractionPipelineDataProvider {
       return Number(persona?.paradoxScore ?? 0)
     },
 
+    async hasCommented(personaId, postId) {
+      const existing = await prisma.personaComment.findFirst({
+        where: { personaId, postId, isHidden: false },
+        select: { id: true },
+      })
+      return existing !== null
+    },
+
     async saveLike(personaId, postId, _provenance) {
       await prisma.$transaction([
         prisma.personaPostLike.create({
