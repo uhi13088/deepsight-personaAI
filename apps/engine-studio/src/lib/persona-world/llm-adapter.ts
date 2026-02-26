@@ -93,7 +93,7 @@ function buildCommentRolePrefix(profile?: PersonaProfileSnapshot): string {
     return profile.commentPrompt.trim()
   }
 
-  // Priority 2: 구조적 필드 조합
+  // Priority 2: 구조적 필드 조합 — 페르소나 고유 특성 최대 활용
   const parts: string[] = []
 
   const roleLabel = profile.role ?? ""
@@ -103,20 +103,43 @@ function buildCommentRolePrefix(profile?: PersonaProfileSnapshot): string {
       : `당신은 ${profile.name}입니다. SNS에서 활동하는 페르소나로, 다른 사람의 포스트에 댓글을 작성합니다.`
   )
 
+  // 페르소나 설명 (성격/배경)
+  if (profile.description?.trim()) {
+    parts.push(`\n[캐릭터]\n${profile.description.trim()}`)
+  }
+
+  // 전문 분야
+  if (profile.expertise?.length) {
+    parts.push(`[전문 분야] ${profile.expertise.slice(0, 4).join(", ")}`)
+  }
+
   // VoiceSpec에서 말투 추출
   const vs = safeParseCommentVoiceSpec(profile.voiceSpec)
   if (vs?.speechStyle) {
     parts.push(`\n[말투] ${vs.speechStyle}`)
   }
   if (vs?.habitualExpressions?.length) {
-    parts.push(`[습관 표현] ${vs.habitualExpressions.join(" / ")}`)
+    parts.push(`[입버릇/습관 표현] ${vs.habitualExpressions.join(" / ")}`)
   }
+
+  // speechPatterns (voiceSpec과 별개 — DB 직접 저장된 말투 패턴)
+  if (profile.speechPatterns?.length) {
+    parts.push(`[말투 패턴] ${profile.speechPatterns.slice(0, 4).join(" / ")}`)
+  }
+
   if (profile.quirks?.length) {
-    parts.push(`[특이 습관] ${profile.quirks.slice(0, 2).join(", ")}`)
+    parts.push(`[특이 습관] ${profile.quirks.slice(0, 3).join(", ")}`)
+  }
+
+  // factbook (핵심 성격/가치관)
+  const factbookStr = typeof profile.factbook === "string" ? profile.factbook.trim() : ""
+  if (factbookStr) {
+    const factLines = factbookStr.split("\n").slice(0, 4).join("\n")
+    parts.push(`\n[핵심 가치관/성격]\n${factLines}`)
   }
 
   parts.push(
-    `\n[주의사항]\n- 댓글만 출력하세요 (부가 설명 없이)\n- 자연스러운 SNS 댓글처럼 작성하세요`
+    `\n[주의사항]\n- 댓글만 출력하세요 (부가 설명 없이)\n- ${profile.name}만의 고유한 말투와 성격이 드러나게 작성하세요\n- 다른 페르소나와 구별되는 개성 있는 표현을 사용하세요`
   )
 
   return parts.join("\n")
@@ -139,12 +162,14 @@ function safeParseCommentVoiceSpec(
           })()
         : null
   if (!obj) return null
-  const profile = obj.profile as Record<string, unknown> | undefined
-  if (!profile) return null
+
+  // voiceSpec 구조 호환: { profile: { speechStyle } } 또는 { speechStyle } 모두 지원
+  const source = (obj.profile as Record<string, unknown> | undefined) ?? obj
+
   return {
-    speechStyle: typeof profile.speechStyle === "string" ? profile.speechStyle : undefined,
-    habitualExpressions: Array.isArray(profile.habitualExpressions)
-      ? (profile.habitualExpressions as string[])
+    speechStyle: typeof source.speechStyle === "string" ? source.speechStyle : undefined,
+    habitualExpressions: Array.isArray(source.habitualExpressions)
+      ? (source.habitualExpressions as string[])
       : undefined,
   }
 }
@@ -194,13 +219,15 @@ function buildCommentUserPrompt(
   const parts: string[] = [`[원본 포스트]\n${postContent}`, `\n[톤] ${tone.tone}`]
 
   if (ragContext.voiceAnchor) {
-    parts.push(`[Voice 참조] ${ragContext.voiceAnchor}`)
+    parts.push(
+      `\n[이 페르소나의 말투 참조 — 반드시 이 스타일을 따르세요]\n${ragContext.voiceAnchor}`
+    )
   }
   if (ragContext.interestContinuity) {
     parts.push(`[관심사 맥락] ${ragContext.interestContinuity}`)
   }
 
-  parts.push("\n위 포스트에 대한 댓글을 작성하세요. 댓글 본문만 출력하세요.")
+  parts.push("\n위 포스트에 대한 댓글을 당신만의 고유한 말투로 작성하세요. 댓글 본문만 출력하세요.")
   return parts.join("\n")
 }
 
