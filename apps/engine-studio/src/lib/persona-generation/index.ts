@@ -24,6 +24,7 @@ import {
   type ActivitySettings,
   type ContentSettings,
 } from "./activity-inference"
+import { inferRegion, inferNationality } from "./structured-fields"
 import { validateConsistency, type ValidationResult } from "./consistency-validator"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
@@ -97,13 +98,18 @@ export function generatePersona(config: GenerationConfig): GeneratedPersona {
     l3: paradox.adjustedL3,
   }
 
-  // Stage 3: 캐릭터 생성
+  // Stage 2.5: 지역/국적 먼저 결정 (이름 일관성 보장)
+  const preRegion = inferRegion(vectors.l1, vectors.l2)
+  const preNationality = inferNationality(preRegion)
+
+  // Stage 3: 캐릭터 생성 (국적에 맞는 이름 선택)
   const character = generateCharacter(
     vectors.l1,
     vectors.l2,
     vectors.l3,
     archetype,
-    config.existingNames
+    config.existingNames,
+    preNationality
   )
 
   // Stage 4: 활동성/콘텐츠 설정 추론
