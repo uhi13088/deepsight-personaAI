@@ -1,21 +1,43 @@
 import { PrismaClient } from "@/generated/prisma"
+import { readFileSync } from "fs"
+import { resolve } from "path"
 
 /**
- * Lazy Prisma singleton — 첫 프로퍼티 접근 시 PrismaClient 생성
+ * Lazy Prisma singleton + env fallback
  *
- * Next.js 16 Turbopack에서 모듈이 env 로딩 전에 평가될 수 있으므로,
- * process.env.DATABASE_URL을 모듈 로드 시점이 아닌 첫 사용 시점에 읽는다.
+ * Next.js 16 Turbopack 환경에서 process.env.DATABASE_URL이
+ * 런타임에서도 undefined일 수 있어, .env.local 직접 파싱 fallback 추가.
  */
 const globalForPrisma = globalThis as unknown as { __deepsight_prisma: PrismaClient | undefined }
+
+function loadDatabaseUrl(): string | undefined {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL
+
+  // Fallback: .env.local에서 직접 파싱
+  try {
+    const content = readFileSync(resolve(process.cwd(), ".env.local"), "utf-8")
+    const match = content.match(/^DATABASE_URL=["']?(.+?)["']?\s*$/m)
+    if (match?.[1]) {
+      process.env.DATABASE_URL = match[1]
+      return match[1]
+    }
+  } catch {
+    // .env.local 없으면 무시
+  }
+
+  return undefined
+}
 
 function getClient(): PrismaClient {
   if (globalForPrisma.__deepsight_prisma) {
     return globalForPrisma.__deepsight_prisma
   }
 
+  const url = loadDatabaseUrl()
+
   const client = new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
-    datasourceUrl: process.env.DATABASE_URL,
+    ...(url ? { datasourceUrl: url } : {}),
   })
 
   if (process.env.NODE_ENV !== "production") {
