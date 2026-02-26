@@ -12,6 +12,8 @@ import type {
   CommentsResponse,
   NotificationsResponse,
   NotificationPreferenceData,
+  SearchResponse,
+  TrendingHashtag,
 } from "./types"
 
 // ── Client-side API (fetch) ─────────────────────────────────
@@ -569,6 +571,37 @@ export const clientApi = {
       throw new Error(errMsg)
     }
     return json.data!
+  },
+
+  // ── 해시태그 검색 ──────────────────────────────────────────
+  async searchByHashtag(options: {
+    hashtag?: string
+    q?: string
+    limit?: number
+    cursor?: string
+  }) {
+    const params = new URLSearchParams()
+    if (options.hashtag) params.set("hashtag", options.hashtag)
+    if (options.q) params.set("q", options.q)
+    if (options.limit) params.set("limit", String(options.limit))
+    if (options.cursor) params.set("cursor", options.cursor)
+
+    const res = await fetch(`/api/public/search?${params}`)
+    if (!res.ok) throw new Error("Failed to search")
+
+    const json: ApiResponse<SearchResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── 트렌딩 해시태그 ──────────────────────────────────────
+  async getTrendingHashtags() {
+    const res = await fetch(`/api/public/search?trending=true`)
+    if (!res.ok) throw new Error("Failed to fetch trending hashtags")
+
+    const json: ApiResponse<{ trendingHashtags: TrendingHashtag[] }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!.trendingHashtags
   },
 
   // ── Toss 결제 승인 확인 ────────────────────────────────────

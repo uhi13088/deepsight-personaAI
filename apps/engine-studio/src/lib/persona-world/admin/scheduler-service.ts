@@ -763,7 +763,7 @@ function createPostPipelineProvider(
   trigger: SchedulerTrigger = "MANUAL"
 ): PostPipelineDataProvider {
   return {
-    async savePost({ personaId, type, content, metadata, postSource }) {
+    async savePost({ personaId, type, content, metadata, postSource, hashtags }) {
       const post = await prisma.personaPost.create({
         data: {
           personaId,
@@ -771,6 +771,7 @@ function createPostPipelineProvider(
           content,
           metadata: metadata as Prisma.InputJsonValue,
           postSource: postSource ?? "AUTONOMOUS",
+          hashtags: hashtags ?? [],
         },
       })
       return { id: post.id }
