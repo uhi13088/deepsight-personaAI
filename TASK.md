@@ -1284,7 +1284,7 @@
   - AC5: ✅ Next.js 16 호환 — `RequestInit.signal` 타입, `NotificationSettings.push` 추가 (api-key-validator, settings-service)
   - AC6: ✅ `pnpm test` 전체 PASS (3,993 tests / 113 files)
 
-- [ ] **T176: 프로덕션 DB 마이그레이션 미적용 수정 — 500 에러 해결**
+- [x] **T176: 프로덕션 DB 마이그레이션 미적용 수정 — 500 에러 해결** ✅ 2026-02-22
   - 배경: 엔진 스튜디오 프로덕션 `/api/internal/personas`, `/api/internal/incubator/dashboard` 500 에러. 원인: 마이그레이션 016~024가 프로덕션 DB에 미적용. Prisma 클라이언트는 최신 스키마 기준 빌드하나 실제 DB에 컬럼/테이블 부재
   - AC1: 마이그레이션 023 테이블명 버그 수정 (`"Persona"` → `"personas"`)
   - AC2: 통합 마이그레이션 스크립트 생성 (`apply_missing_016_to_024.sql`)
@@ -1497,21 +1497,20 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-### Phase PW-H: 피드 해시태그 시스템 (T257)
-
-- [ ] **T257: 페르소나 피드 해시태그 생성 + 해시태그 검색 기능**
-  - 배경: 페르소나가 피드 작성 시 관련 해시태그를 자동 생성하고, 검색에서 해시태그 기반 필터링 지원
-  - AC1: DB 스키마 — `PersonaPost.hashtags String[]` 필드 추가 + 마이그레이션
-  - AC2: LLM 프롬프트 — `buildUserPrompt()`에 해시태그 2~5개 생성 지시 추가
-  - AC3: Post Pipeline — 생성 콘텐츠에서 `#태그` 패턴 추출 → `hashtags[]` 저장
-  - AC4: Feed API — 피드 응답에 `hashtags` 필드 포함
-  - AC5: 검색 API — `/api/public/search` 엔드포인트 (해시태그 검색 + 트렌딩 해시태그)
-  - AC6: PW Frontend — 포스트 카드에 해시태그 칩 표시 + 클릭 시 검색 이동 + Explore 트렌딩 해시태그 섹션
-  - AC7: 테스트 — 해시태그 추출 유닛 테스트 PASS
+(없음)
 
 ---
 
 ## ✅ DONE (최근 완료)
+
+- [x] **T257: 페르소나 피드 해시태그 생성 + 해시태그 검색 기능** ✅ 2026-02-26
+  - AC1: ✅ DB 스키마 — `PersonaPost.hashtags String[]` 필드 + GIN 인덱스 + 마이그레이션 037
+  - AC2: ✅ LLM 프롬프트 — `buildUserPrompt()`에 해시태그 2~5개 생성 지시 추가
+  - AC3: ✅ Post Pipeline — `extractHashtags()` 유틸로 `#태그` 패턴 추출 → `hashtags[]` 저장 (3개 스케줄러 모두 반영)
+  - AC4: ✅ Feed API — 피드 응답에 `hashtags` 필드 포함
+  - AC5: ✅ 검색 API — `/api/public/search` 엔드포인트 (해시태그 검색 + 트렌딩 해시태그)
+  - AC6: ✅ PW Frontend — 포스트 카드에 해시태그 칩 표시 + 클릭 시 검색 이동 + Explore 트렌딩 해시태그 섹션
+  - AC7: ✅ 테스트 — hashtag-utils 15 tests PASS, content-generator 32 PASS, post-pipeline 15 PASS
 
 - [x] **T256: RSS 소스 자동화 — 프리셋 자동 등록 + cron 기반 수집** ✅ 2026-02-25
   - AC1: ✅ 스키마에 `consecutiveFailures`, `lastError` 필드 추가 + 마이그레이션 036
