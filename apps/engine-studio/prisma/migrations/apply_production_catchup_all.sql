@@ -1,11 +1,13 @@
 -- ═══════════════════════════════════════════════════════════════════════
--- 프로덕션 DB 전체 Catchup 마이그레이션
+-- 프로덕션 DB Catchup 마이그레이션 — Step 2 (018~037)
 -- 생성일: 2026-02-26
 --
--- 목적: 프로덕션 DB에 누락된 모든 테이블/컬럼/인덱스를 한번에 적용
---   - 001_full_schema.sql 의 PersonaWorld 관련 테이블 (38~55+)
---   - 016~024 마이그레이션 (apply_missing_016_to_024.sql)
---   - 025~037 마이그레이션
+-- ⚠️  실행 순서 (반드시 지킬 것):
+--   Step 1: 먼저 001_full_schema.sql 실행 (모든 기본 테이블 + ENUM 생성)
+--   Step 2: 그 다음 이 파일 실행 (018~037 추가 변경사항)
+--
+-- 001_full_schema.sql은 ENUM 전체 + 테이블 1~55 + 016~017 변경을 포함합니다.
+-- 이 파일은 그 이후 추가된 변경사항(018~037)만 적용합니다.
 --
 -- 안전성: 모든 구문에 IF NOT EXISTS / IF EXISTS 가드 포함 → 재실행 가능
 -- 주의: ALTER TYPE ADD VALUE는 트랜잭션 안에서 실행 불가 → BEGIN/COMMIT 미사용
@@ -17,572 +19,35 @@
 
 
 -- ╔═══════════════════════════════════════════════════════════════════╗
--- ║  Part 0: 001_full_schema의 전체 ENUM 타입 (누락 방지)              ║
+-- ║  018: ActivityTrigger MANUAL enum 값 추가                          ║
 -- ╚═══════════════════════════════════════════════════════════════════╝
-
--- 인증 및 사용자
-DO $$ BEGIN CREATE TYPE "UserRole" AS ENUM ('ADMIN', 'AI_ENGINEER', 'CONTENT_MANAGER', 'ANALYST'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
--- 페르소나 관리
-DO $$ BEGIN CREATE TYPE "PersonaVisibility" AS ENUM ('GLOBAL', 'PRIVATE', 'SHARED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "PersonaRole" AS ENUM ('REVIEWER', 'CURATOR', 'EDUCATOR', 'COMPANION', 'ANALYST'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "PersonaStatus" AS ENUM ('DRAFT', 'REVIEW', 'ACTIVE', 'STANDARD', 'LEGACY', 'DEPRECATED', 'PAUSED', 'ARCHIVED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "PersonaSource" AS ENUM ('MANUAL', 'INCUBATOR', 'MUTATION', 'AUTO_GENERATED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "ExpertiseLevel" AS ENUM ('CASUAL', 'ENTHUSIAST', 'EXPERT', 'CRITIC'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "PostFrequency" AS ENUM ('RARE', 'OCCASIONAL', 'MODERATE', 'ACTIVE', 'HYPERACTIVE'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "LayerType" AS ENUM ('SOCIAL', 'TEMPERAMENT', 'NARRATIVE'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "OnboardingLevel" AS ENUM ('QUICK', 'STANDARD', 'DEEP'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
--- 매칭 알고리즘
-DO $$ BEGIN CREATE TYPE "AlgorithmType" AS ENUM ('COSINE', 'WEIGHTED', 'CONTEXT', 'HYBRID'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "AlgorithmStatus" AS ENUM ('DRAFT', 'TESTING', 'ACTIVE', 'DEPRECATED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "ChangeType" AS ENUM ('MAJOR', 'MINOR', 'PATCH', 'ROLLBACK'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "FeedbackType" AS ENUM ('LIKE', 'DISLIKE', 'NONE'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "ABTestType" AS ENUM ('ALGORITHM', 'PERSONA', 'PARAMETER', 'WEIGHT', 'DIMENSION'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "ABTestStatus" AS ENUM ('DRAFT', 'RUNNING', 'PAUSED', 'COMPLETED', 'CANCELLED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
--- 설문 및 프로파일링
-DO $$ BEGIN CREATE TYPE "QuestionType" AS ENUM ('SLIDER', 'MULTIPLE_CHOICE', 'RANKING', 'TEXT', 'IMAGE'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "DifficultyLevel" AS ENUM ('EASY', 'MEDIUM', 'HARD'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "IncubatorStatus" AS ENUM ('PENDING', 'PASSED', 'FAILED', 'APPROVED', 'REJECTED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
--- API 엔드포인트
-DO $$ BEGIN CREATE TYPE "HttpMethod" AS ENUM ('GET', 'POST', 'PUT', 'PATCH', 'DELETE'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "EndpointStatus" AS ENUM ('ACTIVE', 'DEPRECATED', 'DISABLED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "FilterType" AS ENUM ('PROFANITY', 'HATE_SPEECH', 'POLITICAL', 'RELIGIOUS', 'CUSTOM'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
--- 배포 관리
-DO $$ BEGIN CREATE TYPE "DeploymentTarget" AS ENUM ('PERSONA', 'ALGORITHM', 'CONFIG'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "DeploymentEnv" AS ENUM ('DEV', 'STG', 'PROD'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "DeploymentStatus" AS ENUM ('PENDING', 'IN_PROGRESS', 'COMPLETED', 'FAILED', 'ROLLED_BACK'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
--- 장애 관리
-DO $$ BEGIN CREATE TYPE "IncidentSeverity" AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "IncidentStatus" AS ENUM ('REPORTED', 'INVESTIGATING', 'IDENTIFIED', 'FIXING', 'RESOLVED', 'CLOSED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
--- 버전 관리
-DO $$ BEGIN CREATE TYPE "VersionStatus" AS ENUM ('ACTIVE', 'DEPRECATED', 'ARCHIVED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
--- PersonaWorld SNS (핵심!)
-DO $$ BEGIN CREATE TYPE "PersonaPostType" AS ENUM (
-  'REVIEW', 'THOUGHT', 'RECOMMENDATION', 'REACTION', 'QUESTION',
-  'LIST', 'THREAD', 'VS_BATTLE', 'QNA', 'CURATION',
-  'DEBATE', 'MEME', 'COLLAB', 'TRIVIA', 'PREDICTION',
-  'ANNIVERSARY', 'BEHIND_STORY'
-); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN CREATE TYPE "ActivityTrigger" AS ENUM (
-  'SCHEDULED', 'CONTENT_RELEASE', 'SOCIAL_EVENT',
-  'USER_INTERACTION', 'TRENDING', 'AUTONOMOUS'
-); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN CREATE TYPE "ProfileQuality" AS ENUM ('BASIC', 'STANDARD', 'ADVANCED', 'PREMIUM'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN CREATE TYPE "SNSPlatform" AS ENUM (
-  'NETFLIX', 'YOUTUBE', 'INSTAGRAM', 'SPOTIFY',
-  'LETTERBOXD', 'TWITTER', 'TIKTOK'
-); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
--- 신고 및 모더레이션
-DO $$ BEGIN CREATE TYPE "ReportTargetType" AS ENUM ('POST', 'COMMENT'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "ReportReason" AS ENUM ('SPAM', 'INAPPROPRIATE', 'HARASSMENT', 'MISINFORMATION', 'OTHER'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "ReportStatus" AS ENUM ('PENDING', 'REVIEWED', 'RESOLVED', 'DISMISSED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN CREATE TYPE "PersonaActivityType" AS ENUM (
-  'POST_CREATED', 'POST_LIKED', 'POST_COMMENTED', 'POST_REPOSTED',
-  'PERSONA_FOLLOWED', 'PERSONA_UNFOLLOWED',
-  'DEBATE_STARTED', 'COLLAB_STARTED', 'SYSTEM'
-); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
--- 소비 기록
-DO $$ BEGIN CREATE TYPE "ConsumptionContentType" AS ENUM ('MOVIE', 'DRAMA', 'MUSIC', 'BOOK', 'ARTICLE', 'GAME', 'OTHER'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "ConsumptionSource" AS ENUM ('AUTONOMOUS', 'FEED', 'RECOMMENDATION', 'ONBOARDING'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
--- 이벤트 버스
-DO $$ BEGIN CREATE TYPE "EventChannelStatus" AS ENUM ('ACTIVE', 'PAUSED', 'ERROR'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "EventStatus" AS ENUM ('PENDING', 'PROCESSING', 'SUCCESS', 'FAILED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "EventPriority" AS ENUM ('LOW', 'NORMAL', 'HIGH', 'CRITICAL'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
--- 인터랙션 로그
-DO $$ BEGIN CREATE TYPE "ParticipantType" AS ENUM ('PERSONA', 'USER', 'CONTENT'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "InteractionType" AS ENUM ('CONVERSATION', 'COMMENT', 'REPLY', 'REACTION', 'POST', 'MENTION'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "LlmCallStatus" AS ENUM ('SUCCESS', 'ERROR'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "InteractionSource" AS ENUM ('DIRECT', 'PERSONA_RELAY', 'EXTERNAL_FEED', 'SYSTEM'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "PostSource" AS ENUM ('AUTONOMOUS', 'FEED_INSPIRED', 'ARENA_TEST', 'SCHEDULED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
--- 블로그
-DO $$ BEGIN CREATE TYPE "BlogCategory" AS ENUM ('TECH', 'PRODUCT', 'INSIGHT', 'ANNOUNCEMENT'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
--- 격리 시스템
-DO $$ BEGIN CREATE TYPE "QuarantineStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'DELETED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
--- 016~024에서 추가되는 ENUM
-DO $$ BEGIN CREATE TYPE "PersonaRequestStatus" AS ENUM ('PENDING', 'SCHEDULED', 'GENERATING', 'COMPLETED', 'FAILED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "CoinTransactionType" AS ENUM ('EARN', 'PURCHASE', 'SPEND'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE "CoinTransactionStatus" AS ENUM ('PENDING', 'COMPLETED', 'FAILED', 'REFUNDED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-
--- ╔═══════════════════════════════════════════════════════════════════╗
--- ║  Part 1: 001_full_schema — PersonaWorld 기본 테이블 (38~55)        ║
--- ╚═══════════════════════════════════════════════════════════════════╝
-
--- ────────────────────────────────────────────────────────────
--- 38. persona_world_users
--- ────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS "persona_world_users" (
-  "id" TEXT NOT NULL,
-  "email" TEXT NOT NULL,
-  "name" TEXT,
-  "profileImageUrl" TEXT,
-
-  -- 6D 벡터
-  "depth" DECIMAL(3,2),
-  "lens" DECIMAL(3,2),
-  "stance" DECIMAL(3,2),
-  "scope" DECIMAL(3,2),
-  "taste" DECIMAL(3,2),
-  "purpose" DECIMAL(3,2),
-
-  -- L2 OCEAN
-  "openness" DECIMAL(3,2),
-  "conscientiousness" DECIMAL(3,2),
-  "extraversion" DECIMAL(3,2),
-  "agreeableness" DECIMAL(3,2),
-  "neuroticism" DECIMAL(3,2),
-  "hasOceanProfile" BOOLEAN NOT NULL DEFAULT false,
-
-  -- 프로필 레벨
-  "profile_level" TEXT NOT NULL DEFAULT 'BASIC',
-
-  -- 프로필 품질
-  "profileQuality" "ProfileQuality" NOT NULL DEFAULT 'BASIC',
-  "confidenceScore" DECIMAL(3,2),
-
-  -- 데이터 소스
-  "dataSources" JSONB,
-  "snsExtendedData" JSONB,
-  "preferences" JSONB,
-
-  "isActive" BOOLEAN NOT NULL DEFAULT true,
-  "lastLoginAt" TIMESTAMP(3),
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-  CONSTRAINT "persona_world_users_pkey" PRIMARY KEY ("id")
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS "persona_world_users_email_key" ON "persona_world_users"("email");
-
--- ────────────────────────────────────────────────────────────
--- 39. persona_posts (이미 존재할 가능성 높음, IF NOT EXISTS)
--- ────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS "persona_posts" (
-  "id" TEXT NOT NULL,
-  "personaId" TEXT NOT NULL,
-  "type" "PersonaPostType" NOT NULL,
-  "content" TEXT NOT NULL,
-  "contentId" TEXT,
-  "metadata" JSONB,
-  "parentId" TEXT,
-  "trigger" "ActivityTrigger" NOT NULL DEFAULT 'SCHEDULED',
-  "likeCount" INTEGER NOT NULL DEFAULT 0,
-  "commentCount" INTEGER NOT NULL DEFAULT 0,
-  "repostCount" INTEGER NOT NULL DEFAULT 0,
-  "isHidden" BOOLEAN NOT NULL DEFAULT false,
-  "hiddenAt" TIMESTAMP(3),
-  "hiddenBy" TEXT,
-  "poignancyScore" DECIMAL(4,3),
-  "postSource" "PostSource" DEFAULT 'AUTONOMOUS',
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-  CONSTRAINT "persona_posts_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "persona_posts_personaId_fkey" FOREIGN KEY ("personaId") REFERENCES "personas"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "persona_posts_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "persona_posts"("id") ON DELETE SET NULL ON UPDATE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS "persona_posts_personaId_createdAt_idx" ON "persona_posts"("personaId", "createdAt");
-CREATE INDEX IF NOT EXISTS "persona_posts_type_createdAt_idx" ON "persona_posts"("type", "createdAt");
-
--- ────────────────────────────────────────────────────────────
--- 40. persona_post_likes
--- ────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS "persona_post_likes" (
-  "id" TEXT NOT NULL,
-  "postId" TEXT NOT NULL,
-  "personaId" TEXT,
-  "userId" TEXT,
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-  CONSTRAINT "persona_post_likes_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "persona_post_likes_postId_fkey" FOREIGN KEY ("postId") REFERENCES "persona_posts"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "persona_post_likes_personaId_fkey" FOREIGN KEY ("personaId") REFERENCES "personas"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "persona_post_likes_userId_fkey" FOREIGN KEY ("userId") REFERENCES "persona_world_users"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "chk_like_author" CHECK (
-    ("personaId" IS NOT NULL AND "userId" IS NULL) OR
-    ("personaId" IS NULL AND "userId" IS NOT NULL)
-  )
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS "persona_post_likes_postId_personaId_key" ON "persona_post_likes"("postId", "personaId");
-CREATE UNIQUE INDEX IF NOT EXISTS "persona_post_likes_postId_userId_key" ON "persona_post_likes"("postId", "userId");
-
--- ────────────────────────────────────────────────────────────
--- 41. persona_comments
--- ────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS "persona_comments" (
-  "id" TEXT NOT NULL,
-  "postId" TEXT NOT NULL,
-  "personaId" TEXT,
-  "userId" TEXT,
-  "content" TEXT NOT NULL,
-  "parentId" TEXT,
-  "isHidden" BOOLEAN NOT NULL DEFAULT false,
-  "hiddenAt" TIMESTAMP(3),
-  "hiddenBy" TEXT,
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-  CONSTRAINT "persona_comments_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "persona_comments_postId_fkey" FOREIGN KEY ("postId") REFERENCES "persona_posts"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "persona_comments_personaId_fkey" FOREIGN KEY ("personaId") REFERENCES "personas"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "persona_comments_userId_fkey" FOREIGN KEY ("userId") REFERENCES "persona_world_users"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "persona_comments_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "persona_comments"("id") ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT "chk_comment_author" CHECK (
-    ("personaId" IS NOT NULL AND "userId" IS NULL) OR
-    ("personaId" IS NULL AND "userId" IS NOT NULL)
-  )
-);
-
-CREATE INDEX IF NOT EXISTS "persona_comments_postId_createdAt_idx" ON "persona_comments"("postId", "createdAt");
-
--- ────────────────────────────────────────────────────────────
--- 42. persona_reposts
--- ────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS "persona_reposts" (
-  "id" TEXT NOT NULL,
-  "originalPostId" TEXT NOT NULL,
-  "personaId" TEXT NOT NULL,
-  "comment" TEXT,
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-  CONSTRAINT "persona_reposts_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "persona_reposts_originalPostId_fkey" FOREIGN KEY ("originalPostId") REFERENCES "persona_posts"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "persona_reposts_personaId_fkey" FOREIGN KEY ("personaId") REFERENCES "personas"("id") ON DELETE CASCADE ON UPDATE CASCADE
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS "persona_reposts_originalPostId_personaId_key" ON "persona_reposts"("originalPostId", "personaId");
-
--- ────────────────────────────────────────────────────────────
--- 43. persona_follows
--- ────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS "persona_follows" (
-  "id" TEXT NOT NULL,
-  "followerPersonaId" TEXT,
-  "followerUserId" TEXT,
-  "followingPersonaId" TEXT NOT NULL,
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-  CONSTRAINT "persona_follows_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "persona_follows_followerPersonaId_fkey" FOREIGN KEY ("followerPersonaId") REFERENCES "personas"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "persona_follows_followerUserId_fkey" FOREIGN KEY ("followerUserId") REFERENCES "persona_world_users"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "persona_follows_followingPersonaId_fkey" FOREIGN KEY ("followingPersonaId") REFERENCES "personas"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "chk_follower" CHECK (
-    ("followerPersonaId" IS NOT NULL AND "followerUserId" IS NULL) OR
-    ("followerPersonaId" IS NULL AND "followerUserId" IS NOT NULL)
-  )
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS "persona_follows_followerPersonaId_followingPersonaId_key" ON "persona_follows"("followerPersonaId", "followingPersonaId");
-CREATE UNIQUE INDEX IF NOT EXISTS "persona_follows_followerUserId_followingPersonaId_key" ON "persona_follows"("followerUserId", "followingPersonaId");
-
--- ────────────────────────────────────────────────────────────
--- 44. persona_post_bookmarks
--- ────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS "persona_post_bookmarks" (
-  "id" TEXT NOT NULL,
-  "userId" TEXT NOT NULL,
-  "postId" TEXT NOT NULL,
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-  CONSTRAINT "persona_post_bookmarks_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "persona_post_bookmarks_userId_fkey" FOREIGN KEY ("userId") REFERENCES "persona_world_users"("id") ON DELETE CASCADE ON UPDATE CASCADE
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS "persona_post_bookmarks_userId_postId_key" ON "persona_post_bookmarks"("userId", "postId");
-
--- ────────────────────────────────────────────────────────────
--- 45. pw_user_survey_responses
--- ────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS "pw_user_survey_responses" (
-  "id" TEXT NOT NULL,
-  "userId" TEXT NOT NULL,
-  "surveyLevel" "OnboardingLevel" NOT NULL,
-  "answers" JSONB NOT NULL,
-  "computedVector" JSONB,
-  "completedAt" TIMESTAMP(3),
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-  CONSTRAINT "pw_user_survey_responses_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "pw_user_survey_responses_userId_fkey" FOREIGN KEY ("userId") REFERENCES "persona_world_users"("id") ON DELETE CASCADE ON UPDATE CASCADE
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS "pw_user_survey_responses_userId_surveyLevel_key" ON "pw_user_survey_responses"("userId", "surveyLevel");
-
--- ────────────────────────────────────────────────────────────
--- 46. sns_connections
--- ────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS "sns_connections" (
-  "id" TEXT NOT NULL,
-  "userId" TEXT NOT NULL,
-  "platform" "SNSPlatform" NOT NULL,
-  "accessToken" TEXT,
-  "refreshToken" TEXT,
-  "expiresAt" TIMESTAMP(3),
-  "profileData" JSONB,
-  "extractedData" JSONB,
-  "lastSyncAt" TIMESTAMP(3),
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-  CONSTRAINT "sns_connections_pkey" PRIMARY KEY ("id")
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS "sns_connections_userId_platform_key" ON "sns_connections"("userId", "platform");
-
--- ────────────────────────────────────────────────────────────
--- 47. persona_world_reports
--- ────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS "persona_world_reports" (
-  "id" TEXT NOT NULL,
-  "reporterUserId" TEXT NOT NULL,
-  "targetType" "ReportTargetType" NOT NULL,
-  "targetId" TEXT NOT NULL,
-  "reason" "ReportReason" NOT NULL,
-  "description" TEXT,
-  "status" "ReportStatus" NOT NULL DEFAULT 'PENDING',
-  "resolvedAt" TIMESTAMP(3),
-  "resolvedBy" TEXT,
-  "resolution" TEXT,
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-  CONSTRAINT "persona_world_reports_pkey" PRIMARY KEY ("id")
-);
-
-CREATE INDEX IF NOT EXISTS "persona_world_reports_status_createdAt_idx" ON "persona_world_reports"("status", "createdAt");
-
--- ────────────────────────────────────────────────────────────
--- 48. persona_activity_logs
--- ────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS "persona_activity_logs" (
-  "id" TEXT NOT NULL,
-  "personaId" TEXT NOT NULL,
-  "activityType" "PersonaActivityType" NOT NULL,
-  "targetId" TEXT,
-  "metadata" JSONB,
-  "trigger" "ActivityTrigger" NOT NULL,
-  "postTypeReason" JSONB,
-  "stateSnapshot" JSONB,
-  "matching_score" DECIMAL(4,3),
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-  CONSTRAINT "persona_activity_logs_pkey" PRIMARY KEY ("id")
-);
-
-CREATE INDEX IF NOT EXISTS "persona_activity_logs_personaId_createdAt_idx" ON "persona_activity_logs"("personaId", "createdAt");
-CREATE INDEX IF NOT EXISTS "persona_activity_logs_activityType_createdAt_idx" ON "persona_activity_logs"("activityType", "createdAt");
-
--- ────────────────────────────────────────────────────────────
--- 49. persona_states
--- ────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS "persona_states" (
-  "id" TEXT NOT NULL,
-  "personaId" TEXT NOT NULL,
-  "mood" DECIMAL(3,2) NOT NULL DEFAULT 0.50,
-  "energy" DECIMAL(3,2) NOT NULL DEFAULT 1.00,
-  "socialBattery" DECIMAL(3,2) NOT NULL DEFAULT 1.00,
-  "paradoxTension" DECIMAL(3,2) NOT NULL DEFAULT 0.00,
-  "narrativeTension" DECIMAL(3,2) NOT NULL DEFAULT 0.00,
-  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-  CONSTRAINT "persona_states_pkey" PRIMARY KEY ("id")
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS "persona_states_personaId_key" ON "persona_states"("personaId");
-
-DO $$ BEGIN
-  ALTER TABLE "persona_states"
-    ADD CONSTRAINT "persona_states_personaId_fkey"
-    FOREIGN KEY ("personaId") REFERENCES "personas"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
--- ────────────────────────────────────────────────────────────
--- 50. persona_relationships
--- ────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS "persona_relationships" (
-  "id" TEXT NOT NULL,
-  "personaAId" TEXT NOT NULL,
-  "personaBId" TEXT NOT NULL,
-  "warmth" DECIMAL(3,2) NOT NULL DEFAULT 0.50,
-  "tension" DECIMAL(3,2) NOT NULL DEFAULT 0.00,
-  "frequency" DECIMAL(3,2) NOT NULL DEFAULT 0.00,
-  "depth" DECIMAL(3,2) NOT NULL DEFAULT 0.00,
-  "lastInteractionAt" TIMESTAMP(3),
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-  CONSTRAINT "persona_relationships_pkey" PRIMARY KEY ("id")
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS "persona_relationships_personaAId_personaBId_key"
-  ON "persona_relationships"("personaAId", "personaBId");
-CREATE INDEX IF NOT EXISTS "persona_relationships_personaAId_idx"
-  ON "persona_relationships"("personaAId");
-CREATE INDEX IF NOT EXISTS "persona_relationships_personaBId_idx"
-  ON "persona_relationships"("personaBId");
-
-DO $$ BEGIN
-  ALTER TABLE "persona_relationships"
-    ADD CONSTRAINT "persona_relationships_personaAId_fkey"
-    FOREIGN KEY ("personaAId") REFERENCES "personas"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  ALTER TABLE "persona_relationships"
-    ADD CONSTRAINT "persona_relationships_personaBId_fkey"
-    FOREIGN KEY ("personaBId") REFERENCES "personas"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
--- ────────────────────────────────────────────────────────────
--- 51. consumption_logs
--- ────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS "consumption_logs" (
-  "id" TEXT NOT NULL,
-  "personaId" TEXT NOT NULL,
-  "contentType" "ConsumptionContentType" NOT NULL,
-  "contentId" TEXT,
-  "title" TEXT NOT NULL,
-  "impression" TEXT NOT NULL,
-  "rating" DECIMAL(3,2),
-  "emotionalImpact" DECIMAL(3,2) NOT NULL,
-  "tags" TEXT[],
-  "source" "ConsumptionSource" NOT NULL,
-  "consumedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-  CONSTRAINT "consumption_logs_pkey" PRIMARY KEY ("id")
-);
-
-CREATE INDEX IF NOT EXISTS "consumption_logs_personaId_consumedAt_idx"
-  ON "consumption_logs"("personaId", "consumedAt");
-CREATE INDEX IF NOT EXISTS "consumption_logs_personaId_tags_idx"
-  ON "consumption_logs"("personaId", "tags");
-
-DO $$ BEGIN
-  ALTER TABLE "consumption_logs"
-    ADD CONSTRAINT "consumption_logs_personaId_fkey"
-    FOREIGN KEY ("personaId") REFERENCES "personas"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
-
--- ╔═══════════════════════════════════════════════════════════════════╗
--- ║  Part 2: 016~024 마이그레이션 (apply_missing_016_to_024.sql)       ║
--- ╚═══════════════════════════════════════════════════════════════════╝
-
--- ── 016: Social Module Config ──
-
-CREATE TABLE IF NOT EXISTS "social_module_config" (
-    "id"            TEXT NOT NULL DEFAULT 'singleton',
-    "authority"     JSONB NOT NULL DEFAULT '{"enabled":false,"weight":0.2}',
-    "connectivity"  JSONB NOT NULL DEFAULT '{"enabled":true,"weight":0.3}',
-    "reputation"    JSONB NOT NULL DEFAULT '{"enabled":true,"weight":0.3}',
-    "tribalism"     JSONB NOT NULL DEFAULT '{"enabled":false,"weight":0.2}',
-    "updatedAt"     TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedBy"     TEXT NOT NULL DEFAULT 'system',
-    CONSTRAINT "social_module_config_pkey" PRIMARY KEY ("id")
-);
-
-INSERT INTO "social_module_config" ("id", "updatedAt", "updatedBy")
-VALUES ('singleton', CURRENT_TIMESTAMP, 'system')
-ON CONFLICT ("id") DO NOTHING;
-
--- ── 017: pw_notifications + persona_reposts.userId ──
-
-CREATE TABLE IF NOT EXISTS "pw_notifications" (
-  "id" TEXT NOT NULL,
-  "userId" TEXT NOT NULL,
-  "type" TEXT NOT NULL,
-  "message" TEXT NOT NULL,
-  "personaId" TEXT,
-  "personaName" TEXT,
-  "postId" TEXT,
-  "commentId" TEXT,
-  "read" BOOLEAN NOT NULL DEFAULT false,
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT "pw_notifications_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "pw_notifications_userId_fkey" FOREIGN KEY ("userId")
-    REFERENCES "persona_world_users"("id") ON DELETE CASCADE ON UPDATE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS "pw_notifications_userId_read_idx"
-  ON "pw_notifications"("userId", "read");
-CREATE INDEX IF NOT EXISTS "pw_notifications_userId_createdAt_idx"
-  ON "pw_notifications"("userId", "createdAt");
-
-ALTER TABLE "persona_reposts" ADD COLUMN IF NOT EXISTS "userId" TEXT;
-
-DO $$ BEGIN
-  ALTER TABLE "persona_reposts" ALTER COLUMN "personaId" DROP NOT NULL;
-EXCEPTION WHEN others THEN NULL;
-END $$;
-
-DO $$ BEGIN
-  ALTER TABLE "persona_reposts"
-    ADD CONSTRAINT "persona_reposts_userId_fkey"
-    FOREIGN KEY ("userId") REFERENCES "persona_world_users"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-
-CREATE UNIQUE INDEX IF NOT EXISTS "persona_reposts_originalPostId_userId_key"
-  ON "persona_reposts"("originalPostId", "userId");
-
--- ── 018: ActivityTrigger MANUAL ──
 
 ALTER TYPE "ActivityTrigger" ADD VALUE IF NOT EXISTS 'MANUAL';
 
--- ── 019: v4.0 Instruction Layer ──
+
+-- ╔═══════════════════════════════════════════════════════════════════╗
+-- ║  019: v4.0 Instruction Layer (personas 컬럼 추가)                  ║
+-- ╚═══════════════════════════════════════════════════════════════════╝
 
 ALTER TABLE "personas" ADD COLUMN IF NOT EXISTS "voiceSpec" JSONB;
 ALTER TABLE "personas" ADD COLUMN IF NOT EXISTS "factbook" JSONB;
 ALTER TABLE "personas" ADD COLUMN IF NOT EXISTS "triggerMap" JSONB;
 ALTER TABLE "personas" ALTER COLUMN "engineVersion" SET DEFAULT '4.0';
 
--- ── 020: PersonaGenerationRequest ──
+
+-- ╔═══════════════════════════════════════════════════════════════════╗
+-- ║  020: PersonaGenerationRequest 테이블                              ║
+-- ╚═══════════════════════════════════════════════════════════════════╝
 
 ALTER TYPE "PersonaSource" ADD VALUE IF NOT EXISTS 'USER_REQUEST';
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'PersonaRequestStatus') THEN
+    CREATE TYPE "PersonaRequestStatus" AS ENUM (
+      'PENDING', 'SCHEDULED', 'GENERATING', 'COMPLETED', 'FAILED'
+    );
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS "persona_generation_requests" (
   "id"                    TEXT NOT NULL DEFAULT gen_random_uuid()::text,
@@ -608,7 +73,10 @@ CREATE INDEX IF NOT EXISTS "persona_generation_requests_userId_idx"
 CREATE INDEX IF NOT EXISTS "persona_generation_requests_status_scheduledDate_idx"
   ON "persona_generation_requests"("status", "scheduledDate");
 
--- ── 021: PWNotificationPreference ──
+
+-- ╔═══════════════════════════════════════════════════════════════════╗
+-- ║  021: PWNotificationPreference 테이블                              ║
+-- ╚═══════════════════════════════════════════════════════════════════╝
 
 CREATE TABLE IF NOT EXISTS "pw_notification_preferences" (
     "id"                    TEXT NOT NULL,
@@ -639,7 +107,20 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- ── 022: CoinTransaction ──
+
+-- ╔═══════════════════════════════════════════════════════════════════╗
+-- ║  022: CoinTransaction 테이블                                      ║
+-- ╚═══════════════════════════════════════════════════════════════════╝
+
+DO $$ BEGIN
+    CREATE TYPE "CoinTransactionType" AS ENUM ('EARN', 'PURCHASE', 'SPEND');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE "CoinTransactionStatus" AS ENUM ('PENDING', 'COMPLETED', 'FAILED', 'REFUNDED');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS "coin_transactions" (
     "id"           TEXT NOT NULL,
@@ -668,7 +149,10 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- ── 023: 페르소나 인구통계 ──
+
+-- ╔═══════════════════════════════════════════════════════════════════╗
+-- ║  023: 페르소나 인구통계 컬럼 추가                                    ║
+-- ╚═══════════════════════════════════════════════════════════════════╝
 
 ALTER TABLE "personas" ADD COLUMN IF NOT EXISTS "gender" TEXT;
 ALTER TABLE "personas" ADD COLUMN IF NOT EXISTS "nationality" TEXT;
@@ -676,21 +160,25 @@ ALTER TABLE "personas" ADD COLUMN IF NOT EXISTS "educationLevel" TEXT;
 ALTER TABLE "personas" ADD COLUMN IF NOT EXISTS "languages" TEXT[] DEFAULT ARRAY[]::TEXT[];
 ALTER TABLE "personas" ADD COLUMN IF NOT EXISTS "knowledgeAreas" TEXT[] DEFAULT ARRAY[]::TEXT[];
 
--- ── 024: 인큐베이터 failReason ──
+
+-- ╔═══════════════════════════════════════════════════════════════════╗
+-- ║  024: 인큐베이터 failReason 컬럼                                    ║
+-- ╚═══════════════════════════════════════════════════════════════════╝
 
 ALTER TABLE "incubator_logs" ADD COLUMN IF NOT EXISTS "failReason" TEXT;
 
 
 -- ╔═══════════════════════════════════════════════════════════════════╗
--- ║  Part 3: 025~037 마이그레이션                                      ║
+-- ║  025: PersonaWorldUser SNS 분석 횟수                               ║
 -- ╚═══════════════════════════════════════════════════════════════════╝
-
--- ── 025: SNS 분석 횟수 ──
 
 ALTER TABLE "persona_world_users"
   ADD COLUMN IF NOT EXISTS "sns_analysis_count" INTEGER NOT NULL DEFAULT 0;
 
--- ── 026: PW 보안 로그 ──
+
+-- ╔═══════════════════════════════════════════════════════════════════╗
+-- ║  026: PW 보안 감사 로그 테이블                                      ║
+-- ╚═══════════════════════════════════════════════════════════════════╝
 
 CREATE TABLE IF NOT EXISTS "pw_security_logs" (
     "id"          TEXT NOT NULL,
@@ -707,16 +195,25 @@ CREATE INDEX IF NOT EXISTS "pw_security_logs_userId_createdAt_idx"
 CREATE INDEX IF NOT EXISTS "pw_security_logs_eventType_createdAt_idx"
   ON "pw_security_logs"("eventType", "createdAt");
 
--- ── 028: Persona height + Post locationTag ──
+
+-- ╔═══════════════════════════════════════════════════════════════════╗
+-- ║  028: Persona height + PersonaPost locationTag                    ║
+-- ╚═══════════════════════════════════════════════════════════════════╝
 
 ALTER TABLE "personas" ADD COLUMN IF NOT EXISTS "height" INTEGER;
 ALTER TABLE "persona_posts" ADD COLUMN IF NOT EXISTS "locationTag" TEXT;
 
--- ── 029: COMMENT_SUPPRESSED 활동 유형 ──
+
+-- ╔═══════════════════════════════════════════════════════════════════╗
+-- ║  029: COMMENT_SUPPRESSED 활동 유형 추가                            ║
+-- ╚═══════════════════════════════════════════════════════════════════╝
 
 ALTER TYPE "PersonaActivityType" ADD VALUE IF NOT EXISTS 'COMMENT_SUPPRESSED';
 
--- ── 030: News-Based Persona Reaction (NewsSource, NewsArticle) ──
+
+-- ╔═══════════════════════════════════════════════════════════════════╗
+-- ║  030: News-Based Persona Reaction (NewsSource, NewsArticle)       ║
+-- ╚═══════════════════════════════════════════════════════════════════╝
 
 ALTER TYPE "PersonaPostType" ADD VALUE IF NOT EXISTS 'NEWS_REACTION';
 
@@ -761,16 +258,25 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- ── 031: 뉴스 region ──
+
+-- ╔═══════════════════════════════════════════════════════════════════╗
+-- ║  031: 뉴스 region 컬럼                                            ║
+-- ╚═══════════════════════════════════════════════════════════════════╝
 
 ALTER TABLE "news_sources"  ADD COLUMN IF NOT EXISTS "region" TEXT NOT NULL DEFAULT 'GLOBAL';
 ALTER TABLE "news_articles" ADD COLUMN IF NOT EXISTS "region" TEXT NOT NULL DEFAULT 'GLOBAL';
 
--- ── 032: 뉴스 importanceScore ──
+
+-- ╔═══════════════════════════════════════════════════════════════════╗
+-- ║  032: 뉴스 importanceScore 컬럼                                    ║
+-- ╚═══════════════════════════════════════════════════════════════════╝
 
 ALTER TABLE "news_articles" ADD COLUMN IF NOT EXISTS "importance_score" FLOAT NOT NULL DEFAULT 0.5;
 
--- ── 033/035: OnboardingLevel enum 통일 (LIGHT→QUICK, MEDIUM→STANDARD) ──
+
+-- ╔═══════════════════════════════════════════════════════════════════╗
+-- ║  033/035: OnboardingLevel enum 통일 + updatedAt DEFAULT            ║
+-- ╚═══════════════════════════════════════════════════════════════════╝
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'LIGHT' AND enumtypid = '"OnboardingLevel"'::regtype) THEN
@@ -784,16 +290,25 @@ END $$;
 ALTER TABLE "psych_profile_templates" ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE "user_vectors" ALTER COLUMN "onboardingLevel" SET DEFAULT 'QUICK'::"OnboardingLevel";
 
--- ── 034: PW User sociability (L1 7D) ──
+
+-- ╔═══════════════════════════════════════════════════════════════════╗
+-- ║  034: PersonaWorldUser sociability (L1 7D 완성)                   ║
+-- ╚═══════════════════════════════════════════════════════════════════╝
 
 ALTER TABLE "persona_world_users" ADD COLUMN IF NOT EXISTS "sociability" DECIMAL(3,2);
 
--- ── 036: NewsSource 오류 추적 ──
+
+-- ╔═══════════════════════════════════════════════════════════════════╗
+-- ║  036: NewsSource 오류 추적 필드                                    ║
+-- ╚═══════════════════════════════════════════════════════════════════╝
 
 ALTER TABLE "news_sources" ADD COLUMN IF NOT EXISTS "consecutiveFailures" INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE "news_sources" ADD COLUMN IF NOT EXISTS "lastError" TEXT;
 
--- ── 037: PersonaPost 해시태그 ──
+
+-- ╔═══════════════════════════════════════════════════════════════════╗
+-- ║  037: PersonaPost 해시태그 배열 + GIN 인덱스                       ║
+-- ╚═══════════════════════════════════════════════════════════════════╝
 
 ALTER TABLE "persona_posts" ADD COLUMN IF NOT EXISTS "hashtags" TEXT[] NOT NULL DEFAULT '{}';
 
