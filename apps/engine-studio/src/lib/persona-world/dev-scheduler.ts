@@ -5,6 +5,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { executePwScheduler } from "./pw-scheduler-service"
+import { isSchedulerEnabled } from "./admin/scheduler-service"
 
 const DEFAULT_INTERVAL_MIN = 10
 
@@ -34,6 +35,19 @@ export function startDevScheduler(): void {
 async function runOnce(): Promise<void> {
   const currentHour = new Date().getHours()
   const timeStr = new Date().toLocaleTimeString("ko-KR")
+
+  // DB의 스케줄러 ON/OFF 설정 존중
+  try {
+    const enabled = await isSchedulerEnabled()
+    if (!enabled) {
+      console.log(`[DevScheduler] ⏸ 스케줄러 OFF 상태 — 건너뜀 (${timeStr})`)
+      return
+    }
+  } catch {
+    // DB 연결 실패 시 건너뜀 (서버 초기화 중일 수 있음)
+    console.log(`[DevScheduler] ⏸ DB 연결 불가 — 건너뜀 (${timeStr})`)
+    return
+  }
 
   console.log(`\n[DevScheduler] ──── 스케줄러 실행 (${timeStr}, hour=${currentHour}) ────`)
 

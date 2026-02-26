@@ -18,6 +18,8 @@ import {
   layerVectorToRecord,
   layerVectorsToMap,
 } from "@/lib/vector/dim-maps"
+import { calculateQualityScore } from "@/lib/quality/quality-score"
+import type { PromptData } from "@/lib/quality/quality-score"
 
 // ═══════════════════════════════════════════════════════════════
 // GET /api/internal/personas/[id]
@@ -52,6 +54,31 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const l2Vector = layerMap.get("TEMPERAMENT")
     const l3Vector = layerMap.get("NARRATIVE")
 
+    // qualityScore: DB에 없으면 벡터+프롬프트로 실시간 계산
+    let qualityScore = persona.qualityScore ? Number(persona.qualityScore) : null
+    if (qualityScore === null && l1Vector && l2Vector && l3Vector) {
+      const l1Rec = layerVectorToRecord(l1Vector, L1_DIM_MAP)
+      const l2Rec = layerVectorToRecord(l2Vector, L2_DIM_MAP)
+      const l3Rec = layerVectorToRecord(l3Vector, L3_DIM_MAP)
+      const prompts: PromptData = {
+        basePrompt: persona.basePrompt ?? persona.promptTemplate ?? "",
+        reviewPrompt: persona.reviewPrompt ?? "",
+        postPrompt: persona.postPrompt ?? "",
+        commentPrompt: persona.commentPrompt ?? "",
+        interactionPrompt: persona.interactionPrompt ?? "",
+      }
+      const qResult = calculateQualityScore(
+        l1Rec as unknown as SocialPersonaVector,
+        l2Rec as unknown as CoreTemperamentVector,
+        l3Rec as unknown as NarrativeDriveVector,
+        prompts,
+        null,
+        null,
+        persona.consistencyScore ? Number(persona.consistencyScore) : null
+      )
+      qualityScore = qResult.overallScore / 100
+    }
+
     const detail: PersonaDetail = {
       id: persona.id,
       name: persona.name,
@@ -65,7 +92,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       parentPersonaId: persona.parentPersonaId,
       paradoxScore: persona.paradoxScore ? Number(persona.paradoxScore) : null,
       dimensionalityScore: persona.dimensionalityScore ? Number(persona.dimensionalityScore) : null,
-      qualityScore: persona.qualityScore ? Number(persona.qualityScore) : null,
+      qualityScore,
       validationScore: persona.validationScore ? Number(persona.validationScore) : null,
       vectors: {
         l1: l1Vector ? layerVectorToRecord(l1Vector, L1_DIM_MAP) : null,
@@ -196,6 +223,56 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
       updateData.paradoxScore = paradoxProfile.overall
       updateData.dimensionalityScore = paradoxProfile.dimensionality
+    }
+
+    // Recompute qualityScore (vectors or prompts 변경 시)
+    if (body.vectors || body.basePrompt !== undefined) {
+      const existingLayerMap = layerVectorsToMap(existing.layerVectors)
+      // 벡터: body 우선, 없으면 기존 DB 값
+      const l1Vec = body.vectors
+        ? (body.vectors.l1 as unknown as SocialPersonaVector)
+        : existingLayerMap.get("SOCIAL")
+          ? (layerVectorToRecord(
+              existingLayerMap.get("SOCIAL")!,
+              L1_DIM_MAP
+            ) as unknown as SocialPersonaVector)
+          : null
+      const l2Vec = body.vectors
+        ? (body.vectors.l2 as unknown as CoreTemperamentVector)
+        : existingLayerMap.get("TEMPERAMENT")
+          ? (layerVectorToRecord(
+              existingLayerMap.get("TEMPERAMENT")!,
+              L2_DIM_MAP
+            ) as unknown as CoreTemperamentVector)
+          : null
+      const l3Vec = body.vectors
+        ? (body.vectors.l3 as unknown as NarrativeDriveVector)
+        : existingLayerMap.get("NARRATIVE")
+          ? (layerVectorToRecord(
+              existingLayerMap.get("NARRATIVE")!,
+              L3_DIM_MAP
+            ) as unknown as NarrativeDriveVector)
+          : null
+
+      if (l1Vec && l2Vec && l3Vec) {
+        const prompts: PromptData = {
+          basePrompt: body.basePrompt ?? existing.basePrompt ?? existing.promptTemplate ?? "",
+          reviewPrompt: existing.reviewPrompt ?? "",
+          postPrompt: existing.postPrompt ?? "",
+          commentPrompt: existing.commentPrompt ?? "",
+          interactionPrompt: existing.interactionPrompt ?? "",
+        }
+        const qResult = calculateQualityScore(
+          l1Vec,
+          l2Vec,
+          l3Vec,
+          prompts,
+          null,
+          null,
+          existing.consistencyScore ? Number(existing.consistencyScore) : null
+        )
+        updateData.qualityScore = qResult.overallScore / 100
+      }
     }
 
     // Transaction: update persona + vectors
