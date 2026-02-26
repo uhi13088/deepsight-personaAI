@@ -72,7 +72,10 @@ export function buildSystemPrompt(input: PostGenerationInput): string {
   const personaSection = buildPersonaSection(input.personaProfile)
 
   // Part 2: 현재 상태 (동적, 매 호출 달라짐)
+  const now = new Date()
+  const dateStr = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일`
   const stateDesc = [
+    `현재 날짜: ${dateStr}`,
     `현재 기분: ${describeValue(personaState.mood, "극부정", "중립", "극긍정")}(${personaState.mood.toFixed(2)})`,
     `에너지: ${describeValue(personaState.energy, "소진", "보통", "충만")}(${personaState.energy.toFixed(2)})`,
     `소셜 배터리: ${describeValue(personaState.socialBattery, "방전", "보통", "충전")}(${personaState.socialBattery.toFixed(2)})`,
