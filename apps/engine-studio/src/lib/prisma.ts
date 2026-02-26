@@ -1,25 +1,39 @@
 import { PrismaClient } from "@/generated/prisma"
-import { createPrismaSingleton } from "@deepsight/auth"
 
-const dbUrl = process.env.DATABASE_URL
+/**
+ * Lazy Prisma singleton — 첫 프로퍼티 접근 시 PrismaClient 생성
+ *
+ * Next.js 16 Turbopack에서 모듈이 env 로딩 전에 평가될 수 있으므로,
+ * process.env.DATABASE_URL을 모듈 로드 시점이 아닌 첫 사용 시점에 읽는다.
+ */
+const globalForPrisma = globalThis as unknown as { __deepsight_prisma: PrismaClient | undefined }
 
-// 디버깅: DATABASE_URL 로딩 상태 확인 (원인 파악 후 제거 예정)
-if (process.env.NODE_ENV === "development") {
-  if (!dbUrl) {
-    const dbKeys = Object.keys(process.env).filter((k) => k.includes("DATABASE"))
-    console.error("[prisma] DATABASE_URL is UNDEFINED. Similar keys:", dbKeys)
-    console.error("[prisma] Total env vars loaded:", Object.keys(process.env).length)
-  } else {
-    console.log("[prisma] DATABASE_URL loaded OK, starts with:", dbUrl.substring(0, 20))
+function getClient(): PrismaClient {
+  if (globalForPrisma.__deepsight_prisma) {
+    return globalForPrisma.__deepsight_prisma
   }
+
+  const client = new PrismaClient({
+    log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+    datasourceUrl: process.env.DATABASE_URL,
+  })
+
+  if (process.env.NODE_ENV !== "production") {
+    globalForPrisma.__deepsight_prisma = client
+  }
+
+  return client
 }
 
-export const prisma = createPrismaSingleton(
-  () =>
-    new PrismaClient({
-      log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
-      datasourceUrl: dbUrl,
-    })
-)
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    const client = getClient()
+    const value = Reflect.get(client, prop, client)
+    if (typeof value === "function") {
+      return value.bind(client)
+    }
+    return value
+  },
+})
 
 export default prisma
