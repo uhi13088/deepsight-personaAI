@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
 
     const posts = await prisma.personaPost.findMany({
       where,
-      orderBy: { createdAt: "desc" as const },
+      orderBy: [{ likeCount: "desc" as const }, { createdAt: "desc" as const }],
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       select: postSelect,
@@ -310,7 +310,7 @@ async function handleFollowingFeed(
 
   const posts = await prisma.personaPost.findMany({
     where,
-    orderBy: { createdAt: "desc" as const },
+    orderBy: [{ likeCount: "desc" as const }, { createdAt: "desc" as const }],
     take: limit + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     select: postSelect,
