@@ -42,6 +42,7 @@ import {
   runDailyNewsReactionPipeline,
   isSchedulerEnabled,
 } from "@/lib/persona-world/admin/scheduler-service"
+import { SCHEDULING_DELAYS } from "@/lib/persona-world/constants"
 
 // ── Result type ──────────────────────────────────────────────────
 
@@ -91,7 +92,28 @@ export async function executeCronScheduler(): Promise<CronSchedulerResult> {
   const interactionResults: Array<{ personaId: string; likes: number; comments: number }> = []
   const llmAvailable = isLLMConfigured()
 
-  for (const decision of schedulerResult.decisions) {
+  // 페르소나 간 랜덤 딜레이 계산 — 동시 활동 방지
+  const decisionCount = schedulerResult.decisions.length
+  const maxDelayPerPersona =
+    decisionCount > 0
+      ? Math.min(
+          Math.floor(SCHEDULING_DELAYS.cronBudgetMs / decisionCount),
+          SCHEDULING_DELAYS.maxPerPersonaDelayMs
+        )
+      : 0
+
+  for (let i = 0; i < schedulerResult.decisions.length; i++) {
+    const decision = schedulerResult.decisions[i]
+
+    // 첫 번째 페르소나는 딜레이 없이 즉시 실행, 이후부터 랜덤 딜레이
+    if (i > 0 && maxDelayPerPersona > 0) {
+      const delayMs = Math.floor(Math.random() * maxDelayPerPersona)
+      console.log(
+        `[Cron/Scheduler] Persona ${decision.personaId} — ${(delayMs / 1000).toFixed(1)}s delay`
+      )
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+
     if (decision.shouldPost && llmAvailable) {
       try {
         const persona = (await schedulerProvider.getActiveStatusPersonas()).find(

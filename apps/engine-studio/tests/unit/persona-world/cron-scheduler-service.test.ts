@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     systemSafetyConfig: { findUnique: vi.fn().mockResolvedValue(null) },
+    systemConfig: { findUnique: vi.fn().mockResolvedValue({ value: true }) },
     personaState: {
       findMany: vi.fn().mockResolvedValue([]),
       update: vi.fn().mockResolvedValue(undefined),
@@ -18,15 +19,25 @@ vi.mock("@/lib/prisma", () => ({
     personaPost: {
       create: vi.fn().mockResolvedValue({ id: "post-1" }),
       findMany: vi.fn().mockResolvedValue([]),
+      update: vi.fn().mockResolvedValue({}),
     },
     personaPostLike: { create: vi.fn().mockResolvedValue({ id: "like-1" }) },
-    personaComment: { create: vi.fn().mockResolvedValue({ id: "comment-1" }) },
+    personaComment: {
+      create: vi.fn().mockResolvedValue({ id: "comment-1" }),
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
     personaFollow: { findUnique: vi.fn().mockResolvedValue(null) },
     personaRelationship: {
       findMany: vi.fn().mockResolvedValue([]),
       findFirst: vi.fn().mockResolvedValue(null),
       upsert: vi.fn().mockResolvedValue({}),
     },
+    newsSource: {
+      count: vi.fn().mockResolvedValue(0),
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    $transaction: vi.fn().mockImplementation((fns: unknown[]) => Promise.all(fns)),
   },
 }))
 
@@ -81,6 +92,7 @@ vi.mock("@/lib/persona-world/llm-adapter", () => ({
   isLLMConfigured: vi.fn(),
   createPostLLMProvider: vi.fn(() => ({ generateText: vi.fn() })),
   createCommentLLMProvider: vi.fn(() => ({ generateComment: vi.fn() })),
+  createNewsLLMProvider: vi.fn(() => null),
 }))
 
 vi.mock("@/lib/persona-world/state-manager", () => ({
@@ -130,6 +142,15 @@ vi.mock("@/lib/persona-world/contagion-integration", () => ({
 vi.mock("@/lib/persona-world/voice-anchor", () => ({
   parseVoiceProfile: vi.fn(() => null),
   buildVoiceAnchorFromProfile: vi.fn(() => ""),
+}))
+
+vi.mock("@/lib/persona-world/news", () => ({
+  executeNewsAutoFetch: vi.fn().mockResolvedValue({ skipped: true, reason: "test" }),
+}))
+
+vi.mock("@/lib/persona-world/admin/scheduler-service", () => ({
+  isSchedulerEnabled: vi.fn().mockResolvedValue(true),
+  runDailyNewsReactionPipeline: vi.fn().mockResolvedValue(undefined),
 }))
 
 // ── mock persona ──────────────────────────────────────────────
@@ -371,5 +392,45 @@ describe("executeCronScheduler", () => {
 
     expect(result.postsCreated).toBe(1)
     expect(result.interactions).toBe(0)
+  })
+
+  it("다수 페르소나 → 두 번째부터 랜덤 딜레이 적용", async () => {
+    vi.useFakeTimers()
+
+    const { prisma } = await import("@/lib/prisma")
+    const mockPersonaB = { ...mockPersona, id: "persona-b", name: "테스트봇B" }
+    vi.mocked(prisma.persona.findMany).mockResolvedValue([
+      mockPersona as never,
+      mockPersonaB as never,
+    ])
+
+    const { runScheduler } = await import("@/lib/persona-world/scheduler")
+    vi.mocked(runScheduler).mockResolvedValueOnce({
+      decisions: [
+        { personaId: "persona-a", shouldPost: false, shouldInteract: true },
+        { personaId: "persona-b", shouldPost: false, shouldInteract: true },
+      ],
+    } as never)
+
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+
+    const { executeCronScheduler } = await import("@/lib/persona-world/cron-scheduler-service")
+    const promise = executeCronScheduler()
+
+    // fake timer를 진행시켜서 딜레이 해소
+    await vi.runAllTimersAsync()
+    const result = await promise
+
+    // 두 번째 페르소나에 딜레이 로그가 찍혔는지 확인
+    const delayLogs = logSpy.mock.calls.filter(
+      (args) => typeof args[0] === "string" && args[0].includes("delay")
+    )
+    expect(delayLogs.length).toBe(1) // persona-b만 딜레이
+    expect(delayLogs[0][0]).toContain("persona-b")
+
+    expect(result.interactions).toBe(2)
+
+    logSpy.mockRestore()
+    vi.useRealTimers()
   })
 })

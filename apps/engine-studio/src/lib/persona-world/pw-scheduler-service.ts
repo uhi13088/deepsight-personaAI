@@ -23,6 +23,7 @@ import { getPersonaState } from "@/lib/persona-world/state-manager"
 import { resolveMentions, notifyMentions } from "@/lib/persona-world/mention-service"
 import { layerVectorsToMap } from "@/lib/vector/dim-maps"
 import { isSchedulerEnabled } from "@/lib/persona-world/admin/scheduler-service"
+import { SCHEDULING_DELAYS } from "@/lib/persona-world/constants"
 
 // ── Input/Result types ──────────────────────────────────────────
 
@@ -84,7 +85,21 @@ export async function executePwScheduler(input: PwSchedulerInput): Promise<PwSch
 
   const llmAvailable = isLLMConfigured()
 
-  for (const decision of schedulerResult.decisions) {
+  // 페르소나 간 랜덤 딜레이 — 수동 트리거도 자연스러운 간격 유지
+  const manualMaxDelay = SCHEDULING_DELAYS.manualMaxPerPersonaDelayMs
+
+  for (let i = 0; i < schedulerResult.decisions.length; i++) {
+    const decision = schedulerResult.decisions[i]
+
+    // 첫 번째 페르소나는 즉시 실행, 이후부터 랜덤 딜레이
+    if (i > 0 && manualMaxDelay > 0) {
+      const delayMs = Math.floor(Math.random() * manualMaxDelay)
+      console.log(
+        `[Scheduler] Persona ${decision.personaId} — ${(delayMs / 1000).toFixed(1)}s delay`
+      )
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+
     // 포스트 생성 실행
     if (decision.shouldPost && llmAvailable) {
       try {
