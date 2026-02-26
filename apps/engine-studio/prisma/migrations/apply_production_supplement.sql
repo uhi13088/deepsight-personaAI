@@ -36,9 +36,10 @@ $$ LANGUAGE plpgsql;
 
 -- ────────────────────────────────────────────────────────────
 -- 2. 카운트 트리거 (좋아요/댓글/리포스트 자동 집계)
+--    테이블 존재 여부를 먼저 확인 후 생성 (prisma db push 미완료 대비)
 -- ────────────────────────────────────────────────────────────
 
--- 좋아요 카운트
+-- 함수는 테이블 없이도 생성 가능
 CREATE OR REPLACE FUNCTION update_post_like_count()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -51,12 +52,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_update_post_like_count ON persona_post_likes;
-CREATE TRIGGER trg_update_post_like_count
-AFTER INSERT OR DELETE ON persona_post_likes
-FOR EACH ROW EXECUTE FUNCTION update_post_like_count();
-
--- 댓글 카운트
 CREATE OR REPLACE FUNCTION update_post_comment_count()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -69,12 +64,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_update_post_comment_count ON persona_comments;
-CREATE TRIGGER trg_update_post_comment_count
-AFTER INSERT OR DELETE ON persona_comments
-FOR EACH ROW EXECUTE FUNCTION update_post_comment_count();
-
--- 리포스트 카운트
 CREATE OR REPLACE FUNCTION update_post_repost_count()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -87,10 +76,42 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_update_post_repost_count ON persona_reposts;
-CREATE TRIGGER trg_update_post_repost_count
-AFTER INSERT OR DELETE ON persona_reposts
-FOR EACH ROW EXECUTE FUNCTION update_post_repost_count();
+-- 트리거 연결 (테이블 존재 시에만)
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'persona_post_likes') THEN
+    DROP TRIGGER IF EXISTS trg_update_post_like_count ON persona_post_likes;
+    CREATE TRIGGER trg_update_post_like_count
+    AFTER INSERT OR DELETE ON persona_post_likes
+    FOR EACH ROW EXECUTE FUNCTION update_post_like_count();
+    RAISE NOTICE 'trigger trg_update_post_like_count created';
+  ELSE
+    RAISE NOTICE 'SKIP: persona_post_likes not found — run prisma db push first';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'persona_comments') THEN
+    DROP TRIGGER IF EXISTS trg_update_post_comment_count ON persona_comments;
+    CREATE TRIGGER trg_update_post_comment_count
+    AFTER INSERT OR DELETE ON persona_comments
+    FOR EACH ROW EXECUTE FUNCTION update_post_comment_count();
+    RAISE NOTICE 'trigger trg_update_post_comment_count created';
+  ELSE
+    RAISE NOTICE 'SKIP: persona_comments not found — run prisma db push first';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'persona_reposts') THEN
+    DROP TRIGGER IF EXISTS trg_update_post_repost_count ON persona_reposts;
+    CREATE TRIGGER trg_update_post_repost_count
+    AFTER INSERT OR DELETE ON persona_reposts
+    FOR EACH ROW EXECUTE FUNCTION update_post_repost_count();
+    RAISE NOTICE 'trigger trg_update_post_repost_count created';
+  ELSE
+    RAISE NOTICE 'SKIP: persona_reposts not found — run prisma db push first';
+  END IF;
+END $$;
 
 
 -- ────────────────────────────────────────────────────────────
