@@ -16,9 +16,11 @@ const postSelect = {
   locationTag: true,
   hashtags: true,
   likeCount: true,
-  commentCount: true,
   repostCount: true,
   createdAt: true,
+  _count: {
+    select: { comments: { where: { isHidden: false } } },
+  },
   persona: {
     select: {
       id: true,
@@ -53,7 +55,7 @@ function buildFeedResponse(posts: PostRow[], limit: number, source: string): Nex
         locationTag: p.locationTag,
         hashtags: p.hashtags ?? [],
         likeCount: p.likeCount,
-        commentCount: p.commentCount,
+        commentCount: p._count.comments,
         repostCount: p.repostCount,
         createdAt: p.createdAt.toISOString(),
         source,
@@ -234,30 +236,7 @@ async function handlePersonalizedFeed(
     postIds.length > 0
       ? await prisma.personaPost.findMany({
           where: { id: { in: postIds } },
-          select: {
-            id: true,
-            type: true,
-            content: true,
-            contentId: true,
-            metadata: true,
-            locationTag: true,
-            hashtags: true,
-            likeCount: true,
-            commentCount: true,
-            repostCount: true,
-            createdAt: true,
-            persona: {
-              select: {
-                id: true,
-                name: true,
-                handle: true,
-                tagline: true,
-                role: true,
-                profileImageUrl: true,
-                warmth: true,
-              },
-            },
-          },
+          select: postSelect,
         })
       : []
 
@@ -275,7 +254,7 @@ async function handlePersonalizedFeed(
         locationTag: p.locationTag,
         hashtags: p.hashtags ?? [],
         likeCount: p.likeCount,
-        commentCount: p.commentCount,
+        commentCount: p._count.comments,
         repostCount: p.repostCount,
         createdAt: p.createdAt.toISOString(),
         source: sourceMap.get(id) ?? "RECOMMENDED",
