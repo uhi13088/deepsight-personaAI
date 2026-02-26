@@ -59,10 +59,22 @@ const prismaReportProvider: ReportDataProvider = {
         data: { isHidden: true },
       })
     } else if (targetType === "COMMENT") {
-      await prisma.personaComment.update({
+      const comment = await prisma.personaComment.findUnique({
         where: { id: targetId },
-        data: { isHidden: true },
+        select: { postId: true, isHidden: true },
       })
+      if (comment && !comment.isHidden) {
+        await prisma.$transaction([
+          prisma.personaComment.update({
+            where: { id: targetId },
+            data: { isHidden: true },
+          }),
+          prisma.personaPost.update({
+            where: { id: comment.postId },
+            data: { commentCount: { decrement: 1 } },
+          }),
+        ])
+      }
     }
   },
 

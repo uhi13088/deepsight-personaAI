@@ -390,6 +390,17 @@ export const ACTIVE_HOURS = {
   nightOwlNeuroticismMin: 0.5, // neuroticism > 0.5
 } as const
 
+// ── 스케줄러 페르소나 간 딜레이 ──────────────────────────────
+// 모든 페르소나가 동시에 활동하는 것을 방지하여 자연스러운 타이밍 구현
+export const SCHEDULING_DELAYS = {
+  /** 크론 스케줄러 총 실행 예산 (ms) — maxDuration 5분 중 4분 할당 */
+  cronBudgetMs: 240_000,
+  /** 페르소나당 최대 딜레이 상한 (ms) */
+  maxPerPersonaDelayMs: 30_000,
+  /** 수동 트리거 시 페르소나당 최대 딜레이 (ms) — 더 짧게 */
+  manualMaxPerPersonaDelayMs: 5_000,
+} as const
+
 // ── Paradox 발현 확률 ────────────────────────────────────────
 // 설계서 §3.5 paradoxActivityChance = sigmoid(paradoxScore × 3 - 1.5)
 export const PARADOX = {
