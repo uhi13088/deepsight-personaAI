@@ -59,6 +59,7 @@
 
 ## Environment
 
+- [2026-02-26] **⭐ Prisma `schema.prisma`의 `env()` 참조는 `datasourceUrl` 옵션과 별개로 엔진이 독립 검증함.** `url = env("DATABASE_URL")`과 `directUrl = env("DIRECT_URL")` 모두 PrismaClient 생성 시 스키마 레벨에서 검증되므로, `process.env`에 유효한 postgres:// URL이 반드시 세팅되어 있어야 함. `datasourceUrl`로 오버라이드해도 스키마 검증은 통과 못 함. 체크리스트: ① `process.env.DATABASE_URL` — 존재 여부가 아닌 **프로토콜 형식까지 검증** (`postgresql://` 또는 `postgres://`로 시작하는지) ② `process.env.DIRECT_URL` — `.env.local`에 없으면 빈 문자열이 되어 Prisma 엔진 검증 실패 → `DATABASE_URL`로 fallback 필수 ③ `.env.local` vs `.env` 우선순위 주의 — Next.js는 `.env.local`을 먼저 로드하고 `.env`는 이미 존재하는 변수를 덮어쓰지 않음
 - [2026-02-19] 새 라이브러리/기능 추가 시 라이브러리 기본 컨벤션이 아닌 프로젝트 기존 환경변수명을 먼저 확인하고 통일할 것. 예: NextAuth v5 기본은 `AUTH_GOOGLE_ID`이지만, 프로젝트에서 이미 `GOOGLE_CLIENT_ID`를 쓰면 그걸 사용
 - [2026-02-21] 동일 대상(Engine Studio URL)을 가리키는 환경변수명은 앱 간 통일할 것. `NEXT_PUBLIC_ENGINE_API_URL`(PW)과 `NEXT_PUBLIC_ENGINE_STUDIO_URL`(Landing)이 혼재 → `NEXT_PUBLIC_ENGINE_STUDIO_URL`로 통일 완료
 
