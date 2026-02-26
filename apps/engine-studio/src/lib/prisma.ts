@@ -4,28 +4,24 @@ import { resolve } from "path"
 
 const globalForPrisma = globalThis as unknown as { __deepsight_prisma: PrismaClient | undefined }
 
-function loadDatabaseUrl(): string | undefined {
-  // 1차: process.env
-  if (process.env.DATABASE_URL) {
-    console.log("[prisma] DATABASE_URL from process.env OK")
-    return process.env.DATABASE_URL
+function isValidPostgresUrl(url: string): boolean {
+  return url.startsWith("postgresql://") || url.startsWith("postgres://")
+}
+
+function parseEnvValue(raw: string): string {
+  let value = raw.trim()
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    value = value.slice(1, -1)
   }
+  return value
+}
 
-  console.error("[prisma] DATABASE_URL not in process.env, trying .env.local fallback...")
-  console.error("[prisma] cwd:", process.cwd())
-
-  // 2차: .env.local 직접 파싱
-  const envPaths = [
-    resolve(process.cwd(), ".env.local"),
-    resolve(process.cwd(), "apps/engine-studio/.env.local"),
-  ]
-
+function loadEnvVar(key: string, envPaths: string[]): string | undefined {
   for (const envPath of envPaths) {
-    if (!existsSync(envPath)) {
-      console.error("[prisma]", envPath, "→ NOT FOUND")
-      continue
-    }
-    console.error("[prisma]", envPath, "→ EXISTS, parsing...")
+    if (!existsSync(envPath)) continue
 
     try {
       const content = readFileSync(envPath, "utf-8")
@@ -33,34 +29,84 @@ function loadDatabaseUrl(): string | undefined {
 
       for (const line of lines) {
         const trimmed = line.trim()
-        if (!trimmed.startsWith("DATABASE_URL")) continue
+        if (!trimmed.startsWith(key)) continue
 
         const eqIdx = trimmed.indexOf("=")
         if (eqIdx === -1) continue
 
-        let value = trimmed.substring(eqIdx + 1).trim()
-        // Remove surrounding quotes
-        if (
-          (value.startsWith('"') && value.endsWith('"')) ||
-          (value.startsWith("'") && value.endsWith("'"))
-        ) {
-          value = value.slice(1, -1)
-        }
+        // key 정확히 매칭 (DATABASE_URL_OTHER 등 방지)
+        const parsedKey = trimmed.substring(0, eqIdx).trim()
+        if (parsedKey !== key) continue
 
-        if (value && (value.startsWith("postgresql://") || value.startsWith("postgres://"))) {
-          console.log("[prisma] DATABASE_URL loaded from", envPath)
-          process.env.DATABASE_URL = value
+        const value = parseEnvValue(trimmed.substring(eqIdx + 1))
+        if (value && isValidPostgresUrl(value)) {
+          console.log(`[prisma] ${key} loaded from ${envPath}`)
           return value
         }
       }
-      console.error("[prisma] DATABASE_URL not found or invalid in", envPath)
     } catch (err) {
-      console.error("[prisma] Error reading", envPath, ":", err)
+      console.error(`[prisma] Error reading ${envPath}:`, err)
     }
+  }
+  return undefined
+}
+
+function loadDatabaseUrl(): string | undefined {
+  const envPaths = [
+    resolve(process.cwd(), ".env.local"),
+    resolve(process.cwd(), ".env"),
+    resolve(process.cwd(), "apps/engine-studio/.env.local"),
+    resolve(process.cwd(), "apps/engine-studio/.env"),
+  ]
+
+  // 1차: process.env (값 형식까지 검증)
+  if (process.env.DATABASE_URL && isValidPostgresUrl(process.env.DATABASE_URL)) {
+    console.log("[prisma] DATABASE_URL from process.env OK")
+    return process.env.DATABASE_URL
+  }
+
+  if (process.env.DATABASE_URL) {
+    console.error(
+      `[prisma] DATABASE_URL in process.env is INVALID (starts with: "${process.env.DATABASE_URL.substring(0, 15)}..."). Trying file fallback...`
+    )
+  } else {
+    console.error("[prisma] DATABASE_URL not in process.env. Trying file fallback...")
+  }
+
+  console.error("[prisma] cwd:", process.cwd())
+
+  // 2차: .env.local / .env 직접 파싱
+  const url = loadEnvVar("DATABASE_URL", envPaths)
+  if (url) {
+    process.env.DATABASE_URL = url
+    return url
   }
 
   console.error("[prisma] FATAL: DATABASE_URL not found anywhere!")
   return undefined
+}
+
+function ensureDirectUrl(fallbackUrl: string): void {
+  if (process.env.DIRECT_URL && isValidPostgresUrl(process.env.DIRECT_URL)) {
+    return
+  }
+
+  const envPaths = [
+    resolve(process.cwd(), ".env.local"),
+    resolve(process.cwd(), ".env"),
+    resolve(process.cwd(), "apps/engine-studio/.env.local"),
+    resolve(process.cwd(), "apps/engine-studio/.env"),
+  ]
+
+  const directUrl = loadEnvVar("DIRECT_URL", envPaths)
+  if (directUrl) {
+    process.env.DIRECT_URL = directUrl
+    return
+  }
+
+  // DIRECT_URL 없으면 DATABASE_URL로 fallback
+  process.env.DIRECT_URL = fallbackUrl
+  console.log("[prisma] DIRECT_URL not found, falling back to DATABASE_URL")
 }
 
 function getClient(): PrismaClient {
@@ -70,10 +116,9 @@ function getClient(): PrismaClient {
 
   const url = loadDatabaseUrl()
 
-  // directUrl이 없으면 DATABASE_URL로 fallback (schema.prisma의 directUrl = env("DIRECT_URL") 대응)
-  if (url && !process.env.DIRECT_URL) {
-    process.env.DIRECT_URL = url
-    console.log("[prisma] DIRECT_URL not set, falling back to DATABASE_URL")
+  // schema.prisma의 directUrl = env("DIRECT_URL") — 엔진이 스키마 검증 시 이 값도 체크하므로 반드시 유효해야 함
+  if (url) {
+    ensureDirectUrl(url)
   }
 
   const client = new PrismaClient({
