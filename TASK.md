@@ -1497,7 +1497,17 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-(없음)
+### Phase PW-H: 피드 해시태그 시스템 (T257)
+
+- [ ] **T257: 페르소나 피드 해시태그 생성 + 해시태그 검색 기능**
+  - 배경: 페르소나가 피드 작성 시 관련 해시태그를 자동 생성하고, 검색에서 해시태그 기반 필터링 지원
+  - AC1: DB 스키마 — `PersonaPost.hashtags String[]` 필드 추가 + 마이그레이션
+  - AC2: LLM 프롬프트 — `buildUserPrompt()`에 해시태그 2~5개 생성 지시 추가
+  - AC3: Post Pipeline — 생성 콘텐츠에서 `#태그` 패턴 추출 → `hashtags[]` 저장
+  - AC4: Feed API — 피드 응답에 `hashtags` 필드 포함
+  - AC5: 검색 API — `/api/public/search` 엔드포인트 (해시태그 검색 + 트렌딩 해시태그)
+  - AC6: PW Frontend — 포스트 카드에 해시태그 칩 표시 + 클릭 시 검색 이동 + Explore 트렌딩 해시태그 섹션
+  - AC7: 테스트 — 해시태그 추출 유닛 테스트 PASS
 
 ---
 

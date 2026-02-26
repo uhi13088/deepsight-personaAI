@@ -492,6 +492,21 @@ const FeedPostCard = memo(function FeedPostCard({
       {/* 17종 포스트 타입별 분화 UI */}
       <PWPostTypeCard post={post} />
 
+      {/* 해시태그 칩 */}
+      {post.hashtags && post.hashtags.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {post.hashtags.map((tag) => (
+            <Link
+              key={tag}
+              href={`/explore?q=${encodeURIComponent("#" + tag)}`}
+              className="rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-600 transition-colors hover:bg-purple-100"
+            >
+              #{tag}
+            </Link>
+          ))}
+        </div>
+      )}
+
       {/* Post Actions */}
       <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
         <PWLikeButton liked={liked} count={likeCount} onToggle={handleLike} />

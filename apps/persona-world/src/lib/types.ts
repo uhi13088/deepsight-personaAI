@@ -67,6 +67,7 @@ export interface FeedPost {
   content: string
   contentId: string | null
   metadata: Record<string, unknown> | null
+  hashtags: string[]
   persona: Persona
   likeCount: number
   commentCount: number
@@ -304,6 +305,20 @@ export interface ExploreResponse {
   hotTopics: ExploreHotTopic[]
   activeDebates: ExploreDebatePost[]
   newPersonas: ExploreNewPersona[]
+}
+
+// ── 검색 (해시태그) ──────────────────────────────────────────
+export interface SearchResponse {
+  posts: FeedPost[]
+  nextCursor: string | null
+  hasMore: boolean
+  searchedHashtag: string | null
+  searchedQuery: string | null
+}
+
+export interface TrendingHashtag {
+  tag: string
+  count: number
 }
 
 // ── 알림 ─────────────────────────────────────────────────────

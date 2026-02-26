@@ -23,6 +23,7 @@ import { buildVoiceAnchorFromProfile, parseVoiceProfile } from "./voice-anchor"
 import { calculatePostPoignancy } from "./poignancy"
 import { determinePostSource } from "@/lib/security/data-provenance"
 import type { PostSource } from "@/lib/security/data-provenance"
+import { extractHashtags } from "./hashtag-utils"
 
 // ── 타입 정의 ────────────────────────────────────────────────
 
@@ -36,6 +37,7 @@ export interface PostPipelineDataProvider {
     poignancyScore?: number
     postSource?: PostSource
     locationTag?: string
+    hashtags?: string[]
   }): Promise<{ id: string }>
 
   /** 최근 포스트 텍스트 조회 (RAG voiceAnchor용) */
@@ -67,6 +69,7 @@ export interface PostCreationResult {
   voiceCheck: VoiceCheckResult | null
   regenerated: boolean
   poignancyScore: number
+  hashtags: string[]
 }
 
 // ── 파이프라인 메인 ──────────────────────────────────────────
@@ -78,9 +81,11 @@ export interface PostCreationResult {
  * 2. RAG 컨텍스트 구축 (간소화)
  * 3. LLM 콘텐츠 생성
  * 4. Voice 일관성 체크 (critical이면 1회 재생성)
- * 5. DB 저장
- * 6. PersonaState 갱신
- * 7. 활동 로그
+ * 5. Poignancy 계산
+ * 6. 해시태그 추출
+ * 7. DB 저장
+ * 8. PersonaState 갱신
+ * 9. 활동 로그
  */
 export async function executePostCreation(
   persona: SchedulerPersona,
@@ -180,7 +185,10 @@ export async function executePostCreation(
   const volatility = persona.vectors.narrative.volatility
   const poignancyScore = calculatePostPoignancy(state, volatility)
 
-  // Step 6: DB 저장 (출처 태깅 포함)
+  // Step 6: 해시태그 추출
+  const hashtags = extractHashtags(result.content)
+
+  // Step 7: DB 저장 (출처 태깅 + 해시태그 포함)
   const postSource = determinePostSource({
     isScheduled: context.trigger === "SCHEDULED",
     isArenaTest: false,
@@ -200,15 +208,16 @@ export async function executePostCreation(
     poignancyScore,
     postSource,
     locationTag: persona.region ?? undefined,
+    hashtags,
   })
 
-  // Step 7: PersonaState 갱신
+  // Step 8: PersonaState 갱신
   await updatePersonaState(persona.id, {
     type: "post_created",
     tokensUsed: result.tokensUsed,
   })
 
-  // Step 8: 활동 로그
+  // Step 9: 활동 로그
   await dataProvider.saveActivityLog({
     personaId: persona.id,
     activityType: "POST_CREATED",
@@ -231,6 +240,7 @@ export async function executePostCreation(
     voiceCheck,
     regenerated,
     poignancyScore,
+    hashtags,
   }
 }
 

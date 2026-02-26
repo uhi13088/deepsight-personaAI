@@ -16,6 +16,7 @@ import {
   Flame,
   Swords,
   Clock,
+  Hash,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -24,6 +25,8 @@ import type {
   ExploreHotTopic,
   ExploreDebatePost,
   ExploreNewPersona,
+  FeedPost,
+  TrendingHashtag,
 } from "@/lib/types"
 import { clientApi } from "@/lib/api"
 import { useUserStore } from "@/lib/user-store"
@@ -84,6 +87,11 @@ function ExploreContent() {
   const [activeDebates, setActiveDebates] = useState<ExploreDebatePost[]>([])
   const [newPersonas, setNewPersonas] = useState<ExploreNewPersona[]>([])
 
+  // 해시태그 검색 상태
+  const [hashtagResults, setHashtagResults] = useState<FeedPost[]>([])
+  const [isHashtagSearch, setIsHashtagSearch] = useState(false)
+  const [trendingHashtags, setTrendingHashtags] = useState<TrendingHashtag[]>([])
+
   const { notifications } = useUserStore()
   const unreadNotifications = useMemo(
     () => notifications.filter((n) => !n.read).length,
@@ -112,14 +120,28 @@ function ExploreContent() {
   const fetchExplore = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await clientApi.getExplore({
-        search: debouncedSearch || undefined,
-        role: activeRoles.length > 0 ? activeRoles.join(",") : undefined,
-      })
-      setClusters(data.clusters)
-      setHotTopics(data.hotTopics)
-      setActiveDebates(data.activeDebates)
-      setNewPersonas(data.newPersonas)
+      // # 으로 시작하는 검색어 → 해시태그 검색
+      if (debouncedSearch.startsWith("#") && debouncedSearch.length > 1) {
+        const tag = debouncedSearch.slice(1)
+        const result = await clientApi.searchByHashtag({ hashtag: tag, limit: 20 })
+        setHashtagResults(result.posts)
+        setIsHashtagSearch(true)
+        setClusters([])
+        setHotTopics([])
+        setActiveDebates([])
+        setNewPersonas([])
+      } else {
+        setIsHashtagSearch(false)
+        setHashtagResults([])
+        const data = await clientApi.getExplore({
+          search: debouncedSearch || undefined,
+          role: activeRoles.length > 0 ? activeRoles.join(",") : undefined,
+        })
+        setClusters(data.clusters)
+        setHotTopics(data.hotTopics)
+        setActiveDebates(data.activeDebates)
+        setNewPersonas(data.newPersonas)
+      }
     } catch (error) {
       console.error("Failed to fetch explore:", error)
       toast.error("탐색 데이터를 불러오는데 실패했습니다")
@@ -131,6 +153,16 @@ function ExploreContent() {
   useEffect(() => {
     fetchExplore()
   }, [fetchExplore])
+
+  // 트렌딩 해시태그 (마운트 시 1회)
+  useEffect(() => {
+    clientApi
+      .getTrendingHashtags()
+      .then(setTrendingHashtags)
+      .catch(() => {
+        /* 실패해도 무시 — 선택적 섹션 */
+      })
+  }, [])
 
   const toggleRole = useCallback((role: string) => {
     setActiveRoles((prev) =>
@@ -170,7 +202,7 @@ function ExploreContent() {
             <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="페르소나, 전문분야 검색..."
+              placeholder="페르소나, 전문분야 또는 #해시태그 검색..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full rounded-full border border-gray-200 bg-white py-3 pl-10 pr-10 text-sm focus:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-100"
@@ -217,8 +249,51 @@ function ExploreContent() {
 
         {loading ? (
           <ExploreSkeleton />
+        ) : isHashtagSearch ? (
+          /* ── 해시태그 검색 결과 ──────────────────────────── */
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Hash className="h-4 w-4 text-purple-500" />
+              <h2 className="text-sm font-semibold text-gray-800">{searchQuery} 검색 결과</h2>
+              <span className="text-xs text-gray-400">{hashtagResults.length}건</span>
+            </div>
+            {hashtagResults.length > 0 ? (
+              hashtagResults.map((post) => <HashtagSearchResultCard key={post.id} post={post} />)
+            ) : (
+              <div className="py-16 text-center">
+                <Hash className="mx-auto mb-4 h-12 w-12 text-gray-300" />
+                <p className="font-medium text-gray-500">해시태그 검색 결과가 없습니다</p>
+                <p className="mt-2 text-sm text-gray-400">다른 해시태그로 검색해보세요</p>
+              </div>
+            )}
+          </div>
         ) : (
           <div className="space-y-8">
+            {/* 트렌딩 해시태그 섹션 */}
+            {trendingHashtags.length > 0 && !searchQuery && (
+              <section>
+                <div className="mb-3 flex items-center gap-2">
+                  <Hash className="h-4 w-4 text-purple-500" />
+                  <h2 className="text-sm font-semibold text-gray-800">트렌딩 해시태그</h2>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {trendingHashtags.slice(0, 12).map((ht) => (
+                    <button
+                      key={ht.tag}
+                      onClick={() => {
+                        setSearchQuery(`#${ht.tag}`)
+                        setDebouncedSearch(`#${ht.tag}`)
+                      }}
+                      className="flex items-center gap-1.5 rounded-full bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-600 transition-colors hover:bg-purple-100"
+                    >
+                      <span>#{ht.tag}</span>
+                      <span className="text-[10px] text-purple-400">{ht.count}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {/* Section 1: 페르소나 클러스터 (AC1) */}
             {clusters.length > 0 && (
               <section>
@@ -461,6 +536,62 @@ const NewPersonaCard = memo(function NewPersonaCard({ persona }: { persona: Expl
             <Clock className="h-2.5 w-2.5" />
             {formatTimeAgo(persona.createdAt)}
           </div>
+        </div>
+      </PWCard>
+    </Link>
+  )
+})
+
+// ── 해시태그 검색 결과 카드 ──────────────────────────────
+
+const HashtagSearchResultCard = memo(function HashtagSearchResultCard({
+  post,
+}: {
+  post: FeedPost
+}) {
+  const roleEmoji = ROLE_EMOJI[post.persona.role] || "\uD83E\uDD16"
+
+  return (
+    <Link href={`/persona/${post.persona.id}`}>
+      <PWCard className="!p-3 transition-shadow hover:shadow-md">
+        <div className="mb-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <PWProfileRing size="sm">
+              <div
+                className={`flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br ${ROLE_COLORS_LIGHT[post.persona.role] || "from-gray-100 to-gray-200"} text-xs`}
+              >
+                {roleEmoji}
+              </div>
+            </PWProfileRing>
+            <div>
+              <div className="text-sm font-medium text-gray-800">{post.persona.name}</div>
+              <div className="text-xs text-gray-400">{post.persona.handle}</div>
+            </div>
+          </div>
+          <span className="text-xs text-gray-400">{formatTimeAgo(post.createdAt)}</span>
+        </div>
+        <p className="mb-2 line-clamp-3 text-sm text-gray-700">{post.content}</p>
+        {post.hashtags && post.hashtags.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-1">
+            {post.hashtags.map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-medium text-purple-600"
+              >
+                #{tag}
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="flex items-center gap-4 text-xs text-gray-400">
+          <span className="flex items-center gap-1">
+            <Heart className="h-3 w-3" />
+            {post.likeCount}
+          </span>
+          <span className="flex items-center gap-1">
+            <MessageCircle className="h-3 w-3" />
+            {post.commentCount}
+          </span>
         </div>
       </PWCard>
     </Link>

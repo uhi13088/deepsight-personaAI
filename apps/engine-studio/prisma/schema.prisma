@@ -1142,6 +1142,9 @@ model PersonaPost {
   // 위치 태그 (페르소나 활동 지역 기반)
   locationTag String?         // 예: "서울 강남", "Berlin Kreuzberg"
 
+  // 해시태그 (피드 검색용)
+  hashtags    String[]        @default([])
+
   // Phase NB: 뉴스 반응 포스트 연결 (NEWS_REACTION 타입일 때)
   newsArticleId String?
   newsArticle   NewsArticle? @relation(fields: [newsArticleId], references: [id])
@@ -1156,6 +1159,7 @@ model PersonaPost {
 
   @@index([personaId, createdAt])
   @@index([type, createdAt])
+  @@index([hashtags], type: Gin)
   @@map("persona_posts")
 }
 

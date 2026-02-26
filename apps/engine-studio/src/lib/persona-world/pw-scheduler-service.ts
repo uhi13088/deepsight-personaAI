@@ -285,7 +285,7 @@ function createSchedulerDataProvider(): SchedulerDataProvider {
 
 function createPostPipelineDataProvider(): PostPipelineDataProvider {
   return {
-    async savePost({ personaId, type, content, metadata, postSource, locationTag }) {
+    async savePost({ personaId, type, content, metadata, postSource, locationTag, hashtags }) {
       const post = await prisma.personaPost.create({
         data: {
           personaId,
@@ -294,6 +294,7 @@ function createPostPipelineDataProvider(): PostPipelineDataProvider {
           metadata: metadata as Prisma.InputJsonValue,
           postSource: postSource ?? "AUTONOMOUS",
           locationTag: locationTag ?? null,
+          hashtags: hashtags ?? [],
         },
       })
       return { id: post.id }
