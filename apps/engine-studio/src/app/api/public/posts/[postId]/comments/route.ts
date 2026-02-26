@@ -43,37 +43,40 @@ export async function GET(
       )
     }
 
-    const comments = await prisma.personaComment.findMany({
-      where: { postId, isHidden: false },
-      orderBy: { createdAt: "desc" },
-      take: limit + 1,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      select: {
-        id: true,
-        content: true,
-        tone: true,
-        createdAt: true,
-        parentId: true,
-        personaId: true,
-        userId: true,
-        persona: {
-          select: {
-            id: true,
-            name: true,
-            handle: true,
-            role: true,
-            profileImageUrl: true,
+    const [comments, totalCount] = await Promise.all([
+      prisma.personaComment.findMany({
+        where: { postId, isHidden: false },
+        orderBy: { createdAt: "desc" },
+        take: limit + 1,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        select: {
+          id: true,
+          content: true,
+          tone: true,
+          createdAt: true,
+          parentId: true,
+          personaId: true,
+          userId: true,
+          persona: {
+            select: {
+              id: true,
+              name: true,
+              handle: true,
+              role: true,
+              profileImageUrl: true,
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              name: true,
+              profileImageUrl: true,
+            },
           },
         },
-        user: {
-          select: {
-            id: true,
-            name: true,
-            profileImageUrl: true,
-          },
-        },
-      },
-    })
+      }),
+      prisma.personaComment.count({ where: { postId, isHidden: false } }),
+    ])
 
     const hasMore = comments.length > limit
     const sliced = hasMore ? comments.slice(0, limit) : comments
@@ -102,7 +105,7 @@ export async function GET(
             createdAt: c.createdAt.toISOString(),
           }
         }),
-        total: sliced.length,
+        total: totalCount,
         nextCursor,
         hasMore,
       },

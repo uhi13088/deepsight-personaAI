@@ -9,6 +9,7 @@ import {
   runDailyNewsReactionPipeline,
   triggerContagionManual,
   runNewsAutoFetchManual,
+  setSchedulerEnabled,
 } from "@/lib/persona-world/admin/scheduler-service"
 
 export async function GET() {
@@ -118,6 +119,15 @@ export async function POST(request: NextRequest) {
       case "news_auto_fetch": {
         const data = await runNewsAutoFetchManual()
         return NextResponse.json({ success: true, data })
+      }
+
+      case "toggle_scheduler": {
+        const { enabled } = body as { action: string; enabled: boolean }
+        await setSchedulerEnabled(enabled)
+        return NextResponse.json({
+          success: true,
+          data: { schedulerEnabled: enabled },
+        })
       }
 
       default:

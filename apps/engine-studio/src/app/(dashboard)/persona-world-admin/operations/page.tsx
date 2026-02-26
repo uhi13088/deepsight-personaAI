@@ -51,6 +51,7 @@ interface ActivityData {
 
 interface SchedulerData {
   isActive: boolean
+  schedulerEnabled: boolean
   activePersonaCount: number
   pausedPersonas: Array<{ id: string; name: string }>
   todayPostCount: number
@@ -111,25 +112,31 @@ export default function OperationsPage() {
   const [triggering, setTriggering] = useState(false)
   const [lastTriggerResult, setLastTriggerResult] = useState<TriggerResult | null>(null)
 
-  // Auto-run state
+  // Auto-run state (서버 DB에서 관리)
   const [autoRun, setAutoRun] = useState(false)
   const [autoInterval, setAutoInterval] = useState(15 * 60 * 1000)
   const [countdown, setCountdown] = useState(0)
+  const [toggling, setToggling] = useState(false)
   const nextRunRef = useRef<number>(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // localStorage 복원
+  // 로컬 간격 복원 (간격만 localStorage, 활성 상태는 서버)
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(SCHEDULER_AUTO_KEY)
       const savedInterval = localStorage.getItem(SCHEDULER_INTERVAL_KEY)
-      if (saved === "true") setAutoRun(true)
       if (savedInterval) setAutoInterval(Number(savedInterval))
     } catch {
       /* ignore */
     }
   }, [])
+
+  // 서버에서 schedulerEnabled 상태 동기화
+  useEffect(() => {
+    if (schedulerData) {
+      setAutoRun(schedulerData.schedulerEnabled)
+    }
+  }, [schedulerData])
 
   // 데이터 fetch
   const fetchActivity = useCallback(async () => {
@@ -218,14 +225,24 @@ export default function OperationsPage() {
     void fetchScheduler()
   }
 
-  // Auto-run 토글 & 이펙트
-  function toggleAutoRun() {
+  // Auto-run 토글 (서버 DB에 저장)
+  async function toggleAutoRun() {
     const next = !autoRun
-    setAutoRun(next)
+    setToggling(true)
     try {
-      localStorage.setItem(SCHEDULER_AUTO_KEY, String(next))
+      const res = await fetch("/api/internal/persona-world-admin/scheduler", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "toggle_scheduler", enabled: next }),
+      })
+      const json = (await res.json()) as { success: boolean }
+      if (json.success) {
+        setAutoRun(next)
+      }
     } catch {
       /* ignore */
+    } finally {
+      setToggling(false)
     }
   }
 
@@ -239,7 +256,6 @@ export default function OperationsPage() {
     }
 
     try {
-      localStorage.setItem(SCHEDULER_AUTO_KEY, "true")
       localStorage.setItem(SCHEDULER_INTERVAL_KEY, String(autoInterval))
     } catch {
       /* ignore */
@@ -488,10 +504,11 @@ export default function OperationsPage() {
                         className={`h-4 w-4 ${autoRun ? "text-emerald-500" : "text-muted-foreground"}`}
                       />
                       <button
-                        onClick={toggleAutoRun}
+                        onClick={() => void toggleAutoRun()}
+                        disabled={toggling}
                         className={`relative h-5 w-9 rounded-full transition-colors ${
                           autoRun ? "bg-emerald-500" : "bg-gray-300 dark:bg-gray-600"
-                        }`}
+                        } ${toggling ? "opacity-50" : ""}`}
                       >
                         <div
                           className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
@@ -532,8 +549,8 @@ export default function OperationsPage() {
                 <div className="rounded-lg border p-4">
                   <p className="text-muted-foreground text-xs">스케줄러 상태</p>
                   <div className="mt-1">
-                    <Badge variant={schedulerData?.isActive ? "default" : "destructive"}>
-                      {schedulerData?.isActive ? "RUNNING" : "PAUSED"}
+                    <Badge variant={autoRun ? "default" : "destructive"}>
+                      {autoRun ? "RUNNING" : "OFF"}
                     </Badge>
                   </div>
                 </div>

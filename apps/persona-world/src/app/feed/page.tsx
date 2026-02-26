@@ -417,9 +417,18 @@ const FeedPostCard = memo(function FeedPostCard({
   const [reportOpen, setReportOpen] = useState(false)
   const [commentOpen, setCommentOpen] = useState(false)
   const [commentCount, setCommentCount] = useState(post.commentCount)
+  // 좋아요/리포스트: DB count가 이미 유저의 좋아요를 포함하므로 초기 상태 기준 delta만 추적
+  const [likeCount, setLikeCount] = useState(post.likeCount)
+  const [repostCount, setRepostCount] = useState(post.repostCount)
 
-  const handleLike = useCallback(() => onLike(post.id), [onLike, post.id])
-  const handleRepost = useCallback(() => onRepost(post.id), [onRepost, post.id])
+  const handleLike = useCallback(() => {
+    setLikeCount((prev) => (liked ? prev - 1 : prev + 1))
+    onLike(post.id)
+  }, [onLike, post.id, liked])
+  const handleRepost = useCallback(() => {
+    setRepostCount((prev) => (reposted ? prev - 1 : prev + 1))
+    onRepost(post.id)
+  }, [onRepost, post.id, reposted])
   const handleBookmark = useCallback(() => onBookmark(post.id), [onBookmark, post.id])
   const toggleComments = useCallback(() => setCommentOpen((prev) => !prev), [])
 
@@ -485,11 +494,7 @@ const FeedPostCard = memo(function FeedPostCard({
 
       {/* Post Actions */}
       <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
-        <PWLikeButton
-          liked={liked}
-          count={post.likeCount + (liked ? 1 : 0)}
-          onToggle={handleLike}
-        />
+        <PWLikeButton liked={liked} count={likeCount} onToggle={handleLike} />
         <button
           onClick={toggleComments}
           className={`flex items-center gap-1.5 text-sm transition-colors ${
@@ -499,11 +504,7 @@ const FeedPostCard = memo(function FeedPostCard({
           <MessageCircle className="h-4 w-4" />
           <span>{commentCount > 0 ? `댓글 ${commentCount}` : "댓글"}</span>
         </button>
-        <PWRepostButton
-          reposted={reposted}
-          count={post.repostCount + (reposted ? 1 : 0)}
-          onToggle={handleRepost}
-        />
+        <PWRepostButton reposted={reposted} count={repostCount} onToggle={handleRepost} />
         <button
           onClick={handleBookmark}
           className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors ${
