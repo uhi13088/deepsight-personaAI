@@ -11,6 +11,8 @@ import type {
   PersonaProfileSnapshot,
   VoiceStyleParams,
 } from "./types"
+import { getWeatherForRegion } from "./weather-service"
+import type { WeatherInfo } from "./weather-service"
 
 /**
  * LLM 호출 인터페이스.
@@ -65,7 +67,10 @@ const POST_TYPE_LENGTH_GUIDE: Partial<
  * 구조: [페르소나 정의 — 캐시 가능] + [현재 상태 — 동적]
  * splitSystemPromptForCache()가 "[현재 상태]" 마커 기준으로 prefix/suffix 분리.
  */
-export function buildSystemPrompt(input: PostGenerationInput): string {
+export function buildSystemPrompt(
+  input: PostGenerationInput,
+  weather?: WeatherInfo | null
+): string {
   const { personaState } = input
 
   // Part 1: 페르소나 정의 (정적, 캐시 가능)
@@ -73,7 +78,7 @@ export function buildSystemPrompt(input: PostGenerationInput): string {
 
   // Part 2: 현재 상태 (동적, 매 호출 달라짐)
   const now = new Date()
-  const worldContext = buildWorldContext(now, input.personaProfile?.region)
+  const worldContext = buildWorldContext(now, input.personaProfile?.region, weather)
   const stateDesc = [
     worldContext,
     `현재 기분: ${describeValue(personaState.mood, "극부정", "중립", "극긍정")}(${personaState.mood.toFixed(2)})`,
@@ -317,7 +322,11 @@ export async function generatePostContent(
   input: PostGenerationInput,
   llmProvider?: LLMProvider
 ): Promise<PostGenerationResult> {
-  const systemPrompt = buildSystemPrompt(input)
+  // 실시간 날씨 조회 (캐시 30분, 실패 시 null → 계절 기반 fallback)
+  const weather = input.personaProfile?.region
+    ? await getWeatherForRegion(input.personaProfile.region).catch(() => null)
+    : null
+  const systemPrompt = buildSystemPrompt(input, weather)
   const userPrompt = buildUserPrompt(input)
 
   if (!llmProvider) {
@@ -376,7 +385,11 @@ const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"]
  * LLM에 주입할 현실 세계 컨텍스트 문자열 생성.
  * 페르소나의 region 기반으로 위치/계절/날씨 힌트를 제공.
  */
-function buildWorldContext(now: Date, region?: string | null): string {
+function buildWorldContext(
+  now: Date,
+  region?: string | null,
+  weather?: WeatherInfo | null
+): string {
   const year = now.getFullYear()
   const month = now.getMonth() + 1
   const date = now.getDate()
@@ -393,10 +406,15 @@ function buildWorldContext(now: Date, region?: string | null): string {
 
   const hemisphere = detectHemisphere(region)
   const season = getSeason(month, hemisphere)
-  const weather = getSeasonalWeather(month, hemisphere)
-
   lines.push(`계절: ${season}`)
-  lines.push(`날씨: ${weather}`)
+
+  // 실시간 날씨 우선, 없으면 계절 기반 추정
+  if (weather) {
+    lines.push(`날씨: ${weather.feelsLike}`)
+    lines.push(`습도: ${weather.humidity}%, 풍속: ${weather.windSpeed}km/h`)
+  } else {
+    lines.push(`날씨: ${getSeasonalWeather(month, hemisphere)}`)
+  }
 
   return lines.join("\n")
 }
