@@ -154,6 +154,7 @@ export interface PersonaProfileSnapshot {
   role?: string | null
   expertise?: string[]
   description?: string | null
+  region?: string | null // 활동 지역 (날씨/계절 컨텍스트용)
   speechPatterns?: string[]
   quirks?: string[]
   postPrompt?: string | null

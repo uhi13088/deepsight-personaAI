@@ -128,6 +128,7 @@ export async function executePostCreation(
     role: persona.role,
     expertise: persona.expertise,
     description: persona.description,
+    region: persona.region,
     speechPatterns: persona.speechPatterns,
     quirks: persona.quirks,
     postPrompt: persona.postPrompt,
