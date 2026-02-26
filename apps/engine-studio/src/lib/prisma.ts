@@ -70,6 +70,12 @@ function getClient(): PrismaClient {
 
   const url = loadDatabaseUrl()
 
+  // directUrl이 없으면 DATABASE_URL로 fallback (schema.prisma의 directUrl = env("DIRECT_URL") 대응)
+  if (url && !process.env.DIRECT_URL) {
+    process.env.DIRECT_URL = url
+    console.log("[prisma] DIRECT_URL not set, falling back to DATABASE_URL")
+  }
+
   const client = new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
     ...(url ? { datasourceUrl: url } : {}),
