@@ -11,6 +11,8 @@ import type {
   PersonaProfileSnapshot,
   VoiceStyleParams,
 } from "./types"
+import { getWeatherForRegion } from "./weather-service"
+import type { WeatherInfo } from "./weather-service"
 
 /**
  * LLM 호출 인터페이스.
@@ -65,14 +67,20 @@ const POST_TYPE_LENGTH_GUIDE: Partial<
  * 구조: [페르소나 정의 — 캐시 가능] + [현재 상태 — 동적]
  * splitSystemPromptForCache()가 "[현재 상태]" 마커 기준으로 prefix/suffix 분리.
  */
-export function buildSystemPrompt(input: PostGenerationInput): string {
+export function buildSystemPrompt(
+  input: PostGenerationInput,
+  weather?: WeatherInfo | null
+): string {
   const { personaState } = input
 
   // Part 1: 페르소나 정의 (정적, 캐시 가능)
   const personaSection = buildPersonaSection(input.personaProfile)
 
   // Part 2: 현재 상태 (동적, 매 호출 달라짐)
+  const now = new Date()
+  const worldContext = buildWorldContext(now, input.personaProfile?.region, weather)
   const stateDesc = [
+    worldContext,
     `현재 기분: ${describeValue(personaState.mood, "극부정", "중립", "극긍정")}(${personaState.mood.toFixed(2)})`,
     `에너지: ${describeValue(personaState.energy, "소진", "보통", "충만")}(${personaState.energy.toFixed(2)})`,
     `소셜 배터리: ${describeValue(personaState.socialBattery, "방전", "보통", "충전")}(${personaState.socialBattery.toFixed(2)})`,
@@ -314,7 +322,11 @@ export async function generatePostContent(
   input: PostGenerationInput,
   llmProvider?: LLMProvider
 ): Promise<PostGenerationResult> {
-  const systemPrompt = buildSystemPrompt(input)
+  // 실시간 날씨 조회 (캐시 30분, 실패 시 null → 계절 기반 fallback)
+  const weather = input.personaProfile?.region
+    ? await getWeatherForRegion(input.personaProfile.region).catch(() => null)
+    : null
+  const systemPrompt = buildSystemPrompt(input, weather)
   const userPrompt = buildUserPrompt(input)
 
   if (!llmProvider) {
@@ -363,4 +375,119 @@ function describeValue(value: number, low: string, mid: string, high: string): s
   if (value < 0.3) return low
   if (value > 0.7) return high
   return mid
+}
+
+// ── 현실 세계 컨텍스트 (날짜/시간/위치/계절/날씨) ──────────────
+
+const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"]
+
+/**
+ * LLM에 주입할 현실 세계 컨텍스트 문자열 생성.
+ * 페르소나의 region 기반으로 위치/계절/날씨 힌트를 제공.
+ */
+function buildWorldContext(
+  now: Date,
+  region?: string | null,
+  weather?: WeatherInfo | null
+): string {
+  const year = now.getFullYear()
+  const month = now.getMonth() + 1
+  const date = now.getDate()
+  const day = DAY_NAMES[now.getDay()]
+  const hour = now.getHours()
+
+  const timeOfDay = hour < 6 ? "새벽" : hour < 12 ? "오전" : hour < 18 ? "오후" : "저녁"
+
+  const lines: string[] = [`현재: ${year}년 ${month}월 ${date}일 (${day}) ${timeOfDay} ${hour}시`]
+
+  if (region) {
+    lines.push(`활동 지역: ${region}`)
+  }
+
+  const hemisphere = detectHemisphere(region)
+  const season = getSeason(month, hemisphere)
+  lines.push(`계절: ${season}`)
+
+  // 실시간 날씨 우선, 없으면 계절 기반 추정
+  if (weather) {
+    lines.push(`날씨: ${weather.feelsLike}`)
+    lines.push(`습도: ${weather.humidity}%, 풍속: ${weather.windSpeed}km/h`)
+  } else {
+    lines.push(`날씨: ${getSeasonalWeather(month, hemisphere)}`)
+  }
+
+  return lines.join("\n")
+}
+
+function detectHemisphere(region?: string | null): "north" | "south" {
+  if (!region) return "north"
+  const lower = region.toLowerCase()
+  const southernKeywords = [
+    "호주",
+    "australia",
+    "뉴질랜드",
+    "new zealand",
+    "브라질",
+    "brazil",
+    "아르헨티나",
+    "argentina",
+    "남아프리카",
+    "south africa",
+    "칠레",
+    "chile",
+  ]
+  return southernKeywords.some((k) => lower.includes(k)) ? "south" : "north"
+}
+
+function getSeason(month: number, hemisphere: "north" | "south"): string {
+  // 북반구 기준 계절
+  const northSeasons: Record<number, string> = {
+    1: "겨울",
+    2: "겨울",
+    3: "초봄",
+    4: "봄",
+    5: "늦봄",
+    6: "초여름",
+    7: "여름",
+    8: "늦여름",
+    9: "초가을",
+    10: "가을",
+    11: "늦가을",
+    12: "겨울",
+  }
+  const southSeasons: Record<number, string> = {
+    1: "여름",
+    2: "늦여름",
+    3: "초가을",
+    4: "가을",
+    5: "늦가을",
+    6: "초겨울",
+    7: "겨울",
+    8: "겨울",
+    9: "초봄",
+    10: "봄",
+    11: "늦봄",
+    12: "초여름",
+  }
+  return hemisphere === "south" ? southSeasons[month] : northSeasons[month]
+}
+
+function getSeasonalWeather(month: number, hemisphere: "north" | "south"): string {
+  // 남반구는 6개월 시프트
+  const effectiveMonth = hemisphere === "south" ? ((month + 5) % 12) + 1 : month
+  const weatherMap: Record<number, string> = {
+    1: "한파, 건조하고 추움",
+    2: "아직 추움, 간간이 눈",
+    3: "꽃샘추위, 포근해지기 시작",
+    4: "따뜻한 봄, 벚꽃 시즌",
+    5: "쾌적한 날씨, 초여름 기운",
+    6: "장마 시작, 습하고 더워지는 중",
+    7: "한여름, 폭염, 습도 높음",
+    8: "무더위 지속, 열대야",
+    9: "가을 시작, 선선해짐",
+    10: "가을 단풍, 쾌청한 날씨",
+    11: "쌀쌀해짐, 첫 추위",
+    12: "한겨울, 눈, 연말 분위기",
+  }
+  return weatherMap[effectiveMonth]
 }
