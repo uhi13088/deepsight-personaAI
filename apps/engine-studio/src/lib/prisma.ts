@@ -1,30 +1,65 @@
 import { PrismaClient } from "@/generated/prisma"
-import { readFileSync } from "fs"
+import { readFileSync, existsSync } from "fs"
 import { resolve } from "path"
 
-/**
- * Lazy Prisma singleton + env fallback
- *
- * Next.js 16 Turbopack 환경에서 process.env.DATABASE_URL이
- * 런타임에서도 undefined일 수 있어, .env.local 직접 파싱 fallback 추가.
- */
 const globalForPrisma = globalThis as unknown as { __deepsight_prisma: PrismaClient | undefined }
 
 function loadDatabaseUrl(): string | undefined {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL
-
-  // Fallback: .env.local에서 직접 파싱
-  try {
-    const content = readFileSync(resolve(process.cwd(), ".env.local"), "utf-8")
-    const match = content.match(/^DATABASE_URL=["']?(.+?)["']?\s*$/m)
-    if (match?.[1]) {
-      process.env.DATABASE_URL = match[1]
-      return match[1]
-    }
-  } catch {
-    // .env.local 없으면 무시
+  // 1차: process.env
+  if (process.env.DATABASE_URL) {
+    console.log("[prisma] DATABASE_URL from process.env OK")
+    return process.env.DATABASE_URL
   }
 
+  console.error("[prisma] DATABASE_URL not in process.env, trying .env.local fallback...")
+  console.error("[prisma] cwd:", process.cwd())
+
+  // 2차: .env.local 직접 파싱
+  const envPaths = [
+    resolve(process.cwd(), ".env.local"),
+    resolve(process.cwd(), "apps/engine-studio/.env.local"),
+  ]
+
+  for (const envPath of envPaths) {
+    if (!existsSync(envPath)) {
+      console.error("[prisma]", envPath, "→ NOT FOUND")
+      continue
+    }
+    console.error("[prisma]", envPath, "→ EXISTS, parsing...")
+
+    try {
+      const content = readFileSync(envPath, "utf-8")
+      const lines = content.split(/\r?\n/)
+
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed.startsWith("DATABASE_URL")) continue
+
+        const eqIdx = trimmed.indexOf("=")
+        if (eqIdx === -1) continue
+
+        let value = trimmed.substring(eqIdx + 1).trim()
+        // Remove surrounding quotes
+        if (
+          (value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))
+        ) {
+          value = value.slice(1, -1)
+        }
+
+        if (value && (value.startsWith("postgresql://") || value.startsWith("postgres://"))) {
+          console.log("[prisma] DATABASE_URL loaded from", envPath)
+          process.env.DATABASE_URL = value
+          return value
+        }
+      }
+      console.error("[prisma] DATABASE_URL not found or invalid in", envPath)
+    } catch (err) {
+      console.error("[prisma] Error reading", envPath, ":", err)
+    }
+  }
+
+  console.error("[prisma] FATAL: DATABASE_URL not found anywhere!")
   return undefined
 }
 
