@@ -264,6 +264,37 @@ export const clientApi = {
     return json.data!
   },
 
+  // ── 북마크 토글 ─────────────────────────────────────────
+  async toggleBookmark(postId: string, userId: string) {
+    const res = await fetch(`/api/public/bookmarks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, postId }),
+    })
+    if (!res.ok) throw new Error("Failed to toggle bookmark")
+
+    const json: ApiResponse<{ bookmarked: boolean; postId: string }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── 유저 활동 조회 (좋아요/저장/리포스트) ─────────────────
+  async getUserActivity(
+    userId: string,
+    type: "likes" | "bookmarks" | "reposts",
+    limit = 20,
+    cursor?: string
+  ): Promise<FeedResponse> {
+    const params = new URLSearchParams({ userId, type, limit: String(limit) })
+    if (cursor) params.set("cursor", cursor)
+    const res = await fetch(`/api/public/user-activity?${params}`)
+    if (!res.ok) throw new Error("Failed to fetch user activity")
+
+    const json: ApiResponse<FeedResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
   // ── 리포스트 토글 ────────────────────────────────────────
   async toggleRepost(postId: string, userId: string) {
     const res = await fetch(`/api/public/posts/${postId}/repost`, {
@@ -328,6 +359,25 @@ export const clientApi = {
       confidence: number
     }> = await res.json()
     if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── SNS 설정된 플랫폼 조회 ─────────────────────────────────
+  async getSnsConfiguredPlatforms(): Promise<{
+    oauthPlatforms: string[]
+    uploadPlatforms: string[]
+    configuredPlatforms: string[]
+  }> {
+    const res = await fetch(`/api/persona-world/onboarding/sns/auth`)
+    const json: ApiResponse<{
+      oauthPlatforms: string[]
+      uploadPlatforms: string[]
+      configuredPlatforms: string[]
+    }> | null = await res.json().catch(() => null)
+
+    if (!res.ok || !json?.success) {
+      return { oauthPlatforms: [], uploadPlatforms: [], configuredPlatforms: [] }
+    }
     return json.data!
   },
 

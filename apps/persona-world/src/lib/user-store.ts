@@ -351,13 +351,18 @@ export const useUserStore = create<UserState>()(
 
       isReposted: (postId) => get().repostedPosts.includes(postId),
 
-      // 북마크 관리 (로컬 전용 — 서버 API 미존재)
-      toggleBookmark: (postId) =>
+      // 북마크 관리 (Optimistic + 서버 동기화)
+      toggleBookmark: (postId) => {
         set((state) => ({
           bookmarkedPosts: state.bookmarkedPosts.includes(postId)
             ? state.bookmarkedPosts.filter((id) => id !== postId)
             : [...state.bookmarkedPosts, postId],
-        })),
+        }))
+        const userId = get().profile?.id
+        if (userId) {
+          syncToServer(() => clientApi.toggleBookmark(postId, userId))
+        }
+      },
 
       isBookmarked: (postId) => get().bookmarkedPosts.includes(postId),
 
