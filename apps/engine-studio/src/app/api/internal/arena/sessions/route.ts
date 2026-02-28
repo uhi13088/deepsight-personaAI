@@ -230,20 +230,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 모드 결정 — SPARRING_1VN은 schema 마이그레이션 후 enum에 추가됨, 현재는 cast로 처리
-    const mode = (allParticipantIds.length > 2 ? "SPARRING_1VN" : "SPARRING_1V1") as "SPARRING_1V1"
+    // 모드 결정
+    const mode = allParticipantIds.length > 2 ? "SPARRING_1VN" : "SPARRING_1V1"
 
     // 예상 비용 계산
     const costEstimate = estimateSessionCost(level, resolvedMaxTurns, 0)
 
-    // 세션 생성
+    // 세션 생성 (extraParticipants를 JSON으로 저장)
     const session = await prisma.arenaSession.create({
       data: {
-        mode,
+        mode: mode as "SPARRING_1V1",
         participantA,
         participantB,
-        // extraParticipants는 schema 마이그레이션 후 활성화
-        // extraParticipants,
+        extraParticipants: extraParticipants.length > 0 ? extraParticipants : undefined,
         topic: topic.trim(),
         maxTurns: resolvedMaxTurns,
         budgetTokens: resolvedBudget,
