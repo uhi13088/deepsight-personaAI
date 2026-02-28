@@ -75,6 +75,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const redirectUri = getRedirectUri(snsPlatform)
     const authUrl = buildAuthUrl(snsPlatform, userId, codeChallenge, returnTo)
 
     if (!authUrl) {
@@ -90,13 +91,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    console.log(`[persona-world/sns/auth] ${snsPlatform} OAuth 시작 — redirect_uri: ${redirectUri}`)
+
     return NextResponse.json({
       success: true,
       data: {
         method: "oauth" as const,
         authUrl,
         platform: snsPlatform,
-        redirectUri: getRedirectUri(snsPlatform),
+        redirectUri,
       },
     })
   } catch (error) {

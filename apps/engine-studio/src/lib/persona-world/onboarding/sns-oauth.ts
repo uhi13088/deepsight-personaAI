@@ -128,16 +128,35 @@ function getClientCredentials(platform: SNSPlatform): {
 }
 
 export function getRedirectUri(platform: SNSPlatform): string {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? process.env.APP_URL ?? ""
+  // OAuth callback은 사용자가 접속하는 공개 URL로 가야 함.
+  // persona-world 프록시가 engine-studio로 중계하므로,
+  // redirect_uri의 base URL은 persona-world의 공개 URL이어야 한다.
+  //
+  // 우선순위:
+  // 1. OAUTH_CALLBACK_BASE_URL — OAuth 전용 명시적 override
+  // 2. PERSONA_WORLD_URL — PW 공개 URL (콜백 라우트에서도 사용)
+  // 3. NEXT_PUBLIC_APP_URL / NEXTAUTH_URL / APP_URL — 레거시 fallback
+  const baseUrl = (
+    process.env.OAUTH_CALLBACK_BASE_URL ??
+    process.env.PERSONA_WORLD_URL ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.NEXTAUTH_URL ??
+    process.env.APP_URL ??
+    ""
+  ).replace(/\/+$/, "")
+
   if (!baseUrl) {
     console.error(
-      "[sns-oauth] NEXT_PUBLIC_APP_URL / NEXTAUTH_URL 환경변수가 설정되지 않았습니다. redirect_uri가 유효하지 않습니다."
+      "[sns-oauth] redirect_uri base URL을 결정할 수 없습니다. " +
+        "OAUTH_CALLBACK_BASE_URL 또는 PERSONA_WORLD_URL 환경변수를 설정하세요."
     )
   }
-  // 쿼리 파라미터 대신 경로 기반으로 플랫폼 식별
-  // Google Cloud Console에 등록할 URI: {baseUrl}/api/persona-world/onboarding/sns/callback/youtube
-  return `${baseUrl}/api/persona-world/onboarding/sns/callback/${platform.toLowerCase()}`
+
+  // Google Cloud Console / Meta Developer Console에 등록할 URI:
+  //   {baseUrl}/api/persona-world/onboarding/sns/callback/youtube
+  const redirectUri = `${baseUrl}/api/persona-world/onboarding/sns/callback/${platform.toLowerCase()}`
+
+  return redirectUri
 }
 
 // ── OAuth URL 빌드 ───────────────────────────────────────────
