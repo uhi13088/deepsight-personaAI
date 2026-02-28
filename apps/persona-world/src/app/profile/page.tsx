@@ -27,11 +27,14 @@ import {
   Shield,
   RefreshCw,
   Brain,
+  Repeat2,
+  MessageCircle,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { useUserStore } from "@/lib/user-store"
 import { clientApi } from "@/lib/api"
+import type { FeedPost } from "@/lib/types"
 import { L1_DIMENSIONS, L2_DIMENSIONS, L3_DIMENSIONS, LAYER_COLORS } from "@/lib/trait-colors"
 import { PROFILE_LEVELS } from "@/lib/profile-level"
 import { SNS_PROVIDER_CONFIG } from "@/lib/role-config"
@@ -47,6 +50,7 @@ export default function ProfilePage() {
     followedPersonas,
     likedPosts,
     bookmarkedPosts,
+    repostedPosts,
     answerDailyQuestion,
     connectSns,
     disconnectSns,
@@ -58,6 +62,41 @@ export default function ProfilePage() {
   const [loadingFollowed, setLoadingFollowed] = useState(false)
   const [showSnsConnect, setShowSnsConnect] = useState(false)
   const [dailyAnswered, setDailyAnswered] = useState(false)
+
+  // 활동 탭
+  type ActivityTab = "likes" | "bookmarks" | "reposts"
+  const [activeActivityTab, setActiveActivityTab] = useState<ActivityTab | null>(null)
+  const [activityPosts, setActivityPosts] = useState<FeedPost[]>([])
+  const [activityLoading, setActivityLoading] = useState(false)
+
+  const fetchActivityPosts = useCallback(
+    async (tab: ActivityTab) => {
+      if (!profile?.id) return
+      setActivityLoading(true)
+      try {
+        const data = await clientApi.getUserActivity(profile.id, tab, 20)
+        setActivityPosts(data.posts)
+      } catch {
+        setActivityPosts([])
+      } finally {
+        setActivityLoading(false)
+      }
+    },
+    [profile?.id]
+  )
+
+  const handleActivityTabClick = useCallback(
+    (tab: ActivityTab) => {
+      if (activeActivityTab === tab) {
+        setActiveActivityTab(null)
+        setActivityPosts([])
+        return
+      }
+      setActiveActivityTab(tab)
+      fetchActivityPosts(tab)
+    },
+    [activeActivityTab, fetchActivityPosts]
+  )
   const [consentProvider, setConsentProvider] = useState<SnsProvider | null>(null)
   const [reanalyzing, setReanalyzing] = useState(false)
   const [reanalysisResult, setReanalysisResult] = useState<{
@@ -512,23 +551,115 @@ export default function ProfilePage() {
         )}
 
         {/* Stats */}
-        <div className="mb-6 grid grid-cols-3 gap-4">
+        <div className="mb-4 grid grid-cols-4 gap-3">
           <PWCard className="text-center">
-            <Users className="mx-auto mb-2 h-6 w-6 text-purple-400" />
-            <div className="text-2xl font-bold text-gray-900">{followedPersonas.length}</div>
-            <div className="text-xs text-gray-500">팔로잉</div>
+            <Users className="mx-auto mb-2 h-5 w-5 text-purple-400" />
+            <div className="text-xl font-bold text-gray-900">{followedPersonas.length}</div>
+            <div className="text-[10px] text-gray-500">팔로잉</div>
           </PWCard>
-          <PWCard className="text-center">
-            <Heart className="mx-auto mb-2 h-6 w-6 text-pink-400" />
-            <div className="text-2xl font-bold text-gray-900">{likedPosts.length}</div>
-            <div className="text-xs text-gray-500">좋아요</div>
-          </PWCard>
-          <PWCard className="text-center">
-            <Bookmark className="mx-auto mb-2 h-6 w-6 text-amber-400" />
-            <div className="text-2xl font-bold text-gray-900">{bookmarkedPosts.length}</div>
-            <div className="text-xs text-gray-500">저장됨</div>
-          </PWCard>
+          <button onClick={() => handleActivityTabClick("likes")} className="text-left">
+            <PWCard
+              className={`text-center transition-all ${activeActivityTab === "likes" ? "ring-2 ring-pink-400" : ""}`}
+            >
+              <Heart
+                className={`mx-auto mb-2 h-5 w-5 ${activeActivityTab === "likes" ? "fill-pink-400 text-pink-400" : "text-pink-400"}`}
+              />
+              <div className="text-xl font-bold text-gray-900">{likedPosts.length}</div>
+              <div className="text-[10px] text-gray-500">좋아요</div>
+            </PWCard>
+          </button>
+          <button onClick={() => handleActivityTabClick("bookmarks")} className="text-left">
+            <PWCard
+              className={`text-center transition-all ${activeActivityTab === "bookmarks" ? "ring-2 ring-amber-400" : ""}`}
+            >
+              <Bookmark
+                className={`mx-auto mb-2 h-5 w-5 ${activeActivityTab === "bookmarks" ? "fill-amber-400 text-amber-400" : "text-amber-400"}`}
+              />
+              <div className="text-xl font-bold text-gray-900">{bookmarkedPosts.length}</div>
+              <div className="text-[10px] text-gray-500">저장됨</div>
+            </PWCard>
+          </button>
+          <button onClick={() => handleActivityTabClick("reposts")} className="text-left">
+            <PWCard
+              className={`text-center transition-all ${activeActivityTab === "reposts" ? "ring-2 ring-blue-400" : ""}`}
+            >
+              <Repeat2
+                className={`mx-auto mb-2 h-5 w-5 ${activeActivityTab === "reposts" ? "text-blue-400" : "text-blue-400"}`}
+              />
+              <div className="text-xl font-bold text-gray-900">{repostedPosts.length}</div>
+              <div className="text-[10px] text-gray-500">리포스트</div>
+            </PWCard>
+          </button>
         </div>
+
+        {/* 활동 포스트 목록 */}
+        {activeActivityTab && (
+          <PWCard className="mb-6">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
+              {activeActivityTab === "likes" && (
+                <>
+                  <Heart className="h-4 w-4 fill-pink-400 text-pink-400" /> 좋아요한 글
+                </>
+              )}
+              {activeActivityTab === "bookmarks" && (
+                <>
+                  <Bookmark className="h-4 w-4 fill-amber-400 text-amber-400" /> 저장한 글
+                </>
+              )}
+              {activeActivityTab === "reposts" && (
+                <>
+                  <Repeat2 className="h-4 w-4 text-blue-400" /> 리포스트한 글
+                </>
+              )}
+            </h3>
+
+            {activityLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-purple-500" />
+              </div>
+            ) : activityPosts.length > 0 ? (
+              <div className="space-y-3">
+                {activityPosts.map((post) => (
+                  <Link
+                    key={post.id}
+                    href={`/persona/${post.persona.id}`}
+                    className="flex gap-3 rounded-lg p-2 transition-colors hover:bg-gray-50"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-pink-400 text-sm">
+                      {post.persona.name.charAt(0)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-900">
+                          {post.persona.name}
+                        </span>
+                        <span className="text-[10px] text-gray-400">@{post.persona.handle}</span>
+                      </div>
+                      <p className="mt-0.5 line-clamp-2 text-xs text-gray-600">{post.content}</p>
+                      <div className="mt-1 flex items-center gap-3 text-[10px] text-gray-400">
+                        <span className="flex items-center gap-0.5">
+                          <Heart className="h-3 w-3" /> {post.likeCount}
+                        </span>
+                        <span className="flex items-center gap-0.5">
+                          <MessageCircle className="h-3 w-3" /> {post.commentCount}
+                        </span>
+                        <span className="flex items-center gap-0.5">
+                          <Repeat2 className="h-3 w-3" /> {post.repostCount}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="py-6 text-center text-sm text-gray-400">
+                {activeActivityTab === "likes" && "아직 좋아요한 글이 없습니다"}
+                {activeActivityTab === "bookmarks" && "아직 저장한 글이 없습니다"}
+                {activeActivityTab === "reposts" && "아직 리포스트한 글이 없습니다"}
+              </p>
+            )}
+          </PWCard>
+        )}
 
         {/* 팔로우한 페르소나 */}
         {followedPersonas.length > 0 && (
