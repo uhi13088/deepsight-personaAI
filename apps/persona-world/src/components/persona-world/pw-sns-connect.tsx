@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { PWButton } from "./pw-button"
 import { PWCard } from "./pw-card"
 import { PWSpinner } from "./pw-spinner"
 import { clientApi } from "@/lib/api"
 import { useUserStore } from "@/lib/user-store"
-import { ExternalLink, Upload, Check, AlertCircle } from "lucide-react"
+import { ExternalLink, Upload, Check, AlertCircle, Clock } from "lucide-react"
 
 // ── 플랫폼 정보 ─────────────────────────────────────────────
 
@@ -79,6 +79,14 @@ export function PWSnsConnect({ compact = false, onConnected }: PWSnsConnectProps
   const [connecting, setConnecting] = useState<string | null>(null)
   const [connected, setConnected] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
+  const [configuredPlatforms, setConfiguredPlatforms] = useState<Set<string> | null>(null)
+
+  // 마운트 시 설정된 플랫폼 조회
+  useEffect(() => {
+    clientApi.getSnsConfiguredPlatforms().then((data) => {
+      setConfiguredPlatforms(new Set(data.configuredPlatforms.map((p) => p.toLowerCase())))
+    })
+  }, [])
 
   // OAuth 시작
   const handleOAuthConnect = useCallback(
@@ -181,6 +189,11 @@ export function PWSnsConnect({ compact = false, onConnected }: PWSnsConnectProps
         {PLATFORMS.map((platform) => {
           const isConnected = connected.has(platform.id)
           const isConnecting = connecting === platform.id
+          // OAuth 플랫폼 중 환경변수 미설정 → 준비중
+          const isComingSoon =
+            platform.method === "oauth" &&
+            configuredPlatforms !== null &&
+            !configuredPlatforms.has(platform.id)
 
           return (
             <PlatformCard
@@ -189,6 +202,7 @@ export function PWSnsConnect({ compact = false, onConnected }: PWSnsConnectProps
               compact={compact}
               isConnected={isConnected}
               isConnecting={isConnecting}
+              isComingSoon={isComingSoon}
               onOAuthConnect={handleOAuthConnect}
               onFileUpload={handleFileUpload}
             />
@@ -210,6 +224,7 @@ function PlatformCard({
   compact,
   isConnected,
   isConnecting,
+  isComingSoon,
   onOAuthConnect,
   onFileUpload,
 }: {
@@ -217,11 +232,12 @@ function PlatformCard({
   compact: boolean
   isConnected: boolean
   isConnecting: boolean
+  isComingSoon: boolean
   onOAuthConnect: (id: string) => void
   onFileUpload: (id: string, file: File) => void
 }) {
   const handleClick = () => {
-    if (isConnected || isConnecting) return
+    if (isConnected || isConnecting || isComingSoon) return
 
     if (platform.method === "upload") {
       // 파일 선택 다이얼로그
@@ -243,34 +259,41 @@ function PlatformCard({
     return (
       <button
         onClick={handleClick}
-        disabled={isConnected || isConnecting}
+        disabled={isConnected || isConnecting || isComingSoon}
         className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-all ${
           isConnected
             ? "border-green-500/30 bg-green-500/10 text-green-400"
-            : `${platform.color} hover:opacity-80`
+            : isComingSoon
+              ? "cursor-not-allowed border-white/10 bg-white/5 text-white/30"
+              : `${platform.color} hover:opacity-80`
         } ${isConnecting ? "opacity-50" : ""} disabled:cursor-not-allowed`}
       >
         {isConnecting ? (
           <PWSpinner size="sm" />
         ) : isConnected ? (
           <Check className="h-4 w-4" />
+        ) : isComingSoon ? (
+          <Clock className="h-4 w-4" />
         ) : platform.method === "upload" ? (
           <Upload className="h-4 w-4" />
         ) : (
           <ExternalLink className="h-4 w-4" />
         )}
         <span className="font-medium">{platform.label}</span>
+        {isComingSoon && <span className="text-[10px] text-white/40">준비중</span>}
       </button>
     )
   }
 
   return (
-    <PWCard className="!p-3">
+    <PWCard className={`!p-3 ${isComingSoon ? "opacity-50" : ""}`}>
       <div className="flex items-center justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span
-              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${platform.color}`}
+              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${
+                isComingSoon ? "border-white/10 bg-white/5 text-white/40" : platform.color
+              }`}
             >
               {platform.label}
             </span>
@@ -279,21 +302,30 @@ function PlatformCard({
                 <Check className="h-3 w-3" /> 연동됨
               </span>
             )}
+            {isComingSoon && (
+              <span className="inline-flex items-center gap-1 text-xs text-white/40">
+                <Clock className="h-3 w-3" /> 준비중
+              </span>
+            )}
           </div>
-          <p className="mt-1 truncate text-xs text-white/50">{platform.description}</p>
+          <p className="mt-1 truncate text-xs text-white/50">
+            {isComingSoon ? "서비스 준비중입니다" : platform.description}
+          </p>
         </div>
 
         <PWButton
           size="sm"
-          variant={isConnected ? "ghost" : "outline"}
+          variant={isConnected || isComingSoon ? "ghost" : "outline"}
           onClick={handleClick}
-          disabled={isConnected || isConnecting}
+          disabled={isConnected || isConnecting || isComingSoon}
           className="ml-3 shrink-0"
         >
           {isConnecting ? (
             <PWSpinner size="sm" />
           ) : isConnected ? (
             "완료"
+          ) : isComingSoon ? (
+            "준비중"
           ) : platform.method === "upload" ? (
             <>
               <Upload className="mr-1 h-3 w-3" />

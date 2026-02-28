@@ -331,6 +331,25 @@ export const clientApi = {
     return json.data!
   },
 
+  // ── SNS 설정된 플랫폼 조회 ─────────────────────────────────
+  async getSnsConfiguredPlatforms(): Promise<{
+    oauthPlatforms: string[]
+    uploadPlatforms: string[]
+    configuredPlatforms: string[]
+  }> {
+    const res = await fetch(`/api/persona-world/onboarding/sns/auth`)
+    const json: ApiResponse<{
+      oauthPlatforms: string[]
+      uploadPlatforms: string[]
+      configuredPlatforms: string[]
+    }> | null = await res.json().catch(() => null)
+
+    if (!res.ok || !json?.success) {
+      return { oauthPlatforms: [], uploadPlatforms: [], configuredPlatforms: [] }
+    }
+    return json.data!
+  },
+
   // ── SNS OAuth 시작 ──────────────────────────────────────────
   async startSnsAuth(userId: string, platform: string, codeChallenge?: string, returnTo?: string) {
     const res = await fetch(`/api/persona-world/onboarding/sns/auth`, {
