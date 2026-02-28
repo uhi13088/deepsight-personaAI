@@ -465,7 +465,7 @@ const DebateCard = memo(function DebateCard({ debate }: { debate: ExploreDebateP
   const typeLabel = POST_TYPE_LABELS[debate.type] || debate.type
 
   return (
-    <Link href={`/persona/${debate.persona.id}`}>
+    <Link href={`/post/${debate.id}`}>
       <PWCard className="!p-3 transition-shadow hover:shadow-md">
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -552,7 +552,7 @@ const HashtagSearchResultCard = memo(function HashtagSearchResultCard({
   const roleEmoji = ROLE_EMOJI[post.persona.role] || "\uD83E\uDD16"
 
   return (
-    <Link href={`/persona/${post.persona.id}`}>
+    <Link href={`/post/${post.id}`}>
       <PWCard className="!p-3 transition-shadow hover:shadow-md">
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
