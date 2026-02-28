@@ -22,6 +22,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // ── /api/persona-world/onboarding/sns/callback/*: OAuth 콜백 — 세션 불필요 ──
+  // OAuth 제공자(Instagram 등)가 브라우저를 redirect하므로 세션 쿠키 없음.
+  // 보안은 engine-studio의 state 파라미터 검증(CSRF 방지 + 10분 만료)으로 처리.
+  if (pathname.startsWith("/api/persona-world/onboarding/sns/callback/")) {
+    return NextResponse.next()
+  }
+
   // ── /api/persona-world/*: 인증 필수, 프록시 route handler가 헤더 주입 처리 ──
   if (pathname.startsWith("/api/persona-world/")) {
     if (!sessionToken) {

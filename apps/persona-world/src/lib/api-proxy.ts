@@ -62,6 +62,7 @@ export async function proxyToEngineStudio(
   const init: RequestInit = {
     method: request.method,
     headers,
+    redirect: "manual",
   }
 
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -73,6 +74,21 @@ export async function proxyToEngineStudio(
   const targetUrl = url.toString()
 
   const response = await fetch(targetUrl, init)
+
+  // redirect: "manual" 설정으로 3xx 응답을 직접 받음 → 브라우저에 그대로 전달
+  // (OAuth 콜백 등 engine-studio가 redirect 응답을 반환하는 케이스)
+  if (response.status >= 300 && response.status < 400) {
+    const responseHeaders = new Headers(response.headers)
+    responseHeaders.delete("transfer-encoding")
+    responseHeaders.delete("content-encoding")
+    responseHeaders.delete("content-length")
+
+    return new NextResponse(null, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: responseHeaders,
+    })
+  }
 
   if (!response.ok) {
     const errorBody = await response.text()
