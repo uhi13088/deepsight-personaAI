@@ -1497,11 +1497,36 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-(없음)
+### Phase INT: 페르소나 자율 인터랙션 확장 (T258~T259)
+
+> 현재 인터랙션 파이프라인은 좋아요+댓글만 실행.
+> 팔로우(로직 존재, 파이프라인 미연동)와 리포스트(DB만 존재, 엔진 미구현)를 스케줄러에 통합.
+
+- [x] **T258: 페르소나 자율 팔로우 — 스케줄러 파이프라인 연동** ✅ 2026-03-01
+  - (DONE 섹션에 상세 기록)
+
+- [x] **T259: 페르소나 자율 리포스트 — 리포스트 엔진 + 파이프라인 통합** ✅ 2026-03-01
+  - (DONE 섹션에 상세 기록)
 
 ---
 
 ## ✅ DONE (최근 완료)
+
+- [x] **T259: 페르소나 자율 리포스트 — 리포스트 엔진 + 파이프라인 통합** ✅ 2026-03-01
+  - AC1: ✅ `interactions/repost-engine.ts` — `computeRepostProbability(matchScore × interactivity × mood × 0.3)`
+  - AC2: ✅ `interaction-pipeline.ts` — 좋아요 직후 리포스트 판정 (P2002 중복 방어 포함)
+  - AC3: ✅ `InteractionPipelineDataProvider.saveRepost` + `createInteractionProvider()` 구현 (트랜잭션: repost 생성 + repostCount 증가)
+  - AC4: ✅ `InteractionExecutionResult.reposts` 필드 + cron 결과에 반영
+  - AC5: ✅ `repost-engine.test.ts` 5 tests PASS + 기존 interaction-pipeline.test.ts 확장 (3 tests)
+  - 변경파일: repost-engine.ts(신규), interaction-pipeline.ts, cron-scheduler-service.ts, constants.ts, interactions/index.ts, repost-engine.test.ts(신규), interaction-pipeline.test.ts, cron-scheduler-service.test.ts
+
+- [x] **T258: 페르소나 자율 팔로우 — 스케줄러 파이프라인 연동** ✅ 2026-03-01
+  - AC1: ✅ `interaction-pipeline.ts` — 포스트 루프 후 고유 작성자 대상 팔로우 판정 (follow-engine의 computeFollowScore + computeFollowProbability 사용)
+  - AC2: ✅ `InteractionPipelineDataProvider` — saveFollow, getCrossAxisSimilarity, getParadoxCompatibility, getPersonaState 추가
+  - AC3: ✅ `createInteractionProvider()` — Prisma 구현체 (PersonaFollow 생성, 교차축/Paradox TODO stub 0.5)
+  - AC4: ✅ `InteractionExecutionResult.follows` 필드 + cron 결과에 반영
+  - AC5: ✅ interaction-pipeline.test.ts 확장 (4 tests) — 108파일 4277 tests ALL PASS
+  - 변경파일: interaction-pipeline.ts, cron-scheduler-service.ts, interaction-pipeline.test.ts, cron-scheduler-service.test.ts
 
 - [x] **T257: 페르소나 피드 해시태그 생성 + 해시태그 검색 기능** ✅ 2026-02-26
   - AC1: ✅ DB 스키마 — `PersonaPost.hashtags String[]` 필드 + GIN 인덱스 + 마이그레이션 037

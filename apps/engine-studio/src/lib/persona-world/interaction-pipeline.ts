@@ -19,6 +19,8 @@ import type {
 } from "./interactions/comment-engine"
 import { generateComment } from "./interactions/comment-engine"
 import { computeLikeProbability } from "./interactions/like-engine"
+import { computeFollowScore, computeFollowProbability } from "./interactions/follow-engine"
+import { computeRepostProbability } from "./interactions/repost-engine"
 import { updatePersonaState } from "./state-manager"
 import { buildVoiceAnchorFromProfile, parseVoiceProfile } from "./voice-anchor"
 import { computeInteractionProvenance } from "@/lib/security/data-provenance"
@@ -85,11 +87,32 @@ export interface InteractionPipelineDataProvider {
 
   /** DB에서 페르소나 voiceProfile JSON 조회 (콜드스타트 fallback용) */
   getVoiceProfile?(personaId: string): Promise<unknown | null>
+
+  // ── T258: 자율 팔로우 ──
+
+  /** 팔로우 저장 */
+  saveFollow?(followerPersonaId: string, followingPersonaId: string): Promise<void>
+
+  /** 교차축 83축 유사도 (0~1) */
+  getCrossAxisSimilarity?(personaAId: string, personaBId: string): Promise<number>
+
+  /** Paradox 호환성 (0~1) */
+  getParadoxCompatibility?(personaAId: string, personaBId: string): Promise<number>
+
+  /** 페르소나 상태 조회 */
+  getPersonaState?(personaId: string): Promise<PersonaStateData>
+
+  // ── T259: 자율 리포스트 ──
+
+  /** 리포스트 저장 */
+  saveRepost?(personaId: string, postId: string): Promise<void>
 }
 
 export interface InteractionExecutionResult {
   likes: Array<{ postId: string; authorId: string }>
   comments: Array<{ postId: string; authorId: string; commentId: string }>
+  reposts: Array<{ postId: string; authorId: string }>
+  follows: Array<{ targetPersonaId: string; score: number }>
   totalTokensUsed: number
 }
 
@@ -120,13 +143,15 @@ export async function executeInteractions(
 ): Promise<InteractionExecutionResult> {
   const likes: InteractionExecutionResult["likes"] = []
   const comments: InteractionExecutionResult["comments"] = []
+  const reposts: InteractionExecutionResult["reposts"] = []
+  const follows: InteractionExecutionResult["follows"] = []
   let totalTokensUsed = 0
 
   // Step 1: 최근 피드 포스트 조회 (최대 10개)
   const feedPosts = await dataProvider.getRecentFeedPosts(persona.id, 10)
 
   if (feedPosts.length === 0) {
-    return { likes, comments, totalTokensUsed: 0 }
+    return { likes, comments, reposts, follows, totalTokensUsed: 0 }
   }
 
   // Phase RA: 루프 전 페르소나 벡터 캐싱 + L2 갈등 패턴 분류
@@ -198,11 +223,36 @@ export async function executeInteractions(
       }
     }
 
-    // Phase RA: 댓글 여부 결정 — L2 기질 + tension 기반 Engagement Decision
-    // 기존: 좋아요한 포스트 중 30% 확률 (기질/갈등 무관)
-    // 변경: L2 패턴 + tension → skip/react_only/comment 확률적 결정
+    // T259: 리포스트 판정 — 좋아요 이후, 댓글 전
     const liked = alreadyLiked || likes.some((l) => l.postId === post.id)
-    if (!liked) continue // 좋아요 없으면 댓글도 없음
+    if (!liked) continue // 좋아요 없으면 리포스트/댓글도 없음
+
+    if (dataProvider.saveRepost) {
+      const repostProb = computeRepostProbability(matchScore, interactivity, state.mood)
+      if (Math.random() < repostProb) {
+        try {
+          await dataProvider.saveRepost(persona.id, post.id)
+          reposts.push({ postId: post.id, authorId: post.authorId })
+
+          await dataProvider.updateRelationship(persona.id, post.authorId, "repost")
+
+          await dataProvider.saveActivityLog({
+            personaId: persona.id,
+            activityType: "POST_REPOSTED",
+            targetId: post.id,
+            metadata: { probability: repostProb, matchScore },
+          })
+        } catch (error) {
+          // P2002: 이미 리포스트한 포스트 — 중복 무시
+          if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002")) {
+            throw error
+          }
+        }
+      }
+    }
+
+    // Phase RA: 댓글 여부 결정 — L2 기질 + tension 기반 Engagement Decision
+    // L2 패턴 + tension → skip/react_only/comment 확률적 결정
 
     // 이미 이 포스트에 댓글을 달았으면 스킵 (중복 댓글 방지)
     if (dataProvider.hasCommented) {
@@ -324,6 +374,52 @@ export async function executeInteractions(
     })
   }
 
+  // T258: 팔로우 판정 — 인터랙션한 고유 작성자 대상
+  if (
+    dataProvider.saveFollow &&
+    dataProvider.getCrossAxisSimilarity &&
+    dataProvider.getParadoxCompatibility
+  ) {
+    // 좋아요한 포스트 작성자 중 고유 ID 추출
+    const interactedAuthorIds = [...new Set(likes.map((l) => l.authorId))]
+
+    for (const authorId of interactedAuthorIds) {
+      const alreadyFollowing = await dataProvider.isFollowing(persona.id, authorId)
+      if (alreadyFollowing) continue
+
+      const [basicMatch, crossAxis, paradoxCompat] = await Promise.all([
+        dataProvider.getBasicMatchScore(persona.id, authorId),
+        dataProvider.getCrossAxisSimilarity(persona.id, authorId),
+        dataProvider.getParadoxCompatibility(persona.id, authorId),
+      ])
+
+      const sociability = personaVectors.social.sociability
+      const score = computeFollowScore(basicMatch, crossAxis, paradoxCompat)
+      const probability = computeFollowProbability(score, sociability)
+
+      if (probability > 0 && Math.random() < probability) {
+        try {
+          await dataProvider.saveFollow(persona.id, authorId)
+          follows.push({ targetPersonaId: authorId, score })
+
+          await dataProvider.updateRelationship(persona.id, authorId, "follow")
+
+          await dataProvider.saveActivityLog({
+            personaId: persona.id,
+            activityType: "PERSONA_FOLLOWED",
+            targetId: authorId,
+            metadata: { score, probability, breakdown: { basicMatch, crossAxis, paradoxCompat } },
+          })
+        } catch (error) {
+          // P2002: 이미 팔로우 — 중복 무시
+          if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002")) {
+            throw error
+          }
+        }
+      }
+    }
+  }
+
   // Step 5: PersonaState 업데이트 (댓글 작성마다 state 갱신)
   for (const _comment of comments) {
     await updatePersonaState(persona.id, {
@@ -332,5 +428,5 @@ export async function executeInteractions(
     })
   }
 
-  return { likes, comments, totalTokensUsed }
+  return { likes, comments, reposts, follows, totalTokensUsed }
 }

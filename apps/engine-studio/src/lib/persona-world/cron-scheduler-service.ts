@@ -57,7 +57,13 @@ export interface CronSchedulerResult {
   details: {
     execution: {
       postsCreated: Array<{ personaId: string; postId: string; postType: string }>
-      interactions: Array<{ personaId: string; likes: number; comments: number }>
+      interactions: Array<{
+        personaId: string
+        likes: number
+        comments: number
+        reposts: number
+        follows: number
+      }>
     }
     [key: string]: unknown
   }
@@ -89,7 +95,13 @@ export async function executeCronScheduler(): Promise<CronSchedulerResult> {
   const schedulerResult = await runScheduler(context, schedulerProvider)
 
   const postResults: Array<{ personaId: string; postId: string; postType: string }> = []
-  const interactionResults: Array<{ personaId: string; likes: number; comments: number }> = []
+  const interactionResults: Array<{
+    personaId: string
+    likes: number
+    comments: number
+    reposts: number
+    follows: number
+  }> = []
   const llmAvailable = isLLMConfigured()
 
   // 페르소나 간 랜덤 딜레이 계산 — 동시 활동 방지
@@ -188,6 +200,8 @@ export async function executeCronScheduler(): Promise<CronSchedulerResult> {
           personaId: decision.personaId,
           likes: result.likes.length,
           comments: result.comments.length,
+          reposts: result.reposts.length,
+          follows: result.follows.length,
         })
       } catch (err) {
         console.error(`[Cron/Scheduler] Interaction failed for ${decision.personaId}:`, err)
@@ -440,7 +454,14 @@ function createSchedulerDataProvider(): SchedulerDataProvider {
     async getActiveStatusPersonas(): Promise<SchedulerPersona[]> {
       const personas = await prisma.persona.findMany({
         where: { status: { in: ["ACTIVE", "STANDARD"] } },
-        include: { layerVectors: true },
+        include: {
+          layerVectors: true,
+          posts: {
+            select: { type: true },
+            orderBy: { createdAt: "desc" },
+            take: 3, // 다양성 쿨다운용 최근 3개
+          },
+        },
       })
 
       return personas.flatMap((p): SchedulerPersona[] => {
@@ -497,6 +518,7 @@ function createSchedulerDataProvider(): SchedulerDataProvider {
             peakHours: p.peakHours,
             triggerMap: p.triggerMap,
             knowledgeAreas: p.knowledgeAreas,
+            recentPostTypes: p.posts.map((post) => post.type),
           },
         ]
       })
@@ -723,6 +745,51 @@ function createInteractionProvider(): InteractionPipelineDataProvider {
         select: { voiceProfile: true },
       })
       return persona?.voiceProfile ?? null
+    },
+
+    // ── T258: 자율 팔로우 ──
+
+    async saveFollow(followerPersonaId, followingPersonaId) {
+      await prisma.personaFollow.create({
+        data: { followerPersonaId, followingPersonaId },
+      })
+    },
+
+    async getCrossAxisSimilarity(_personaAId, _personaBId) {
+      // TODO: 실제 83축 교차축 유사도 계산 연동
+      return 0.5
+    },
+
+    async getParadoxCompatibility(_personaAId, _personaBId) {
+      // TODO: 실제 Paradox 호환성 계산 연동
+      return 0.5
+    },
+
+    async getPersonaState(personaId) {
+      const state = await prisma.personaState.findUnique({
+        where: { personaId },
+        select: { mood: true, energy: true, socialBattery: true, paradoxTension: true },
+      })
+      return {
+        mood: Number(state?.mood ?? 0.5),
+        energy: Number(state?.energy ?? 1.0),
+        socialBattery: Number(state?.socialBattery ?? 1.0),
+        paradoxTension: Number(state?.paradoxTension ?? 0),
+      }
+    },
+
+    // ── T259: 자율 리포스트 ──
+
+    async saveRepost(personaId, postId) {
+      await prisma.$transaction([
+        prisma.personaRepost.create({
+          data: { personaId, originalPostId: postId },
+        }),
+        prisma.personaPost.update({
+          where: { id: postId },
+          data: { repostCount: { increment: 1 } },
+        }),
+      ])
     },
   }
 }

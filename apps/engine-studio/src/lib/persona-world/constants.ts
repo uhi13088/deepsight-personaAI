@@ -20,9 +20,9 @@ export const POST_TYPE_AFFINITIES: PostTypeAffinity[] = [
     // DEBATE: 비판적 + 강한 신념 → 논쟁 주도
     type: "DEBATE",
     conditions: [
-      { layer: "L1", dimension: "stance", operator: ">", threshold: 0.7, weight: 0.5 },
-      { layer: "L1", dimension: "initiative", operator: ">", threshold: 0.7, weight: 0.3 },
-      { layer: "L3", dimension: "moralCompass", operator: ">", threshold: 0.6, weight: 0.2 },
+      { layer: "L1", dimension: "stance", operator: ">", threshold: 0.6, weight: 0.5 },
+      { layer: "L1", dimension: "initiative", operator: ">", threshold: 0.5, weight: 0.3 },
+      { layer: "L3", dimension: "moralCompass", operator: ">", threshold: 0.5, weight: 0.2 },
     ],
   },
   {
@@ -62,19 +62,19 @@ export const POST_TYPE_AFFINITIES: PostTypeAffinity[] = [
     // THREAD: 체계적 정리 + 도덕적 사명감 → 연재
     type: "THREAD",
     conditions: [
-      { layer: "L1", dimension: "scope", operator: ">", threshold: 0.7, weight: 0.3 },
-      { layer: "L1", dimension: "expressiveness", operator: ">", threshold: 0.7, weight: 0.25 },
-      { layer: "L2", dimension: "conscientiousness", operator: ">", threshold: 0.5, weight: 0.25 },
-      { layer: "L3", dimension: "moralCompass", operator: ">", threshold: 0.5, weight: 0.2 },
+      { layer: "L1", dimension: "scope", operator: ">", threshold: 0.6, weight: 0.3 },
+      { layer: "L1", dimension: "expressiveness", operator: ">", threshold: 0.5, weight: 0.25 },
+      { layer: "L2", dimension: "conscientiousness", operator: ">", threshold: 0.4, weight: 0.25 },
+      { layer: "L3", dimension: "moralCompass", operator: ">", threshold: 0.4, weight: 0.2 },
     ],
   },
   {
     // VS_BATTLE: 비판적 + 높은 폭발성
     type: "VS_BATTLE",
     conditions: [
-      { layer: "L1", dimension: "stance", operator: ">", threshold: 0.8, weight: 0.4 },
-      { layer: "paradox", dimension: "paradoxScore", operator: ">", threshold: 0.5, weight: 0.3 },
-      { layer: "L3", dimension: "volatility", operator: ">", threshold: 0.5, weight: 0.3 },
+      { layer: "L1", dimension: "stance", operator: ">", threshold: 0.6, weight: 0.4 },
+      { layer: "paradox", dimension: "paradoxScore", operator: ">", threshold: 0.4, weight: 0.3 },
+      { layer: "L3", dimension: "volatility", operator: ">", threshold: 0.4, weight: 0.3 },
     ],
   },
   {
@@ -104,8 +104,8 @@ export const POST_TYPE_AFFINITIES: PostTypeAffinity[] = [
   {
     type: "PREDICTION",
     conditions: [
-      { layer: "L1", dimension: "lens", operator: ">", threshold: 0.7, weight: 0.5 },
-      { layer: "L1", dimension: "depth", operator: ">", threshold: 0.6, weight: 0.5 },
+      { layer: "L1", dimension: "lens", operator: ">", threshold: 0.5, weight: 0.5 },
+      { layer: "L1", dimension: "depth", operator: ">", threshold: 0.5, weight: 0.5 },
     ],
   },
   {
@@ -119,19 +119,19 @@ export const POST_TYPE_AFFINITIES: PostTypeAffinity[] = [
     // MEME: 실험적 취향 + 감정 폭발성 → 유머/밈
     type: "MEME",
     conditions: [
-      { layer: "L1", dimension: "taste", operator: ">", threshold: 0.7, weight: 0.4 },
-      { layer: "L1", dimension: "expressiveness", operator: ">", threshold: 0.5, weight: 0.4 },
-      { layer: "L3", dimension: "volatility", operator: ">", threshold: 0.5, weight: 0.2 },
+      { layer: "L1", dimension: "taste", operator: ">", threshold: 0.5, weight: 0.4 },
+      { layer: "L1", dimension: "expressiveness", operator: ">", threshold: 0.4, weight: 0.4 },
+      { layer: "L3", dimension: "volatility", operator: ">", threshold: 0.4, weight: 0.2 },
     ],
   },
   {
     // COLLAB: 사교적 + 결핍(연결 욕구) → 협업
     type: "COLLAB",
     conditions: [
-      { layer: "L1", dimension: "sociability", operator: ">", threshold: 0.7, weight: 0.3 },
-      { layer: "L2", dimension: "agreeableness", operator: ">", threshold: 0.6, weight: 0.25 },
-      { layer: "L1", dimension: "interactivity", operator: ">", threshold: 0.6, weight: 0.25 },
-      { layer: "L3", dimension: "lack", operator: ">", threshold: 0.5, weight: 0.2 },
+      { layer: "L1", dimension: "sociability", operator: ">", threshold: 0.5, weight: 0.3 },
+      { layer: "L2", dimension: "agreeableness", operator: ">", threshold: 0.5, weight: 0.25 },
+      { layer: "L1", dimension: "interactivity", operator: ">", threshold: 0.5, weight: 0.25 },
+      { layer: "L3", dimension: "lack", operator: ">", threshold: 0.4, weight: 0.2 },
     ],
   },
   {
@@ -148,6 +148,15 @@ export const POST_TYPE_AFFINITIES: PostTypeAffinity[] = [
       { layer: "L1", dimension: "purpose", operator: ">", threshold: 0.6, weight: 0.4 },
       { layer: "L1", dimension: "sociability", operator: ">", threshold: 0.4, weight: 0.35 },
       { layer: "L3", dimension: "growthArc", operator: ">", threshold: 0.5, weight: 0.25 },
+    ],
+  },
+  {
+    // NEWS_REACTION: 외부 자극에 민감 + 표현력 → 뉴스 반응
+    type: "NEWS_REACTION",
+    conditions: [
+      { layer: "L1", dimension: "expressiveness", operator: ">", threshold: 0.5, weight: 0.4 },
+      { layer: "L2", dimension: "openness", operator: ">", threshold: 0.5, weight: 0.3 },
+      { layer: "L3", dimension: "volatility", operator: ">", threshold: 0.4, weight: 0.3 },
     ],
   },
 ]
@@ -249,6 +258,12 @@ export const FOLLOW_WEIGHTS = {
   paradoxCompatibility: 0.2, // Paradox 호환성
   probabilityMultiplier: 0.5, // followScore × sociability × 0.5
   threshold: 0.6, // followScore > 0.6
+} as const
+
+// ── 리포스트 판정 가중치 ──────────────────────────────────────
+// 좋아요보다 희귀하도록 0.3 계수 적용
+export const REPOST_WEIGHTS = {
+  probabilityMultiplier: 0.3, // matchScore × interactivity × mood × 0.3
 } as const
 
 // ── 팔로우 발표 포스트 조건 ──────────────────────────────────

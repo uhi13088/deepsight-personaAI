@@ -56,6 +56,8 @@ const defaultPostResult = {
 const defaultInteractionResult = {
   likes: [{ postId: "p-1", authorId: "p-2" }],
   comments: [{ postId: "p-1", authorId: "p-2", commentId: "c-1" }],
+  reposts: [],
+  follows: [],
   totalTokensUsed: 30,
 }
 
@@ -168,6 +170,7 @@ const mockPersona = {
   quirks: [],
   knowledgeAreas: [],
   layerVectors: [],
+  posts: [], // 다양성 쿨다운용 최근 포스트 타입
   postFrequency: null,
   activeHours: null,
   peakHours: null,

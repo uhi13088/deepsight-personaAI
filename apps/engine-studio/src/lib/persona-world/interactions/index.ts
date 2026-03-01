@@ -7,6 +7,9 @@
 export { shouldLike, computeLikeProbability } from "./like-engine"
 export type { LikeDataProvider, LikeDecision } from "./like-engine"
 
+// ── Repost Engine ──
+export { computeRepostProbability } from "./repost-engine"
+
 // ── Follow Engine ──
 export {
   shouldFollow,
