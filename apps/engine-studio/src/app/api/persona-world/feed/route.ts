@@ -5,8 +5,8 @@ import type { FeedDataProvider } from "@/lib/persona-world/feed/feed-engine"
 import type { RecommendedCandidate } from "@/lib/persona-world/feed/recommended-posts"
 import { cosineSimilarity } from "@/lib/vector/utils"
 import { calculateVFinal } from "@/lib/vector/v-final"
-import { applyGenreWeights } from "@/lib/matching/tuning"
-import type { GenreWeightTable } from "@/lib/matching/tuning"
+import { applyGenreWeights, extractHyperParameters } from "@/lib/matching/tuning"
+import type { GenreWeightTable, TuningProfile } from "@/lib/matching/tuning"
 import type { SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector } from "@/types"
 import { verifyInternalToken } from "@/lib/internal-auth"
 
@@ -112,13 +112,16 @@ export async function POST(request: NextRequest) {
           }),
         ])
 
-        // 장르 가중치 테이블 추출
-        const genreWeights: GenreWeightTable | null =
-          tuningRow?.value &&
-          typeof tuningRow.value === "object" &&
-          "genreWeights" in (tuningRow.value as Record<string, unknown>)
-            ? ((tuningRow.value as Record<string, unknown>).genreWeights as GenreWeightTable)
+        // 튜닝 프로필에서 하이퍼파라미터 + 장르 가중치 추출
+        const tuningProfile =
+          tuningRow?.value && typeof tuningRow.value === "object"
+            ? (tuningRow.value as Partial<TuningProfile>)
             : null
+
+        const genreWeights: GenreWeightTable | null = tuningProfile?.genreWeights ?? null
+
+        // 하이퍼파라미터 추출 (DB 프로필 → 정규화된 값)
+        const hyperParams = extractHyperParameters(tuningProfile?.parameters ?? [])
 
         // 후보 포스트 조회
         const posts = await prisma.personaPost.findMany({
@@ -228,7 +231,7 @@ export async function POST(request: NextRequest) {
         }
         const userVFinal = userL2 ? calculateVFinal(userL1, userL2, defaultL3, 0.3) : null
 
-        return posts.map((p) => {
+        const candidates = posts.map((p) => {
           const vecs = vectorMap.get(p.personaId)
           if (!vecs?.l1 || vecs.l1.length < 7) {
             // 벡터 없는 페르소나 → 인기도 폴백
@@ -273,7 +276,9 @@ export async function POST(request: NextRequest) {
           const l1Div = round(1 - l1Sim)
           const l2Div = round(1 - l2Sim)
           const freshness = 0.8 // 피드 내 중복 체크는 distributeTiers에서 처리
-          const explorationScore = round(0.4 * l1Div + 0.4 * l2Div + 0.2 * freshness)
+          // diversity_factor로 탐색 점수 부스트 (0.3 → 기본, 1.0 → 최대 탐색)
+          const rawExploration = 0.4 * l1Div + 0.4 * l2Div + 0.2 * freshness
+          const explorationScore = round(rawExploration * (1 + hyperParams.diversityFactor))
 
           // Advanced: V_Final 유사도 50% + L2 유사도 30% + 역설 호환 20%
           let vFinalSim = l1Sim // V_Final 없으면 L1으로 대체
@@ -315,6 +320,9 @@ export async function POST(request: NextRequest) {
             advancedScore,
           }
         })
+
+        // 하이퍼파라미터 적용: similarity_threshold로 품질 필터링
+        return candidates.filter((c) => c.basicScore >= hyperParams.similarityThreshold)
       },
 
       async getTrendingPostIds(

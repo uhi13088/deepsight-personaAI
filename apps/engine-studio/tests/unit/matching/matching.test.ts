@@ -496,8 +496,8 @@ describe("Simulator", () => {
 
 describe("Tuning", () => {
   describe("DEFAULT_HYPERPARAMETERS", () => {
-    it("6개 파라미터 정의", () => {
-      expect(DEFAULT_HYPERPARAMETERS).toHaveLength(6)
+    it("3개 파라미터 정의 (실제 파이프라인에서 사용하는 것만)", () => {
+      expect(DEFAULT_HYPERPARAMETERS).toHaveLength(3)
     })
   })
 
@@ -517,7 +517,7 @@ describe("Tuning", () => {
     it("프로필 생성", () => {
       const profile = createTuningProfile("테스트")
       expect(profile.name).toBe("테스트")
-      expect(profile.parameters).toHaveLength(6)
+      expect(profile.parameters).toHaveLength(3)
       expect(profile.genreWeights).toHaveLength(12)
     })
   })

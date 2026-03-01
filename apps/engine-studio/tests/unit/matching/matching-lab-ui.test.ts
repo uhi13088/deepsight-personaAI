@@ -289,9 +289,9 @@ describe("Simulator Page Logic", () => {
 
 describe("Tuning Page Logic", () => {
   describe("튜닝 프로필", () => {
-    it("기본 프로필 생성 시 6종 파라미터를 포함해야 한다", () => {
+    it("기본 프로필 생성 시 3종 파라미터를 포함해야 한다", () => {
       const profile = createTuningProfile("테스트")
-      expect(profile.parameters.length).toBe(6)
+      expect(profile.parameters.length).toBe(3)
       expect(profile.genreWeights.length).toBe(12)
       expect(profile.name).toBe("테스트")
     })

@@ -12,6 +12,7 @@ import {
   applyPresetWeights,
   validateGenreWeights,
   autoCorrectGenreWeights,
+  runAutoTuning,
   DEFAULT_HYPERPARAMETERS,
   DEFAULT_GENRE_WEIGHTS,
 } from "@/lib/matching/tuning"
@@ -20,6 +21,8 @@ import type {
   HyperParameter,
   GenreWeightTable,
   GenreWeightIssue,
+  AutoTuningResult,
+  AutoTuningConfig,
 } from "@/lib/matching/tuning"
 
 // ── Prisma Helpers ──────────────────────────────────────────────
@@ -62,6 +65,8 @@ interface TuningResponse {
   corrections?: GenreWeightIssue[]
   /** 검증 이슈 (validate_weights 액션용) */
   issues?: GenreWeightIssue[]
+  /** 자동 튜닝 결과 (run_auto_tuning 액션용) */
+  autoTuning?: AutoTuningResult
 }
 
 interface CreateTuningRequest {
@@ -79,11 +84,13 @@ interface UpdateTuningRequest {
     | "apply_preset_weights"
     | "validate_weights"
     | "auto_correct"
+    | "run_auto_tuning"
   key?: string
   value?: number
   genre?: string
   dimension?: SocialDimension
   weight?: number
+  autoTuningConfig?: Partial<AutoTuningConfig>
 }
 
 // ── GET — 현재 튜닝 프로필 반환 ────────────────────────────────
@@ -236,6 +243,20 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json<ApiResponse<TuningResponse>>({
           success: true,
           data: { profile, corrections: result.corrections },
+        })
+      }
+      case "run_auto_tuning": {
+        const tuningConfig: AutoTuningConfig = {
+          virtualUserCount: body.autoTuningConfig?.virtualUserCount ?? 50,
+          method: body.autoTuningConfig?.method ?? "grid_search",
+          targetMetric: body.autoTuningConfig?.targetMetric ?? "balanced",
+        }
+        const tuningResult = runAutoTuning(profile, tuningConfig)
+        profile = tuningResult.profile
+        await saveProfile(profile)
+        return NextResponse.json<ApiResponse<TuningResponse>>({
+          success: true,
+          data: { profile, autoTuning: tuningResult.result },
         })
       }
       default:

@@ -3,7 +3,13 @@
 // T57-AC3: 하이퍼파라미터, 장르별 가중치, 자동 튜닝
 // ═══════════════════════════════════════════════════════════════
 
-import type { SocialDimension } from "@/types"
+import type {
+  SocialDimension,
+  SocialPersonaVector,
+  CoreTemperamentVector,
+  NarrativeDriveVector,
+} from "@/types"
+import { cosineSimilarity } from "@/lib/vector/utils"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
@@ -64,7 +70,7 @@ export const DEFAULT_HYPERPARAMETERS: HyperParameter[] = [
     min: 0,
     max: 100,
     step: 5,
-    description: "이 점수 미만의 매칭은 결과에서 제외됩니다",
+    description: "이 점수 미만의 매칭은 결과에서 제외됩니다 (0~100%)",
   },
   {
     key: "top_n",
@@ -84,34 +90,35 @@ export const DEFAULT_HYPERPARAMETERS: HyperParameter[] = [
     step: 0.05,
     description: "높을수록 다양한 유형의 페르소나를 추천합니다",
   },
-  {
-    key: "feedback_learning_rate",
-    label: "피드백 반영 속도",
-    value: 0.1,
-    min: 0.01,
-    max: 0.5,
-    step: 0.01,
-    description: "유저 피드백이 매칭에 반영되는 속도",
-  },
-  {
-    key: "latent_trait_weight",
-    label: "잠재 성향 가중치",
-    value: 0.2,
-    min: 0,
-    max: 1,
-    step: 0.05,
-    description: "암묵적 행동 데이터의 매칭 반영 비율",
-  },
-  {
-    key: "context_sensitivity",
-    label: "컨텍스트 민감도",
-    value: 0.5,
-    min: 0,
-    max: 1,
-    step: 0.1,
-    description: "시간/상황 컨텍스트가 매칭에 미치는 영향",
-  },
 ]
+
+// ── 하이퍼파라미터 추출 유틸리티 ─────────────────────────────
+
+/**
+ * 튜닝 프로필에서 하이퍼파라미터를 key:value 맵으로 추출.
+ * 매칭 파이프라인에서 사용하기 쉬운 형태로 변환.
+ */
+export interface ExtractedHyperParameters {
+  /** 최소 매칭 점수 0~1 (원본 0~100을 0~1로 변환) */
+  similarityThreshold: number
+  /** 추천 페르소나 수 */
+  topN: number
+  /** 추천 다양성 0~1 */
+  diversityFactor: number
+}
+
+/**
+ * 튜닝 프로필 parameters 배열에서 실제 사용 가능한 하이퍼파라미터 추출.
+ * 파이프라인에 주입할 때 이 함수를 통해 정규화된 값을 얻음.
+ */
+export function extractHyperParameters(parameters: HyperParameter[]): ExtractedHyperParameters {
+  const map = new Map(parameters.map((p) => [p.key, p.value]))
+  return {
+    similarityThreshold: (map.get("similarity_threshold") ?? 50) / 100,
+    topN: map.get("top_n") ?? 5,
+    diversityFactor: map.get("diversity_factor") ?? 0.3,
+  }
+}
 
 // ── 장르 카탈로그 (엔진이 인식하는 공식 장르 목록) ──────────
 
@@ -802,4 +809,194 @@ export function applyGenreWeights(
     const weight = entry.weights[dim] ?? 1.0
     return Math.max(0, Math.min(1, 0.5 + (v - 0.5) * weight))
   })
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 자동 튜닝 엔진 — 시뮬레이션 기반 최적 하이퍼파라미터 탐색
+// ═══════════════════════════════════════════════════════════════
+
+export interface AutoTuningConfig {
+  /** 시뮬레이션에 사용할 가상 유저 수 */
+  virtualUserCount: number
+  /** 탐색 방법 */
+  method: "grid_search" | "bayesian"
+  /** 최적화 목표 */
+  targetMetric: "quality" | "diversity" | "balanced"
+}
+
+export interface AutoTuningResult {
+  /** 최적 파라미터 조합 */
+  bestParameters: Record<string, number>
+  /** 최적 점수 (0~1) */
+  bestScore: number
+  /** 총 실험 반복 수 */
+  iterations: number
+  /** 모든 조합별 결과 (상위 10개) */
+  topResults: Array<{ params: Record<string, number>; score: number }>
+  /** 최적 파라미터가 프로필에 적용되었는지 */
+  applied: boolean
+  /** 탐색 소요 시간 (ms) */
+  durationMs: number
+}
+
+/** 자동 튜닝 시 사용할 가상 벡터 쌍 */
+interface SimulationPair {
+  userL1: number[]
+  personaL1: number[]
+  userL2: number[]
+  personaL2: number[]
+}
+
+/**
+ * 자동 튜닝 실행: 시뮬레이션으로 최적 하이퍼파라미터를 탐색.
+ *
+ * 1. 가상 유저/페르소나 벡터 쌍 생성
+ * 2. 각 파라미터 조합으로 매칭 점수 계산
+ * 3. 품질 메트릭(평균 점수, 실패율, 다양성) 평가
+ * 4. 최적 조합 반환
+ *
+ * @param profile - 현재 튜닝 프로필
+ * @param config - 자동 튜닝 설정
+ * @returns { result, profile } - 탐색 결과 + 최적 파라미터 적용된 프로필
+ */
+export function runAutoTuning(
+  profile: TuningProfile,
+  config: AutoTuningConfig = {
+    virtualUserCount: 50,
+    method: "grid_search",
+    targetMetric: "balanced",
+  }
+): { result: AutoTuningResult; profile: TuningProfile } {
+  const startTime = Date.now()
+
+  // 1. 가상 유저/페르소나 벡터 쌍 생성
+  const pairs: SimulationPair[] = Array.from({ length: config.virtualUserCount }, () => ({
+    userL1: randomVector(7),
+    personaL1: randomVector(7),
+    userL2: randomVector(5),
+    personaL2: randomVector(5),
+  }))
+
+  // 2. 파라미터 탐색 공간 정의
+  const paramSpace = [
+    {
+      key: "similarity_threshold",
+      values: [10, 20, 30, 40, 50, 60, 70],
+    },
+    {
+      key: "diversity_factor",
+      values: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
+    },
+  ]
+
+  // 3. Grid Search: 모든 조합 평가
+  const combinations = generateGridSearchCombinations(paramSpace)
+  const results: Array<{ params: Record<string, number>; score: number }> = []
+
+  for (const combo of combinations) {
+    const threshold = (combo.similarity_threshold ?? 50) / 100
+    const diversityFactor = combo.diversity_factor ?? 0.3
+
+    // 각 조합으로 시뮬레이션 실행
+    const metrics = evaluateParameterCombo(pairs, threshold, diversityFactor, profile.genreWeights)
+    const score = computeCompositeScore(metrics, config.targetMetric)
+
+    results.push({ params: combo, score })
+  }
+
+  // 4. 최적 조합 선택
+  results.sort((a, b) => b.score - a.score)
+  const best = results[0]
+
+  // 5. 최적 파라미터를 프로필에 적용
+  let updatedProfile = profile
+  if (best) {
+    for (const [key, value] of Object.entries(best.params)) {
+      const param = updatedProfile.parameters.find((p) => p.key === key)
+      if (param) {
+        updatedProfile = updateParameter(updatedProfile, key, value)
+      }
+    }
+  }
+
+  return {
+    result: {
+      bestParameters: best?.params ?? {},
+      bestScore: Math.round((best?.score ?? 0) * 100) / 100,
+      iterations: combinations.length,
+      topResults: results.slice(0, 10),
+      applied: true,
+      durationMs: Date.now() - startTime,
+    },
+    profile: updatedProfile,
+  }
+}
+
+// ── 시뮬레이션 내부 함수 ─────────────────────────────────────
+
+interface SimulationMetrics {
+  avgMatchScore: number
+  failureRate: number
+  diversity: number
+}
+
+function evaluateParameterCombo(
+  pairs: SimulationPair[],
+  threshold: number,
+  diversityFactor: number,
+  genreWeights: GenreWeightTable
+): SimulationMetrics {
+  const scores: number[] = []
+  const explorationScores: number[] = []
+
+  for (const pair of pairs) {
+    // L1 코사인 유사도 (Basic 매칭)
+    const l1Sim = Math.max(0, cosineSimilarity(pair.userL1, pair.personaL1))
+    // L2 코사인 유사도
+    const l2Sim = Math.max(0, cosineSimilarity(pair.userL2, pair.personaL2))
+
+    const basicScore = 0.7 * l1Sim + 0.3 * l2Sim
+    scores.push(basicScore)
+
+    // 탐색 점수: 발산도 × diversity boost
+    const l1Div = 1 - l1Sim
+    const l2Div = 1 - l2Sim
+    const rawExploration = 0.4 * l1Div + 0.4 * l2Div + 0.2 * 0.8
+    explorationScores.push(rawExploration * (1 + diversityFactor))
+  }
+
+  // 메트릭 계산
+  const passed = scores.filter((s) => s >= threshold)
+  const avgMatchScore = passed.length > 0 ? passed.reduce((a, b) => a + b, 0) / passed.length : 0
+  const failureRate = 1 - passed.length / scores.length
+
+  // 다양성: 탐색 점수 분산 (높을수록 다양)
+  const avgExploration = explorationScores.reduce((a, b) => a + b, 0) / explorationScores.length
+  const variance =
+    explorationScores.reduce((s, v) => s + (v - avgExploration) ** 2, 0) / explorationScores.length
+  const diversity = Math.min(1, avgExploration * (1 + Math.sqrt(variance)))
+
+  return { avgMatchScore, failureRate, diversity }
+}
+
+function computeCompositeScore(
+  metrics: SimulationMetrics,
+  target: AutoTuningConfig["targetMetric"]
+): number {
+  switch (target) {
+    case "quality":
+      // 품질 중심: 높은 평균 점수 + 낮은 실패율
+      return 0.7 * metrics.avgMatchScore + 0.3 * (1 - metrics.failureRate)
+    case "diversity":
+      // 다양성 중심: 높은 다양성 + 적당한 품질
+      return 0.3 * metrics.avgMatchScore + 0.2 * (1 - metrics.failureRate) + 0.5 * metrics.diversity
+    case "balanced":
+    default:
+      // 균형: 품질 40% + 실패율 30% + 다양성 30%
+      return 0.4 * metrics.avgMatchScore + 0.3 * (1 - metrics.failureRate) + 0.3 * metrics.diversity
+  }
+}
+
+function randomVector(dims: number): number[] {
+  return Array.from({ length: dims }, () => Math.round(Math.random() * 100) / 100)
 }
