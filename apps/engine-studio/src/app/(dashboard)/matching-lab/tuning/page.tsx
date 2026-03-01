@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
 import { KNOWN_GENRES } from "@/lib/matching/tuning"
-import type { TuningProfile, GenreWeightIssue, AutoTuningResult } from "@/lib/matching/tuning"
+import type {
+  TuningProfile,
+  GenreWeightIssue,
+  AutoTuningResult,
+  TuningLogEntry,
+} from "@/lib/matching/tuning"
 import {
   createMatchingABTest,
   startMatchingABTest,
@@ -36,6 +41,7 @@ import {
   AlertCircle,
   Wand2,
   ShieldCheck,
+  ScrollText,
 } from "lucide-react"
 
 const L1_DIMS: SocialDimension[] = [
@@ -65,7 +71,7 @@ const AB_TEST_TYPES: Array<{ key: ABTestType; label: string }> = [
   { key: "layer", label: "레이어" },
 ]
 
-type ActiveTab = "parameters" | "genres" | "autotuning" | "abtest"
+type ActiveTab = "parameters" | "genres" | "autotuning" | "abtest" | "logs"
 
 export default function TuningPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("parameters")
@@ -86,21 +92,25 @@ export default function TuningPage() {
   const [newTestType, setNewTestType] = useState<ABTestType>("tier")
   const [verdicts, setVerdicts] = useState<Record<string, ABTestVerdict>>({})
 
+  // 로그
+  const [logs, setLogs] = useState<TuningLogEntry[]>([])
+
   // 새 장르 추가 (KNOWN_GENRES에서 선택)
   const [selectedGenre, setSelectedGenre] = useState("")
 
-  // 프로필 로드
+  // 프로필 + 로그 로드
   useEffect(() => {
     fetch("/api/internal/matching-lab/tuning")
       .then((r) => r.json())
       .then(
         (d: {
           success: boolean
-          data?: { profile: TuningProfile }
+          data?: { profile: TuningProfile; logs?: TuningLogEntry[] }
           error?: { code: string; message: string }
         }) => {
           if (d.success && d.data) {
             setProfile(d.data.profile)
+            setLogs(d.data.logs ?? [])
           } else {
             setError(d.error?.message ?? "튜닝 프로필 로드 실패")
           }
@@ -347,6 +357,7 @@ export default function TuningPage() {
     { key: "genres", label: "장르 가중치", icon: <FlaskConical className="h-3.5 w-3.5" /> },
     { key: "autotuning", label: "자동 튜닝", icon: <TestTubes className="h-3.5 w-3.5" /> },
     { key: "abtest", label: "A/B 테스트", icon: <TestTubes className="h-3.5 w-3.5" /> },
+    { key: "logs", label: "변경 로그", icon: <ScrollText className="h-3.5 w-3.5" /> },
   ]
 
   if (loading) {
@@ -890,7 +901,119 @@ export default function TuningPage() {
             )}
           </div>
         )}
+
+        {/* ── 변경 로그 탭 ── */}
+        {activeTab === "logs" && (
+          <div className="space-y-4">
+            <div className="bg-card rounded-lg border p-4">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-sm font-medium">변경 이력</h3>
+                <span className="text-muted-foreground text-xs">최근 {logs.length}건</span>
+              </div>
+
+              {logs.length === 0 ? (
+                <div className="flex flex-col items-center py-8 text-center">
+                  <ScrollText className="text-muted-foreground mb-2 h-8 w-8" />
+                  <p className="text-muted-foreground text-sm">아직 변경 이력이 없습니다.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {logs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="border-border flex items-start gap-3 border-b pb-2 last:border-0"
+                    >
+                      <div className="mt-0.5 flex-shrink-0">
+                        <LogActionIcon action={log.action} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm">{log.summary}</p>
+                        <p className="text-muted-foreground text-[10px]">
+                          {formatLogTime(log.timestamp)}
+                        </p>
+                      </div>
+                      <LogActionBadge action={log.action} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </>
   )
+}
+
+// ── 로그 UI 헬퍼 ──────────────────────────────────────────────
+
+const LOG_ACTION_LABELS: Record<string, string> = {
+  update_parameter: "파라미터",
+  update_genre_weight: "장르 가중치",
+  add_genre: "장르 추가",
+  remove_genre: "장르 삭제",
+  apply_preset_weights: "프리셋",
+  auto_correct: "자동 보정",
+  run_auto_tuning: "자동 튜닝",
+  profile_created: "프로필 생성",
+}
+
+function LogActionBadge({ action }: { action: string }) {
+  const label = LOG_ACTION_LABELS[action] ?? action
+  const variant =
+    action === "run_auto_tuning"
+      ? "bg-purple-500/10 text-purple-400"
+      : action === "auto_correct"
+        ? "bg-amber-500/10 text-amber-400"
+        : action.startsWith("update")
+          ? "bg-blue-500/10 text-blue-400"
+          : action === "remove_genre"
+            ? "bg-red-500/10 text-red-400"
+            : "bg-emerald-500/10 text-emerald-400"
+  return (
+    <span className={`flex-shrink-0 rounded px-2 py-0.5 text-[10px] font-medium ${variant}`}>
+      {label}
+    </span>
+  )
+}
+
+function LogActionIcon({ action }: { action: string }) {
+  const cls = "h-3.5 w-3.5 text-muted-foreground"
+  switch (action) {
+    case "update_parameter":
+      return <SlidersHorizontal className={cls} />
+    case "update_genre_weight":
+    case "add_genre":
+    case "remove_genre":
+    case "apply_preset_weights":
+      return <FlaskConical className={cls} />
+    case "auto_correct":
+      return <ShieldCheck className={cls} />
+    case "run_auto_tuning":
+      return <TestTubes className={cls} />
+    default:
+      return <ScrollText className={cls} />
+  }
+}
+
+function formatLogTime(timestamp: number): string {
+  const d = new Date(timestamp)
+  const now = new Date()
+  const diffMs = now.getTime() - d.getTime()
+  const diffMin = Math.floor(diffMs / 60000)
+  const diffHour = Math.floor(diffMs / 3600000)
+  const diffDay = Math.floor(diffMs / 86400000)
+
+  if (diffMin < 1) return "방금 전"
+  if (diffMin < 60) return `${diffMin}분 전`
+  if (diffHour < 24) return `${diffHour}시간 전`
+  if (diffDay < 7) return `${diffDay}일 전`
+
+  return d.toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
 }

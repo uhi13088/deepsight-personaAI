@@ -39,6 +39,46 @@ export interface GenreWeightEntry {
 
 export type GenreWeightTable = GenreWeightEntry[]
 
+// ── 튜닝 로그 ──────────────────────────────────────────────────
+
+export type TuningLogAction =
+  | "update_parameter"
+  | "update_genre_weight"
+  | "add_genre"
+  | "remove_genre"
+  | "apply_preset_weights"
+  | "auto_correct"
+  | "run_auto_tuning"
+  | "profile_created"
+
+export interface TuningLogEntry {
+  id: string
+  action: TuningLogAction
+  summary: string
+  details?: Record<string, unknown>
+  timestamp: number
+}
+
+const MAX_LOG_ENTRIES = 100
+
+export function createTuningLog(
+  action: TuningLogAction,
+  summary: string,
+  details?: Record<string, unknown>
+): TuningLogEntry {
+  return {
+    id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    action,
+    summary,
+    details,
+    timestamp: Date.now(),
+  }
+}
+
+export function appendTuningLog(logs: TuningLogEntry[], entry: TuningLogEntry): TuningLogEntry[] {
+  return [entry, ...logs].slice(0, MAX_LOG_ENTRIES)
+}
+
 export interface TuningExperiment {
   id: string
   profileId: string
