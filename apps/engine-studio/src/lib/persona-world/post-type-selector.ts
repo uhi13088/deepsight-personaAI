@@ -142,19 +142,44 @@ export function weightedRandomSelect(
 }
 
 /**
+ * 다양성 쿨다운: 최근 사용된 타입의 점수를 감소시켜 반복 방지.
+ *
+ * recentTypes 배열의 순서: [가장 최근, 그 이전, ...]
+ * 감쇠: 최근 1번째 → ×0.2, 2번째 → ×0.5, 3번째 → ×0.7
+ */
+export function applyDiversityCooldown(
+  scores: Record<string, number>,
+  recentTypes: string[]
+): Record<string, number> {
+  const COOLDOWN_FACTORS = [0.2, 0.5, 0.7]
+  const modified = { ...scores }
+
+  for (let i = 0; i < Math.min(recentTypes.length, COOLDOWN_FACTORS.length); i++) {
+    const type = recentTypes[i]
+    if (modified[type] !== undefined) {
+      modified[type] *= COOLDOWN_FACTORS[i]
+    }
+  }
+
+  return modified
+}
+
+/**
  * 모든 포스트 타입의 친화도 점수를 계산하고 가중 랜덤으로 선택.
  *
  * 설계서 §4.5 전체 파이프라인:
  * 1. 각 포스트 타입의 친화도 점수 계산
  * 2. PersonaState 보정
- * 3. 가중 랜덤 선택
+ * 3. 다양성 쿨다운 (최근 사용 타입 감쇠)
+ * 4. 가중 랜덤 선택
  */
 export function selectPostType(
   vectors: ThreeLayerVector,
   paradoxScore: number,
   state: PersonaStateData,
   affinities: PostTypeAffinity[] = POST_TYPE_AFFINITIES,
-  random?: number
+  random?: number,
+  recentTypes: string[] = []
 ): {
   selectedType: PersonaPostType
   scores: Record<string, number>
@@ -168,18 +193,21 @@ export function selectPostType(
   }
 
   // Step 2: 상태 보정
-  const modifiedScores = applyStateModifiers(rawScores, state)
+  const stateModified = applyStateModifiers(rawScores, state)
 
   // 상태 보정 비율 기록
   const stateModifierRecord: Record<string, number> = {}
   for (const key of Object.keys(rawScores)) {
-    if (rawScores[key] > 0 && modifiedScores[key] !== rawScores[key]) {
-      stateModifierRecord[key] = modifiedScores[key] / rawScores[key]
+    if (rawScores[key] > 0 && stateModified[key] !== rawScores[key]) {
+      stateModifierRecord[key] = stateModified[key] / rawScores[key]
     }
   }
 
-  // Step 3: 0점 초과 항목만 후보
-  const candidates = Object.entries(modifiedScores)
+  // Step 3: 다양성 쿨다운
+  const diversityApplied = applyDiversityCooldown(stateModified, recentTypes)
+
+  // Step 4: 0점 초과 항목만 후보
+  const candidates = Object.entries(diversityApplied)
     .filter(([, score]) => score > 0)
     .map(([type, score]) => ({ type: type as PersonaPostType, score }))
 
@@ -202,10 +230,13 @@ export function selectPostType(
     .map((c) => `${c.type}(${c.score.toFixed(2)})`)
     .join(", ")
 
+  const cooldownInfo =
+    recentTypes.length > 0 ? ` cooldown=[${recentTypes.slice(0, 3).join(",")}]` : ""
+
   return {
     selectedType: selection.type,
     scores: rawScores,
     stateModifiers: stateModifierRecord,
-    reason: `top3=[${topScores}] → selected ${selection.type}(p=${selection.probability.toFixed(2)})`,
+    reason: `top3=[${topScores}] → selected ${selection.type}(p=${selection.probability.toFixed(2)})${cooldownInfo}`,
   }
 }

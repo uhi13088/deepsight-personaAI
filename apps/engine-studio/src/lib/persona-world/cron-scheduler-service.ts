@@ -440,7 +440,14 @@ function createSchedulerDataProvider(): SchedulerDataProvider {
     async getActiveStatusPersonas(): Promise<SchedulerPersona[]> {
       const personas = await prisma.persona.findMany({
         where: { status: { in: ["ACTIVE", "STANDARD"] } },
-        include: { layerVectors: true },
+        include: {
+          layerVectors: true,
+          posts: {
+            select: { type: true },
+            orderBy: { createdAt: "desc" },
+            take: 3, // 다양성 쿨다운용 최근 3개
+          },
+        },
       })
 
       return personas.flatMap((p): SchedulerPersona[] => {
@@ -497,6 +504,7 @@ function createSchedulerDataProvider(): SchedulerDataProvider {
             peakHours: p.peakHours,
             triggerMap: p.triggerMap,
             knowledgeAreas: p.knowledgeAreas,
+            recentPostTypes: p.posts.map((post) => post.type),
           },
         ]
       })

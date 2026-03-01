@@ -168,6 +168,7 @@ const mockPersona = {
   quirks: [],
   knowledgeAreas: [],
   layerVectors: [],
+  posts: [], // 다양성 쿨다운용 최근 포스트 타입
   postFrequency: null,
   activeHours: null,
   peakHours: null,

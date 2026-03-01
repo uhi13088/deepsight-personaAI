@@ -53,6 +53,7 @@ export interface SchedulerPersona {
   peakHours?: number[] // DB 저장 피크 시간대
   triggerMap?: unknown // TriggerRuleDSL[] - structured rule engine
   knowledgeAreas?: string[] // 전문 지식 분야 (topic fallback)
+  recentPostTypes?: string[] // 최근 포스트 타입 (다양성 쿨다운용, 최근→과거 순서)
 }
 
 /**
@@ -259,8 +260,15 @@ export function decideActivity(
         selectionProbability: paradoxResult.adjustedChance,
       }
     } else {
-      // 4c. 일반 포스트 타입 선택
-      const selection = selectPostType(persona.vectors, persona.paradoxScore, state)
+      // 4c. 일반 포스트 타입 선택 (다양성 쿨다운 적용)
+      const selection = selectPostType(
+        persona.vectors,
+        persona.paradoxScore,
+        state,
+        undefined,
+        undefined,
+        persona.recentPostTypes ?? []
+      )
       postType = selection.selectedType
       postTypeReason = {
         affinityScores: selection.scores,
