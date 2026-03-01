@@ -108,6 +108,9 @@ interface UserState {
   toggleBookmark: (postId: string) => void
   isBookmarked: (postId: string) => boolean
 
+  // 서버에서 활동 복원
+  restoreActivity: () => Promise<void>
+
   // 알림
   notifications: Notification[]
   addNotification: (notification: Omit<Notification, "id" | "createdAt" | "read">) => void
@@ -365,6 +368,22 @@ export const useUserStore = create<UserState>()(
       },
 
       isBookmarked: (postId) => get().bookmarkedPosts.includes(postId),
+
+      // 서버에서 좋아요/북마크/리포스트 목록 복원 (로그인 후 호출)
+      restoreActivity: async () => {
+        const userId = get().profile?.id
+        if (!userId) return
+        try {
+          const data = await clientApi.getUserStats(userId)
+          set({
+            likedPosts: data.likedPostIds,
+            bookmarkedPosts: data.bookmarkedPostIds,
+            repostedPosts: data.repostedPostIds,
+          })
+        } catch (err) {
+          console.warn("[user-store] Failed to restore activity:", err)
+        }
+      },
 
       // 알림 관리 — Server Sync
       addNotification: (notification) =>

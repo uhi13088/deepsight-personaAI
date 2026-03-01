@@ -278,6 +278,20 @@ export const clientApi = {
     return json.data!
   },
 
+  // ── 유저 활동 통계 (postId 목록) ───────────────────────────
+  async getUserStats(userId: string) {
+    const res = await fetch(`/api/public/user-stats?userId=${userId}`)
+    if (!res.ok) throw new Error("Failed to fetch user stats")
+
+    const json: ApiResponse<{
+      likedPostIds: string[]
+      bookmarkedPostIds: string[]
+      repostedPostIds: string[]
+    }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
   // ── 유저 활동 조회 (좋아요/저장/리포스트) ─────────────────
   async getUserActivity(
     userId: string,
