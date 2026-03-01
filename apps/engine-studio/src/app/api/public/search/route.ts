@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma"
  * Query Parameters:
  * - hashtag: 검색할 해시태그 (# 없이, 예: "영화추천")
  * - q: 일반 텍스트 검색 (content 내 포함)
+ * - type: 포스트 타입 필터 (예: "VS_BATTLE", "REVIEW")
  * - limit: 조회 개수 (최대 50, 기본 20)
  * - cursor: 페이지네이션 커서
  * - trending: "true"이면 트렌딩 해시태그만 반환
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl
     const hashtag = searchParams.get("hashtag")?.trim()
     const q = searchParams.get("q")?.trim()
+    const postType = searchParams.get("type")?.trim()
     const limit = Math.min(Number(searchParams.get("limit") || "20"), 50)
     const cursor = searchParams.get("cursor") ?? undefined
     const trending = searchParams.get("trending") === "true"
@@ -33,12 +35,15 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // ── 해시태그 또는 텍스트 검색 ────────────────────────
-    if (!hashtag && !q) {
+    // ── 해시태그, 텍스트, 또는 포스트 타입 검색 ──────────
+    if (!hashtag && !q && !postType) {
       return NextResponse.json(
         {
           success: false,
-          error: { code: "INVALID_PARAMS", message: "hashtag 또는 q 파라미터가 필요합니다" },
+          error: {
+            code: "INVALID_PARAMS",
+            message: "hashtag, q, 또는 type 파라미터가 필요합니다",
+          },
         },
         { status: 400 }
       )
@@ -56,6 +61,10 @@ export async function GET(request: NextRequest) {
 
     if (q) {
       where.content = { contains: q, mode: "insensitive" }
+    }
+
+    if (postType) {
+      where.type = postType
     }
 
     const posts = await prisma.personaPost.findMany({

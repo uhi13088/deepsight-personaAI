@@ -637,16 +637,18 @@ export const clientApi = {
     return json.data!
   },
 
-  // ── 해시태그 검색 ──────────────────────────────────────────
+  // ── 해시태그 / 타입 검색 ────────────────────────────────────
   async searchByHashtag(options: {
     hashtag?: string
     q?: string
+    type?: string
     limit?: number
     cursor?: string
   }) {
     const params = new URLSearchParams()
     if (options.hashtag) params.set("hashtag", options.hashtag)
     if (options.q) params.set("q", options.q)
+    if (options.type) params.set("type", options.type)
     if (options.limit) params.set("limit", String(options.limit))
     if (options.cursor) params.set("cursor", options.cursor)
 
