@@ -25,6 +25,8 @@ import { determinePostSource } from "@/lib/security/data-provenance"
 import type { PostSource } from "@/lib/security/data-provenance"
 import { extractHashtags } from "./hashtag-utils"
 import { extractMentionHandles } from "./mention-service"
+import { extractConsumptionFromPost } from "./consumption-manager"
+import type { ConsumptionRecord } from "./types"
 
 // ── 타입 정의 ────────────────────────────────────────────────
 
@@ -65,6 +67,9 @@ export interface PostPipelineDataProvider {
   getActivePersonaHandles?(
     excludePersonaId: string
   ): Promise<Array<{ handle: string; name: string }>>
+
+  /** 소비 기록 저장 (포스트 → ConsumptionLog 자동 추출) */
+  recordConsumption?(personaId: string, record: ConsumptionRecord): Promise<{ id: string }>
 }
 
 export interface PostCreationResult {
@@ -239,6 +244,35 @@ export async function executePostCreation(
     locationTag: persona.region ?? undefined,
     hashtags,
   })
+
+  // Step 7.5: 소비 기록 자동 추출 (CURATION/REVIEW/NEWS_REACTION → ConsumptionLog)
+  if (dataProvider.recordConsumption) {
+    try {
+      const consumptionItems = extractConsumptionFromPost({
+        postType,
+        content: result.content,
+        metadata: postMetadata,
+        topic: topic ?? undefined,
+        hashtags,
+      })
+
+      for (const item of consumptionItems) {
+        await dataProvider.recordConsumption(persona.id, {
+          ...item,
+          source: "AUTONOMOUS",
+        })
+      }
+
+      if (consumptionItems.length > 0) {
+        console.log(
+          `[PostPipeline] ${persona.name}: ${consumptionItems.length}건 소비 기록 저장 (${postType})`
+        )
+      }
+    } catch (err) {
+      // 소비 기록 실패는 포스트 생성을 중단하지 않음
+      console.error(`[PostPipeline] Consumption recording failed for ${persona.id}:`, err)
+    }
+  }
 
   // Step 8: PersonaState 갱신
   await updatePersonaState(persona.id, {

@@ -1511,6 +1511,21 @@
 - [x] **T260: COLLAB 포스트 팬텀 멘션 방지** ✅ 2026-03-01
   - (DONE 섹션에 상세 기록)
 
+### Phase CON: 소비 기억 자동 기록 (T262)
+
+> 포스트 생성 시 CURATION/REVIEW/NEWS_REACTION 콘텐츠를 ConsumptionLog에 자동 저장.
+> 현재 recordConsumption() 함수는 존재하지만 파이프라인에서 호출되지 않아 소비 기억이 비어있음.
+
+- [ ] **T262: 포스트 → 소비 기억 자동 기록 — ConsumptionLog 파이프라인 연동**
+  - 배경: CURATION/REVIEW/NEWS_REACTION 포스트 생성 시 콘텐츠 아이템이 ConsumptionLog에 저장되지 않음
+  - AC1: ✅ `extractConsumptionFromPost()` 순수 함수 — CURATION(items), REVIEW(단일), NEWS_REACTION(기사) 추출
+  - AC2: ✅ `inferContentType()` — 해시태그+토픽 키워드 기반 콘텐츠 타입 추론 (MOVIE/DRAMA/MUSIC/BOOK/ARTICLE/GAME/OTHER)
+  - AC3: ✅ `PostPipelineDataProvider.recordConsumption?` 옵셔널 메서드 추가
+  - AC4: ✅ `executePostCreation()` Step 7.5 — 포스트 저장 후 소비 기록 추출+저장 (실패해도 포스트 생성 중단 안 함)
+  - AC5: ✅ cron-scheduler-service + pw-scheduler-service 양쪽 provider에 recordConsumption 구현체 추가
+  - AC6: ✅ 테스트 37개 PASS (전체 108파일 4308 tests ALL PASS)
+  - 변경파일: consumption-manager.ts, post-pipeline.ts, cron-scheduler-service.ts, pw-scheduler-service.ts, consumption-manager.test.ts
+
 ---
 
 ## ✅ DONE (최근 완료)
