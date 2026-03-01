@@ -260,6 +260,12 @@ export const FOLLOW_WEIGHTS = {
   threshold: 0.6, // followScore > 0.6
 } as const
 
+// ── 리포스트 판정 가중치 ──────────────────────────────────────
+// 좋아요보다 희귀하도록 0.3 계수 적용
+export const REPOST_WEIGHTS = {
+  probabilityMultiplier: 0.3, // matchScore × interactivity × mood × 0.3
+} as const
+
 // ── 팔로우 발표 포스트 조건 ──────────────────────────────────
 // 설계서 §5.4
 export const FOLLOW_ANNOUNCEMENT = {

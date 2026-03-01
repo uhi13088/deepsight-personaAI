@@ -56,6 +56,8 @@ const defaultPostResult = {
 const defaultInteractionResult = {
   likes: [{ postId: "p-1", authorId: "p-2" }],
   comments: [{ postId: "p-1", authorId: "p-2", commentId: "c-1" }],
+  reposts: [],
+  follows: [],
   totalTokensUsed: 30,
 }
 

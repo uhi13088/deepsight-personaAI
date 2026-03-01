@@ -71,6 +71,15 @@ vi.mock("@/lib/persona-world/interactions/voice-adjustment", () => ({
   mergeAllowedTones: vi.fn((tones: string[]) => tones),
 }))
 
+vi.mock("@/lib/persona-world/interactions/follow-engine", () => ({
+  computeFollowScore: vi.fn(() => 0.7),
+  computeFollowProbability: vi.fn(() => 0.5),
+}))
+
+vi.mock("@/lib/persona-world/interactions/repost-engine", () => ({
+  computeRepostProbability: vi.fn(() => 0.5),
+}))
+
 // ── 헬퍼 ────────────────────────────────────────────────────
 
 const defaultVectors = {
@@ -134,6 +143,15 @@ function createMockDP(
     updateRelationship: vi.fn().mockResolvedValue(undefined),
     saveActivityLog: vi.fn().mockResolvedValue(undefined),
     getVoiceProfile: vi.fn().mockResolvedValue(null),
+    // T258: 자율 팔로우
+    saveFollow: vi.fn().mockResolvedValue(undefined),
+    getCrossAxisSimilarity: vi.fn().mockResolvedValue(0.5),
+    getParadoxCompatibility: vi.fn().mockResolvedValue(0.5),
+    getPersonaState: vi
+      .fn()
+      .mockResolvedValue({ mood: 0.5, energy: 0.8, socialBattery: 0.7, paradoxTension: 0.2 }),
+    // T259: 자율 리포스트
+    saveRepost: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   }
 }
@@ -360,5 +378,102 @@ describe("executeInteractions", () => {
 
     // 에러 없이 완료
     expect(result.likes.length).toBeGreaterThanOrEqual(0)
+  })
+
+  // ── T259: 리포스트 ──
+
+  it("좋아요 후 리포스트 확률 충족 → 리포스트 저장 + 관계 업데이트 + 로그", async () => {
+    const dp = createMockDP()
+
+    const result = await executeInteractions(makePersona(), makeState(), dp)
+
+    // Math.random = 0.0 < repostProbability(0.5) → 리포스트 실행
+    expect(result.reposts.length).toBeGreaterThanOrEqual(1)
+    expect(dp.saveRepost).toHaveBeenCalled()
+    expect(dp.updateRelationship).toHaveBeenCalledWith("p-1", expect.any(String), "repost")
+  })
+
+  it("리포스트 확률 미충족 → 리포스트 없음 (댓글은 여전히 가능)", async () => {
+    const { computeRepostProbability } =
+      await import("@/lib/persona-world/interactions/repost-engine")
+    vi.mocked(computeRepostProbability).mockReturnValue(0) // 확률 0
+
+    const dp = createMockDP()
+    const result = await executeInteractions(makePersona(), makeState(), dp)
+
+    expect(result.reposts).toHaveLength(0)
+    expect(dp.saveRepost).not.toHaveBeenCalled()
+    // 댓글은 여전히 가능
+    expect(result.comments.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it("saveRepost 미제공 → 리포스트 스킵", async () => {
+    const dp = createMockDP({ saveRepost: undefined })
+    const result = await executeInteractions(makePersona(), makeState(), dp)
+
+    expect(result.reposts).toHaveLength(0)
+    // 좋아요/댓글은 정상 동작
+    expect(result.likes.length).toBeGreaterThanOrEqual(1)
+  })
+
+  // ── T258: 팔로우 ──
+
+  it("좋아요 후 팔로우 확률 충족 → 팔로우 저장 + 로그", async () => {
+    const dp = createMockDP()
+
+    const result = await executeInteractions(makePersona(), makeState(), dp)
+
+    // Math.random = 0.0 < followProbability(0.5) → 팔로우 실행
+    expect(result.follows.length).toBeGreaterThanOrEqual(1)
+    expect(dp.saveFollow).toHaveBeenCalled()
+    expect(dp.updateRelationship).toHaveBeenCalledWith("p-1", expect.any(String), "follow")
+  })
+
+  it("이미 팔로우 중 → 팔로우 스킵", async () => {
+    const dp = createMockDP({
+      isFollowing: vi.fn().mockResolvedValue(true),
+    })
+
+    const result = await executeInteractions(makePersona(), makeState(), dp)
+
+    // 이미 팔로우 중이면 saveFollow 미호출
+    expect(result.follows).toHaveLength(0)
+    expect(dp.saveFollow).not.toHaveBeenCalled()
+  })
+
+  it("팔로우 확률 미충족 → 팔로우 없음", async () => {
+    const { computeFollowProbability } =
+      await import("@/lib/persona-world/interactions/follow-engine")
+    vi.mocked(computeFollowProbability).mockReturnValue(0)
+
+    const dp = createMockDP()
+    const result = await executeInteractions(makePersona(), makeState(), dp)
+
+    expect(result.follows).toHaveLength(0)
+  })
+
+  it("saveFollow 미제공 → 팔로우 스킵", async () => {
+    const dp = createMockDP({
+      saveFollow: undefined,
+      getCrossAxisSimilarity: undefined,
+      getParadoxCompatibility: undefined,
+    })
+    const result = await executeInteractions(makePersona(), makeState(), dp)
+
+    expect(result.follows).toHaveLength(0)
+    // 좋아요/댓글은 정상 동작
+    expect(result.likes.length).toBeGreaterThanOrEqual(1)
+  })
+
+  // ── 결과 구조 ──
+
+  it("결과에 reposts, follows 필드 포함", async () => {
+    const dp = createMockDP()
+    const result = await executeInteractions(makePersona(), makeState(), dp)
+
+    expect(result).toHaveProperty("reposts")
+    expect(result).toHaveProperty("follows")
+    expect(Array.isArray(result.reposts)).toBe(true)
+    expect(Array.isArray(result.follows)).toBe(true)
   })
 })
