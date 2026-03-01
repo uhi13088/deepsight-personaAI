@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { executePostCreation } from "@/lib/persona-world/post-pipeline"
+import { executePostCreation, stripPhantomMentions } from "@/lib/persona-world/post-pipeline"
 import type {
   PostPipelineDataProvider,
   PostCreationResult,
@@ -451,5 +451,44 @@ describe("executePostCreation", () => {
         locationTag: "부산",
       })
     )
+  })
+})
+
+// ═══ stripPhantomMentions ═══
+
+describe("stripPhantomMentions", () => {
+  const validHandles = [{ handle: "민수" }, { handle: "테크_리뷰어" }]
+
+  it("유효한 멘션은 유지", () => {
+    const content = "안녕 @민수 같이 작업할래?"
+    expect(stripPhantomMentions(content, validHandles)).toBe(content)
+  })
+
+  it("팬텀 멘션은 @를 제거", () => {
+    const content = "안녕 @시네마틱_레이어 같이 작업할래?"
+    const result = stripPhantomMentions(content, validHandles)
+    expect(result).toBe("안녕 시네마틱_레이어 같이 작업할래?")
+    expect(result).not.toContain("@시네마틱_레이어")
+  })
+
+  it("혼합 (유효 + 팬텀) → 유효만 유지", () => {
+    const content = "@민수 @시네마틱_레이어 @테크_리뷰어 함께 해요"
+    const result = stripPhantomMentions(content, validHandles)
+    expect(result).toContain("@민수")
+    expect(result).toContain("@테크_리뷰어")
+    expect(result).not.toContain("@시네마틱_레이어")
+    expect(result).toContain("시네마틱_레이어") // 이름 자체는 유지
+  })
+
+  it("멘션 없는 텍스트 → 그대로 반환", () => {
+    const content = "멘션 없는 일반 텍스트"
+    expect(stripPhantomMentions(content, validHandles)).toBe(content)
+  })
+
+  it("빈 validHandles → 모든 멘션 제거", () => {
+    const content = "@민수 안녕"
+    const result = stripPhantomMentions(content, [])
+    expect(result).not.toContain("@민수")
+    expect(result).toContain("민수")
   })
 })
