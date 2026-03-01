@@ -206,6 +206,23 @@ export function LNB() {
     return pathname === href || pathname.startsWith(href + "/")
   }
 
+  /**
+   * 자식 메뉴 중 가장 구체적인(경로가 긴) 매칭 하나만 active 처리.
+   * /persona-studio/incubator 와 /persona-studio/incubator/golden-samples 가
+   * 동시에 active 되는 버그 방지.
+   */
+  function getActiveChildHref(children: { href: string }[]): string | null {
+    let best: string | null = null
+    for (const child of children) {
+      if (pathname === child.href || pathname.startsWith(child.href + "/")) {
+        if (!best || child.href.length > best.length) {
+          best = child.href
+        }
+      }
+    }
+    return best
+  }
+
   return (
     <aside
       className={cn(
@@ -292,20 +309,23 @@ export function LNB() {
 
               {hasChildren && expanded && !collapsed && (
                 <div className="border-sidebar-border ml-4 mt-0.5 space-y-0.5 border-l pl-2">
-                  {section.children.map((child) => (
-                    <Link
-                      key={child.href}
-                      href={child.href}
-                      className={cn(
-                        "block rounded-md px-2 py-1 text-xs transition-colors",
-                        isActive(child.href)
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                          : "text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                      )}
-                    >
-                      {child.label}
-                    </Link>
-                  ))}
+                  {(() => {
+                    const activeHref = getActiveChildHref(section.children)
+                    return section.children.map((child) => (
+                      <Link
+                        key={child.href}
+                        href={child.href}
+                        className={cn(
+                          "block rounded-md px-2 py-1 text-xs transition-colors",
+                          child.href === activeHref
+                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                            : "text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        )}
+                      >
+                        {child.label}
+                      </Link>
+                    ))
+                  })()}
                 </div>
               )}
             </div>
