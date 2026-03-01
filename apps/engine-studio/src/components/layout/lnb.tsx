@@ -115,6 +115,7 @@ const navSections: NavSection[] = [
     basePath: "/persona-world-admin",
     children: [
       { label: "Operations", href: "/persona-world-admin/operations" },
+      { label: "Scheduler", href: "/persona-world-admin/scheduler" },
       { label: "Moderation", href: "/persona-world-admin/moderation" },
       { label: "Quality Monitor", href: "/persona-world-admin/quality" },
       { label: "Evolution", href: "/persona-world-admin/evolution" },

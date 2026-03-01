@@ -19,8 +19,8 @@ function buildConversationPrompt(
   speakerId: string,
   personaNames: Record<string, string>
 ): string {
-  const opponentId = session.participants.find((p) => p !== speakerId) ?? ""
-  const opponentName = personaNames[opponentId] ?? opponentId
+  const otherIds = session.participants.filter((p) => p !== speakerId)
+  const otherNames = otherIds.map((id) => personaNames[id] ?? id)
   const myName = personaNames[speakerId] ?? speakerId
 
   const history = session.turns
@@ -28,19 +28,36 @@ function buildConversationPrompt(
     .join("\n\n")
 
   const lines: string[] = []
+  const allNames = session.participants.map((id) => personaNames[id] ?? id).join(", ")
 
   if (session.turns.length === 0) {
     lines.push(`주제: "${session.topic}"`)
-    lines.push(`${opponentName}와 토론을 시작합니다. 당신의 첫 발언을 해주세요.`)
+    if (otherNames.length === 1) {
+      lines.push(`${otherNames[0]}와 토론을 시작합니다. 당신의 첫 발언을 해주세요.`)
+    } else {
+      lines.push(`참가자: ${allNames}`)
+      lines.push(
+        `${otherNames.join(", ")}와 함께하는 토론을 시작합니다. 당신의 첫 발언을 해주세요.`
+      )
+    }
   } else {
     lines.push(`주제: "${session.topic}"`)
+    if (otherNames.length > 1) {
+      lines.push(`참가자: ${allNames}`)
+    }
     lines.push(``)
     lines.push(`대화 기록:`)
     lines.push(history)
     lines.push(``)
-    lines.push(
-      `위 대화에 이어, ${myName}로서 ${opponentName}의 주장에 반응하여 자연스럽게 발언하세요.`
-    )
+    if (otherNames.length === 1) {
+      lines.push(
+        `위 대화에 이어, ${myName}로서 ${otherNames[0]}의 주장에 반응하여 자연스럽게 발언하세요.`
+      )
+    } else {
+      lines.push(
+        `위 대화에 이어, ${myName}로서 다른 참가자들의 주장에 반응하여 자연스럽게 발언하세요.`
+      )
+    }
   }
 
   lines.push(`2~4문장으로 간결하게 작성하세요.`)
@@ -82,9 +99,16 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       )
     }
 
-    // 2. 참가자 페르소나 로드
+    // 2. 참가자 페르소나 로드 (extraParticipants 포함)
+    type SessionWithExtra = typeof dbSession & { extraParticipants?: unknown }
+    const extra = (dbSession as SessionWithExtra).extraParticipants
+    const extraIds: string[] = Array.isArray(extra)
+      ? extra.filter((id): id is string => typeof id === "string")
+      : []
+    const allParticipantIds = [dbSession.participantA, dbSession.participantB, ...extraIds]
+
     const personas = await prisma.persona.findMany({
-      where: { id: { in: [dbSession.participantA, dbSession.participantB] } },
+      where: { id: { in: allParticipantIds } },
       select: { id: true, name: true, role: true, basePrompt: true, promptTemplate: true },
     })
 
@@ -100,10 +124,11 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     }
 
     // 3. lib 형식 세션 구성 (PENDING 상태 — startSession이 RUNNING으로 변경)
+    const mode = allParticipantIds.length > 2 ? "SPARRING_1VN" : "SPARRING_1V1"
     const libSession: ArenaSession = {
       id: dbSession.id,
-      mode: "SPARRING_1V1",
-      participants: [dbSession.participantA, dbSession.participantB],
+      mode: mode as ArenaSession["mode"],
+      participants: allParticipantIds,
       profileLoadLevel: dbSession.profileLoadLevel as ArenaSession["profileLoadLevel"],
       topic: dbSession.topic,
       maxTurns: dbSession.maxTurns,

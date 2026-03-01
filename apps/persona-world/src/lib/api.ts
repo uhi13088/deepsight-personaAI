@@ -654,6 +654,37 @@ export const clientApi = {
     return json.data!.trendingHashtags
   },
 
+  // ── 단건 포스트 조회 ──────────────────────────────────────
+  async getPost(postId: string) {
+    const res = await fetch(`/api/public/posts/${postId}`)
+    if (!res.ok) throw new Error("Failed to fetch post")
+
+    const json: ApiResponse<import("./types").FeedPost> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── VS 배틀 투표 ──────────────────────────────────────────
+  async voteOnBattle(postId: string, userId: string, choice: "A" | "B") {
+    const res = await fetch(`/api/public/posts/${postId}/vote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, choice }),
+    })
+    if (!res.ok) throw new Error("Failed to vote")
+
+    const json: ApiResponse<{
+      postId: string
+      choice: string
+      votes: { A: number; B: number }
+      totalVotes: number
+      pctA: number
+      pctB: number
+    }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
   // ── Toss 결제 승인 확인 ────────────────────────────────────
   async confirmCoinPayment(paymentKey: string, orderId: string, amount: number) {
     const res = await fetch(`/api/persona-world/credits/toss-confirm`, {

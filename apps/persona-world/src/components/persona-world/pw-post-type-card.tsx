@@ -1,9 +1,12 @@
 "use client"
 
+import { useState, useCallback } from "react"
 import Link from "next/link"
 import type { FeedPost } from "@/lib/types"
 import { POST_TYPE_LABELS, POST_TYPE_EMOJI, POST_TYPE_COLORS } from "@/lib/role-config"
 import { parseMentions } from "@/lib/mention-utils"
+import { useUserStore } from "@/lib/user-store"
+import { clientApi } from "@/lib/api"
 
 interface PWPostTypeCardProps {
   post: FeedPost
@@ -32,7 +35,7 @@ export function PWPostTypeCard({ post }: PWPostTypeCardProps) {
       </div>
 
       {/* 타입별 특화 렌더링 */}
-      {post.type === "VS_BATTLE" && <VsBattleContent metadata={post.metadata} />}
+      {post.type === "VS_BATTLE" && <VsBattleContent postId={post.id} metadata={post.metadata} />}
       {post.type === "QNA" && <QnaContent metadata={post.metadata} />}
       {post.type === "CURATION" && <CurationContent metadata={post.metadata} />}
       {post.type === "DEBATE" && <DebateContent metadata={post.metadata} />}
@@ -64,38 +67,140 @@ export function PWPostTypeCard({ post }: PWPostTypeCardProps) {
 
 // ── VS_BATTLE ───────────────────────────────────────────────
 
-function VsBattleContent({ metadata }: { metadata: Record<string, unknown> | null }) {
+function VsBattleContent({
+  postId,
+  metadata,
+}: {
+  postId: string
+  metadata: Record<string, unknown> | null
+}) {
+  const userId = useUserStore((s) => s.profile?.id)
+  const optionA = String(metadata?.optionA ?? "A")
+  const optionB = String(metadata?.optionB ?? "B")
+
+  const voters = (metadata?.voters as Record<string, string> | undefined) ?? {}
+  const initialChoice = userId ? (voters[userId] as "A" | "B" | undefined) : undefined
+
+  const initialVotes = (metadata?.votes as { A?: number; B?: number } | undefined) ?? {}
+  const initialTotalVotes = (initialVotes.A ?? 0) + (initialVotes.B ?? 0)
+  const initialPctA =
+    initialTotalVotes > 0 ? Math.round(((initialVotes.A ?? 0) / initialTotalVotes) * 100) : 50
+
+  const [myChoice, setMyChoice] = useState<"A" | "B" | undefined>(initialChoice)
+  const [pctA, setPctA] = useState(initialPctA)
+  const [totalVotes, setTotalVotes] = useState(initialTotalVotes)
+  const [voting, setVoting] = useState(false)
+
+  const handleVote = useCallback(
+    async (choice: "A" | "B") => {
+      if (!userId || voting) return
+      setVoting(true)
+
+      // 낙관적 업데이트
+      const prevChoice = myChoice
+      const prevPctA = pctA
+      const prevTotal = totalVotes
+
+      let newTotal = totalVotes
+      let newVotesA = Math.round((pctA / 100) * totalVotes)
+      let newVotesB = totalVotes - newVotesA
+
+      if (prevChoice) {
+        if (prevChoice === "A") newVotesA = Math.max(0, newVotesA - 1)
+        else newVotesB = Math.max(0, newVotesB - 1)
+        newTotal--
+      }
+      if (choice === "A") newVotesA++
+      else newVotesB++
+      newTotal++
+
+      const newPctA = newTotal > 0 ? Math.round((newVotesA / newTotal) * 100) : 50
+      setMyChoice(choice)
+      setPctA(newPctA)
+      setTotalVotes(newTotal)
+
+      try {
+        const result = await clientApi.voteOnBattle(postId, userId, choice)
+        setPctA(result.pctA)
+        setTotalVotes(result.totalVotes)
+      } catch {
+        // 롤백
+        setMyChoice(prevChoice)
+        setPctA(prevPctA)
+        setTotalVotes(prevTotal)
+      } finally {
+        setVoting(false)
+      }
+    },
+    [userId, voting, myChoice, pctA, totalVotes, postId]
+  )
+
   if (!metadata) return null
-  const optionA = String(metadata.optionA ?? "A")
-  const optionB = String(metadata.optionB ?? "B")
-  const votes = metadata.votes as { A?: number; B?: number } | undefined
-  const totalVotes = (votes?.A ?? 0) + (votes?.B ?? 0)
-  const pctA = totalVotes > 0 ? Math.round(((votes?.A ?? 0) / totalVotes) * 100) : 50
+
+  const hasVoted = myChoice !== undefined
+  const pctB = 100 - pctA
 
   return (
     <div className="mb-3 space-y-2">
       <div className="flex items-center gap-2">
-        <div className="flex-1 overflow-hidden rounded-lg bg-red-50 p-2.5">
+        {/* Option A */}
+        <button
+          onClick={() => handleVote("A")}
+          disabled={!userId || voting}
+          className={`flex-1 overflow-hidden rounded-lg p-2.5 text-left transition-all ${
+            myChoice === "A" ? "bg-red-100 ring-2 ring-red-400" : "bg-red-50 hover:bg-red-100"
+          } ${!userId ? "cursor-default" : "cursor-pointer"}`}
+        >
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-red-700">{optionA}</span>
-            <span className="text-xs font-bold text-red-600">{pctA}%</span>
+            <span className="text-sm font-medium text-red-700">
+              {myChoice === "A" && "\u2714 "}
+              {optionA}
+            </span>
+            {(hasVoted || totalVotes > 0) && (
+              <span className="text-xs font-bold text-red-600">{pctA}%</span>
+            )}
           </div>
-          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-red-100">
-            <div className="h-full rounded-full bg-red-400" style={{ width: `${pctA}%` }} />
-          </div>
-        </div>
+          {(hasVoted || totalVotes > 0) && (
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-red-100">
+              <div
+                className="h-full rounded-full bg-red-400 transition-all duration-300"
+                style={{ width: `${pctA}%` }}
+              />
+            </div>
+          )}
+        </button>
+
         <span className="text-xs font-bold text-gray-400">VS</span>
-        <div className="flex-1 overflow-hidden rounded-lg bg-blue-50 p-2.5">
+
+        {/* Option B */}
+        <button
+          onClick={() => handleVote("B")}
+          disabled={!userId || voting}
+          className={`flex-1 overflow-hidden rounded-lg p-2.5 text-left transition-all ${
+            myChoice === "B" ? "bg-blue-100 ring-2 ring-blue-400" : "bg-blue-50 hover:bg-blue-100"
+          } ${!userId ? "cursor-default" : "cursor-pointer"}`}
+        >
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-blue-700">{optionB}</span>
-            <span className="text-xs font-bold text-blue-600">{100 - pctA}%</span>
+            <span className="text-sm font-medium text-blue-700">
+              {myChoice === "B" && "\u2714 "}
+              {optionB}
+            </span>
+            {(hasVoted || totalVotes > 0) && (
+              <span className="text-xs font-bold text-blue-600">{pctB}%</span>
+            )}
           </div>
-          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-blue-100">
-            <div className="h-full rounded-full bg-blue-400" style={{ width: `${100 - pctA}%` }} />
-          </div>
-        </div>
+          {(hasVoted || totalVotes > 0) && (
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-blue-100">
+              <div
+                className="h-full rounded-full bg-blue-400 transition-all duration-300"
+                style={{ width: `${pctB}%` }}
+              />
+            </div>
+          )}
+        </button>
       </div>
       {totalVotes > 0 && <p className="text-center text-xs text-gray-400">{totalVotes}명 참여</p>}
+      {!userId && <p className="text-center text-xs text-gray-400">로그인 후 투표할 수 있습니다</p>}
     </div>
   )
 }
