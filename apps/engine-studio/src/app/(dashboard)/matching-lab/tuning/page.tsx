@@ -12,7 +12,7 @@ import {
   generateGridSearchCombinations,
   KNOWN_GENRES,
 } from "@/lib/matching/tuning"
-import type { TuningProfile, TuningExperiment } from "@/lib/matching/tuning"
+import type { TuningProfile, TuningExperiment, GenreWeightIssue } from "@/lib/matching/tuning"
 import {
   createMatchingABTest,
   startMatchingABTest,
@@ -40,6 +40,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Wand2,
+  ShieldCheck,
 } from "lucide-react"
 
 const L1_DIMS: SocialDimension[] = [
@@ -197,6 +198,46 @@ export default function TuningPage() {
   const availableGenres = KNOWN_GENRES.filter(
     (g) => !profile?.genreWeights.some((gw) => gw.genre === g.id)
   )
+
+  // 검증/자동보정 상태
+  const [validationIssues, setValidationIssues] = useState<GenreWeightIssue[]>([])
+
+  const handleValidate = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/matching-lab/tuning", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "validate_weights" }),
+      })
+      const data = (await res.json()) as {
+        success: boolean
+        data?: { issues?: GenreWeightIssue[] }
+      }
+      setValidationIssues(data.data?.issues ?? [])
+    } catch {
+      // 검증 실패 시 무시
+    }
+  }, [])
+
+  const handleAutoCorrect = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/matching-lab/tuning", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "auto_correct" }),
+      })
+      const data = (await res.json()) as {
+        success: boolean
+        data?: { profile: TuningProfile; corrections?: GenreWeightIssue[] }
+      }
+      if (data.success && data.data) {
+        setProfile(data.data.profile)
+        setValidationIssues([])
+      }
+    } catch {
+      // 보정 실패 시 무시
+    }
+  }, [])
 
   const handleRemoveGenre = useCallback(
     (genre: string) => {
@@ -406,6 +447,53 @@ export default function TuningPage() {
                 엔진이 인식하는 공식 장르 목록에서 선택합니다. 프리셋 초기화: 모든 장르 가중치를
                 추천값으로 복원합니다.
               </p>
+            </div>
+
+            {/* 수치 검증 / 자동 보정 */}
+            <div className="bg-card rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">수치 검증</h3>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={handleValidate}>
+                    <ShieldCheck className="mr-1 h-3.5 w-3.5" />
+                    검증
+                  </Button>
+                  {validationIssues.length > 0 && (
+                    <Button size="sm" variant="outline" onClick={handleAutoCorrect}>
+                      <Wand2 className="mr-1 h-3.5 w-3.5" />
+                      자동 보정
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {validationIssues.length > 0 ? (
+                <div className="mt-3 space-y-1">
+                  {validationIssues.map((issue, i) => (
+                    <div
+                      key={i}
+                      className={`rounded px-3 py-1.5 text-xs ${
+                        issue.type === "range"
+                          ? "bg-red-500/10 text-red-400"
+                          : issue.type === "imbalance"
+                            ? "bg-amber-500/10 text-amber-400"
+                            : "bg-blue-500/10 text-blue-400"
+                      }`}
+                    >
+                      <span className="mr-1 font-medium uppercase">[{issue.type}]</span>
+                      {issue.message}
+                    </div>
+                  ))}
+                  <p className="text-muted-foreground mt-2 text-[10px]">
+                    총 {validationIssues.length}건 — &quot;자동 보정&quot; 클릭 시 범위 클램핑 +
+                    평균 정규화 + 과도 이탈 보간 수행
+                  </p>
+                </div>
+              ) : (
+                <p className="text-muted-foreground mt-2 text-xs">
+                  &quot;검증&quot;을 클릭하면 범위 이탈, 차원 불균형, 프리셋 대비 과도 이탈을 자동
+                  탐지합니다.
+                </p>
+              )}
             </div>
 
             {/* 장르×차원 가중치 테이블 */}

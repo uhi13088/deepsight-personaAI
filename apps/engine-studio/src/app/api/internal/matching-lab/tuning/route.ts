@@ -10,10 +10,17 @@ import {
   addGenre,
   removeGenre,
   applyPresetWeights,
+  validateGenreWeights,
+  autoCorrectGenreWeights,
   DEFAULT_HYPERPARAMETERS,
   DEFAULT_GENRE_WEIGHTS,
 } from "@/lib/matching/tuning"
-import type { TuningProfile, HyperParameter, GenreWeightTable } from "@/lib/matching/tuning"
+import type {
+  TuningProfile,
+  HyperParameter,
+  GenreWeightTable,
+  GenreWeightIssue,
+} from "@/lib/matching/tuning"
 
 // ── Prisma Helpers ──────────────────────────────────────────────
 
@@ -51,6 +58,10 @@ async function getOrCreateProfile(): Promise<TuningProfile> {
 
 interface TuningResponse {
   profile: TuningProfile
+  /** 자동 보정이 실행된 경우 보정 내역 */
+  corrections?: GenreWeightIssue[]
+  /** 검증 이슈 (validate_weights 액션용) */
+  issues?: GenreWeightIssue[]
 }
 
 interface CreateTuningRequest {
@@ -66,6 +77,8 @@ interface UpdateTuningRequest {
     | "add_genre"
     | "remove_genre"
     | "apply_preset_weights"
+    | "validate_weights"
+    | "auto_correct"
   key?: string
   value?: number
   genre?: string
@@ -209,6 +222,22 @@ export async function PUT(request: NextRequest) {
         profile = applyPresetWeights(profile)
         break
       }
+      case "validate_weights": {
+        const issues = validateGenreWeights(profile.genreWeights)
+        return NextResponse.json<ApiResponse<TuningResponse>>({
+          success: true,
+          data: { profile, issues },
+        })
+      }
+      case "auto_correct": {
+        const result = autoCorrectGenreWeights(profile)
+        profile = result.profile
+        await saveProfile(profile)
+        return NextResponse.json<ApiResponse<TuningResponse>>({
+          success: true,
+          data: { profile, corrections: result.corrections },
+        })
+      }
       default:
         return NextResponse.json<ApiResponse<never>>(
           {
@@ -219,11 +248,25 @@ export async function PUT(request: NextRequest) {
         )
     }
 
+    // 저장 전 자동 검증 (범위 이탈만 자동 보정, 경고는 응답에 포함)
+    const issues = validateGenreWeights(profile.genreWeights)
+    const rangeIssues = issues.filter((i) => i.type === "range")
+    let corrections: GenreWeightIssue[] = []
+    if (rangeIssues.length > 0) {
+      const result = autoCorrectGenreWeights(profile)
+      profile = result.profile
+      corrections = result.corrections
+    }
+
     await saveProfile(profile)
 
     return NextResponse.json<ApiResponse<TuningResponse>>({
       success: true,
-      data: { profile },
+      data: {
+        profile,
+        ...(corrections.length > 0 ? { corrections } : {}),
+        ...(issues.length > 0 ? { issues } : {}),
+      },
     })
   } catch {
     return NextResponse.json<ApiResponse<never>>(

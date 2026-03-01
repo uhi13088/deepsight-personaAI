@@ -613,6 +613,169 @@ export function applyPresetWeights(profile: TuningProfile): TuningProfile {
   return { ...profile, genreWeights, updatedAt: Date.now() }
 }
 
+// ── 장르 가중치 자동 검증/보정 ──────────────────────────────
+
+export type GenreIssueType = "range" | "imbalance" | "drift"
+
+export interface GenreWeightIssue {
+  genre: string
+  type: GenreIssueType
+  message: string
+  dimension?: SocialDimension
+  value?: number
+  corrected?: number
+}
+
+const WEIGHT_MIN = 0.5
+const WEIGHT_MAX = 2.0
+const MEAN_LOW = 0.8
+const MEAN_HIGH = 1.2
+const DRIFT_THRESHOLD = 0.5
+
+const ALL_DIMS: SocialDimension[] = [
+  "depth",
+  "lens",
+  "stance",
+  "scope",
+  "taste",
+  "purpose",
+  "sociability",
+]
+
+/**
+ * 장르 가중치 검증: 3가지 이상을 탐지
+ * 1. range: 0.5~2.0 범위 이탈
+ * 2. imbalance: 7차원 평균이 0.8~1.2 범위 이탈 (모두 높거나 모두 낮음)
+ * 3. drift: KNOWN_GENRES 프리셋 대비 단일 차원이 ±0.5 이상 이탈
+ */
+export function validateGenreWeights(table: GenreWeightTable): GenreWeightIssue[] {
+  const issues: GenreWeightIssue[] = []
+
+  for (const entry of table) {
+    const values = ALL_DIMS.map((d) => entry.weights[d])
+
+    // 1) Range check
+    for (const dim of ALL_DIMS) {
+      const v = entry.weights[dim]
+      if (v < WEIGHT_MIN || v > WEIGHT_MAX) {
+        issues.push({
+          genre: entry.genre,
+          type: "range",
+          dimension: dim,
+          value: v,
+          corrected: Math.max(WEIGHT_MIN, Math.min(WEIGHT_MAX, v)),
+          message: `${entry.genre}.${dim} = ${v} (범위 ${WEIGHT_MIN}~${WEIGHT_MAX} 이탈)`,
+        })
+      }
+    }
+
+    // 2) Imbalance check
+    const mean = values.reduce((s, v) => s + v, 0) / values.length
+    if (mean < MEAN_LOW || mean > MEAN_HIGH) {
+      issues.push({
+        genre: entry.genre,
+        type: "imbalance",
+        value: Math.round(mean * 100) / 100,
+        message: `${entry.genre} 평균 가중치 ${mean.toFixed(2)} (${MEAN_LOW}~${MEAN_HIGH} 범위 이탈 — 전체적으로 ${mean > MEAN_HIGH ? "과대" : "과소"} 평가)`,
+      })
+    }
+
+    // 3) Drift check (프리셋 대비)
+    const known = KNOWN_GENRES.find((g) => g.id === entry.genre)
+    if (known) {
+      for (const dim of ALL_DIMS) {
+        const diff = Math.abs(entry.weights[dim] - known.preset[dim])
+        if (diff > DRIFT_THRESHOLD) {
+          issues.push({
+            genre: entry.genre,
+            type: "drift",
+            dimension: dim,
+            value: entry.weights[dim],
+            corrected: known.preset[dim],
+            message: `${entry.genre}.${dim} = ${entry.weights[dim]} (프리셋 ${known.preset[dim]}에서 ±${diff.toFixed(1)} 이탈)`,
+          })
+        }
+      }
+    }
+  }
+
+  return issues
+}
+
+/**
+ * 장르 가중치 자동 보정: 감지된 이상을 수정
+ * - range: 범위 내로 클램핑
+ * - imbalance: 평균이 1.0이 되도록 정규화
+ * - drift: 프리셋 쪽으로 50% 당기기 (완전 리셋 아닌 부분 보정)
+ *
+ * @returns { profile, corrections } - 보정된 프로필 + 수정 내역
+ */
+export function autoCorrectGenreWeights(profile: TuningProfile): {
+  profile: TuningProfile
+  corrections: GenreWeightIssue[]
+} {
+  const issues = validateGenreWeights(profile.genreWeights)
+  if (issues.length === 0) return { profile, corrections: [] }
+
+  const corrections: GenreWeightIssue[] = []
+
+  const genreWeights = profile.genreWeights.map((entry) => {
+    const newWeights = { ...entry.weights }
+    let corrected = false
+
+    // 1) Range fix: 클램핑
+    for (const dim of ALL_DIMS) {
+      const v = newWeights[dim]
+      if (v < WEIGHT_MIN || v > WEIGHT_MAX) {
+        newWeights[dim] = Math.max(WEIGHT_MIN, Math.min(WEIGHT_MAX, v))
+        corrected = true
+      }
+    }
+
+    // 2) Imbalance fix: 평균 1.0으로 정규화
+    const values = ALL_DIMS.map((d) => newWeights[d])
+    const mean = values.reduce((s, v) => s + v, 0) / values.length
+    if (mean < MEAN_LOW || mean > MEAN_HIGH) {
+      const scale = 1.0 / mean
+      for (const dim of ALL_DIMS) {
+        newWeights[dim] = Math.max(
+          WEIGHT_MIN,
+          Math.min(WEIGHT_MAX, Math.round(newWeights[dim] * scale * 100) / 100)
+        )
+      }
+      corrected = true
+    }
+
+    // 3) Drift fix: 프리셋 쪽으로 50% 보간 (과도 이탈 차원만)
+    const known = KNOWN_GENRES.find((g) => g.id === entry.genre)
+    if (known) {
+      for (const dim of ALL_DIMS) {
+        const diff = Math.abs(newWeights[dim] - known.preset[dim])
+        if (diff > DRIFT_THRESHOLD) {
+          // 현재값과 프리셋의 50% 지점으로 보정
+          newWeights[dim] = Math.round(((newWeights[dim] + known.preset[dim]) / 2) * 100) / 100
+          corrected = true
+        }
+      }
+    }
+
+    if (corrected) {
+      corrections.push({
+        genre: entry.genre,
+        type: "range",
+        message: `${entry.genre} 가중치 자동 보정됨`,
+      })
+    }
+
+    return { ...entry, weights: newWeights }
+  })
+
+  return {
+    profile: { ...profile, genreWeights, updatedAt: Date.now() },
+    corrections,
+  }
+}
+
 // ── 가중 벡터 적용 ───────────────────────────────────────────
 
 export function applyGenreWeights(
