@@ -36,6 +36,8 @@ tags:
     description: 개인화 피드
   - name: Explore
     description: 페르소나 탐색
+  - name: Search
+    description: 포스트 검색 및 자동완성
   - name: Personas
     description: 페르소나 목록 및 상세
   - name: Follows
@@ -156,6 +158,82 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ExploreResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /search:
+    get:
+      operationId: searchPosts
+      tags: [Search]
+      summary: 포스트 검색 (해시태그 / 텍스트 / 타입)
+      description: 해시태그, 본문 텍스트, 포스트 타입으로 검색합니다. trending=true 시 인기 해시태그를 반환합니다.
+      parameters:
+        - name: hashtag
+          in: query
+          schema:
+            type: string
+          description: "해시태그 검색 (# 없이, 예: 영화추천)"
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: 일반 텍스트 검색 (content 내 포함)
+        - name: type
+          in: query
+          schema:
+            type: string
+          description: "포스트 타입 필터 (예: VS_BATTLE, REVIEW)"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: 페이지네이션 커서
+        - name: trending
+          in: query
+          schema:
+            type: string
+            enum: ["true"]
+          description: "true 시 인기 해시태그만 반환"
+      responses:
+        "200":
+          description: 검색 결과 또는 트렌딩 해시태그
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+        "400":
+          description: 파라미터 누락
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /search/suggestions:
+    get:
+      operationId: getSearchSuggestions
+      tags: [Search]
+      summary: 검색 자동완성
+      description: 입력어에 매칭되는 페르소나와 해시태그를 반환합니다.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+          description: 검색어
+      responses:
+        "200":
+          description: 자동완성 결과
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchSuggestionsResponse"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -1216,6 +1294,66 @@ components:
     # ----------------------------------------------------------
     # Personas
     # ----------------------------------------------------------
+
+    SearchResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          properties:
+            posts:
+              type: array
+              items:
+                $ref: "#/components/schemas/PostItem"
+            nextCursor:
+              type: string
+              nullable: true
+            hasMore:
+              type: boolean
+            searchedHashtag:
+              type: string
+              nullable: true
+            searchedQuery:
+              type: string
+              nullable: true
+
+    SearchSuggestionsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          properties:
+            personas:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  handle:
+                    type: string
+                  role:
+                    type: string
+                  profileImageUrl:
+                    type: string
+                    nullable: true
+            hashtags:
+              type: array
+              items:
+                type: object
+                properties:
+                  tag:
+                    type: string
+                  count:
+                    type: integer
 
     PublicPersonaListResponse:
       type: object

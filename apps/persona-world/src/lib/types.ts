@@ -321,6 +321,21 @@ export interface TrendingHashtag {
   count: number
 }
 
+// ── 검색 자동완성 ────────────────────────────────────────────
+
+export interface SearchSuggestionPersona {
+  id: string
+  name: string
+  handle: string
+  role: string
+  profileImageUrl: string | null
+}
+
+export interface SearchSuggestionsResponse {
+  personas: SearchSuggestionPersona[]
+  hashtags: TrendingHashtag[]
+}
+
 // ── 알림 ─────────────────────────────────────────────────────
 
 export type NotificationType =

@@ -531,6 +531,40 @@
 
 ---
 
+## DONE (v4.0 — 자율 인터랙션)
+
+- [x] **T258: 자율 팔로우 파이프라인 통합** ✅ 2026-03-01
+  - AC1: interaction-pipeline.ts — 좋아요 작성자 대상 follow-engine 확률 판정 + P2002 방어
+  - AC2: InteractionPipelineDataProvider 확장 — saveFollow, getCrossAxisSimilarity, getParadoxCompatibility, getPersonaState
+  - AC3: cron-scheduler-service.ts — follow provider 구현
+  - 테스트: 4277 PASS (108 파일), Build PASS
+
+- [x] **T259: 자율 리포스트 엔진 + 파이프라인 통합** ✅ 2026-03-01
+  - AC1: repost-engine.ts 신규 — computeRepostProbability (matchScore × interactivity × mood × 0.3)
+  - AC2: interaction-pipeline.ts — 좋아요 후 리포스트 확률 판정 + P2002 방어
+  - AC3: cron-scheduler-service.ts — saveRepost (트랜잭션 생성 + repostCount 증가)
+  - 테스트: repost-engine.test.ts (5 테스트), interaction-pipeline.test.ts (+7), 4277 PASS
+
+- [x] **T260: COLLAB 포스트 팬텀 멘션 방지** ✅ 2026-03-01
+  - AC1: content-generator.ts — COLLAB 프롬프트에 실제 활성 페르소나 핸들 목록 주입
+  - AC2: post-pipeline.ts — stripPhantomMentions() 후처리 필터 (존재하지 않는 @멘션 제거)
+  - AC3: PostPipelineDataProvider.getActivePersonaHandles — 활성 페르소나 핸들 조회 인터페이스
+  - 테스트: content-generator.test.ts (+4), post-pipeline.test.ts (+5), 4286 PASS
+
+---
+
+## DONE (v4.0 — 검색 고도화)
+
+- [x] **T261: Explore 검색 기능 수정 + 자동완성** ✅ 2026-03-01
+  - AC1: 일반 텍스트 검색 시 포스트 내용 기반 결과 표시 (기존 페르소나 클러스터만 표시 → 포스트 검색으로 변경)
+  - AC2: 검색 모드 시 탐색 섹션 (클러스터/핫토픽/토론/신규) 숨김 — 검색 결과만 표시
+  - AC3: 검색 자동완성 — suggestions API (페르소나 이름/핸들 + 해시태그) + 드롭다운 UI
+  - 신규: search/suggestions/route.ts
+  - 변경: explore/page.tsx, api.ts, types.ts
+  - 테스트: 4286 PASS (108 파일)
+
+---
+
 ## IN_PROGRESS
 
 (없음)
