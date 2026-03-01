@@ -300,6 +300,14 @@ export function buildUserPrompt(input: PostGenerationInput): string {
     parts.push(`[소비 기억] ${input.ragContext.consumptionMemory}`)
   }
 
+  // COLLAB: 실제 존재하는 페르소나 핸들 목록 주입 (팬텀 멘션 방지)
+  if (input.postType === "COLLAB" && input.availablePersonaHandles?.length) {
+    const handleList = input.availablePersonaHandles
+      .map((p) => `@${p.handle} (${p.name})`)
+      .join(", ")
+    parts.push(`[멘션 가능 목록] ${handleList}`)
+  }
+
   // 공통 지시
   const commonInstructions = [
     `\n위 조건에 맞는 SNS 포스트를 작성하세요.`,
@@ -574,7 +582,9 @@ function getTypeSpecificInstructions(postType: PersonaPostTypeStr): string[] {
     case "COLLAB":
       return [
         `- 글 마지막(해시태그 뒤)에 협업 참여자를 아래 형식으로 출력하세요:`,
-        `  [PARTICIPANTS: 이름1, 이름2, ...]`,
+        `  [PARTICIPANTS: 핸들1, 핸들2, ...]`,
+        `- [중요] 반드시 [멘션 가능 목록]에 있는 핸들만 사용하세요. 목록에 없는 이름/핸들을 만들어내지 마세요.`,
+        `- 본문에서 @멘션할 때도 반드시 [멘션 가능 목록]의 핸들만 사용하세요.`,
       ]
     default:
       return []

@@ -189,6 +189,8 @@ export interface PostGenerationInput {
   personaState: PersonaStateData
   voiceStyle?: VoiceStyleParams // Voice 스타일 (벡터에서 도출)
   personaProfile?: PersonaProfileSnapshot // 프로필 데이터 (LLM 프롬프트 개인화)
+  /** COLLAB 등 멘션 가능 포스트용 — 실제 존재하는 페르소나 핸들 목록 */
+  availablePersonaHandles?: Array<{ handle: string; name: string }>
 }
 
 export interface PostGenerationResult {

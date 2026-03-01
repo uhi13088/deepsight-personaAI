@@ -1508,9 +1508,22 @@
 - [x] **T259: 페르소나 자율 리포스트 — 리포스트 엔진 + 파이프라인 통합** ✅ 2026-03-01
   - (DONE 섹션에 상세 기록)
 
+- [x] **T260: COLLAB 포스트 팬텀 멘션 방지** ✅ 2026-03-01
+  - (DONE 섹션에 상세 기록)
+
 ---
 
 ## ✅ DONE (최근 완료)
+
+- [x] **T260: COLLAB 포스트 팬텀 멘션 방지 — LLM 환각 @멘션 근본 수정** ✅ 2026-03-01
+  - 버그: LLM이 COLLAB 포스트에서 DB에 없는 페르소나를 @멘션 (예: @시네마틱\_레이어)
+  - 근본 원인: (1) LLM 프롬프트에 실제 페르소나 목록 미제공 (2) 생성 후 검증 없음
+  - AC1: ✅ `PostGenerationInput.availablePersonaHandles` 필드 추가
+  - AC2: ✅ `buildUserPrompt()` — COLLAB일 때 `[멘션 가능 목록]` 주입 + "목록에 없는 이름 만들지 마세요" 지시
+  - AC3: ✅ `PostPipelineDataProvider.getActivePersonaHandles()` — 활성 페르소나 핸들 목록 조회
+  - AC4: ✅ `stripPhantomMentions()` — 생성 후 허용 목록에 없는 @멘션의 @ 제거 (이중 방어)
+  - AC5: ✅ cron-scheduler-service + pw-scheduler-service 양쪽 provider에 구현체 추가
+  - 변경파일: types.ts, content-generator.ts, post-pipeline.ts, cron-scheduler-service.ts, pw-scheduler-service.ts
 
 - [x] **T259: 페르소나 자율 리포스트 — 리포스트 엔진 + 파이프라인 통합** ✅ 2026-03-01
   - AC1: ✅ `interactions/repost-engine.ts` — `computeRepostProbability(matchScore × interactivity × mood × 0.3)`

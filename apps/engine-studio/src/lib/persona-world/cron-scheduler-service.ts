@@ -579,6 +579,21 @@ function createPostPipelineProvider(): PostPipelineDataProvider {
       })
       return persona?.voiceProfile ?? null
     },
+
+    async getActivePersonaHandles(excludePersonaId) {
+      const personas = await prisma.persona.findMany({
+        where: {
+          status: { in: ["ACTIVE", "STANDARD"] },
+          id: { not: excludePersonaId },
+          handle: { not: null },
+        },
+        select: { handle: true, name: true },
+        take: 50,
+      })
+      return personas
+        .filter((p): p is typeof p & { handle: string } => p.handle !== null)
+        .map((p) => ({ handle: p.handle, name: p.name }))
+    },
   }
 }
 

@@ -24,6 +24,7 @@ import { calculatePostPoignancy } from "./poignancy"
 import { determinePostSource } from "@/lib/security/data-provenance"
 import type { PostSource } from "@/lib/security/data-provenance"
 import { extractHashtags } from "./hashtag-utils"
+import { extractMentionHandles } from "./mention-service"
 
 // ── 타입 정의 ────────────────────────────────────────────────
 
@@ -59,6 +60,11 @@ export interface PostPipelineDataProvider {
 
   /** DB에서 페르소나 voiceProfile JSON 조회 (콜드스타트 fallback용) */
   getVoiceProfile?(personaId: string): Promise<unknown | null>
+
+  /** 활성 페르소나 핸들 목록 조회 (COLLAB 멘션용, 팬텀 멘션 방지) */
+  getActivePersonaHandles?(
+    excludePersonaId: string
+  ): Promise<Array<{ handle: string; name: string }>>
 }
 
 export interface PostCreationResult {
@@ -137,6 +143,12 @@ export async function executePostCreation(
     factbook: persona.factbook,
   }
 
+  // Step 2.5: COLLAB 포스트 — 멘션 가능한 활성 페르소나 목록 조회
+  let availablePersonaHandles: Array<{ handle: string; name: string }> | undefined
+  if (postType === "COLLAB" && dataProvider.getActivePersonaHandles) {
+    availablePersonaHandles = await dataProvider.getActivePersonaHandles(persona.id)
+  }
+
   const generationInput: PostGenerationInput = {
     personaId: persona.id,
     postType,
@@ -150,10 +162,19 @@ export async function executePostCreation(
     },
     personaState: state,
     personaProfile,
+    availablePersonaHandles,
   }
 
   // Step 3: LLM 콘텐츠 생성
   let result = await generatePostContent(generationInput, llmProvider)
+
+  // Step 3.5: 팬텀 멘션 필터링 — 존재하지 않는 @멘션 제거
+  if (availablePersonaHandles) {
+    result = {
+      ...result,
+      content: stripPhantomMentions(result.content, availablePersonaHandles),
+    }
+  }
 
   // Step 4: Voice 일관성 체크
   let voiceCheck: VoiceCheckResult | null = null
@@ -266,4 +287,32 @@ function describeEmotionalState(state: PersonaStateData): string {
   if (state.paradoxTension > 0.6) parts.push("내면 갈등이 높은 상태")
 
   return parts.join(", ")
+}
+
+/**
+ * LLM이 생성한 콘텐츠에서 존재하지 않는 @멘션을 제거.
+ *
+ * 허용 목록에 없는 핸들의 @를 제거하여 일반 텍스트로 변환.
+ * 예: "@시네마틱_레이어" → "시네마틱_레이어"
+ */
+export function stripPhantomMentions(
+  content: string,
+  validHandles: Array<{ handle: string }>
+): string {
+  const validSet = new Set(validHandles.map((h) => h.handle))
+  const mentionedHandles = extractMentionHandles(content)
+
+  let result = content
+  for (const handle of mentionedHandles) {
+    if (!validSet.has(handle)) {
+      // @를 제거하여 일반 텍스트로 변환 (이름 자체는 유지)
+      result = result.replace(new RegExp(`@${escapeRegex(handle)}`, "g"), handle)
+    }
+  }
+
+  return result
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }

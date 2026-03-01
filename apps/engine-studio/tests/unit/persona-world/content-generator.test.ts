@@ -4,6 +4,7 @@ import {
   buildUserPrompt,
   generatePostContent,
   buildVoiceStyleInstruction,
+  extractPostTypeMetadata,
 } from "@/lib/persona-world/content-generator"
 import type {
   PostGenerationInput,
@@ -145,6 +146,56 @@ describe("buildUserPrompt", () => {
     const prompt = buildUserPrompt(input)
 
     expect(prompt).toContain("300~800자")
+  })
+})
+
+// ═══ buildUserPrompt — COLLAB 멘션 목록 ═══
+
+describe("buildUserPrompt — COLLAB phantom mention prevention", () => {
+  it("COLLAB + availablePersonaHandles → [멘션 가능 목록] 섹션 포함", () => {
+    const input = makeInput({
+      postType: "COLLAB" as PersonaPostType,
+      availablePersonaHandles: [
+        { handle: "영화광_민수", name: "민수" },
+        { handle: "테크_리뷰어", name: "지수" },
+      ],
+    })
+    const prompt = buildUserPrompt(input)
+
+    expect(prompt).toContain("[멘션 가능 목록]")
+    expect(prompt).toContain("@영화광_민수 (민수)")
+    expect(prompt).toContain("@테크_리뷰어 (지수)")
+    expect(prompt).toContain("목록에 없는 이름")
+  })
+
+  it("COLLAB + availablePersonaHandles 미제공 → 핸들 데이터 없음", () => {
+    const input = makeInput({
+      postType: "COLLAB" as PersonaPostType,
+    })
+    const prompt = buildUserPrompt(input)
+
+    // 지시 텍스트에는 [멘션 가능 목록] 언급이 있지만, 실제 핸들 데이터 행은 없어야 함
+    expect(prompt).not.toMatch(/\[멘션 가능 목록\]\s*@/)
+  })
+
+  it("COLLAB 아닌 타입 + availablePersonaHandles → 멘션 목록 미포함", () => {
+    const input = makeInput({
+      postType: "REVIEW" as PersonaPostType,
+      availablePersonaHandles: [{ handle: "test", name: "테스트" }],
+    })
+    const prompt = buildUserPrompt(input)
+
+    expect(prompt).not.toMatch(/\[멘션 가능 목록\]\s*@/)
+  })
+
+  it("COLLAB 타입 지시에 '목록에 없는 이름 만들지 마세요' 포함", () => {
+    const input = makeInput({
+      postType: "COLLAB" as PersonaPostType,
+      availablePersonaHandles: [{ handle: "test", name: "테스트" }],
+    })
+    const prompt = buildUserPrompt(input)
+
+    expect(prompt).toContain("만들어내지 마세요")
   })
 })
 
