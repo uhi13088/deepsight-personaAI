@@ -56,6 +56,7 @@ export default function ProfilePage() {
     disconnectSns,
     setSnsAnalyzing,
     purchasedItems,
+    restoreActivity,
   } = useUserStore()
 
   const [followedPersonaDetails, setFollowedPersonaDetails] = useState<PersonaDetail[]>([])
@@ -97,6 +98,13 @@ export default function ProfilePage() {
     },
     [activeActivityTab, fetchActivityPosts]
   )
+  // 프로필 마운트 시 서버에서 활동 데이터 동기화
+  useEffect(() => {
+    if (profile?.id) {
+      void restoreActivity()
+    }
+  }, [profile?.id, restoreActivity])
+
   const [consentProvider, setConsentProvider] = useState<SnsProvider | null>(null)
   const [reanalyzing, setReanalyzing] = useState(false)
   const [reanalysisResult, setReanalysisResult] = useState<{
