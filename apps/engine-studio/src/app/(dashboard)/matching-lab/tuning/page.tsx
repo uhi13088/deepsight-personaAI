@@ -6,12 +6,13 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
-import {
-  createTuningExperiment,
-  startExperiment,
-  generateGridSearchCombinations,
+import { KNOWN_GENRES } from "@/lib/matching/tuning"
+import type {
+  TuningProfile,
+  GenreWeightIssue,
+  AutoTuningResult,
+  TuningLogEntry,
 } from "@/lib/matching/tuning"
-import type { TuningProfile, TuningExperiment } from "@/lib/matching/tuning"
 import {
   createMatchingABTest,
   startMatchingABTest,
@@ -38,6 +39,9 @@ import {
   RotateCcw,
   CheckCircle2,
   AlertCircle,
+  Wand2,
+  ShieldCheck,
+  ScrollText,
 } from "lucide-react"
 
 const L1_DIMS: SocialDimension[] = [
@@ -67,7 +71,7 @@ const AB_TEST_TYPES: Array<{ key: ABTestType; label: string }> = [
   { key: "layer", label: "레이어" },
 ]
 
-type ActiveTab = "parameters" | "genres" | "autotuning" | "abtest"
+type ActiveTab = "parameters" | "genres" | "autotuning" | "abtest" | "logs"
 
 export default function TuningPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("parameters")
@@ -77,9 +81,10 @@ export default function TuningPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // 자동 튜닝 실험
-  const [experiment, setExperiment] = useState<TuningExperiment | null>(null)
-  const [tuningMethod, setTuningMethod] = useState<"grid_search" | "bayesian">("grid_search")
+  // 자동 튜닝
+  const [autoTuningResult, setAutoTuningResult] = useState<AutoTuningResult | null>(null)
+  const [autoTuningRunning, setAutoTuningRunning] = useState(false)
+  const [tuningTarget, setTuningTarget] = useState<"quality" | "diversity" | "balanced">("balanced")
 
   // A/B 테스트
   const [abTests, setAbTests] = useState<MatchingABTestConfig[]>([])
@@ -87,21 +92,25 @@ export default function TuningPage() {
   const [newTestType, setNewTestType] = useState<ABTestType>("tier")
   const [verdicts, setVerdicts] = useState<Record<string, ABTestVerdict>>({})
 
-  // 새 장르 추가
-  const [newGenre, setNewGenre] = useState("")
+  // 로그
+  const [logs, setLogs] = useState<TuningLogEntry[]>([])
 
-  // 프로필 로드
+  // 새 장르 추가 (KNOWN_GENRES에서 선택)
+  const [selectedGenre, setSelectedGenre] = useState("")
+
+  // 프로필 + 로그 로드
   useEffect(() => {
     fetch("/api/internal/matching-lab/tuning")
       .then((r) => r.json())
       .then(
         (d: {
           success: boolean
-          data?: { profile: TuningProfile }
+          data?: { profile: TuningProfile; logs?: TuningLogEntry[] }
           error?: { code: string; message: string }
         }) => {
           if (d.success && d.data) {
             setProfile(d.data.profile)
+            setLogs(d.data.logs ?? [])
           } else {
             setError(d.error?.message ?? "튜닝 프로필 로드 실패")
           }
@@ -181,10 +190,60 @@ export default function TuningPage() {
   )
 
   const handleAddGenre = useCallback(() => {
-    if (!newGenre.trim()) return
-    void updateProfileViaAPI({ action: "add_genre", genre: newGenre.trim() })
-    setNewGenre("")
-  }, [newGenre, updateProfileViaAPI])
+    if (!selectedGenre) return
+    void updateProfileViaAPI({ action: "add_genre", genre: selectedGenre })
+    setSelectedGenre("")
+  }, [selectedGenre, updateProfileViaAPI])
+
+  // 장르 프리셋 일괄 적용 (자동 가중치)
+  const handleApplyPresets = useCallback(() => {
+    void updateProfileViaAPI({ action: "apply_preset_weights" })
+  }, [updateProfileViaAPI])
+
+  // 현재 프로필에 없는 KNOWN_GENRES만 필터
+  const availableGenres = KNOWN_GENRES.filter(
+    (g) => !profile?.genreWeights.some((gw) => gw.genre === g.id)
+  )
+
+  // 검증/자동보정 상태
+  const [validationIssues, setValidationIssues] = useState<GenreWeightIssue[]>([])
+
+  const handleValidate = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/matching-lab/tuning", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "validate_weights" }),
+      })
+      const data = (await res.json()) as {
+        success: boolean
+        data?: { issues?: GenreWeightIssue[] }
+      }
+      setValidationIssues(data.data?.issues ?? [])
+    } catch {
+      // 검증 실패 시 무시
+    }
+  }, [])
+
+  const handleAutoCorrect = useCallback(async () => {
+    try {
+      const res = await fetch("/api/internal/matching-lab/tuning", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "auto_correct" }),
+      })
+      const data = (await res.json()) as {
+        success: boolean
+        data?: { profile: TuningProfile; corrections?: GenreWeightIssue[] }
+      }
+      if (data.success && data.data) {
+        setProfile(data.data.profile)
+        setValidationIssues([])
+      }
+    } catch {
+      // 보정 실패 시 무시
+    }
+  }, [])
 
   const handleRemoveGenre = useCallback(
     (genre: string) => {
@@ -193,20 +252,39 @@ export default function TuningPage() {
     [updateProfileViaAPI]
   )
 
-  // ── 자동 튜닝 핸들러 (auto tune action) ──
-  const handleStartAutoTuning = useCallback(() => {
-    if (!profile) return
-    const space = profile.parameters
-      .filter((p) => p.key === "similarity_threshold" || p.key === "diversity_factor")
-      .map((p) => ({
-        key: p.key,
-        values: Array.from({ length: 5 }, (_, i) => p.min + (i * (p.max - p.min)) / 4),
-      }))
-
-    const exp = createTuningExperiment(profile.id, tuningMethod, space, 25)
-    const started = startExperiment(exp)
-    setExperiment(started)
-  }, [profile, tuningMethod])
+  // ── 자동 튜닝 핸들러 (서버 실행) ──
+  const handleStartAutoTuning = useCallback(async () => {
+    if (!profile || autoTuningRunning) return
+    setAutoTuningRunning(true)
+    try {
+      const res = await fetch("/api/internal/matching-lab/tuning", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "run_auto_tuning",
+          autoTuningConfig: {
+            virtualUserCount: 50,
+            method: "grid_search",
+            targetMetric: tuningTarget,
+          },
+        }),
+      })
+      const data = (await res.json()) as {
+        success: boolean
+        data?: { profile: TuningProfile; autoTuning?: AutoTuningResult }
+      }
+      if (data.success && data.data) {
+        setProfile(data.data.profile)
+        if (data.data.autoTuning) {
+          setAutoTuningResult(data.data.autoTuning)
+        }
+      }
+    } catch {
+      // 자동 튜닝 실패
+    } finally {
+      setAutoTuningRunning(false)
+    }
+  }, [profile, autoTuningRunning, tuningTarget])
 
   // ── A/B 테스트 핸들러 ──
   const handleCreateABTest = useCallback(() => {
@@ -279,6 +357,7 @@ export default function TuningPage() {
     { key: "genres", label: "장르 가중치", icon: <FlaskConical className="h-3.5 w-3.5" /> },
     { key: "autotuning", label: "자동 튜닝", icon: <TestTubes className="h-3.5 w-3.5" /> },
     { key: "abtest", label: "A/B 테스트", icon: <TestTubes className="h-3.5 w-3.5" /> },
+    { key: "logs", label: "변경 로그", icon: <ScrollText className="h-3.5 w-3.5" /> },
   ]
 
   if (loading) {
@@ -364,22 +443,83 @@ export default function TuningPage() {
         {/* ── 장르 가중치 탭 ── */}
         {activeTab === "genres" && (
           <div className="space-y-4">
-            {/* 장르 추가 */}
+            {/* 장르 추가 + 자동 가중치 */}
             <div className="bg-card rounded-lg border p-4">
               <h3 className="mb-3 text-sm font-medium">장르 관리</h3>
-              <div className="flex gap-2">
-                <Input
-                  className="max-w-[200px]"
-                  placeholder="새 장르명"
-                  value={newGenre}
-                  onChange={(e) => setNewGenre(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAddGenre()}
-                />
-                <Button size="sm" onClick={handleAddGenre} disabled={!newGenre.trim()}>
+              <div className="flex flex-wrap gap-2">
+                <select
+                  className="border-border bg-background min-w-[180px] rounded-md border px-3 py-2 text-sm"
+                  value={selectedGenre}
+                  onChange={(e) => setSelectedGenre(e.target.value)}
+                >
+                  <option value="">장르 선택...</option>
+                  {availableGenres.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.label} ({g.id})
+                    </option>
+                  ))}
+                </select>
+                <Button size="sm" onClick={handleAddGenre} disabled={!selectedGenre}>
                   <Plus className="mr-1 h-3.5 w-3.5" />
                   추가
                 </Button>
+                <div className="border-border mx-1 border-l" />
+                <Button size="sm" variant="outline" onClick={handleApplyPresets}>
+                  <Wand2 className="mr-1 h-3.5 w-3.5" />
+                  프리셋 초기화
+                </Button>
               </div>
+              <p className="text-muted-foreground mt-2 text-xs">
+                엔진이 인식하는 공식 장르 목록에서 선택합니다. 프리셋 초기화: 모든 장르 가중치를
+                추천값으로 복원합니다.
+              </p>
+            </div>
+
+            {/* 수치 검증 / 자동 보정 */}
+            <div className="bg-card rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">수치 검증</h3>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={handleValidate}>
+                    <ShieldCheck className="mr-1 h-3.5 w-3.5" />
+                    검증
+                  </Button>
+                  {validationIssues.length > 0 && (
+                    <Button size="sm" variant="outline" onClick={handleAutoCorrect}>
+                      <Wand2 className="mr-1 h-3.5 w-3.5" />
+                      자동 보정
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {validationIssues.length > 0 ? (
+                <div className="mt-3 space-y-1">
+                  {validationIssues.map((issue, i) => (
+                    <div
+                      key={i}
+                      className={`rounded px-3 py-1.5 text-xs ${
+                        issue.type === "range"
+                          ? "bg-red-500/10 text-red-400"
+                          : issue.type === "imbalance"
+                            ? "bg-amber-500/10 text-amber-400"
+                            : "bg-blue-500/10 text-blue-400"
+                      }`}
+                    >
+                      <span className="mr-1 font-medium uppercase">[{issue.type}]</span>
+                      {issue.message}
+                    </div>
+                  ))}
+                  <p className="text-muted-foreground mt-2 text-[10px]">
+                    총 {validationIssues.length}건 — &quot;자동 보정&quot; 클릭 시 범위 클램핑 +
+                    평균 정규화 + 과도 이탈 보간 수행
+                  </p>
+                </div>
+              ) : (
+                <p className="text-muted-foreground mt-2 text-xs">
+                  &quot;검증&quot;을 클릭하면 범위 이탈, 차원 불균형, 프리셋 대비 과도 이탈을 자동
+                  탐지합니다.
+                </p>
+              )}
             </div>
 
             {/* 장르×차원 가중치 테이블 */}
@@ -406,7 +546,14 @@ export default function TuningPage() {
                   ) : (
                     profile.genreWeights.map((entry) => (
                       <tr key={entry.genre} className="border-border border-b last:border-0">
-                        <td className="px-4 py-3 font-medium capitalize">{entry.genre}</td>
+                        <td className="px-4 py-3 font-medium">
+                          <span>
+                            {KNOWN_GENRES.find((g) => g.id === entry.genre)?.label ?? entry.genre}
+                          </span>
+                          <span className="text-muted-foreground ml-1 text-xs">
+                            ({entry.genre})
+                          </span>
+                        </td>
                         {L1_DIMS.map((dim) => {
                           const w = entry.weights[dim]
                           const color =
@@ -460,112 +607,121 @@ export default function TuningPage() {
         {activeTab === "autotuning" && (
           <div className="space-y-4">
             <div className="bg-card rounded-lg border p-4">
-              <h3 className="mb-4 text-sm font-medium">자동 튜닝 실험</h3>
+              <h3 className="mb-4 text-sm font-medium">자동 튜닝</h3>
+              <p className="text-muted-foreground mb-4 text-xs">
+                가상 유저 50명을 생성하고 49개 파라미터 조합을 시뮬레이션하여 최적 하이퍼파라미터를
+                자동으로 찾아 적용합니다.
+              </p>
 
               <div className="mb-4 flex items-center gap-3">
                 <select
                   className="border-border bg-background rounded-md border px-3 py-2 text-sm"
-                  value={tuningMethod}
-                  onChange={(e) => setTuningMethod(e.target.value as "grid_search" | "bayesian")}
+                  value={tuningTarget}
+                  onChange={(e) =>
+                    setTuningTarget(e.target.value as "quality" | "diversity" | "balanced")
+                  }
                 >
-                  <option value="grid_search">Grid Search</option>
-                  <option value="bayesian">Bayesian Optimization</option>
+                  <option value="balanced">균형 (품질 + 다양성)</option>
+                  <option value="quality">품질 중심</option>
+                  <option value="diversity">다양성 중심</option>
                 </select>
-                <Button onClick={handleStartAutoTuning} disabled={experiment?.status === "running"}>
-                  <Play className="mr-1.5 h-4 w-4" />
-                  튜닝 시작
+                <Button onClick={handleStartAutoTuning} disabled={autoTuningRunning}>
+                  {autoTuningRunning ? (
+                    <RotateCcw className="mr-1.5 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Play className="mr-1.5 h-4 w-4" />
+                  )}
+                  {autoTuningRunning ? "튜닝 중..." : "자동 튜닝 시작"}
                 </Button>
               </div>
 
-              {experiment && (
+              {autoTuningResult && (
                 <div className="space-y-3">
+                  {/* 결과 요약 카드 */}
                   <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                    <div className="rounded-lg bg-blue-500/10 p-3">
-                      <p className="text-muted-foreground text-xs">방법</p>
-                      <p className="mt-1 text-sm font-medium">
-                        {experiment.method === "grid_search" ? "Grid Search" : "Bayesian"}
+                    <div className="rounded-lg bg-emerald-500/10 p-3">
+                      <p className="text-muted-foreground text-xs">최적 점수</p>
+                      <p className="mt-1 text-sm font-bold text-emerald-400">
+                        {Math.round(autoTuningResult.bestScore * 100)}%
                       </p>
+                    </div>
+                    <div className="rounded-lg bg-blue-500/10 p-3">
+                      <p className="text-muted-foreground text-xs">시뮬레이션</p>
+                      <p className="mt-1 text-sm font-medium">{autoTuningResult.iterations}회</p>
                     </div>
                     <div className="rounded-lg bg-purple-500/10 p-3">
-                      <p className="text-muted-foreground text-xs">상태</p>
-                      <Badge
-                        variant={
-                          experiment.status === "running"
-                            ? "warning"
-                            : experiment.status === "completed"
-                              ? "success"
-                              : "muted"
-                        }
-                      >
-                        {experiment.status}
-                      </Badge>
+                      <p className="text-muted-foreground text-xs">소요 시간</p>
+                      <p className="mt-1 text-sm font-medium">{autoTuningResult.durationMs}ms</p>
                     </div>
                     <div className="rounded-lg bg-amber-500/10 p-3">
-                      <p className="text-muted-foreground text-xs">반복</p>
-                      <p className="mt-1 text-sm font-medium">
-                        {experiment.iterations} / {experiment.maxIterations}
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-emerald-500/10 p-3">
-                      <p className="text-muted-foreground text-xs">최고 점수</p>
-                      <p className="mt-1 text-sm font-medium">
-                        {experiment.bestScore !== null
-                          ? `${Math.round(experiment.bestScore * 100)}%`
-                          : "-"}
-                      </p>
+                      <p className="text-muted-foreground text-xs">적용</p>
+                      <div className="mt-1 flex items-center gap-1">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                        <span className="text-sm font-medium text-emerald-400">자동 적용됨</span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* 진행 바 */}
-                  <div className="space-y-1">
-                    <div className="text-muted-foreground flex justify-between text-xs">
-                      <span>진행률</span>
-                      <span>
-                        {Math.round((experiment.iterations / experiment.maxIterations) * 100)}%
-                      </span>
-                    </div>
-                    <div className="relative h-2 overflow-hidden rounded-full bg-white/5">
-                      <div
-                        className="absolute inset-y-0 left-0 rounded-full bg-blue-500/60 transition-all"
-                        style={{
-                          width: `${(experiment.iterations / experiment.maxIterations) * 100}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* 파라미터 공간 */}
+                  {/* 최적 파라미터 */}
                   <div className="bg-background rounded-lg border p-3">
                     <p className="text-muted-foreground mb-2 text-xs font-medium">
-                      탐색 파라미터 공간
+                      최적 파라미터 (자동 적용됨)
                     </p>
                     <div className="space-y-1 text-xs">
-                      {experiment.parameterSpace.map((ps) => {
-                        const param = profile.parameters.find((p) => p.key === ps.key)
+                      {Object.entries(autoTuningResult.bestParameters).map(([key, value]) => {
+                        const param = profile.parameters.find((p) => p.key === key)
                         return (
-                          <div key={ps.key} className="flex items-center gap-2">
-                            <span className="text-muted-foreground w-28">
-                              {param?.label ?? ps.key}
-                            </span>
-                            <span className="font-mono">
-                              [{ps.values.map((v) => v.toFixed(1)).join(", ")}]
+                          <div key={key} className="flex items-center justify-between">
+                            <span className="text-muted-foreground">{param?.label ?? key}</span>
+                            <span className="font-mono font-bold text-emerald-400">
+                              {typeof value === "number" && value < 1 ? value.toFixed(2) : value}
                             </span>
                           </div>
                         )
                       })}
                     </div>
-                    <p className="text-muted-foreground mt-2 text-[10px]">
-                      총 조합: {generateGridSearchCombinations(experiment.parameterSpace).length}개
+                  </div>
+
+                  {/* 상위 조합 결과 */}
+                  <div className="bg-background rounded-lg border p-3">
+                    <p className="text-muted-foreground mb-2 text-xs font-medium">
+                      상위 조합 비교 (Top 5)
                     </p>
+                    <div className="space-y-1">
+                      {autoTuningResult.topResults.slice(0, 5).map((r, i) => (
+                        <div
+                          key={i}
+                          className={`flex items-center justify-between rounded px-2 py-1 text-xs ${
+                            i === 0 ? "bg-emerald-500/10 font-medium" : ""
+                          }`}
+                        >
+                          <span className="text-muted-foreground">
+                            {Object.entries(r.params)
+                              .map(
+                                ([k, v]) =>
+                                  `${k}=${typeof v === "number" && v < 1 ? v.toFixed(2) : v}`
+                              )
+                              .join(", ")}
+                          </span>
+                          <span className={i === 0 ? "text-emerald-400" : "text-muted-foreground"}>
+                            {Math.round(r.score * 100)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
 
-              {!experiment && (
+              {!autoTuningResult && !autoTuningRunning && (
                 <div className="flex flex-col items-center py-8 text-center">
                   <TestTubes className="text-muted-foreground mb-2 h-8 w-8" />
                   <p className="text-muted-foreground text-sm">
-                    Grid Search 또는 Bayesian 방법을 선택하고 튜닝을 시작하세요
+                    최적화 목표를 선택하고 자동 튜닝을 시작하세요.
+                    <br />
+                    <span className="text-xs">
+                      시뮬레이션 결과가 즉시 하이퍼파라미터에 자동 적용됩니다.
+                    </span>
                   </p>
                 </div>
               )}
@@ -745,7 +901,119 @@ export default function TuningPage() {
             )}
           </div>
         )}
+
+        {/* ── 변경 로그 탭 ── */}
+        {activeTab === "logs" && (
+          <div className="space-y-4">
+            <div className="bg-card rounded-lg border p-4">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-sm font-medium">변경 이력</h3>
+                <span className="text-muted-foreground text-xs">최근 {logs.length}건</span>
+              </div>
+
+              {logs.length === 0 ? (
+                <div className="flex flex-col items-center py-8 text-center">
+                  <ScrollText className="text-muted-foreground mb-2 h-8 w-8" />
+                  <p className="text-muted-foreground text-sm">아직 변경 이력이 없습니다.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {logs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="border-border flex items-start gap-3 border-b pb-2 last:border-0"
+                    >
+                      <div className="mt-0.5 flex-shrink-0">
+                        <LogActionIcon action={log.action} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm">{log.summary}</p>
+                        <p className="text-muted-foreground text-[10px]">
+                          {formatLogTime(log.timestamp)}
+                        </p>
+                      </div>
+                      <LogActionBadge action={log.action} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </>
   )
+}
+
+// ── 로그 UI 헬퍼 ──────────────────────────────────────────────
+
+const LOG_ACTION_LABELS: Record<string, string> = {
+  update_parameter: "파라미터",
+  update_genre_weight: "장르 가중치",
+  add_genre: "장르 추가",
+  remove_genre: "장르 삭제",
+  apply_preset_weights: "프리셋",
+  auto_correct: "자동 보정",
+  run_auto_tuning: "자동 튜닝",
+  profile_created: "프로필 생성",
+}
+
+function LogActionBadge({ action }: { action: string }) {
+  const label = LOG_ACTION_LABELS[action] ?? action
+  const variant =
+    action === "run_auto_tuning"
+      ? "bg-purple-500/10 text-purple-400"
+      : action === "auto_correct"
+        ? "bg-amber-500/10 text-amber-400"
+        : action.startsWith("update")
+          ? "bg-blue-500/10 text-blue-400"
+          : action === "remove_genre"
+            ? "bg-red-500/10 text-red-400"
+            : "bg-emerald-500/10 text-emerald-400"
+  return (
+    <span className={`flex-shrink-0 rounded px-2 py-0.5 text-[10px] font-medium ${variant}`}>
+      {label}
+    </span>
+  )
+}
+
+function LogActionIcon({ action }: { action: string }) {
+  const cls = "h-3.5 w-3.5 text-muted-foreground"
+  switch (action) {
+    case "update_parameter":
+      return <SlidersHorizontal className={cls} />
+    case "update_genre_weight":
+    case "add_genre":
+    case "remove_genre":
+    case "apply_preset_weights":
+      return <FlaskConical className={cls} />
+    case "auto_correct":
+      return <ShieldCheck className={cls} />
+    case "run_auto_tuning":
+      return <TestTubes className={cls} />
+    default:
+      return <ScrollText className={cls} />
+  }
+}
+
+function formatLogTime(timestamp: number): string {
+  const d = new Date(timestamp)
+  const now = new Date()
+  const diffMs = now.getTime() - d.getTime()
+  const diffMin = Math.floor(diffMs / 60000)
+  const diffHour = Math.floor(diffMs / 3600000)
+  const diffDay = Math.floor(diffMs / 86400000)
+
+  if (diffMin < 1) return "방금 전"
+  if (diffMin < 60) return `${diffMin}분 전`
+  if (diffHour < 24) return `${diffHour}시간 전`
+  if (diffDay < 7) return `${diffDay}일 전`
+
+  return d.toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
 }

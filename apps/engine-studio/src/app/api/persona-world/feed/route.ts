@@ -5,6 +5,8 @@ import type { FeedDataProvider } from "@/lib/persona-world/feed/feed-engine"
 import type { RecommendedCandidate } from "@/lib/persona-world/feed/recommended-posts"
 import { cosineSimilarity } from "@/lib/vector/utils"
 import { calculateVFinal } from "@/lib/vector/v-final"
+import { applyGenreWeights, extractHyperParameters } from "@/lib/matching/tuning"
+import type { GenreWeightTable, TuningProfile } from "@/lib/matching/tuning"
 import type { SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector } from "@/types"
 import { verifyInternalToken } from "@/lib/internal-auth"
 
@@ -85,24 +87,41 @@ export async function POST(request: NextRequest) {
         lim: number,
         excludePostIds: string[]
       ): Promise<RecommendedCandidate[]> {
-        // 유저 벡터 로드
-        const pwUser = await prisma.personaWorldUser.findUnique({
-          where: { id: uid },
-          select: {
-            depth: true,
-            lens: true,
-            stance: true,
-            scope: true,
-            taste: true,
-            purpose: true,
-            openness: true,
-            conscientiousness: true,
-            extraversion: true,
-            agreeableness: true,
-            neuroticism: true,
-            hasOceanProfile: true,
-          },
-        })
+        // 유저 벡터 + 장르 가중치 로드
+        const [pwUser, tuningRow] = await Promise.all([
+          prisma.personaWorldUser.findUnique({
+            where: { id: uid },
+            select: {
+              depth: true,
+              lens: true,
+              stance: true,
+              scope: true,
+              taste: true,
+              purpose: true,
+              openness: true,
+              conscientiousness: true,
+              extraversion: true,
+              agreeableness: true,
+              neuroticism: true,
+              hasOceanProfile: true,
+            },
+          }),
+          prisma.systemConfig.findUnique({
+            where: { category_key: { category: "MATCHING_TUNING", key: "profile" } },
+            select: { value: true },
+          }),
+        ])
+
+        // 튜닝 프로필에서 하이퍼파라미터 + 장르 가중치 추출
+        const tuningProfile =
+          tuningRow?.value && typeof tuningRow.value === "object"
+            ? (tuningRow.value as Partial<TuningProfile>)
+            : null
+
+        const genreWeights: GenreWeightTable | null = tuningProfile?.genreWeights ?? null
+
+        // 하이퍼파라미터 추출 (DB 프로필 → 정규화된 값)
+        const hyperParams = extractHyperParameters(tuningProfile?.parameters ?? [])
 
         // 후보 포스트 조회
         const posts = await prisma.personaPost.findMany({
@@ -162,7 +181,7 @@ export async function POST(request: NextRequest) {
             }
           : null
 
-        // 페르소나 벡터 + paradoxScore 병렬 조회
+        // 페르소나 벡터 + paradoxScore + favoriteGenres 병렬 조회
         const personaIds = [...new Set(posts.map((p) => p.personaId))]
         const [personaVectors, personas] = await Promise.all([
           prisma.personaLayerVector.findMany({
@@ -181,10 +200,11 @@ export async function POST(request: NextRequest) {
           }),
           prisma.persona.findMany({
             where: { id: { in: personaIds } },
-            select: { id: true, paradoxScore: true },
+            select: { id: true, paradoxScore: true, favoriteGenres: true },
           }),
         ])
         const paradoxMap = new Map(personas.map((p) => [p.id, Number(p.paradoxScore ?? 0)]))
+        const genreMap = new Map(personas.map((p) => [p.id, p.favoriteGenres[0] ?? null]))
 
         // 페르소나별 벡터 맵 구축
         const vectorMap = new Map<string, { l1?: number[]; l2?: number[]; l3?: number[] }>()
@@ -211,7 +231,7 @@ export async function POST(request: NextRequest) {
         }
         const userVFinal = userL2 ? calculateVFinal(userL1, userL2, defaultL3, 0.3) : null
 
-        return posts.map((p) => {
+        const candidates = posts.map((p) => {
           const vecs = vectorMap.get(p.personaId)
           if (!vecs?.l1 || vecs.l1.length < 7) {
             // 벡터 없는 페르소나 → 인기도 폴백
@@ -226,8 +246,19 @@ export async function POST(request: NextRequest) {
 
           const personaL1Vec = vecs.l1
 
+          // 장르 가중치 적용: 페르소나의 대표 장르로 L1 벡터 조정
+          const primaryGenre = genreMap.get(p.personaId)
+          const weightedUserL1 =
+            primaryGenre && genreWeights
+              ? applyGenreWeights(userL1Vec, primaryGenre, genreWeights)
+              : userL1Vec
+          const weightedPersonaL1 =
+            primaryGenre && genreWeights
+              ? applyGenreWeights(personaL1Vec, primaryGenre, genreWeights)
+              : personaL1Vec
+
           // Basic: L1 코사인 유사도 70% + L2 유사도 30%
-          const l1Sim = Math.max(0, cosineSimilarity(userL1Vec, personaL1Vec))
+          const l1Sim = Math.max(0, cosineSimilarity(weightedUserL1, weightedPersonaL1))
           let l2Sim = 0.5 // L2 없으면 중립값
           if (userL2 && vecs.l2 && vecs.l2.length >= 5) {
             const userL2Vec = [
@@ -245,7 +276,9 @@ export async function POST(request: NextRequest) {
           const l1Div = round(1 - l1Sim)
           const l2Div = round(1 - l2Sim)
           const freshness = 0.8 // 피드 내 중복 체크는 distributeTiers에서 처리
-          const explorationScore = round(0.4 * l1Div + 0.4 * l2Div + 0.2 * freshness)
+          // diversity_factor로 탐색 점수 부스트 (0.3 → 기본, 1.0 → 최대 탐색)
+          const rawExploration = 0.4 * l1Div + 0.4 * l2Div + 0.2 * freshness
+          const explorationScore = round(rawExploration * (1 + hyperParams.diversityFactor))
 
           // Advanced: V_Final 유사도 50% + L2 유사도 30% + 역설 호환 20%
           let vFinalSim = l1Sim // V_Final 없으면 L1으로 대체
@@ -287,6 +320,9 @@ export async function POST(request: NextRequest) {
             advancedScore,
           }
         })
+
+        // 하이퍼파라미터 적용: similarity_threshold로 품질 필터링
+        return candidates.filter((c) => c.basicScore >= hyperParams.similarityThreshold)
       },
 
       async getTrendingPostIds(

@@ -496,14 +496,14 @@ describe("Simulator", () => {
 
 describe("Tuning", () => {
   describe("DEFAULT_HYPERPARAMETERS", () => {
-    it("6개 파라미터 정의", () => {
-      expect(DEFAULT_HYPERPARAMETERS).toHaveLength(6)
+    it("3개 파라미터 정의 (실제 파이프라인에서 사용하는 것만)", () => {
+      expect(DEFAULT_HYPERPARAMETERS).toHaveLength(3)
     })
   })
 
   describe("DEFAULT_GENRE_WEIGHTS", () => {
-    it("6개 장르 정의", () => {
-      expect(DEFAULT_GENRE_WEIGHTS).toHaveLength(6)
+    it("12개 기본 장르 정의", () => {
+      expect(DEFAULT_GENRE_WEIGHTS).toHaveLength(12)
     })
 
     it("각 장르에 7D 가중치가 있음", () => {
@@ -517,8 +517,8 @@ describe("Tuning", () => {
     it("프로필 생성", () => {
       const profile = createTuningProfile("테스트")
       expect(profile.name).toBe("테스트")
-      expect(profile.parameters).toHaveLength(6)
-      expect(profile.genreWeights).toHaveLength(6)
+      expect(profile.parameters).toHaveLength(3)
+      expect(profile.genreWeights).toHaveLength(12)
     })
   })
 
@@ -555,8 +555,9 @@ describe("Tuning", () => {
   describe("addGenre / removeGenre", () => {
     it("장르 추가", () => {
       const profile = createTuningProfile("테스트")
-      const updated = addGenre(profile, "horror")
-      expect(updated.genreWeights).toHaveLength(7)
+      const initialCount = profile.genreWeights.length
+      const updated = addGenre(profile, "musical")
+      expect(updated.genreWeights).toHaveLength(initialCount + 1)
     })
 
     it("중복 장르 추가 시 에러", () => {
@@ -566,8 +567,9 @@ describe("Tuning", () => {
 
     it("장르 삭제", () => {
       const profile = createTuningProfile("테스트")
+      const initialCount = profile.genreWeights.length
       const updated = removeGenre(profile, "thriller")
-      expect(updated.genreWeights).toHaveLength(5)
+      expect(updated.genreWeights).toHaveLength(initialCount - 1)
     })
   })
 

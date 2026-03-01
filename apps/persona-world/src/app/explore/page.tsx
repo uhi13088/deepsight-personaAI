@@ -92,6 +92,11 @@ function ExploreContent() {
   const [isHashtagSearch, setIsHashtagSearch] = useState(false)
   const [trendingHashtags, setTrendingHashtags] = useState<TrendingHashtag[]>([])
 
+  // 핫 토픽 (포스트 타입) 필터
+  const [activeTopicType, setActiveTopicType] = useState<string | null>(null)
+  const [topicPosts, setTopicPosts] = useState<FeedPost[]>([])
+  const [topicLoading, setTopicLoading] = useState(false)
+
   const { notifications } = useUserStore()
   const unreadNotifications = useMemo(
     () => notifications.filter((n) => !n.read).length,
@@ -174,7 +179,32 @@ function ExploreContent() {
     setSearchQuery("")
     setDebouncedSearch("")
     setActiveRoles([])
+    setActiveTopicType(null)
+    setTopicPosts([])
   }, [])
+
+  const handleTopicClick = useCallback(
+    async (topicType: string) => {
+      // 같은 타입 다시 클릭 → 해제
+      if (activeTopicType === topicType) {
+        setActiveTopicType(null)
+        setTopicPosts([])
+        return
+      }
+      setActiveTopicType(topicType)
+      setTopicLoading(true)
+      try {
+        const result = await clientApi.searchByHashtag({ type: topicType, limit: 20 })
+        setTopicPosts(result.posts)
+      } catch {
+        toast.error("포스트를 불러오는데 실패했습니다")
+        setTopicPosts([])
+      } finally {
+        setTopicLoading(false)
+      }
+    },
+    [activeTopicType]
+  )
 
   const totalPersonas = useMemo(() => clusters.reduce((sum, c) => sum + c.count, 0), [clusters])
 
@@ -319,9 +349,32 @@ function ExploreContent() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {hotTopics.map((topic) => (
-                    <HotTopicChip key={topic.type} topic={topic} />
+                    <HotTopicChip
+                      key={topic.type}
+                      topic={topic}
+                      isActive={activeTopicType === topic.type}
+                      onClick={() => handleTopicClick(topic.type)}
+                    />
                   ))}
                 </div>
+                {/* 핫 토픽 포스트 목록 */}
+                {activeTopicType && (
+                  <div className="mt-3 space-y-3">
+                    {topicLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-5 w-5 animate-spin text-orange-400" />
+                      </div>
+                    ) : topicPosts.length > 0 ? (
+                      topicPosts.map((post) => (
+                        <HashtagSearchResultCard key={post.id} post={post} />
+                      ))
+                    ) : (
+                      <div className="py-6 text-center text-sm text-gray-400">
+                        해당 타입의 포스트가 없습니다
+                      </div>
+                    )}
+                  </div>
+                )}
               </section>
             )}
 
@@ -436,14 +489,25 @@ const ClusterCard = memo(function ClusterCard({ cluster }: { cluster: ExploreClu
 
 // ── 핫 토픽 칩 ────────────────────────────────────────────
 
-const HotTopicChip = memo(function HotTopicChip({ topic }: { topic: ExploreHotTopic }) {
+const HotTopicChip = memo(function HotTopicChip({
+  topic,
+  isActive,
+  onClick,
+}: {
+  topic: ExploreHotTopic
+  isActive: boolean
+  onClick: () => void
+}) {
   const emoji = POST_TYPE_EMOJI[topic.type] || "\uD83D\uDD25"
   const label = POST_TYPE_LABELS[topic.type] || topic.type
   const colorClass = POST_TYPE_COLORS[topic.type] || "bg-gray-50 text-gray-600"
 
   return (
-    <div
-      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${colorClass}`}
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${colorClass} ${
+        isActive ? "ring-2 ring-orange-400 ring-offset-1" : "hover:opacity-80"
+      }`}
     >
       <span>{emoji}</span>
       <span>{label}</span>
@@ -454,7 +518,7 @@ const HotTopicChip = memo(function HotTopicChip({ topic }: { topic: ExploreHotTo
           {topic.engagement}
         </span>
       )}
-    </div>
+    </button>
   )
 })
 

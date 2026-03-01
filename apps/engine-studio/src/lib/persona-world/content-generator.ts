@@ -300,12 +300,20 @@ export function buildUserPrompt(input: PostGenerationInput): string {
     parts.push(`[소비 기억] ${input.ragContext.consumptionMemory}`)
   }
 
-  parts.push(
+  // 공통 지시
+  const commonInstructions = [
     `\n위 조건에 맞는 SNS 포스트를 작성하세요.`,
     `- 포스트 본문 끝에 관련 해시태그를 2~5개 포함하세요 (예: #영화추천 #넷플릭스)`,
     `- 해시태그는 주제, 감정, 카테고리를 반영해 자연스럽게 달아주세요`,
-    `- 포스트 본문과 해시태그만 출력하세요`
-  )
+  ]
+
+  // 타입별 구조화 출력 지시
+  const typeInstructions = getTypeSpecificInstructions(input.postType)
+  if (typeInstructions.length > 0) {
+    parts.push(...commonInstructions, ...typeInstructions)
+  } else {
+    parts.push(...commonInstructions, `- 포스트 본문과 해시태그만 출력하세요`)
+  }
 
   return parts.join("\n")
 }
@@ -329,17 +337,20 @@ export async function generatePostContent(
   const systemPrompt = buildSystemPrompt(input, weather)
   const userPrompt = buildUserPrompt(input)
 
+  const baseMetadata: Record<string, unknown> = {
+    postType: input.postType,
+    trigger: input.trigger,
+    topic: input.topic,
+    systemPromptLength: systemPrompt.length,
+    userPromptLength: userPrompt.length,
+  }
+
   if (!llmProvider) {
     // LLM provider 미제공 → placeholder (개발/테스트용)
+    const placeholderMeta = { ...baseMetadata, ...getPlaceholderMetadata(input.postType) }
     return {
       content: `[${input.postType}] ${input.topic ?? "자유 주제"} — 생성 대기 중`,
-      metadata: {
-        postType: input.postType,
-        trigger: input.trigger,
-        topic: input.topic,
-        systemPromptLength: systemPrompt.length,
-        userPromptLength: userPrompt.length,
-      },
+      metadata: placeholderMeta,
       tokensUsed: 0,
       voiceConsistencyScore: 0,
     }
@@ -354,15 +365,13 @@ export async function generatePostContent(
     maxTokens,
   })
 
+  // 타입별 구조화 메타데이터 추출
+  const extracted = extractPostTypeMetadata(result.text, input.postType)
+  const metadata = { ...baseMetadata, ...extracted.metadata }
+
   return {
-    content: result.text,
-    metadata: {
-      postType: input.postType,
-      trigger: input.trigger,
-      topic: input.topic,
-      systemPromptLength: systemPrompt.length,
-      userPromptLength: userPrompt.length,
-    },
+    content: extracted.cleanContent,
+    metadata,
     tokensUsed: result.tokensUsed,
     voiceConsistencyScore: 0, // 생성 후 별도 측정 (T113 quality-monitor)
   }
@@ -490,4 +499,339 @@ function getSeasonalWeather(month: number, hemisphere: "north" | "south"): strin
     12: "한겨울, 눈, 연말 분위기",
   }
   return weatherMap[effectiveMonth]
+}
+
+// ── placeholder 메타데이터 (LLM 없을 때) ────────────────────
+
+function getPlaceholderMetadata(postType: PersonaPostTypeStr): Record<string, unknown> {
+  switch (postType) {
+    case "VS_BATTLE":
+      return { optionA: "옵션 A", optionB: "옵션 B" }
+    case "REVIEW":
+      return { rating: 4 }
+    case "PREDICTION":
+      return { confidence: 70 }
+    case "QNA":
+      return { questions: [{ q: "질문 예시", a: "답변 예시" }] }
+    case "CURATION":
+      return { items: [{ rank: 1, title: "아이템 예시", reason: "추천 이유" }] }
+    case "DEBATE":
+      return { positions: [{ position: "찬성" }, { position: "반대" }] }
+    case "TRIVIA":
+      return { options: ["선택지 A", "선택지 B", "선택지 C"] }
+    case "COLLAB":
+      return { participants: ["참여자1"] }
+    default:
+      return {}
+  }
+}
+
+// ── 타입별 구조화 출력 지시 ──────────────────────────────────
+
+type PersonaPostTypeStr = string
+
+function getTypeSpecificInstructions(postType: PersonaPostTypeStr): string[] {
+  switch (postType) {
+    case "VS_BATTLE":
+      return [
+        `- 반드시 글 마지막(해시태그 뒤)에 투표 옵션을 아래 형식으로 출력하세요:`,
+        `  [OPTION_A: 옵션A 라벨]`,
+        `  [OPTION_B: 옵션B 라벨]`,
+        `- 옵션 라벨은 짧고 명확하게 (예: "직접 대화파", "문자 소통파")`,
+      ]
+    case "REVIEW":
+      return [
+        `- 글 마지막(해시태그 뒤)에 별점을 아래 형식으로 출력하세요:`,
+        `  [RATING: N] (N은 1~5 정수)`,
+      ]
+    case "PREDICTION":
+      return [
+        `- 글 마지막(해시태그 뒤)에 예측 신뢰도를 아래 형식으로 출력하세요:`,
+        `  [CONFIDENCE: N] (N은 0~100 정수)`,
+      ]
+    case "QNA":
+      return [
+        `- 글 마지막(해시태그 뒤)에 Q&A를 아래 형식으로 출력하세요 (1~3개):`,
+        `  [Q: 질문 내용]`,
+        `  [A: 답변 내용]`,
+      ]
+    case "CURATION":
+      return [
+        `- 글 마지막(해시태그 뒤)에 큐레이션 아이템을 아래 형식으로 출력하세요 (3~5개):`,
+        `  [ITEM: 제목 | 추천 이유]`,
+      ]
+    case "DEBATE":
+      return [
+        `- 글 마지막(해시태그 뒤)에 토론 입장을 아래 형식으로 출력하세요 (2~3개):`,
+        `  [POSITION: 입장명]`,
+        `- 입장명 예시: 찬성, 반대, 중립`,
+      ]
+    case "TRIVIA":
+      return [
+        `- 글 마지막(해시태그 뒤)에 퀴즈 선택지를 아래 형식으로 출력하세요 (3~4개):`,
+        `  [CHOICE: 선택지 내용]`,
+      ]
+    case "COLLAB":
+      return [
+        `- 글 마지막(해시태그 뒤)에 협업 참여자를 아래 형식으로 출력하세요:`,
+        `  [PARTICIPANTS: 이름1, 이름2, ...]`,
+      ]
+    default:
+      return []
+  }
+}
+
+// ── 타입별 메타데이터 추출 ──────────────────────────────────
+
+interface ExtractedMetadata {
+  cleanContent: string
+  metadata: Record<string, unknown>
+}
+
+/**
+ * LLM 출력에서 포스트 타입별 구조화 메타데이터를 추출.
+ * 마커를 파싱한 뒤 본문에서 제거.
+ */
+export function extractPostTypeMetadata(
+  text: string,
+  postType: PersonaPostTypeStr
+): ExtractedMetadata {
+  switch (postType) {
+    case "VS_BATTLE":
+      return extractVsBattle(text)
+    case "REVIEW":
+      return extractReview(text)
+    case "PREDICTION":
+      return extractPrediction(text)
+    case "QNA":
+      return extractQna(text)
+    case "CURATION":
+      return extractCuration(text)
+    case "DEBATE":
+      return extractDebate(text)
+    case "TRIVIA":
+      return extractTrivia(text)
+    case "COLLAB":
+      return extractCollab(text)
+    default:
+      return { cleanContent: text.trim(), metadata: {} }
+  }
+}
+
+// ── VS_BATTLE ───────────────────────────────────────────────
+
+function extractVsBattle(text: string): ExtractedMetadata {
+  const markerA = text.match(/\[OPTION_A:\s*(.+?)\]/i)
+  const markerB = text.match(/\[OPTION_B:\s*(.+?)\]/i)
+
+  if (markerA?.[1] && markerB?.[1]) {
+    const cleanContent = text
+      .replace(/\[OPTION_A:\s*.+?\]/gi, "")
+      .replace(/\[OPTION_B:\s*.+?\]/gi, "")
+      .trim()
+    return {
+      cleanContent,
+      metadata: { optionA: markerA[1].trim(), optionB: markerB[1].trim() },
+    }
+  }
+
+  // fallback: "X vs Y" 패턴
+  const vsMatch = text.match(/['"]?([^'""\n]{2,20})['"]?\s+vs\.?\s+['"]?([^'""\n]{2,20})['"]?/i)
+  if (vsMatch?.[1] && vsMatch?.[2]) {
+    return {
+      cleanContent: text.trim(),
+      metadata: { optionA: vsMatch[1].trim(), optionB: vsMatch[2].trim() },
+    }
+  }
+
+  return { cleanContent: text.trim(), metadata: { optionA: "A", optionB: "B" } }
+}
+
+// ── REVIEW ──────────────────────────────────────────────────
+
+function extractReview(text: string): ExtractedMetadata {
+  const match = text.match(/\[RATING:\s*(\d)\]/i)
+  const rating = match ? Math.min(5, Math.max(1, Number(match[1]))) : 0
+  const cleanContent = text.replace(/\[RATING:\s*\d\]/gi, "").trim()
+
+  if (!rating) {
+    // fallback: ★ 개수 카운트 또는 "N/5", "N점" 패턴
+    const starCount = (text.match(/★/g) ?? []).length
+    if (starCount >= 1 && starCount <= 5) {
+      return { cleanContent: text.trim(), metadata: { rating: starCount } }
+    }
+    const scoreMatch = text.match(/(\d)[\/점]\s*5/)
+    if (scoreMatch) {
+      return { cleanContent: text.trim(), metadata: { rating: Number(scoreMatch[1]) } }
+    }
+  }
+
+  return { cleanContent, metadata: rating ? { rating } : {} }
+}
+
+// ── PREDICTION ──────────────────────────────────────────────
+
+function extractPrediction(text: string): ExtractedMetadata {
+  const match = text.match(/\[CONFIDENCE:\s*(\d+)\]/i)
+  const confidence = match ? Math.min(100, Math.max(0, Number(match[1]))) : 0
+  const cleanContent = text.replace(/\[CONFIDENCE:\s*\d+\]/gi, "").trim()
+
+  if (!confidence) {
+    // fallback: "N%" 패턴
+    const pctMatch = text.match(/(\d{1,3})%/)
+    if (pctMatch) {
+      const val = Number(pctMatch[1])
+      if (val >= 10 && val <= 100) {
+        return { cleanContent: text.trim(), metadata: { confidence: val } }
+      }
+    }
+  }
+
+  return { cleanContent, metadata: confidence ? { confidence } : {} }
+}
+
+// ── QNA ─────────────────────────────────────────────────────
+
+function extractQna(text: string): ExtractedMetadata {
+  const qMatches = [...text.matchAll(/\[Q:\s*(.+?)\]/gi)]
+  const aMatches = [...text.matchAll(/\[A:\s*(.+?)\]/gi)]
+
+  if (qMatches.length > 0) {
+    const questions = qMatches.map((qm, i) => ({
+      q: qm[1].trim(),
+      a: aMatches[i]?.[1]?.trim() ?? "",
+    }))
+    const cleanContent = text
+      .replace(/\[Q:\s*.+?\]/gi, "")
+      .replace(/\[A:\s*.+?\]/gi, "")
+      .trim()
+    return { cleanContent, metadata: { questions } }
+  }
+
+  // fallback: "Q:" / "A:" 패턴 (마커 없이 본문에 포함된 경우)
+  const qaLines = text.match(/Q[.:]?\s*(.+?)(?:\n|$)\s*A[.:]?\s*(.+?)(?:\n|$)/gi)
+  if (qaLines && qaLines.length > 0) {
+    const questions = qaLines.map((block) => {
+      const qm = block.match(/Q[.:]?\s*(.+?)(?:\n|$)/i)
+      const am = block.match(/A[.:]?\s*(.+?)(?:\n|$)/i)
+      return { q: qm?.[1]?.trim() ?? "", a: am?.[1]?.trim() ?? "" }
+    })
+    return { cleanContent: text.trim(), metadata: { questions } }
+  }
+
+  return { cleanContent: text.trim(), metadata: {} }
+}
+
+// ── CURATION ────────────────────────────────────────────────
+
+function extractCuration(text: string): ExtractedMetadata {
+  const itemMatches = [...text.matchAll(/\[ITEM:\s*(.+?)\]/gi)]
+
+  if (itemMatches.length > 0) {
+    const items = itemMatches.map((m, i) => {
+      const parts = m[1].split("|").map((p) => p.trim())
+      return { rank: i + 1, title: parts[0] ?? "", reason: parts[1] ?? "" }
+    })
+    const cleanContent = text.replace(/\[ITEM:\s*.+?\]/gi, "").trim()
+    return { cleanContent, metadata: { items } }
+  }
+
+  // fallback: 번호 리스트 "1. 제목 - 이유" 패턴
+  const numbered = [...text.matchAll(/(\d+)[.)]\s*(.+?)(?:\s*[-–—]\s*(.+?))?(?:\n|$)/g)]
+  if (numbered.length >= 2) {
+    const items = numbered.map((m) => ({
+      rank: Number(m[1]),
+      title: m[2].trim(),
+      reason: m[3]?.trim() ?? "",
+    }))
+    return { cleanContent: text.trim(), metadata: { items } }
+  }
+
+  return { cleanContent: text.trim(), metadata: {} }
+}
+
+// ── DEBATE ──────────────────────────────────────────────────
+
+function extractDebate(text: string): ExtractedMetadata {
+  const posMatches = [...text.matchAll(/\[POSITION:\s*(.+?)\]/gi)]
+
+  if (posMatches.length > 0) {
+    const positions = posMatches.map((m) => ({
+      position: m[1].trim(),
+      argument: "",
+    }))
+    const cleanContent = text.replace(/\[POSITION:\s*.+?\]/gi, "").trim()
+    return { cleanContent, metadata: { positions } }
+  }
+
+  // fallback: "찬성", "반대", "중립" 키워드 탐지
+  const stanceKeywords = ["찬성", "반대", "중립", "지지", "반박"]
+  const found = stanceKeywords.filter((k) => text.includes(k))
+  if (found.length >= 2) {
+    const positions = found.map((k) => ({ position: k, argument: "" }))
+    return { cleanContent: text.trim(), metadata: { positions } }
+  }
+
+  return { cleanContent: text.trim(), metadata: {} }
+}
+
+// ── TRIVIA ──────────────────────────────────────────────────
+
+function extractTrivia(text: string): ExtractedMetadata {
+  const choiceMatches = [...text.matchAll(/\[CHOICE:\s*(.+?)\]/gi)]
+
+  if (choiceMatches.length > 0) {
+    const options = choiceMatches.map((m) => m[1].trim())
+    const cleanContent = text.replace(/\[CHOICE:\s*.+?\]/gi, "").trim()
+    return { cleanContent, metadata: { options } }
+  }
+
+  // fallback: "A. ...", "B. ..." 패턴
+  const abcMatches = [...text.matchAll(/([A-D])[.)]\s*(.+?)(?:\n|$)/g)]
+  if (abcMatches.length >= 2) {
+    const options = abcMatches.map((m) => m[2].trim())
+    return { cleanContent: text.trim(), metadata: { options } }
+  }
+
+  return { cleanContent: text.trim(), metadata: {} }
+}
+
+// ── COLLAB ──────────────────────────────────────────────────
+
+function extractCollab(text: string): ExtractedMetadata {
+  const match = text.match(/\[PARTICIPANTS:\s*(.+?)\]/i)
+
+  if (match?.[1]) {
+    const participants = match[1]
+      .split(",")
+      .map((p) => p.trim().replace(/^@/, ""))
+      .filter(Boolean)
+    const cleanContent = text.replace(/\[PARTICIPANTS:\s*.+?\]/gi, "").trim()
+    return { cleanContent, metadata: { participants } }
+  }
+
+  // fallback: @멘션 추출
+  const mentions = [...text.matchAll(/@(\w+)/g)]
+  if (mentions.length > 0) {
+    const participants = mentions.map((m) => m[1])
+    return { cleanContent: text.trim(), metadata: { participants } }
+  }
+
+  return { cleanContent: text.trim(), metadata: {} }
+}
+
+// ── 하위 호환용 alias ───────────────────────────────────────
+
+/** @deprecated Use extractPostTypeMetadata instead */
+export function extractVsBattleOptions(text: string): {
+  optionA: string
+  optionB: string
+  cleanContent: string
+} {
+  const result = extractVsBattle(text)
+  return {
+    optionA: String(result.metadata.optionA ?? "A"),
+    optionB: String(result.metadata.optionB ?? "B"),
+    cleanContent: result.cleanContent,
+  }
 }

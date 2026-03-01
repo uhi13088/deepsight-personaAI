@@ -28,6 +28,8 @@ import {
   computeNegativePenalty,
 } from "./context-enricher"
 import { round, clamp, SOCIAL_DIM_LABELS } from "./utils"
+import { applyGenreWeights } from "./tuning"
+import type { GenreWeightTable, ExtractedHyperParameters } from "./tuning"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
@@ -74,6 +76,12 @@ export interface MatchingContext {
   socialSignals?: Map<string, SocialSignal>
   /** Enrichment Layer 확장 컨텍스트 */
   enrichment?: EnrichedMatchingContext
+  /** 콘텐츠 장르 (장르 가중치 적용용) */
+  genre?: string
+  /** 장르별 가중치 테이블 (튜닝 프로필에서 로드) */
+  genreWeights?: GenreWeightTable
+  /** 튜닝 프로필에서 추출한 하이퍼파라미터 (DB 값으로 DEFAULT_MATCHING_CONFIG 오버라이드) */
+  hyperParameters?: ExtractedHyperParameters
 }
 
 export interface MatchResult {
@@ -456,9 +464,30 @@ export function matchAll(
   config: MatchingConfig = DEFAULT_MATCHING_CONFIG,
   context?: MatchingContext
 ): MatchResult[] {
+  // 하이퍼파라미터 오버라이드: 튜닝 프로필 값이 있으면 config 대체
+  const hp = context?.hyperParameters
+  const effectiveConfig: MatchingConfig = hp
+    ? {
+        tierWeights: config.tierWeights,
+        similarityThreshold: hp.similarityThreshold,
+        topN: hp.topN,
+        diversityFactor: hp.diversityFactor,
+      }
+    : config
+
   const enrichment = context?.enrichment
   const userContext = enrichment?.userContext
   const enabledFeatures = enrichment?.experiment?.enabledFeatures
+
+  // Genre weights: 장르가 지정되면 L1 벡터에 장르 가중치 적용
+  const genre = context?.genre
+  const genreWeights = context?.genreWeights
+
+  // 유저 VFinal에 장르 가중치 적용 (L1 차원만 영향)
+  const userVFinalVector =
+    genre && genreWeights
+      ? applyGenreWeights(user.vFinal.vector, genre, genreWeights)
+      : user.vFinal.vector
 
   // 1. 블록된 페르소나 사전 필터링
   const filteredPersonas = personas.filter((persona) => {
@@ -494,10 +523,16 @@ export function matchAll(
     // Pre-compute: 페르소나 VFinal (Basic/Advanced에서 공유, 1회만 계산)
     const personaVFinal = calculateVFinal(persona.l1, persona.l2, persona.l3)
 
+    // 페르소나 VFinal에도 장르 가중치 적용
+    const personaVFinalVector =
+      genre && genreWeights
+        ? applyGenreWeights(personaVFinal.vector, genre, genreWeights)
+        : personaVFinal.vector
+
     // Basic
     const basicResult = calculateBasicScore(
-      user.vFinal.vector,
-      personaVFinal.vector,
+      userVFinalVector,
+      personaVFinalVector,
       user.crossAxisProfile,
       persona.crossAxisProfile,
       user.paradoxProfile,
@@ -508,8 +543,8 @@ export function matchAll(
 
     // Advanced
     const advancedResult = calculateAdvancedScore(
-      user.vFinal.vector,
-      personaVFinal.vector,
+      userVFinalVector,
+      personaVFinalVector,
       user.crossAxisProfile,
       persona.crossAxisProfile,
       user.paradoxProfile,
@@ -533,17 +568,17 @@ export function matchAll(
     allResults.push(toMatchResult(persona.id, "exploration", explorationResult, userL1, persona.l1))
   }
 
-  // 4. Tier별 상위 N개 선택 (동적 가중치 적용)
+  // 4. Tier별 상위 N개 선택 (동적 가중치 적용, 하이퍼파라미터 반영)
   const byTier = groupByTier(allResults)
-  const topN = config.topN
+  const topN = effectiveConfig.topN
 
   const basicCount = Math.max(1, Math.round(topN * tierWeights.basic))
   const explorationCount = Math.max(1, Math.round(topN * tierWeights.exploration))
   const advancedCount = Math.max(1, topN - basicCount - explorationCount)
 
   const selected: MatchResult[] = [
-    ...selectTopN(byTier.basic, basicCount, config.similarityThreshold),
-    ...selectTopN(byTier.advanced, advancedCount, config.similarityThreshold),
+    ...selectTopN(byTier.basic, basicCount, effectiveConfig.similarityThreshold),
+    ...selectTopN(byTier.advanced, advancedCount, effectiveConfig.similarityThreshold),
     ...selectTopN(byTier.exploration, explorationCount, 0), // 탐색은 threshold 미적용
   ]
 
