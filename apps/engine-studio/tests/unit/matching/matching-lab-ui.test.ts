@@ -292,7 +292,7 @@ describe("Tuning Page Logic", () => {
     it("기본 프로필 생성 시 6종 파라미터를 포함해야 한다", () => {
       const profile = createTuningProfile("테스트")
       expect(profile.parameters.length).toBe(6)
-      expect(profile.genreWeights.length).toBe(6)
+      expect(profile.genreWeights.length).toBe(12)
       expect(profile.name).toBe("테스트")
     })
 
@@ -313,9 +313,9 @@ describe("Tuning Page Logic", () => {
     it("장르 추가 후 테이블에 포함되어야 한다", () => {
       let profile = createTuningProfile("테스트")
       const initialCount = profile.genreWeights.length
-      profile = addGenre(profile, "horror")
+      profile = addGenre(profile, "musical")
       expect(profile.genreWeights.length).toBe(initialCount + 1)
-      expect(profile.genreWeights.find((g) => g.genre === "horror")).toBeTruthy()
+      expect(profile.genreWeights.find((g) => g.genre === "musical")).toBeTruthy()
     })
 
     it("이미 존재하는 장르 추가 시 에러 발생", () => {

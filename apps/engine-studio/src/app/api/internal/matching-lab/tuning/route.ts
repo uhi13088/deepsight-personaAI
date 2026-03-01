@@ -9,6 +9,7 @@ import {
   updateGenreWeight,
   addGenre,
   removeGenre,
+  applyPresetWeights,
   DEFAULT_HYPERPARAMETERS,
   DEFAULT_GENRE_WEIGHTS,
 } from "@/lib/matching/tuning"
@@ -59,7 +60,12 @@ interface CreateTuningRequest {
 }
 
 interface UpdateTuningRequest {
-  action: "update_parameter" | "update_genre_weight" | "add_genre" | "remove_genre"
+  action:
+    | "update_parameter"
+    | "update_genre_weight"
+    | "add_genre"
+    | "remove_genre"
+    | "apply_preset_weights"
   key?: string
   value?: number
   genre?: string
@@ -197,6 +203,10 @@ export async function PUT(request: NextRequest) {
           )
         }
         profile = removeGenre(profile, body.genre)
+        break
+      }
+      case "apply_preset_weights": {
+        profile = applyPresetWeights(profile)
         break
       }
       default:

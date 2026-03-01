@@ -113,60 +113,26 @@ export const DEFAULT_HYPERPARAMETERS: HyperParameter[] = [
   },
 ]
 
-// ── 기본 장르별 가중치 ───────────────────────────────────────
+// ── 장르 카탈로그 (엔진이 인식하는 공식 장르 목록) ──────────
 
-export const DEFAULT_GENRE_WEIGHTS: GenreWeightTable = [
+export interface GenreDefinition {
+  id: string
+  label: string // 한국어 표시명
+  /** 장르 특성에 맞는 기본 가중치 프리셋 */
+  preset: Record<SocialDimension, number>
+}
+
+/**
+ * 엔진이 인식하는 공식 장르 목록.
+ * - 새 장르를 추가할 때 이 목록에서 선택해야 엔진이 인식 가능
+ * - preset: 장르 특성에 맞는 기본 가중치 (자동 튜닝 시 사용)
+ */
+export const KNOWN_GENRES: GenreDefinition[] = [
+  // ── 기본 장르 ──
   {
-    genre: "thriller",
-    weights: {
-      depth: 1.2,
-      lens: 1.2,
-      stance: 1.1,
-      scope: 1.0,
-      taste: 1.0,
-      purpose: 1.1,
-      sociability: 0.8,
-    },
-  },
-  {
-    genre: "romance",
-    weights: {
-      depth: 0.9,
-      lens: 0.7,
-      stance: 0.8,
-      scope: 0.9,
-      taste: 1.0,
-      purpose: 1.1,
-      sociability: 1.2,
-    },
-  },
-  {
-    genre: "documentary",
-    weights: {
-      depth: 1.3,
-      lens: 1.2,
-      stance: 1.1,
-      scope: 1.2,
-      taste: 0.9,
-      purpose: 1.2,
-      sociability: 0.7,
-    },
-  },
-  {
-    genre: "comedy",
-    weights: {
-      depth: 0.8,
-      lens: 0.9,
-      stance: 0.8,
-      scope: 0.8,
-      taste: 1.1,
-      purpose: 0.7,
-      sociability: 1.3,
-    },
-  },
-  {
-    genre: "drama",
-    weights: {
+    id: "drama",
+    label: "드라마",
+    preset: {
       depth: 1.1,
       lens: 1.0,
       stance: 1.0,
@@ -177,8 +143,74 @@ export const DEFAULT_GENRE_WEIGHTS: GenreWeightTable = [
     },
   },
   {
-    genre: "scifi",
-    weights: {
+    id: "comedy",
+    label: "코미디",
+    preset: {
+      depth: 0.8,
+      lens: 0.9,
+      stance: 0.8,
+      scope: 0.8,
+      taste: 1.1,
+      purpose: 0.7,
+      sociability: 1.3,
+    },
+  },
+  {
+    id: "romance",
+    label: "로맨스",
+    preset: {
+      depth: 0.9,
+      lens: 0.7,
+      stance: 0.8,
+      scope: 0.9,
+      taste: 1.0,
+      purpose: 1.1,
+      sociability: 1.2,
+    },
+  },
+  {
+    id: "thriller",
+    label: "스릴러",
+    preset: {
+      depth: 1.2,
+      lens: 1.2,
+      stance: 1.1,
+      scope: 1.0,
+      taste: 1.0,
+      purpose: 1.1,
+      sociability: 0.8,
+    },
+  },
+  {
+    id: "horror",
+    label: "호러",
+    preset: {
+      depth: 1.1,
+      lens: 1.3,
+      stance: 1.2,
+      scope: 0.8,
+      taste: 1.1,
+      purpose: 0.9,
+      sociability: 0.7,
+    },
+  },
+  {
+    id: "action",
+    label: "액션",
+    preset: {
+      depth: 0.8,
+      lens: 0.9,
+      stance: 0.9,
+      scope: 0.9,
+      taste: 1.2,
+      purpose: 0.8,
+      sociability: 1.1,
+    },
+  },
+  {
+    id: "scifi",
+    label: "SF",
+    preset: {
       depth: 1.2,
       lens: 1.1,
       stance: 1.0,
@@ -188,7 +220,227 @@ export const DEFAULT_GENRE_WEIGHTS: GenreWeightTable = [
       sociability: 0.8,
     },
   },
+  {
+    id: "fantasy",
+    label: "판타지",
+    preset: {
+      depth: 1.0,
+      lens: 1.0,
+      stance: 0.9,
+      scope: 1.2,
+      taste: 1.3,
+      purpose: 0.9,
+      sociability: 0.9,
+    },
+  },
+  // ── 서사/문화 장르 ──
+  {
+    id: "documentary",
+    label: "다큐멘터리",
+    preset: {
+      depth: 1.3,
+      lens: 1.2,
+      stance: 1.1,
+      scope: 1.2,
+      taste: 0.9,
+      purpose: 1.2,
+      sociability: 0.7,
+    },
+  },
+  {
+    id: "animation",
+    label: "애니메이션",
+    preset: {
+      depth: 0.9,
+      lens: 0.8,
+      stance: 0.8,
+      scope: 1.0,
+      taste: 1.3,
+      purpose: 0.8,
+      sociability: 1.1,
+    },
+  },
+  {
+    id: "mystery",
+    label: "미스터리",
+    preset: {
+      depth: 1.3,
+      lens: 1.3,
+      stance: 1.1,
+      scope: 0.9,
+      taste: 1.0,
+      purpose: 1.1,
+      sociability: 0.7,
+    },
+  },
+  {
+    id: "musical",
+    label: "뮤지컬",
+    preset: {
+      depth: 0.8,
+      lens: 0.7,
+      stance: 0.7,
+      scope: 1.0,
+      taste: 1.3,
+      purpose: 0.9,
+      sociability: 1.3,
+    },
+  },
+  {
+    id: "war",
+    label: "전쟁",
+    preset: {
+      depth: 1.2,
+      lens: 1.1,
+      stance: 1.3,
+      scope: 1.1,
+      taste: 0.8,
+      purpose: 1.2,
+      sociability: 0.7,
+    },
+  },
+  {
+    id: "history",
+    label: "역사",
+    preset: {
+      depth: 1.3,
+      lens: 1.2,
+      stance: 1.2,
+      scope: 1.3,
+      taste: 0.8,
+      purpose: 1.2,
+      sociability: 0.7,
+    },
+  },
+  {
+    id: "crime",
+    label: "범죄",
+    preset: {
+      depth: 1.2,
+      lens: 1.2,
+      stance: 1.2,
+      scope: 1.0,
+      taste: 0.9,
+      purpose: 1.1,
+      sociability: 0.8,
+    },
+  },
+  {
+    id: "sports",
+    label: "스포츠",
+    preset: {
+      depth: 0.8,
+      lens: 0.8,
+      stance: 0.9,
+      scope: 0.9,
+      taste: 1.1,
+      purpose: 0.8,
+      sociability: 1.3,
+    },
+  },
+  {
+    id: "family",
+    label: "가족",
+    preset: {
+      depth: 0.9,
+      lens: 0.8,
+      stance: 0.8,
+      scope: 1.0,
+      taste: 0.9,
+      purpose: 1.1,
+      sociability: 1.2,
+    },
+  },
+  // ── 콘텐츠 형식 장르 ──
+  {
+    id: "reality",
+    label: "리얼리티",
+    preset: {
+      depth: 0.7,
+      lens: 0.8,
+      stance: 0.8,
+      scope: 0.9,
+      taste: 1.1,
+      purpose: 0.7,
+      sociability: 1.4,
+    },
+  },
+  {
+    id: "variety",
+    label: "예능",
+    preset: {
+      depth: 0.7,
+      lens: 0.8,
+      stance: 0.7,
+      scope: 0.8,
+      taste: 1.2,
+      purpose: 0.7,
+      sociability: 1.4,
+    },
+  },
+  {
+    id: "noir",
+    label: "느와르",
+    preset: {
+      depth: 1.3,
+      lens: 1.2,
+      stance: 1.2,
+      scope: 0.9,
+      taste: 1.1,
+      purpose: 1.1,
+      sociability: 0.7,
+    },
+  },
+  {
+    id: "western",
+    label: "서부극",
+    preset: {
+      depth: 1.0,
+      lens: 1.0,
+      stance: 1.1,
+      scope: 1.0,
+      taste: 1.1,
+      purpose: 0.9,
+      sociability: 0.8,
+    },
+  },
+  {
+    id: "indie",
+    label: "인디/독립",
+    preset: {
+      depth: 1.3,
+      lens: 1.1,
+      stance: 1.0,
+      scope: 0.8,
+      taste: 1.2,
+      purpose: 1.1,
+      sociability: 0.7,
+    },
+  },
 ]
+
+// ── 기본 장르별 가중치 ───────────────────────────────────────
+
+/** 기본 프로필에 포함되는 장르 (주요 장르 12개) */
+const DEFAULT_GENRE_IDS = [
+  "drama",
+  "comedy",
+  "romance",
+  "thriller",
+  "horror",
+  "action",
+  "scifi",
+  "fantasy",
+  "documentary",
+  "animation",
+  "mystery",
+  "crime",
+] as const
+
+export const DEFAULT_GENRE_WEIGHTS: GenreWeightTable = DEFAULT_GENRE_IDS.map((id) => {
+  const def = KNOWN_GENRES.find((g) => g.id === id)!
+  return { genre: id, weights: { ...def.preset } }
+})
 
 // ── 튜닝 프로필 생성 ────────────────────────────────────────
 
@@ -246,19 +498,15 @@ export function addGenre(profile: TuningProfile, genre: string): TuningProfile {
     throw new Error(`장르 '${genre}'가 이미 존재합니다`)
   }
 
-  const defaultWeights: Record<SocialDimension, number> = {
-    depth: 1.0,
-    lens: 1.0,
-    stance: 1.0,
-    scope: 1.0,
-    taste: 1.0,
-    purpose: 1.0,
-    sociability: 1.0,
-  }
+  // KNOWN_GENRES에서 프리셋 가중치를 찾아 적용 (없으면 1.0 기본값)
+  const known = KNOWN_GENRES.find((g) => g.id === genre)
+  const weights: Record<SocialDimension, number> = known
+    ? { ...known.preset }
+    : { depth: 1.0, lens: 1.0, stance: 1.0, scope: 1.0, taste: 1.0, purpose: 1.0, sociability: 1.0 }
 
   return {
     ...profile,
-    genreWeights: [...profile.genreWeights, { genre, weights: defaultWeights }],
+    genreWeights: [...profile.genreWeights, { genre, weights }],
     updatedAt: Date.now(),
   }
 }
@@ -348,6 +596,21 @@ export function generateGridSearchCombinations(
   }
 
   return combinations
+}
+
+// ── 장르 프리셋 일괄 적용 (자동 가중치) ─────────────────────
+
+/**
+ * 현재 프로필의 모든 장르 가중치를 KNOWN_GENRES 프리셋으로 초기화.
+ * 관리자가 수동 조정 후 원래 추천값으로 돌아가고 싶을 때 사용.
+ */
+export function applyPresetWeights(profile: TuningProfile): TuningProfile {
+  const genreWeights = profile.genreWeights.map((entry) => {
+    const known = KNOWN_GENRES.find((g) => g.id === entry.genre)
+    if (!known) return entry
+    return { ...entry, weights: { ...known.preset } }
+  })
+  return { ...profile, genreWeights, updatedAt: Date.now() }
 }
 
 // ── 가중 벡터 적용 ───────────────────────────────────────────

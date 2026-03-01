@@ -28,6 +28,8 @@ import {
   computeNegativePenalty,
 } from "./context-enricher"
 import { round, clamp, SOCIAL_DIM_LABELS } from "./utils"
+import { applyGenreWeights } from "./tuning"
+import type { GenreWeightTable } from "./tuning"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
@@ -74,6 +76,10 @@ export interface MatchingContext {
   socialSignals?: Map<string, SocialSignal>
   /** Enrichment Layer 확장 컨텍스트 */
   enrichment?: EnrichedMatchingContext
+  /** 콘텐츠 장르 (장르 가중치 적용용) */
+  genre?: string
+  /** 장르별 가중치 테이블 (튜닝 프로필에서 로드) */
+  genreWeights?: GenreWeightTable
 }
 
 export interface MatchResult {
@@ -460,6 +466,16 @@ export function matchAll(
   const userContext = enrichment?.userContext
   const enabledFeatures = enrichment?.experiment?.enabledFeatures
 
+  // Genre weights: 장르가 지정되면 L1 벡터에 장르 가중치 적용
+  const genre = context?.genre
+  const genreWeights = context?.genreWeights
+
+  // 유저 VFinal에 장르 가중치 적용 (L1 차원만 영향)
+  const userVFinalVector =
+    genre && genreWeights
+      ? applyGenreWeights(user.vFinal.vector, genre, genreWeights)
+      : user.vFinal.vector
+
   // 1. 블록된 페르소나 사전 필터링
   const filteredPersonas = personas.filter((persona) => {
     const signals = enrichment?.personaSignals?.get(persona.id)
@@ -494,10 +510,16 @@ export function matchAll(
     // Pre-compute: 페르소나 VFinal (Basic/Advanced에서 공유, 1회만 계산)
     const personaVFinal = calculateVFinal(persona.l1, persona.l2, persona.l3)
 
+    // 페르소나 VFinal에도 장르 가중치 적용
+    const personaVFinalVector =
+      genre && genreWeights
+        ? applyGenreWeights(personaVFinal.vector, genre, genreWeights)
+        : personaVFinal.vector
+
     // Basic
     const basicResult = calculateBasicScore(
-      user.vFinal.vector,
-      personaVFinal.vector,
+      userVFinalVector,
+      personaVFinalVector,
       user.crossAxisProfile,
       persona.crossAxisProfile,
       user.paradoxProfile,
@@ -508,8 +530,8 @@ export function matchAll(
 
     // Advanced
     const advancedResult = calculateAdvancedScore(
-      user.vFinal.vector,
-      personaVFinal.vector,
+      userVFinalVector,
+      personaVFinalVector,
       user.crossAxisProfile,
       persona.crossAxisProfile,
       user.paradoxProfile,

@@ -10,6 +10,7 @@ import {
   createTuningExperiment,
   startExperiment,
   generateGridSearchCombinations,
+  KNOWN_GENRES,
 } from "@/lib/matching/tuning"
 import type { TuningProfile, TuningExperiment } from "@/lib/matching/tuning"
 import {
@@ -38,6 +39,7 @@ import {
   RotateCcw,
   CheckCircle2,
   AlertCircle,
+  Wand2,
 } from "lucide-react"
 
 const L1_DIMS: SocialDimension[] = [
@@ -87,8 +89,8 @@ export default function TuningPage() {
   const [newTestType, setNewTestType] = useState<ABTestType>("tier")
   const [verdicts, setVerdicts] = useState<Record<string, ABTestVerdict>>({})
 
-  // 새 장르 추가
-  const [newGenre, setNewGenre] = useState("")
+  // 새 장르 추가 (KNOWN_GENRES에서 선택)
+  const [selectedGenre, setSelectedGenre] = useState("")
 
   // 프로필 로드
   useEffect(() => {
@@ -181,10 +183,20 @@ export default function TuningPage() {
   )
 
   const handleAddGenre = useCallback(() => {
-    if (!newGenre.trim()) return
-    void updateProfileViaAPI({ action: "add_genre", genre: newGenre.trim() })
-    setNewGenre("")
-  }, [newGenre, updateProfileViaAPI])
+    if (!selectedGenre) return
+    void updateProfileViaAPI({ action: "add_genre", genre: selectedGenre })
+    setSelectedGenre("")
+  }, [selectedGenre, updateProfileViaAPI])
+
+  // 장르 프리셋 일괄 적용 (자동 가중치)
+  const handleApplyPresets = useCallback(() => {
+    void updateProfileViaAPI({ action: "apply_preset_weights" })
+  }, [updateProfileViaAPI])
+
+  // 현재 프로필에 없는 KNOWN_GENRES만 필터
+  const availableGenres = KNOWN_GENRES.filter(
+    (g) => !profile?.genreWeights.some((gw) => gw.genre === g.id)
+  )
 
   const handleRemoveGenre = useCallback(
     (genre: string) => {
@@ -364,22 +376,36 @@ export default function TuningPage() {
         {/* ── 장르 가중치 탭 ── */}
         {activeTab === "genres" && (
           <div className="space-y-4">
-            {/* 장르 추가 */}
+            {/* 장르 추가 + 자동 가중치 */}
             <div className="bg-card rounded-lg border p-4">
               <h3 className="mb-3 text-sm font-medium">장르 관리</h3>
-              <div className="flex gap-2">
-                <Input
-                  className="max-w-[200px]"
-                  placeholder="새 장르명"
-                  value={newGenre}
-                  onChange={(e) => setNewGenre(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAddGenre()}
-                />
-                <Button size="sm" onClick={handleAddGenre} disabled={!newGenre.trim()}>
+              <div className="flex flex-wrap gap-2">
+                <select
+                  className="border-border bg-background min-w-[180px] rounded-md border px-3 py-2 text-sm"
+                  value={selectedGenre}
+                  onChange={(e) => setSelectedGenre(e.target.value)}
+                >
+                  <option value="">장르 선택...</option>
+                  {availableGenres.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.label} ({g.id})
+                    </option>
+                  ))}
+                </select>
+                <Button size="sm" onClick={handleAddGenre} disabled={!selectedGenre}>
                   <Plus className="mr-1 h-3.5 w-3.5" />
                   추가
                 </Button>
+                <div className="border-border mx-1 border-l" />
+                <Button size="sm" variant="outline" onClick={handleApplyPresets}>
+                  <Wand2 className="mr-1 h-3.5 w-3.5" />
+                  프리셋 초기화
+                </Button>
               </div>
+              <p className="text-muted-foreground mt-2 text-xs">
+                엔진이 인식하는 공식 장르 목록에서 선택합니다. 프리셋 초기화: 모든 장르 가중치를
+                추천값으로 복원합니다.
+              </p>
             </div>
 
             {/* 장르×차원 가중치 테이블 */}
@@ -406,7 +432,14 @@ export default function TuningPage() {
                   ) : (
                     profile.genreWeights.map((entry) => (
                       <tr key={entry.genre} className="border-border border-b last:border-0">
-                        <td className="px-4 py-3 font-medium capitalize">{entry.genre}</td>
+                        <td className="px-4 py-3 font-medium">
+                          <span>
+                            {KNOWN_GENRES.find((g) => g.id === entry.genre)?.label ?? entry.genre}
+                          </span>
+                          <span className="text-muted-foreground ml-1 text-xs">
+                            ({entry.genre})
+                          </span>
+                        </td>
                         {L1_DIMS.map((dim) => {
                           const w = entry.weights[dim]
                           const color =
