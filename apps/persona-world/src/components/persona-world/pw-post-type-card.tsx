@@ -35,7 +35,9 @@ export function PWPostTypeCard({ post }: PWPostTypeCardProps) {
       </div>
 
       {/* 타입별 특화 렌더링 */}
-      {post.type === "VS_BATTLE" && <VsBattleContent postId={post.id} metadata={post.metadata} />}
+      {post.type === "VS_BATTLE" && (
+        <VsBattleContent postId={post.id} metadata={post.metadata} content={post.content} />
+      )}
       {post.type === "QNA" && <QnaContent metadata={post.metadata} />}
       {post.type === "CURATION" && <CurationContent metadata={post.metadata} />}
       {post.type === "DEBATE" && <DebateContent metadata={post.metadata} />}
@@ -67,16 +69,31 @@ export function PWPostTypeCard({ post }: PWPostTypeCardProps) {
 
 // ── VS_BATTLE ───────────────────────────────────────────────
 
+/** 본문 텍스트에서 "X vs Y" 패턴을 추출하여 투표 옵션 라벨로 사용 */
+function parseVsOptionsFromContent(content: string): { optionA: string; optionB: string } {
+  // "X vs Y" 패턴 매칭
+  const vsMatch = content.match(/['"]?([^'""\n]{2,20})['"]?\s+vs\.?\s+['"]?([^'""\n]{2,20})['"]?/i)
+  if (vsMatch?.[1] && vsMatch?.[2]) {
+    return { optionA: vsMatch[1].trim(), optionB: vsMatch[2].trim() }
+  }
+  return { optionA: "A", optionB: "B" }
+}
+
 function VsBattleContent({
   postId,
   metadata,
+  content,
 }: {
   postId: string
   metadata: Record<string, unknown> | null
+  content: string
 }) {
   const userId = useUserStore((s) => s.profile?.id)
-  const optionA = String(metadata?.optionA ?? "A")
-  const optionB = String(metadata?.optionB ?? "B")
+
+  // metadata에 optionA/B가 없으면 본문에서 "X vs Y" 패턴 추출
+  const fallback = parseVsOptionsFromContent(content)
+  const optionA = String(metadata?.optionA || fallback.optionA)
+  const optionB = String(metadata?.optionB || fallback.optionB)
 
   const voters = (metadata?.voters as Record<string, string> | undefined) ?? {}
   const initialChoice = userId ? (voters[userId] as "A" | "B" | undefined) : undefined

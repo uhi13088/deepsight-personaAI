@@ -300,12 +300,24 @@ export function buildUserPrompt(input: PostGenerationInput): string {
     parts.push(`[소비 기억] ${input.ragContext.consumptionMemory}`)
   }
 
-  parts.push(
-    `\n위 조건에 맞는 SNS 포스트를 작성하세요.`,
-    `- 포스트 본문 끝에 관련 해시태그를 2~5개 포함하세요 (예: #영화추천 #넷플릭스)`,
-    `- 해시태그는 주제, 감정, 카테고리를 반영해 자연스럽게 달아주세요`,
-    `- 포스트 본문과 해시태그만 출력하세요`
-  )
+  if (input.postType === "VS_BATTLE") {
+    parts.push(
+      `\n위 조건에 맞는 VS 배틀 SNS 포스트를 작성하세요.`,
+      `- 포스트 본문 끝에 관련 해시태그를 2~5개 포함하세요 (예: #영화추천 #넷플릭스)`,
+      `- 해시태그는 주제, 감정, 카테고리를 반영해 자연스럽게 달아주세요`,
+      `- 반드시 글 마지막(해시태그 뒤)에 투표 옵션을 아래 형식으로 출력하세요:`,
+      `  [OPTION_A: 옵션A 라벨]`,
+      `  [OPTION_B: 옵션B 라벨]`,
+      `- 옵션 라벨은 짧고 명확하게 (예: "직접 대화파", "문자 소통파")`
+    )
+  } else {
+    parts.push(
+      `\n위 조건에 맞는 SNS 포스트를 작성하세요.`,
+      `- 포스트 본문 끝에 관련 해시태그를 2~5개 포함하세요 (예: #영화추천 #넷플릭스)`,
+      `- 해시태그는 주제, 감정, 카테고리를 반영해 자연스럽게 달아주세요`,
+      `- 포스트 본문과 해시태그만 출력하세요`
+    )
+  }
 
   return parts.join("\n")
 }
@@ -329,17 +341,24 @@ export async function generatePostContent(
   const systemPrompt = buildSystemPrompt(input, weather)
   const userPrompt = buildUserPrompt(input)
 
+  const baseMetadata: Record<string, unknown> = {
+    postType: input.postType,
+    trigger: input.trigger,
+    topic: input.topic,
+    systemPromptLength: systemPrompt.length,
+    userPromptLength: userPrompt.length,
+  }
+
   if (!llmProvider) {
     // LLM provider 미제공 → placeholder (개발/테스트용)
+    const placeholderMeta = { ...baseMetadata }
+    if (input.postType === "VS_BATTLE") {
+      placeholderMeta.optionA = input.topic ?? "옵션 A"
+      placeholderMeta.optionB = "반대 의견"
+    }
     return {
       content: `[${input.postType}] ${input.topic ?? "자유 주제"} — 생성 대기 중`,
-      metadata: {
-        postType: input.postType,
-        trigger: input.trigger,
-        topic: input.topic,
-        systemPromptLength: systemPrompt.length,
-        userPromptLength: userPrompt.length,
-      },
+      metadata: placeholderMeta,
       tokensUsed: 0,
       voiceConsistencyScore: 0,
     }
@@ -354,15 +373,20 @@ export async function generatePostContent(
     maxTokens,
   })
 
+  const metadata = { ...baseMetadata }
+
+  // VS_BATTLE: LLM 출력에서 옵션 라벨 추출
+  let content = result.text
+  if (input.postType === "VS_BATTLE") {
+    const extracted = extractVsBattleOptions(content)
+    content = extracted.cleanContent
+    metadata.optionA = extracted.optionA
+    metadata.optionB = extracted.optionB
+  }
+
   return {
-    content: result.text,
-    metadata: {
-      postType: input.postType,
-      trigger: input.trigger,
-      topic: input.topic,
-      systemPromptLength: systemPrompt.length,
-      userPromptLength: userPrompt.length,
-    },
+    content,
+    metadata,
     tokensUsed: result.tokensUsed,
     voiceConsistencyScore: 0, // 생성 후 별도 측정 (T113 quality-monitor)
   }
@@ -490,4 +514,51 @@ function getSeasonalWeather(month: number, hemisphere: "north" | "south"): strin
     12: "한겨울, 눈, 연말 분위기",
   }
   return weatherMap[effectiveMonth]
+}
+
+// ── VS_BATTLE 옵션 추출 ──────────────────────────────────────
+
+/**
+ * LLM 출력에서 VS_BATTLE 옵션 라벨을 추출.
+ *
+ * 1순위: [OPTION_A: ...] / [OPTION_B: ...] 마커
+ * 2순위: 본문에서 "X vs Y" 패턴 파싱
+ */
+export function extractVsBattleOptions(text: string): {
+  optionA: string
+  optionB: string
+  cleanContent: string
+} {
+  // 1순위: 구조화된 마커 파싱
+  const markerA = text.match(/\[OPTION_A:\s*(.+?)\]/i)
+  const markerB = text.match(/\[OPTION_B:\s*(.+?)\]/i)
+
+  if (markerA?.[1] && markerB?.[1]) {
+    const cleanContent = text
+      .replace(/\[OPTION_A:\s*.+?\]/gi, "")
+      .replace(/\[OPTION_B:\s*.+?\]/gi, "")
+      .trim()
+    return {
+      optionA: markerA[1].trim(),
+      optionB: markerB[1].trim(),
+      cleanContent,
+    }
+  }
+
+  // 2순위: "X vs Y" 패턴 (첫 번째 매칭)
+  const vsMatch = text.match(/['"]?([^'""\n]{2,20})['"]?\s+vs\.?\s+['"]?([^'""\n]{2,20})['"]?/i)
+  if (vsMatch?.[1] && vsMatch?.[2]) {
+    return {
+      optionA: vsMatch[1].trim(),
+      optionB: vsMatch[2].trim(),
+      cleanContent: text.trim(),
+    }
+  }
+
+  // 3순위: fallback — 옵션 추출 실패
+  return {
+    optionA: "A",
+    optionB: "B",
+    cleanContent: text.trim(),
+  }
 }

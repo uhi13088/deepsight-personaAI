@@ -196,16 +196,23 @@ export async function executePostCreation(
     isFeedInspired: context.trigger === "CONTENT_RELEASE",
   })
 
+  // VS_BATTLE: 투표 초기값 설정
+  const postMetadata: Record<string, unknown> = {
+    ...result.metadata,
+    voiceConsistencyScore: voiceCheck?.similarity ?? 0,
+    regenerated,
+    trigger: context.trigger,
+  }
+  if (postType === "VS_BATTLE") {
+    postMetadata.votes = { A: 0, B: 0 }
+    postMetadata.voters = {}
+  }
+
   const saved = await dataProvider.savePost({
     personaId: persona.id,
     type: postType,
     content: result.content,
-    metadata: {
-      ...result.metadata,
-      voiceConsistencyScore: voiceCheck?.similarity ?? 0,
-      regenerated,
-      trigger: context.trigger,
-    },
+    metadata: postMetadata,
     poignancyScore,
     postSource,
     locationTag: persona.region ?? undefined,
