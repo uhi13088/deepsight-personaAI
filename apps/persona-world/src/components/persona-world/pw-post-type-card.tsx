@@ -38,14 +38,18 @@ export function PWPostTypeCard({ post }: PWPostTypeCardProps) {
       {post.type === "VS_BATTLE" && (
         <VsBattleContent postId={post.id} metadata={post.metadata} content={post.content} />
       )}
-      {post.type === "QNA" && <QnaContent metadata={post.metadata} />}
-      {post.type === "CURATION" && <CurationContent metadata={post.metadata} />}
-      {post.type === "DEBATE" && <DebateContent metadata={post.metadata} />}
-      {post.type === "TRIVIA" && <TriviaContent metadata={post.metadata} />}
-      {post.type === "PREDICTION" && <PredictionContent metadata={post.metadata} />}
-      {post.type === "REVIEW" && <ReviewContent metadata={post.metadata} />}
+      {post.type === "QNA" && <QnaContent metadata={post.metadata} content={post.content} />}
+      {post.type === "CURATION" && (
+        <CurationContent metadata={post.metadata} content={post.content} />
+      )}
+      {post.type === "DEBATE" && <DebateContent metadata={post.metadata} content={post.content} />}
+      {post.type === "TRIVIA" && <TriviaContent metadata={post.metadata} content={post.content} />}
+      {post.type === "PREDICTION" && (
+        <PredictionContent metadata={post.metadata} content={post.content} />
+      )}
+      {post.type === "REVIEW" && <ReviewContent metadata={post.metadata} content={post.content} />}
       {post.type === "LIST" && <ListContent content={post.content} />}
-      {post.type === "COLLAB" && <CollabContent metadata={post.metadata} />}
+      {post.type === "COLLAB" && <CollabContent metadata={post.metadata} content={post.content} />}
 
       {/* 공통 본문 (멘션 하이라이트 포함) */}
       <p className="whitespace-pre-wrap text-gray-800">
@@ -224,9 +228,23 @@ function VsBattleContent({
 
 // ── QNA ─────────────────────────────────────────────────────
 
-function QnaContent({ metadata }: { metadata: Record<string, unknown> | null }) {
-  if (!metadata) return null
-  const questions = metadata.questions as Array<{ q?: string; a?: string }> | undefined
+function QnaContent({
+  metadata,
+  content,
+}: {
+  metadata: Record<string, unknown> | null
+  content: string
+}) {
+  let questions = metadata?.questions as Array<{ q?: string; a?: string }> | undefined
+
+  // fallback: 본문에서 Q:/A: 패턴 파싱
+  if (!questions?.length) {
+    const qaBlocks = [...content.matchAll(/Q[.:]?\s*(.+?)(?:\n|$)\s*A[.:]?\s*(.+?)(?:\n|$)/gi)]
+    if (qaBlocks.length > 0) {
+      questions = qaBlocks.map((m) => ({ q: m[1]?.trim(), a: m[2]?.trim() }))
+    }
+  }
+
   if (!questions?.length) return null
 
   return (
@@ -243,11 +261,29 @@ function QnaContent({ metadata }: { metadata: Record<string, unknown> | null }) 
 
 // ── CURATION ────────────────────────────────────────────────
 
-function CurationContent({ metadata }: { metadata: Record<string, unknown> | null }) {
-  if (!metadata) return null
-  const items = metadata.items as
+function CurationContent({
+  metadata,
+  content,
+}: {
+  metadata: Record<string, unknown> | null
+  content: string
+}) {
+  let items = metadata?.items as
     | Array<{ rank?: number; title?: string; reason?: string }>
     | undefined
+
+  // fallback: 번호 리스트 파싱
+  if (!items?.length) {
+    const numbered = [...content.matchAll(/(\d+)[.)]\s*(.+?)(?:\s*[-–—]\s*(.+?))?(?:\n|$)/g)]
+    if (numbered.length >= 2) {
+      items = numbered.map((m) => ({
+        rank: Number(m[1]),
+        title: m[2].trim(),
+        reason: m[3]?.trim(),
+      }))
+    }
+  }
+
   if (!items?.length) return null
 
   return (
@@ -267,17 +303,32 @@ function CurationContent({ metadata }: { metadata: Record<string, unknown> | nul
 
 // ── DEBATE ──────────────────────────────────────────────────
 
-function DebateContent({ metadata }: { metadata: Record<string, unknown> | null }) {
-  if (!metadata) return null
-  const positions = metadata.positions as
-    | Array<{ position?: string; argument?: string }>
-    | undefined
+function DebateContent({
+  metadata,
+  content,
+}: {
+  metadata: Record<string, unknown> | null
+  content: string
+}) {
+  let positions = metadata?.positions as Array<{ position?: string; argument?: string }> | undefined
+
+  // fallback: 찬성/반대/중립 키워드 탐지
+  if (!positions?.length) {
+    const stanceKeywords = ["찬성", "반대", "중립", "지지", "반박"]
+    const found = stanceKeywords.filter((k) => content.includes(k))
+    if (found.length >= 2) {
+      positions = found.map((k) => ({ position: k }))
+    }
+  }
+
   if (!positions?.length) return null
 
   const positionColors: Record<string, string> = {
     찬성: "bg-green-100 text-green-700",
     반대: "bg-red-100 text-red-700",
     중립: "bg-gray-100 text-gray-600",
+    지지: "bg-green-100 text-green-700",
+    반박: "bg-red-100 text-red-700",
   }
 
   return (
@@ -296,9 +347,23 @@ function DebateContent({ metadata }: { metadata: Record<string, unknown> | null 
 
 // ── TRIVIA ──────────────────────────────────────────────────
 
-function TriviaContent({ metadata }: { metadata: Record<string, unknown> | null }) {
-  if (!metadata) return null
-  const options = metadata.options as string[] | undefined
+function TriviaContent({
+  metadata,
+  content,
+}: {
+  metadata: Record<string, unknown> | null
+  content: string
+}) {
+  let options = metadata?.options as string[] | undefined
+
+  // fallback: A. B. C. D. 패턴 파싱
+  if (!options?.length) {
+    const abcMatches = [...content.matchAll(/([A-D])[.)]\s*(.+?)(?:\n|$)/g)]
+    if (abcMatches.length >= 2) {
+      options = abcMatches.map((m) => m[2].trim())
+    }
+  }
+
   if (!options?.length) return null
 
   return (
@@ -318,9 +383,24 @@ function TriviaContent({ metadata }: { metadata: Record<string, unknown> | null 
 
 // ── PREDICTION ──────────────────────────────────────────────
 
-function PredictionContent({ metadata }: { metadata: Record<string, unknown> | null }) {
-  if (!metadata) return null
-  const confidence = Number(metadata.confidence ?? 0)
+function PredictionContent({
+  metadata,
+  content,
+}: {
+  metadata: Record<string, unknown> | null
+  content: string
+}) {
+  let confidence = Number(metadata?.confidence ?? 0)
+
+  // fallback: N% 패턴
+  if (!confidence) {
+    const pctMatch = content.match(/(\d{1,3})%/)
+    if (pctMatch) {
+      const val = Number(pctMatch[1])
+      if (val >= 10 && val <= 100) confidence = val
+    }
+  }
+
   if (!confidence) return null
 
   return (
@@ -338,9 +418,26 @@ function PredictionContent({ metadata }: { metadata: Record<string, unknown> | n
 
 // ── REVIEW ──────────────────────────────────────────────────
 
-function ReviewContent({ metadata }: { metadata: Record<string, unknown> | null }) {
-  if (!metadata) return null
-  const rating = Number(metadata.rating ?? 0)
+function ReviewContent({
+  metadata,
+  content,
+}: {
+  metadata: Record<string, unknown> | null
+  content: string
+}) {
+  let rating = Number(metadata?.rating ?? 0)
+
+  // fallback: ★ 개수 카운트
+  if (!rating) {
+    const starCount = (content.match(/★/g) ?? []).length
+    if (starCount >= 1 && starCount <= 5) rating = starCount
+  }
+  // fallback: "N/5" 또는 "N점" 패턴
+  if (!rating) {
+    const scoreMatch = content.match(/(\d)[/점]\s*5/)
+    if (scoreMatch) rating = Number(scoreMatch[1])
+  }
+
   if (!rating) return null
 
   return (
@@ -378,9 +475,23 @@ function ListContent({ content }: { content: string }) {
 
 // ── COLLAB ──────────────────────────────────────────────────
 
-function CollabContent({ metadata }: { metadata: Record<string, unknown> | null }) {
-  if (!metadata) return null
-  const participants = metadata.participants as string[] | undefined
+function CollabContent({
+  metadata,
+  content,
+}: {
+  metadata: Record<string, unknown> | null
+  content: string
+}) {
+  let participants = metadata?.participants as string[] | undefined
+
+  // fallback: @멘션 추출
+  if (!participants?.length) {
+    const mentions = [...content.matchAll(/@(\w+)/g)]
+    if (mentions.length > 0) {
+      participants = mentions.map((m) => m[1])
+    }
+  }
+
   if (!participants?.length) return null
 
   return (
