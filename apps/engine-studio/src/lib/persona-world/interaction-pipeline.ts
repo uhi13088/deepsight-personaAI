@@ -34,6 +34,7 @@ import type { SecurityMiddlewareProvider } from "./security/security-middleware"
 import { securityOutputMiddleware, createSecurityQuarantine } from "./security/security-middleware"
 import { isFeatureEnabled, type PWKillSwitchConfig } from "./security/pw-kill-switch"
 import type { ImmutableFact } from "@/types"
+import { runModerationPipeline } from "./moderation/auto-moderator"
 
 // ── 타입 정의 ────────────────────────────────────────────────
 
@@ -406,6 +407,35 @@ export async function executeInteractions(
         securityBlockedComments++
         continue // 이 포스트에 대한 댓글 스킵
       }
+    }
+
+    // Moderation Pipeline Stage 1+2: 댓글 모더레이션 (T294)
+    const moderationResult = runModerationPipeline(commentResult.content)
+    if (moderationResult.action === "BLOCK") {
+      // BLOCK → 댓글 스킵 + ModerationLog (T294 AC2)
+      if (securityOptions?.securityProvider) {
+        await securityOptions.securityProvider.saveModerationLog({
+          contentType: "COMMENT",
+          contentId: `comment-blocked-${persona.id}-${post.id}-${Date.now()}`,
+          personaId: persona.id,
+          stage: `STAGE_${moderationResult.stage}`,
+          verdict: "BLOCK",
+          violations: moderationResult.detections,
+        })
+      }
+
+      await dataProvider.saveActivityLog({
+        personaId: persona.id,
+        activityType: "COMMENT_BLOCKED_MODERATION",
+        targetId: post.id,
+        metadata: {
+          stage: moderationResult.stage,
+          detections: moderationResult.detections.map((d) => d.type),
+        },
+      })
+
+      securityBlockedComments++
+      continue
     }
 
     const commentProvenance = computeInteractionProvenance({

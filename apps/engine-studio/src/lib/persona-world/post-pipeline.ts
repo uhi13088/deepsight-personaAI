@@ -40,6 +40,7 @@ import {
 import { isFeatureEnabled, type PWKillSwitchConfig } from "./security/pw-kill-switch"
 import type { ImmutableFact } from "@/types"
 import type { PostQualityLogInput } from "./types"
+import { runModerationPipeline, type ModerationResult } from "./moderation/auto-moderator"
 
 // ── 타입 정의 ────────────────────────────────────────────────
 
@@ -292,6 +293,59 @@ export async function executePostCreation(
     if (outputCheck.shouldQuarantine) {
       quarantined = true
     }
+  }
+
+  // Step 5.7: 모더레이션 파이프라인 Stage 1+2 (T293)
+  const moderationResult = runModerationPipeline(result.content)
+
+  if (moderationResult.action === "BLOCK") {
+    // BLOCK → 포스트 저장 중단 + ModerationLog 기록 (T293 AC2)
+    if (securityOptions?.securityProvider) {
+      await securityOptions.securityProvider.saveModerationLog({
+        contentType: "POST",
+        contentId: `blocked-${persona.id}-${Date.now()}`,
+        personaId: persona.id,
+        stage: `STAGE_${moderationResult.stage}`,
+        verdict: "BLOCK",
+        violations: moderationResult.detections,
+      })
+    }
+
+    await dataProvider.saveActivityLog({
+      personaId: persona.id,
+      activityType: "POST_BLOCKED_MODERATION",
+      postId: "",
+      metadata: {
+        stage: moderationResult.stage,
+        detections: moderationResult.detections.map((d) => d.type),
+      },
+    })
+
+    throw new Error(
+      `[PostPipeline] Moderation BLOCKED at Stage ${moderationResult.stage}: ${moderationResult.detections.map((d) => d.type).join(", ")}`
+    )
+  }
+
+  if (moderationResult.action === "QUARANTINE" && securityOptions?.securityProvider) {
+    // QUARANTINE → 격리 큐 + 포스트 미공개 저장 (T293 AC3)
+    quarantined = true
+  }
+
+  // SANITIZE → 치환된 콘텐츠 적용
+  if (moderationResult.sanitizedContent) {
+    result = { ...result, content: moderationResult.sanitizedContent }
+  }
+
+  // ModerationLog 기록 (PASS 포함, T293 AC4)
+  if (securityOptions?.securityProvider) {
+    await securityOptions.securityProvider.saveModerationLog({
+      contentType: "POST",
+      contentId: `pre-save-${persona.id}-${Date.now()}`,
+      personaId: persona.id,
+      stage: `STAGE_${moderationResult.stage}`,
+      verdict: moderationResult.action,
+      violations: moderationResult.detections.length > 0 ? moderationResult.detections : undefined,
+    })
   }
 
   // Step 6: 해시태그 추출
