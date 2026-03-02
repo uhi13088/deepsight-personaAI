@@ -9,6 +9,10 @@ import {
   MAX_COMMENT_LENGTH,
 } from "@/lib/persona-world/comment-utils"
 import { verifyInternalToken } from "@/lib/internal-auth"
+import { getUserTrustScore } from "@/lib/persona-world/security/trust-score-crud"
+import { getInspectionLevel } from "@/lib/persona-world/security/user-trust"
+import { checkRateLimit, RATE_LIMITS } from "@/lib/persona-world/security/user-rate-limiter"
+import { inspectInput } from "@/lib/persona-world/security/pw-gate-rules"
 
 /**
  * GET /api/public/posts/[postId]/comments
@@ -200,6 +204,46 @@ export async function POST(
         { success: false, error: { code: "NOT_FOUND", message: "유저를 찾을 수 없습니다" } },
         { status: 404 }
       )
+    }
+
+    // v4.0 T305: Trust Score + Rate Limit + Gate Guard 체크
+    try {
+      const trustScore = await getUserTrustScore(prisma, userId)
+      const inspectionLevel = getInspectionLevel(trustScore.score)
+      if (inspectionLevel === "BLOCKED") {
+        return NextResponse.json(
+          { success: false, error: { code: "USER_BLOCKED", message: "계정이 차단되었습니다" } },
+          { status: 403 }
+        )
+      }
+
+      const rateCheck = checkRateLimit(userId, "comment", RATE_LIMITS.comment)
+      if (!rateCheck.allowed) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "RATE_LIMIT",
+              message: "댓글 작성 빈도가 너무 높습니다. 잠시 후 다시 시도하세요.",
+            },
+          },
+          { status: 429 }
+        )
+      }
+
+      // Gate Guard: 입력 텍스트 보안 검사
+      const gateResult = inspectInput(trimmedContent)
+      if (gateResult.action === "BLOCK") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "CONTENT_BLOCKED", message: "부적절한 내용이 포함되어 있습니다" },
+          },
+          { status: 400 }
+        )
+      }
+    } catch {
+      // trust score/gate guard 실패 시 진행 허용 (graceful degradation)
     }
 
     // 부모 댓글 존재 확인 (답글인 경우)

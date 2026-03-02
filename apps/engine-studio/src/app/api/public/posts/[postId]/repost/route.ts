@@ -3,6 +3,9 @@ import { Prisma } from "@/generated/prisma"
 import { prisma } from "@/lib/prisma"
 import { notifyPostReposted } from "@/lib/persona-world/notification-service"
 import { verifyInternalToken } from "@/lib/internal-auth"
+import { getUserTrustScore } from "@/lib/persona-world/security/trust-score-crud"
+import { getInspectionLevel } from "@/lib/persona-world/security/user-trust"
+import { checkRateLimit, RATE_LIMITS } from "@/lib/persona-world/security/user-rate-limiter"
 
 /**
  * POST /api/public/posts/[postId]/repost
@@ -68,6 +71,34 @@ export async function POST(
           },
           { status: 401 }
         )
+      }
+
+      // v4.0 T307: Trust Score + Rate Limit 체크
+      try {
+        const trustScore = await getUserTrustScore(prisma, userId)
+        const inspectionLevel = getInspectionLevel(trustScore.score)
+        if (inspectionLevel === "BLOCKED") {
+          return NextResponse.json(
+            { success: false, error: { code: "USER_BLOCKED", message: "계정이 차단되었습니다" } },
+            { status: 403 }
+          )
+        }
+
+        const rateCheck = checkRateLimit(userId, "repost", RATE_LIMITS.repost)
+        if (!rateCheck.allowed) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "RATE_LIMIT",
+                message: "요청이 너무 많습니다. 잠시 후 다시 시도하세요.",
+              },
+            },
+            { status: 429 }
+          )
+        }
+      } catch {
+        // trust score 조회 실패 시 진행 허용 (graceful degradation)
       }
     }
 

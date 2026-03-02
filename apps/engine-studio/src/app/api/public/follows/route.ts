@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma"
 import { Prisma } from "@/generated/prisma"
 import { notifyFollowed } from "@/lib/persona-world/notification-service"
 import { verifyInternalToken } from "@/lib/internal-auth"
+import { getUserTrustScore } from "@/lib/persona-world/security/trust-score-crud"
+import { getInspectionLevel } from "@/lib/persona-world/security/user-trust"
+import { checkRateLimit, RATE_LIMITS } from "@/lib/persona-world/security/user-rate-limiter"
 
 /**
  * GET /api/public/follows?userId=...
@@ -105,6 +108,36 @@ export async function POST(request: NextRequest) {
         },
         { status: 404 }
       )
+    }
+
+    // v4.0 T306: Trust Score + Rate Limit 체크
+    if (followerUserId) {
+      try {
+        const trustScore = await getUserTrustScore(prisma, followerUserId)
+        const inspectionLevel = getInspectionLevel(trustScore.score)
+        if (inspectionLevel === "BLOCKED") {
+          return NextResponse.json(
+            { success: false, error: { code: "USER_BLOCKED", message: "계정이 차단되었습니다" } },
+            { status: 403 }
+          )
+        }
+
+        const rateCheck = checkRateLimit(followerUserId, "follow", RATE_LIMITS.follow)
+        if (!rateCheck.allowed) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "RATE_LIMIT",
+                message: "요청이 너무 많습니다. 잠시 후 다시 시도하세요.",
+              },
+            },
+            { status: 429 }
+          )
+        }
+      } catch {
+        // trust score 조회 실패 시 진행 허용 (graceful degradation)
+      }
     }
 
     // followerUserId가 있으면 PersonaWorldUser 존재 보장 (없으면 생성)
