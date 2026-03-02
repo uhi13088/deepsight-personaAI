@@ -324,6 +324,151 @@ export interface UserActivity {
   metadata?: Record<string, unknown>
 }
 
+// ═══════════════════════════════════════════════════════════════
+// v4.0 — 보안 통합 타입 (T276)
+// ═══════════════════════════════════════════════════════════════
+
+// ── Gate Guard 검사 결과 ───────────────────────────────────────
+
+export type GateAction = "PASS" | "WARN" | "BLOCK"
+export type GateSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+
+export interface GateCheckResult {
+  action: GateAction
+  severity: GateSeverity
+  category: string
+  matchedPattern?: string
+}
+
+// ── Sentinel 검사 결과 ─────────────────────────────────────────
+
+export interface SentinelCheckResult {
+  passed: boolean
+  violations: Array<{
+    type: string
+    severity: GateSeverity
+    description: string
+  }>
+  processingTimeMs: number
+}
+
+// ── 통합 SecurityCheckResult (Gate + Sentinel) ─────────────────
+
+export interface SecurityCheckResult {
+  gateCheck: GateCheckResult
+  sentinelCheck?: SentinelCheckResult
+  overallPass: boolean
+  blockedReasons: string[]
+}
+
+// ── PW Gate 검사 입력/결과 (PW 특화 4종 검사) ──────────────────
+
+export interface PWGateCheckInput {
+  text: string
+  personaId?: string
+  userId?: string
+  contentType: "POST" | "COMMENT" | "INTERACTION"
+  metadata?: Record<string, unknown>
+}
+
+export interface PWGateCheckResult {
+  injection: GateCheckResult
+  pii: GateCheckResult
+  manipulation: GateCheckResult
+  rateLimit: GateCheckResult
+  overallAction: GateAction
+  overallSeverity: GateSeverity
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v4.0 — 품질/모더레이션/비용 통합 타입 (T277)
+// ═══════════════════════════════════════════════════════════════
+
+// ── 품질 로그 입력 타입 ────────────────────────────────────────
+
+export interface PostQualityLogInput {
+  postId: string
+  personaId: string
+  voiceSpecMatch: number
+  factbookViolations: number
+  repetitionScore: number
+  topicRelevance: number
+  overallScore: number
+}
+
+export interface CommentQualityLogInput {
+  commentId: string
+  personaId: string
+  toneMatch: number
+  contextRelevance: number
+  memoryReference: boolean
+  naturalness: number
+  overallScore: number
+}
+
+export type AnomalyType = "BOT_PATTERN" | "ENERGY_MISMATCH" | "SUDDEN_BURST" | "PROLONGED_SILENCE"
+export type AnomalySeverity = "INFO" | "WARNING" | "CRITICAL"
+
+export interface InteractionPatternLogInput {
+  personaId: string
+  period: "HOURLY" | "DAILY" | "WEEKLY"
+  stats: {
+    postCount: number
+    commentCount: number
+    likeCount: number
+    avgResponseTimeMs: number
+  }
+  anomalies: Array<{
+    type: AnomalyType
+    severity: AnomalySeverity
+    description: string
+  }>
+}
+
+// ── 모더레이션 타입 ────────────────────────────────────────────
+
+export type ModerationVerdict = "PASS" | "WARN" | "BLOCK" | "QUARANTINE"
+export type ModerationAction = "PASS" | "LOG" | "WARN" | "SANITIZE" | "QUARANTINE" | "BLOCK"
+
+export interface ModerationResult {
+  action: ModerationAction
+  stage: 1 | 2 | 3
+  detections: Array<{
+    type: string
+    severity: string
+    description: string
+    matchedRule?: string
+  }>
+  sanitizedContent?: string
+  shouldQuarantine: boolean
+}
+
+// ── 비용 제어 타입 ─────────────────────────────────────────────
+
+export type BudgetAlertLevel = "INFO" | "WARNING" | "CRITICAL" | "EMERGENCY"
+
+export type CostOverrunAction =
+  | { type: "REDUCE_POST_FREQUENCY"; factor: number }
+  | { type: "FREEZE_GENERATION" }
+  | { type: "FREEZE_AUTONOMOUS" }
+  | { type: "GLOBAL_FREEZE" }
+
+export type CostMode = "QUALITY" | "BALANCE" | "COST_PRIORITY"
+
+export interface CostModeApplication {
+  mode: CostMode
+  schedulerUpdates: {
+    postFrequencyMultiplier: number
+    commentFrequencyMultiplier: number
+  }
+  interviewSampling: number
+  arenaFrequency: number
+  estimatedBudget: {
+    daily: number
+    monthly: number
+  }
+}
+
 // ── Re-export for convenience ────────────────────────────────
 export type { ThreeLayerVector, SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector }
 export type { PersonaPostType }
