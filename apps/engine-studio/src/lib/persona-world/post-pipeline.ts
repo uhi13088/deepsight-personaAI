@@ -39,6 +39,7 @@ import {
 } from "./security/security-middleware"
 import { isFeatureEnabled, type PWKillSwitchConfig } from "./security/pw-kill-switch"
 import type { ImmutableFact } from "@/types"
+import type { PostQualityLogInput } from "./types"
 
 // ── 타입 정의 ────────────────────────────────────────────────
 
@@ -82,6 +83,9 @@ export interface PostPipelineDataProvider {
 
   /** 소비 기록 저장 (포스트 → ConsumptionLog 자동 추출) */
   recordConsumption?(personaId: string, record: ConsumptionRecord): Promise<{ id: string }>
+
+  /** v4.0: 품질 로그 DB 저장 (T287) — side effect, 실패해도 포스트 중단 안 함 */
+  savePostQualityLog?(input: PostQualityLogInput): Promise<void>
 }
 
 /** v4.0 보안 옵션 (optional — 없으면 보안 검사 스킵) */
@@ -357,6 +361,23 @@ export async function executePostCreation(
     type: "post_created",
     tokensUsed: result.tokensUsed,
   })
+
+  // Step 8.5: 품질 로그 자동 생성 (T287 — side effect, 실패해도 중단 안 함)
+  if (dataProvider.savePostQualityLog) {
+    try {
+      await dataProvider.savePostQualityLog({
+        postId: saved.id,
+        personaId: persona.id,
+        voiceSpecMatch: voiceCheck?.similarity ?? 0.5,
+        factbookViolations: 0,
+        repetitionScore: 0,
+        topicRelevance: topic ? 0.8 : 0.5,
+        overallScore: voiceCheck?.similarity ?? 0.5,
+      })
+    } catch (err) {
+      console.error(`[PostPipeline] Quality log failed for ${saved.id}:`, err)
+    }
+  }
 
   // Step 9: 활동 로그
   await dataProvider.saveActivityLog({

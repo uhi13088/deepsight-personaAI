@@ -10,6 +10,7 @@ import type {
   PersonaProfileSnapshot,
   RelationshipScore,
   CommentGenerationInput,
+  CommentQualityLogInput,
 } from "./types"
 import type { SchedulerPersona } from "./scheduler"
 import type {
@@ -110,6 +111,9 @@ export interface InteractionPipelineDataProvider {
 
   /** 리포스트 저장 */
   saveRepost?(personaId: string, postId: string): Promise<void>
+
+  /** v4.0: 품질 로그 DB 저장 (T288) */
+  saveCommentQualityLog?(input: CommentQualityLogInput): Promise<void>
 }
 
 /** v4.0 보안 옵션 */
@@ -418,6 +422,23 @@ export async function executeInteractions(
     comments.push({ postId: post.id, authorId: post.authorId, commentId: saved.id })
 
     await dataProvider.updateRelationship(persona.id, post.authorId, "comment")
+
+    // 품질 로그 자동 생성 (T288 — side effect, 실패해도 댓글 중단 안 함)
+    if (dataProvider.saveCommentQualityLog) {
+      try {
+        await dataProvider.saveCommentQualityLog({
+          commentId: saved.id,
+          personaId: persona.id,
+          toneMatch: commentResult.tone.confidence,
+          contextRelevance: 0.7,
+          memoryReference: false,
+          naturalness: 0.7,
+          overallScore: commentResult.tone.confidence,
+        })
+      } catch (err) {
+        console.error(`[InteractionPipeline] Comment quality log failed for ${saved.id}:`, err)
+      }
+    }
 
     await dataProvider.saveActivityLog({
       personaId: persona.id,
