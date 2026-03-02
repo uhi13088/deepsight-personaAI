@@ -186,6 +186,13 @@ model Persona {
   factbook            Json?           // Factbook (immutableFacts + mutableContext + integrityHash)
   triggerMap          Json?           // TriggerRuleDSL[] (structured rule engine)
 
+  // === v4.0 NEW: TTS Voice Profile (1:1 통화용) ===
+  ttsProvider         String?           // "google" | "openai" | "elevenlabs"
+  ttsVoiceId          String?           // TTS voice identifier
+  ttsPitch            Decimal?          @db.Decimal(3, 2) // -1.0 ~ 1.0
+  ttsSpeed            Decimal?          @db.Decimal(3, 2) // 0.5 ~ 2.0
+  ttsLanguage         String?           @default("ko-KR")
+
   // === v3.0 NEW: Archetype & Scores ===
   archetypeId         String?
   paradoxScore        Decimal?        @db.Decimal(4, 3) // 0.000~1.000
@@ -221,6 +228,10 @@ model Persona {
   consumptionLogs     ConsumptionLog[]
   generationRequests  PersonaGenerationRequest[]
   pwQuarantineEntries PWQuarantineEntry[] @relation("PWQuarantineEntries")
+
+  // Chat & Call (1:1 대화/통화)
+  chatThreads         ChatThread[]
+  callReservations    CallReservation[]
 
   @@map("personas")
 }
@@ -1350,6 +1361,10 @@ model PersonaWorldUser {
   coinTransactions CoinTransaction[]
   trustScore      UserTrustScore?
 
+  // Chat & Call (1:1 대화/통화)
+  chatThreads     ChatThread[]
+  callReservations CallReservation[]
+
   @@map("persona_world_users")
 }
 
@@ -1809,6 +1824,10 @@ model InteractionSession {
   sentimentValence    Decimal? @db.Decimal(3, 2)
 
   logs          InteractionLog[]
+
+  // Chat & Call back-relations (1:1)
+  chatThread    ChatThread?
+  callSession   CallSession?
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -2582,4 +2601,115 @@ model BudgetConfig {
   updatedBy       String?
 
   @@map("budget_configs")
+}
+
+// ============================================
+// v4.0 1:1 채팅 시스템 (T330)
+// ============================================
+
+model ChatThread {
+  id             String             @id @default(cuid())
+  personaId      String
+  persona        Persona            @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  userId         String
+  user           PersonaWorldUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // InteractionSession 연결 (기억 시스템 통합)
+  sessionId      String?            @unique
+  session        InteractionSession? @relation(fields: [sessionId], references: [id])
+
+  title          String?            // 대화 주제 (자동 생성)
+  lastMessageAt  DateTime?
+  totalMessages  Int                @default(0)
+  isActive       Boolean            @default(true)
+
+  messages       ChatMessage[]
+
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([personaId])
+  @@index([userId, lastMessageAt])
+  @@map("chat_threads")
+}
+
+model ChatMessage {
+  id             String          @id @default(cuid())
+  threadId       String
+  thread         ChatThread      @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  role           ChatMessageRole
+  content        String          @db.Text
+  imageUrl       String?         // Vision: 유저가 보낸 이미지 URL
+
+  tokenCount     Int?            // 응답 토큰 수 (PERSONA만)
+  poignancyScore Decimal?        @db.Decimal(4, 3) // 감정 가중치 0.000~1.000
+
+  createdAt      DateTime        @default(now())
+
+  @@index([threadId, createdAt])
+  @@map("chat_messages")
+}
+
+enum ChatMessageRole {
+  USER
+  PERSONA
+}
+
+// ============================================
+// v4.0 통화 예약/세션 시스템 (T330)
+// ============================================
+
+model CallReservation {
+  id             String                @id @default(cuid())
+  personaId      String
+  persona        Persona               @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  userId         String
+  user           PersonaWorldUser      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  scheduledAt    DateTime              // 예약 시간
+  status         CallReservationStatus @default(PENDING)
+  coinSpent      Int                   // 차감된 코인 수 (200)
+
+  session        CallSession?
+
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([userId])
+  @@index([personaId])
+  @@index([userId, scheduledAt])
+  @@index([status, scheduledAt])
+  @@map("call_reservations")
+}
+
+model CallSession {
+  id                   String              @id @default(cuid())
+  reservationId        String              @unique
+  reservation          CallReservation     @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  // InteractionSession 연결 (기억 시스템 통합)
+  interactionSessionId String?             @unique
+  interactionSession   InteractionSession? @relation(fields: [interactionSessionId], references: [id])
+
+  startedAt            DateTime            @default(now())
+  endedAt              DateTime?
+  totalTurns           Int                 @default(0)
+  totalDurationSec     Int?                // 총 통화 시간 (초)
+  summary              String?             @db.Text // 통화 요약 (자동 생성)
+
+  createdAt            DateTime            @default(now())
+
+  @@index([reservationId])
+  @@map("call_sessions")
+}
+
+enum CallReservationStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  EXPIRED
 }

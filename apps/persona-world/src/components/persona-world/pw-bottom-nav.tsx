@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import type { LucideIcon } from "lucide-react"
-import { Home, Search, ShoppingBag, Bell, User } from "lucide-react"
+import { Home, Search, MessageCircle, ShoppingBag, Bell, User } from "lucide-react"
 import { useUserStore } from "@/lib/user-store"
 
 interface NavItem {
@@ -16,6 +16,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: "/feed", icon: Home, label: "홈" },
   { href: "/explore", icon: Search, label: "탐색" },
+  { href: "/chat", icon: MessageCircle, label: "채팅" },
   { href: "/shop", icon: ShoppingBag, label: "상점" },
   { href: "/notifications", icon: Bell, label: "알림", showBadge: true },
   { href: "/profile", icon: User, label: "프로필" },

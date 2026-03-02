@@ -27,7 +27,7 @@ const PERSONA_ITEMS: ShopItem[] = [
   {
     id: "follow_slot_expand",
     name: "팔로우 슬롯 확장",
-    description: "팔로우 가능 페르소나 수 +3 (기본 10개)",
+    description: "팔로우 가능 페르소나 수 +3 (기본 30개)",
     price: 150,
     category: "persona",
     emoji: "\u{1F465}",
@@ -52,7 +52,7 @@ const PERSONA_ITEMS: ShopItem[] = [
     category: "persona",
     emoji: "\u{1F4AC}",
     repeatable: true,
-    tag: "SOON",
+    tag: "NEW",
   },
   {
     id: "persona_call_reservation",
@@ -62,7 +62,7 @@ const PERSONA_ITEMS: ShopItem[] = [
     category: "persona",
     emoji: "\u{1F4DE}",
     repeatable: true,
-    tag: "SOON",
+    tag: "NEW",
   },
 ]
 

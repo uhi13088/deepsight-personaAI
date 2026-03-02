@@ -15,6 +15,10 @@ import type {
   SearchResponse,
   TrendingHashtag,
   SearchSuggestionsResponse,
+  ChatThread,
+  ChatMessage,
+  SendMessageResponse,
+  CallReservation,
 } from "./types"
 
 // ── Client-side API (fetch) ─────────────────────────────────
@@ -724,6 +728,119 @@ export const clientApi = {
     if (!res.ok) throw new Error("Failed to confirm payment")
 
     const json: ApiResponse<{ balance: number; coins: number }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── 1:1 채팅 ──────────────────────────────────────────────
+  async getChatThreads(userId: string) {
+    const res = await fetch(`/api/persona-world/chat/threads?userId=${encodeURIComponent(userId)}`)
+    if (!res.ok) throw new Error("Failed to fetch chat threads")
+
+    const json: ApiResponse<{ threads: ChatThread[] }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!.threads
+  },
+
+  async createChatThread(userId: string, personaId: string) {
+    const res = await fetch(`/api/persona-world/chat/threads`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, personaId }),
+    })
+    if (!res.ok) throw new Error("Failed to create chat thread")
+
+    const json: ApiResponse<{ thread: ChatThread }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!.thread
+  },
+
+  async getChatMessages(
+    threadId: string,
+    userId: string,
+    options?: { cursor?: string; limit?: number }
+  ) {
+    const params = new URLSearchParams({ userId })
+    if (options?.cursor) params.set("cursor", options.cursor)
+    if (options?.limit) params.set("limit", String(options.limit))
+
+    const res = await fetch(
+      `/api/persona-world/chat/threads/${encodeURIComponent(threadId)}/messages?${params}`
+    )
+    if (!res.ok) throw new Error("Failed to fetch chat messages")
+
+    const json: ApiResponse<{
+      messages: ChatMessage[]
+      nextCursor: string | null
+      hasMore: boolean
+    }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  async sendChatMessage(
+    threadId: string,
+    userId: string,
+    content: string,
+    imageBase64?: string,
+    imageMediaType?: string
+  ) {
+    const res = await fetch(
+      `/api/persona-world/chat/threads/${encodeURIComponent(threadId)}/messages`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, content, imageBase64, imageMediaType }),
+      }
+    )
+
+    if (res.status === 402) {
+      throw new Error("INSUFFICIENT_CREDITS")
+    }
+    if (!res.ok) throw new Error("Failed to send message")
+
+    const json: ApiResponse<SendMessageResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── 통화 예약 ─────────────────────────────────────────────
+  async getCallReservations(userId: string) {
+    const res = await fetch(
+      `/api/persona-world/calls/reservations?userId=${encodeURIComponent(userId)}`
+    )
+    if (!res.ok) throw new Error("Failed to fetch call reservations")
+
+    const json: ApiResponse<{ reservations: CallReservation[] }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!.reservations
+  },
+
+  async createCallReservation(userId: string, personaId: string, scheduledAt: string) {
+    const res = await fetch(`/api/persona-world/calls/reservations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, personaId, scheduledAt }),
+    })
+
+    if (res.status === 402) {
+      throw new Error("INSUFFICIENT_CREDITS")
+    }
+    if (!res.ok) throw new Error("Failed to create call reservation")
+
+    const json: ApiResponse<{ reservationId: string; remainingBalance: number }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  async cancelCallReservation(reservationId: string, userId: string) {
+    const res = await fetch(
+      `/api/persona-world/calls/reservations/${encodeURIComponent(reservationId)}?userId=${encodeURIComponent(userId)}`,
+      { method: "DELETE" }
+    )
+    if (!res.ok) throw new Error("Failed to cancel reservation")
+
+    const json: ApiResponse<{ cancelled: boolean }> = await res.json()
     if (!json.success) throw new Error(json.error?.message || "Unknown error")
     return json.data!
   },
