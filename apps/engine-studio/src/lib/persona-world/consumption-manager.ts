@@ -214,3 +214,138 @@ export function autoTag(contentType: ConsumptionContentType, title: string): str
 
   return tags
 }
+
+// ── 포스트 → 소비 기록 추출 (순수 함수) ─────────────────────
+
+/**
+ * 포스트 생성 후 소비 기록으로 추출할 아이템을 반환.
+ *
+ * - CURATION: metadata.items 배열 → 각 아이템 = 소비 기록
+ * - REVIEW: 포스트 토픽/콘텐츠에서 단일 아이템 추출
+ * - NEWS_REACTION: 뉴스 기사 1건 추출
+ *
+ * 반환값은 source 필드 미포함 (호출자가 결정).
+ */
+export function extractConsumptionFromPost(params: {
+  postType: string
+  content: string
+  metadata: Record<string, unknown>
+  topic?: string
+  hashtags?: string[]
+}): Array<Omit<ConsumptionRecord, "source">> {
+  const { postType, content, metadata, topic, hashtags = [] } = params
+  const contentType = inferContentType(hashtags, topic)
+
+  switch (postType) {
+    case "CURATION": {
+      const items = metadata.items as
+        | Array<{ rank?: number; title?: string; reason?: string }>
+        | undefined
+      if (!items || items.length === 0) return []
+
+      return items
+        .filter((item) => item.title && item.title.trim().length > 0)
+        .map((item) => ({
+          contentType,
+          title: item.title!.trim(),
+          impression: item.reason?.trim() || `${item.title!.trim()} — 큐레이션 목록에 포함`,
+          emotionalImpact: 0.2,
+          tags: autoTag(contentType, item.title!),
+        }))
+    }
+
+    case "REVIEW": {
+      // 리뷰 대상 추출: 토픽 또는 콘텐츠 첫 줄에서 제목 추출
+      const title = extractReviewTitle(content, topic)
+      if (!title) return []
+
+      // rating: metadata.rating (1-5 → 0.0-1.0 변환)
+      const rawRating = typeof metadata.rating === "number" ? metadata.rating : undefined
+      const rating = rawRating ? Math.min(1, rawRating / 5) : undefined
+
+      return [
+        {
+          contentType,
+          title,
+          impression: extractFirstSentence(content),
+          rating,
+          emotionalImpact: 0.3,
+          tags: autoTag(contentType, title),
+        },
+      ]
+    }
+
+    case "NEWS_REACTION": {
+      const title = topic || extractFirstLine(content)
+      if (!title) return []
+
+      return [
+        {
+          contentType: "ARTICLE" as ConsumptionContentType,
+          title,
+          impression: extractFirstSentence(content),
+          emotionalImpact: 0.15,
+          tags: autoTag("ARTICLE", title),
+        },
+      ]
+    }
+
+    default:
+      return []
+  }
+}
+
+/** 해시태그와 토픽에서 콘텐츠 타입 추론 */
+export function inferContentType(hashtags: string[], topic?: string): ConsumptionContentType {
+  const text = [...hashtags, topic ?? ""].join(" ").toLowerCase()
+
+  const patterns: Array<{ type: ConsumptionContentType; keywords: string[] }> = [
+    {
+      type: "MOVIE",
+      keywords: ["영화", "필름", "film", "movie", "시네마", "cinema", "감독", "개봉"],
+    },
+    {
+      type: "DRAMA",
+      keywords: ["드라마", "시리즈", "drama", "series", "시즌", "season", "웹드라마"],
+    },
+    { type: "MUSIC", keywords: ["음악", "앨범", "music", "album", "노래", "song", "아티스트"] },
+    { type: "BOOK", keywords: ["책", "소설", "book", "novel", "에세이", "essay", "저자", "작가"] },
+    { type: "ARTICLE", keywords: ["기사", "뉴스", "news", "article", "보도", "칼럼"] },
+    { type: "GAME", keywords: ["게임", "game", "플레이", "play", "콘솔", "스팀"] },
+  ]
+
+  for (const { type, keywords } of patterns) {
+    if (keywords.some((kw) => text.includes(kw))) return type
+  }
+  return "OTHER"
+}
+
+/** REVIEW 포스트에서 리뷰 대상 제목 추출 */
+function extractReviewTitle(content: string, topic?: string): string | null {
+  // 토픽이 있으면 우선 사용
+  if (topic && topic.trim().length > 0) return topic.trim()
+
+  // 콘텐츠에서 <제목> 또는 「제목」 또는 '제목' 패턴 추출
+  const titleMatch = content.match(/[<＜《「『'"](.+?)[>＞》」』'"]/)
+  if (titleMatch) return titleMatch[1].trim()
+
+  // 첫 줄에서 추출 시도
+  const firstLine = content.split("\n")[0]?.trim()
+  if (firstLine && firstLine.length <= 50) return firstLine
+
+  return null
+}
+
+/** 콘텐츠의 첫 번째 문장 추출 (impression용, 최대 50자) */
+function extractFirstSentence(content: string): string {
+  const cleaned = content.replace(/#\S+/g, "").trim()
+  const match = cleaned.match(/^(.+?[.!?。！？])/)
+  const sentence = match ? match[1] : (cleaned.split("\n")[0] ?? "")
+  return sentence.length > 50 ? sentence.slice(0, 47) + "..." : sentence
+}
+
+/** 콘텐츠의 첫 줄 추출 */
+function extractFirstLine(content: string): string {
+  const line = content.split("\n")[0]?.trim() ?? ""
+  return line.length > 50 ? line.slice(0, 47) + "..." : line
+}

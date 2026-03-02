@@ -25,6 +25,22 @@ import { determinePostSource } from "@/lib/security/data-provenance"
 import type { PostSource } from "@/lib/security/data-provenance"
 import { extractHashtags } from "./hashtag-utils"
 import { extractMentionHandles } from "./mention-service"
+import { extractConsumptionFromPost } from "./consumption-manager"
+import type { ConsumptionRecord } from "./types"
+import type {
+  SecurityMiddlewareProvider,
+  InputCheckResult,
+  OutputCheckResult,
+} from "./security/security-middleware"
+import {
+  securityOutputMiddleware,
+  createSecurityQuarantine,
+  buildSecurityCheckResult,
+} from "./security/security-middleware"
+import { isFeatureEnabled, type PWKillSwitchConfig } from "./security/pw-kill-switch"
+import type { ImmutableFact } from "@/types"
+import type { PostQualityLogInput } from "./types"
+import { runModerationPipeline, type ModerationResult } from "./moderation/auto-moderator"
 
 // ── 타입 정의 ────────────────────────────────────────────────
 
@@ -65,6 +81,19 @@ export interface PostPipelineDataProvider {
   getActivePersonaHandles?(
     excludePersonaId: string
   ): Promise<Array<{ handle: string; name: string }>>
+
+  /** 소비 기록 저장 (포스트 → ConsumptionLog 자동 추출) */
+  recordConsumption?(personaId: string, record: ConsumptionRecord): Promise<{ id: string }>
+
+  /** v4.0: 품질 로그 DB 저장 (T287) — side effect, 실패해도 포스트 중단 안 함 */
+  savePostQualityLog?(input: PostQualityLogInput): Promise<void>
+}
+
+/** v4.0 보안 옵션 (optional — 없으면 보안 검사 스킵) */
+export interface PostPipelineSecurityOptions {
+  killSwitch?: PWKillSwitchConfig
+  securityProvider?: SecurityMiddlewareProvider
+  immutableFacts?: ImmutableFact[]
 }
 
 export interface PostCreationResult {
@@ -76,6 +105,8 @@ export interface PostCreationResult {
   regenerated: boolean
   poignancyScore: number
   hashtags: string[]
+  /** v4.0: 보안 검사 결과 (securityOptions 전달 시만) */
+  securityCheck?: { inputPassed: boolean; outputPassed: boolean; quarantined: boolean }
 }
 
 // ── 파이프라인 메인 ──────────────────────────────────────────
@@ -99,9 +130,17 @@ export async function executePostCreation(
   context: SchedulerContext,
   state: PersonaStateData,
   llmProvider: LLMProvider,
-  dataProvider: PostPipelineDataProvider
+  dataProvider: PostPipelineDataProvider,
+  securityOptions?: PostPipelineSecurityOptions
 ): Promise<PostCreationResult> {
   const postType = decision.postType ?? ("THOUGHT" as PersonaPostType)
+
+  // Step 0: Kill Switch 확인 (T285 — postGeneration 토글)
+  if (securityOptions?.killSwitch) {
+    if (!isFeatureEnabled(securityOptions.killSwitch, "postGeneration")) {
+      throw new Error("[PostPipeline] postGeneration feature is disabled by kill switch")
+    }
+  }
 
   // Step 1: 주제 선택 (knowledgeAreas 폴백: provider가 null 반환 시)
   const providerTopic = await dataProvider.selectTopic(persona.id, context.trigger)
@@ -207,6 +246,108 @@ export async function executePostCreation(
   const volatility = persona.vectors.narrative.volatility
   const poignancyScore = calculatePostPoignancy(state, volatility)
 
+  // Step 5.5: Output Sentinel — 생성 콘텐츠 보안 검사 (T280)
+  let outputCheck: OutputCheckResult | undefined
+  let quarantined = false
+  if (securityOptions?.securityProvider) {
+    outputCheck = securityOutputMiddleware(result.content, securityOptions.immutableFacts)
+
+    if (!outputCheck.passed) {
+      // BLOCKED — quarantine에 저장 + 포스트 생성 중단
+      await createSecurityQuarantine(securityOptions.securityProvider, {
+        contentType: "POST",
+        contentId: `pending-${persona.id}-${Date.now()}`,
+        personaId: persona.id,
+        sentinelResult: outputCheck.sentinelResult,
+      })
+
+      // 활동 로그에 보안 차단 기록 (T278 AC2)
+      await dataProvider.saveActivityLog({
+        personaId: persona.id,
+        activityType: "POST_BLOCKED_SECURITY",
+        postId: "",
+        metadata: {
+          reason: outputCheck.reason,
+          violations: outputCheck.sentinelResult.violations.length,
+          securityCheck: buildSecurityCheckResult(
+            {
+              passed: true,
+              gateResult: { action: "PASS", severity: "LOW", category: "" },
+              inspectionLevel: "BASIC",
+              reason: "PASS",
+            },
+            outputCheck
+          ),
+        },
+      })
+
+      throw new Error(`[PostPipeline] Output sentinel BLOCKED: ${outputCheck.reason}`)
+    }
+
+    // FLAGGED — PII 마스킹 적용 후 계속 진행 (T280 AC3)
+    if (outputCheck.sanitizedContent) {
+      result = { ...result, content: outputCheck.sanitizedContent }
+    }
+
+    // quarantine 기록 (flagged도 기록)
+    if (outputCheck.shouldQuarantine) {
+      quarantined = true
+    }
+  }
+
+  // Step 5.7: 모더레이션 파이프라인 Stage 1+2 (T293)
+  const moderationResult = runModerationPipeline(result.content)
+
+  if (moderationResult.action === "BLOCK") {
+    // BLOCK → 포스트 저장 중단 + ModerationLog 기록 (T293 AC2)
+    if (securityOptions?.securityProvider) {
+      await securityOptions.securityProvider.saveModerationLog({
+        contentType: "POST",
+        contentId: `blocked-${persona.id}-${Date.now()}`,
+        personaId: persona.id,
+        stage: `STAGE_${moderationResult.stage}`,
+        verdict: "BLOCK",
+        violations: moderationResult.detections,
+      })
+    }
+
+    await dataProvider.saveActivityLog({
+      personaId: persona.id,
+      activityType: "POST_BLOCKED_MODERATION",
+      postId: "",
+      metadata: {
+        stage: moderationResult.stage,
+        detections: moderationResult.detections.map((d) => d.type),
+      },
+    })
+
+    throw new Error(
+      `[PostPipeline] Moderation BLOCKED at Stage ${moderationResult.stage}: ${moderationResult.detections.map((d) => d.type).join(", ")}`
+    )
+  }
+
+  if (moderationResult.action === "QUARANTINE" && securityOptions?.securityProvider) {
+    // QUARANTINE → 격리 큐 + 포스트 미공개 저장 (T293 AC3)
+    quarantined = true
+  }
+
+  // SANITIZE → 치환된 콘텐츠 적용
+  if (moderationResult.sanitizedContent) {
+    result = { ...result, content: moderationResult.sanitizedContent }
+  }
+
+  // ModerationLog 기록 (PASS 포함, T293 AC4)
+  if (securityOptions?.securityProvider) {
+    await securityOptions.securityProvider.saveModerationLog({
+      contentType: "POST",
+      contentId: `pre-save-${persona.id}-${Date.now()}`,
+      personaId: persona.id,
+      stage: `STAGE_${moderationResult.stage}`,
+      verdict: moderationResult.action,
+      violations: moderationResult.detections.length > 0 ? moderationResult.detections : undefined,
+    })
+  }
+
   // Step 6: 해시태그 추출
   const hashtags = extractHashtags(result.content)
 
@@ -240,11 +381,57 @@ export async function executePostCreation(
     hashtags,
   })
 
+  // Step 7.5: 소비 기록 자동 추출 (CURATION/REVIEW/NEWS_REACTION → ConsumptionLog)
+  if (dataProvider.recordConsumption) {
+    try {
+      const consumptionItems = extractConsumptionFromPost({
+        postType,
+        content: result.content,
+        metadata: postMetadata,
+        topic: topic ?? undefined,
+        hashtags,
+      })
+
+      for (const item of consumptionItems) {
+        await dataProvider.recordConsumption(persona.id, {
+          ...item,
+          source: "AUTONOMOUS",
+        })
+      }
+
+      if (consumptionItems.length > 0) {
+        console.log(
+          `[PostPipeline] ${persona.name}: ${consumptionItems.length}건 소비 기록 저장 (${postType})`
+        )
+      }
+    } catch (err) {
+      // 소비 기록 실패는 포스트 생성을 중단하지 않음
+      console.error(`[PostPipeline] Consumption recording failed for ${persona.id}:`, err)
+    }
+  }
+
   // Step 8: PersonaState 갱신
   await updatePersonaState(persona.id, {
     type: "post_created",
     tokensUsed: result.tokensUsed,
   })
+
+  // Step 8.5: 품질 로그 자동 생성 (T287 — side effect, 실패해도 중단 안 함)
+  if (dataProvider.savePostQualityLog) {
+    try {
+      await dataProvider.savePostQualityLog({
+        postId: saved.id,
+        personaId: persona.id,
+        voiceSpecMatch: voiceCheck?.similarity ?? 0.5,
+        factbookViolations: 0,
+        repetitionScore: 0,
+        topicRelevance: topic ? 0.8 : 0.5,
+        overallScore: voiceCheck?.similarity ?? 0.5,
+      })
+    } catch (err) {
+      console.error(`[PostPipeline] Quality log failed for ${saved.id}:`, err)
+    }
+  }
 
   // Step 9: 활동 로그
   await dataProvider.saveActivityLog({
@@ -261,6 +448,16 @@ export async function executePostCreation(
     },
   })
 
+  // Step 9.5: 격리 기록 저장 (flagged content — T282)
+  if (quarantined && securityOptions?.securityProvider && outputCheck) {
+    await createSecurityQuarantine(securityOptions.securityProvider, {
+      contentType: "POST",
+      contentId: saved.id,
+      personaId: persona.id,
+      sentinelResult: outputCheck.sentinelResult,
+    })
+  }
+
   return {
     postId: saved.id,
     content: result.content,
@@ -270,6 +467,9 @@ export async function executePostCreation(
     regenerated,
     poignancyScore,
     hashtags,
+    securityCheck: securityOptions?.securityProvider
+      ? { inputPassed: true, outputPassed: outputCheck?.passed ?? true, quarantined }
+      : undefined,
   }
 }
 

@@ -62,3 +62,20 @@ export type {
 // Integration
 export { buildCostDashboard, changeCostMode } from "./cost-integration"
 export type { CostDataProvider, CostDashboard } from "./cost-integration"
+
+// Cost Runner (v4.0 T299~T303)
+export {
+  aggregateAndSaveDailyCostReport,
+  checkBudgetBeforeExecution,
+  getSchedulerFrequencyFromBudget,
+  applyAutoActionToFrequency,
+  getBudgetConfigForAdmin,
+  updateBudgetConfigForAdmin,
+} from "./cost-runner"
+export type {
+  CostRunnerProvider,
+  BudgetConfigData,
+  BudgetConfigUpdate,
+  BudgetCheckResult,
+  SchedulerFrequencyOverride,
+} from "./cost-runner"

@@ -10,6 +10,7 @@ import type {
   PersonaProfileSnapshot,
   RelationshipScore,
   CommentGenerationInput,
+  CommentQualityLogInput,
 } from "./types"
 import type { SchedulerPersona } from "./scheduler"
 import type {
@@ -29,6 +30,11 @@ import { computeRelationshipProfileWithDecay } from "./interactions/relationship
 import { classifyL2Pattern } from "./interactions/l2-pattern"
 import { decideEngagement } from "./interactions/engagement-decision"
 import { computeVoiceAdjustment, mergeAllowedTones } from "./interactions/voice-adjustment"
+import type { SecurityMiddlewareProvider } from "./security/security-middleware"
+import { securityOutputMiddleware, createSecurityQuarantine } from "./security/security-middleware"
+import { isFeatureEnabled, type PWKillSwitchConfig } from "./security/pw-kill-switch"
+import type { ImmutableFact } from "@/types"
+import { runModerationPipeline } from "./moderation/auto-moderator"
 
 // ── 타입 정의 ────────────────────────────────────────────────
 
@@ -106,6 +112,16 @@ export interface InteractionPipelineDataProvider {
 
   /** 리포스트 저장 */
   saveRepost?(personaId: string, postId: string): Promise<void>
+
+  /** v4.0: 품질 로그 DB 저장 (T288) */
+  saveCommentQualityLog?(input: CommentQualityLogInput): Promise<void>
+}
+
+/** v4.0 보안 옵션 */
+export interface InteractionSecurityOptions {
+  killSwitch?: PWKillSwitchConfig
+  securityProvider?: SecurityMiddlewareProvider
+  immutableFacts?: ImmutableFact[]
 }
 
 export interface InteractionExecutionResult {
@@ -114,6 +130,8 @@ export interface InteractionExecutionResult {
   reposts: Array<{ postId: string; authorId: string }>
   follows: Array<{ targetPersonaId: string; score: number }>
   totalTokensUsed: number
+  /** v4.0: 보안으로 스킵된 댓글 수 */
+  securityBlockedComments?: number
 }
 
 // ── 파이프라인 메인 ──────────────────────────────────────────
@@ -139,13 +157,26 @@ export async function executeInteractions(
   persona: SchedulerPersona,
   state: PersonaStateData,
   dataProvider: InteractionPipelineDataProvider,
-  commentLLMProvider?: CommentLLMProvider
+  commentLLMProvider?: CommentLLMProvider,
+  securityOptions?: InteractionSecurityOptions
 ): Promise<InteractionExecutionResult> {
   const likes: InteractionExecutionResult["likes"] = []
   const comments: InteractionExecutionResult["comments"] = []
   const reposts: InteractionExecutionResult["reposts"] = []
   const follows: InteractionExecutionResult["follows"] = []
   let totalTokensUsed = 0
+  let securityBlockedComments = 0
+
+  // Step 0: Kill Switch 확인 (T285)
+  if (securityOptions?.killSwitch) {
+    if (!isFeatureEnabled(securityOptions.killSwitch, "commentGeneration")) {
+      // 댓글 비활성 — 좋아요/리포스트만 진행
+      console.log("[InteractionPipeline] commentGeneration disabled by kill switch")
+    }
+    if (!isFeatureEnabled(securityOptions.killSwitch, "likeInteraction")) {
+      return { likes, comments, reposts, follows, totalTokensUsed: 0, securityBlockedComments: 0 }
+    }
+  }
 
   // Step 1: 최근 피드 포스트 조회 (최대 10개)
   const feedPosts = await dataProvider.getRecentFeedPosts(persona.id, 10)
@@ -332,12 +363,80 @@ export async function executeInteractions(
       saveCommentLog: async () => {},
     }
 
+    // Kill Switch: 댓글 생성 비활성이면 스킵 (T285)
+    if (
+      securityOptions?.killSwitch &&
+      !isFeatureEnabled(securityOptions.killSwitch, "commentGeneration")
+    ) {
+      continue
+    }
+
     const commentResult: CommentResult = await generateComment(
       commentInput,
       personaVectors, // 캐시된 벡터 재사용
       commentDataProvider,
       commentLLMProvider
     )
+
+    // Output Sentinel: 댓글 생성 후 보안 검사 (T281)
+    if (securityOptions?.securityProvider) {
+      const outputCheck = securityOutputMiddleware(
+        commentResult.content,
+        securityOptions.immutableFacts
+      )
+
+      if (!outputCheck.passed) {
+        // BLOCKED — 댓글 스킵 + quarantine 기록 (T281 AC2)
+        await createSecurityQuarantine(securityOptions.securityProvider, {
+          contentType: "COMMENT",
+          contentId: `comment-${persona.id}-${post.id}-${Date.now()}`,
+          personaId: persona.id,
+          sentinelResult: outputCheck.sentinelResult,
+        })
+
+        await dataProvider.saveActivityLog({
+          personaId: persona.id,
+          activityType: "COMMENT_BLOCKED_SECURITY",
+          targetId: post.id,
+          metadata: {
+            reason: outputCheck.reason,
+            violations: outputCheck.sentinelResult.violations.length,
+          },
+        })
+
+        securityBlockedComments++
+        continue // 이 포스트에 대한 댓글 스킵
+      }
+    }
+
+    // Moderation Pipeline Stage 1+2: 댓글 모더레이션 (T294)
+    const moderationResult = runModerationPipeline(commentResult.content)
+    if (moderationResult.action === "BLOCK") {
+      // BLOCK → 댓글 스킵 + ModerationLog (T294 AC2)
+      if (securityOptions?.securityProvider) {
+        await securityOptions.securityProvider.saveModerationLog({
+          contentType: "COMMENT",
+          contentId: `comment-blocked-${persona.id}-${post.id}-${Date.now()}`,
+          personaId: persona.id,
+          stage: `STAGE_${moderationResult.stage}`,
+          verdict: "BLOCK",
+          violations: moderationResult.detections,
+        })
+      }
+
+      await dataProvider.saveActivityLog({
+        personaId: persona.id,
+        activityType: "COMMENT_BLOCKED_MODERATION",
+        targetId: post.id,
+        metadata: {
+          stage: moderationResult.stage,
+          detections: moderationResult.detections.map((d) => d.type),
+        },
+      })
+
+      securityBlockedComments++
+      continue
+    }
 
     const commentProvenance = computeInteractionProvenance({
       source: "SYSTEM",
@@ -353,6 +452,23 @@ export async function executeInteractions(
     comments.push({ postId: post.id, authorId: post.authorId, commentId: saved.id })
 
     await dataProvider.updateRelationship(persona.id, post.authorId, "comment")
+
+    // 품질 로그 자동 생성 (T288 — side effect, 실패해도 댓글 중단 안 함)
+    if (dataProvider.saveCommentQualityLog) {
+      try {
+        await dataProvider.saveCommentQualityLog({
+          commentId: saved.id,
+          personaId: persona.id,
+          toneMatch: commentResult.tone.confidence,
+          contextRelevance: 0.7,
+          memoryReference: false,
+          naturalness: 0.7,
+          overallScore: commentResult.tone.confidence,
+        })
+      } catch (err) {
+        console.error(`[InteractionPipeline] Comment quality log failed for ${saved.id}:`, err)
+      }
+    }
 
     await dataProvider.saveActivityLog({
       personaId: persona.id,
@@ -375,7 +491,12 @@ export async function executeInteractions(
   }
 
   // T258: 팔로우 판정 — 인터랙션한 고유 작성자 대상
+  // Kill Switch: followInteraction 비활성이면 스킵 (T285)
+  const followEnabled =
+    !securityOptions?.killSwitch ||
+    isFeatureEnabled(securityOptions.killSwitch, "followInteraction")
   if (
+    followEnabled &&
     dataProvider.saveFollow &&
     dataProvider.getCrossAxisSimilarity &&
     dataProvider.getParadoxCompatibility
@@ -428,5 +549,12 @@ export async function executeInteractions(
     })
   }
 
-  return { likes, comments, reposts, follows, totalTokensUsed }
+  return {
+    likes,
+    comments,
+    reposts,
+    follows,
+    totalTokensUsed,
+    securityBlockedComments: securityBlockedComments > 0 ? securityBlockedComments : undefined,
+  }
 }

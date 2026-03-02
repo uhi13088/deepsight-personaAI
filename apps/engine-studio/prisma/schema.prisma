@@ -220,6 +220,7 @@ model Persona {
   relationshipsAsB    PersonaRelationship[] @relation("RelationshipB")
   consumptionLogs     ConsumptionLog[]
   generationRequests  PersonaGenerationRequest[]
+  pwQuarantineEntries PWQuarantineEntry[] @relation("PWQuarantineEntries")
 
   @@map("personas")
 }
@@ -1347,6 +1348,7 @@ model PersonaWorldUser {
   personaRequests PersonaGenerationRequest[]
   notificationPreference PWNotificationPreference?
   coinTransactions CoinTransaction[]
+  trustScore      UserTrustScore?
 
   @@map("persona_world_users")
 }
@@ -1514,6 +1516,10 @@ model PersonaActivityLog {
   stateSnapshot   Json?            // PersonaState 스냅샷 (mood, energy, socialBattery, paradoxTension)
   matchingScore   Decimal?         @db.Decimal(4, 3) @map("matching_score") // 매칭 기반 활동인 경우 점수
 
+  // v4.0 보안/출처 필드 (T266)
+  securityCheck   Json?            // GateCheckResult 또는 SentinelCheckResult
+  provenanceData  Json?            // ProvenanceRecord (출처 추적)
+
   createdAt       DateTime         @default(now())
 
   @@index([personaId, createdAt])
@@ -1549,6 +1555,11 @@ model PersonaState {
   paradoxTension    Decimal  @db.Decimal(3, 2) @default(0.00)  // 0.00~1.00
   narrativeTension  Decimal  @db.Decimal(3, 2) @default(0.00)  // 0.00~1.00 L3 서사 긴장
 
+  // v4.0 활동 카운터 (T264)
+  lastActivityAt    DateTime?                                   // 마지막 활동 시각
+  postsThisWeek     Int      @default(0)                        // 금주 포스트 수
+  commentsThisWeek  Int      @default(0)                        // 금주 댓글 수
+
   updatedAt       DateTime @updatedAt
 
   @@map("persona_states")
@@ -1567,6 +1578,13 @@ model PersonaRelationship {
   depth           Decimal  @db.Decimal(3, 2) @default(0.00)  // 답글 체인 길이 평균
 
   lastInteractionAt DateTime?
+
+  // v4.0 관계 단계/유형 + 카운터 (T263)
+  stage             String   @default("STRANGER")              // STRANGER/ACQUAINTANCE/FAMILIAR/CLOSE/COOLING/DORMANT
+  type              String   @default("NEUTRAL")               // NEUTRAL/ALLY/RIVAL/MENTOR/FAN
+  positiveComments  Int      @default(0)                       // 긍정 댓글 누적
+  negativeComments  Int      @default(0)                       // 부정 댓글 누적
+  totalInteractions Int      @default(0)                       // 총 인터랙션 누적
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -1588,6 +1606,13 @@ model ConsumptionLog {
   emotionalImpact Decimal                @db.Decimal(3, 2)  // PersonaState 변화량
   tags            String[]               // 자동 태깅 ["SF", "호러", "Netflix"]
   source          ConsumptionSource
+
+  // v4.0 필드 (T265)
+  sourceType      String?                // POST, EXTERNAL, RECOMMENDATION
+  interactionType String?                // LIKE, COMMENT, REPOST, MENTION
+  poignancyScore  Decimal?               @db.Decimal(3, 2)  // 감정 중요도 점수
+  retentionScore  Decimal?               @db.Decimal(3, 2)  // 기억 유지율
+
   consumedAt      DateTime               @default(now())
   createdAt       DateTime               @default(now())
 
@@ -1595,6 +1620,7 @@ model ConsumptionLog {
 
   @@index([personaId, consumedAt])
   @@index([personaId, tags])
+  @@index([sourceType])
   @@map("consumption_logs")
 }
 
@@ -2334,4 +2360,220 @@ model NewsArticle {
 
   @@index([publishedAt])
   @@map("news_articles")
+}
+
+// ============================================
+// v4.0 운영 모델: 유저 신뢰도 (T267)
+// ============================================
+
+model UserTrustScore {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            PersonaWorldUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  score           Decimal  @db.Decimal(3, 2) @default(0.80)  // 0.00~1.00
+  inspectionLevel String   @default("HIGH")                   // HIGH/MEDIUM/LOW/BLOCKED
+  blockCount      Int      @default(0)
+  warnCount       Int      @default(0)
+  reportCount     Int      @default(0)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("user_trust_scores")
+}
+
+// ============================================
+// v4.0 운영 모델: PW 격리 큐 (T268)
+// ============================================
+
+model PWQuarantineEntry {
+  id              String   @id @default(cuid())
+  contentType     String                                       // POST/COMMENT
+  contentId       String                                       // PersonaPost.id 또는 PersonaComment.id
+  personaId       String
+  persona         Persona  @relation("PWQuarantineEntries", fields: [personaId], references: [id], onDelete: Cascade)
+
+  reason          String                                       // 격리 사유
+  severity        String   @default("MEDIUM")                  // LOW/MEDIUM/HIGH/CRITICAL
+  status          String   @default("PENDING")                 // PENDING/APPROVED/REJECTED/EXPIRED
+  expiresAt       DateTime?                                    // severity별 자동 만료 시각
+  reviewedBy      String?
+  reviewNote      String?
+  reviewedAt      DateTime?
+
+  createdAt       DateTime @default(now())
+
+  @@index([status])
+  @@index([personaId])
+  @@index([expiresAt])
+  @@map("pw_quarantine_entries")
+}
+
+// ============================================
+// v4.0 운영 모델: 모더레이션 로그 (T269)
+// ============================================
+
+model ModerationLog {
+  id              String   @id @default(cuid())
+  contentType     String                                       // POST/COMMENT
+  contentId       String
+  personaId       String?
+
+  stage           String                                       // RULE_BASED/SENTINEL/ASYNC
+  verdict         String                                       // PASS/BLOCK/QUARANTINE/WARN
+  violations      Json?                                        // 위반 상세 배열
+  actions         Json?                                        // 실행된 액션 배열
+  processingTimeMs Int?
+
+  createdAt       DateTime @default(now())
+
+  @@index([personaId])
+  @@index([contentId])
+  @@index([createdAt])
+  @@map("moderation_logs")
+}
+
+// ============================================
+// v4.0 운영 모델: 품질 로그 (T270)
+// ============================================
+
+model PostQualityLog {
+  id              String   @id @default(cuid())
+  postId          String
+  personaId       String
+
+  voiceSpecMatch    Decimal  @db.Decimal(3, 2)                 // VoiceSpec 일치도
+  factbookViolations Int     @default(0)                       // 팩트북 위반 수
+  repetitionScore   Decimal  @db.Decimal(3, 2)                 // 반복도 (낮을수록 좋음)
+  topicRelevance    Decimal  @db.Decimal(3, 2)                 // 주제 관련성
+  overallScore      Decimal  @db.Decimal(3, 2)                 // 종합 품질 점수
+
+  createdAt       DateTime @default(now())
+
+  @@index([personaId, createdAt])
+  @@index([postId])
+  @@map("post_quality_logs")
+}
+
+model CommentQualityLog {
+  id              String   @id @default(cuid())
+  commentId       String
+  personaId       String
+
+  toneMatch         Decimal  @db.Decimal(3, 2)                 // 톤 일치도
+  contextRelevance  Decimal  @db.Decimal(3, 2)                 // 컨텍스트 관련성
+  memoryReference   Boolean  @default(false)                    // 기억 참조 여부
+  naturalness       Decimal  @db.Decimal(3, 2)                 // 자연스러움
+  overallScore      Decimal  @db.Decimal(3, 2)                 // 종합 품질 점수
+
+  createdAt       DateTime @default(now())
+
+  @@index([personaId, createdAt])
+  @@index([commentId])
+  @@map("comment_quality_logs")
+}
+
+// ============================================
+// v4.0 운영 모델: 인터뷰 로그 (T271)
+// ============================================
+
+model InterviewLog {
+  id              String   @id @default(cuid())
+  personaId       String
+
+  questionCount     Int
+  passCount         Int
+  warnCount         Int
+  failCount         Int
+  overallScore      Decimal  @db.Decimal(3, 2)                 // 종합 인터뷰 점수
+  goldenSampleScore Decimal? @db.Decimal(3, 2)                 // 골든 샘플 점수
+  contextualScore   Decimal? @db.Decimal(3, 2)                 // 맥락 질문 점수
+  details           Json?                                      // 문항별 상세 결과
+
+  createdAt       DateTime @default(now())
+
+  @@index([personaId, createdAt])
+  @@map("interview_logs")
+}
+
+// ============================================
+// v4.0 운영 모델: KPI 스냅샷 (T272)
+// ============================================
+
+model KPISnapshot {
+  id              String   @id @default(cuid())
+  snapshotType    String                                       // HOURLY/DAILY/WEEKLY
+  metrics         Json                                         // KPI 메트릭 JSON
+  period          String                                       // "2026-03-02T14:00:00Z" or "2026-03-02"
+
+  createdAt       DateTime @default(now())
+
+  @@index([snapshotType, createdAt])
+  @@map("kpi_snapshots")
+}
+
+// ============================================
+// v4.0 운영 모델: 일별 비용 리포트 (T273)
+// ============================================
+
+model DailyCostReport {
+  id              String   @id @default(cuid())
+  date            DateTime @unique                             // 집계 날짜 (일 단위)
+
+  totalCost       Decimal  @db.Decimal(10, 4)                  // 총 비용 (USD)
+  postingCost     Decimal  @db.Decimal(10, 4) @default(0)      // 포스트 생성 비용
+  commentCost     Decimal  @db.Decimal(10, 4) @default(0)      // 댓글 생성 비용
+  interviewCost   Decimal  @db.Decimal(10, 4) @default(0)      // 인터뷰 비용
+  arenaCost       Decimal  @db.Decimal(10, 4) @default(0)      // 아레나 비용
+  otherCost       Decimal  @db.Decimal(10, 4) @default(0)      // 기타 비용
+  llmCalls        Int      @default(0)                         // 총 LLM 호출 수
+  cacheHitRate    Decimal? @db.Decimal(3, 2)                   // 캐시 히트율
+
+  createdAt       DateTime @default(now())
+
+  @@map("daily_cost_reports")
+}
+
+// ============================================
+// v4.0 운영 모델: 유저 신고 (T274)
+// ============================================
+
+model ContentReport {
+  id              String   @id @default(cuid())
+  reporterId      String                                       // 신고자 userId
+  targetType      String                                       // POST/COMMENT/PERSONA
+  targetId        String                                       // 신고 대상 ID
+  category        String                                       // INAPPROPRIATE_CONTENT/WRONG_INFORMATION/CHARACTER_BREAK/REPETITIVE_CONTENT/UNPLEASANT_INTERACTION/TECHNICAL_ISSUE
+  description     String?                                      // 신고 상세 설명
+
+  status          String   @default("PENDING")                 // PENDING/RESOLVED/DISMISSED
+  resolvedBy      String?
+  resolvedAt      DateTime?
+  resolution      String?                                      // HIDDEN/DELETED/PERSONA_PAUSED/DISMISSED/NO_ACTION
+  adminNote       String?
+
+  createdAt       DateTime @default(now())
+
+  @@index([status])
+  @@index([targetId])
+  @@index([reporterId])
+  @@map("content_reports")
+}
+
+// ============================================
+// v4.0 운영 모델: 예산 설정 (T275)
+// ============================================
+
+model BudgetConfig {
+  id              String   @id @default("singleton")           // 싱글톤 레코드
+  dailyBudget     Decimal  @db.Decimal(10, 2) @default(50.00)  // 일 예산 (USD)
+  monthlyBudget   Decimal  @db.Decimal(10, 2) @default(1000.00) // 월 예산 (USD)
+  costMode        String   @default("BALANCE")                 // QUALITY/BALANCE/COST_PRIORITY
+  alertThresholds Json?                                        // 알림 임계값 설정
+  autoActions     Json?                                        // 자동 조치 설정
+  updatedAt       DateTime @updatedAt
+  updatedBy       String?
+
+  @@map("budget_configs")
 }

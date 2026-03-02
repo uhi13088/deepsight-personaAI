@@ -1,6 +1,6 @@
 # DeepSight v4.0 — TASK 관리
 
-> 마지막 업데이트: 2026-02-25
+> 마지막 업데이트: 2026-03-02
 
 ---
 
@@ -528,6 +528,109 @@
   - 신규: arena-feedback.ts, arena-feedback.test.ts (17 테스트)
   - 변경: persona-world/index.ts (배럴 익스포트)
   - 테스트: 4203 PASS (105 파일), Build PASS
+
+---
+
+## DONE (v4.0 — 자율 인터랙션)
+
+- [x] **T258: 자율 팔로우 파이프라인 통합** ✅ 2026-03-01
+  - AC1: interaction-pipeline.ts — 좋아요 작성자 대상 follow-engine 확률 판정 + P2002 방어
+  - AC2: InteractionPipelineDataProvider 확장 — saveFollow, getCrossAxisSimilarity, getParadoxCompatibility, getPersonaState
+  - AC3: cron-scheduler-service.ts — follow provider 구현
+  - 테스트: 4277 PASS (108 파일), Build PASS
+
+- [x] **T259: 자율 리포스트 엔진 + 파이프라인 통합** ✅ 2026-03-01
+  - AC1: repost-engine.ts 신규 — computeRepostProbability (matchScore × interactivity × mood × 0.3)
+  - AC2: interaction-pipeline.ts — 좋아요 후 리포스트 확률 판정 + P2002 방어
+  - AC3: cron-scheduler-service.ts — saveRepost (트랜잭션 생성 + repostCount 증가)
+  - 테스트: repost-engine.test.ts (5 테스트), interaction-pipeline.test.ts (+7), 4277 PASS
+
+- [x] **T260: COLLAB 포스트 팬텀 멘션 방지** ✅ 2026-03-01
+  - AC1: content-generator.ts — COLLAB 프롬프트에 실제 활성 페르소나 핸들 목록 주입
+  - AC2: post-pipeline.ts — stripPhantomMentions() 후처리 필터 (존재하지 않는 @멘션 제거)
+  - AC3: PostPipelineDataProvider.getActivePersonaHandles — 활성 페르소나 핸들 조회 인터페이스
+  - 테스트: content-generator.test.ts (+4), post-pipeline.test.ts (+5), 4286 PASS
+
+---
+
+## DONE (v4.0 — 검색 고도화)
+
+- [x] **T261: Explore 검색 기능 수정 + 자동완성** ✅ 2026-03-01
+  - AC1: 일반 텍스트 검색 시 포스트 내용 기반 결과 표시 (기존 페르소나 클러스터만 표시 → 포스트 검색으로 변경)
+  - AC2: 검색 모드 시 탐색 섹션 (클러스터/핫토픽/토론/신규) 숨김 — 검색 결과만 표시
+  - AC3: 검색 자동완성 — suggestions API (페르소나 이름/핸들 + 해시태그) + 드롭다운 UI
+  - 신규: search/suggestions/route.ts
+  - 변경: explore/page.tsx, api.ts, types.ts
+  - 테스트: 4286 PASS (108 파일)
+
+---
+
+## DONE (v4.0 — PersonaWorld v4.0 전체 갭 구현)
+
+- [x] **T263~T268: PersonaWorld v4.0 DB 스키마 + 기본 모델** ✅ 2026-03-02
+  - PersonaState 확장 (postsThisWeek, commentsThisWeek, lastActivityAt)
+  - PersonaRelationship 확장 (lastInteractionAt, warmth/frequency/depth)
+  - BudgetConfig 싱글턴 모델, DailyCostReport 집계 모델
+  - ModerationLog, PWQuarantineEntry, UserTrustScore 모델
+  - KPISnapshot, PersonaActivityLog 모델
+
+- [x] **T269~T277: PW 보안 계층 통합** ✅ 2026-03-02
+  - pw-gate-rules.ts: 6종 PW 특화 Gate Guard 패턴 + 4종 구조 검사 + 4종 Rate Limit
+  - user-trust.ts: Trust Score 5이벤트 Decay/Recovery + 4수준 Inspection
+  - pw-kill-switch.ts: 8종 PW Kill Switch 토글 + 4종 자동 트리거
+  - quarantine.ts: 4단계 심각도별 자동 만료 (72h/48h/24h/수동)
+  - security-middleware.ts: 입력(Gate Guard+Trust)+출력(Sentinel+Quarantine) 통합
+  - trust-score-crud.ts: Prisma CRUD + 일일 회복 배치
+
+- [x] **T278~T286: 모더레이션 + 품질 측정 + 스케줄러** ✅ 2026-03-02
+  - moderation-runner.ts: DI 기반 비동기 분석 (Stage 3)
+  - quality-runner.ts: 인터랙션 패턴 분석 + PIS 스냅샷 + Arena 트리거
+  - quality-logger.ts: 포스트/댓글/인터랙션 품질 로그 유틸
+  - post-pipeline.ts: 보안 옵션 + 모더레이션 + quarantine 통합
+  - interaction-pipeline.ts: 보안 옵션 통합
+
+- [x] **T287~T298: 비용 제어 모듈** ✅ 2026-03-02
+  - cost-runner.ts: DI 기반 비용 제어 러너 (예산 체크, 일일 집계)
+  - cost/index.ts: 비용 모듈 배럴 익스포트
+  - budget route: GET/PUT /operations/budget BudgetConfig CRUD
+
+- [x] **T299~T303: 비용 제어 통합** ✅ 2026-03-02
+  - cron-scheduler-service.ts: 예산 체크 → EMERGENCY/CRITICAL 차단, WARNING 빈도 감소
+  - admin cost route: BudgetConfig 기반 비용 대시보드 (SystemConfig fallback)
+
+- [x] **T304~T307: 유저 인터랙션 보안 통합** ✅ 2026-03-02
+  - user-rate-limiter.ts: 인메모리 슬라이딩 윈도우 (like 60/h, comment 30/h, follow 20/h, repost 30/h)
+  - likes/comments/follows/repost route: Trust Score 체크 + Rate Limit + Gate Guard
+
+- [x] **T308~T311: 온보딩 API 확장** ✅ 2026-03-02
+  - daily-micro.ts: 마이크로 질문 엔진 (불확실성 기반 차원 선택, ±0.05 미세 조정)
+  - daily-question route: GET (오늘의 질문) + POST (응답 처리)
+  - vector-provenance.ts: 벡터 출처 추적 모듈 (cold-start/micro/sns/activity/manual)
+  - T312~T314: 이전 세션에서 이미 구현 완료 (pw-gate-rules, user-trust, quarantine)
+
+- [x] **T315~T320: v4.0 일일 운영 배치** ✅ 2026-03-02
+  - v4-operations cron route: 6종 배치 작업 통합
+  - T315: DailyCostReport 집계
+  - T316: Trust Score 일일 회복
+  - T317: 비동기 모더레이션 Stage 3
+  - T318: 인터랙션 패턴 분석
+  - T319: PIS 스냅샷 저장
+  - T320: 관계 감쇠 (warmth × 0.99, frequency × 0.98, 7일+ 비활동)
+
+- [x] **T321~T323: DI Provider Prisma 구현** ✅ 2026-03-02
+  - T321: security-provider-factory.ts — SecurityMiddlewareProvider Prisma 팩토리 + 스케줄러 연동
+  - T322~T323: QualityRunnerProvider, AsyncAnalysisProvider — v4-operations route에 인라인 구현
+
+- [x] **T324~T325: 피드 v4.0 확장** ✅ 2026-03-02
+  - social-boost.ts: 소셜 모듈 부스트 (warmth/frequency/depth 가중 평균, 최대 +0.15)
+  - filterBotSuspects: 봇 의심 페르소나 필터 (suspectScore ≥ 0.8)
+  - feed-engine.ts: optional FeedEnhancementOptions 통합
+
+- [x] **T326: PersonaState 카운터 업데이트** ✅ 2026-03-02
+  - state-manager.ts: postsThisWeek/commentsThisWeek 증분 + lastActivityAt 설정
+  - v4-operations cron: 월요일 주간 카운터 리셋
+
+- 테스트: 4308 PASS (108 파일), Build PASS
 
 ---
 

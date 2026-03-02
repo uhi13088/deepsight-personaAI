@@ -18,7 +18,7 @@ import {
   createCommentLLMProvider,
   isLLMConfigured,
 } from "@/lib/persona-world/llm-adapter"
-import { getConsumptionContext } from "@/lib/persona-world/consumption-manager"
+import { getConsumptionContext, recordConsumption } from "@/lib/persona-world/consumption-manager"
 import { getPersonaState } from "@/lib/persona-world/state-manager"
 import { resolveMentions, notifyMentions } from "@/lib/persona-world/mention-service"
 import { layerVectorsToMap } from "@/lib/vector/dim-maps"
@@ -366,6 +366,10 @@ function createPostPipelineDataProvider(): PostPipelineDataProvider {
       return personas
         .filter((p): p is typeof p & { handle: string } => p.handle !== null)
         .map((p) => ({ handle: p.handle, name: p.name }))
+    },
+
+    async recordConsumption(personaId, record) {
+      return recordConsumption(personaId, record)
     },
   }
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, Suspense, useCallback, useMemo, memo } from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import { PWLogoWithText, PWCard, PWProfileRing, PWBottomNav } from "@/components/persona-world"
 import {
   Search,
@@ -17,6 +17,8 @@ import {
   Swords,
   Clock,
   Hash,
+  FileSearch,
+  User,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -27,6 +29,7 @@ import type {
   ExploreNewPersona,
   FeedPost,
   TrendingHashtag,
+  SearchSuggestionsResponse,
 } from "@/lib/types"
 import { clientApi } from "@/lib/api"
 import { useUserStore } from "@/lib/user-store"
@@ -75,6 +78,7 @@ function ExploreSkeleton() {
 
 function ExploreContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const initialQuery = searchParams.get("q") || ""
 
   const [loading, setLoading] = useState(true)
@@ -82,15 +86,25 @@ function ExploreContent() {
   const [debouncedSearch, setDebouncedSearch] = useState(initialQuery)
   const [activeRoles, setActiveRoles] = useState<string[]>([])
 
+  // 탐색 모드 상태 (검색어 비어있을 때)
   const [clusters, setClusters] = useState<ExploreCluster[]>([])
   const [hotTopics, setHotTopics] = useState<ExploreHotTopic[]>([])
   const [activeDebates, setActiveDebates] = useState<ExploreDebatePost[]>([])
   const [newPersonas, setNewPersonas] = useState<ExploreNewPersona[]>([])
 
-  // 해시태그 검색 상태
-  const [hashtagResults, setHashtagResults] = useState<FeedPost[]>([])
-  const [isHashtagSearch, setIsHashtagSearch] = useState(false)
+  // 검색 결과 상태 (검색어 있을 때 — 포스트 검색)
+  const [searchResults, setSearchResults] = useState<FeedPost[]>([])
+  const [isSearchMode, setIsSearchMode] = useState(false)
   const [trendingHashtags, setTrendingHashtags] = useState<TrendingHashtag[]>([])
+
+  // 자동완성 상태
+  const [suggestions, setSuggestions] = useState<SearchSuggestionsResponse>({
+    personas: [],
+    hashtags: [],
+  })
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const suggestionsRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // 핫 토픽 (포스트 타입) 필터
   const [activeTopicType, setActiveTopicType] = useState<string | null>(null)
@@ -103,7 +117,7 @@ function ExploreContent() {
     [notifications]
   )
 
-  // 검색어 디바운스 (300ms)
+  // 검색어 디바운스 (300ms — 결과 fetch용)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     debounceRef.current = setTimeout(() => {
@@ -113,6 +127,42 @@ function ExploreContent() {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
   }, [searchQuery])
+
+  // 자동완성 디바운스 (200ms — 더 빠른 응답)
+  const suggestDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (!searchQuery || searchQuery.length < 1) {
+      setSuggestions({ personas: [], hashtags: [] })
+      return
+    }
+    suggestDebounceRef.current = setTimeout(async () => {
+      try {
+        const result = await clientApi.getSearchSuggestions(searchQuery)
+        setSuggestions(result)
+      } catch {
+        // 자동완성 실패는 무시
+      }
+    }, 200)
+    return () => {
+      if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current)
+    }
+  }, [searchQuery])
+
+  // 자동완성 외부 클릭 시 닫기
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(e.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
 
   useEffect(() => {
     const query = searchParams.get("q")
@@ -125,21 +175,26 @@ function ExploreContent() {
   const fetchExplore = useCallback(async () => {
     setLoading(true)
     try {
-      // # 으로 시작하는 검색어 → 해시태그 검색
-      if (debouncedSearch.startsWith("#") && debouncedSearch.length > 1) {
-        const tag = debouncedSearch.slice(1)
-        const result = await clientApi.searchByHashtag({ hashtag: tag, limit: 20 })
-        setHashtagResults(result.posts)
-        setIsHashtagSearch(true)
+      if (debouncedSearch.length > 0) {
+        // 검색 모드: 모든 검색어 → 포스트 결과 표시
+        setIsSearchMode(true)
+        const isHashtag = debouncedSearch.startsWith("#") && debouncedSearch.length > 1
+        const result = await clientApi.searchByHashtag(
+          isHashtag
+            ? { hashtag: debouncedSearch.slice(1), limit: 20 }
+            : { q: debouncedSearch, limit: 20 }
+        )
+        setSearchResults(result.posts)
+        // 탐색 섹션 초기화
         setClusters([])
         setHotTopics([])
         setActiveDebates([])
         setNewPersonas([])
       } else {
-        setIsHashtagSearch(false)
-        setHashtagResults([])
+        // 탐색 모드: 검색어 없음 → 기존 explore 데이터
+        setIsSearchMode(false)
+        setSearchResults([])
         const data = await clientApi.getExplore({
-          search: debouncedSearch || undefined,
           role: activeRoles.length > 0 ? activeRoles.join(",") : undefined,
         })
         setClusters(data.clusters)
@@ -181,6 +236,22 @@ function ExploreContent() {
     setActiveRoles([])
     setActiveTopicType(null)
     setTopicPosts([])
+    setShowSuggestions(false)
+    setSuggestions({ personas: [], hashtags: [] })
+  }, [])
+
+  const handleSuggestionPersonaClick = useCallback(
+    (personaId: string) => {
+      setShowSuggestions(false)
+      router.push(`/persona/${personaId}`)
+    },
+    [router]
+  )
+
+  const handleSuggestionHashtagClick = useCallback((tag: string) => {
+    setShowSuggestions(false)
+    setSearchQuery(`#${tag}`)
+    setDebouncedSearch(`#${tag}`)
   }, [])
 
   const handleTopicClick = useCallback(
@@ -207,6 +278,7 @@ function ExploreContent() {
   )
 
   const totalPersonas = useMemo(() => clusters.reduce((sum, c) => sum + c.count, 0), [clusters])
+  const hasSuggestions = suggestions.personas.length > 0 || suggestions.hashtags.length > 0
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -226,15 +298,22 @@ function ExploreContent() {
       </header>
 
       <main className="mx-auto max-w-2xl px-4 pb-20 pt-16">
-        {/* Search */}
-        <div className="mb-4">
+        {/* Search + Autocomplete */}
+        <div className="relative mb-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
             <input
+              ref={inputRef}
               type="text"
-              placeholder="페르소나, 전문분야 또는 #해시태그 검색..."
+              placeholder="포스트 내용, 페르소나 또는 #해시태그 검색..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                setShowSuggestions(true)
+              }}
+              onFocus={() => {
+                if (searchQuery && hasSuggestions) setShowSuggestions(true)
+              }}
               className="w-full rounded-full border border-gray-200 bg-white py-3 pl-10 pr-10 text-sm focus:border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-100"
             />
             {searchQuery && (
@@ -246,61 +325,127 @@ function ExploreContent() {
               </button>
             )}
           </div>
-        </div>
 
-        {/* Role Filter Chips (AC5) */}
-        <div className="mb-6 flex flex-wrap gap-2">
-          {ROLE_OPTIONS.map((role) => {
-            const isActive = activeRoles.includes(role)
-            return (
-              <button
-                key={role}
-                onClick={() => toggleRole(role)}
-                className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                  isActive
-                    ? `bg-gradient-to-r ${ROLE_COLORS_BOLD[role]} text-white`
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                <span>{ROLE_EMOJI[role]}</span>
-                {ROLE_NAMES[role]}
-              </button>
-            )
-          })}
-          {activeRoles.length > 0 && (
-            <button
-              onClick={() => setActiveRoles([])}
-              className="rounded-full px-2 py-1.5 text-xs text-gray-400 hover:text-gray-600"
+          {/* 자동완성 드롭다운 */}
+          {showSuggestions && hasSuggestions && (
+            <div
+              ref={suggestionsRef}
+              className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg"
             >
-              초기화
-            </button>
+              {/* 페르소나 제안 */}
+              {suggestions.personas.length > 0 && (
+                <div className="border-b border-gray-100 px-3 py-2">
+                  <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                    페르소나
+                  </div>
+                  {suggestions.personas.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => handleSuggestionPersonaClick(p.id)}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-purple-50"
+                    >
+                      <div
+                        className={`flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br ${ROLE_COLORS_LIGHT[p.role] || "from-gray-100 to-gray-200"} text-xs`}
+                      >
+                        {ROLE_EMOJI[p.role] || <User className="h-3.5 w-3.5 text-gray-400" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-gray-800">{p.name}</div>
+                        <div className="truncate text-[11px] text-gray-400">
+                          @{p.handle} · {ROLE_NAMES[p.role] || p.role}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* 해시태그 제안 */}
+              {suggestions.hashtags.length > 0 && (
+                <div className="px-3 py-2">
+                  <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                    해시태그
+                  </div>
+                  {suggestions.hashtags.map((h) => (
+                    <button
+                      key={h.tag}
+                      onClick={() => handleSuggestionHashtagClick(h.tag)}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-purple-50"
+                    >
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-purple-50">
+                        <Hash className="h-3.5 w-3.5 text-purple-500" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <span className="text-sm font-medium text-gray-800">#{h.tag}</span>
+                        <span className="ml-2 text-[11px] text-gray-400">{h.count}건</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
 
+        {/* Role Filter Chips — 탐색 모드에서만 표시 */}
+        {!isSearchMode && (
+          <div className="mb-6 flex flex-wrap gap-2">
+            {ROLE_OPTIONS.map((role) => {
+              const isActive = activeRoles.includes(role)
+              return (
+                <button
+                  key={role}
+                  onClick={() => toggleRole(role)}
+                  className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                    isActive
+                      ? `bg-gradient-to-r ${ROLE_COLORS_BOLD[role]} text-white`
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  <span>{ROLE_EMOJI[role]}</span>
+                  {ROLE_NAMES[role]}
+                </button>
+              )
+            })}
+            {activeRoles.length > 0 && (
+              <button
+                onClick={() => setActiveRoles([])}
+                className="rounded-full px-2 py-1.5 text-xs text-gray-400 hover:text-gray-600"
+              >
+                초기화
+              </button>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <ExploreSkeleton />
-        ) : isHashtagSearch ? (
-          /* ── 해시태그 검색 결과 ──────────────────────────── */
+        ) : isSearchMode ? (
+          /* ── 검색 결과 (포스트 기반) ──────────────────────── */
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <Hash className="h-4 w-4 text-purple-500" />
-              <h2 className="text-sm font-semibold text-gray-800">{searchQuery} 검색 결과</h2>
-              <span className="text-xs text-gray-400">{hashtagResults.length}건</span>
+              <FileSearch className="h-4 w-4 text-purple-500" />
+              <h2 className="text-sm font-semibold text-gray-800">
+                &ldquo;{debouncedSearch}&rdquo; 검색 결과
+              </h2>
+              <span className="text-xs text-gray-400">{searchResults.length}건</span>
             </div>
-            {hashtagResults.length > 0 ? (
-              hashtagResults.map((post) => <HashtagSearchResultCard key={post.id} post={post} />)
+            {searchResults.length > 0 ? (
+              searchResults.map((post) => <HashtagSearchResultCard key={post.id} post={post} />)
             ) : (
               <div className="py-16 text-center">
-                <Hash className="mx-auto mb-4 h-12 w-12 text-gray-300" />
-                <p className="font-medium text-gray-500">해시태그 검색 결과가 없습니다</p>
-                <p className="mt-2 text-sm text-gray-400">다른 해시태그로 검색해보세요</p>
+                <FileSearch className="mx-auto mb-4 h-12 w-12 text-gray-300" />
+                <p className="font-medium text-gray-500">검색 결과가 없습니다</p>
+                <p className="mt-2 text-sm text-gray-400">
+                  다른 키워드로 검색하거나 #해시태그를 사용해보세요
+                </p>
               </div>
             )}
           </div>
         ) : (
           <div className="space-y-8">
             {/* 트렌딩 해시태그 섹션 */}
-            {trendingHashtags.length > 0 && !searchQuery && (
+            {trendingHashtags.length > 0 && (
               <section>
                 <div className="mb-3 flex items-center gap-2">
                   <Hash className="h-4 w-4 text-purple-500" />
@@ -415,13 +560,9 @@ function ExploreContent() {
               newPersonas.length === 0 && (
                 <div className="py-16 text-center">
                   <Sparkles className="mx-auto mb-4 h-12 w-12 text-gray-300" />
-                  <p className="font-medium text-gray-500">
-                    {searchQuery ? "검색 결과가 없습니다" : "아직 활성화된 페르소나가 없습니다"}
-                  </p>
+                  <p className="font-medium text-gray-500">아직 활성화된 페르소나가 없습니다</p>
                   <p className="mt-2 text-sm text-gray-400">
-                    {searchQuery
-                      ? "다른 키워드로 검색해보세요"
-                      : "Engine Studio에서 페르소나를 활성화해주세요"}
+                    Engine Studio에서 페르소나를 활성화해주세요
                   </p>
                 </div>
               )}

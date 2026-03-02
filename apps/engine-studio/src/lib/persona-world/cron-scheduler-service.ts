@@ -18,7 +18,7 @@ import {
   createCommentLLMProvider,
   isLLMConfigured,
 } from "@/lib/persona-world/llm-adapter"
-import { getConsumptionContext } from "@/lib/persona-world/consumption-manager"
+import { getConsumptionContext, recordConsumption } from "@/lib/persona-world/consumption-manager"
 import { getPersonaState } from "@/lib/persona-world/state-manager"
 import { resolveMentions, notifyMentions } from "@/lib/persona-world/mention-service"
 import { layerVectorsToMap } from "@/lib/vector/dim-maps"
@@ -43,6 +43,13 @@ import {
   isSchedulerEnabled,
 } from "@/lib/persona-world/admin/scheduler-service"
 import { SCHEDULING_DELAYS } from "@/lib/persona-world/constants"
+import { createSecurityMiddlewareProvider } from "@/lib/persona-world/security/security-provider-factory"
+import type { CostRunnerProvider, BudgetCheckResult } from "@/lib/persona-world/cost/cost-runner"
+import {
+  checkBudgetBeforeExecution,
+  getSchedulerFrequencyFromBudget,
+  applyAutoActionToFrequency,
+} from "@/lib/persona-world/cost/cost-runner"
 
 // ── Result type ──────────────────────────────────────────────────
 
@@ -52,6 +59,7 @@ export interface CronSchedulerResult {
   postsCreated: number
   interactions: number
   llmAvailable: boolean
+  budgetCheck?: BudgetCheckResult
   contagion?: ContagionRoundLog | { skipped: true; reason: string }
   newsAutoFetch?: AutoFetchResult | { skipped: true; reason: string }
   details: {
@@ -86,6 +94,34 @@ export async function executeCronScheduler(): Promise<CronSchedulerResult> {
     }
   }
 
+  // ── v4.0 T299: 예산 체크 — 실행 전 예산 초과 확인 ──────────
+  let budgetCheck: BudgetCheckResult | undefined
+  try {
+    const costProvider = createCostRunnerProvider()
+    budgetCheck = await checkBudgetBeforeExecution(costProvider)
+
+    if (!budgetCheck.allowed) {
+      console.warn(`[CronScheduler] 예산 초과로 실행 차단: ${budgetCheck.reason}`)
+      return {
+        executedAt: new Date().toISOString(),
+        decisions: 0,
+        postsCreated: 0,
+        interactions: 0,
+        llmAvailable: isLLMConfigured(),
+        budgetCheck,
+        details: { execution: { postsCreated: [], interactions: [] } },
+      }
+    }
+
+    if (budgetCheck.alerts.length > 0) {
+      console.log(
+        `[CronScheduler] 예산 경고: ${budgetCheck.alerts.map((a) => `${a.level}(${a.usagePercentage}%)`).join(", ")}`
+      )
+    }
+  } catch (err) {
+    console.error("[CronScheduler] Budget check failed, proceeding anyway:", err)
+  }
+
   const context: SchedulerContext = {
     trigger: "SCHEDULED",
     currentHour: new Date().getHours(),
@@ -103,6 +139,15 @@ export async function executeCronScheduler(): Promise<CronSchedulerResult> {
     follows: number
   }> = []
   const llmAvailable = isLLMConfigured()
+
+  // v4.0 T303: 예산 auto-action에 의한 빈도 감소 적용
+  const shouldSkipPosts =
+    budgetCheck?.autoAction?.type === "FREEZE_GENERATION" ||
+    budgetCheck?.autoAction?.type === "FREEZE_AUTONOMOUS" ||
+    budgetCheck?.autoAction?.type === "GLOBAL_FREEZE"
+
+  const postFrequencyFactor =
+    budgetCheck?.autoAction?.type === "REDUCE_POST_FREQUENCY" ? budgetCheck.autoAction.factor : 1.0
 
   // 페르소나 간 랜덤 딜레이 계산 — 동시 활동 방지
   const decisionCount = schedulerResult.decisions.length
@@ -126,7 +171,11 @@ export async function executeCronScheduler(): Promise<CronSchedulerResult> {
       await new Promise((resolve) => setTimeout(resolve, delayMs))
     }
 
-    if (decision.shouldPost && llmAvailable) {
+    // v4.0 T303: 예산 auto-action 적용 — 빈도 감소 시 확률적 스킵
+    const skipThisPost =
+      shouldSkipPosts || (postFrequencyFactor < 1.0 && Math.random() > postFrequencyFactor)
+
+    if (decision.shouldPost && llmAvailable && !skipThisPost) {
       try {
         const persona = (await schedulerProvider.getActiveStatusPersonas()).find(
           (p) => p.id === decision.personaId
@@ -137,6 +186,7 @@ export async function executeCronScheduler(): Promise<CronSchedulerResult> {
         const llmProvider = createPostLLMProvider(persona.id)
         const postDataProvider = createPostPipelineProvider()
 
+        const securityProvider = createSecurityMiddlewareProvider(prisma)
         const postResult = await executePostCreation(
           persona,
           {
@@ -148,7 +198,8 @@ export async function executeCronScheduler(): Promise<CronSchedulerResult> {
           context,
           state,
           llmProvider,
-          postDataProvider
+          postDataProvider,
+          { securityProvider }
         )
 
         postResults.push({
@@ -194,7 +245,10 @@ export async function executeCronScheduler(): Promise<CronSchedulerResult> {
             })
           : undefined
 
-        const result = await executeInteractions(persona, state, interactionDP, commentLLM)
+        const securityProvider = createSecurityMiddlewareProvider(prisma)
+        const result = await executeInteractions(persona, state, interactionDP, commentLLM, {
+          securityProvider,
+        })
 
         interactionResults.push({
           personaId: decision.personaId,
@@ -258,6 +312,7 @@ export async function executeCronScheduler(): Promise<CronSchedulerResult> {
     postsCreated: postResults.length,
     interactions: interactionResults.length,
     llmAvailable,
+    budgetCheck,
     contagion,
     newsAutoFetch,
     details: {
@@ -594,6 +649,10 @@ function createPostPipelineProvider(): PostPipelineDataProvider {
         .filter((p): p is typeof p & { handle: string } => p.handle !== null)
         .map((p) => ({ handle: p.handle, name: p.name }))
     },
+
+    async recordConsumption(personaId, record) {
+      return recordConsumption(personaId, record)
+    },
   }
 }
 
@@ -879,6 +938,212 @@ function createNewsAutoFetchDataProvider(): NewsAutoFetchDataProvider {
         where: { category_key: { category: "NEWS", key } },
       })
       return config?.value ?? null
+    },
+  }
+}
+
+// ── v4.0 T299: CostRunnerProvider (Prisma) ──────────────────
+
+function createCostRunnerProvider(): CostRunnerProvider {
+  return {
+    async aggregateDailyUsage(date: Date) {
+      const dayStart = new Date(date)
+      dayStart.setHours(0, 0, 0, 0)
+      const dayEnd = new Date(dayStart)
+      dayEnd.setDate(dayEnd.getDate() + 1)
+
+      const logs = await prisma.llmUsageLog.findMany({
+        where: { createdAt: { gte: dayStart, lt: dayEnd } },
+        select: {
+          callType: true,
+          estimatedCostUsd: true,
+          inputTokens: true,
+          cacheReadInputTokens: true,
+        },
+      })
+
+      let postingCost = 0
+      let commentCost = 0
+      let interviewCost = 0
+      let arenaCost = 0
+      let otherCost = 0
+      let totalInputTokens = 0
+      let totalCachedTokens = 0
+
+      for (const log of logs) {
+        const cost = Number(log.estimatedCostUsd)
+        const ct = log.callType.toLowerCase()
+        if (ct === "post") postingCost += cost
+        else if (ct === "comment") commentCost += cost
+        else if (ct === "interview" || ct === "test-generate") interviewCost += cost
+        else if (ct === "arena" || ct === "judge") arenaCost += cost
+        else otherCost += cost
+
+        totalInputTokens += log.inputTokens
+        totalCachedTokens += log.cacheReadInputTokens ?? 0
+      }
+
+      const totalCost = postingCost + commentCost + interviewCost + arenaCost + otherCost
+      const cacheHitRate = totalInputTokens > 0 ? totalCachedTokens / totalInputTokens : 0
+
+      return {
+        totalCost: Math.round(totalCost * 10000) / 10000,
+        postingCost: Math.round(postingCost * 10000) / 10000,
+        commentCost: Math.round(commentCost * 10000) / 10000,
+        interviewCost: Math.round(interviewCost * 10000) / 10000,
+        arenaCost: Math.round(arenaCost * 10000) / 10000,
+        otherCost: Math.round(otherCost * 10000) / 10000,
+        llmCalls: logs.length,
+        cacheHitRate: Math.round(cacheHitRate * 100) / 100,
+      }
+    },
+
+    async saveDailyCostReport(params) {
+      const report = await prisma.dailyCostReport.upsert({
+        where: { date: params.date },
+        update: {
+          totalCost: params.totalCost,
+          postingCost: params.postingCost,
+          commentCost: params.commentCost,
+          interviewCost: params.interviewCost,
+          arenaCost: params.arenaCost,
+          otherCost: params.otherCost,
+          llmCalls: params.llmCalls,
+          cacheHitRate: params.cacheHitRate,
+        },
+        create: {
+          date: params.date,
+          totalCost: params.totalCost,
+          postingCost: params.postingCost,
+          commentCost: params.commentCost,
+          interviewCost: params.interviewCost,
+          arenaCost: params.arenaCost,
+          otherCost: params.otherCost,
+          llmCalls: params.llmCalls,
+          cacheHitRate: params.cacheHitRate,
+        },
+      })
+      return { id: report.id }
+    },
+
+    async getMonthlyDailyReports(monthStart, monthEnd) {
+      const reports = await prisma.dailyCostReport.findMany({
+        where: { date: { gte: monthStart, lt: monthEnd } },
+        orderBy: { date: "asc" },
+      })
+      return reports.map((r) => ({
+        date: r.date,
+        totalCost: Number(r.totalCost),
+        postingCost: Number(r.postingCost),
+        commentCost: Number(r.commentCost),
+        interviewCost: Number(r.interviewCost),
+        arenaCost: Number(r.arenaCost),
+        otherCost: Number(r.otherCost),
+        llmCalls: r.llmCalls,
+        cacheHitRate: r.cacheHitRate !== null ? Number(r.cacheHitRate) : null,
+      }))
+    },
+
+    async getBudgetConfig() {
+      const config = await prisma.budgetConfig
+        .findUnique({ where: { id: "singleton" } })
+        .catch(() => null)
+
+      if (!config) {
+        return {
+          id: "singleton",
+          dailyBudget: 50,
+          monthlyBudget: 1000,
+          costMode: "BALANCE" as const,
+          alertThresholds: null,
+          autoActions: null,
+          updatedAt: new Date(),
+          updatedBy: null,
+        }
+      }
+
+      return {
+        id: config.id,
+        dailyBudget: Number(config.dailyBudget),
+        monthlyBudget: Number(config.monthlyBudget),
+        costMode: config.costMode as "QUALITY" | "BALANCE" | "COST_PRIORITY",
+        alertThresholds: config.alertThresholds as {
+          info: number
+          warning: number
+          critical: number
+          emergency: number
+        } | null,
+        autoActions: config.autoActions as Record<string, unknown> | null,
+        updatedAt: config.updatedAt,
+        updatedBy: config.updatedBy,
+      }
+    },
+
+    async updateBudgetConfig(params) {
+      const data: Record<string, unknown> = {}
+      if (params.dailyBudget !== undefined) data.dailyBudget = params.dailyBudget
+      if (params.monthlyBudget !== undefined) data.monthlyBudget = params.monthlyBudget
+      if (params.costMode !== undefined) data.costMode = params.costMode
+      if (params.alertThresholds !== undefined)
+        data.alertThresholds = params.alertThresholds as Prisma.InputJsonValue
+      if (params.autoActions !== undefined)
+        data.autoActions = params.autoActions as Prisma.InputJsonValue
+      if (params.updatedBy !== undefined) data.updatedBy = params.updatedBy
+
+      const config = await prisma.budgetConfig.upsert({
+        where: { id: "singleton" },
+        update: data,
+        create: {
+          id: "singleton",
+          dailyBudget: params.dailyBudget ?? 50,
+          monthlyBudget: params.monthlyBudget ?? 1000,
+          costMode: params.costMode ?? "BALANCE",
+          ...(params.alertThresholds && {
+            alertThresholds: params.alertThresholds as Prisma.InputJsonValue,
+          }),
+          ...(params.autoActions && { autoActions: params.autoActions as Prisma.InputJsonValue }),
+          ...(params.updatedBy && { updatedBy: params.updatedBy }),
+        },
+      })
+
+      return {
+        id: config.id,
+        dailyBudget: Number(config.dailyBudget),
+        monthlyBudget: Number(config.monthlyBudget),
+        costMode: config.costMode as "QUALITY" | "BALANCE" | "COST_PRIORITY",
+        alertThresholds: config.alertThresholds as {
+          info: number
+          warning: number
+          critical: number
+          emergency: number
+        } | null,
+        autoActions: config.autoActions as Record<string, unknown> | null,
+        updatedAt: config.updatedAt,
+        updatedBy: config.updatedBy,
+      }
+    },
+
+    async getMonthlySpending() {
+      const monthStart = new Date()
+      monthStart.setDate(1)
+      monthStart.setHours(0, 0, 0, 0)
+
+      const result = await prisma.llmUsageLog.aggregate({
+        where: { createdAt: { gte: monthStart } },
+        _sum: { estimatedCostUsd: true },
+      })
+      return Number(result._sum.estimatedCostUsd ?? 0)
+    },
+
+    async getDailySpending() {
+      const todayStart = new Date()
+      todayStart.setHours(0, 0, 0, 0)
+
+      const result = await prisma.llmUsageLog.aggregate({
+        where: { createdAt: { gte: todayStart } },
+        _sum: { estimatedCostUsd: true },
+      })
+      return Number(result._sum.estimatedCostUsd ?? 0)
     },
   }
 }

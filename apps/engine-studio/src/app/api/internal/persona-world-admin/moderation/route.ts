@@ -24,6 +24,64 @@ export async function GET() {
           }>
       )
 
+    // v4.0: PWQuarantineEntry 목록 (T298)
+    const quarantineEntries = await prisma.pWQuarantineEntry
+      .findMany({
+        orderBy: { createdAt: "desc" },
+        take: 50,
+        where: { status: "PENDING" },
+      })
+      .catch(
+        () =>
+          [] as Array<{
+            id: string
+            contentType: string
+            contentId: string
+            personaId: string
+            reason: string
+            severity: string
+            status: string
+            expiresAt: Date | null
+            createdAt: Date
+          }>
+      )
+
+    // v4.0: ContentReport 목록 (T296)
+    const contentReports = await prisma.contentReport
+      .findMany({
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      })
+      .catch(
+        () =>
+          [] as Array<{
+            id: string
+            reporterId: string
+            targetType: string
+            targetId: string
+            category: string
+            status: string
+            createdAt: Date
+          }>
+      )
+
+    // v4.0: 최근 ModerationLog (T298)
+    const moderationLogs = await prisma.moderationLog
+      .findMany({
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      })
+      .catch(
+        () =>
+          [] as Array<{
+            id: string
+            contentType: string
+            stage: string
+            verdict: string
+            createdAt: Date
+          }>
+      )
+
     return NextResponse.json({
       success: true,
       data: {
@@ -35,6 +93,34 @@ export async function GET() {
           reason: r.reason,
           status: r.status,
           createdAt: r.createdAt.toISOString(),
+        })),
+        // v4.0
+        quarantineEntries: quarantineEntries.map((q) => ({
+          id: q.id,
+          contentType: q.contentType,
+          contentId: q.contentId,
+          personaId: q.personaId,
+          reason: q.reason,
+          severity: q.severity,
+          status: q.status,
+          expiresAt: q.expiresAt?.toISOString() ?? null,
+          createdAt: q.createdAt.toISOString(),
+        })),
+        contentReports: contentReports.map((cr) => ({
+          id: cr.id,
+          reporterId: cr.reporterId,
+          targetType: cr.targetType,
+          targetId: cr.targetId,
+          category: cr.category,
+          status: cr.status,
+          createdAt: cr.createdAt.toISOString(),
+        })),
+        recentModerationLogs: moderationLogs.map((ml) => ({
+          id: ml.id,
+          contentType: ml.contentType,
+          stage: ml.stage,
+          verdict: ml.verdict,
+          createdAt: ml.createdAt.toISOString(),
         })),
       },
     })
@@ -166,6 +252,55 @@ export async function POST(request: NextRequest) {
           data: { status: "RESOLVED", resolvedAt: new Date(), resolution: "PERSONA_PAUSED" },
         })
         break
+      }
+
+      // v4.0: PWQuarantineEntry 승인/거부 (T298 AC3)
+      case "approve_quarantine": {
+        const { quarantineId } = body as { quarantineId?: string }
+        if (quarantineId) {
+          await prisma.pWQuarantineEntry.update({
+            where: { id: quarantineId },
+            data: { status: "APPROVED", reviewedAt: new Date(), reviewNote: "Admin approved" },
+          })
+        }
+        return NextResponse.json({ success: true, data: { action, quarantineId } })
+      }
+
+      case "reject_quarantine": {
+        const { quarantineId: rejectId, reviewNote } = body as {
+          quarantineId?: string
+          reviewNote?: string
+        }
+        if (rejectId) {
+          await prisma.pWQuarantineEntry.update({
+            where: { id: rejectId },
+            data: {
+              status: "REJECTED",
+              reviewedAt: new Date(),
+              reviewNote: reviewNote ?? "Admin rejected",
+            },
+          })
+        }
+        return NextResponse.json({ success: true, data: { action, quarantineId: rejectId } })
+      }
+
+      // v4.0: ContentReport 처리 (T296 AC3)
+      case "resolve_content_report": {
+        const { contentReportId, resolution: reportResolution } = body as {
+          contentReportId?: string
+          resolution?: string
+        }
+        if (contentReportId) {
+          await prisma.contentReport.update({
+            where: { id: contentReportId },
+            data: {
+              status: "RESOLVED",
+              resolvedAt: new Date(),
+              resolution: reportResolution ?? "NO_ACTION",
+            },
+          })
+        }
+        return NextResponse.json({ success: true, data: { action, contentReportId } })
       }
 
       default:

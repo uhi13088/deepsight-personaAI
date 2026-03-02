@@ -14,6 +14,7 @@ import type {
   NotificationPreferenceData,
   SearchResponse,
   TrendingHashtag,
+  SearchSuggestionsResponse,
 } from "./types"
 
 // ── Client-side API (fetch) ─────────────────────────────────
@@ -668,6 +669,18 @@ export const clientApi = {
     const json: ApiResponse<{ trendingHashtags: TrendingHashtag[] }> = await res.json()
     if (!json.success) throw new Error(json.error?.message || "Unknown error")
     return json.data!.trendingHashtags
+  },
+
+  // ── 검색 자동완성 ──────────────────────────────────────────
+  async getSearchSuggestions(q: string): Promise<SearchSuggestionsResponse> {
+    if (!q || q.length < 1) return { personas: [], hashtags: [] }
+
+    const res = await fetch(`/api/public/search/suggestions?q=${encodeURIComponent(q)}`)
+    if (!res.ok) return { personas: [], hashtags: [] }
+
+    const json: ApiResponse<SearchSuggestionsResponse> = await res.json()
+    if (!json.success || !json.data) return { personas: [], hashtags: [] }
+    return json.data
   },
 
   // ── 단건 포스트 조회 ──────────────────────────────────────
