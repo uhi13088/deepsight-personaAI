@@ -143,9 +143,9 @@ pnpm --filter engine-studio build  # 앱별 빌드
 
 ### v4 설계/구현 (Active)
 
-- 엔진 설계서: `docs/design/persona-engine-v4.md`
+- 엔진 설계서: `docs/design/persona-engine-v4-design.md` (인덱스 + Part 1~3)
 - 엔진 구현계획서: `docs/design/persona-engine-v4-impl.md`
-- PersonaWorld 설계서: `docs/design/persona-world-v4.md`
+- PersonaWorld 설계서: `docs/design/persona-world-v4-design.md` (인덱스 + Part 1~3)
 - PersonaWorld 구현계획서: `docs/design/persona-world-v4-impl.md`
 
 ### 기능정의서 (Reference)

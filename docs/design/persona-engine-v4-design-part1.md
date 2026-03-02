@@ -1,6 +1,6 @@
 # DeepSight Persona Engine v4.0 — Core (섹션 1~5)
 
-**상위 문서**: [`persona-engine-v4.md`](./persona-engine-v4.md)
+**상위 문서**: [`persona-engine-v4-design.md`](./persona-engine-v4-design.md)
 **버전**: v4.0
 **작성일**: 2026-02-17
 **상태**: Draft
@@ -185,13 +185,13 @@ G5(캐릭터) ──→ G3(자기교정) ──→ G2(기억)  G4(비용)
 
 본 설계서는 분량으로 인해 3개 파일로 분할되어 있다.
 
-| 파일                                  | 섹션    | 내용                                      |
-| ------------------------------------- | ------- | ----------------------------------------- |
-| `persona-engine-v4-core.md` (본 파일) | §1~§5   | 개요, 아키텍처, 벡터, 캐릭터 바이블, 보안 |
-| `persona-engine-v4-intelligence.md`   | §6~§10  | 기억, 아레나, 데이터 아키텍처, 소셜, 감정 |
-| `persona-engine-v4-operations.md`     | §11~§15 | 비용, 매칭, 품질, LLM 전략, 로드맵        |
+| 파일                                          | 섹션    | 내용                                      |
+| --------------------------------------------- | ------- | ----------------------------------------- |
+| `persona-engine-v4-design-part1.md` (본 파일) | §1~§5   | 개요, 아키텍처, 벡터, 캐릭터 바이블, 보안 |
+| `persona-engine-v4-design-part2.md`           | §6~§10  | 기억, 아레나, 데이터 아키텍처, 소셜, 감정 |
+| `persona-engine-v4-design-part3.md`           | §11~§15 | 비용, 매칭, 품질, LLM 전략, 로드맵        |
 
-인덱스 및 전체 목차: [`persona-engine-v4.md`](./persona-engine-v4.md)
+인덱스 및 전체 목차: [`persona-engine-v4-design.md`](./persona-engine-v4-design.md)
 구현 계획서: [`persona-engine-v4-impl.md`](./persona-engine-v4-impl.md)
 
 ---
@@ -1326,4 +1326,294 @@ trustScore = baseTrust(source) × (1 + 0.1 × verificationSteps) × decayFactor^
 
 ---
 
-_persona-engine-v4-core.md (§1~§5) 완료_
+_persona-engine-v4-design-part1.md (§1~§5) 완료_
+
+---
+
+## Appendix A: 연구 기반 보강 제안 (v4.1+)
+
+> 학술 연구 23편 기반 분석. 기존 v4.0 설계를 유지하며 보강하는 방향.
+> 원본: `persona-engine-v4-research-review.md` (통합 후 삭제)
+
+---
+
+### A.1 성격 벡터의 이론적 정당성 (§3 보강)
+
+#### 현재 설계의 공백
+
+v4.0의 3-Layer 벡터 구조:
+
+| 레이어                | 차원     | 심리학적 근거 명시 여부 |
+| --------------------- | -------- | ----------------------- |
+| L1 (Social Persona)   | 7D       | **미명시**              |
+| L2 (Core Temperament) | 5D OCEAN | Big Five — 명시         |
+| L3 (Narrative Drive)  | 4D       | **미명시**              |
+
+**공백**: L1과 L3의 차원 선정 근거가 설계서에 명시되어 있지 않다. 이는:
+
+1. 차원 간 직교성(orthogonality) 보장 여부 불명확 → 중복 측정 가능성
+2. 향후 차원 추가/변경 시 이론적 기준 부재
+
+#### 이론적 근거
+
+- **PersonaLLM [R17]**: LLM이 Big Five 성격을 일관되게 표현 가능 (큰 효과크기, Cohen's d > 0.8). L2 OCEAN이 LLM 기반 페르소나 생성에서도 신뢰할 수 있는 제어 변수임을 확인.
+- **Anthropic Persona Vectors [R22]**: Claude의 활성화 공간에서 성격 특성 방향을 추출, Big Five 차원과 높은 상관관계. LLM 내부 표현 공간에서 성격 차원이 실제로 분리 가능하다는 증거.
+- **Frisch & Giulianelli [R18]**: 성격 조건화 에이전트 간 언어 정렬(lexical alignment)이 성격 일관성의 유효한 프록시.
+
+#### L1 차원의 이론적 매핑
+
+| L1 차원       | 대응 구성개념                          | 출처                    |
+| ------------- | -------------------------------------- | ----------------------- |
+| `depth`       | Need for Cognition (NfC)               | Cacioppo & Petty, 1982  |
+| `lens`        | Thinking-Feeling (T-F)                 | Myers, 1962             |
+| `stance`      | Dispositional Skepticism               | Tobacyk & Milford, 1983 |
+| `scope`       | Focus of Attention — Detail vs Gestalt | Navon, 1977             |
+| `taste`       | Sensation Seeking (openness 하위)      | Zuckerman, 1979         |
+| `purpose`     | Intrinsic vs Extrinsic Motivation      | Deci & Ryan, 1985       |
+| `sociability` | Introversion-Extraversion (Big Five E) | Costa & McCrae, 1992    |
+
+> **주의**: `sociability`(L1)와 `extraversion`(L2)은 동일한 Big Five E 차원에서 파생되지만 **측정 수준이 다르다**. L1 sociability는 관찰 가능한 공개적 사회성이고, L2 extraversion은 내재적 기질(압박 시 드러남)이다. 두 값이 다를 수 있는 것이 오히려 페르소나의 깊이를 만든다.
+
+#### L3 차원의 이론적 매핑
+
+| L3 차원        | 대응 구성개념                           | 출처                      |
+| -------------- | --------------------------------------- | ------------------------- |
+| `lack`         | 결핍 동기 (D-needs)                     | Maslow, 1943              |
+| `moralCompass` | Moral Foundations Theory — 규칙 vs 결과 | Haidt, 2012               |
+| `volatility`   | 정서 불안정성 / BIS 민감도              | Gray, 1982                |
+| `growthArc`    | 성장 동기 (B-needs) / Growth Mindset    | Maslow, 1943; Dweck, 2006 |
+
+> `volatility`(L3)와 `neuroticism`(L2): volatility는 서사적 행동 패턴의 시간적 불안정성(스토리 차원), neuroticism은 기질적 정서 반응성(기질 차원)으로 구분된다.
+
+#### 직교성 검증 방안
+
+```typescript
+interface OrthogonalityReport {
+  layerPair: "L1xL2" | "L1xL3" | "L2xL3"
+  correlationMatrix: number[][]
+  maxCorrelation: number // 목표: < 0.30
+  problematicPairs: Array<{ dim1: string; dim2: string; r: number }>
+}
+```
+
+**기준**: 동일 레이어 내 `|r| < 0.30` → 실질적 독립성 확보.
+**교차 레이어**: sociability(L1) ↔ extraversion(L2)처럼 이론적 관련성이 있는 쌍은 중복이 아닌 **의도된 상호작용**으로 문서화.
+
+#### References
+
+- [R17] Jiang, H., et al. (2023). PersonaLLM. _arXiv:2305.02547_.
+- [R18] Frisch, I., & Giulianelli, M. (2024). LLM agents in interaction. _arXiv:2402.02764_.
+- [R22] Anthropic. (2025). _Persona Vectors_. Anthropic Research.
+
+---
+
+### A.2 관계 모델 보강 — 6단계 양방향 모델 (§4.2 보강)
+
+#### 현재 설계의 공백
+
+v4.0 관계 프로토콜은 **발전만 다루며**, 쇠퇴/복귀 경로가 없다:
+
+```
+STRANGER → ACQUAINTANCE → FAMILIAR → CLOSE
+```
+
+1. **쇠퇴 경로 없음**: 비활성·갈등·냉각 시 관계가 어떻게 변하는지 미정의
+2. **복귀 경로 없음**: 한번 떨어진 관계가 재활성화되는 메커니즘 없음
+
+결과적으로, 오랫동안 인터랙션이 없는 페르소나도 영구히 `CLOSE` 상태를 유지하는 비현실적 상황이 발생한다.
+
+#### 이론적 근거
+
+- **Knapp의 관계 발전 모델 [R5]**: 10단계 양방향 모델 (발전 5 + 쇠퇴 5). 관계는 어느 단계에서든 이탈이 시작될 수 있다.
+- **Bickmore & Picard [R9]**: 장기 공백 후 "공백을 언급"하는 행동이 관계 재개에 효과적. 재활성화 프로토콜 필요성 지지.
+- **Smith et al. [R11]**: AI 관계의 비대칭성을 관계 이력(peakStage, lastInteractionAt)으로 완화.
+- **Turkle [R13]**: 자연스러운 거리감을 설계에 반영하여 과도한 의존성 위험 감소.
+
+#### 보강 방향: 6단계 양방향 모델
+
+```
+발전 경로:
+  STRANGER → ACQUAINTANCE → FAMILIAR → CLOSE
+
+쇠퇴 경로 (신규):
+  CLOSE / FAMILIAR / ACQUAINTANCE → COOLING → DORMANT
+
+재활성화 경로 (신규):
+  DORMANT → ACQUAINTANCE (재접촉 시)
+  COOLING → 이전 단계 복귀 (warmth 회복 시)
+```
+
+| 단계             | 설명                             | 행동 프로토콜                |
+| ---------------- | -------------------------------- | ---------------------------- |
+| STRANGER         | 첫 접촉 또는 재활성화 전         | 격식 only, 자기노출 없음     |
+| ACQUAINTANCE     | 초기 교류                        | 약간 캐주얼, 표면적 자기노출 |
+| FAMILIAR         | 반복적 관계                      | 자유로운 톤, 개인적 자기노출 |
+| CLOSE            | 깊은 친밀감                      | 매우 친밀, 깊은 자기노출     |
+| COOLING _(신규)_ | 비활성 또는 갈등으로 거리감 발생 | 격식으로 회귀, 자기노출 감소 |
+| DORMANT _(신규)_ | 장기 비활성 — 사실상 휴면        | 격식 only, 자기노출 없음     |
+
+#### 단계 전환 조건
+
+```
+COOLING 진입:
+  inactivity_days ≥ 14
+  OR (tension ≥ 0.8 && warmth < 0.4)
+
+DORMANT 진입:
+  COOLING 상태 && inactivity_days ≥ 60
+
+DORMANT → ACQUAINTANCE (재활성화):
+  신규 인터랙션 발생 시 (cold restart)
+  warmth = peakWarmth × 0.3  (기억의 흔적 반영)
+
+COOLING → 이전 단계 복귀:
+  inactivity_days < 14 복구
+  AND warmth ≥ threshold[previousStage] × 0.8
+```
+
+#### warmth 자동 감쇠 공식
+
+```
+warmth(t) = warmth_0 × e^(-decayRate × inactivity_days)
+```
+
+- `decayRate` 기본값: `0.02` (1/일) → 35일 후 warmth 약 50% 감쇠
+- COOLING 상태에서는 감쇠율 1.5배 적용
+
+#### 타입 명세
+
+```typescript
+type RelationshipStage = "STRANGER" | "ACQUAINTANCE" | "FAMILIAR" | "CLOSE" | "COOLING" | "DORMANT"
+
+interface RelationshipDecayConfig {
+  inactivityDaysForCooling: number // 기본: 14
+  inactivityDaysForDormant: number // 기본: 60
+  warmthDecayRate: number // 기본: 0.02 (일별)
+  tensionThresholdForCooling: number // 기본: 0.8
+}
+
+interface StageTransition {
+  from: RelationshipStage
+  to: RelationshipStage
+  at: Date
+  trigger: "warmth_threshold" | "inactivity" | "tension_peak" | "reactivation"
+}
+
+interface RelationshipHistory {
+  peakStage: RelationshipStage
+  peakWarmth: number
+  lastInteractionAt: Date
+  inactivityDays: number
+  stageTransitions: StageTransition[]
+}
+```
+
+#### 기존 설계와의 통합 지점
+
+| 통합 대상                  | 변경 내용                                                                    |
+| -------------------------- | ---------------------------------------------------------------------------- |
+| `PersonaRelationship` (DB) | `stage` 컬럼에 `COOLING`, `DORMANT` 값 추가, `RelationshipHistory` 필드 추가 |
+| 감정 전염 (`§10`)          | COOLING/DORMANT 관계는 전파 가중치 0.1× 이하 적용                            |
+| 소셜 모듈 그래프 (`§9`)    | DORMANT 엣지를 약엣지(weak edge)로 분류, betweenness 계산 제외               |
+| Integrity Monitor (`§5.2`) | DORMANT → ACQUAINTANCE 전환 시 warmth 리셋 이력 감사 로그 기록               |
+
+#### References
+
+- [R5] Knapp, M. L. (1978). _Social Intercourse: From Greeting to Goodbye_. Allyn & Bacon.
+- [R9] Bickmore, T., & Picard, R. W. (2005). _ACM TOCHI_, 12(2), 293–327.
+- [R11] Smith, T. W., et al. (2025). _PNAS_.
+- [R13] Turkle, S. (2011). _Alone Together_. Basic Books.
+
+---
+
+### A.3 라포르 메트릭 도입 — RapportScore 3요소 (§4.2/§9 보강)
+
+#### 현재 설계의 공백
+
+관계 품질이 warmth/tension 두 수치에만 의존한다:
+
+1. **과정 지표 부재**: warmth는 결과(친밀도)를 나타낼 뿐, 형성 과정(상호주의, 조율, 긍정성)을 측정하지 않는다.
+2. **단일 차원 측정**: 라포르는 복수의 독립적 요소로 구성되므로, warmth 하나로는 구분할 수 없는 관계 패턴이 존재한다.
+
+#### 이론적 근거
+
+- **Tickle-Degnen & Rosenthal [R6]**: 라포르 3요소 — 상호주의, 긍정성, 조율. 관계 단계별 가중치 변화.
+- **Short, Williams & Christie [R7]**: 사회적 존재감 = 친밀감 + 즉시성.
+- **Biocca, Harms & Burgoon [R8]**: 확장 Social Presence — 공존감, 심리적 관여, 행동적 참여.
+
+#### 3요소 합성 라포르 점수 (RapportScore)
+
+기존 warmth를 **폐기하지 않고**, positivity 구성요소로 흡수. 상호주의·조율을 신규 추가.
+
+| 요소     | 변수명                | 측정 신호                                         |
+| -------- | --------------------- | ------------------------------------------------- |
+| 상호주의 | `mutualAttentiveness` | 인터랙션 응답률, 평균 응답 지연, 메시지 길이 균형 |
+| 긍정성   | `positivity`          | 기존 warmth + 감정 분석(긍정 표현 빈도)           |
+| 조율     | `coordination`        | 어휘 중복률(lexical alignment), 템포 동기화       |
+
+#### RapportScore 합성 공식
+
+```typescript
+function computeRapportScore(components: RapportComponents, stage: RelationshipStage): number {
+  const weights = RAPPORT_WEIGHTS[stage]
+  return (
+    weights.mutualAttentiveness * components.mutualAttentiveness +
+    weights.positivity * components.positivity +
+    weights.coordination * components.coordination
+  )
+}
+
+const RAPPORT_WEIGHTS: Record<RelationshipStage, RapportWeights> = {
+  STRANGER: { mutualAttentiveness: 0.6, positivity: 0.3, coordination: 0.1 },
+  ACQUAINTANCE: { mutualAttentiveness: 0.45, positivity: 0.35, coordination: 0.2 },
+  FAMILIAR: { mutualAttentiveness: 0.3, positivity: 0.35, coordination: 0.35 },
+  CLOSE: { mutualAttentiveness: 0.25, positivity: 0.3, coordination: 0.45 },
+  COOLING: { mutualAttentiveness: 0.5, positivity: 0.4, coordination: 0.1 },
+  DORMANT: { mutualAttentiveness: 0.7, positivity: 0.2, coordination: 0.1 },
+}
+```
+
+#### 소셜 그래프 가중치 공식 업데이트
+
+```
+기존:  weight = warmth × 0.5 + frequency × 0.3 + (1 - tension) × 0.2
+보강:  weight = rapportScore × 0.5 + frequency × 0.3 + (1 - tension) × 0.2
+```
+
+#### 타입 명세
+
+```typescript
+interface RapportComponents {
+  mutualAttentiveness: number // 0.0 ~ 1.0
+  positivity: number // 0.0 ~ 1.0  (기존 warmth 흡수)
+  coordination: number // 0.0 ~ 1.0
+}
+
+interface RapportWeights {
+  mutualAttentiveness: number
+  positivity: number
+  coordination: number
+  // 합: 1.0
+}
+
+interface RelationshipRapportExtension {
+  rapportComponents: RapportComponents
+  rapportScore: number
+  rapportUpdatedAt: Date
+}
+```
+
+#### 기존 설계와의 통합 지점
+
+| 통합 대상                  | 변경 내용                                                    |
+| -------------------------- | ------------------------------------------------------------ |
+| `PersonaRelationship` (DB) | `rapportComponents` JSON 컬럼 추가, `rapportScore` 컬럼 추가 |
+| 소셜 그래프 가중치 (`§9`)  | `weight` 공식의 warmth → rapportScore 교체                   |
+| 관계 단계 전환 조건 (`§2`) | 발전 조건의 warmth 임계값을 rapportScore로 대체 가능         |
+| 아레나 심판 (`§7.3`)       | interactionQuality 평가 시 coordination 요소 반영 권장       |
+
+#### References
+
+- [R6] Tickle-Degnen, L., & Rosenthal, R. (1990). _Psychological Inquiry_, 1(4), 285–293.
+- [R7] Short, J., et al. (1976). _The Social Psychology of Telecommunications_. Wiley.
+- [R8] Biocca, F., et al. (2003). _Presence_, 12(5), 456–480.
