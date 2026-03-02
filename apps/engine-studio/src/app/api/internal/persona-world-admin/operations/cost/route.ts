@@ -211,12 +211,89 @@ async function createPrismaCostDataProvider(): Promise<CostDataProvider> {
       }))
     },
 
-    async getMonthDailyReports() {
-      // 간소화: 빈 배열 반환 (일별 집계 테이블 미구현 시 일간 리포트로 대체)
-      return []
+    async getMonthDailyReports(month: string) {
+      // v4.0 T300: DailyCostReport 테이블에서 집계 데이터 읽기
+      const [year, monthNum] = month.split("-").map(Number)
+      const monthStart = new Date(year, monthNum - 1, 1)
+      const monthEnd = new Date(year, monthNum, 1)
+
+      const reports = await prisma.dailyCostReport
+        .findMany({
+          where: { date: { gte: monthStart, lt: monthEnd } },
+          orderBy: { date: "asc" },
+        })
+        .catch(() => [])
+
+      return reports.map((r) => {
+        const postCost = Number(r.postingCost)
+        const commentCost = Number(r.commentCost)
+        const interviewCost = Number(r.interviewCost)
+        const arenaCost = Number(r.arenaCost)
+        const otherCost = Number(r.otherCost)
+        const totalCost = Number(r.totalCost)
+
+        return {
+          date: r.date.toISOString().slice(0, 10),
+          totalCost,
+          totalCalls: r.llmCalls,
+          byCallType: [
+            {
+              callType: "POST" as const,
+              count: 0,
+              totalCost: postCost,
+              avgCostPerCall: 0,
+              totalTokens: 0,
+            },
+            {
+              callType: "COMMENT" as const,
+              count: 0,
+              totalCost: commentCost,
+              avgCostPerCall: 0,
+              totalTokens: 0,
+            },
+            {
+              callType: "INTERVIEW" as const,
+              count: 0,
+              totalCost: interviewCost,
+              avgCostPerCall: 0,
+              totalTokens: 0,
+            },
+            {
+              callType: "ARENA" as const,
+              count: 0,
+              totalCost: arenaCost,
+              avgCostPerCall: 0,
+              totalTokens: 0,
+            },
+            {
+              callType: "OTHER" as const,
+              count: 0,
+              totalCost: otherCost,
+              avgCostPerCall: 0,
+              totalTokens: 0,
+            },
+          ].filter((ct) => ct.totalCost > 0),
+          byPersona: [],
+          cacheEfficiency: {
+            totalInputTokens: 0,
+            cachedTokens: 0,
+            cacheHitRate: Number(r.cacheHitRate ?? 0),
+            estimatedSavings: 0,
+          },
+        }
+      })
     },
 
     async getCurrentCostMode(): Promise<CostMode> {
+      // v4.0 T302: BudgetConfig 모델에서 costMode 우선 조회
+      const budgetConfig = await prisma.budgetConfig
+        .findUnique({ where: { id: "singleton" } })
+        .catch(() => null)
+      if (budgetConfig?.costMode && VALID_COST_MODES.includes(budgetConfig.costMode as CostMode)) {
+        return budgetConfig.costMode as CostMode
+      }
+
+      // fallback: SystemConfig
       const config = await prisma.systemConfig
         .findUnique({
           where: { category_key: { category: "COST", key: "mode" } },
@@ -227,7 +304,6 @@ async function createPrismaCostDataProvider(): Promise<CostDataProvider> {
         const mode = config.value as CostMode
         if (VALID_COST_MODES.includes(mode)) return mode
       }
-      // JSON value 형태인 경우
       if (
         config?.value &&
         typeof config.value === "object" &&
@@ -237,10 +313,17 @@ async function createPrismaCostDataProvider(): Promise<CostDataProvider> {
         if (VALID_COST_MODES.includes(mode)) return mode
       }
 
-      return "QUALITY" // 기본값
+      return "BALANCE" // BudgetConfig default
     },
 
     async setCostMode(mode: CostMode) {
+      // v4.0 T302: BudgetConfig 모델에 저장 (싱글톤 upsert)
+      await prisma.budgetConfig.upsert({
+        where: { id: "singleton" },
+        update: { costMode: mode },
+        create: { id: "singleton", costMode: mode, dailyBudget: 50, monthlyBudget: 1000 },
+      })
+      // SystemConfig도 동기화 (하위 호환)
       await prisma.systemConfig.upsert({
         where: { category_key: { category: "COST", key: "mode" } },
         update: { value: mode },
@@ -254,6 +337,12 @@ async function createPrismaCostDataProvider(): Promise<CostDataProvider> {
     },
 
     async getDailyBudget() {
+      // v4.0 T301: BudgetConfig 모델에서 우선 조회
+      const budgetConfig = await prisma.budgetConfig
+        .findUnique({ where: { id: "singleton" } })
+        .catch(() => null)
+      if (budgetConfig) return Number(budgetConfig.dailyBudget)
+
       const config = await prisma.systemConfig
         .findUnique({
           where: { category_key: { category: "COST", key: "daily_budget" } },
@@ -263,10 +352,16 @@ async function createPrismaCostDataProvider(): Promise<CostDataProvider> {
       if (config?.value && typeof config.value === "number") {
         return config.value
       }
-      return 8 // 기본값: $8/일 (QUALITY 모드 100명 기준 ~$6.3/일)
+      return 50 // BudgetConfig default
     },
 
     async getMonthlyBudget() {
+      // v4.0 T301: BudgetConfig 모델에서 우선 조회
+      const budgetConfig = await prisma.budgetConfig
+        .findUnique({ where: { id: "singleton" } })
+        .catch(() => null)
+      if (budgetConfig) return Number(budgetConfig.monthlyBudget)
+
       const config = await prisma.systemConfig
         .findUnique({
           where: { category_key: { category: "COST", key: "monthly_budget" } },
@@ -276,7 +371,7 @@ async function createPrismaCostDataProvider(): Promise<CostDataProvider> {
       if (config?.value && typeof config.value === "number") {
         return config.value
       }
-      return 240 // 기본값: $240/월 (QUALITY 모드 100명)
+      return 1000 // BudgetConfig default
     },
 
     async getMonthlySpending() {
