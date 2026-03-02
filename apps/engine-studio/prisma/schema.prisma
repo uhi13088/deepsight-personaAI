@@ -1892,11 +1892,17 @@ model LlmUsageLog {
   cacheReadInputTokens     Int?     // 캐시 히트 시 읽은 입력 토큰
   cacheSavingsUsd          Decimal? @db.Decimal(10, 6) // 캐싱 절감액 (USD)
 
+  // v4.1: 최적화 라우팅 추적 (T328)
+  routingReason   String?  // explicit_param | haiku_whitelist | config_override | default_model
+  batchGroupId    String?  // 배치 생성 시 그룹 ID (T329)
+  isRegenerated   Boolean  @default(false) // 품질 미달로 재생성된 항목 (T329)
+
   createdAt       DateTime @default(now())
 
   @@index([createdAt])
   @@index([callType])
   @@index([personaId])
+  @@index([routingReason])
   @@map("llm_usage_logs")
 }
 

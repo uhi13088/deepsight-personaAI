@@ -6,3 +6,4 @@
 export * from "./model-config"
 export * from "./safety-config"
 export * from "./api-config"
+export * from "./optimization-config"

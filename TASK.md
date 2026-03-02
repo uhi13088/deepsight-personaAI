@@ -1988,6 +1988,30 @@
   - AC3: 주간 리셋 cron (월요일 00:00 UTC 카운터 0으로 리셋)
   - AC4: 테스트 + Build PASS
 
+### Phase v4.1-OPT: 비용 최적화 자동화 + 품질 보호 (T327~T332)
+
+> v4.1 핵심: 품질 게이트 자동 재생성 + Haiku 화이트리스트 라우팅 + A/B 모니터링 자동화.
+> **원칙**: 모든 최적화는 수동 개입 없이 자동 실행. 엔진 스튜디오에서 로그만 확인.
+> **품질 보호 3원칙**: (1) 0.9 미만 자동 재생성 (2) Haiku는 화이트리스트만 (3) A/B 품질 자동 비교.
+
+- [x] **T327: 최적화 설정 모듈 — optimization-config.ts** ✅ 2026-03-02
+  - (DONE 섹션에 상세 기록)
+
+- [x] **T328: Haiku 화이트리스트 자동 라우팅** ✅ 2026-03-02
+  - (DONE 섹션에 상세 기록)
+
+- [x] **T329: 배치 댓글 생성 + 품질 게이트 자동 재생성** ✅ 2026-03-02
+  - (DONE 섹션에 상세 기록)
+
+- [x] **T330: A/B 품질 모니터링 자동화** ✅ 2026-03-02
+  - (DONE 섹션에 상세 기록)
+
+- [x] **T331: 스케일 기반 자동 트리거** ✅ 2026-03-02
+  - (DONE 섹션에 상세 기록)
+
+- [x] **T332: 엔진 스튜디오 최적화 로그 뷰어** ✅ 2026-03-02
+  - (DONE 섹션에 상세 기록)
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
@@ -2024,6 +2048,58 @@
 ---
 
 ## ✅ DONE (최근 완료)
+
+### Phase v4.1-OPT 완료 (T327~T332) ✅ 2026-03-02
+
+- [x] **T327: 최적화 설정 모듈 — optimization-config.ts** ✅ 2026-03-02
+  - AC1: ✅ `HAIKU_WHITELIST` — 6개 안전 callType 화이트리스트 (pw:news_analysis, pw:impression, cold_start_summary, metadata_extraction, tag_classification, sentiment_label)
+  - AC2: ✅ `OPTIMIZATION_THRESHOLDS` — 5단계 임계값 (batch_comment:10+, haiku_routing:50+, vector_cache:100+, arena_auto_schedule:200+, memory_index:500+)
+  - AC3: ✅ `DEFAULT_BATCH_COMMENT_CONFIG` — maxBatchSize:3, qualityThreshold:0.9, maxRegenerationAttempts:2
+  - AC4: ✅ `DEFAULT_AB_MONITOR_CONFIG` — comparisonWindowDays:7, minSampleSize:30, significanceThreshold:0.05
+  - AC5: ✅ `global-config/index.ts` re-export + 38 tests PASS + Build PASS
+  - 변경파일: optimization-config.ts(신규), optimization-config.test.ts(신규), global-config/index.ts
+
+- [x] **T328: Haiku 화이트리스트 자동 라우팅** ✅ 2026-03-02
+  - AC1: ✅ `resolveModelWithRouting()` — 모델 결정 4단계: params.model → Haiku whitelist → DB callTypeOverrides → DEFAULT_MODEL
+  - AC2: ✅ Prisma 스키마 — LlmUsageLog에 routingReason, batchGroupId, isRegenerated 필드 추가
+  - AC3: ✅ `RoutingReason` 타입 (explicit_param | haiku_whitelist | config_override | default_model) + logUsage 추적
+  - AC4: ✅ 기존 callTypeOverrides 공존 (명시적 DB 오버라이드 우선)
+  - AC5: ✅ 기존 8 tests PASS + Build PASS
+  - 변경파일: llm-client.ts, schema.prisma
+
+- [x] **T329: 배치 댓글 생성 + 품질 게이트 자동 재생성** ✅ 2026-03-02
+  - AC1: ✅ `batch-comment-generator.ts` — N개 댓글 1 LLM 호출 생성 (JSON 배열)
+  - AC2: ✅ 품질 채점: 길이(40%) + 톤 매칭(30%) + 자연스러움(30%), threshold=0.9
+  - AC3: ✅ 0.9 미만 자동 재생성 (최대 2회, 점수 개선 시 교체, 실패 시 최선 결과 유지)
+  - AC4: ✅ BatchLLMProvider/QualityScorer 인터페이스 (테스트 가능한 DI 구조)
+  - AC5: ✅ buildBatchPrompt + parseBatchResponse (JSON 파싱 + 줄바꿈 폴백)
+  - AC6: ✅ 26 tests PASS + Build PASS
+  - 변경파일: batch-comment-generator.ts(신규), batch-comment-generator.test.ts(신규)
+
+- [x] **T330: A/B 품질 모니터링 자동화** ✅ 2026-03-02
+  - AC1: ✅ `optimization-monitor.ts` — llmUsageLog 기반 자동 집계
+  - AC2: ✅ Haiku vs Sonnet 비교 (callType별 avgCost, avgDuration, sampleCount, costSavingsPercent)
+  - AC3: ✅ 배치 vs 개별 댓글 비교 (batchGroupId 유무 기준)
+  - AC4: ✅ 자동 경고 3종: quality_drop(critical), cost_savings(info), performance_change(warning)
+  - AC5: ✅ roundCost() 6자리 정밀도로 USD 미소액 정확도 보장
+  - AC6: ✅ 18 tests PASS + Build PASS
+  - 변경파일: optimization-monitor.ts(신규), optimization-monitor.test.ts(신규)
+
+- [x] **T331: 스케일 기반 자동 트리거** ✅ 2026-03-02
+  - AC1: ✅ `scale-trigger.ts` — checkScaleTrigger() 페르소나 수 기반 단계 결정
+  - AC2: ✅ ScaleTriggerState 캐시 (lastPersonaCount, activeFeatures, lastCheckedAt)
+  - AC3: ✅ getCheckIntervalMs() 적응형 체크 간격 (1분/3분/5분/10분)
+  - AC4: ✅ formatChangeForActivity() — 활성화/비활성화 이벤트 포맷
+  - AC5: ✅ 17 tests PASS + Build PASS
+  - 변경파일: scale-trigger.ts(신규), scale-trigger.test.ts(신규)
+
+- [x] **T332: 엔진 스튜디오 최적화 로그 뷰어** ✅ 2026-03-02
+  - AC1: ✅ `GET /api/internal/persona-world-admin/operations/optimization` — 최적화 대시보드 (days, limit 파라미터)
+  - AC2: ✅ `/persona-world-admin/operations/optimization` 읽기 전용 페이지
+  - AC3: ✅ 5개 섹션: 현재 상태, Haiku 라우팅 통계, A/B 비교, 자동 경고, 최근 로그 테이블
+  - AC4: ✅ 기간 선택(7/14/30일) + 새로고침 + 로딩 스켈레톤
+  - AC5: ✅ Build PASS (99 v4.1 tests ALL PASS)
+  - 변경파일: operations/optimization/route.ts(신규), operations/optimization/page.tsx(신규)
 
 - [x] **T260: COLLAB 포스트 팬텀 멘션 방지 — LLM 환각 @멘션 근본 수정** ✅ 2026-03-01
   - 버그: LLM이 COLLAB 포스트에서 DB에 없는 페르소나를 @멘션 (예: @시네마틱\_레이어)

@@ -2,6 +2,7 @@
 // LLM Client — Anthropic SDK 기반 통합 클라이언트
 // 페르소나 테스트 생성 및 향후 LLM 호출에 공통 사용
 // T143: Prompt Caching 지원 — 정적 prefix를 캐시하여 비용 절감
+// T328: Haiku 화이트리스트 자동 라우팅 + routingReason 추적
 // ═══════════════════════════════════════════════════════════════
 
 import Anthropic from "@anthropic-ai/sdk"
@@ -12,8 +13,10 @@ import {
   createModelConfig,
   resolveModelForCallType,
   buildDefaultCallTypeOverrides,
+  isHaikuWhitelisted,
+  MODEL_API_IDS,
 } from "@/lib/global-config"
-import type { SafetyFilter, FilterAction, ModelConfig } from "@/lib/global-config"
+import type { SafetyFilter, FilterAction, ModelConfig, RoutingReason } from "@/lib/global-config"
 import type { Prisma } from "@/generated/prisma"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
@@ -227,6 +230,43 @@ async function saveSafetyFilterLogs(filter: SafetyFilter): Promise<void> {
   })
 }
 
+// ── 모델 라우팅 (T328) ─────────────────────────────────────────
+
+const HAIKU_API_MODEL = MODEL_API_IDS["claude-haiku"]
+
+/**
+ * 모델 결정 + 라우팅 이유 추적.
+ *
+ * 우선순위:
+ * 1. params.model (명시적 지정) → explicit_param
+ * 2. Haiku 화이트리스트 (callType 기반) → haiku_whitelist
+ * 3. DB callTypeOverrides (UI 설정) → config_override
+ * 4. DEFAULT_MODEL → default_model
+ */
+async function resolveModelWithRouting(
+  params: LLMGenerateParams
+): Promise<{ model: string; routingReason: RoutingReason }> {
+  // 1. 명시적 모델 지정
+  if (params.model) {
+    return { model: params.model, routingReason: "explicit_param" }
+  }
+
+  // 2. Haiku 화이트리스트 자동 라우팅
+  if (params.callType && isHaikuWhitelisted(params.callType)) {
+    return { model: HAIKU_API_MODEL, routingReason: "haiku_whitelist" }
+  }
+
+  // 3. DB callTypeOverrides → 4. DEFAULT_MODEL
+  const modelConfig = await loadModelConfigCached()
+  const resolved = resolveModelForCallType(modelConfig, params.callType)
+
+  // callTypeOverrides에서 해석된 건지 default인지 구분
+  const hasOverride = params.callType ? !!modelConfig.callTypeOverrides[params.callType] : false
+  const routingReason: RoutingReason = hasOverride ? "config_override" : "default_model"
+
+  return { model: resolved, routingReason }
+}
+
 // ── 생성 함수 ─────────────────────────────────────────────────
 
 const DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
@@ -238,14 +278,9 @@ export async function generateText(params: LLMGenerateParams): Promise<LLMGenera
   const maxTokens = params.maxTokens ?? DEFAULT_MAX_TOKENS
   const temperature = params.temperature ?? DEFAULT_TEMPERATURE
 
-  // 모델 결정: params.model(명시적) → DB callTypeOverrides → DEFAULT_MODEL
-  let model: string
-  if (params.model) {
-    model = params.model
-  } else {
-    const modelConfig = await loadModelConfigCached()
-    model = resolveModelForCallType(modelConfig, params.callType)
-  }
+  // 모델 결정 (T328 확장):
+  // 우선순위: params.model(명시적) → Haiku 화이트리스트 → DB callTypeOverrides → DEFAULT_MODEL
+  const { model, routingReason } = await resolveModelWithRouting(params)
 
   const startTime = Date.now()
   let result: LLMGenerateResult
@@ -316,6 +351,7 @@ export async function generateText(params: LLMGenerateParams): Promise<LLMGenera
       errorMessage: null,
       cacheCreationInputTokens: result.cacheCreationInputTokens,
       cacheReadInputTokens: result.cacheReadInputTokens,
+      routingReason,
     }).catch(() => {
       // 로깅 실패 무시
     })
@@ -335,6 +371,7 @@ export async function generateText(params: LLMGenerateParams): Promise<LLMGenera
       errorMessage,
       cacheCreationInputTokens: 0,
       cacheReadInputTokens: 0,
+      routingReason,
     }).catch(() => {
       // 로깅 실패 무시
     })
@@ -356,6 +393,10 @@ interface LogUsageParams {
   errorMessage: string | null
   cacheCreationInputTokens: number
   cacheReadInputTokens: number
+  // v4.1 최적화 추적 (T328)
+  routingReason?: RoutingReason
+  batchGroupId?: string
+  isRegenerated?: boolean
 }
 
 async function logUsage(params: LogUsageParams): Promise<void> {
@@ -382,6 +423,10 @@ async function logUsage(params: LogUsageParams): Promise<void> {
         params.cacheCreationInputTokens > 0 ? params.cacheCreationInputTokens : null,
       cacheReadInputTokens: params.cacheReadInputTokens > 0 ? params.cacheReadInputTokens : null,
       cacheSavingsUsd: cacheSavings > 0 ? cacheSavings : null,
+      // v4.1 최적화 추적 (T328)
+      routingReason: params.routingReason ?? null,
+      batchGroupId: params.batchGroupId ?? null,
+      isRegenerated: params.isRegenerated ?? false,
     },
   })
 }
