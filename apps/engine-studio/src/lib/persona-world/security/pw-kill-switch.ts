@@ -157,6 +157,87 @@ export function setGlobalFreeze(
   return updated
 }
 
+// ── 자동 트리거 조건 검사 (T284) ────────────────────────────
+
+/**
+ * 보안 이벤트 집계 데이터.
+ */
+export interface SecurityEventStats {
+  /** 최근 1시간 BLOCK 횟수 */
+  blockCountLastHour: number
+  /** 최근 24시간 PII BLOCK 횟수 */
+  piiBlockCountLast24h: number
+  /** 벡터 이상 페르소나 비율 (0~1) */
+  driftPercentage: number
+  /** 일 예산 대비 사용 비율 (1.0 = 100%) */
+  dailyBudgetUsageRatio: number
+}
+
+/**
+ * 자동 트리거 조건 4종 검사 (T284).
+ *
+ * AC2: Injection Surge — 10+ BLOCK/1h → FREEZE_USER_INTERACTION
+ * AC3: PII Leak Surge — 5+ PII block/24h → FREEZE_POST_GENERATION
+ * AC4: Collective Drift — 20%+ 페르소나 벡터 이상 → GLOBAL_FREEZE
+ * AC5: Cost Overrun — 일 예산 150% → FREEZE_POST_AND_COMMENT
+ */
+export function checkAutoTriggers(
+  config: PWKillSwitchConfig,
+  stats: SecurityEventStats
+): PWKillSwitchConfig {
+  let updated = config
+
+  // AC2: Injection Surge — 10+ BLOCK/1h
+  if (stats.blockCountLastHour >= 10) {
+    const alreadyTriggered = config.activeTriggers.some((t) => t.type === "INJECTION_SURGE")
+    if (!alreadyTriggered) {
+      updated = applyAutoTrigger(
+        updated,
+        "INJECTION_SURGE",
+        `${stats.blockCountLastHour} blocks in last hour (threshold: 10)`
+      )
+    }
+  }
+
+  // AC3: PII Leak Surge — 5+ PII block/24h
+  if (stats.piiBlockCountLast24h >= 5) {
+    const alreadyTriggered = config.activeTriggers.some((t) => t.type === "PII_LEAK_SURGE")
+    if (!alreadyTriggered) {
+      updated = applyAutoTrigger(
+        updated,
+        "PII_LEAK_SURGE",
+        `${stats.piiBlockCountLast24h} PII blocks in last 24h (threshold: 5)`
+      )
+    }
+  }
+
+  // AC4: Collective Drift — 20%+
+  if (stats.driftPercentage >= 0.2) {
+    const alreadyTriggered = config.activeTriggers.some((t) => t.type === "COLLECTIVE_DRIFT")
+    if (!alreadyTriggered) {
+      updated = setGlobalFreeze(
+        updated,
+        true,
+        `${(stats.driftPercentage * 100).toFixed(1)}% personas drifted (threshold: 20%)`
+      )
+    }
+  }
+
+  // AC5: Cost Overrun — 일 예산 150%
+  if (stats.dailyBudgetUsageRatio >= 1.5) {
+    const alreadyTriggered = config.activeTriggers.some((t) => t.type === "COST_OVERRUN")
+    if (!alreadyTriggered) {
+      updated = applyAutoTrigger(
+        updated,
+        "COST_OVERRUN",
+        `Daily budget usage at ${(stats.dailyBudgetUsageRatio * 100).toFixed(0)}% (threshold: 150%)`
+      )
+    }
+  }
+
+  return updated
+}
+
 /**
  * 자동 트리거 발동.
  */
