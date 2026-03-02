@@ -4,7 +4,7 @@
 **작성일**: 2026-02-16
 **최종 수정**: 2026-02-17
 **상태**: Active
-**설계서 참조**: `docs/design/persona-engine-v4.md`
+**설계서 참조**: `docs/design/persona-engine-v4-design.md`
 
 ---
 
@@ -1141,7 +1141,7 @@ const ESTIMATED_TOKENS = {
 
 ## 12. 매칭 알고리즘 구현
 
-> **설계서 참조**: `persona-engine-v4.md` §12
+> **설계서 참조**: `persona-engine-v4-design.md` §12
 
 ### 12.1 3-Tier 매칭 전략
 
@@ -1202,7 +1202,7 @@ applySocialBoost(matchResults, socialGraph): MatchResult[]
 
 ## 13. 품질 피드백 루프 구현
 
-> **설계서 참조**: `persona-engine-v4.md` §13
+> **설계서 참조**: `persona-engine-v4-design.md` §13
 
 ### 13.1 Auto-Interview (엔진 코어)
 
@@ -1290,7 +1290,7 @@ runQualityFeedbackLoop(personaId): FeedbackLoopResult
 
 ## 14. LLM 모델 전략
 
-> **설계서 참조**: `persona-engine-v4.md` §14
+> **설계서 참조**: `persona-engine-v4-design.md` §14
 
 ### 14.1 2-Tier 라우팅
 

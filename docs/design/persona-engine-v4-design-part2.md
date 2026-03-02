@@ -1,6 +1,6 @@
 # DeepSight Persona Engine v4.0 — Intelligence (섹션 6~10)
 
-**상위 문서**: [`persona-engine-v4.md`](./persona-engine-v4.md)
+**상위 문서**: [`persona-engine-v4-design.md`](./persona-engine-v4-design.md)
 **버전**: v4.0
 **작성일**: 2026-02-17
 **상태**: Draft
@@ -2069,3 +2069,78 @@ interface KillSwitch {
 | Data Arch. (§8) | Emotion → Data     | mood 갱신이 PersonaState(Memory Layer)에 반영            |
 | Vectors (§3)    | Emotion → Vectors  | mood가 Pressure Coefficient 계산에 영향 (§3.4)           |
 | Execution       | Emotion → Exec     | 갱신된 mood가 프롬프트 Dynamic 블록에 반영               |
+
+---
+
+## Appendix A: 연구 기반 보강 제안 (v4.1+)
+
+> 학술 연구 기반 분석. 기존 v4.0 설계를 유지하며 보강하는 방향.
+> 원본: `persona-engine-v4-research-review.md` (통합 후 삭제)
+
+---
+
+### A.1 공감/사회적 지능 평가 (§7.3/§13 보강)
+
+#### 현재 설계의 공백
+
+v4.0 아레나 심판 4차원은 모두 **페르소나 내부 일관성**을 측정하며, **사회적 상호작용 능력** — 공감, 맥락 파악, 적절한 사회적 반응 — 을 직접 평가하지 않는다.
+
+| 차원               | 가중치 | 평가 내용              |
+| ------------------ | ------ | ---------------------- |
+| voiceConsistency   | 0.30   | 보이스 스펙 준수       |
+| factbookAccuracy   | 0.25   | 팩트북 일치            |
+| characterDepth     | 0.25   | 캐릭터 깊이와 일관성   |
+| interactionQuality | 0.20   | 대화 품질과 자연스러움 |
+
+#### 이론적 근거
+
+- **SOTOPIA [R14]**: GPT-4를 포함한 최신 LLM이 전략적 소통과 목표 달성에서 인간에 미달. Believability·Relationship·Social Rules 3개 차원을 아레나 심판에 통합 권장.
+- **Sorin et al. [R15]**: ChatGPT가 78.6%에서 인간 의사보다 공감적으로 평가됨. 동시에 표면적 공감과 실질적 공감 이해 사이의 괴리 경고. → 맥락 적합성(contextual appropriateness) 측정 우선.
+- **Lee et al. [R16]**: 공감이 과도할 때(무비판적 동조) 오히려 신뢰 손상. → 공감 점수에 상한 패널티 도입.
+
+#### 보강 방향: 심판 평가 차원 확장
+
+| 차원                     | 기존 가중치 | 보강 가중치 |
+| ------------------------ | ----------- | ----------- |
+| voiceConsistency         | 0.30        | 0.25        |
+| factbookAccuracy         | 0.25        | 0.22        |
+| characterDepth           | 0.25        | 0.23        |
+| interactionQuality       | 0.20        | 0.18        |
+| **empathicIntelligence** | —           | **0.12**    |
+
+#### empathicIntelligence 세부 평가 기준
+
+```typescript
+interface EmpathicIntelligenceScore {
+  contextualAppropriateness: number // 감정적 맥락에 맞는 반응 (0~1)
+  perspectiveTaking: number // 상대방 관점 반영 여부 (0~1)
+  socialRuleAdherence: number // 사회적 규범 준수 (0~1)
+  empathyCalibration: number // 과도한 동조 패널티 반영 (0~1)
+  score: number // 4항목 평균
+}
+```
+
+#### Auto-Interview 보강 문항 (E1~E6)
+
+| 번호 | 측정 차원                  | 문항 (예시)                                      |
+| ---- | -------------------------- | ------------------------------------------------ |
+| E1   | Believability              | 이 페르소나의 반응이 설정과 일관되게 느껴지는가? |
+| E2   | Perspective Taking         | 상대방의 감정/상황을 페르소나가 인식하고 있는가? |
+| E3   | Social Rules               | 대화에서 사회적 에티켓을 준수하는가?             |
+| E4   | Contextual Appropriateness | 감정적 맥락에 맞는 반응을 하는가?                |
+| E5   | Empathy Calibration        | 공감이 과도하게 무비판적이지 않은가?             |
+| E6   | Relationship Contribution  | 이 인터랙션이 관계에 긍정적으로 기여하는가?      |
+
+#### 기존 설계와의 통합 지점
+
+| 통합 대상                         | 변경 내용                                             |
+| --------------------------------- | ----------------------------------------------------- |
+| 아레나 심판 (`§7.3`)              | `empathicIntelligence` 추가, 가중치 재배분            |
+| Auto-Interview (`§13.1`)          | E1~E6 문항 추가 (20항 → 26항)                         |
+| Persona Integrity Score (`§13.2`) | `interactionQuality` 채점 시 empathy calibration 반영 |
+
+#### References
+
+- [R14] Zhou, X., et al. (2024). SOTOPIA. _ICLR 2024_.
+- [R15] Sorin, V., et al. (2024). _npj Breast Cancer_.
+- [R16] Lee, Y. C., et al. (2024). _arXiv:2403.05572_.

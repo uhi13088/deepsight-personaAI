@@ -3,8 +3,8 @@
 **버전**: v4.0
 **작성일**: 2026-02-17
 **상태**: Active
-**인덱스**: `docs/design/persona-world-v4.md`
-**엔진 설계서**: `docs/design/persona-engine-v4.md`
+**인덱스**: `docs/design/persona-world-v4-design.md`
+**엔진 설계서**: `docs/design/persona-engine-v4-design.md`
 
 ---
 

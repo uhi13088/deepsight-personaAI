@@ -3,9 +3,9 @@
 **버전**: v4.0
 **작성일**: 2026-02-17
 **상태**: Active
-**설계서 참조**: [`persona-engine-v4.md`](./persona-engine-v4.md)
-**Part 1 (§1~§5)**: [`persona-engine-v4-core.md`](./persona-engine-v4-core.md)
-**Part 2 (§6~§10)**: [`persona-engine-v4-intelligence.md`](./persona-engine-v4-intelligence.md)
+**설계서 참조**: [`persona-engine-v4-design.md`](./persona-engine-v4-design.md)
+**Part 1 (§1~§5)**: [`persona-engine-v4-design-part1.md`](./persona-engine-v4-design-part1.md)
+**Part 2 (§6~§10)**: [`persona-engine-v4-design-part2.md`](./persona-engine-v4-design-part2.md)
 
 ---
 
@@ -1940,3 +1940,224 @@ v4.0 Foundation
 | 텍스트 전용 콘텐츠 벡터 | v4.0      | v4.2      | 멀티모달 콘텐츠 매칭 불가    |
 | 관리자 의존 교정 승인   | v4.0      | v5.0      | 교정 주기 병목               |
 | 개별 페르소나 단위 운영 | v4.0      | v5.1      | 집단 역학 미반영             |
+
+---
+
+## Appendix A: 연구 기반 보강 제안 (v4.1+)
+
+> 학술 연구 기반 분석. 기존 v4.0 설계를 유지하며 보강하는 방향.
+> 원본: `persona-engine-v4-research-review.md` (통합 후 삭제)
+
+---
+
+### A.1 매칭 알고리즘의 신뢰 신호 (§12 보강)
+
+#### 현재 설계의 공백
+
+두 Tier 모두 **정적 벡터 유사도**에만 의존하며, 실제 인터랙션을 통해 축적된 **관계 신뢰(trust)**가 매칭 점수에 반영되지 않는다.
+
+결과적으로:
+
+- 벡터가 유사해도 실제 인터랙션에서 갈등이 잦은 페르소나 쌍이 계속 상위 매칭됨
+- 장기 인터랙션을 통해 신뢰가 검증된 관계가 벡터 미스매치로 하위 매칭됨
+
+#### 이론적 근거
+
+- **Golbeck — FilmTrust [R1]**: 소셜 네트워크 신뢰를 CF에 통합, 평균에서 벗어난 취향 사용자에서 MAE 유의미 감소.
+- **Massa & Avesani — TARS [R2]**: 신뢰 메트릭으로 cold-start 사용자 정확도+커버리지 동시 향상.
+- **Tkalcic & Chen [R3]**: Big Five는 도메인 독립적이며 cold-start 완화에 효과적.
+- **Hu & Pu [R4]**: 성격 벡터 코사인 유사도로 CF 강화, 롱테일 정확도 향상.
+
+#### 보강 방향: 신뢰 가중 매칭 점수
+
+> **참고**: v4.0 구현(`trust-score.ts`)에서 이미 유사한 TrustScore가 구현되어 있음.
+> 아래는 원본 연구 기반 초기 제안으로, 구현 시 기존 코드와 정합 필요.
+
+**Trust Score 합성**:
+
+```typescript
+function computeTrustScore(history: InteractionHistory): number {
+  const persistence = clamp(history.totalSessions / 30, 0, 1)
+  const resolution = history.conflictResolutionRate
+  const depthTrend = clamp(history.engagementDepthSlope, 0, 1)
+  return 0.4 * persistence + 0.35 * resolution + 0.25 * depthTrend
+}
+```
+
+**매칭 점수 통합**:
+
+```
+TrustWeightedScore = (1 - λ) × VectorScore + λ × TrustScore
+λ = min(0.30, 0.05 × log(1 + totalSessions))
+```
+
+- 인터랙션 없음(totalSessions=0): λ=0 → 순수 벡터 유사도
+- 10세션: λ≈0.115
+- 30세션+: λ=0.30 (상한)
+
+**Cold-Start 처리**: 신규 유저는 L2(OCEAN) 유사도를 대리 지표로 활용. 첫 3회 인터랙션 이후부터 실제 TrustScore 계산 시작.
+
+#### References
+
+- [R1] Golbeck, J. (2006). In _iTrust 2006_, LNCS 3986, 93–104.
+- [R2] Massa, P., & Avesani, P. (2007). In _RecSys 2007_, 17–24.
+- [R3] Tkalcic, M., & Chen, L. (2015). In _RecSys Handbook_ (2nd ed.), 715–739.
+- [R4] Hu, R., & Pu, P. (2011). In _RecSys 2011_, 197–204.
+
+---
+
+### A.2 출력 다양성 & 성격 일관성 (§13 보강)
+
+#### 현재 설계의 공백
+
+1. **반복성 방지 없음**: 동일 패턴 반복 시 인터랙션 동기 저하(habituation) [R9]
+2. **언어 정렬 미측정**: Frisch & Giulianelli [R18]의 lexical alignment이 Integrity Score에 미반영
+3. **다양성-일관성 트레이드오프 미설계**: 명시적 관리 메커니즘 없음
+
+#### 이론적 근거
+
+- **Bickmore & Picard [R9]**: 동일한 인터랙션 패턴 반복 → 관계 동기 저하.
+- **Frisch & Giulianelli [R18]**: 어휘 중복률이 성격 일관성의 유효한 프록시. 과도한 정렬은 다양성 저하와 상관.
+- **Chen et al. [R19]**: 장기 대화에서 초기 성격 설정 희석되는 persona drift 문제. Drift 감지 + 재앵커링 필요.
+- **Anthropic — The Assistant Axis [R23]**: 캐릭터 정체성을 활성화 공간의 안정적 방향으로 고정하는 것이 일관성 유지의 핵심.
+
+#### 보강 방향 1: 다양성 점수 (DiversityScore)
+
+```typescript
+interface DiversityMetrics {
+  ngramOverlapRate: number // 최근 10개 출력 간 trigram 중복률 (낮을수록 다양)
+  templateUsageRate: number // 고정 문구/패턴 사용 빈도 (낮을수록 다양)
+  sentimentVariance: number // 감정 표현 분산 (높을수록 다양)
+  topicCoverageScore: number // 다룬 주제 범위 (높을수록 다양)
+}
+// DiversityScore = 4 지표 가중 평균, 목표 > 0.6
+```
+
+**개입 트리거**:
+
+```
+DiversityScore < 0.4  → 경고 (Arena 검토 대상 플래그)
+DiversityScore < 0.3  → 다양성 주입 프롬프트 활성화
+```
+
+#### 보강 방향 2: 언어 정렬 기반 일관성 측정
+
+```typescript
+interface LexicalAlignmentMetrics {
+  coreVocabularyConsistency: number // 핵심 어휘 사용률
+  stylemarkerStability: number // 말버릇/습관 표현 출현율
+  registerConsistency: number // 격식도 수준 분산 (낮을수록 일관)
+}
+// LexicalAlignmentScore = 3 지표 평균, 목표 > 0.7
+```
+
+**Persona Integrity Score 확장**:
+
+```
+기존:
+PersonaIntegrityScore = 0.35 × ContextRecall + 0.35 × SettingConsistency + 0.30 × CharacterStability
+
+보강:
+PersonaIntegrityScore = 0.30 × ContextRecall + 0.28 × SettingConsistency
+                      + 0.27 × CharacterStability + 0.15 × LexicalAlignmentScore
+```
+
+#### 보강 방향 3: Persona Drift 감지
+
+```typescript
+function computePersonaDrift(current: VoiceStyleParams, baseline: VoiceStyleParams): number {
+  const params = Object.keys(baseline) as (keyof VoiceStyleParams)[]
+  const totalDelta = params.reduce((sum, key) => sum + Math.abs(current[key] - baseline[key]), 0)
+  return totalDelta / params.length
+}
+```
+
+**임계값**:
+
+```
+drift < 0.1   → 정상
+drift 0.1~0.2 → 경고 (Arena 재교정 권고)
+drift > 0.2   → 자동 재앵커링 (VoiceSpec 기준값으로 soft reset)
+```
+
+#### 다양성-일관성 균형 지표
+
+```
+BalanceScore = min(DiversityScore / 0.6, 1.0) × min(LexicalAlignmentScore / 0.7, 1.0)
+목표: BalanceScore > 0.70
+```
+
+Arena 스케줄링 시 BalanceScore가 낮은 페르소나 우선 교정.
+
+#### 기존 설계와의 통합 지점
+
+| 통합 대상                         | 변경 내용                                           |
+| --------------------------------- | --------------------------------------------------- |
+| Persona Integrity Score (`§13.2`) | `LexicalAlignmentScore` 4번째 구성요소로 추가       |
+| 아레나 교정 루프 (`§7.4`)         | DiversityScore < 임계값 시 교정 트리거 추가         |
+| 보이스 스펙 (`§4.3`)              | `baselineVoiceParams` 최초 스냅샷 저장 필드 추가    |
+| 인큐베이터 대시보드               | DiversityScore + PersonaDrift 지표 시각화 패널 추가 |
+
+#### References
+
+- [R9] Bickmore, T., & Picard, R. W. (2005). _ACM TOCHI_, 12(2), 293–327.
+- [R18] Frisch, I., & Giulianelli, M. (2024). _arXiv:2402.02764_.
+- [R19] Chen, J., et al. (2024). _arXiv:2406.01171_.
+- [R23] Anthropic. (2026). _The Assistant Axis_. Anthropic Research.
+
+---
+
+### A.3 종합 로드맵
+
+#### 보강 제안 요약
+
+| 영역          | 핵심 제안                                        | 구현 복잡도 | 임팩트  | 위치   |
+| ------------- | ------------------------------------------------ | ----------- | ------- | ------ |
+| 관계 모델     | 6단계 양방향 모델 (COOLING/DORMANT + 재활성화)   | 중          | 높음    | Part 1 |
+| 라포르 메트릭 | 3요소 RapportScore (상호주의/긍정성/조율)        | 중          | 높음    | Part 1 |
+| 매칭 신뢰     | Trust-Weighted Matching (λ 동적 가중)            | 중          | 중-높음 | Part 3 |
+| 벡터 이론     | L1/L3 차원 심리학 매핑 문서화                    | 낮음        | 중      | Part 1 |
+| 공감 평가     | 아레나 empathicIntelligence 차원 + E1~E6 문항    | 중          | 높음    | Part 2 |
+| 출력 품질     | DiversityScore + LexicalAlignment + PersonaDrift | 높음        | 높음    | Part 3 |
+
+#### 구현 우선순위
+
+**Phase 1** — 이론 기반 확보 (문서 수준, 코드 변경 없음)
+
+- L1/L3 차원 심리학 매핑 명시, Auto-Interview E1~E6 추가, 관계 모델 COOLING/DORMANT 설계서 반영
+
+**Phase 2** — 관계·라포르 인프라 (DB 스키마 변경 포함)
+
+- RelationshipStage COOLING/DORMANT 추가, RapportComponents DB + computeRapportScore(), 소셜 그래프 weight 공식 업데이트
+
+**Phase 3** — 매칭 고도화 (알고리즘 레이어)
+
+- TrustScore 계산기, TrustWeightedScore 매칭 통합, Cold-start L2 우선 매칭 분기
+
+**Phase 4** — 품질 루프 강화 (Arena + Integrity)
+
+- empathicIntelligence 차원, DiversityMetrics 파이프라인, LexicalAlignmentScore + Integrity Score 통합, PersonaDrift 감지
+
+#### 호환성 원칙
+
+1. **기존 필드 삭제 없음**: warmth, tension 등 기존 값 유지, 신규 필드 추가
+2. **단계적 활성화**: Phase별로 독립 배포 가능
+3. **Graceful Degradation**: Trust/Rapport 계산 실패 시 기존 벡터 유사도만으로 fallback
+4. **테스트 우선**: 각 Phase 완료 시 기존 테스트 PASS 후 완료 처리
+
+#### 검증 지표
+
+| 지표                      | 목표값            | 측정 방법                              |
+| ------------------------- | ----------------- | -------------------------------------- |
+| Persona Integrity Score   | ≥ 0.85            | Auto-Interview + LexicalAlignment      |
+| BalanceScore              | ≥ 0.70            | DiversityScore × LexicalAlignmentScore |
+| PersonaDrift              | < 0.10            | VoiceStyleParams 편차                  |
+| TrustWeighted 매칭 정확도 | CF 대비 ≥ 5% 개선 | A/B 테스트 (30세션+ 서브셋)            |
+| empathicIntelligence 점수 | ≥ 0.75            | 아레나 심판 신규 차원                  |
+
+#### 연구 미해결 과제
+
+1. **라포르 요소 가중치 최적화**: RAPPORT_WEIGHTS 값은 [R6]의 정성적 기술에서 추론한 것으로, DeepSight 도메인에 맞는 실증적 교정 필요.
+2. **신뢰 λ 상한값**: 30% 상한은 보수적 선택이며, 실제 인터랙션 데이터 기반 최적화 필요.
+3. **공감 과잉 판별**: empathy calibration 패널티의 임계값은 도메인별로 달라지며, 자동화된 기준 정립이 어려움.
+4. **LLM 성격 드리프트의 원인**: persona drift의 근본 원인이 프롬프트 설계인지 모델 내부 표현인지 미확정. [R23] 후속 연구 모니터링 필요.

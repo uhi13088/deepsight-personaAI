@@ -204,6 +204,7 @@ export default function PersonaListPage() {
           personas={data?.personas ?? []}
           isLoading={isLoading}
           onDelete={handleDeleteRequest}
+          onUpgrade={() => refetch()}
         />
 
         {/* Pagination */}

@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { User, BarChart3, Sparkles, Pencil, Trash2, ArrowUpCircle } from "lucide-react"
+import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { ARCHETYPE_LABELS } from "@/constants/v3/interpretation-tables"
 import type { PersonaListItem } from "@/types"
@@ -102,9 +103,22 @@ export function PersonaCard({ persona, onDelete, onUpgrade }: PersonaCardProps) 
     setIsUpgrading(true)
     try {
       const res = await fetch(`/api/internal/personas/${persona.id}/upgrade`, { method: "POST" })
-      if (res.ok) {
+      const json = await res.json()
+
+      if (res.ok && json.success) {
+        if (json.data.upgraded) {
+          toast.success(`${persona.name} — v${json.data.engineVersion} 업그레이드 완료`, {
+            description: "VoiceSpec, Factbook, TriggerMap이 생성되었습니다.",
+          })
+        } else {
+          toast.info(`${persona.name} — ${json.data.reason ?? "이미 최신 버전입니다"}`)
+        }
         onUpgrade?.(persona.id)
+      } else {
+        toast.error(`업그레이드 실패: ${json.error?.message ?? "알 수 없는 오류"}`)
       }
+    } catch {
+      toast.error("네트워크 오류가 발생했습니다.")
     } finally {
       setIsUpgrading(false)
     }

@@ -6,10 +6,10 @@
 **상태**: Active
 **설계서 참조**:
 
-- 인덱스: `docs/design/persona-world-v4.md`
-- Part 1 Core: `docs/design/persona-world-v4-core.md` (§1-4)
-- Part 2 Social: `docs/design/persona-world-v4-social.md` (§5-8)
-- Part 3 Operations: `docs/design/persona-world-v4-operations.md` (§9-12)
+- 인덱스: `docs/design/persona-world-v4-design.md`
+- Part 1 Core: `docs/design/persona-world-v4-design-part1.md` (§1-4)
+- Part 2 Social: `docs/design/persona-world-v4-design-part2.md` (§5-8)
+- Part 3 Operations: `docs/design/persona-world-v4-design-part3.md` (§9-12)
 
 ---
 
@@ -664,7 +664,7 @@ POST   /api/persona-world/onboarding/sns-connect
 
 ## 9. 보안 통합
 
-> **설계서 참조**: `persona-world-v4-operations.md` §10
+> **설계서 참조**: `persona-world-v4-design-part3.md` §10
 
 ### 9.1 보안 파이프라인 (3경로)
 
@@ -819,7 +819,7 @@ queryByTrustScore(minScore): DataProvenance[]
 
 ## 10. 품질 측정 통합
 
-> **설계서 참조**: `persona-world-v4-operations.md` §9
+> **설계서 참조**: `persona-world-v4-design-part3.md` §9
 
 ### 10.1 Auto-Interview (PW 확장)
 
@@ -985,7 +985,7 @@ trackCorrectionResult(correctionId): CorrectionTracking
 
 ## 11. 모더레이션 & 운영
 
-> **설계서 참조**: `persona-world-v4-operations.md` §11
+> **설계서 참조**: `persona-world-v4-design-part3.md` §11
 
 ### 11.1 자동 모더레이션 파이프라인
 
@@ -1181,7 +1181,7 @@ computeUserExperienceKPIs(): UserExperienceKPIs
 
 ## 12. 비용 모니터링 & 제어
 
-> **설계서 참조**: `persona-world-v4-operations.md` §12
+> **설계서 참조**: `persona-world-v4-design-part3.md` §12
 
 ### 12.1 비용 추적 (확장)
 

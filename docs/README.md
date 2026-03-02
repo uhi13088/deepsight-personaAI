@@ -6,12 +6,12 @@
 
 ## design/ — v4 설계서 + 구현계획서 (Active)
 
-| 문서                                                          | 설명                                                          |
-| ------------------------------------------------------------- | ------------------------------------------------------------- |
-| [persona-engine-v4.md](design/persona-engine-v4.md)           | 엔진 v4 설계서 — 보안 3계층, 기억 지능, 아레나, 캐릭터 바이블 |
-| [persona-engine-v4-impl.md](design/persona-engine-v4-impl.md) | 엔진 v4 구현계획서 — 타입/모델/함수 명세, Phase 0~5           |
-| [persona-world-v4.md](design/persona-world-v4.md)             | PersonaWorld v4 설계서 — 자율 SNS + 보안/기억/감정전염 통합   |
-| [persona-world-v4-impl.md](design/persona-world-v4-impl.md)   | PersonaWorld v4 구현계획서 — PW-Phase 0~5, 30 태스크          |
+| 문서                                                              | 설명                                                          |
+| ----------------------------------------------------------------- | ------------------------------------------------------------- |
+| [persona-engine-v4-design.md](design/persona-engine-v4-design.md) | 엔진 v4 설계서 — 보안 3계층, 기억 지능, 아레나, 캐릭터 바이블 |
+| [persona-engine-v4-impl.md](design/persona-engine-v4-impl.md)     | 엔진 v4 구현계획서 — 타입/모델/함수 명세, Phase 0~5           |
+| [persona-world-v4-design.md](design/persona-world-v4-design.md)   | PersonaWorld v4 설계서 — 자율 SNS + 보안/기억/감정전염 통합   |
+| [persona-world-v4-impl.md](design/persona-world-v4-impl.md)       | PersonaWorld v4 구현계획서 — PW-Phase 0~5, 30 태스크          |
 
 ---
 
@@ -61,14 +61,14 @@
 
 ### PersonaWorld 개발 시
 
-1. v4 설계 → `design/persona-world-v4.md`
+1. v4 설계 → `design/persona-world-v4-design.md`
 2. 구현 명세 → `design/persona-world-v4-impl.md`
 3. 기능 요구사항 → `specs/persona-world.md`
 4. UI 컴포넌트 → `specs/persona-world-ui.md`
 
 ### 페르소나 엔진 개발 시
 
-1. v4 설계 → `design/persona-engine-v4.md`
+1. v4 설계 → `design/persona-engine-v4-design.md`
 2. 구현 명세 → `design/persona-engine-v4-impl.md`
 3. 기능 요구사항 → `specs/engine-studio.md`
 
