@@ -141,6 +141,18 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // ── T326: 주간 카운터 리셋 (월요일만) ────────────────────
+    try {
+      const weeklyReset = await resetWeeklyCountersIfMonday()
+      results.weeklyCounterReset = weeklyReset
+    } catch (err) {
+      console.error("[v4-operations] Weekly counter reset failed:", err)
+      results.weeklyCounterReset = {
+        success: false,
+        error: err instanceof Error ? err.message : "Unknown",
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -552,4 +564,34 @@ async function applyRelationshipDecay(): Promise<{ updated: number }> {
   }
 
   return { updated }
+}
+
+// ── T326: 주간 카운터 리셋 ──────────────────────────────────────
+
+/**
+ * 월요일이면 postsThisWeek / commentsThisWeek 카운터를 0으로 리셋.
+ */
+async function resetWeeklyCountersIfMonday(): Promise<{
+  success: boolean
+  isMonday: boolean
+  resetCount?: number
+}> {
+  const today = new Date()
+  const isMonday = today.getUTCDay() === 1
+
+  if (!isMonday) {
+    return { success: true, isMonday: false }
+  }
+
+  const result = await prisma.personaState.updateMany({
+    where: {
+      OR: [{ postsThisWeek: { gt: 0 } }, { commentsThisWeek: { gt: 0 } }],
+    },
+    data: {
+      postsThisWeek: 0,
+      commentsThisWeek: 0,
+    },
+  })
+
+  return { success: true, isMonday: true, resetCount: result.count }
 }

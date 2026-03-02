@@ -10,12 +10,18 @@ import { getFollowingPosts, type FollowingPostsProvider } from "./following-post
 import { getRecommendedPosts, type RecommendedPostsProvider } from "./recommended-posts"
 import { getTrendingPosts, type TrendingPostsProvider } from "./trending-posts"
 import { interleaveFeed } from "./interleaver"
+import { applyFeedEnhancements, type SocialBoostProvider } from "./social-boost"
 
 /**
  * 피드 엔진 통합 프로바이더.
  */
 export interface FeedDataProvider
   extends FollowingPostsProvider, RecommendedPostsProvider, TrendingPostsProvider {}
+
+/** v4.0 피드 옵션 (optional) */
+export interface FeedEnhancementOptions {
+  socialBoostProvider?: SocialBoostProvider
+}
 
 /**
  * 피드 생성.
@@ -28,7 +34,8 @@ export interface FeedDataProvider
  */
 export async function generateFeed(
   request: FeedRequest,
-  provider: FeedDataProvider
+  provider: FeedDataProvider,
+  enhancementOptions?: FeedEnhancementOptions
 ): Promise<FeedResponse> {
   const limit = request.limit || FEED_DEFAULTS.pageSize
 
@@ -65,13 +72,22 @@ export async function generateFeed(
   ])
 
   // 인터리빙
-  const posts = interleaveFeed(
+  let posts = interleaveFeed(
     followingPosts,
     recommended.basic,
     recommended.exploration,
     recommended.advanced,
     trendingPosts
   )
+
+  // v4.0 T324: 소셜 부스트 + 봇 필터 적용
+  if (enhancementOptions?.socialBoostProvider) {
+    posts = await applyFeedEnhancements(
+      posts,
+      request.userId,
+      enhancementOptions.socialBoostProvider
+    )
+  }
 
   return {
     posts,

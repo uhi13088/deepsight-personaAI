@@ -20,7 +20,11 @@ export { interleaveFeed } from "./interleaver"
 
 // ── Feed Engine ──
 export { generateFeed } from "./feed-engine"
-export type { FeedDataProvider } from "./feed-engine"
+export type { FeedDataProvider, FeedEnhancementOptions } from "./feed-engine"
+
+// ── Social Boost (v4.0) ──
+export { applySocialBoost, filterBotSuspects, applyFeedEnhancements } from "./social-boost"
+export type { SocialBoostProvider, SocialRelation, BotSuspectInfo } from "./social-boost"
 
 // ── Explore Engine ──
 export { getExploreData } from "./explore-engine"

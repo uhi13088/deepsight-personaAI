@@ -272,6 +272,8 @@ export interface FeedPost {
   source: FeedSource
   matchingScore?: number // 추천 포스트인 경우
   matchingExplanation?: string // "취향이 비슷한 페르소나" 등
+  personaId?: string // v4.0: 소셜 부스트/봇 필터용
+  socialBoosted?: boolean // v4.0: 소셜 부스트 적용 여부
 }
 
 // ── Explore ──────────────────────────────────────────────────

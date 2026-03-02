@@ -69,6 +69,16 @@ export async function updatePersonaState(
   const current = await getPersonaState(personaId)
   const updated = applyStateEvent(current, event)
 
+  // v4.0 T326: 활동 카운터 증분 + lastActivityAt 설정
+  const counterUpdate: Record<string, unknown> = {}
+  if (event.type === "post_created") {
+    counterUpdate.postsThisWeek = { increment: 1 }
+    counterUpdate.lastActivityAt = new Date()
+  } else if (event.type === "comment_created") {
+    counterUpdate.commentsThisWeek = { increment: 1 }
+    counterUpdate.lastActivityAt = new Date()
+  }
+
   await prisma.personaState.upsert({
     where: { personaId },
     update: {
@@ -77,6 +87,7 @@ export async function updatePersonaState(
       socialBattery: updated.socialBattery,
       paradoxTension: updated.paradoxTension,
       narrativeTension: updated.narrativeTension ?? 0,
+      ...counterUpdate,
     },
     create: {
       personaId,
@@ -85,6 +96,10 @@ export async function updatePersonaState(
       socialBattery: updated.socialBattery,
       paradoxTension: updated.paradoxTension,
       narrativeTension: updated.narrativeTension ?? 0,
+      ...(event.type === "post_created" ? { postsThisWeek: 1, lastActivityAt: new Date() } : {}),
+      ...(event.type === "comment_created"
+        ? { commentsThisWeek: 1, lastActivityAt: new Date() }
+        : {}),
     },
   })
 

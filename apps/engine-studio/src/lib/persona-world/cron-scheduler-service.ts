@@ -43,6 +43,7 @@ import {
   isSchedulerEnabled,
 } from "@/lib/persona-world/admin/scheduler-service"
 import { SCHEDULING_DELAYS } from "@/lib/persona-world/constants"
+import { createSecurityMiddlewareProvider } from "@/lib/persona-world/security/security-provider-factory"
 import type { CostRunnerProvider, BudgetCheckResult } from "@/lib/persona-world/cost/cost-runner"
 import {
   checkBudgetBeforeExecution,
@@ -185,6 +186,7 @@ export async function executeCronScheduler(): Promise<CronSchedulerResult> {
         const llmProvider = createPostLLMProvider(persona.id)
         const postDataProvider = createPostPipelineProvider()
 
+        const securityProvider = createSecurityMiddlewareProvider(prisma)
         const postResult = await executePostCreation(
           persona,
           {
@@ -196,7 +198,8 @@ export async function executeCronScheduler(): Promise<CronSchedulerResult> {
           context,
           state,
           llmProvider,
-          postDataProvider
+          postDataProvider,
+          { securityProvider }
         )
 
         postResults.push({
@@ -242,7 +245,10 @@ export async function executeCronScheduler(): Promise<CronSchedulerResult> {
             })
           : undefined
 
-        const result = await executeInteractions(persona, state, interactionDP, commentLLM)
+        const securityProvider = createSecurityMiddlewareProvider(prisma)
+        const result = await executeInteractions(persona, state, interactionDP, commentLLM, {
+          securityProvider,
+        })
 
         interactionResults.push({
           personaId: decision.personaId,
