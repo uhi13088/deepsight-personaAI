@@ -127,7 +127,7 @@ export async function POST() {
       // ── TTS 재추론 ──────────────────────────────────────
       // ElevenLabs API 키가 있으면 ElevenLabs 우선 사용 (18개 고유 음성)
       const preferredProvider = process.env.ELEVENLABS_API_KEY ? "elevenlabs" : "openai"
-      const ttsProfile = inferTTSVoiceFromVectors(l1, l2, gender, preferredProvider)
+      const ttsProfile = inferTTSVoiceFromVectors(l1, l2, gender, preferredProvider, l3)
 
       // 중복 voice+speed 조합 회피
       let finalSpeed = ttsProfile.speed

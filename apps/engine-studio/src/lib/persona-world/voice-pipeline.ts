@@ -16,10 +16,11 @@ export interface TTSVoiceConfig {
   pitch?: number
   speed?: number
   language?: string
-  /** ElevenLabs voice_settings — 페르소나 벡터에서 자동 계산 */
+  /** ElevenLabs voice_settings — Voice Engine 10D에서 자동 계산 */
   stability?: number
   similarityBoost?: number
   style?: number
+  useSpeakerBoost?: boolean
 }
 
 export interface STTResult {
@@ -282,7 +283,7 @@ export async function textToSpeechElevenLabs(
         stability: config.stability ?? 0.5,
         similarity_boost: config.similarityBoost ?? 0.75,
         style: config.style ?? 0.0,
-        use_speaker_boost: true,
+        use_speaker_boost: config.useSpeakerBoost ?? true,
       },
     }),
   })

@@ -9,6 +9,11 @@ import type {
   NarrativeDriveVector,
   PersonaArchetype,
 } from "@/types"
+import {
+  computeVoiceCharacter,
+  voiceCharacterToElevenLabs,
+  type VoiceCharacter,
+} from "@/lib/persona-world/voice-engine"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
@@ -23,6 +28,10 @@ export interface TTSVoiceProfile {
   similarityBoost?: number
   /** ElevenLabs: 표현력 (0~1). 높을수록 감정 표현 풍부 */
   style?: number
+  /** ElevenLabs: speaker boost 활성화 여부 */
+  useSpeakerBoost?: boolean
+  /** Voice Engine 10D 캐릭터 벡터 — UI 시각화/디버깅용 */
+  voiceCharacter?: VoiceCharacter
 }
 
 export interface CharacterProfile {
@@ -323,7 +332,7 @@ export function generateCharacter(
   const habits = generateHabits(l2, l3)
   const relationships = generateRelationships(l1, l2, archetype)
 
-  const ttsVoice = inferTTSVoice(l1, l2, gender, preferredTtsProvider)
+  const ttsVoice = inferTTSVoice(l1, l2, l3, gender, preferredTtsProvider)
 
   return {
     name,
@@ -410,13 +419,25 @@ const ELEVENLABS_VOICE_MAP = {
   },
 } as const
 
+/**
+ * L1/L2/L3 벡터 + 성별 → TTSVoiceProfile 통합 추론.
+ *
+ * 파이프라인:
+ *   1. 성격 유형 → base voice ID 선택
+ *   2. Voice Engine 10D: L1/L2/L3 → VoiceCharacter(10차원)
+ *   3. VoiceCharacter → ElevenLabs API params (stability, similarity_boost, style, speed)
+ *
+ * ElevenLabs: 18 base voice × 10D 연속 파라미터 = 사실상 무한한 고유 음색.
+ * OpenAI: 6 base voice + 속도 변화 (voice_settings 미사용).
+ */
 function inferTTSVoice(
   l1: SocialPersonaVector,
   l2: CoreTemperamentVector,
+  l3: NarrativeDriveVector,
   gender: "MALE" | "FEMALE" | "NON_BINARY",
   preferredProvider: "openai" | "elevenlabs" = "openai"
 ): TTSVoiceProfile {
-  // 1. 성격 유형 결정
+  // 1. 성격 유형 → base voice ID
   let personalityKey: "analytical" | "critical" | "social" | "emotional" | "default"
   if (l1.lens > 0.6 && l1.depth > 0.6) {
     personalityKey = "analytical"
@@ -430,85 +451,65 @@ function inferTTSVoice(
     personalityKey = "default"
   }
 
-  // 2. 음성 ID 결정 — provider에 따라 다른 매핑 사용
   const voiceId =
     preferredProvider === "elevenlabs"
       ? ELEVENLABS_VOICE_MAP[gender][personalityKey]
       : OPENAI_VOICE_MAP[gender][personalityKey]
 
-  // 3. 속도 추론 (0.85 ~ 1.20)
-  // 높은 depth → 느림, 높은 sociability/extraversion → 빠름
-  const depthFactor = l1.depth * -0.15 // depth 1.0 → -0.15
-  const socialFactor = l1.sociability * 0.1 // sociability 1.0 → +0.10
-  const extraFactor = l2.extraversion * 0.1 // extraversion 1.0 → +0.10
-  const baseSpeed = 1.0
+  // 2. ElevenLabs → Voice Engine 10D 파이프라인
+  if (preferredProvider === "elevenlabs") {
+    const voiceChar = computeVoiceCharacter(l1, l2, l3)
+    const params = voiceCharacterToElevenLabs(voiceChar)
+    return {
+      provider: "elevenlabs",
+      voiceId,
+      speed: params.speed,
+      language: "ko-KR",
+      stability: params.stability,
+      similarityBoost: params.similarityBoost,
+      style: params.style,
+      useSpeakerBoost: params.useSpeakerBoost,
+      voiceCharacter: voiceChar,
+    }
+  }
+
+  // 3. OpenAI → 속도만 벡터 기반 계산
+  const depthFactor = l1.depth * -0.15
+  const socialFactor = l1.sociability * 0.1
+  const extraFactor = l2.extraversion * 0.1
   const speed =
     Math.round(
-      Math.max(0.85, Math.min(1.2, baseSpeed + depthFactor + socialFactor + extraFactor)) * 100
+      Math.max(0.85, Math.min(1.2, 1.0 + depthFactor + socialFactor + extraFactor)) * 100
     ) / 100
 
-  // 4. ElevenLabs voice_settings — L1/L2 벡터에서 동적 계산
-  //    같은 base voice라도 파라미터 조합으로 고유한 음색 생성
-  const voiceSettings =
-    preferredProvider === "elevenlabs" ? computeElevenLabsVoiceSettings(l1, l2) : undefined
-
   return {
-    provider: preferredProvider,
+    provider: "openai",
     voiceId,
     speed,
     language: "ko-KR",
-    ...voiceSettings,
   }
-}
-
-/**
- * L1/L2 벡터 → ElevenLabs voice_settings 동적 계산.
- *
- * 18개 base voice × 연속 파라미터 조합 = 사실상 무한한 고유 음색.
- * 추가 API 연동 없이 기존 TTS API 호출의 voice_settings만 변경.
- *
- * - stability (0.2~0.9): 음성 일관성. conscientiousness↑ → 안정, neuroticism↑ → 변화
- * - similarityBoost (0.3~0.95): 원본 음성 유사도. depth↑ → 유사, taste↑ → 독특
- * - style (0.0~0.7): 표현력 강도. sociability/extraversion↑ → 풍부, lens↑ → 절제
- */
-function computeElevenLabsVoiceSettings(
-  l1: SocialPersonaVector,
-  l2: CoreTemperamentVector
-): { stability: number; similarityBoost: number; style: number } {
-  // stability: 차분한 성격 → 높음, 신경질적/변덕 → 낮음
-  const rawStability = 0.55 + l2.conscientiousness * 0.25 - l2.neuroticism * 0.2 - l1.stance * 0.1
-  const stability = round2(clamp(rawStability, 0.2, 0.9))
-
-  // similarityBoost: 깊이/분석 → 원본 유지, 실험적 취향 → 독특하게
-  const rawSimilarity = 0.6 + l1.depth * 0.2 - l1.taste * 0.15 + l1.lens * 0.1
-  const similarityBoost = round2(clamp(rawSimilarity, 0.3, 0.95))
-
-  // style: 사교적/외향적 → 표현력 풍부, 분석적 → 절제
-  const rawStyle = 0.1 + l1.sociability * 0.25 + l2.extraversion * 0.2 - l1.lens * 0.1
-  const style = round2(clamp(rawStyle, 0.0, 0.7))
-
-  return { stability, similarityBoost, style }
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value))
-}
-
-function round2(value: number): number {
-  return Math.round(value * 100) / 100
 }
 
 /**
  * 벡터 + 성별에서 TTS 음성을 추론하는 외부 유틸.
  * 파이프라인에서 수동 모드 시 직접 호출 가능.
+ *
+ * L3가 없으면 기본값(0.5)으로 대체 — 하위 호환성 유지.
  */
 export function inferTTSVoiceFromVectors(
   l1: SocialPersonaVector,
   l2: CoreTemperamentVector,
   gender: "MALE" | "FEMALE" | "NON_BINARY" = "NON_BINARY",
-  preferredProvider: "openai" | "elevenlabs" = "openai"
+  preferredProvider: "openai" | "elevenlabs" = "openai",
+  l3?: NarrativeDriveVector
 ): TTSVoiceProfile {
-  return inferTTSVoice(l1, l2, gender, preferredProvider)
+  const narrativeVec: NarrativeDriveVector = l3 ?? {
+    lack: 0.5,
+    moralCompass: 0.5,
+    volatility: 0.5,
+    growthArc: 0.5,
+  }
+  return inferTTSVoice(l1, l2, narrativeVec, gender, preferredProvider)
 }
 
 // ── 이름 생성 (국적 + 성격 일관성 보장) ──────────────────────
