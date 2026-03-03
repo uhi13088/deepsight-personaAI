@@ -17,6 +17,12 @@ export interface TTSVoiceProfile {
   voiceId: string
   speed: number
   language: string
+  /** ElevenLabs: 안정성 (0~1). 높을수록 일관된 음색 */
+  stability?: number
+  /** ElevenLabs: 원본 유사도 (0~1). 높을수록 원본에 가까움 */
+  similarityBoost?: number
+  /** ElevenLabs: 표현력 (0~1). 높을수록 감정 표현 풍부 */
+  style?: number
 }
 
 export interface CharacterProfile {
@@ -441,12 +447,55 @@ function inferTTSVoice(
       Math.max(0.85, Math.min(1.2, baseSpeed + depthFactor + socialFactor + extraFactor)) * 100
     ) / 100
 
+  // 4. ElevenLabs voice_settings — L1/L2 벡터에서 동적 계산
+  //    같은 base voice라도 파라미터 조합으로 고유한 음색 생성
+  const voiceSettings =
+    preferredProvider === "elevenlabs" ? computeElevenLabsVoiceSettings(l1, l2) : undefined
+
   return {
     provider: preferredProvider,
     voiceId,
     speed,
     language: "ko-KR",
+    ...voiceSettings,
   }
+}
+
+/**
+ * L1/L2 벡터 → ElevenLabs voice_settings 동적 계산.
+ *
+ * 18개 base voice × 연속 파라미터 조합 = 사실상 무한한 고유 음색.
+ * 추가 API 연동 없이 기존 TTS API 호출의 voice_settings만 변경.
+ *
+ * - stability (0.2~0.9): 음성 일관성. conscientiousness↑ → 안정, neuroticism↑ → 변화
+ * - similarityBoost (0.3~0.95): 원본 음성 유사도. depth↑ → 유사, taste↑ → 독특
+ * - style (0.0~0.7): 표현력 강도. sociability/extraversion↑ → 풍부, lens↑ → 절제
+ */
+function computeElevenLabsVoiceSettings(
+  l1: SocialPersonaVector,
+  l2: CoreTemperamentVector
+): { stability: number; similarityBoost: number; style: number } {
+  // stability: 차분한 성격 → 높음, 신경질적/변덕 → 낮음
+  const rawStability = 0.55 + l2.conscientiousness * 0.25 - l2.neuroticism * 0.2 - l1.stance * 0.1
+  const stability = round2(clamp(rawStability, 0.2, 0.9))
+
+  // similarityBoost: 깊이/분석 → 원본 유지, 실험적 취향 → 독특하게
+  const rawSimilarity = 0.6 + l1.depth * 0.2 - l1.taste * 0.15 + l1.lens * 0.1
+  const similarityBoost = round2(clamp(rawSimilarity, 0.3, 0.95))
+
+  // style: 사교적/외향적 → 표현력 풍부, 분석적 → 절제
+  const rawStyle = 0.1 + l1.sociability * 0.25 + l2.extraversion * 0.2 - l1.lens * 0.1
+  const style = round2(clamp(rawStyle, 0.0, 0.7))
+
+  return { stability, similarityBoost, style }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value))
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100
 }
 
 /**

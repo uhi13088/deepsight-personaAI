@@ -16,6 +16,10 @@ export interface TTSVoiceConfig {
   pitch?: number
   speed?: number
   language?: string
+  /** ElevenLabs voice_settings — 페르소나 벡터에서 자동 계산 */
+  stability?: number
+  similarityBoost?: number
+  style?: number
 }
 
 export interface STTResult {
@@ -275,9 +279,9 @@ export async function textToSpeechElevenLabs(
       text,
       model_id: "eleven_multilingual_v2",
       voice_settings: {
-        stability: 0.5,
-        similarity_boost: 0.75,
-        style: 0.0,
+        stability: config.stability ?? 0.5,
+        similarity_boost: config.similarityBoost ?? 0.75,
+        style: config.style ?? 0.0,
         use_speaker_boost: true,
       },
     }),
@@ -332,9 +336,9 @@ class TtsCacheStore {
   private misses = 0
   private totalSizeBytes = 0
 
-  /** provider + voiceId + speed + text → SHA-256 키 (16자) */
+  /** provider + voiceId + speed + voice_settings + text → SHA-256 키 (16자) */
   generateKey(text: string, config: TTSVoiceConfig): string {
-    const raw = `${config.provider}|${config.voiceId}|${config.speed ?? 1}|${text}`
+    const raw = `${config.provider}|${config.voiceId}|${config.speed ?? 1}|${config.stability ?? ""}|${config.similarityBoost ?? ""}|${config.style ?? ""}|${text}`
     return createHash("sha256").update(raw).digest("hex").slice(0, 16)
   }
 
@@ -445,6 +449,9 @@ export function buildTTSConfig(persona: {
   ttsPitch?: number | null
   ttsSpeed?: number | null
   ttsLanguage?: string | null
+  ttsStability?: number | null
+  ttsSimilarityBoost?: number | null
+  ttsStyle?: number | null
 }): TTSVoiceConfig {
   return {
     provider: (persona.ttsProvider as TTSProvider) || DEFAULT_TTS_CONFIG.provider,
@@ -452,6 +459,10 @@ export function buildTTSConfig(persona: {
     pitch: persona.ttsPitch != null ? Number(persona.ttsPitch) : DEFAULT_TTS_CONFIG.pitch,
     speed: persona.ttsSpeed != null ? Number(persona.ttsSpeed) : DEFAULT_TTS_CONFIG.speed,
     language: persona.ttsLanguage || DEFAULT_TTS_CONFIG.language,
+    stability: persona.ttsStability != null ? Number(persona.ttsStability) : undefined,
+    similarityBoost:
+      persona.ttsSimilarityBoost != null ? Number(persona.ttsSimilarityBoost) : undefined,
+    style: persona.ttsStyle != null ? Number(persona.ttsStyle) : undefined,
   }
 }
 
