@@ -6,7 +6,14 @@
 // ═══════════════════════════════════════════════════════════════
 
 import type { RelationshipScore } from "../types"
-import { applyWarmthDecay, applyFrequencyDecay } from "./relationship-protocol"
+import {
+  applyWarmthDecay,
+  applyFrequencyDecay,
+  updateMomentum,
+  detectMilestones,
+  updatePeakStage,
+  determineStage,
+} from "./relationship-protocol"
 
 /**
  * 인터랙션 데이터 (관계 업데이트 입력).
@@ -52,6 +59,7 @@ export const DEFAULT_RELATIONSHIP: RelationshipScore = {
   frequency: 0.0,
   depth: 0.0,
   lastInteractionAt: null,
+  attraction: 0.0,
 }
 
 /**
@@ -112,13 +120,61 @@ export function computeRelationshipUpdate(
     depth = clamp(current.depth * 0.7 + (event.chainLength / 10) * 0.3)
   }
 
-  return {
+  // v4.2: attraction 업데이트 (warmth 충분 + tension 낮을 때 자연 성장)
+  let attraction = current.attraction ?? 0
+  if (warmth >= 0.5 && tension <= 0.3) {
+    if (event.type === "comment" && sentimentMod.warmth >= 0) {
+      attraction = clamp(attraction + 0.03) // 댓글이 가장 큰 attraction 성장
+    } else if (event.type === "like") {
+      attraction = clamp(attraction + 0.01)
+    } else if (event.type === "follow") {
+      attraction = clamp(attraction + 0.02)
+    } else if (event.type === "repost") {
+      attraction = clamp(attraction + 0.01)
+    }
+    // 깊은 대화가 attraction 가속
+    if (
+      event.type === "comment" &&
+      event.chainLength !== undefined &&
+      event.chainLength >= 3 &&
+      warmth >= 0.6
+    ) {
+      attraction = clamp(attraction + 0.02)
+    }
+  }
+  // negative 감정은 attraction 감소
+  if (sentimentMod.warmth < 0) {
+    attraction = clamp(attraction - 0.02)
+  }
+
+  const baseUpdate: RelationshipScore = {
     warmth,
     tension,
     frequency,
     depth,
     lastInteractionAt: new Date(),
+    // v4.1: 기존 필드 보존
+    peakStage: current.peakStage,
+    momentum: current.momentum,
+    milestones: current.milestones,
+    // v4.2: attraction 보존
+    attraction,
   }
+
+  // v4.1: 모멘텀 업데이트 (EMA)
+  baseUpdate.momentum = updateMomentum(current, baseUpdate)
+
+  // v4.1: peakStage 갱신
+  const currentStage = determineStage(baseUpdate)
+  baseUpdate.peakStage = updatePeakStage(current.peakStage, currentStage)
+
+  // v4.1: 마일스톤 감지 + 기존 마일스톤에 추가
+  const newMilestones = detectMilestones(current, baseUpdate)
+  if (newMilestones.length > 0) {
+    baseUpdate.milestones = [...(current.milestones ?? []), ...newMilestones]
+  }
+
+  return baseUpdate
 }
 
 /**
@@ -209,12 +265,24 @@ export async function recalculateRelationship(
     depth = current.depth * 0.95
   }
 
+  // v4.2: attraction도 감쇠 (관심은 시간이 지나면 사라짐)
+  const attraction =
+    stats.totalInteractions > 0
+      ? (current.attraction ?? 0) // 활동이 있으면 유지
+      : clamp((current.attraction ?? 0) * 0.93) // 무활동 시 7% 주간 감쇠
+
   const updated: RelationshipScore = {
     warmth: clamp(warmth),
     tension: clamp(tension),
     frequency: clamp(frequency),
     depth: clamp(depth),
     lastInteractionAt: current.lastInteractionAt,
+    // v4.1: 기존 필드 보존 (배치 재계산에서는 모멘텀/마일스톤 변경 없음)
+    peakStage: current.peakStage,
+    momentum: current.momentum,
+    milestones: current.milestones,
+    // v4.2: attraction 보존
+    attraction: clamp(attraction),
   }
 
   await provider.upsertRelationship(personaAId, personaBId, updated)

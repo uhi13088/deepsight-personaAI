@@ -797,6 +797,67 @@
 
 ---
 
+## DONE (v4.1 — 관계 모델 확장)
+
+- [x] **T350~T354: 관계 프로토콜 v4.1 확장** ✅ 2026-03-03
+  - **T350: RelationshipScore 타입 확장**
+    - peakStage (최고 도달 단계 추적), momentum (관계 발전 속도), milestones (이벤트 기록)
+    - RelationshipMilestone 타입 신규 (first_debate/first_vulnerability/first_betrayal/first_deep_share/reconciliation)
+  - **T351: 관계 유형 5→10종 확장**
+    - 기존: NEUTRAL, ALLY, RIVAL, MENTOR, FAN
+    - 신규: CONFIDANT (깊은 신뢰), FRENEMY (모순적 관계), NEMESIS (깊은 적대), MUSE (창작 영감), PROTEGE (멘티)
+    - 각 유형별 TypeModifier 정의 (interactionBoost, debateWillingness, selfDisclosure, extraTones)
+  - **T352: 관계 단계 4→6 forward + ESTRANGED**
+    - 기존 4단계: STRANGER → ACQUAINTANCE → FAMILIAR → CLOSE
+    - 확장 6단계: STRANGER → ACQUAINTANCE → REGULAR → FAMILIAR → INTIMATE → CLOSE
+    - Decay 3단계: COOLING → DORMANT → ESTRANGED (갈등 기반 분리)
+    - 총 9단계, 각 단계별 BehaviorProtocol 정의
+    - ESTRANGED: peakStage ≥ FAMILIAR && tension ≥ 0.7 && warmth ≤ 0.7
+  - **T353: 비대칭/동적 메커니즘**
+    - 모멘텀: computeMomentum (rapid/gradual/stagnant/declining), updateMomentum (EMA)
+    - 마일스톤: detectMilestones (5종 이벤트 감지), computeMilestoneQualityDelta
+    - peakStage: updatePeakStage (최고 단계 추적, decay 단계 무시)
+    - 관계 요약: summarizeRelationship에 모멘텀+마일스톤 서술 추가
+  - **T354: 테스트 전면 업데이트**
+    - 기존 41→126 테스트 (85개 신규 추가)
+    - 신규 유형 10종 분류 검증, 신규 단계 6+3 전환 검증
+    - 모멘텀 시스템 4종, 마일스톤 감지 7종, peakStage 추적 6종
+    - 하위 호환: 기존 API (computeRelationshipProfile, determineStage 등) 시그니처 유지
+  - 변경: types.ts, relationship-protocol.ts, relationship-protocol.test.ts
+  - 테스트: 4479 PASS (114 파일)
+
+- [x] **T355: 관계 유형 대규모 확장 (v4.2)** ✅ 2026-03-03
+  - **T355-1: 타입 시스템 확장 (types.ts)**
+    - RelationshipScore에 `attraction?: number` (0.0~1.0) 로맨틱 감정 지표 추가
+    - RelationshipMilestone에 `first_flirt` / `confession` / `breakup` 3종 로맨틱 마일스톤 추가
+  - **T355-2: 관계 프로토콜 전면 확장 (relationship-protocol.ts)**
+    - 관계 유형 10→22종 확장 (+12종)
+    - 로맨틱 6종: CRUSH, SWEETHEART, LOVER, SOULMATE, EX, OBSESSED
+    - 사회적 3종: GUARDIAN, COMPANION, BESTIE
+    - 감정 복합 3종: TSUNDERE, TOXIC, PUSH_PULL
+    - TYPE_THRESHOLDS 12종 추가 (attraction 기반 임계값)
+    - TYPE_MODIFIERS 12종 추가 (행동 프로필)
+    - determineType() 7그룹 우선순위 재설계 (EX→극한→로맨틱→갈등→긍정심층→중립대→기본)
+    - detectMilestones() 로맨틱 마일스톤 3종 감지 추가
+    - summarizeRelationship() 12종 typeHint + attraction 표시 + 로맨틱 마일스톤 서술
+  - **T355-3: 관계 매니저 attraction 연동 (relationship-manager.ts)**
+    - DEFAULT_RELATIONSHIP에 `attraction: 0.0` 추가
+    - computeRelationshipUpdate(): attraction 성장 (warmth≥0.5+tension≤0.3일 때 comment+0.03, like+0.01, follow+0.02, repost+0.01, 깊은대화 가속+0.02)
+    - recalculateRelationship(): attraction 무활동 감쇠 7%/주
+    - negative 감정 시 attraction 감소 (-0.02)
+  - **T355-4: 파이프라인 일관성 (interaction-pipeline.ts)**
+    - DEFAULT_RELATIONSHIP에 `attraction: 0` 추가 (파이프라인 동기화)
+  - **T355-5: 테스트 확장 (relationship-protocol.test.ts)**
+    - v4.2 determineType: CRUSH/SWEETHEART/LOVER/SOULMATE/EX/OBSESSED/BESTIE/GUARDIAN/COMPANION/TSUNDERE/TOXIC/PUSH_PULL + 우선순위 검증
+    - v4.2 buildProtocol: 9종 신규 유형 TypeModifier 검증
+    - v4.2 detectMilestones: first_flirt/confession/breakup + 동시감지 + 조건불충족 검증
+    - v4.2 summarizeRelationship: attraction 표시 + typeHint + 로맨틱 마일스톤 서술
+    - 기존 테스트 호환성 유지 (MENTOR 분류 기준값 조정)
+  - 변경: types.ts, relationship-protocol.ts, relationship-manager.ts, interaction-pipeline.ts, relationship-protocol.test.ts
+  - 테스트: 4518 PASS (114 파일)
+
+---
+
 ## QUEUE
 
 (없음)

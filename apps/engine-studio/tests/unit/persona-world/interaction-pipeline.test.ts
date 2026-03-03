@@ -48,6 +48,7 @@ vi.mock("@/lib/persona-world/interactions/relationship-protocol", () => ({
       interactionBoost: 1.0,
     },
   })),
+  summarizeRelationship: vi.fn(() => "관계 단계: STRANGER. 관계 유형: NEUTRAL"),
 }))
 
 vi.mock("@/lib/persona-world/interactions/l2-pattern", () => ({
