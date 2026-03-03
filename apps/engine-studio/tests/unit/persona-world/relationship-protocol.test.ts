@@ -155,6 +155,152 @@ describe("determineType", () => {
       determineType(makeScore({ warmth: 0.55, tension: 0.55, frequency: 0.4, depth: 0.2 }))
     ).toBe("FRENEMY")
   })
+
+  // ── v4.2 로맨틱 유형 ──
+
+  it("attraction 0.4 + warmth 0.5 → CRUSH (v4.2)", () => {
+    expect(
+      determineType(makeScore({ warmth: 0.5, tension: 0.1, depth: 0.1, attraction: 0.4 }))
+    ).toBe("CRUSH")
+  })
+
+  it("attraction 0.5 + warmth 0.6 + depth 0.3 → SWEETHEART (v4.2)", () => {
+    expect(
+      determineType(makeScore({ warmth: 0.6, tension: 0.1, depth: 0.3, attraction: 0.5 }))
+    ).toBe("SWEETHEART")
+  })
+
+  it("attraction 0.7 + warmth 0.7 + depth 0.5 + tension 낮음 → LOVER (v4.2)", () => {
+    expect(
+      determineType(
+        makeScore({ warmth: 0.7, tension: 0.2, depth: 0.5, attraction: 0.7, frequency: 0.4 })
+      )
+    ).toBe("LOVER")
+  })
+
+  it("attraction 0.9 + warmth 0.9 + depth 0.8 → SOULMATE (v4.2)", () => {
+    expect(
+      determineType(
+        makeScore({ warmth: 0.9, tension: 0.1, depth: 0.8, attraction: 0.9, frequency: 0.5 })
+      )
+    ).toBe("SOULMATE")
+  })
+
+  it("breakup 마일스톤 + attraction 낮음 → EX (v4.2)", () => {
+    const milestones = [{ type: "breakup" as const, occurredAt: new Date(), qualityDelta: -0.12 }]
+    expect(
+      determineType(
+        makeScore({ warmth: 0.4, tension: 0.3, depth: 0.3, attraction: 0.2, milestones })
+      )
+    ).toBe("EX")
+  })
+
+  it("breakup 마일스톤 있지만 attraction 높으면 → EX 아님 (재결합 가능)", () => {
+    const milestones = [{ type: "breakup" as const, occurredAt: new Date(), qualityDelta: -0.12 }]
+    expect(
+      determineType(
+        makeScore({ warmth: 0.7, tension: 0.1, depth: 0.5, attraction: 0.7, milestones })
+      )
+    ).toBe("LOVER")
+  })
+
+  it("attraction 0.6 + tension 0.4 + frequency 0.5 → OBSESSED (v4.2)", () => {
+    expect(
+      determineType(
+        makeScore({ warmth: 0.5, tension: 0.4, depth: 0.3, attraction: 0.6, frequency: 0.5 })
+      )
+    ).toBe("OBSESSED")
+  })
+
+  // ── v4.2 사회적 유형 ──
+
+  it("warmth 0.8 + frequency 0.5 + depth 0.4 + tension 낮음 → BESTIE (v4.2)", () => {
+    expect(
+      determineType(makeScore({ warmth: 0.8, tension: 0.1, depth: 0.4, frequency: 0.5 }))
+    ).toBe("BESTIE")
+  })
+
+  it("warmth 0.7 + frequency 0.6 + depth 0.3 + tension 낮음 → GUARDIAN (v4.2)", () => {
+    expect(
+      determineType(makeScore({ warmth: 0.7, tension: 0.15, depth: 0.3, frequency: 0.6 }))
+    ).toBe("GUARDIAN")
+  })
+
+  it("frequency 0.6 + warmth 0.4 → COMPANION (v4.2)", () => {
+    expect(
+      determineType(makeScore({ warmth: 0.4, tension: 0.35, depth: 0.2, frequency: 0.6 }))
+    ).toBe("COMPANION")
+  })
+
+  // ── v4.2 감정 복합 유형 ──
+
+  it("attraction 0.3 + tension 0.4 + warmth 0.5 + depth 낮음 → TSUNDERE (v4.2)", () => {
+    expect(
+      determineType(
+        makeScore({ warmth: 0.5, tension: 0.4, depth: 0.2, attraction: 0.3, frequency: 0.3 })
+      )
+    ).toBe("TSUNDERE")
+  })
+
+  it("tension 0.5 + frequency 0.6 + warmth 낮음 → TOXIC (v4.2)", () => {
+    expect(
+      determineType(makeScore({ warmth: 0.2, tension: 0.6, depth: 0.2, frequency: 0.6 }))
+    ).toBe("TOXIC")
+  })
+
+  it("attraction 0.3 + warmth 0.4 + tension 0.3 + frequency 0.5 → PUSH_PULL (v4.2)", () => {
+    expect(
+      determineType(
+        makeScore({ warmth: 0.4, tension: 0.3, depth: 0.1, attraction: 0.3, frequency: 0.5 })
+      )
+    ).toBe("PUSH_PULL")
+  })
+
+  // ── v4.2 우선순위 테스트 ──
+
+  it("SOULMATE가 LOVER보다 우선", () => {
+    expect(
+      determineType(
+        makeScore({ warmth: 0.95, tension: 0.05, depth: 0.85, attraction: 0.95, frequency: 0.6 })
+      )
+    ).toBe("SOULMATE")
+  })
+
+  it("OBSESSED가 LOVER보다 우선 (tension 있으면 불건강)", () => {
+    expect(
+      determineType(
+        makeScore({ warmth: 0.6, tension: 0.5, depth: 0.4, attraction: 0.7, frequency: 0.6 })
+      )
+    ).toBe("OBSESSED")
+  })
+
+  it("TOXIC가 RIVAL보다 우선 (frequency 극고 + warmth 극저)", () => {
+    expect(
+      determineType(makeScore({ warmth: 0.2, tension: 0.6, depth: 0.2, frequency: 0.7 }))
+    ).toBe("TOXIC")
+  })
+
+  it("LOVER가 SWEETHEART보다 우선 (더 높은 attraction+depth)", () => {
+    expect(
+      determineType(
+        makeScore({ warmth: 0.75, tension: 0.1, depth: 0.6, attraction: 0.75, frequency: 0.4 })
+      )
+    ).toBe("LOVER")
+  })
+
+  it("TSUNDERE가 CRUSH보다 우선 (tension 있으면 츤데레)", () => {
+    expect(
+      determineType(
+        makeScore({ warmth: 0.45, tension: 0.4, depth: 0.2, attraction: 0.4, frequency: 0.3 })
+      )
+    ).toBe("TSUNDERE")
+  })
+
+  it("attraction 없으면 기존 유형 유지 (ALLY)", () => {
+    expect(determineType(makeScore({ warmth: 0.7, tension: 0.1, depth: 0.3, attraction: 0 }))).toBe(
+      "ALLY"
+    )
+  })
 })
 
 // ═══════════════════════════════════════════════════════════════
@@ -269,6 +415,71 @@ describe("buildProtocol", () => {
     expect(protocol.allowedTones).toContain("deep_analysis")
     expect(protocol.selfDisclosure).toBeGreaterThan(0.5)
   })
+
+  // v4.2 로맨틱 유형 프로토콜
+  it("FAMILIAR + CRUSH → 갈등 회피 + 자기노출 소량 (v4.2)", () => {
+    const protocol = buildProtocol("FAMILIAR", "CRUSH")
+    expect(protocol.debateWillingness).toBeLessThan(0.5)
+    expect(protocol.allowedTones).toContain("supportive")
+    expect(protocol.allowedTones).toContain("empathetic")
+  })
+
+  it("INTIMATE + LOVER → 높은 상호작용 + 깊은 자기노출 (v4.2)", () => {
+    const protocol = buildProtocol("INTIMATE", "LOVER")
+    expect(protocol.interactionBoost).toBeGreaterThan(1.7)
+    expect(protocol.selfDisclosure).toBe(1.0) // 0.65 + 0.35 = 1.0
+    expect(protocol.allowedTones).toContain("intimate_joke")
+    expect(protocol.allowedTones).toContain("paradox_response")
+  })
+
+  it("CLOSE + SOULMATE → 최대 개방 (v4.2)", () => {
+    const protocol = buildProtocol("CLOSE", "SOULMATE")
+    expect(protocol.selfDisclosure).toBe(1.0)
+    expect(protocol.interactionBoost).toBe(2.0) // 1.5 + 0.5, clamped to 2.0
+    expect(protocol.allowedTones).toContain("deep_analysis")
+    expect(protocol.allowedTones).toContain("unique_perspective")
+  })
+
+  it("FAMILIAR + EX → 상호작용 기피 + 경계 (v4.2)", () => {
+    const protocol = buildProtocol("FAMILIAR", "EX")
+    expect(protocol.interactionBoost).toBeLessThan(1.1)
+    expect(protocol.selfDisclosure).toBeLessThan(0.4)
+    expect(protocol.allowedTones).toContain("formal_analysis")
+  })
+
+  it("REGULAR + OBSESSED → 과도한 interactionBoost (v4.2)", () => {
+    const protocol = buildProtocol("REGULAR", "OBSESSED")
+    expect(protocol.interactionBoost).toBeGreaterThan(1.5)
+  })
+
+  // v4.2 사회적 유형 프로토콜
+  it("FAMILIAR + GUARDIAN → 방어적 논쟁 참여 (v4.2)", () => {
+    const protocol = buildProtocol("FAMILIAR", "GUARDIAN")
+    expect(protocol.debateWillingness).toBeGreaterThan(0.7)
+    expect(protocol.allowedTones).toContain("soft_rebuttal")
+    expect(protocol.allowedTones).toContain("supportive")
+  })
+
+  it("REGULAR + BESTIE → 높은 빈도 + 적당한 자기노출 (v4.2)", () => {
+    const protocol = buildProtocol("REGULAR", "BESTIE")
+    expect(protocol.interactionBoost).toBeGreaterThan(1.3)
+    expect(protocol.allowedTones).toContain("intimate_joke")
+  })
+
+  // v4.2 감정 복합 유형 프로토콜
+  it("ACQUAINTANCE + TSUNDERE → 까칠한 논쟁 + 속마음 숨김 (v4.2)", () => {
+    const protocol = buildProtocol("ACQUAINTANCE", "TSUNDERE")
+    expect(protocol.debateWillingness).toBeGreaterThan(0.5)
+    expect(protocol.selfDisclosure).toBeLessThan(0.3)
+    expect(protocol.allowedTones).toContain("soft_rebuttal")
+  })
+
+  it("REGULAR + TOXIC → 높은 논쟁 + 닫힌 자기노출 (v4.2)", () => {
+    const protocol = buildProtocol("REGULAR", "TOXIC")
+    expect(protocol.debateWillingness).toBeGreaterThan(0.7)
+    expect(protocol.selfDisclosure).toBeLessThan(0.4)
+    expect(protocol.allowedTones).toContain("direct_rebuttal")
+  })
 })
 
 // ═══════════════════════════════════════════════════════════════
@@ -283,8 +494,9 @@ describe("computeRelationshipProfile", () => {
   })
 
   it("높은 인터랙션 → CLOSE/MENTOR", () => {
+    // warmth 0.7: BESTIE(0.8)/CONFIDANT(0.8) 미달, frequency 0.5: GUARDIAN(0.6) 미달 → MENTOR
     const profile = computeRelationshipProfile(
-      makeScore({ warmth: 0.8, tension: 0.1, frequency: 0.6, depth: 0.5 })
+      makeScore({ warmth: 0.7, tension: 0.1, frequency: 0.5, depth: 0.5 })
     )
     expect(profile.stage).toBe("CLOSE")
     expect(profile.type).toBe("MENTOR")
@@ -467,6 +679,68 @@ describe("summarizeRelationship", () => {
     const profile = computeRelationshipProfile(score)
     const summary = summarizeRelationship(score, profile)
     expect(summary).toContain("서서히 멀어지는 중")
+  })
+
+  it("v4.2: attraction > 0이면 지표에 포함", () => {
+    const score = makeScore({ attraction: 0.5 })
+    const profile = computeRelationshipProfile(score)
+    const summary = summarizeRelationship(score, profile)
+    expect(summary).toContain("attraction=0.50")
+  })
+
+  it("v4.2: attraction 0이면 지표에 미포함", () => {
+    const score = makeScore({ attraction: 0 })
+    const profile = computeRelationshipProfile(score)
+    const summary = summarizeRelationship(score, profile)
+    expect(summary).not.toContain("attraction")
+  })
+
+  it("v4.2: CRUSH 유형 → 행동 힌트 포함", () => {
+    const score = makeScore({ warmth: 0.5, tension: 0.1, depth: 0.1, attraction: 0.4 })
+    const profile = computeRelationshipProfile(score)
+    const summary = summarizeRelationship(score, profile)
+    expect(summary).toContain("CRUSH")
+    expect(summary).toContain("설렘")
+  })
+
+  it("v4.2: LOVER 유형 → 로맨틱 힌트 포함", () => {
+    const score = makeScore({
+      warmth: 0.7,
+      tension: 0.1,
+      depth: 0.5,
+      attraction: 0.7,
+      frequency: 0.4,
+    })
+    const profile = computeRelationshipProfile(score)
+    const summary = summarizeRelationship(score, profile)
+    expect(summary).toContain("LOVER")
+    expect(summary).toContain("로맨틱")
+  })
+
+  it("v4.2: 로맨틱 마일스톤 서술 포함", () => {
+    const milestones = [
+      { type: "first_flirt" as const, occurredAt: new Date(), qualityDelta: 0.03 },
+      { type: "confession" as const, occurredAt: new Date(), qualityDelta: 0.08 },
+    ]
+    const score = makeScore({ milestones })
+    const profile = computeRelationshipProfile(score)
+    const summary = summarizeRelationship(score, profile)
+    expect(summary).toContain("설렘을 느낀 적 있음")
+    expect(summary).toContain("마음을 고백한 적 있음")
+  })
+
+  it("v4.2: TSUNDERE 유형 → 츤데레 힌트 포함", () => {
+    const score = makeScore({
+      warmth: 0.5,
+      tension: 0.4,
+      depth: 0.2,
+      attraction: 0.3,
+      frequency: 0.3,
+    })
+    const profile = computeRelationshipProfile(score)
+    const summary = summarizeRelationship(score, profile)
+    expect(summary).toContain("TSUNDERE")
+    expect(summary).toContain("츤데레")
   })
 })
 
@@ -1036,6 +1310,50 @@ describe("detectMilestones", () => {
     const next = makeScore({ tension: 0.3, warmth: 0.5, depth: 0.3 })
     const milestones = detectMilestones(prev, next, now)
     expect(milestones).toHaveLength(0)
+  })
+
+  // v4.2 로맨틱 마일스톤
+
+  it("attraction 0.3 진입 → first_flirt (v4.2)", () => {
+    const prev = makeScore({ attraction: 0.2 })
+    const next = makeScore({ attraction: 0.35 })
+    const milestones = detectMilestones(prev, next, now)
+    const flirt = milestones.find((m) => m.type === "first_flirt")
+    expect(flirt).toBeDefined()
+    expect(flirt!.qualityDelta).toBe(0.03)
+  })
+
+  it("attraction 0.7 진입 → confession (v4.2)", () => {
+    const prev = makeScore({ attraction: 0.65 })
+    const next = makeScore({ attraction: 0.75 })
+    const milestones = detectMilestones(prev, next, now)
+    const confession = milestones.find((m) => m.type === "confession")
+    expect(confession).toBeDefined()
+    expect(confession!.qualityDelta).toBe(0.08)
+  })
+
+  it("attraction ≥ 0.5 + warmth 급락 → breakup (v4.2)", () => {
+    const prev = makeScore({ attraction: 0.6, warmth: 0.7 })
+    const next = makeScore({ attraction: 0.6, warmth: 0.4 }) // warmth drop = -0.3
+    const milestones = detectMilestones(prev, next, now)
+    const breakup = milestones.find((m) => m.type === "breakup")
+    expect(breakup).toBeDefined()
+    expect(breakup!.qualityDelta).toBe(-0.12)
+  })
+
+  it("attraction < 0.5 → breakup 불가 (v4.2)", () => {
+    const prev = makeScore({ attraction: 0.3, warmth: 0.7 })
+    const next = makeScore({ attraction: 0.3, warmth: 0.3 })
+    const milestones = detectMilestones(prev, next, now)
+    expect(milestones.find((m) => m.type === "breakup")).toBeUndefined()
+  })
+
+  it("동시에 여러 로맨틱 마일스톤 감지 가능 (v4.2)", () => {
+    const prev = makeScore({ attraction: 0.2, warmth: 0.5 })
+    const next = makeScore({ attraction: 0.75, warmth: 0.5 }) // first_flirt + confession
+    const milestones = detectMilestones(prev, next, now)
+    expect(milestones.find((m) => m.type === "first_flirt")).toBeDefined()
+    expect(milestones.find((m) => m.type === "confession")).toBeDefined()
   })
 })
 

@@ -826,6 +826,36 @@
   - 변경: types.ts, relationship-protocol.ts, relationship-protocol.test.ts
   - 테스트: 4479 PASS (114 파일)
 
+- [x] **T355: 관계 유형 대규모 확장 (v4.2)** ✅ 2026-03-03
+  - **T355-1: 타입 시스템 확장 (types.ts)**
+    - RelationshipScore에 `attraction?: number` (0.0~1.0) 로맨틱 감정 지표 추가
+    - RelationshipMilestone에 `first_flirt` / `confession` / `breakup` 3종 로맨틱 마일스톤 추가
+  - **T355-2: 관계 프로토콜 전면 확장 (relationship-protocol.ts)**
+    - 관계 유형 10→22종 확장 (+12종)
+    - 로맨틱 6종: CRUSH, SWEETHEART, LOVER, SOULMATE, EX, OBSESSED
+    - 사회적 3종: GUARDIAN, COMPANION, BESTIE
+    - 감정 복합 3종: TSUNDERE, TOXIC, PUSH_PULL
+    - TYPE_THRESHOLDS 12종 추가 (attraction 기반 임계값)
+    - TYPE_MODIFIERS 12종 추가 (행동 프로필)
+    - determineType() 7그룹 우선순위 재설계 (EX→극한→로맨틱→갈등→긍정심층→중립대→기본)
+    - detectMilestones() 로맨틱 마일스톤 3종 감지 추가
+    - summarizeRelationship() 12종 typeHint + attraction 표시 + 로맨틱 마일스톤 서술
+  - **T355-3: 관계 매니저 attraction 연동 (relationship-manager.ts)**
+    - DEFAULT_RELATIONSHIP에 `attraction: 0.0` 추가
+    - computeRelationshipUpdate(): attraction 성장 (warmth≥0.5+tension≤0.3일 때 comment+0.03, like+0.01, follow+0.02, repost+0.01, 깊은대화 가속+0.02)
+    - recalculateRelationship(): attraction 무활동 감쇠 7%/주
+    - negative 감정 시 attraction 감소 (-0.02)
+  - **T355-4: 파이프라인 일관성 (interaction-pipeline.ts)**
+    - DEFAULT_RELATIONSHIP에 `attraction: 0` 추가 (파이프라인 동기화)
+  - **T355-5: 테스트 확장 (relationship-protocol.test.ts)**
+    - v4.2 determineType: CRUSH/SWEETHEART/LOVER/SOULMATE/EX/OBSESSED/BESTIE/GUARDIAN/COMPANION/TSUNDERE/TOXIC/PUSH_PULL + 우선순위 검증
+    - v4.2 buildProtocol: 9종 신규 유형 TypeModifier 검증
+    - v4.2 detectMilestones: first_flirt/confession/breakup + 동시감지 + 조건불충족 검증
+    - v4.2 summarizeRelationship: attraction 표시 + typeHint + 로맨틱 마일스톤 서술
+    - 기존 테스트 호환성 유지 (MENTOR 분류 기준값 조정)
+  - 변경: types.ts, relationship-protocol.ts, relationship-manager.ts, interaction-pipeline.ts, relationship-protocol.test.ts
+  - 테스트: 4518 PASS (114 파일)
+
 ---
 
 ## QUEUE

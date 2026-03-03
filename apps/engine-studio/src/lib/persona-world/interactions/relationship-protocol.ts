@@ -1,10 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
-// Relationship Protocol v4.1
+// Relationship Protocol v4.2
 // T143: 기본 관계 프로토콜
 // T350~T353: 관계 모델 확장
 //   - T351: 유형 5→10종 (CONFIDANT/FRENEMY/NEMESIS/MUSE/PROTEGE)
 //   - T352: 단계 4→6 forward + ESTRANGED (총 9단계)
 //   - T353: 비대칭/동적 메커니즘 (모멘텀, 마일스톤)
+// T355: 관계 유형 대규모 확장
+//   - 유형 10→22종 (+로맨틱 6종, 사회적 3종, 감정 복합 3종)
+//   - attraction 지표 추가
+//   - 로맨틱 마일스톤 3종 (first_flirt/confession/breakup)
 // ═══════════════════════════════════════════════════════════════
 
 import type { RelationshipScore, RelationshipMilestone } from "../types"
@@ -32,10 +36,13 @@ export type RelationshipStage =
   | "ESTRANGED" // 한때 가까웠으나 갈등으로 의도적 거리두기 (v4.1 신규)
 
 /**
- * v4.1 관계 유형 (10종)
+ * v4.2 관계 유형 (22종)
  *
  * 기존 5종: NEUTRAL, ALLY, RIVAL, MENTOR, FAN
- * 신규 5종: CONFIDANT, FRENEMY, NEMESIS, MUSE, PROTEGE
+ * v4.1 5종: CONFIDANT, FRENEMY, NEMESIS, MUSE, PROTEGE
+ * v4.2 로맨틱 6종: CRUSH, SWEETHEART, LOVER, SOULMATE, EX, OBSESSED
+ * v4.2 사회적 3종: GUARDIAN, COMPANION, BESTIE
+ * v4.2 감정 복합 3종: TSUNDERE, TOXIC, PUSH_PULL
  */
 export type RelationshipType =
   | "NEUTRAL" // 평범한 관계
@@ -48,6 +55,18 @@ export type RelationshipType =
   | "NEMESIS" // RIVAL보다 깊은 개인적 대립, 역사적 갈등 (v4.1)
   | "MUSE" // 상대의 관점에서 창작적 영감 수령 (v4.1)
   | "PROTEGE" // MENTOR 역방향 — 가르침 받는 쪽 (v4.1)
+  | "CRUSH" // 짝사랑 — attraction 있으나 깊이 부족 (v4.2)
+  | "SWEETHEART" // 썸 — 상호 호감, 발전 중 (v4.2)
+  | "LOVER" // 연인 — 깊은 로맨틱 관계 (v4.2)
+  | "SOULMATE" // 소울메이트 — LOVER 진화, 극한 유대 (v4.2)
+  | "EX" // 전 연인 — breakup 마일스톤 기반 (v4.2)
+  | "OBSESSED" // 집착 — attraction+tension 동시 고값, 불건강 (v4.2)
+  | "GUARDIAN" // 보호자 — 보호 본능, 비요청 조언 (v4.2)
+  | "COMPANION" // 동반자 — 항상 함께, 일상적 유대 (v4.2)
+  | "BESTIE" // 절친 — BFF 수준, 높은 warmth+frequency (v4.2)
+  | "TSUNDERE" // 츤데레 — 겉으론 차갑지만 속은 따뜻+호감 (v4.2)
+  | "TOXIC" // 독성 — 파괴적이지만 끊지 못하는 관계 (v4.2)
+  | "PUSH_PULL" // 밀당 — 다가갔다 밀어내기 반복 (v4.2)
 
 // ── 행동 프로토콜 ──────────────────────────────────────────
 
@@ -140,19 +159,47 @@ export const ESTRANGED_WARMTH_DROP = 0.3
 
 // ── 유형 판단 임계값 ────────────────────────────────────────
 
-/** v4.1: 10종 유형 판단 임계값 */
+/** v4.2: 22종 유형 판단 임계값 */
 export const TYPE_THRESHOLDS = {
   // 기존 5종
   ally: { minWarmth: 0.6, maxTension: 0.3 },
   rival: { minTension: 0.5, minFrequency: 0.3 },
   mentor: { minDepth: 0.5, minWarmth: 0.5 },
   fan: { minWarmth: 0.6, maxDepth: 0.2 },
-  // v4.1 신규 5종
+  // v4.1 5종
   confidant: { minWarmth: 0.8, minDepth: 0.7, maxTension: 0.2 },
   frenemy: { minWarmth: 0.5, minTension: 0.5 },
   nemesis: { minTension: 0.7, minDepth: 0.5, maxWarmth: 0.3 },
   muse: { minWarmth: 0.5, minDepth: 0.3, maxFrequency: 0.3 },
   protege: { minDepth: 0.5, minWarmth: 0.5 },
+  // v4.2 로맨틱 6종
+  crush: { minAttraction: 0.4, minWarmth: 0.4 },
+  sweetheart: { minAttraction: 0.5, minWarmth: 0.6, minDepth: 0.3 },
+  lover: { minAttraction: 0.7, minWarmth: 0.7, minDepth: 0.5, maxTension: 0.3 },
+  soulmate: { minAttraction: 0.9, minWarmth: 0.9, minDepth: 0.8 },
+  ex: { maxAttraction: 0.4 },
+  obsessed: { minAttraction: 0.6, minTension: 0.4, minFrequency: 0.5 },
+  // v4.2 사회적 3종
+  guardian: { minWarmth: 0.7, minFrequency: 0.6, minDepth: 0.3, maxTension: 0.2 },
+  companion: { minFrequency: 0.6, minWarmth: 0.4 },
+  bestie: { minWarmth: 0.8, minFrequency: 0.5, minDepth: 0.4, maxTension: 0.2 },
+  // v4.2 감정 복합 3종
+  tsundere: {
+    minAttraction: 0.3,
+    minTension: 0.35,
+    minWarmth: 0.35,
+    maxWarmth: 0.65,
+    maxDepth: 0.4,
+  },
+  toxic: { minTension: 0.5, minFrequency: 0.6, maxWarmth: 0.3 },
+  pushPull: {
+    minAttraction: 0.3,
+    minWarmth: 0.3,
+    maxWarmth: 0.6,
+    minTension: 0.2,
+    maxTension: 0.5,
+    minFrequency: 0.4,
+  },
 } as const
 
 // ── 단계별 행동 프로토콜 ────────────────────────────────────
@@ -282,7 +329,7 @@ interface TypeModifier {
 }
 
 const TYPE_MODIFIERS: Record<RelationshipType, TypeModifier> = {
-  // 기존 5종
+  // ── 기존 5종 ──
   NEUTRAL: {
     interactionBoostDelta: 0,
     debateWillingnessDelta: 0,
@@ -313,7 +360,7 @@ const TYPE_MODIFIERS: Record<RelationshipType, TypeModifier> = {
     selfDisclosureDelta: 0,
     extraTones: ["supportive", "light_reaction"],
   },
-  // v4.1 신규 5종
+  // ── v4.1 5종 ──
   CONFIDANT: {
     interactionBoostDelta: 0.3,
     debateWillingnessDelta: 0,
@@ -344,12 +391,94 @@ const TYPE_MODIFIERS: Record<RelationshipType, TypeModifier> = {
     selfDisclosureDelta: 0.15,
     extraTones: ["supportive", "empathetic", "deep_analysis"],
   },
+  // ── v4.2 로맨틱 6종 ──
+  CRUSH: {
+    interactionBoostDelta: 0.3, // 적극적 상호작용 시도
+    debateWillingnessDelta: -0.2, // 갈등 회피 (싫은 모습 보이기 싫음)
+    selfDisclosureDelta: 0.05, // 조심스러운 자기 노출
+    extraTones: ["supportive", "light_reaction", "empathetic"],
+  },
+  SWEETHEART: {
+    interactionBoostDelta: 0.35, // 자주 대화하고 싶음
+    debateWillingnessDelta: -0.1, // 갈등 약간 회피
+    selfDisclosureDelta: 0.15, // 서서히 마음 열기
+    extraTones: ["light_reaction", "intimate_joke", "empathetic"],
+  },
+  LOVER: {
+    interactionBoostDelta: 0.5, // 가장 높은 상호작용 욕구
+    debateWillingnessDelta: 0, // 편안한 의견 교환
+    selfDisclosureDelta: 0.35, // 깊은 자기 노출
+    extraTones: ["intimate_joke", "empathetic", "paradox_response", "supportive"],
+  },
+  SOULMATE: {
+    interactionBoostDelta: 0.5, // 최고의 유대
+    debateWillingnessDelta: 0.1, // 진솔한 의견 교환 가능
+    selfDisclosureDelta: 0.4, // 완전한 자기 노출
+    extraTones: [
+      "intimate_joke",
+      "empathetic",
+      "paradox_response",
+      "deep_analysis",
+      "unique_perspective",
+    ],
+  },
+  EX: {
+    interactionBoostDelta: -0.2, // 상호작용 기피
+    debateWillingnessDelta: 0.1, // 잔여 감정으로 날카로움
+    selfDisclosureDelta: -0.15, // 경계, 마음 닫음
+    extraTones: ["formal_analysis", "light_reaction"],
+  },
+  OBSESSED: {
+    interactionBoostDelta: 0.6, // 과도한 관심, 멈출 수 없음
+    debateWillingnessDelta: -0.1, // 상대 비위 맞추려 함
+    selfDisclosureDelta: 0, // 일방적 관심
+    extraTones: ["supportive", "empathetic", "light_reaction"],
+  },
+  // ── v4.2 사회적 3종 ──
+  GUARDIAN: {
+    interactionBoostDelta: 0.35, // 늘 지켜보고 보호
+    debateWillingnessDelta: 0.2, // 상대를 위해 논쟁도 불사
+    selfDisclosureDelta: 0.1,
+    extraTones: ["supportive", "empathetic", "soft_rebuttal"],
+  },
+  COMPANION: {
+    interactionBoostDelta: 0.4, // 습관적으로 함께
+    debateWillingnessDelta: 0, // 편안한 관계
+    selfDisclosureDelta: 0.1,
+    extraTones: ["light_reaction", "supportive", "empathetic"],
+  },
+  BESTIE: {
+    interactionBoostDelta: 0.45, // 절친 — 가장 자주 교류
+    debateWillingnessDelta: 0, // 편하지만 굳이 안 싸움
+    selfDisclosureDelta: 0.25,
+    extraTones: ["intimate_joke", "light_reaction", "empathetic", "supportive"],
+  },
+  // ── v4.2 감정 복합 3종 ──
+  TSUNDERE: {
+    interactionBoostDelta: 0.2, // 관심 있지만 티 안 냄
+    debateWillingnessDelta: 0.2, // 겉으로 까칠하게 반응
+    selfDisclosureDelta: -0.05, // 속마음 숨김
+    extraTones: ["soft_rebuttal", "light_reaction", "intimate_joke"],
+  },
+  TOXIC: {
+    interactionBoostDelta: 0.3, // 독성 패턴 — 끊지 못함
+    debateWillingnessDelta: 0.3, // 자주 충돌
+    selfDisclosureDelta: -0.1, // 상처받을까 봐 닫음
+    extraTones: ["direct_rebuttal", "soft_rebuttal"],
+  },
+  PUSH_PULL: {
+    interactionBoostDelta: 0.15, // 다가갔다 밀어내기
+    debateWillingnessDelta: 0.1,
+    selfDisclosureDelta: 0.05, // 조금씩만 보여줌
+    extraTones: ["light_reaction", "soft_rebuttal", "empathetic"],
+  },
 }
 
-// ── v4.1: 마일스톤 감지 임계값 ─────────────────────────────
+// ── v4.1+v4.2: 마일스톤 감지 임계값 ─────────────────────────
 
 /** 마일스톤 이벤트 감지 기준 */
 export const MILESTONE_THRESHOLDS = {
+  // v4.1 기존 5종
   /** 첫 논쟁: tension 단일 이벤트에서 0.15 이상 급증 */
   firstDebate: { tensionDelta: 0.15 },
   /** 첫 취약성 공유: INTIMATE 이상 단계 진입 시 자동 기록 */
@@ -360,6 +489,13 @@ export const MILESTONE_THRESHOLDS = {
   firstDeepShare: { minDepth: 0.5 },
   /** 화해: ESTRANGED에서 tension 0.3 이하로 회복 */
   reconciliation: { maxTension: 0.3 },
+  // v4.2 로맨틱 3종
+  /** 첫 설렘: attraction이 0.3 이상으로 진입 */
+  firstFlirt: { minAttraction: 0.3 },
+  /** 고백: attraction이 0.7 이상 도달 (LOVER 수준) */
+  confession: { minAttraction: 0.7 },
+  /** 이별: attraction ≥ 0.5 상태에서 warmth가 0.25 이상 급락 */
+  breakup: { minPrevAttraction: 0.5, warmthDrop: -0.25 },
 } as const
 
 // ══════════════════════════════════════════════════════════════
@@ -554,24 +690,31 @@ export function computeStageProgress(
 // ══════════════════════════════════════════════════════════════
 
 /**
- * v4.1 관계 스코어로 유형 결정 (10종).
+ * v4.2 관계 스코어로 유형 결정 (22종).
  *
- * 우선순위:
- * 1. NEMESIS (최우선 — 깊은 적대)
- * 2. FRENEMY (warmth+tension 동시 고값)
- * 3. RIVAL (tension+frequency 고값)
- * 4. CONFIDANT (warmth+depth 극고, tension 극저)
- * 5. MENTOR (depth+warmth 고값)
- * 6. PROTEGE (depth+warmth 고값, frequency 낮음)
- * 7. FAN (warmth 고, depth 저)
- * 8. MUSE (warmth 중고, depth 중, frequency 저)
- * 9. ALLY (warmth 고, tension 저)
- * 10. NEUTRAL (기본값)
+ * 우선순위 그룹:
+ * [1] 이벤트 기반: EX (breakup 마일스톤)
+ * [2] 극단 상태: NEMESIS, SOULMATE, OBSESSED, TOXIC
+ * [3] 로맨틱: LOVER, TSUNDERE, SWEETHEART, PUSH_PULL, CRUSH
+ * [4] 갈등: FRENEMY, RIVAL
+ * [5] 긍정 심층: CONFIDANT, BESTIE, GUARDIAN, MENTOR, FAN, ALLY
+ * [6] 중립대: COMPANION, PROTEGE, MUSE
+ * [7] 기본값: NEUTRAL
  */
 export function determineType(score: RelationshipScore): RelationshipType {
   const t = TYPE_THRESHOLDS
+  const attraction = score.attraction ?? 0
+  const milestones = score.milestones ?? []
+  const hasBreakup = milestones.some((m) => m.type === "breakup")
 
-  // 1. NEMESIS: tension 극고 + depth 고 + warmth 저 (깊은 적대)
+  // ── [1] 이벤트 기반 ──
+  // EX: breakup 마일스톤 + attraction 소진
+  if (hasBreakup && attraction <= t.ex.maxAttraction) {
+    return "EX"
+  }
+
+  // ── [2] 극단 상태 ──
+  // NEMESIS: tension 극고 + depth 고 + warmth 저
   if (
     score.tension >= t.nemesis.minTension &&
     score.depth >= t.nemesis.minDepth &&
@@ -580,19 +723,95 @@ export function determineType(score: RelationshipScore): RelationshipType {
     return "NEMESIS"
   }
 
-  // 2. FRENEMY: warmth+tension 동시 고값 (모순적 관계)
+  // SOULMATE: 모든 지표 극고 (로맨틱 극한)
+  if (
+    attraction >= t.soulmate.minAttraction &&
+    score.warmth >= t.soulmate.minWarmth &&
+    score.depth >= t.soulmate.minDepth
+  ) {
+    return "SOULMATE"
+  }
+
+  // OBSESSED: attraction 고 + tension 고 + frequency 고 (불건강 집착)
+  if (
+    attraction >= t.obsessed.minAttraction &&
+    score.tension >= t.obsessed.minTension &&
+    score.frequency >= t.obsessed.minFrequency
+  ) {
+    return "OBSESSED"
+  }
+
+  // TOXIC: tension 고 + frequency 고 + warmth 저 (파괴적이지만 끊지 못함)
+  if (
+    score.tension >= t.toxic.minTension &&
+    score.frequency >= t.toxic.minFrequency &&
+    score.warmth <= t.toxic.maxWarmth
+  ) {
+    return "TOXIC"
+  }
+
+  // ── [3] 로맨틱 (attraction 기반) ──
+  // LOVER: 완전한 로맨틱 관계
+  if (
+    attraction >= t.lover.minAttraction &&
+    score.warmth >= t.lover.minWarmth &&
+    score.depth >= t.lover.minDepth &&
+    score.tension <= t.lover.maxTension
+  ) {
+    return "LOVER"
+  }
+
+  // TSUNDERE: 겉은 차갑지만 속은 호감 (attraction + tension + moderate warmth)
+  if (
+    attraction >= t.tsundere.minAttraction &&
+    score.tension >= t.tsundere.minTension &&
+    score.warmth >= t.tsundere.minWarmth &&
+    score.warmth < t.tsundere.maxWarmth &&
+    score.depth <= t.tsundere.maxDepth
+  ) {
+    return "TSUNDERE"
+  }
+
+  // SWEETHEART: 상호 호감 발전 중
+  if (
+    attraction >= t.sweetheart.minAttraction &&
+    score.warmth >= t.sweetheart.minWarmth &&
+    score.depth >= t.sweetheart.minDepth
+  ) {
+    return "SWEETHEART"
+  }
+
+  // PUSH_PULL: 밀당 — 모든 값이 중간대, attraction 존재
+  if (
+    attraction >= t.pushPull.minAttraction &&
+    score.warmth >= t.pushPull.minWarmth &&
+    score.warmth <= t.pushPull.maxWarmth &&
+    score.tension >= t.pushPull.minTension &&
+    score.tension <= t.pushPull.maxTension &&
+    score.frequency >= t.pushPull.minFrequency
+  ) {
+    return "PUSH_PULL"
+  }
+
+  // CRUSH: 초기 attraction (나머지 로맨틱 캐치올)
+  if (attraction >= t.crush.minAttraction && score.warmth >= t.crush.minWarmth) {
+    return "CRUSH"
+  }
+
+  // ── [4] 갈등 기반 (attraction 없음) ──
+  // FRENEMY: warmth + tension 동시 고값
   if (score.warmth >= t.frenemy.minWarmth && score.tension >= t.frenemy.minTension) {
     return "FRENEMY"
   }
 
-  // 3. RIVAL: tension+frequency 고값 (잦은 갈등)
+  // RIVAL: tension + frequency 고값
   if (score.tension >= t.rival.minTension && score.frequency >= t.rival.minFrequency) {
     return "RIVAL"
   }
 
-  // 이하는 tension이 낮은 긍정적 관계군
+  // ── [5] 긍정 심층 (warmth 고, tension 저) ──
   if (score.warmth >= t.ally.minWarmth && score.tension <= t.ally.maxTension) {
-    // 4. CONFIDANT: warmth+depth 극고, tension 극저
+    // CONFIDANT: warmth + depth 극고, tension 극저
     if (
       score.warmth >= t.confidant.minWarmth &&
       score.depth >= t.confidant.minDepth &&
@@ -601,26 +820,52 @@ export function determineType(score: RelationshipScore): RelationshipType {
       return "CONFIDANT"
     }
 
-    // 5. MENTOR: depth+warmth 고값
+    // BESTIE: warmth + frequency 고, 적당한 depth
+    if (
+      score.warmth >= t.bestie.minWarmth &&
+      score.frequency >= t.bestie.minFrequency &&
+      score.depth >= t.bestie.minDepth &&
+      score.tension <= t.bestie.maxTension
+    ) {
+      return "BESTIE"
+    }
+
+    // GUARDIAN: warmth 고 + frequency 고 + depth 중
+    if (
+      score.warmth >= t.guardian.minWarmth &&
+      score.frequency >= t.guardian.minFrequency &&
+      score.depth >= t.guardian.minDepth &&
+      score.tension <= t.guardian.maxTension
+    ) {
+      return "GUARDIAN"
+    }
+
+    // MENTOR: depth + warmth 고값
     if (score.depth >= t.mentor.minDepth && score.warmth >= t.mentor.minWarmth) {
       return "MENTOR"
     }
 
-    // 6. FAN: warmth 고, depth 저
+    // FAN: warmth 고, depth 저
     if (score.depth <= t.fan.maxDepth) {
       return "FAN"
     }
 
-    // 9. ALLY: 일반적 긍정 관계
+    // ALLY: 일반적 긍정 관계
     return "ALLY"
   }
 
-  // 7. PROTEGE: depth+warmth 중고, tension 중 (ALLY 조건 밖)
+  // ── [6] 중립대 (warmth 중간 또는 tension 중간) ──
+  // COMPANION: frequency 매우 높음, 습관적 동행
+  if (score.frequency >= t.companion.minFrequency && score.warmth >= t.companion.minWarmth) {
+    return "COMPANION"
+  }
+
+  // PROTEGE: depth + warmth 중고 (ALLY 조건 밖)
   if (score.depth >= t.protege.minDepth && score.warmth >= t.protege.minWarmth) {
     return "PROTEGE"
   }
 
-  // 8. MUSE: warmth 중고, depth 중, frequency 저 (빈도 낮지만 깊은 영감)
+  // MUSE: warmth 중고, depth 중, frequency 저 (빈도 낮지만 깊은 영감)
   if (
     score.warmth >= t.muse.minWarmth &&
     score.depth >= t.muse.minDepth &&
@@ -629,6 +874,7 @@ export function determineType(score: RelationshipScore): RelationshipType {
     return "MUSE"
   }
 
+  // ── [7] 기본값 ──
   return "NEUTRAL"
 }
 
@@ -700,7 +946,7 @@ export function updateMomentum(prevScore: RelationshipScore, newScore: Relations
 }
 
 // ══════════════════════════════════════════════════════════════
-// v4.1: 마일스톤 감지
+// v4.1+v4.2: 마일스톤 감지
 // ══════════════════════════════════════════════════════════════
 
 /**
@@ -716,6 +962,8 @@ export function detectMilestones(
   const existing = newScore.milestones ?? []
   const existingTypes = new Set(existing.map((m) => m.type))
   const detected: RelationshipMilestone[] = []
+
+  // ── v4.1 기존 5종 ──
 
   // 첫 논쟁: tension 급증
   if (
@@ -760,6 +1008,38 @@ export function detectMilestones(
     newScore.tension <= MILESTONE_THRESHOLDS.reconciliation.maxTension
   ) {
     detected.push({ type: "reconciliation", occurredAt: now, qualityDelta: 0.1 })
+  }
+
+  // ── v4.2 로맨틱 3종 ──
+
+  const prevAttraction = prevScore.attraction ?? 0
+  const newAttraction = newScore.attraction ?? 0
+
+  // 첫 설렘: attraction이 0.3 이상으로 진입
+  if (
+    !existingTypes.has("first_flirt") &&
+    prevAttraction < MILESTONE_THRESHOLDS.firstFlirt.minAttraction &&
+    newAttraction >= MILESTONE_THRESHOLDS.firstFlirt.minAttraction
+  ) {
+    detected.push({ type: "first_flirt", occurredAt: now, qualityDelta: 0.03 })
+  }
+
+  // 고백: attraction이 0.7 이상 도달
+  if (
+    !existingTypes.has("confession") &&
+    prevAttraction < MILESTONE_THRESHOLDS.confession.minAttraction &&
+    newAttraction >= MILESTONE_THRESHOLDS.confession.minAttraction
+  ) {
+    detected.push({ type: "confession", occurredAt: now, qualityDelta: 0.08 })
+  }
+
+  // 이별: attraction ≥ 0.5 상태에서 warmth 급락
+  if (
+    !existingTypes.has("breakup") &&
+    prevAttraction >= MILESTONE_THRESHOLDS.breakup.minPrevAttraction &&
+    newScore.warmth - prevScore.warmth <= MILESTONE_THRESHOLDS.breakup.warmthDrop
+  ) {
+    detected.push({ type: "breakup", occurredAt: now, qualityDelta: -0.12 })
   }
 
   return detected
@@ -857,7 +1137,7 @@ export function getInteractionMultiplier(profile: RelationshipProfile): number {
   return profile.protocol.interactionBoost
 }
 
-/** v4.1: 관계 요약 텍스트 생성 (프롬프트용) */
+/** v4.2: 관계 요약 텍스트 생성 (프롬프트용) */
 export function summarizeRelationship(
   score: RelationshipScore,
   profile: RelationshipProfile
@@ -866,9 +1146,12 @@ export function summarizeRelationship(
 
   parts.push(`관계 단계: ${profile.stage}`)
   parts.push(`관계 유형: ${profile.type}`)
+
+  const attraction = score.attraction ?? 0
   parts.push(
     `지표: warmth=${score.warmth.toFixed(2)}, tension=${score.tension.toFixed(2)}, ` +
-      `frequency=${score.frequency.toFixed(2)}, depth=${score.depth.toFixed(2)}`
+      `frequency=${score.frequency.toFixed(2)}, depth=${score.depth.toFixed(2)}` +
+      (attraction > 0 ? `, attraction=${attraction.toFixed(2)}` : "")
   )
 
   // 단계별 설명
@@ -880,6 +1163,26 @@ export function summarizeRelationship(
   }
   if (profile.stage === "ESTRANGED") {
     parts.push("한때 가까웠으나 갈등으로 거리를 둔 상태 — 조심스러운 태도")
+  }
+
+  // v4.2: 유형별 행동 힌트
+  const typeHints: Partial<Record<RelationshipType, string>> = {
+    CRUSH: "설렘이 있지만 아직 표현하지 못함 — 호감을 숨기며 조심스럽게 행동",
+    SWEETHEART: "서로 호감이 있음 — 장난스럽고 탐색적인 대화",
+    LOVER: "깊은 로맨틱 관계 — 친밀하고 편안한 소통",
+    SOULMATE: "영혼의 단짝 — 말하지 않아도 통하는 관계",
+    EX: "전 연인 — 과거를 알지만 어색하고 조심스러움",
+    OBSESSED: "상대에 대한 집착 — 과도한 관심과 불안정한 행동",
+    GUARDIAN: "보호자 — 상대를 지키려는 본능, 비요청 조언",
+    COMPANION: "동반자 — 늘 함께하는 일상적 존재",
+    BESTIE: "절친 — 서로를 가장 잘 아는 BFF",
+    TSUNDERE: "츤데레 — 겉으론 차갑게 굴지만 속으론 호감",
+    TOXIC: "독성 관계 — 끊고 싶지만 끊지 못하는 파괴적 패턴",
+    PUSH_PULL: "밀당 — 다가갔다 밀어내기 반복, 예측 불가",
+  }
+  const hint = typeHints[profile.type]
+  if (hint) {
+    parts.push(hint)
   }
 
   // 모멘텀 정보
@@ -900,6 +1203,9 @@ export function summarizeRelationship(
       first_betrayal: "신뢰가 크게 손상된 적 있음",
       first_deep_share: "깊은 이야기를 나눈 적 있음",
       reconciliation: "갈등 후 화해한 적 있음",
+      first_flirt: "서로에게 설렘을 느낀 적 있음",
+      confession: "마음을 고백한 적 있음",
+      breakup: "이별을 겪은 적 있음",
     }
     const descs = milestones.map((m) => milestoneDescs[m.type]).filter(Boolean)
     if (descs.length > 0) {

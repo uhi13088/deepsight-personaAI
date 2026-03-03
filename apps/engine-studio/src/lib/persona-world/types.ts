@@ -74,6 +74,8 @@ export interface RelationshipScore {
   momentum?: number
   /** v4.1: 관계 마일스톤 이벤트 기록 */
   milestones?: RelationshipMilestone[]
+  /** v4.2: 로맨틱 감정 지표 (0.0~1.0) */
+  attraction?: number
 }
 
 /** 관계 마일스톤 이벤트 */
@@ -84,6 +86,9 @@ export interface RelationshipMilestone {
     | "first_betrayal"
     | "first_deep_share"
     | "reconciliation"
+    | "first_flirt" // v4.2: 첫 설렘 (attraction ≥ 0.3)
+    | "confession" // v4.2: 고백 (attraction ≥ 0.7, LOVER 진입)
+    | "breakup" // v4.2: 이별 (warmth 급락 when attraction ≥ 0.5)
   occurredAt: Date
   /** 마일스톤 발생 시 영구적 관계 품질 보정 */
   qualityDelta: number

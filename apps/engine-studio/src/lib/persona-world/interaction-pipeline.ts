@@ -145,6 +145,7 @@ const DEFAULT_RELATIONSHIP: RelationshipScore = {
   frequency: 0,
   depth: 0,
   lastInteractionAt: null,
+  attraction: 0,
 }
 
 /**
