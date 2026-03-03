@@ -90,14 +90,18 @@ export async function GET(request: NextRequest) {
     const since = new Date()
     since.setDate(since.getDate() - days)
 
-    // 테이블 존재 여부 + 데이터 확인 (raw query 실패 방지)
+    // 테이블 존재 여부 + 데이터 확인
+    // count()는 SELECT COUNT(*) 이므로 컬럼 누락 영향 없음 (테이블 부재만 감지)
     let totalCount: number
     try {
       totalCount = await prisma.llmUsageLog.count({
         where: { createdAt: { gte: since } },
       })
-    } catch {
-      // 테이블이 없거나 마이그레이션 미적용 — 빈 데이터 반환
+    } catch (err) {
+      console.error(
+        "[llm-costs] count 실패 (테이블 미존재):",
+        err instanceof Error ? err.message : err
+      )
       return NextResponse.json({
         success: true,
         data: EMPTY_RESPONSE,
