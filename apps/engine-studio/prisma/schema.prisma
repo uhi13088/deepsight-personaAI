@@ -1594,9 +1594,9 @@ model PersonaRelationship {
 
   lastInteractionAt DateTime?
 
-  // v4.2 관계 단계(9종)/유형(22종) + 카운터 (T263, T355, T356)
-  stage             String   @default("STRANGER")              // STRANGER/ACQUAINTANCE/REGULAR/FAMILIAR/INTIMATE/CLOSE/COOLING/DORMANT/ESTRANGED
-  type              String   @default("NEUTRAL")               // NEUTRAL/ALLY/RIVAL/MENTOR/FAN/CONFIDANT/FRENEMY/NEMESIS/MUSE/PROTEGE/CRUSH/SWEETHEART/LOVER/SOULMATE/EX/OBSESSED/GUARDIAN/COMPANION/BESTIE/TSUNDERE/TOXIC/PUSH_PULL
+  // v4.1: 관계 단계 9종 (T263, T352) / v4.2: 관계 유형 22종 (T355, T356)
+  stage             String   @default("STRANGER")              // v4.1: STRANGER/ACQUAINTANCE/REGULAR/FAMILIAR/INTIMATE/CLOSE/COOLING/DORMANT/ESTRANGED (9종)
+  type              String   @default("NEUTRAL")               // v4.1: 10종 → v4.2: 22종 (NEUTRAL~PUSH_PULL)
   positiveComments  Int      @default(0)                       // 긍정 댓글 누적
   negativeComments  Int      @default(0)                       // 부정 댓글 누적
   totalInteractions Int      @default(0)                       // 총 인터랙션 누적

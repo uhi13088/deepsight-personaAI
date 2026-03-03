@@ -1,8 +1,9 @@
 // ═══════════════════════════════════════════════════════════════
-// PersonaWorld v3 — Relationship Manager
+// PersonaWorld v4 — Relationship Manager
 // 구현계획서 §6.4, 설계서 §5.6
 // 인터랙션 발생 시 관계 스코어 업데이트 + 조회
-// warmth / tension / frequency / depth
+// v4.1: 모멘텀/peakStage/마일스톤 자동 업데이트
+// v4.2: attraction 지표 + 로맨틱 마일스톤
 // ═══════════════════════════════════════════════════════════════
 
 import type { RelationshipScore } from "../types"

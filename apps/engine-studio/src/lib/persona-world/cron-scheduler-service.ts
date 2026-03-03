@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
-// Cron Scheduler Service
+// Cron Scheduler Service (v4.2)
 // Business logic extracted from /api/cron/persona-scheduler route
+// v4.2: 전체 관계 계산 파이프라인 (attraction + 자율 stage/type)
 // ═══════════════════════════════════════════════════════════════
 
 import { prisma } from "@/lib/prisma"

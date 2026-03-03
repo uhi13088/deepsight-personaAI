@@ -1,6 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
-// PersonaWorld v3 — Type Definitions
+// PersonaWorld v4 — Type Definitions
 // 구현계획서 §3 기준, 설계서 §3~§9 기반
+// v4.1: RelationshipScore 확장 (peakStage/momentum/milestones)
+// v4.2: attraction 지표 + 로맨틱 마일스톤
 // ═══════════════════════════════════════════════════════════════
 
 import type {

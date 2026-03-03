@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
-// Scheduler Admin Service
+// Scheduler Admin Service (v4.2)
 // Business logic extracted from /api/internal/persona-world-admin/scheduler route
+// v4.2: 전체 관계 계산 파이프라인 (attraction + 자율 stage/type)
 // ═══════════════════════════════════════════════════════════════
 
 import { prisma } from "@/lib/prisma"
