@@ -2012,6 +2012,149 @@
 - [x] **T332: 엔진 스튜디오 최적화 로그 뷰어** ✅ 2026-03-02
   - (DONE 섹션에 상세 기록)
 
+### Phase ES-PREVIEW: 미리보기 테스트 v4 업그레이드 + TTS 튜닝 (T333~T350)
+
+> **배경**: 미리보기 테스트(test-generate)가 v3 프롬프트 fallback을 사용 중. 프로덕션 대화 엔진은 v4(VoiceSpec+Factbook+TriggerRules).
+> 결과: 미리보기와 실제 응답이 완전히 다른 프롬프트로 생성됨. v4 동기화 + 통화 테스트 + TTS 튜닝 필요.
+> **3 서브페이즈**: (A) 시스템 프롬프트 v4 동기화, (B) 통화 테스트 추가, (C) TTS 음성 튜닝 UI.
+
+#### Subphase A: 시스템 프롬프트 v4 동기화 (T333~T338)
+
+- [ ] **T333: test-generate DB 조회 — voiceSpec 필드 추가**
+  - 배경: test-generate API가 Persona 조회 시 voiceSpec을 가져오지 않아 v3 fallback 발생
+  - AC1: `route.ts` Prisma select에 `voiceSpec: true` 추가
+  - AC2: voiceSpec이 있는 페르소나에서 조회 시 JSON 반환 확인
+  - AC3: Build PASS
+
+- [ ] **T334: test-generate DB 조회 — factbook 필드 추가**
+  - 배경: Factbook(immutableFacts/mutableContext)이 v4 프롬프트에 필수
+  - AC1: `route.ts` Prisma select에 `factbook: true` 추가
+  - AC2: factbook이 있는 페르소나에서 조회 시 JSON 반환 확인
+  - AC3: Build PASS
+
+- [ ] **T335: test-generate DB 조회 — triggerRules + demographics 필드 추가**
+  - 배경: TriggerRules(행동 트리거)와 demographics(지역/성별/나이/학력)가 v4 프롬프트에 사용됨
+  - AC1: `route.ts` Prisma select에 `triggerRules: true` + demographics 필드(gender, birthDate, nationality, region, educationLevel) 추가
+  - AC2: 응답에 해당 필드 포함 확인
+  - AC3: Build PASS
+
+- [ ] **T336: test-generate PromptBuildInput — v4 필드 매핑**
+  - 배경: DB에서 가져온 voiceSpec/factbook/triggerRules/demographics를 PromptBuildInput에 전달해야 isV4Input() 충족
+  - AC1: voiceSpec → PromptBuildInput.voiceSpec 매핑 (JSON → VoiceSpec 타입 캐스팅)
+  - AC2: factbook → PromptBuildInput.factbook 매핑
+  - AC3: triggerRules → PromptBuildInput.triggerRules 매핑
+  - AC4: demographics → PromptBuildInput.demographics 매핑
+  - AC5: isV4Input() = true 확인 (voiceSpec이 있을 때)
+  - AC6: voiceSpec이 없는 v3 페르소나는 기존 fallback 유지
+  - AC7: Build PASS
+
+- [ ] **T337: test-generate — PersonaState 기본값 주입**
+  - 배경: 프로덕션 대화 엔진은 mood/energy/socialBattery/paradoxTension을 suffix에 포함하지만 test-generate는 미포함
+  - AC1: 테스트용 기본 PersonaState 정의 (mood=0.6, energy=0.7, socialBattery=0.6, paradoxTension=persona.paradoxScore)
+  - AC2: buildAllPrompts 호출 시 state 정보를 시나리오 컨텍스트에 포함
+  - AC3: 선택적: 요청 body에 state override 파라미터 추가 (옵셔널)
+  - AC4: Build PASS
+
+- [ ] **T338: PreviewTab — v4 시스템 프롬프트 표시 확인 + 버전 배지**
+  - 배경: PreviewTab의 "시스템 프롬프트 보기"가 v4 프롬프트를 올바르게 표시하는지 확인
+  - AC1: prompts 객체가 v4 형식(자연어, VoiceSpec 섹션 포함)으로 생성되는지 확인
+  - AC2: "시스템 프롬프트 보기" 영역에 v3/v4 버전 배지 표시
+  - AC3: v3 fallback 시 "⚠ v3 프롬프트 사용 중 — VoiceSpec을 설정하면 v4로 전환됩니다" 경고 표시
+  - AC4: Build PASS
+
+#### Subphase B: 통화 테스트 추가 (T339~T343)
+
+- [ ] **T339: test-generate API — "call" 타입 추가**
+  - 배경: 현재 review/post/comment/interaction만 지원. 통화(call) 테스트 필요
+  - AC1: TestPromptType에 "call" 추가
+  - AC2: call 타입용 시스템 프롬프트 빌드 — conversation-engine의 buildConversationSystemSuffix "call" 모드 규칙 적용
+  - AC3: call 모드 maxTokens 기본값 200 (CALL_MAX_TOKENS)
+  - AC4: Build PASS
+
+- [ ] **T340: test-generate API — 멀티턴 대화 지원**
+  - 배경: 통화 테스트는 멀티턴 대화가 필수. 현재 single-shot(generateText)만 사용
+  - AC1: 요청 body에 `messages?: Array<{ role: "user" | "assistant"; content: string }>` 파라미터 추가
+  - AC2: messages가 있으면 generateConversation() 사용, 없으면 기존 generateText() 유지
+  - AC3: 시스템 프롬프트를 prefix(cacheable) + suffix(dynamic) 분리 전달
+  - AC4: 응답에 전체 대화 이력 포함
+  - AC5: Build PASS
+
+- [ ] **T341: PreviewTab — "통화" 탭 버튼 + 기본 시나리오**
+  - 배경: PreviewTab UI에 "통화" 버튼 추가
+  - AC1: PreviewPromptType에 "call" 추가
+  - AC2: PREVIEW_LABELS에 call 항목 추가 (label: "통화", scenario: 기본 통화 시나리오)
+  - AC3: 통화 탭 선택 시 기존 리뷰/포스트/댓글/대화와 동일한 UX로 시나리오 입력 가능
+  - AC4: Build PASS
+
+- [ ] **T342: PreviewTab — 멀티턴 채팅 UI**
+  - 배경: 통화 테스트는 한 번 생성으로 끝나지 않고 연속 대화가 가능해야 함
+  - AC1: 통화/대화 모드 선택 시 채팅 인터페이스 표시 (메시지 버블 이력 + 하단 입력)
+  - AC2: 사용자 메시지 입력 → API 호출 시 이전 messages[] 함께 전송
+  - AC3: 어시스턴트 응답을 채팅 버블로 추가 표시
+  - AC4: "대화 초기화" 버튼으로 messages 리셋
+  - AC5: 스크롤 자동 이동 (새 메시지 시 하단으로)
+  - AC6: Build PASS
+
+- [ ] **T343: PreviewTab — 통화 모드 UX 안내**
+  - 배경: 통화 모드는 응답 스타일이 다름을 사용자에게 안내
+  - AC1: 통화 모드 선택 시 안내 배너 표시 ("음성 통화 모드: 1~3문장, 이모지 없음, 자연스러운 턴테이킹")
+  - AC2: 각 응답에 토큰 사용량 표시 (call은 200 제한 vs chat 500)
+  - AC3: 통화 vs 채팅 모드 비교 설명 tooltip
+  - AC4: Build PASS
+
+#### Subphase C: TTS 음성 튜닝 UI (T344~T350)
+
+- [ ] **T344: types/api.ts — PersonaDetail에 TTS 필드 타입 추가**
+  - 배경: PersonaDetail 인터페이스에 TTS 관련 필드가 없음
+  - AC1: PersonaDetail에 ttsProvider, ttsVoiceId, ttsPitch, ttsSpeed, ttsLanguage 추가
+  - AC2: 모든 필드 optional (null 허용)
+  - AC3: Build PASS
+
+- [ ] **T345: types/api.ts — UpdatePersonaBody에 TTS 필드 타입 추가**
+  - 배경: UpdatePersonaBody에 TTS 필드가 없어 API로 업데이트 불가
+  - AC1: UpdatePersonaBody에 ttsProvider?, ttsVoiceId?, ttsPitch?, ttsSpeed?, ttsLanguage? 추가
+  - AC2: Build PASS
+
+- [ ] **T346: GET /api/internal/personas/[id] — TTS 5필드 응답 포함**
+  - 배경: Prisma 조회에서 TTS 필드가 select에 미포함
+  - AC1: Prisma select에 ttsProvider, ttsVoiceId, ttsPitch, ttsSpeed, ttsLanguage 추가
+  - AC2: 응답 JSON에 해당 필드 포함 확인
+  - AC3: null인 경우에도 필드 존재 확인
+  - AC4: Build PASS
+
+- [ ] **T347: PUT /api/internal/personas/[id] — TTS 5필드 업데이트 지원**
+  - 배경: PUT 핸들러에서 TTS 필드 업데이트를 받지 않음
+  - AC1: UpdatePersonaBody 검증에 TTS 5필드 추가
+  - AC2: updateData 구성 시 TTS 필드 포함
+  - AC3: ttsSpeed 범위 검증 (0.5~2.0), ttsPitch 범위 검증 (-1.0~1.0)
+  - AC4: ttsProvider 허용값 검증 ("openai" | "google" | "elevenlabs")
+  - AC5: Build PASS
+
+- [ ] **T348: OverviewTab — TTS 음성 설정 섹션 UI (provider + voiceId)**
+  - 배경: 페르소나 상세 페이지에서 TTS 설정을 조회/수정할 수 없음
+  - AC1: OverviewTab에 "음성 설정" 섹션 추가
+  - AC2: TTS Provider 선택 드롭다운 (openai / google / elevenlabs)
+  - AC3: Voice ID 선택 — provider별 옵션 (OpenAI: alloy/echo/fable/onyx/nova/shimmer)
+  - AC4: 현재 저장된 값 표시, editable 모드에서만 수정 가능
+  - AC5: Build PASS
+
+- [ ] **T349: OverviewTab — TTS 튜닝 UI (speed/pitch/language 슬라이더)**
+  - 배경: speed, pitch, language 세부 조정이 필요
+  - AC1: Speed 슬라이더 (0.5~2.0, step 0.1, 기본값 1.0)
+  - AC2: Pitch 슬라이더 (-1.0~1.0, step 0.1, 기본값 0.0)
+  - AC3: Language 선택 드롭다운 (ko-KR, en-US, ja-JP 등)
+  - AC4: 슬라이더 값 실시간 표시
+  - AC5: 변경 시 상위 save 버튼과 연동 (hasChanges 감지)
+  - AC6: Build PASS
+
+- [ ] **T350: OverviewTab — TTS 음성 프리뷰 재생 버튼**
+  - 배경: 설정만으로는 실제 음성을 확인할 수 없음. 프리뷰 재생 필요
+  - AC1: "미리듣기" 버튼 — 현재 TTS 설정으로 샘플 텍스트 음성 합성
+  - AC2: voice-pipeline의 synthesizeSpeech() 호출하는 내부 API 엔드포인트 추가
+  - AC3: Audio 재생 UI (재생/정지, 로딩 스피너)
+  - AC4: 페르소나 이름 + 대표 문장으로 샘플 텍스트 자동 생성
+  - AC5: Build PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
