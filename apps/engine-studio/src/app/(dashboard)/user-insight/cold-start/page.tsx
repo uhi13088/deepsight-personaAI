@@ -333,10 +333,12 @@ function useAiSummary() {
         if (json.success && json.data) {
           setResult(json.data)
         } else {
-          setError(json.error?.message ?? "AI 요약 생성에 실패했습니다")
+          setError(
+            json.error?.message ?? "AI 프로필 분석에 실패했습니다. 잠시 후 다시 시도해 주세요."
+          )
         }
       } catch {
-        setError("AI 서버와 통신 중 오류가 발생했습니다")
+        setError("AI 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.")
       } finally {
         setLoading(false)
       }
@@ -634,10 +636,12 @@ export default function ColdStartPage() {
       if (json.success && json.data) {
         setSets(json.data.sets)
       } else {
-        setError(json.error?.message ?? "데이터를 불러오지 못했습니다")
+        setError(
+          json.error?.message ?? "온보딩 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+        )
       }
     } catch {
-      setError("서버와 통신 중 오류가 발생했습니다")
+      setError("서버 연결에 실패했습니다. 네트워크 상태를 확인하고 다시 시도해 주세요.")
     } finally {
       setLoading(false)
     }
@@ -712,8 +716,31 @@ export default function ColdStartPage() {
     return (
       <>
         <Header title="Cold Start Strategy" description="유저 온보딩 질문 설계 및 관리" />
-        <div className="flex items-center justify-center p-8">
-          <div className="text-sm text-red-400">{error}</div>
+        <div className="flex items-center justify-center p-12">
+          <div className="flex max-w-md flex-col items-center gap-4 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10">
+              <AlertCircle className="h-6 w-6 text-red-400" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-medium">데이터를 불러올 수 없습니다</h3>
+              <p className="text-muted-foreground text-xs leading-relaxed">{error}</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setError(null)
+                setLoading(true)
+                void fetchData()
+              }}
+            >
+              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+              다시 시도
+            </Button>
+            <p className="text-muted-foreground text-[11px]">
+              문제가 계속되면 관리자에게 문의하세요.
+            </p>
+          </div>
         </div>
       </>
     )
@@ -883,8 +910,15 @@ export default function ColdStartPage() {
               })}
 
             {currentSet.questions.length === 0 && (
-              <div className="text-muted-foreground rounded-lg border border-dashed py-12 text-center text-sm">
-                질문이 없습니다. DB 마이그레이션(009_cold_start_v3.sql)을 실행하세요.
+              <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed py-12 text-center">
+                <AlertCircle className="text-muted-foreground h-8 w-8" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">등록된 온보딩 질문이 없습니다</p>
+                  <p className="text-muted-foreground text-xs">
+                    질문 데이터가 아직 준비되지 않았습니다. 관리자에게 초기 데이터 설정을
+                    요청하세요.
+                  </p>
+                </div>
               </div>
             )}
           </div>
