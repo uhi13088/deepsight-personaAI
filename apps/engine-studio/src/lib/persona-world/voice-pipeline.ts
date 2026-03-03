@@ -39,6 +39,34 @@ export const DEFAULT_TTS_CONFIG: TTSVoiceConfig = {
 export const OPENAI_VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"] as const
 export type OpenAIVoice = (typeof OPENAI_VOICES)[number]
 
+// ── STT 언어 → BCP-47 매핑 (Google TTS용) ────────────────
+
+const STT_LANG_TO_BCP47: Record<string, string> = {
+  ko: "ko-KR",
+  en: "en-US",
+  ja: "ja-JP",
+  zh: "zh-CN",
+  es: "es-ES",
+  fr: "fr-FR",
+  de: "de-DE",
+  pt: "pt-BR",
+  it: "it-IT",
+  ru: "ru-RU",
+  ar: "ar-SA",
+  hi: "hi-IN",
+  th: "th-TH",
+  vi: "vi-VN",
+  id: "id-ID",
+}
+
+/**
+ * STT 언어 코드(ISO 639-1) → BCP-47 변환.
+ * Google TTS languageCode에 사용.
+ */
+export function sttLanguageToBcp47(sttLang: string): string {
+  return STT_LANG_TO_BCP47[sttLang] ?? `${sttLang}-${sttLang.toUpperCase()}`
+}
+
 // ── STT: Whisper API ──────────────────────────────────────────
 
 /**
@@ -71,7 +99,7 @@ export async function speechToText(
   const blob = new Blob([ab], { type: contentType })
   formData.append("file", blob, `audio.${ext}`)
   formData.append("model", "whisper-1")
-  formData.append("language", "ko")
+  // language 미지정 → Whisper가 자동 인식 (유저 언어 적응)
   formData.append("response_format", "verbose_json")
 
   const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {

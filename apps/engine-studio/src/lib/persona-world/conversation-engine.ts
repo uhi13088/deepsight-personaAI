@@ -26,6 +26,8 @@ export interface ConversationContext {
   /** RAG 검색된 기억 컨텍스트 (과거 대화 기억 등) */
   ragContext: string
   mode: ConversationMode
+  /** 유저의 감지된 사용 언어 (ISO 639-1, e.g. "ko", "en", "ja"). STT 또는 텍스트에서 감지. */
+  userLanguage?: string
 }
 
 export interface ConversationInput {
@@ -181,7 +183,8 @@ export function buildConversationSystemPrefix(persona: PersonaProfileSnapshot): 
 export function buildConversationSystemSuffix(
   state: PersonaStateData,
   ragContext: string,
-  mode: ConversationMode
+  mode: ConversationMode,
+  userLanguage?: string
 ): string {
   const lines: string[] = []
 
@@ -200,6 +203,14 @@ export function buildConversationSystemSuffix(
   if (ragContext) {
     lines.push("\n## 이 유저와의 기억")
     lines.push(ragContext)
+  }
+
+  // ── 언어 규칙 ──
+  lines.push("\n## 언어 규칙")
+  lines.push("- 유저가 사용하는 언어로 대화하세요.")
+  lines.push("- 당신의 성격, 말투 특징, 습관적 표현은 유지하되, 언어만 유저에 맞추세요.")
+  if (userLanguage && userLanguage !== "ko") {
+    lines.push(`- 유저의 감지된 언어: ${userLanguage}`)
   }
 
   // ── 모드별 대화 규칙 ──
@@ -305,11 +316,11 @@ export async function generateConversationResponse(
   input: ConversationInput
 ): Promise<ConversationResult> {
   const { context, history, userMessage, imageBase64, imageMediaType } = input
-  const { persona, personaId, personaState, ragContext, mode } = context
+  const { persona, personaId, personaState, ragContext, mode, userLanguage } = context
 
   // 시스템 프롬프트 빌드
   const prefix = buildConversationSystemPrefix(persona)
-  const suffix = buildConversationSystemSuffix(personaState, ragContext, mode)
+  const suffix = buildConversationSystemSuffix(personaState, ragContext, mode, userLanguage)
 
   // Anthropic 메시지 빌드
   const messages = buildAnthropicMessages(history, userMessage, imageBase64, imageMediaType)
