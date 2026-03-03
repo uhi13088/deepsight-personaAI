@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Plus, Shuffle, ChevronDown, Loader2 } from "lucide-react"
+import { Plus, Shuffle, ChevronDown, Loader2, Volume2 } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
 import { PersonaGrid } from "@/components/persona/persona-grid"
@@ -27,6 +27,10 @@ export default function PersonaListPage() {
   // 삭제 확인 다이얼로그 상태
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // 일괄 프로필 재설정 상태
+  const [isRecalculating, setIsRecalculating] = useState(false)
+  const [recalcResult, setRecalcResult] = useState<string | null>(null)
 
   const handleFiltersChange = useCallback((next: PersonaFilterState) => {
     setFilters(next)
@@ -104,6 +108,34 @@ export default function PersonaListPage() {
     setDeleteTarget(null)
   }, [])
 
+  const handleRecalculateProfiles = useCallback(async () => {
+    setIsRecalculating(true)
+    setRecalcResult(null)
+    setGenerateError(null)
+
+    try {
+      const res = await fetch("/api/internal/personas/recalculate-tts", {
+        method: "POST",
+      })
+      const json = await res.json()
+
+      if (!json.success) {
+        setGenerateError(json.error?.message ?? "프로필 재설정에 실패했습니다.")
+        return
+      }
+
+      const { updated, skipped } = json.data as { updated: number; skipped: number }
+      setRecalcResult(
+        `${updated}개 페르소나 음성 및 프로필 재설정 완료${skipped > 0 ? ` (${skipped}개 스킵)` : ""}`
+      )
+      refetch()
+    } catch {
+      setGenerateError("네트워크 오류가 발생했습니다.")
+    } finally {
+      setIsRecalculating(false)
+    }
+  }, [refetch])
+
   return (
     <>
       <Header title="Persona List" description="페르소나 목록 조회 및 관리" />
@@ -113,6 +145,21 @@ export default function PersonaListPage() {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">페르소나 관리</h2>
           <div className="flex items-center gap-2">
+            {/* 음성/프로필 일괄 재설정 */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleRecalculateProfiles}
+              disabled={isRecalculating}
+            >
+              {isRecalculating ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : (
+                <Volume2 className="mr-1 h-4 w-4" />
+              )}
+              {isRecalculating ? "재설정 중..." : "음성 일괄 재설정"}
+            </Button>
+
             {/* 랜덤 생성 버튼 (드롭다운) */}
             <div className="relative">
               <div className="flex">
@@ -182,6 +229,13 @@ export default function PersonaListPage() {
         {generateError && (
           <div className="bg-destructive/10 text-destructive rounded-lg px-4 py-3 text-sm">
             {generateError}
+          </div>
+        )}
+
+        {/* 일괄 재설정 성공 */}
+        {recalcResult && (
+          <div className="rounded-lg bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600">
+            {recalcResult}
           </div>
         )}
 

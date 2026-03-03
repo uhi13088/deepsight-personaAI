@@ -66,12 +66,12 @@ const TTS_PROVIDERS = [
 ] as const
 
 const OPENAI_VOICES = [
-  { value: "alloy", label: "Alloy" },
-  { value: "echo", label: "Echo" },
-  { value: "fable", label: "Fable" },
-  { value: "onyx", label: "Onyx" },
-  { value: "nova", label: "Nova" },
-  { value: "shimmer", label: "Shimmer" },
+  { value: "alloy", label: "Alloy", desc: "중성 · 안정적" },
+  { value: "echo", label: "Echo", desc: "남성 · 깊은 톤" },
+  { value: "fable", label: "Fable", desc: "중성 · 표현력" },
+  { value: "onyx", label: "Onyx", desc: "남성 · 권위" },
+  { value: "nova", label: "Nova", desc: "여성 · 따뜻함" },
+  { value: "shimmer", label: "Shimmer", desc: "여성 · 밝은" },
 ] as const
 
 const TTS_LANGUAGES = [
@@ -229,7 +229,14 @@ export function OverviewTab({
 
           {/* Voice ID */}
           <div>
-            <label className="text-muted-foreground mb-1 block text-xs">Voice</label>
+            <label className="text-muted-foreground mb-1 block text-xs">
+              Voice
+              {currentTtsVoiceId && currentTtsProvider === "openai" && (
+                <span className="text-muted-foreground ml-1">
+                  — {OPENAI_VOICES.find((v) => v.value === currentTtsVoiceId)?.desc ?? ""}
+                </span>
+              )}
+            </label>
             {editable ? (
               currentTtsProvider === "openai" ? (
                 <select
@@ -240,7 +247,7 @@ export function OverviewTab({
                   <option value="">(선택)</option>
                   {OPENAI_VOICES.map((v) => (
                     <option key={v.value} value={v.value}>
-                      {v.label}
+                      {v.label} — {v.desc}
                     </option>
                   ))}
                 </select>
@@ -253,9 +260,11 @@ export function OverviewTab({
               )
             ) : (
               <p className="text-sm">
-                {OPENAI_VOICES.find((v) => v.value === currentTtsVoiceId)?.label ??
-                  currentTtsVoiceId ??
-                  "-"}
+                {(() => {
+                  const voice = OPENAI_VOICES.find((v) => v.value === currentTtsVoiceId)
+                  if (voice) return `${voice.label} (${voice.desc})`
+                  return currentTtsVoiceId ?? "-"
+                })()}
               </p>
             )}
           </div>
