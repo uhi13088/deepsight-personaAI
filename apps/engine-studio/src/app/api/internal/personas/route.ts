@@ -209,7 +209,7 @@ export async function GET(request: NextRequest) {
     }
 
     // ── Execute queries ──────────────────────────────────────
-    // include 쿼리 실패 시 (테이블 미존재 등) 단독 조회 폴백
+    // 3단계 폴백 — 각 단계에서 실패 원인을 구조적으로 진단
     const fullQuery = () =>
       prisma.persona.findMany({
         where,
@@ -223,16 +223,101 @@ export async function GET(request: NextRequest) {
       })
     type PersonaWithRelations = Awaited<ReturnType<typeof fullQuery>>[number]
 
+    /** 쿼리 실패 시 에러에서 누락 컬럼명 추출 */
+    function extractMissingColumn(err: unknown): string | null {
+      if (!(err instanceof Error)) return null
+      return err.message.match(/column `([^`]+)` does not exist/)?.[1] ?? null
+    }
+
+    /** 구조화된 진단 로그 */
+    function logQueryDiagnostic(level: string, err: unknown, hint: string) {
+      const msg = err instanceof Error ? err.message : String(err)
+      const col = extractMissingColumn(err)
+      console.error(`[personas API] ${level}:`, {
+        error: msg.slice(0, 200),
+        ...(col ? { missingColumn: col } : {}),
+        hint,
+        fix: "prisma/migrations/041_production_catchup_038_040.sql 실행",
+      })
+    }
+
     let personas: PersonaWithRelations[]
-    try {
-      personas = await fullQuery()
-    } catch {
-      const base = await prisma.persona.findMany({ where, orderBy, skip, take: limit })
-      personas = base.map((p) => ({
-        ...p,
-        layerVectors: [],
-        personaState: null,
-      })) as PersonaWithRelations[]
+    let queryDegraded: string | null = null
+
+    // ── L1: 정상 쿼리 (Persona + layerVectors + personaState) ──
+    const l1Result = await fullQuery().catch((e: unknown) => e as Error)
+    if (Array.isArray(l1Result)) {
+      personas = l1Result
+    } else {
+      logQueryDiagnostic(
+        "L1 실패 (include query)",
+        l1Result,
+        "persona_states 또는 persona_layer_vectors에 미적용 컬럼"
+      )
+
+      // ── L2: Persona만 (관계 테이블 제외) ──
+      const l2Result = await prisma.persona
+        .findMany({ where, orderBy, skip, take: limit })
+        .catch((e: unknown) => e as Error)
+      if (Array.isArray(l2Result)) {
+        personas = l2Result.map((p) => ({
+          ...p,
+          layerVectors: [],
+          personaState: null,
+        })) as PersonaWithRelations[]
+        queryDegraded = `L2: 관계 쿼리 실패 → 벡터/상태 없음 (${extractMissingColumn(l1Result) ?? "관계 테이블 문제"})`
+      } else {
+        logQueryDiagnostic(
+          "L2 실패 (Persona 단독)",
+          l2Result,
+          "personas 테이블에 미적용 컬럼 (TTS 등)"
+        )
+
+        // ── L3: 기존 001 스키마 컬럼만 select ──
+        const l3Result = await prisma.persona
+          .findMany({
+            where,
+            orderBy,
+            skip,
+            take: limit,
+            select: {
+              id: true,
+              name: true,
+              role: true,
+              expertise: true,
+              description: true,
+              profileImageUrl: true,
+              status: true,
+              source: true,
+              archetypeId: true,
+              paradoxScore: true,
+              dimensionalityScore: true,
+              qualityScore: true,
+              validationScore: true,
+              engineVersion: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          })
+          .catch((e: unknown) => e as Error)
+
+        if (Array.isArray(l3Result)) {
+          personas = l3Result.map((p) => ({
+            ...p,
+            layerVectors: [],
+            personaState: null,
+          })) as unknown as PersonaWithRelations[]
+          queryDegraded = `L3: 핵심 필드만 → 벡터/상태/TTS 없음 (${extractMissingColumn(l2Result) ?? "personas 테이블 문제"})`
+        } else {
+          logQueryDiagnostic("L3 실패 (select 최소)", l3Result, "기본 스키마조차 문제")
+          personas = []
+          queryDegraded = "L3: 전체 실패 → DB 마이그레이션 필수"
+        }
+      }
+    }
+
+    if (queryDegraded) {
+      console.warn("[personas API] ⚠️ 쿼리 저하:", queryDegraded)
     }
 
     const [totalCount, statusCounts] = await Promise.all([
@@ -332,6 +417,7 @@ export async function GET(request: NextRequest) {
           totalMatched: crossAxisFilters?.length ? filteredList.length : totalCount,
           statusDistribution,
         },
+        ...(queryDegraded ? { _migrationWarning: queryDegraded } : {}),
       },
     }
 

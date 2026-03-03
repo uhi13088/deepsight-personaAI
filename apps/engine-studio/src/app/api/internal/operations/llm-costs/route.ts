@@ -90,14 +90,18 @@ export async function GET(request: NextRequest) {
     const since = new Date()
     since.setDate(since.getDate() - days)
 
-    // 테이블 존재 여부 + 데이터 확인 (raw query 실패 방지)
+    // 테이블 존재 여부 + 데이터 확인
+    // count()는 SELECT COUNT(*) 이므로 컬럼 누락 영향 없음 (테이블 부재만 감지)
     let totalCount: number
     try {
       totalCount = await prisma.llmUsageLog.count({
         where: { createdAt: { gte: since } },
       })
-    } catch {
-      // 테이블이 없거나 마이그레이션 미적용 — 빈 데이터 반환
+    } catch (err) {
+      console.error(
+        "[llm-costs] count 실패 (테이블 미존재):",
+        err instanceof Error ? err.message : err
+      )
       return NextResponse.json({
         success: true,
         data: EMPTY_RESPONSE,
@@ -214,11 +218,25 @@ export async function GET(request: NextRequest) {
       // raw query 실패 시 빈 배열 유지
     }
 
-    // 최근 호출 목록
+    // 최근 호출 목록 (select 명시 — 마이그레이션 미적용 컬럼 SELECT 방지)
     const recentRaw = await prisma.llmUsageLog.findMany({
       where: { createdAt: { gte: since } },
       orderBy: { createdAt: "desc" },
       take: limit,
+      select: {
+        id: true,
+        personaId: true,
+        callType: true,
+        model: true,
+        inputTokens: true,
+        outputTokens: true,
+        totalTokens: true,
+        estimatedCostUsd: true,
+        durationMs: true,
+        status: true,
+        errorMessage: true,
+        createdAt: true,
+      },
     })
 
     const recentCalls: RecentCall[] = recentRaw.map((r) => ({

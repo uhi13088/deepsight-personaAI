@@ -34,11 +34,15 @@ const L2_KEYS = [
 const L3_KEYS = ["lack", "moralCompass", "volatility", "growthArc"] as const
 
 async function loadPersonasFromDB(): Promise<PersonaCandidate[]> {
+  // select 명시: 매칭에 필요한 필드만 조회 (마이그레이션 미적용 컬럼 SELECT 방지)
   const personas = await prisma.persona.findMany({
     where: { status: { in: ["ACTIVE", "STANDARD", "REVIEW"] } },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      archetypeId: true,
       layerVectors: {
-        orderBy: { version: "desc" },
+        orderBy: { version: "desc" as const },
       },
     },
     take: 100,
@@ -134,11 +138,22 @@ export async function GET() {
       success: true,
       data: { personas, source: "db" },
     })
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    const missingCol = msg.match(/column `([^`]+)` does not exist/)?.[1]
+    console.error("[matching-lab/simulate] GET 실패:", {
+      error: msg.slice(0, 200),
+      ...(missingCol
+        ? { missingColumn: missingCol, fix: "041_production_catchup_038_040.sql 실행" }
+        : {}),
+    })
     return NextResponse.json<ApiResponse<never>>(
       {
         success: false,
-        error: { code: "INTERNAL_ERROR", message: "페르소나 목록 조회 실패" },
+        error: {
+          code: "INTERNAL_ERROR",
+          message: `페르소나 목록 조회 실패: ${missingCol ? `DB에 ${missingCol} 컬럼 없음 (마이그레이션 필요)` : msg.slice(0, 100)}`,
+        },
       },
       { status: 500 }
     )
@@ -255,11 +270,22 @@ export async function POST(request: NextRequest) {
         personaSource,
       },
     })
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    const missingCol = msg.match(/column `([^`]+)` does not exist/)?.[1]
+    console.error("[matching-lab/simulate] POST 실패:", {
+      error: msg.slice(0, 200),
+      ...(missingCol
+        ? { missingColumn: missingCol, fix: "041_production_catchup_038_040.sql 실행" }
+        : {}),
+    })
     return NextResponse.json<ApiResponse<never>>(
       {
         success: false,
-        error: { code: "INTERNAL_ERROR", message: "시뮬레이션 실행 실패" },
+        error: {
+          code: "INTERNAL_ERROR",
+          message: `시뮬레이션 실행 실패: ${missingCol ? `DB에 ${missingCol} 컬럼 없음 (마이그레이션 필요)` : msg.slice(0, 100)}`,
+        },
       },
       { status: 500 }
     )

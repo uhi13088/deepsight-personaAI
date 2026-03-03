@@ -66,6 +66,8 @@
 ## Database
 
 - [2026-02-19] 수동 SQL 시드 파일 작성 시 반드시 001_full_schema.sql(Prisma 마이그레이션)의 실제 컬럼명을 확인할 것. Prisma는 camelCase 컬럼명을 생성하므로 snake_case로 작성하면 불일치 발생. CREATE TABLE IF NOT EXISTS 대신 기존 테이블 전제로 INSERT만 작성
+- [2026-03-03] **⭐ Prisma 스키마에 컬럼 추가 시 반드시 마이그레이션 SQL 파일도 동시에 생성할 것.** `prisma db push`는 로컬 DB만 동기화하므로 프로덕션에는 적용되지 않음. 프로덕션은 수동 SQL 마이그레이션으로만 스키마 변경 가능. 체크리스트: ① `schema.prisma`에 필드 추가 ② 해당 필드의 `ALTER TABLE ADD COLUMN IF NOT EXISTS` SQL을 migrations/ 폴더에 작성 ③ 배포 전 마이그레이션 SQL을 프로덕션 DB에 적용 — 이 3단계 중 하나라도 빠지면 Prisma 클라이언트가 존재하지 않는 컬럼을 SELECT하여 전체 API 500 에러 발생. **특히 `findMany()` 등 전체 컬럼 SELECT 쿼리는 관계없는 API까지 연쇄 장애 유발**
+- [2026-03-03] **배포 전 DB 마이그레이션 상태 확인 필수.** 배포(Vercel 등)는 `prisma generate && next build`만 실행하고 DB 스키마는 변경하지 않음. 새 컬럼/테이블이 스키마에 추가되었으면 배포 전에 반드시 프로덕션 DB에 마이그레이션을 적용해야 함. 확인 명령: `SELECT column_name FROM information_schema.columns WHERE table_name = '테이블명';`
 
 ## Performance
 
