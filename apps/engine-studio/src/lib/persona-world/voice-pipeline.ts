@@ -5,7 +5,7 @@
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
-export type TTSProvider = "openai" | "google"
+export type TTSProvider = "openai" | "google" | "elevenlabs"
 
 export interface TTSVoiceConfig {
   provider: TTSProvider
@@ -38,6 +38,31 @@ export const DEFAULT_TTS_CONFIG: TTSVoiceConfig = {
 
 export const OPENAI_VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"] as const
 export type OpenAIVoice = (typeof OPENAI_VOICES)[number]
+
+// ElevenLabs 프리셋 음성 카탈로그
+export const ELEVENLABS_VOICES = [
+  // Male
+  { id: "onwK4e9ZLuTAKqWW03F9", name: "Daniel", gender: "male", desc: "남성 · 권위 · 깊은" },
+  { id: "nPczCjzI2devNBz1zQrb", name: "Brian", gender: "male", desc: "남성 · 내레이터" },
+  { id: "IKne3meq5aSn9XLyUdCD", name: "Charlie", gender: "male", desc: "남성 · 캐주얼" },
+  { id: "TxGEqnHWrfWFTfGW9XjX", name: "Josh", gender: "male", desc: "남성 · 젊은" },
+  { id: "pNInz6obpgDQGcFmaJgB", name: "Adam", gender: "male", desc: "남성 · 깊은 톤" },
+  { id: "TX3LPaxmHKxFdv7VOQHJ", name: "Liam", gender: "male", desc: "남성 · 젊은 내레이터" },
+  { id: "JBFqnCBsd6RMkjVDRZzb", name: "George", gender: "male", desc: "남성 · 따뜻한" },
+  { id: "g5CIjZEefAph4nQFvHAz", name: "Ethan", gender: "male", desc: "남성 · 내레이션" },
+  // Female
+  { id: "21m00Tcm4TlvDq8ikWAM", name: "Rachel", gender: "female", desc: "여성 · 차분한" },
+  { id: "XB0fDUnXU5powFXDhCwa", name: "Charlotte", gender: "female", desc: "여성 · 세련된" },
+  { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah", gender: "female", desc: "여성 · 부드러운" },
+  { id: "9BWtsMINqrJLrRacOk9x", name: "Aria", gender: "female", desc: "여성 · 표현력" },
+  { id: "pFZP5JQG7iQjIQuC4Bku", name: "Lily", gender: "female", desc: "여성 · 따뜻한" },
+  { id: "XrExE9yKIg1WjnnlVkGX", name: "Matilda", gender: "female", desc: "여성 · 온화한" },
+  { id: "LcfcDJNUP1GQjkzn1xUU", name: "Emily", gender: "female", desc: "여성 · 차분한" },
+  { id: "ThT5KcBeYPX3keUQqHPh", name: "Dorothy", gender: "female", desc: "여성 · 밝은" },
+  // Non-binary
+  { id: "SAz9YHcvj6GT2YYXdXww", name: "River", gender: "neutral", desc: "중성 · 자연스러운" },
+  { id: "iP95p4xoKVk53GoZ742B", name: "Chris", gender: "neutral", desc: "중성 · 캐주얼" },
+] as const
 
 // ── STT 언어 → BCP-47 매핑 (Google TTS용) ────────────────
 
@@ -218,6 +243,61 @@ export async function textToSpeechGoogle(text: string, config: TTSVoiceConfig): 
   }
 }
 
+// ── TTS: ElevenLabs ──────────────────────────────────────────
+
+/**
+ * ElevenLabs TTS API를 통해 텍스트 → 음성 변환.
+ * eleven_multilingual_v2 모델로 한국어 포함 다국어 지원.
+ * 반환: { audioBase64, contentType, durationEstimateSec }
+ */
+export async function textToSpeechElevenLabs(
+  text: string,
+  config: TTSVoiceConfig
+): Promise<TTSResult> {
+  const apiKey = process.env.ELEVENLABS_API_KEY
+  if (!apiKey) {
+    throw new Error("ELEVENLABS_API_KEY is not configured for TTS")
+  }
+
+  const voiceId = config.voiceId || "21m00Tcm4TlvDq8ikWAM" // Rachel (기본)
+
+  const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    method: "POST",
+    headers: {
+      "xi-api-key": apiKey,
+      "Content-Type": "application/json",
+      Accept: "audio/mpeg",
+    },
+    body: JSON.stringify({
+      text,
+      model_id: "eleven_multilingual_v2",
+      voice_settings: {
+        stability: 0.5,
+        similarity_boost: 0.75,
+        style: 0.0,
+        use_speaker_boost: true,
+      },
+    }),
+  })
+
+  if (!res.ok) {
+    const errText = await res.text()
+    throw new Error(`ElevenLabs TTS failed (${res.status}): ${errText}`)
+  }
+
+  const arrayBuffer = await res.arrayBuffer()
+  const audioBase64 = Buffer.from(arrayBuffer).toString("base64")
+
+  // 대략적인 길이 추정 (한국어 평균 분당 250자 기준)
+  const estimatedDuration = Math.max(1, Math.ceil((text.length / 250) * 60))
+
+  return {
+    audioBase64,
+    contentType: "audio/mpeg",
+    durationEstimateSec: estimatedDuration,
+  }
+}
+
 // ── 통합 TTS 디스패처 ─────────────────────────────────────────
 
 /**
@@ -227,6 +307,9 @@ export async function textToSpeech(
   text: string,
   config: TTSVoiceConfig = DEFAULT_TTS_CONFIG
 ): Promise<TTSResult> {
+  if (config.provider === "elevenlabs") {
+    return textToSpeechElevenLabs(text, config)
+  }
   if (config.provider === "google") {
     return textToSpeechGoogle(text, config)
   }
@@ -260,6 +343,10 @@ export function buildTTSConfig(persona: {
 export function isVoiceConfigured(): { stt: boolean; tts: boolean } {
   return {
     stt: !!process.env.OPENAI_API_KEY,
-    tts: !!(process.env.OPENAI_API_KEY || process.env.GOOGLE_TTS_API_KEY),
+    tts: !!(
+      process.env.OPENAI_API_KEY ||
+      process.env.GOOGLE_TTS_API_KEY ||
+      process.env.ELEVENLABS_API_KEY
+    ),
   }
 }

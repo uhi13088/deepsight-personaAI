@@ -74,6 +74,30 @@ const OPENAI_VOICES = [
   { value: "shimmer", label: "Shimmer", desc: "여성 · 밝은" },
 ] as const
 
+const ELEVENLABS_VOICES = [
+  // Male
+  { value: "onwK4e9ZLuTAKqWW03F9", label: "Daniel", desc: "남성 · 권위 · 깊은" },
+  { value: "nPczCjzI2devNBz1zQrb", label: "Brian", desc: "남성 · 내레이터" },
+  { value: "IKne3meq5aSn9XLyUdCD", label: "Charlie", desc: "남성 · 캐주얼" },
+  { value: "TxGEqnHWrfWFTfGW9XjX", label: "Josh", desc: "남성 · 젊은" },
+  { value: "pNInz6obpgDQGcFmaJgB", label: "Adam", desc: "남성 · 깊은 톤" },
+  { value: "TX3LPaxmHKxFdv7VOQHJ", label: "Liam", desc: "남성 · 젊은 내레이터" },
+  { value: "JBFqnCBsd6RMkjVDRZzb", label: "George", desc: "남성 · 따뜻한" },
+  { value: "g5CIjZEefAph4nQFvHAz", label: "Ethan", desc: "남성 · 내레이션" },
+  // Female
+  { value: "21m00Tcm4TlvDq8ikWAM", label: "Rachel", desc: "여성 · 차분한" },
+  { value: "XB0fDUnXU5powFXDhCwa", label: "Charlotte", desc: "여성 · 세련된" },
+  { value: "EXAVITQu4vr4xnSDxMaL", label: "Sarah", desc: "여성 · 부드러운" },
+  { value: "9BWtsMINqrJLrRacOk9x", label: "Aria", desc: "여성 · 표현력" },
+  { value: "pFZP5JQG7iQjIQuC4Bku", label: "Lily", desc: "여성 · 따뜻한" },
+  { value: "XrExE9yKIg1WjnnlVkGX", label: "Matilda", desc: "여성 · 온화한" },
+  { value: "LcfcDJNUP1GQjkzn1xUU", label: "Emily", desc: "여성 · 차분한" },
+  { value: "ThT5KcBeYPX3keUQqHPh", label: "Dorothy", desc: "여성 · 밝은" },
+  // Non-binary
+  { value: "SAz9YHcvj6GT2YYXdXww", label: "River", desc: "중성 · 자연스러운" },
+  { value: "iP95p4xoKVk53GoZ742B", label: "Chris", desc: "중성 · 캐주얼" },
+] as const
+
 const TTS_LANGUAGES = [
   { value: "ko-KR", label: "한국어" },
   { value: "en-US", label: "English (US)" },
@@ -236,6 +260,11 @@ export function OverviewTab({
                   — {OPENAI_VOICES.find((v) => v.value === currentTtsVoiceId)?.desc ?? ""}
                 </span>
               )}
+              {currentTtsVoiceId && currentTtsProvider === "elevenlabs" && (
+                <span className="text-muted-foreground ml-1">
+                  — {ELEVENLABS_VOICES.find((v) => v.value === currentTtsVoiceId)?.desc ?? ""}
+                </span>
+              )}
             </label>
             {editable ? (
               currentTtsProvider === "openai" ? (
@@ -251,6 +280,19 @@ export function OverviewTab({
                     </option>
                   ))}
                 </select>
+              ) : currentTtsProvider === "elevenlabs" ? (
+                <select
+                  className="border-border bg-background w-full rounded-lg border px-3 py-2 text-sm"
+                  value={currentTtsVoiceId ?? ""}
+                  onChange={(e) => onTtsChange.setVoiceId(e.target.value || null)}
+                >
+                  <option value="">(선택)</option>
+                  {ELEVENLABS_VOICES.map((v) => (
+                    <option key={v.value} value={v.value}>
+                      {v.label} — {v.desc}
+                    </option>
+                  ))}
+                </select>
               ) : (
                 <Input
                   value={currentTtsVoiceId ?? ""}
@@ -261,8 +303,10 @@ export function OverviewTab({
             ) : (
               <p className="text-sm">
                 {(() => {
-                  const voice = OPENAI_VOICES.find((v) => v.value === currentTtsVoiceId)
-                  if (voice) return `${voice.label} (${voice.desc})`
+                  const openaiVoice = OPENAI_VOICES.find((v) => v.value === currentTtsVoiceId)
+                  if (openaiVoice) return `${openaiVoice.label} (${openaiVoice.desc})`
+                  const elVoice = ELEVENLABS_VOICES.find((v) => v.value === currentTtsVoiceId)
+                  if (elVoice) return `${elVoice.label} (${elVoice.desc})`
                   return currentTtsVoiceId ?? "-"
                 })()}
               </p>

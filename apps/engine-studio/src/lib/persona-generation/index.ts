@@ -103,13 +103,18 @@ export function generatePersona(config: GenerationConfig): GeneratedPersona {
   const preNationality = inferNationality(preRegion)
 
   // Stage 3: 캐릭터 생성 (국적에 맞는 이름 선택)
+  // ElevenLabs API 키가 있으면 ElevenLabs TTS 우선 사용 (18개 고유 음성)
+  const preferredTtsProvider = process.env.ELEVENLABS_API_KEY
+    ? ("elevenlabs" as const)
+    : ("openai" as const)
   const character = generateCharacter(
     vectors.l1,
     vectors.l2,
     vectors.l3,
     archetype,
     config.existingNames,
-    preNationality
+    preNationality,
+    preferredTtsProvider
   )
 
   // Stage 4: 활동성/콘텐츠 설정 추론

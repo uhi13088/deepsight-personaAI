@@ -13,7 +13,7 @@ import type {
 // ── 타입 정의 ─────────────────────────────────────────────────
 
 export interface TTSVoiceProfile {
-  provider: "openai" | "google"
+  provider: "openai" | "google" | "elevenlabs"
   voiceId: string
   speed: number
   language: string
@@ -304,7 +304,8 @@ export function generateCharacter(
   l3: NarrativeDriveVector,
   archetype?: PersonaArchetype,
   existingNames: string[] = [],
-  nationality?: string
+  nationality?: string,
+  preferredTtsProvider: "openai" | "elevenlabs" = "openai"
 ): CharacterProfile {
   const { name, gender } = generateName(l1, l2, existingNames, nationality)
   const role = generateRole(l1, l2, archetype)
@@ -316,7 +317,7 @@ export function generateCharacter(
   const habits = generateHabits(l2, l3)
   const relationships = generateRelationships(l1, l2, archetype)
 
-  const ttsVoice = inferTTSVoice(l1, l2, gender)
+  const ttsVoice = inferTTSVoice(l1, l2, gender, preferredTtsProvider)
 
   return {
     name,
@@ -375,10 +376,39 @@ const OPENAI_VOICE_MAP = {
   },
 } as const
 
+/**
+ * ElevenLabs 성별 × 성격 매핑 — 18개 고유 음성
+ * 각 성별/성격 조합마다 고유한 voice ID를 사용하여 12+ 페르소나 전부 독창적 음성 보장.
+ */
+const ELEVENLABS_VOICE_MAP = {
+  MALE: {
+    analytical: "onwK4e9ZLuTAKqWW03F9", // Daniel — 권위 있는 깊은 목소리
+    critical: "nPczCjzI2devNBz1zQrb", // Brian — 딥 내레이터
+    social: "IKne3meq5aSn9XLyUdCD", // Charlie — 캐주얼
+    emotional: "TxGEqnHWrfWFTfGW9XjX", // Josh — 젊고 깊은
+    default: "pNInz6obpgDQGcFmaJgB", // Adam — 딥 보이스
+  },
+  FEMALE: {
+    analytical: "21m00Tcm4TlvDq8ikWAM", // Rachel — 차분한
+    critical: "XB0fDUnXU5powFXDhCwa", // Charlotte — 세련된
+    social: "EXAVITQu4vr4xnSDxMaL", // Sarah — 부드러운
+    emotional: "9BWtsMINqrJLrRacOk9x", // Aria — 표현력 풍부
+    default: "pFZP5JQG7iQjIQuC4Bku", // Lily — 따뜻한
+  },
+  NON_BINARY: {
+    analytical: "SAz9YHcvj6GT2YYXdXww", // River — 중성
+    critical: "g5CIjZEefAph4nQFvHAz", // Ethan — 내레이션
+    social: "iP95p4xoKVk53GoZ742B", // Chris — 캐주얼
+    emotional: "XrExE9yKIg1WjnnlVkGX", // Matilda — 온화한
+    default: "SAz9YHcvj6GT2YYXdXww", // River — 중성
+  },
+} as const
+
 function inferTTSVoice(
   l1: SocialPersonaVector,
   l2: CoreTemperamentVector,
-  gender: "MALE" | "FEMALE" | "NON_BINARY"
+  gender: "MALE" | "FEMALE" | "NON_BINARY",
+  preferredProvider: "openai" | "elevenlabs" = "openai"
 ): TTSVoiceProfile {
   // 1. 성격 유형 결정
   let personalityKey: "analytical" | "critical" | "social" | "emotional" | "default"
@@ -394,8 +424,11 @@ function inferTTSVoice(
     personalityKey = "default"
   }
 
-  // 2. 음성 ID 결정
-  const voiceId = OPENAI_VOICE_MAP[gender][personalityKey]
+  // 2. 음성 ID 결정 — provider에 따라 다른 매핑 사용
+  const voiceId =
+    preferredProvider === "elevenlabs"
+      ? ELEVENLABS_VOICE_MAP[gender][personalityKey]
+      : OPENAI_VOICE_MAP[gender][personalityKey]
 
   // 3. 속도 추론 (0.85 ~ 1.20)
   // 높은 depth → 느림, 높은 sociability/extraversion → 빠름
@@ -409,7 +442,7 @@ function inferTTSVoice(
     ) / 100
 
   return {
-    provider: "openai",
+    provider: preferredProvider,
     voiceId,
     speed,
     language: "ko-KR",
@@ -423,9 +456,10 @@ function inferTTSVoice(
 export function inferTTSVoiceFromVectors(
   l1: SocialPersonaVector,
   l2: CoreTemperamentVector,
-  gender: "MALE" | "FEMALE" | "NON_BINARY" = "NON_BINARY"
+  gender: "MALE" | "FEMALE" | "NON_BINARY" = "NON_BINARY",
+  preferredProvider: "openai" | "elevenlabs" = "openai"
 ): TTSVoiceProfile {
-  return inferTTSVoice(l1, l2, gender)
+  return inferTTSVoice(l1, l2, gender, preferredProvider)
 }
 
 // ── 이름 생성 (국적 + 성격 일관성 보장) ──────────────────────

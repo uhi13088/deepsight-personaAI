@@ -38,7 +38,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           error: {
             code: "TTS_NOT_CONFIGURED",
             message:
-              "TTS API 키가 설정되지 않았습니다. OPENAI_API_KEY 또는 GOOGLE_TTS_API_KEY를 확인해주세요.",
+              "TTS API 키가 설정되지 않았습니다. OPENAI_API_KEY, GOOGLE_TTS_API_KEY, 또는 ELEVENLABS_API_KEY를 확인해주세요.",
           },
         } satisfies ApiResponse<never>,
         { status: 503 }
