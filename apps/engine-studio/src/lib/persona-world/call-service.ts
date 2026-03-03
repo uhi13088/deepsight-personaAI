@@ -20,7 +20,7 @@ import type {
 } from "./conversation-memory"
 import { spendCredits, getBalance } from "./credit-service"
 import type { CreditDataProvider } from "./credit-service"
-import { speechToText, textToSpeech, buildTTSConfig } from "./voice-pipeline"
+import { speechToText, textToSpeech, buildTTSConfig, sttLanguageToBcp47 } from "./voice-pipeline"
 import type { TTSResult } from "./voice-pipeline"
 import type { PersonaProfileSnapshot, PersonaStateData } from "./types"
 
@@ -250,6 +250,8 @@ export interface CallTurnResult {
   personaAudio: TTSResult
   turnNumber: number
   shouldEnd: boolean
+  /** STT가 감지한 유저 사용 언어 (ISO 639-1) */
+  detectedLanguage: string
 }
 
 /**
@@ -298,7 +300,7 @@ export async function processCallTurn(
     userMessage = `${sttResult.text}\n\n[시스템: 통화 시간이 거의 끝나갑니다. 자연스럽게 마무리 인사를 해주세요.]`
   }
 
-  // 6. LLM 응답 생성
+  // 6. LLM 응답 생성 (유저 언어로 응답하도록 지시)
   const input: ConversationInput = {
     context: {
       persona: profile,
@@ -306,14 +308,16 @@ export async function processCallTurn(
       personaState: currentState,
       ragContext,
       mode: "call",
+      userLanguage: sttResult.language,
     },
     history: params.conversationHistory,
     userMessage,
   }
   const llmResult = await generateConversationResponse(input)
 
-  // 7. TTS 변환
+  // 7. TTS 변환 (유저 언어로 languageCode 오버라이드, voiceId/speed는 페르소나 프로필 유지)
   const ttsConfig = buildTTSConfig(await dp.getPersonaTTSConfig(params.personaId))
+  ttsConfig.language = sttLanguageToBcp47(sttResult.language)
   const personaAudio = await textToSpeech(llmResult.text, ttsConfig)
 
   // 8. 기억 기록 (유저 발화 + 페르소나 응답)
@@ -347,6 +351,7 @@ export async function processCallTurn(
     personaAudio,
     turnNumber: params.turnNumber + 1,
     shouldEnd,
+    detectedLanguage: sttResult.language,
   }
 }
 

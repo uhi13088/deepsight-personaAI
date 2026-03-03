@@ -13,6 +13,7 @@ import {
 } from "@/lib/persona-generation/structured-fields"
 import { inferActivitySettings } from "@/lib/persona-generation/activity-inference"
 import { generateCharacterWithLLM } from "@/lib/persona-generation/llm-character-generator"
+import { inferTTSVoiceFromVectors } from "@/lib/persona-generation/character-generator"
 import { buildAllPrompts } from "@/lib/prompt-builder"
 import {
   generateAllQualitativeDimensions,
@@ -177,6 +178,11 @@ interface SavePersonaParams {
   languages?: string[]
   knowledgeAreas?: string[]
   height?: number
+  // TTS 음성 프로필
+  ttsProvider?: string
+  ttsVoiceId?: string
+  ttsSpeed?: number
+  ttsLanguage?: string
 }
 
 async function savePersonaToDb(params: SavePersonaParams) {
@@ -227,6 +233,12 @@ async function savePersonaToDb(params: SavePersonaParams) {
         languages: params.languages ?? [],
         knowledgeAreas: params.knowledgeAreas ?? [],
         height: params.height ?? undefined,
+
+        // TTS 음성 프로필
+        ttsProvider: params.ttsProvider ?? undefined,
+        ttsVoiceId: params.ttsVoiceId ?? undefined,
+        ttsSpeed: params.ttsSpeed ?? undefined,
+        ttsLanguage: params.ttsLanguage ?? "ko-KR",
 
         // v3 호환: 기존 소비자가 직접 접근하는 필드 유지
         voiceProfile: params.qualitative.voice as unknown as Prisma.InputJsonValue,
@@ -475,6 +487,10 @@ async function executeAutoPipeline(options?: AutoPipelineInput): Promise<Generat
     languages: demographics.languages,
     knowledgeAreas: demographics.knowledgeAreas,
     height: demographics.height,
+    ttsProvider: character.ttsVoice.provider,
+    ttsVoiceId: character.ttsVoice.voiceId,
+    ttsSpeed: character.ttsVoice.speed,
+    ttsLanguage: character.ttsVoice.language,
   })
 
   // T161-AC4: 커버리지 리포트
@@ -586,6 +602,19 @@ async function executeManualPipeline(input: ManualPipelineInput): Promise<Genera
     languages: demographics.languages,
     knowledgeAreas: demographics.knowledgeAreas,
     height: demographics.height,
+    ...(() => {
+      const tts = inferTTSVoiceFromVectors(
+        l1,
+        l2,
+        (demographics.gender as "MALE" | "FEMALE" | "NON_BINARY") ?? "NON_BINARY"
+      )
+      return {
+        ttsProvider: tts.provider,
+        ttsVoiceId: tts.voiceId,
+        ttsSpeed: tts.speed,
+        ttsLanguage: tts.language,
+      }
+    })(),
   })
 
   return {

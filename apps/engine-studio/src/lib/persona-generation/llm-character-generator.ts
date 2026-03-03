@@ -12,6 +12,7 @@ import type {
 } from "@/types"
 import { generateText, isLLMConfigured } from "@/lib/llm-client"
 import type { CharacterProfile, RelationshipSeed } from "./character-generator"
+import { inferTTSVoiceFromVectors } from "./character-generator"
 
 // ── 상수 ────────────────────────────────────────────────────
 
@@ -266,6 +267,8 @@ function validateAndNormalize(raw: RawCharacterOutput): CharacterProfile {
     quirks,
     habits,
     relationships,
+    // ttsVoice는 호출측에서 inferTTSVoiceFromVectors로 덮어씀
+    ttsVoice: { provider: "openai" as const, voiceId: "alloy", speed: 1.0, language: "ko-KR" },
   }
 }
 
@@ -361,7 +364,9 @@ export async function generateCharacterWithLLM(
 
   const jsonStr = extractJSON(result.text)
   const parsed = JSON.parse(jsonStr) as RawCharacterOutput
-  return validateAndNormalize(parsed)
+  const character = validateAndNormalize(parsed)
+  character.ttsVoice = inferTTSVoiceFromVectors(l1, l2, character.gender)
+  return character
 }
 
 // ── 내부 함수 테스트용 export ────────────────────────────────
