@@ -603,10 +603,15 @@ async function executeManualPipeline(input: ManualPipelineInput): Promise<Genera
     knowledgeAreas: demographics.knowledgeAreas,
     height: demographics.height,
     ...(() => {
+      const preferredProvider = process.env.ELEVENLABS_API_KEY
+        ? ("elevenlabs" as const)
+        : ("openai" as const)
       const tts = inferTTSVoiceFromVectors(
         l1,
         l2,
-        (demographics.gender as "MALE" | "FEMALE" | "NON_BINARY") ?? "NON_BINARY"
+        (demographics.gender as "MALE" | "FEMALE" | "NON_BINARY") ?? "NON_BINARY",
+        preferredProvider,
+        l3
       )
       return {
         ttsProvider: tts.provider,

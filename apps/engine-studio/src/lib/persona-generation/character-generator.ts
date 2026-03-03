@@ -9,14 +9,29 @@ import type {
   NarrativeDriveVector,
   PersonaArchetype,
 } from "@/types"
+import {
+  computeVoiceCharacter,
+  voiceCharacterToElevenLabs,
+  type VoiceCharacter,
+} from "@/lib/persona-world/voice-engine"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
 export interface TTSVoiceProfile {
-  provider: "openai" | "google"
+  provider: "openai" | "google" | "elevenlabs"
   voiceId: string
   speed: number
   language: string
+  /** ElevenLabs: 안정성 (0~1). 높을수록 일관된 음색 */
+  stability?: number
+  /** ElevenLabs: 원본 유사도 (0~1). 높을수록 원본에 가까움 */
+  similarityBoost?: number
+  /** ElevenLabs: 표현력 (0~1). 높을수록 감정 표현 풍부 */
+  style?: number
+  /** ElevenLabs: speaker boost 활성화 여부 */
+  useSpeakerBoost?: boolean
+  /** Voice Engine 10D 캐릭터 벡터 — UI 시각화/디버깅용 */
+  voiceCharacter?: VoiceCharacter
 }
 
 export interface CharacterProfile {
@@ -304,7 +319,8 @@ export function generateCharacter(
   l3: NarrativeDriveVector,
   archetype?: PersonaArchetype,
   existingNames: string[] = [],
-  nationality?: string
+  nationality?: string,
+  preferredTtsProvider: "openai" | "elevenlabs" = "openai"
 ): CharacterProfile {
   const { name, gender } = generateName(l1, l2, existingNames, nationality)
   const role = generateRole(l1, l2, archetype)
@@ -316,7 +332,7 @@ export function generateCharacter(
   const habits = generateHabits(l2, l3)
   const relationships = generateRelationships(l1, l2, archetype)
 
-  const ttsVoice = inferTTSVoice(l1, l2, gender)
+  const ttsVoice = inferTTSVoice(l1, l2, l3, gender, preferredTtsProvider)
 
   return {
     name,
@@ -375,12 +391,53 @@ const OPENAI_VOICE_MAP = {
   },
 } as const
 
+/**
+ * ElevenLabs 성별 × 성격 매핑 — 18개 고유 음성
+ * 각 성별/성격 조합마다 고유한 voice ID를 사용하여 12+ 페르소나 전부 독창적 음성 보장.
+ */
+const ELEVENLABS_VOICE_MAP = {
+  MALE: {
+    analytical: "onwK4e9ZLuTAKqWW03F9", // Daniel — 권위 있는 깊은 목소리
+    critical: "nPczCjzI2devNBz1zQrb", // Brian — 딥 내레이터
+    social: "IKne3meq5aSn9XLyUdCD", // Charlie — 캐주얼
+    emotional: "TxGEqnHWrfWFTfGW9XjX", // Josh — 젊고 깊은
+    default: "pNInz6obpgDQGcFmaJgB", // Adam — 딥 보이스
+  },
+  FEMALE: {
+    analytical: "21m00Tcm4TlvDq8ikWAM", // Rachel — 차분한
+    critical: "XB0fDUnXU5powFXDhCwa", // Charlotte — 세련된
+    social: "EXAVITQu4vr4xnSDxMaL", // Sarah — 부드러운
+    emotional: "9BWtsMINqrJLrRacOk9x", // Aria — 표현력 풍부
+    default: "pFZP5JQG7iQjIQuC4Bku", // Lily — 따뜻한
+  },
+  NON_BINARY: {
+    analytical: "SAz9YHcvj6GT2YYXdXww", // River — 중성
+    critical: "g5CIjZEefAph4nQFvHAz", // Ethan — 내레이션
+    social: "iP95p4xoKVk53GoZ742B", // Chris — 캐주얼
+    emotional: "XrExE9yKIg1WjnnlVkGX", // Matilda — 온화한
+    default: "SAz9YHcvj6GT2YYXdXww", // River — 중성
+  },
+} as const
+
+/**
+ * L1/L2/L3 벡터 + 성별 → TTSVoiceProfile 통합 추론.
+ *
+ * 파이프라인:
+ *   1. 성격 유형 → base voice ID 선택
+ *   2. Voice Engine 10D: L1/L2/L3 → VoiceCharacter(10차원)
+ *   3. VoiceCharacter → ElevenLabs API params (stability, similarity_boost, style, speed)
+ *
+ * ElevenLabs: 18 base voice × 10D 연속 파라미터 = 사실상 무한한 고유 음색.
+ * OpenAI: 6 base voice + 속도 변화 (voice_settings 미사용).
+ */
 function inferTTSVoice(
   l1: SocialPersonaVector,
   l2: CoreTemperamentVector,
-  gender: "MALE" | "FEMALE" | "NON_BINARY"
+  l3: NarrativeDriveVector,
+  gender: "MALE" | "FEMALE" | "NON_BINARY",
+  preferredProvider: "openai" | "elevenlabs" = "openai"
 ): TTSVoiceProfile {
-  // 1. 성격 유형 결정
+  // 1. 성격 유형 → base voice ID
   let personalityKey: "analytical" | "critical" | "social" | "emotional" | "default"
   if (l1.lens > 0.6 && l1.depth > 0.6) {
     personalityKey = "analytical"
@@ -394,18 +451,35 @@ function inferTTSVoice(
     personalityKey = "default"
   }
 
-  // 2. 음성 ID 결정
-  const voiceId = OPENAI_VOICE_MAP[gender][personalityKey]
+  const voiceId =
+    preferredProvider === "elevenlabs"
+      ? ELEVENLABS_VOICE_MAP[gender][personalityKey]
+      : OPENAI_VOICE_MAP[gender][personalityKey]
 
-  // 3. 속도 추론 (0.85 ~ 1.20)
-  // 높은 depth → 느림, 높은 sociability/extraversion → 빠름
-  const depthFactor = l1.depth * -0.15 // depth 1.0 → -0.15
-  const socialFactor = l1.sociability * 0.1 // sociability 1.0 → +0.10
-  const extraFactor = l2.extraversion * 0.1 // extraversion 1.0 → +0.10
-  const baseSpeed = 1.0
+  // 2. ElevenLabs → Voice Engine 10D 파이프라인
+  if (preferredProvider === "elevenlabs") {
+    const voiceChar = computeVoiceCharacter(l1, l2, l3)
+    const params = voiceCharacterToElevenLabs(voiceChar)
+    return {
+      provider: "elevenlabs",
+      voiceId,
+      speed: params.speed,
+      language: "ko-KR",
+      stability: params.stability,
+      similarityBoost: params.similarityBoost,
+      style: params.style,
+      useSpeakerBoost: params.useSpeakerBoost,
+      voiceCharacter: voiceChar,
+    }
+  }
+
+  // 3. OpenAI → 속도만 벡터 기반 계산
+  const depthFactor = l1.depth * -0.15
+  const socialFactor = l1.sociability * 0.1
+  const extraFactor = l2.extraversion * 0.1
   const speed =
     Math.round(
-      Math.max(0.85, Math.min(1.2, baseSpeed + depthFactor + socialFactor + extraFactor)) * 100
+      Math.max(0.85, Math.min(1.2, 1.0 + depthFactor + socialFactor + extraFactor)) * 100
     ) / 100
 
   return {
@@ -419,13 +493,23 @@ function inferTTSVoice(
 /**
  * 벡터 + 성별에서 TTS 음성을 추론하는 외부 유틸.
  * 파이프라인에서 수동 모드 시 직접 호출 가능.
+ *
+ * L3가 없으면 기본값(0.5)으로 대체 — 하위 호환성 유지.
  */
 export function inferTTSVoiceFromVectors(
   l1: SocialPersonaVector,
   l2: CoreTemperamentVector,
-  gender: "MALE" | "FEMALE" | "NON_BINARY" = "NON_BINARY"
+  gender: "MALE" | "FEMALE" | "NON_BINARY" = "NON_BINARY",
+  preferredProvider: "openai" | "elevenlabs" = "openai",
+  l3?: NarrativeDriveVector
 ): TTSVoiceProfile {
-  return inferTTSVoice(l1, l2, gender)
+  const narrativeVec: NarrativeDriveVector = l3 ?? {
+    lack: 0.5,
+    moralCompass: 0.5,
+    volatility: 0.5,
+    growthArc: 0.5,
+  }
+  return inferTTSVoice(l1, l2, narrativeVec, gender, preferredProvider)
 }
 
 // ── 이름 생성 (국적 + 성격 일관성 보장) ──────────────────────

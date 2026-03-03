@@ -130,10 +130,11 @@ async function loadQuestionsFromDb(mode: OnboardingMode): Promise<ColdStartQuest
         `[Cold Start] DB 조회 실패 (mode=${mode}, level=${range.level}, range=${range.from}-${range.to}):`,
         msg
       )
-      // enum 불일치 감지 시 명확한 에러 메시지
+      // enum 불일치 감지 시 사용자 친화적 에러
       if (msg.includes("enum") || msg.includes("OnboardingLevel")) {
+        console.error(`[Cold Start] DB enum mismatch — migration 필요: ${msg}`)
         throw new Error(
-          `DB OnboardingLevel enum 값 불일치 — migration 033 적용 필요: ${msg}`
+          "온보딩 데이터베이스 설정이 최신 상태가 아닙니다. 관리자에게 DB 업데이트를 요청하세요."
         )
       }
       throw err
@@ -196,15 +197,19 @@ export async function GET() {
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err)
     console.error("[Cold Start GET] 데이터 조회 실패:", err)
+
+    // 사용자에게 이미 친화적으로 변환된 메시지는 그대로 전달
+    const isUserFriendly = errMsg.includes("관리자에게") || errMsg.includes("요청하세요")
+    const userMessage = isUserFriendly
+      ? errMsg
+      : "온보딩 질문 데이터를 불러오는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요."
+
     return NextResponse.json<ApiResponse<never>>(
       {
         success: false,
         error: {
           code: "INTERNAL_ERROR",
-          message:
-            process.env.NODE_ENV === "development"
-              ? `콜드 스타트 데이터 조회 실패: ${errMsg}`
-              : "콜드 스타트 데이터 조회 실패",
+          message: userMessage,
         },
       },
       { status: 500 }
@@ -350,7 +355,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json<ApiResponse<never>>(
       {
         success: false,
-        error: { code: "INTERNAL_ERROR", message: "콜드 스타트 작업 실패" },
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "질문 세트 수정 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+        },
       },
       { status: 500 }
     )

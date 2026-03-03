@@ -34,7 +34,10 @@ export async function POST(request: Request) {
     if (!isLLMConfigured()) {
       return NextResponse.json({
         success: false,
-        error: { code: "LLM_NOT_CONFIGURED", message: "ANTHROPIC_API_KEY가 설정되지 않았습니다." },
+        error: {
+          code: "LLM_NOT_CONFIGURED",
+          message: "AI 분석 기능이 아직 설정되지 않았습니다. 관리자에게 문의하세요.",
+        },
       })
     }
 
@@ -43,7 +46,10 @@ export async function POST(request: Request) {
     if (!body.l1) {
       return NextResponse.json({
         success: false,
-        error: { code: "INVALID_REQUEST", message: "l1 벡터가 필요합니다." },
+        error: {
+          code: "INVALID_REQUEST",
+          message: "분석에 필요한 성향 데이터가 부족합니다. 질문에 먼저 답변해 주세요.",
+        },
       })
     }
 
@@ -94,9 +100,13 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : "AI 요약 생성 중 오류"
+    console.error("[Cold Start Summarize] AI 요약 실패:", message)
     return NextResponse.json({
       success: false,
-      error: { code: "SUMMARIZE_ERROR", message },
+      error: {
+        code: "SUMMARIZE_ERROR",
+        message: "AI 프로필 분석 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+      },
     })
   }
 }

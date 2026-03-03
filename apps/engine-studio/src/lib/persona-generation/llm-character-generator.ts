@@ -365,7 +365,10 @@ export async function generateCharacterWithLLM(
   const jsonStr = extractJSON(result.text)
   const parsed = JSON.parse(jsonStr) as RawCharacterOutput
   const character = validateAndNormalize(parsed)
-  character.ttsVoice = inferTTSVoiceFromVectors(l1, l2, character.gender)
+  const preferredTtsProvider = process.env.ELEVENLABS_API_KEY
+    ? ("elevenlabs" as const)
+    : ("openai" as const)
+  character.ttsVoice = inferTTSVoiceFromVectors(l1, l2, character.gender, preferredTtsProvider, l3)
   return character
 }
 
