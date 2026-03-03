@@ -1,7 +1,9 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState, useCallback, useRef } from "react"
+import { Loader2, Play, Square } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { usePersonaDetail } from "@/hooks/use-persona-detail"
 import { PERSONA_ROLES } from "@/types/persona-form"
@@ -29,6 +31,22 @@ const EDUCATION_LABELS: Record<string, string> = {
 
 export type PersonaData = NonNullable<ReturnType<typeof usePersonaDetail>["data"]>
 
+export interface TtsEdits {
+  provider: string | null | undefined
+  voiceId: string | null | undefined
+  speed: number | null | undefined
+  pitch: number | null | undefined
+  language: string | null | undefined
+}
+
+export interface TtsChangeHandlers {
+  setProvider: (v: string | null | undefined) => void
+  setVoiceId: (v: string | null | undefined) => void
+  setSpeed: (v: number | null | undefined) => void
+  setPitch: (v: number | null | undefined) => void
+  setLanguage: (v: string | null | undefined) => void
+}
+
 export interface OverviewTabProps {
   data: PersonaData
   editable: boolean
@@ -36,7 +54,33 @@ export interface OverviewTabProps {
   currentDescription: string
   onNameChange: (v: string) => void
   onDescriptionChange: (v: string) => void
+  ttsEdits: TtsEdits
+  onTtsChange: TtsChangeHandlers
 }
+
+// TTS 상수
+const TTS_PROVIDERS = [
+  { value: "openai", label: "OpenAI" },
+  { value: "google", label: "Google" },
+  { value: "elevenlabs", label: "ElevenLabs" },
+] as const
+
+const OPENAI_VOICES = [
+  { value: "alloy", label: "Alloy" },
+  { value: "echo", label: "Echo" },
+  { value: "fable", label: "Fable" },
+  { value: "onyx", label: "Onyx" },
+  { value: "nova", label: "Nova" },
+  { value: "shimmer", label: "Shimmer" },
+] as const
+
+const TTS_LANGUAGES = [
+  { value: "ko-KR", label: "한국어" },
+  { value: "en-US", label: "English (US)" },
+  { value: "ja-JP", label: "日本語" },
+  { value: "zh-CN", label: "中文 (简体)" },
+  { value: "es-ES", label: "Español" },
+] as const
 
 // ── OverviewTab ──────────────────────────────────────────────
 
@@ -47,7 +91,16 @@ export function OverviewTab({
   currentDescription,
   onNameChange,
   onDescriptionChange,
+  ttsEdits,
+  onTtsChange,
 }: OverviewTabProps) {
+  // TTS 현재값 (편집 override 우선)
+  const currentTtsProvider = ttsEdits.provider !== undefined ? ttsEdits.provider : data.ttsProvider
+  const currentTtsVoiceId = ttsEdits.voiceId !== undefined ? ttsEdits.voiceId : data.ttsVoiceId
+  const currentTtsSpeed = ttsEdits.speed !== undefined ? ttsEdits.speed : data.ttsSpeed
+  const currentTtsPitch = ttsEdits.pitch !== undefined ? ttsEdits.pitch : data.ttsPitch
+  const currentTtsLanguage = ttsEdits.language !== undefined ? ttsEdits.language : data.ttsLanguage
+
   return (
     <div className="space-y-6">
       {/* Basic Info */}
@@ -145,6 +198,154 @@ export function OverviewTab({
         </div>
       </section>
 
+      {/* TTS Voice Settings */}
+      <section className="space-y-4">
+        <h3 className="text-sm font-semibold">음성 설정 (TTS)</h3>
+        <div className="grid grid-cols-2 gap-4">
+          {/* Provider */}
+          <div>
+            <label className="text-muted-foreground mb-1 block text-xs">Provider</label>
+            {editable ? (
+              <select
+                className="border-border bg-background w-full rounded-lg border px-3 py-2 text-sm"
+                value={currentTtsProvider ?? ""}
+                onChange={(e) => onTtsChange.setProvider(e.target.value || null)}
+              >
+                <option value="">(설정 안 함)</option>
+                {TTS_PROVIDERS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p className="text-sm">
+                {TTS_PROVIDERS.find((p) => p.value === currentTtsProvider)?.label ??
+                  currentTtsProvider ??
+                  "-"}
+              </p>
+            )}
+          </div>
+
+          {/* Voice ID */}
+          <div>
+            <label className="text-muted-foreground mb-1 block text-xs">Voice</label>
+            {editable ? (
+              currentTtsProvider === "openai" ? (
+                <select
+                  className="border-border bg-background w-full rounded-lg border px-3 py-2 text-sm"
+                  value={currentTtsVoiceId ?? ""}
+                  onChange={(e) => onTtsChange.setVoiceId(e.target.value || null)}
+                >
+                  <option value="">(선택)</option>
+                  {OPENAI_VOICES.map((v) => (
+                    <option key={v.value} value={v.value}>
+                      {v.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <Input
+                  value={currentTtsVoiceId ?? ""}
+                  onChange={(e) => onTtsChange.setVoiceId(e.target.value || null)}
+                  placeholder="Voice ID"
+                />
+              )
+            ) : (
+              <p className="text-sm">
+                {OPENAI_VOICES.find((v) => v.value === currentTtsVoiceId)?.label ??
+                  currentTtsVoiceId ??
+                  "-"}
+              </p>
+            )}
+          </div>
+
+          {/* Speed */}
+          <div>
+            <label className="text-muted-foreground mb-1 block text-xs">
+              속도 {currentTtsSpeed !== null ? `(${currentTtsSpeed?.toFixed(1) ?? "1.0"})` : ""}
+            </label>
+            {editable ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2.0"
+                  step="0.1"
+                  value={currentTtsSpeed ?? 1.0}
+                  onChange={(e) => onTtsChange.setSpeed(parseFloat(e.target.value))}
+                  className="flex-1"
+                />
+                <span className="text-muted-foreground w-10 text-right text-xs">
+                  {(currentTtsSpeed ?? 1.0).toFixed(1)}
+                </span>
+              </div>
+            ) : (
+              <p className="text-sm">{currentTtsSpeed?.toFixed(1) ?? "-"}</p>
+            )}
+          </div>
+
+          {/* Pitch */}
+          <div>
+            <label className="text-muted-foreground mb-1 block text-xs">
+              피치 {currentTtsPitch !== null ? `(${currentTtsPitch?.toFixed(1) ?? "0.0"})` : ""}
+            </label>
+            {editable ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="range"
+                  min="-1.0"
+                  max="1.0"
+                  step="0.1"
+                  value={currentTtsPitch ?? 0}
+                  onChange={(e) => onTtsChange.setPitch(parseFloat(e.target.value))}
+                  className="flex-1"
+                />
+                <span className="text-muted-foreground w-10 text-right text-xs">
+                  {(currentTtsPitch ?? 0).toFixed(1)}
+                </span>
+              </div>
+            ) : (
+              <p className="text-sm">{currentTtsPitch?.toFixed(1) ?? "-"}</p>
+            )}
+          </div>
+
+          {/* Language */}
+          <div>
+            <label className="text-muted-foreground mb-1 block text-xs">언어</label>
+            {editable ? (
+              <select
+                className="border-border bg-background w-full rounded-lg border px-3 py-2 text-sm"
+                value={currentTtsLanguage ?? "ko-KR"}
+                onChange={(e) => onTtsChange.setLanguage(e.target.value)}
+              >
+                {TTS_LANGUAGES.map((l) => (
+                  <option key={l.value} value={l.value}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p className="text-sm">
+                {TTS_LANGUAGES.find((l) => l.value === currentTtsLanguage)?.label ??
+                  currentTtsLanguage ??
+                  "-"}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* TTS 미리듣기 */}
+        <TtsPreviewButton
+          personaId={data.id}
+          provider={currentTtsProvider}
+          voiceId={currentTtsVoiceId}
+          speed={currentTtsSpeed}
+          pitch={currentTtsPitch}
+          language={currentTtsLanguage}
+        />
+      </section>
+
       {/* Active Hours */}
       <ActiveHoursSection data={data} />
 
@@ -173,6 +374,96 @@ function ScoreCard({ label, value }: { label: string; value: number | null }) {
       <p className="mt-1 text-lg font-semibold">
         {value !== null ? (value * 100).toFixed(0) + "%" : "-"}
       </p>
+    </div>
+  )
+}
+
+function TtsPreviewButton({
+  personaId,
+  provider,
+  voiceId,
+  speed,
+  pitch,
+  language,
+}: {
+  personaId: string
+  provider: string | null
+  voiceId: string | null
+  speed: number | null
+  pitch: number | null
+  language: string | null
+}) {
+  const [loading, setLoading] = useState(false)
+  const [playing, setPlaying] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  const handlePreview = useCallback(async () => {
+    if (playing && audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+      setPlaying(false)
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const res = await fetch(`/api/internal/personas/${personaId}/tts-preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: provider ?? undefined,
+          voiceId: voiceId ?? undefined,
+          speed: speed ?? undefined,
+          pitch: pitch ?? undefined,
+          language: language ?? undefined,
+        }),
+      })
+      const json = await res.json()
+
+      if (!json.success) {
+        setError(json.error?.message ?? "프리뷰 생성에 실패했습니다.")
+        return
+      }
+
+      const { audioBase64, contentType } = json.data as { audioBase64: string; contentType: string }
+      const audioUrl = `data:${contentType};base64,${audioBase64}`
+
+      if (audioRef.current) {
+        audioRef.current.pause()
+      }
+
+      const audio = new Audio(audioUrl)
+      audioRef.current = audio
+      audio.onended = () => setPlaying(false)
+      audio.onerror = () => {
+        setPlaying(false)
+        setError("오디오 재생에 실패했습니다.")
+      }
+      await audio.play()
+      setPlaying(true)
+    } catch {
+      setError("네트워크 오류가 발생했습니다.")
+    } finally {
+      setLoading(false)
+    }
+  }, [personaId, provider, voiceId, speed, pitch, language, playing])
+
+  return (
+    <div className="flex items-center gap-3">
+      <Button variant="outline" size="sm" onClick={handlePreview} disabled={loading}>
+        {loading ? (
+          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+        ) : playing ? (
+          <Square className="mr-1 h-3 w-3" />
+        ) : (
+          <Play className="mr-1 h-3 w-3" />
+        )}
+        {loading ? "생성 중..." : playing ? "정지" : "미리듣기"}
+      </Button>
+      {error && <span className="text-xs text-red-500">{error}</span>}
     </div>
   )
 }

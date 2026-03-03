@@ -144,6 +144,15 @@ export interface PersonaDetail {
   educationLevel: string | null
   languages: string[]
   knowledgeAreas: string[]
+  // v4 프롬프트 여부 표시
+  hasVoiceSpec: boolean
+  hasFactbook: boolean
+  // TTS 음성 설정
+  ttsProvider: string | null
+  ttsVoiceId: string | null
+  ttsPitch: number | null
+  ttsSpeed: number | null
+  ttsLanguage: string | null
 }
 
 // ── Persona Update API ────────────────────────────────────────
@@ -161,6 +170,12 @@ export interface UpdatePersonaBody {
   }
   archetypeId?: string | null
   basePrompt?: string
+  // TTS 음성 설정
+  ttsProvider?: string | null
+  ttsVoiceId?: string | null
+  ttsPitch?: number | null
+  ttsSpeed?: number | null
+  ttsLanguage?: string | null
 }
 
 // ── Persona Duplicate API ─────────────────────────────────────

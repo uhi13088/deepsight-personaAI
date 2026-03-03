@@ -45,6 +45,12 @@ export default function PersonaEditPage({ params }: { params: Promise<{ id: stri
   const [editName, setEditName] = useState<string | null>(null)
   const [editDescription, setEditDescription] = useState<string | null>(null)
   const [editPrompt, setEditPrompt] = useState<string | null>(null)
+  // TTS edit state (undefined = not edited, null = cleared, string/number = changed)
+  const [editTtsProvider, setEditTtsProvider] = useState<string | null | undefined>(undefined)
+  const [editTtsVoiceId, setEditTtsVoiceId] = useState<string | null | undefined>(undefined)
+  const [editTtsSpeed, setEditTtsSpeed] = useState<number | null | undefined>(undefined)
+  const [editTtsPitch, setEditTtsPitch] = useState<number | null | undefined>(undefined)
+  const [editTtsLanguage, setEditTtsLanguage] = useState<string | null | undefined>(undefined)
 
   // ── Loading / Error ─────────────────────────────────────────
   if (isLoading) {
@@ -83,7 +89,14 @@ export default function PersonaEditPage({ params }: { params: Promise<{ id: stri
   const currentDescription = editDescription ?? data.description ?? ""
   const currentPrompt = editPrompt ?? data.basePrompt
 
-  const hasChanges = editName !== null || editDescription !== null || editPrompt !== null
+  const hasTtsChanges =
+    editTtsProvider !== undefined ||
+    editTtsVoiceId !== undefined ||
+    editTtsSpeed !== undefined ||
+    editTtsPitch !== undefined ||
+    editTtsLanguage !== undefined
+  const hasChanges =
+    editName !== null || editDescription !== null || editPrompt !== null || hasTtsChanges
 
   // ── Save handler ────────────────────────────────────────────
   const handleSave = async () => {
@@ -104,6 +117,11 @@ export default function PersonaEditPage({ params }: { params: Promise<{ id: stri
       if (editName !== null) body.name = editName
       if (editDescription !== null) body.description = editDescription || null
       if (editPrompt !== null) body.basePrompt = editPrompt
+      if (editTtsProvider !== undefined) body.ttsProvider = editTtsProvider
+      if (editTtsVoiceId !== undefined) body.ttsVoiceId = editTtsVoiceId
+      if (editTtsSpeed !== undefined) body.ttsSpeed = editTtsSpeed
+      if (editTtsPitch !== undefined) body.ttsPitch = editTtsPitch
+      if (editTtsLanguage !== undefined) body.ttsLanguage = editTtsLanguage
 
       const res = await fetch(`/api/internal/personas/${id}`, {
         method: "PUT",
@@ -118,6 +136,11 @@ export default function PersonaEditPage({ params }: { params: Promise<{ id: stri
       setEditName(null)
       setEditDescription(null)
       setEditPrompt(null)
+      setEditTtsProvider(undefined)
+      setEditTtsVoiceId(undefined)
+      setEditTtsSpeed(undefined)
+      setEditTtsPitch(undefined)
+      setEditTtsLanguage(undefined)
       refetch()
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "알 수 없는 오류")
@@ -223,6 +246,20 @@ export default function PersonaEditPage({ params }: { params: Promise<{ id: stri
             currentDescription={currentDescription}
             onNameChange={setEditName}
             onDescriptionChange={setEditDescription}
+            ttsEdits={{
+              provider: editTtsProvider,
+              voiceId: editTtsVoiceId,
+              speed: editTtsSpeed,
+              pitch: editTtsPitch,
+              language: editTtsLanguage,
+            }}
+            onTtsChange={{
+              setProvider: setEditTtsProvider,
+              setVoiceId: setEditTtsVoiceId,
+              setSpeed: setEditTtsSpeed,
+              setPitch: setEditTtsPitch,
+              setLanguage: setEditTtsLanguage,
+            }}
           />
         )}
 
