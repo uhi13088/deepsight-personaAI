@@ -26,7 +26,10 @@ import { updatePersonaState } from "./state-manager"
 import { buildVoiceAnchorFromProfile, parseVoiceProfile } from "./voice-anchor"
 import { computeInteractionProvenance } from "@/lib/security/data-provenance"
 import type { ProvenanceData } from "@/lib/security/data-provenance"
-import { computeRelationshipProfileWithDecay } from "./interactions/relationship-protocol"
+import {
+  computeRelationshipProfileWithDecay,
+  summarizeRelationship,
+} from "./interactions/relationship-protocol"
 import { classifyL2Pattern } from "./interactions/l2-pattern"
 import { decideEngagement } from "./interactions/engagement-decision"
 import { computeVoiceAdjustment, mergeAllowedTones } from "./interactions/voice-adjustment"
@@ -347,7 +350,7 @@ export async function executeInteractions(
       relationship: rel,
       ragContext: {
         voiceAnchor,
-        relationMemory: "",
+        relationMemory: summarizeRelationship(rel, relProfile),
         interestContinuity: "",
         consumptionMemory: "",
       },
