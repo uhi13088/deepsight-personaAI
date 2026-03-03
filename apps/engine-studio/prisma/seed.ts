@@ -51,6 +51,7 @@ async function main() {
 - 객관적 근거에 기반한 평가
 - 장르 컨벤션과의 비교 분석`,
       vector: { depth: 0.85, lens: 0.78, stance: 0.72, scope: 0.45, taste: 0.68, purpose: 0.82 },
+      tts: { provider: "openai", voiceId: "onyx", speed: 0.92, language: "ko-KR" },
     },
     {
       name: "감성 에세이스트",
@@ -62,6 +63,7 @@ async function main() {
 - 개인적 경험과의 연결
 - 따뜻하고 친근한 어조`,
       vector: { depth: 0.62, lens: 0.25, stance: 0.35, scope: 0.58, taste: 0.75, purpose: 0.42 },
+      tts: { provider: "openai", voiceId: "nova", speed: 1.0, language: "ko-KR" },
     },
     {
       name: "트렌드 헌터",
@@ -73,6 +75,7 @@ async function main() {
 - 대중적 반응과 밈 요소
 - 간결하고 임팩트 있는 정보 전달`,
       vector: { depth: 0.45, lens: 0.55, stance: 0.48, scope: 0.85, taste: 0.32, purpose: 0.38 },
+      tts: { provider: "openai", voiceId: "shimmer", speed: 1.15, language: "ko-KR" },
     },
     {
       name: "균형 잡힌 가이드",
@@ -84,6 +87,7 @@ async function main() {
 - 사용자 취향에 맞는 맞춤 추천
 - 친절하고 이해하기 쉬운 설명`,
       vector: { depth: 0.55, lens: 0.52, stance: 0.5, scope: 0.55, taste: 0.48, purpose: 0.52 },
+      tts: { provider: "openai", voiceId: "alloy", speed: 1.05, language: "ko-KR" },
     },
     {
       name: "시네필 평론가",
@@ -95,22 +99,32 @@ async function main() {
 - 시네마토그래피와 미장센 분석
 - 주제의식과 메시지 해석`,
       vector: { depth: 0.92, lens: 0.72, stance: 0.78, scope: 0.22, taste: 0.88, purpose: 0.75 },
+      tts: { provider: "openai", voiceId: "echo", speed: 0.88, language: "ko-KR" },
     },
   ]
 
   for (const personaData of personas) {
-    const { vector, ...rest } = personaData
+    const { vector, tts, ...rest } = personaData
 
     const persona = await prisma.persona.upsert({
       where: {
         id: `seed-${rest.name.replace(/\s+/g, "-").toLowerCase()}`,
       },
-      update: {},
+      update: {
+        ttsProvider: tts.provider,
+        ttsVoiceId: tts.voiceId,
+        ttsSpeed: tts.speed,
+        ttsLanguage: tts.language,
+      },
       create: {
         id: `seed-${rest.name.replace(/\s+/g, "-").toLowerCase()}`,
         ...rest,
         status: "ACTIVE",
         createdById: admin.id,
+        ttsProvider: tts.provider,
+        ttsVoiceId: tts.voiceId,
+        ttsSpeed: tts.speed,
+        ttsLanguage: tts.language,
       },
     })
 

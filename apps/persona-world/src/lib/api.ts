@@ -844,4 +844,27 @@ export const clientApi = {
     if (!json.success) throw new Error(json.error?.message || "Unknown error")
     return json.data!
   },
+
+  // ── 상점 아이템 ──────────────────────────────────────────────
+  async getShopItems() {
+    const res = await fetch("/api/persona-world/shop")
+    if (!res.ok) return null // fallback to static data
+
+    const json: ApiResponse<ShopItemFromAPI[]> = await res.json()
+    if (!json.success) return null
+    return json.data!
+  },
+}
+
+/** API에서 반환하는 상점 아이템 형태 */
+export interface ShopItemFromAPI {
+  itemKey: string
+  name: string
+  description: string
+  price: number
+  priceLabel: string | null
+  category: string
+  emoji: string
+  repeatable: boolean
+  tag: string | null
 }

@@ -1,9 +1,12 @@
 /**
  * 크레딧 상점 — 아이템 정의 + 카테고리
  *
- * 정적 데이터로 관리. DB 불필요.
+ * DB(pw_shop_items)에서 관리. Engine Studio PW Admin에서 가격/태그/활성화 설정.
+ * API 실패 시 정적 폴백 데이터 사용.
  * 구매 상태는 user-store (Zustand persist) 에서 관리.
  */
+
+import type { ShopItemFromAPI } from "./api"
 
 export type ShopCategory = "persona" | "profile"
 
@@ -22,8 +25,9 @@ export interface ShopItem {
   tag?: "NEW" | "HOT" | "SOON"
 }
 
-// ── 페르소나 카테고리 ─────────────────────────────────────────
-const PERSONA_ITEMS: ShopItem[] = [
+// ── 정적 폴백 데이터 (API 실패 시) ──────────────────────────────
+
+const FALLBACK_ITEMS: ShopItem[] = [
   {
     id: "follow_slot_expand",
     name: "팔로우 슬롯 확장",
@@ -64,10 +68,6 @@ const PERSONA_ITEMS: ShopItem[] = [
     repeatable: true,
     tag: "NEW",
   },
-]
-
-// ── 프로필 꾸미기 카테고리 ────────────────────────────────────
-const PROFILE_ITEMS: ShopItem[] = [
   {
     id: "profile_reset",
     name: "성향 초기화",
@@ -135,15 +135,66 @@ const PROFILE_ITEMS: ShopItem[] = [
   },
 ]
 
-// ── 전체 아이템 + 유틸 ───────────────────────────────────────
-export const SHOP_ITEMS: ShopItem[] = [...PERSONA_ITEMS, ...PROFILE_ITEMS]
+// ── API 데이터 → ShopItem 변환 ──────────────────────────────────
+
+function apiItemToShopItem(item: ShopItemFromAPI): ShopItem {
+  return {
+    id: item.itemKey,
+    name: item.name,
+    description: item.description,
+    price: item.price,
+    priceLabel: item.priceLabel ?? undefined,
+    category: item.category as ShopCategory,
+    emoji: item.emoji,
+    repeatable: item.repeatable,
+    tag: (item.tag as ShopItem["tag"]) ?? undefined,
+  }
+}
+
+// ── 캐싱된 아이템 (API에서 불러온 데이터) ────────────────────────
+
+let cachedItems: ShopItem[] | null = null
+let cacheTimestamp = 0
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5분
+
+/**
+ * 상점 아이템 목록을 API에서 가져오기.
+ * API 실패 시 정적 폴백 데이터 반환.
+ */
+export async function fetchShopItems(): Promise<ShopItem[]> {
+  const now = Date.now()
+  if (cachedItems && now - cacheTimestamp < CACHE_TTL_MS) {
+    return cachedItems
+  }
+
+  try {
+    const { clientApi } = await import("./api")
+    const apiItems = await clientApi.getShopItems()
+    if (apiItems && apiItems.length > 0) {
+      cachedItems = apiItems.map(apiItemToShopItem)
+      cacheTimestamp = now
+      return cachedItems
+    }
+  } catch {
+    // API 실패 → 폴백
+  }
+
+  return FALLBACK_ITEMS
+}
+
+// ── 정적 유틸 (동기적 접근용) ───────────────────────────────────
+// 기존 코드와의 호환성 유지
+
+export const SHOP_ITEMS: ShopItem[] = FALLBACK_ITEMS
 
 export function getShopItemsByCategory(category: ShopCategory): ShopItem[] {
-  return SHOP_ITEMS.filter((item) => item.category === category)
+  const items = cachedItems ?? FALLBACK_ITEMS
+  return items.filter((item) => item.category === category)
 }
 
 export function getShopItemById(id: string): ShopItem | undefined {
-  return SHOP_ITEMS.find((item) => item.id === id)
+  const items = cachedItems ?? FALLBACK_ITEMS
+  return items.find((item) => item.id === id)
 }
 
 /** 뱃지 아이템 ID인지 확인 */

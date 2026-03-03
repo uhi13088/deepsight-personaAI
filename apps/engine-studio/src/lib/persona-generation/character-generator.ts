@@ -12,6 +12,13 @@ import type {
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
+export interface TTSVoiceProfile {
+  provider: "openai" | "google"
+  voiceId: string
+  speed: number
+  language: string
+}
+
 export interface CharacterProfile {
   name: string
   /** 이름에서 파생된 성별 */
@@ -26,6 +33,8 @@ export interface CharacterProfile {
   quirks: string[]
   habits: string[]
   relationships: RelationshipSeed[]
+  /** TTS 음성 프로필 (자동 추론) */
+  ttsVoice: TTSVoiceProfile
 }
 
 export interface RelationshipSeed {
@@ -307,6 +316,8 @@ export function generateCharacter(
   const habits = generateHabits(l2, l3)
   const relationships = generateRelationships(l1, l2, archetype)
 
+  const ttsVoice = inferTTSVoice(l1, l2, gender)
+
   return {
     name,
     gender,
@@ -318,7 +329,103 @@ export function generateCharacter(
     quirks,
     habits,
     relationships,
+    ttsVoice,
   }
+}
+
+// ── TTS 음성 자동 추론 ──────────────────────────────────────
+
+/**
+ * 성격 벡터 + 성별에서 고유한 TTS 음성을 추론.
+ *
+ * OpenAI voices:
+ *  - alloy: 중성, 안정적           → 균형잡힌 성격
+ *  - echo: 깊고 사색적 (남성적)     → 분석적 + 내향적
+ *  - fable: 표현력 풍부 (스토리텔러) → 서사적 + 감성적
+ *  - onyx: 권위 있는 깊은 톤        → 비판적 + 자신감
+ *  - nova: 따뜻하고 부드러운 (여성적) → 공감적 + 사교적
+ *  - shimmer: 밝고 에너지 넘침      → 외향적 + 활동적
+ *
+ * Speed: 성격 특성 기반 (0.85~1.20)
+ *  - 높은 depth/분석력 → 느린 속도 (신중)
+ *  - 높은 sociability/외향 → 빠른 속도 (에너지)
+ */
+const OPENAI_VOICE_MAP = {
+  // 성별 × 성격 유형 매핑
+  MALE: {
+    analytical: "echo", // 깊고 사색적
+    critical: "onyx", // 권위 있는
+    social: "fable", // 표현력 풍부
+    emotional: "alloy", // 중성적 따뜻함
+    default: "echo",
+  },
+  FEMALE: {
+    analytical: "alloy", // 안정적 중성
+    critical: "shimmer", // 밝지만 날카로운
+    social: "nova", // 따뜻하고 친근
+    emotional: "fable", // 표현력 풍부
+    default: "nova",
+  },
+  NON_BINARY: {
+    analytical: "alloy", // 중성적
+    critical: "echo", // 깊은 톤
+    social: "shimmer", // 밝은 에너지
+    emotional: "fable", // 스토리텔링
+    default: "alloy",
+  },
+} as const
+
+function inferTTSVoice(
+  l1: SocialPersonaVector,
+  l2: CoreTemperamentVector,
+  gender: "MALE" | "FEMALE" | "NON_BINARY"
+): TTSVoiceProfile {
+  // 1. 성격 유형 결정
+  let personalityKey: "analytical" | "critical" | "social" | "emotional" | "default"
+  if (l1.lens > 0.6 && l1.depth > 0.6) {
+    personalityKey = "analytical"
+  } else if (l1.stance > 0.6) {
+    personalityKey = "critical"
+  } else if (l1.sociability > 0.6 || l2.extraversion > 0.6) {
+    personalityKey = "social"
+  } else if (l1.lens < 0.4) {
+    personalityKey = "emotional"
+  } else {
+    personalityKey = "default"
+  }
+
+  // 2. 음성 ID 결정
+  const voiceId = OPENAI_VOICE_MAP[gender][personalityKey]
+
+  // 3. 속도 추론 (0.85 ~ 1.20)
+  // 높은 depth → 느림, 높은 sociability/extraversion → 빠름
+  const depthFactor = l1.depth * -0.15 // depth 1.0 → -0.15
+  const socialFactor = l1.sociability * 0.1 // sociability 1.0 → +0.10
+  const extraFactor = l2.extraversion * 0.1 // extraversion 1.0 → +0.10
+  const baseSpeed = 1.0
+  const speed =
+    Math.round(
+      Math.max(0.85, Math.min(1.2, baseSpeed + depthFactor + socialFactor + extraFactor)) * 100
+    ) / 100
+
+  return {
+    provider: "openai",
+    voiceId,
+    speed,
+    language: "ko-KR",
+  }
+}
+
+/**
+ * 벡터 + 성별에서 TTS 음성을 추론하는 외부 유틸.
+ * 파이프라인에서 수동 모드 시 직접 호출 가능.
+ */
+export function inferTTSVoiceFromVectors(
+  l1: SocialPersonaVector,
+  l2: CoreTemperamentVector,
+  gender: "MALE" | "FEMALE" | "NON_BINARY" = "NON_BINARY"
+): TTSVoiceProfile {
+  return inferTTSVoice(l1, l2, gender)
 }
 
 // ── 이름 생성 (국적 + 성격 일관성 보장) ──────────────────────

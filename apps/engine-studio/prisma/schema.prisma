@@ -2713,3 +2713,27 @@ enum CallReservationStatus {
   CANCELLED
   EXPIRED
 }
+
+// ============================================
+// PW 상점 아이템 관리
+// ============================================
+
+model PWShopItem {
+  id          String   @id @default(cuid())
+  itemKey     String   @unique @map("item_key")     // follow_slot_expand, persona_chat 등
+  name        String
+  description String
+  price       Int      @default(0)
+  priceLabel  String?  @map("price_label")           // "10 코인/턴"
+  category    String   @default("persona")            // persona | profile
+  emoji       String   @default("🎁")
+  repeatable  Boolean  @default(false)
+  tag         String?                                  // NEW | HOT | SOON | null
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("pw_shop_items")
+}
