@@ -367,6 +367,52 @@ export interface NotificationsResponse {
   hasMore: boolean
 }
 
+// ── 1:1 채팅 ──────────────────────────────────────────────
+export interface ChatThread {
+  id: string
+  personaId: string
+  personaName: string
+  personaImageUrl: string | null
+  lastMessageAt: string | null
+  lastMessageContent: string | null
+  totalMessages: number
+  isActive: boolean
+}
+
+export interface ChatMessage {
+  id: string
+  role: "USER" | "PERSONA"
+  content: string
+  imageUrl: string | null
+  createdAt: string
+}
+
+export interface SendMessageResponse {
+  userMessageId: string
+  personaMessageId: string
+  personaResponse: string
+  remainingBalance: number
+}
+
+// ── 통화 예약 ──────────────────────────────────────────────
+export type CallReservationStatus =
+  | "PENDING"
+  | "CONFIRMED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "EXPIRED"
+
+export interface CallReservation {
+  id: string
+  personaId: string
+  personaName: string
+  personaImageUrl: string | null
+  scheduledAt: string
+  status: CallReservationStatus
+  coinSpent: number
+}
+
 // ── 알림 환경설정 ────────────────────────────────────────
 export interface NotificationPreferenceData {
   likeEnabled: boolean

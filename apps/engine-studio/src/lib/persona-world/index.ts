@@ -498,3 +498,81 @@ export type {
   ContagionRoundLog,
   ContagionExecutionResult,
 } from "./contagion-integration"
+
+// Chat Service (T333 — 1:1 채팅 서비스)
+export {
+  createThread,
+  sendMessage,
+  getThreads as getChatThreads,
+  getMessages as getChatMessages,
+} from "./chat-service"
+export type {
+  ChatDataProvider,
+  CreateThreadResult,
+  SendMessageInput,
+  SendMessageResult,
+} from "./chat-service"
+
+// Conversation Memory (T332 — 기억 파이프라인 통합)
+export {
+  retrieveConversationMemories,
+  recordConversationTurn,
+  finalizeConversation,
+  adjustStateForConversation,
+} from "./conversation-memory"
+export type {
+  ConversationMemoryProvider,
+  ConversationTurnInput,
+  ConversationFinalizeInput,
+} from "./conversation-memory"
+
+// Conversation Engine (T331 — 1:1 채팅/통화 공용)
+export {
+  buildConversationSystemPrefix,
+  buildConversationSystemSuffix,
+  buildAnthropicMessages,
+  generateConversationResponse,
+} from "./conversation-engine"
+export type {
+  ConversationMode,
+  ConversationMessage,
+  ConversationContext,
+  ConversationInput,
+  ConversationResult,
+} from "./conversation-engine"
+
+// Voice Pipeline (T337 — STT + TTS)
+export {
+  speechToText,
+  textToSpeech,
+  textToSpeechOpenAI,
+  textToSpeechGoogle,
+  buildTTSConfig,
+  isVoiceConfigured,
+  DEFAULT_TTS_CONFIG,
+  OPENAI_VOICES,
+} from "./voice-pipeline"
+export type {
+  TTSProvider,
+  TTSVoiceConfig,
+  STTResult,
+  TTSResult,
+  OpenAIVoice,
+} from "./voice-pipeline"
+
+// Call Service (T338 — 1:1 통화 서비스)
+export {
+  createReservation,
+  startCall,
+  processCallTurn,
+  endCall,
+  getReservations as getCallReservations,
+  cancelReservation,
+} from "./call-service"
+export type {
+  CallDataProvider,
+  CreateReservationResult,
+  StartCallResult,
+  CallTurnResult,
+  EndCallResult,
+} from "./call-service"

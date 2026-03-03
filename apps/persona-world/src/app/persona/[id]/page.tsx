@@ -1,12 +1,13 @@
 "use client"
 
 import { useEffect, useState, memo } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
   ArrowLeft,
   Heart,
   MessageCircle,
+  Phone,
   Repeat2,
   Share,
   Users,
@@ -80,9 +81,11 @@ const PostCard = memo(function PostCard({
 
 export default function PersonaDetailPage() {
   const params = useParams()
+  const router = useRouter()
   const personaId = params.id as string
 
   const { followedPersonas, followPersona, unfollowPersona, addNotification } = useUserStore()
+  const profile = useUserStore((s) => s.profile)
   const [persona, setPersona] = useState<PersonaFullDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -125,6 +128,45 @@ export default function PersonaDetailPage() {
         personaId: persona.id,
         personaName: persona.name,
       })
+    }
+  }
+
+  const [isStartingChat, setIsStartingChat] = useState(false)
+  const [isBookingCall, setIsBookingCall] = useState(false)
+
+  const handleStartChat = async () => {
+    if (!profile?.id || !persona) return
+    try {
+      setIsStartingChat(true)
+      const thread = await clientApi.createChatThread(profile.id, personaId)
+      router.push(`/chat/${thread.id}`)
+    } catch (err) {
+      console.error("Failed to start chat:", err)
+      toast.error("채팅을 시작할 수 없습니다")
+    } finally {
+      setIsStartingChat(false)
+    }
+  }
+
+  const handleBookCall = async () => {
+    if (!profile?.id || !persona) return
+    try {
+      setIsBookingCall(true)
+      // 30분 후로 예약
+      const scheduledAt = new Date(Date.now() + 30 * 60 * 1000).toISOString()
+      await clientApi.createCallReservation(profile.id, personaId, scheduledAt)
+      toast.success(`${persona.name}와의 통화가 예약되었습니다!`)
+      router.push("/calls")
+    } catch (err) {
+      if (err instanceof Error && err.message === "INSUFFICIENT_CREDITS") {
+        toast.error("코인이 부족합니다. 상점에서 충전해주세요!")
+        router.push("/shop")
+      } else {
+        console.error("Failed to book call:", err)
+        toast.error("통화 예약에 실패했습니다")
+      }
+    } finally {
+      setIsBookingCall(false)
     }
   }
 
@@ -221,6 +263,34 @@ export default function PersonaDetailPage() {
                   팔로우
                 </>
               )}
+            </button>
+          </div>
+
+          {/* 대화하기 + 통화 예약 버튼 */}
+          <div className="mb-4 flex gap-2">
+            <button
+              onClick={handleStartChat}
+              disabled={isStartingChat}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 to-purple-500 px-4 py-2.5 text-sm font-medium text-white transition-all hover:shadow-lg disabled:opacity-50"
+            >
+              {isStartingChat ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <MessageCircle className="h-4 w-4" />
+              )}
+              대화하기
+            </button>
+            <button
+              onClick={handleBookCall}
+              disabled={isBookingCall}
+              className="flex items-center justify-center gap-2 rounded-xl border border-violet-200 bg-white px-4 py-2.5 text-sm font-medium text-violet-600 transition-all hover:bg-violet-50 disabled:opacity-50"
+            >
+              {isBookingCall ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Phone className="h-4 w-4" />
+              )}
+              통화 예약
             </button>
           </div>
 

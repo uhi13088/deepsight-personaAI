@@ -380,6 +380,138 @@ export async function generateText(params: LLMGenerateParams): Promise<LLMGenera
   }
 }
 
+// ── 멀티턴 대화 생성 (T331: 1:1 채팅/통화) ──────────────────────
+
+export interface ConversationGenerateParams {
+  /** 정적 시스템 프롬프트 prefix (캐시 대상: 페르소나 정의+VoiceSpec+Factbook) */
+  systemPromptPrefix?: string
+  /** 동적 시스템 프롬프트 suffix (현재 상태+RAG+규칙) */
+  systemPromptSuffix: string
+  /** 멀티턴 대화 이력 (Anthropic MessageParam 형식) */
+  messages: Anthropic.MessageParam[]
+  maxTokens?: number
+  temperature?: number
+  callType?: string
+  personaId?: string
+}
+
+/**
+ * 멀티턴 대화 생성 — 1:1 채팅/통화용.
+ * generateText()와 동일한 인프라(모델 라우팅, 안전 필터, 사용량 로깅, 프롬프트 캐싱)를
+ * 사용하되, 멀티턴 messages 배열과 Vision(이미지) 콘텐츠를 지원.
+ */
+export async function generateConversation(
+  params: ConversationGenerateParams
+): Promise<LLMGenerateResult> {
+  const client = getClient()
+  const maxTokens = params.maxTokens ?? DEFAULT_MAX_TOKENS
+  const temperature = params.temperature ?? DEFAULT_TEMPERATURE
+
+  // 모델 라우팅 (T328)
+  const routingParams: LLMGenerateParams = {
+    systemPrompt: params.systemPromptSuffix,
+    userMessage: "",
+    callType: params.callType,
+    personaId: params.personaId,
+  }
+  const { model, routingReason } = await resolveModelWithRouting(routingParams)
+
+  const startTime = Date.now()
+
+  try {
+    // 안전 필터: 마지막 유저 메시지만 검사
+    const lastUserMsg = [...params.messages].reverse().find((m) => m.role === "user")
+    if (lastUserMsg) {
+      const userText =
+        typeof lastUserMsg.content === "string"
+          ? lastUserMsg.content
+          : (lastUserMsg.content as Array<{ type: string; text?: string }>)
+              .filter((b) => b.type === "text")
+              .map((b) => b.text ?? "")
+              .join(" ")
+
+      const safetyFilter = await loadSafetyFilter()
+      if (safetyFilter.config.level !== "off" && userText) {
+        const { result: filterResult, updatedFilter } = evaluateFilter(safetyFilter, userText)
+        saveSafetyFilterLogs(updatedFilter).catch(() => {})
+        if (filterResult.action === "block") {
+          throw new SafetyFilterBlockedError(
+            filterResult.action,
+            filterResult.matchedWords.map((m) => m.word)
+          )
+        }
+      }
+    }
+
+    // 시스템 프롬프트 (캐싱 지원)
+    const systemContent = buildSystemBlocks(params.systemPromptSuffix, params.systemPromptPrefix)
+
+    const response = await client.messages.create({
+      model,
+      max_tokens: maxTokens,
+      temperature,
+      system: systemContent,
+      messages: params.messages,
+    })
+
+    const text = response.content
+      .filter((block): block is Anthropic.TextBlock => block.type === "text")
+      .map((block) => block.text)
+      .join("")
+
+    const usage = response.usage as {
+      input_tokens: number
+      output_tokens: number
+      cache_creation_input_tokens?: number
+      cache_read_input_tokens?: number
+    }
+
+    const result: LLMGenerateResult = {
+      text,
+      inputTokens: usage.input_tokens,
+      outputTokens: usage.output_tokens,
+      model,
+      stopReason: response.stop_reason,
+      cacheCreationInputTokens: usage.cache_creation_input_tokens ?? 0,
+      cacheReadInputTokens: usage.cache_read_input_tokens ?? 0,
+    }
+
+    const durationMs = Date.now() - startTime
+    logUsage({
+      personaId: params.personaId ?? null,
+      callType: params.callType ?? "unknown",
+      model,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      durationMs,
+      status: "SUCCESS",
+      errorMessage: null,
+      cacheCreationInputTokens: result.cacheCreationInputTokens,
+      cacheReadInputTokens: result.cacheReadInputTokens,
+      routingReason,
+    }).catch(() => {})
+
+    return result
+  } catch (error) {
+    const durationMs = Date.now() - startTime
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
+    logUsage({
+      personaId: params.personaId ?? null,
+      callType: params.callType ?? "unknown",
+      model,
+      inputTokens: 0,
+      outputTokens: 0,
+      durationMs,
+      status: "ERROR",
+      errorMessage,
+      cacheCreationInputTokens: 0,
+      cacheReadInputTokens: 0,
+      routingReason,
+    }).catch(() => {})
+    throw error
+  }
+}
+
 // ── 사용량 로깅 ───────────────────────────────────────────────
 
 interface LogUsageParams {
