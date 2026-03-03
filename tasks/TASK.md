@@ -797,6 +797,37 @@
 
 ---
 
+## DONE (v4.1 — 관계 모델 확장)
+
+- [x] **T350~T354: 관계 프로토콜 v4.1 확장** ✅ 2026-03-03
+  - **T350: RelationshipScore 타입 확장**
+    - peakStage (최고 도달 단계 추적), momentum (관계 발전 속도), milestones (이벤트 기록)
+    - RelationshipMilestone 타입 신규 (first_debate/first_vulnerability/first_betrayal/first_deep_share/reconciliation)
+  - **T351: 관계 유형 5→10종 확장**
+    - 기존: NEUTRAL, ALLY, RIVAL, MENTOR, FAN
+    - 신규: CONFIDANT (깊은 신뢰), FRENEMY (모순적 관계), NEMESIS (깊은 적대), MUSE (창작 영감), PROTEGE (멘티)
+    - 각 유형별 TypeModifier 정의 (interactionBoost, debateWillingness, selfDisclosure, extraTones)
+  - **T352: 관계 단계 4→6 forward + ESTRANGED**
+    - 기존 4단계: STRANGER → ACQUAINTANCE → FAMILIAR → CLOSE
+    - 확장 6단계: STRANGER → ACQUAINTANCE → REGULAR → FAMILIAR → INTIMATE → CLOSE
+    - Decay 3단계: COOLING → DORMANT → ESTRANGED (갈등 기반 분리)
+    - 총 9단계, 각 단계별 BehaviorProtocol 정의
+    - ESTRANGED: peakStage ≥ FAMILIAR && tension ≥ 0.7 && warmth ≤ 0.7
+  - **T353: 비대칭/동적 메커니즘**
+    - 모멘텀: computeMomentum (rapid/gradual/stagnant/declining), updateMomentum (EMA)
+    - 마일스톤: detectMilestones (5종 이벤트 감지), computeMilestoneQualityDelta
+    - peakStage: updatePeakStage (최고 단계 추적, decay 단계 무시)
+    - 관계 요약: summarizeRelationship에 모멘텀+마일스톤 서술 추가
+  - **T354: 테스트 전면 업데이트**
+    - 기존 41→126 테스트 (85개 신규 추가)
+    - 신규 유형 10종 분류 검증, 신규 단계 6+3 전환 검증
+    - 모멘텀 시스템 4종, 마일스톤 감지 7종, peakStage 추적 6종
+    - 하위 호환: 기존 API (computeRelationshipProfile, determineStage 등) 시그니처 유지
+  - 변경: types.ts, relationship-protocol.ts, relationship-protocol.test.ts
+  - 테스트: 4479 PASS (114 파일)
+
+---
+
 ## QUEUE
 
 (없음)

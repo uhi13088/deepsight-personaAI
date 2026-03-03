@@ -1,30 +1,53 @@
 // ═══════════════════════════════════════════════════════════════
-// Relationship Protocol v4.0
-// T143: 관계 단계 + 유형 + 행동 프로토콜
-// 기존 RelationshipScore(warmth/tension/frequency/depth) 위에
-// 단계/유형/행동 규범을 레이어링
+// Relationship Protocol v4.1
+// T143: 기본 관계 프로토콜
+// T350~T353: 관계 모델 확장
+//   - T351: 유형 5→10종 (CONFIDANT/FRENEMY/NEMESIS/MUSE/PROTEGE)
+//   - T352: 단계 4→6 forward + ESTRANGED (총 9단계)
+//   - T353: 비대칭/동적 메커니즘 (모멘텀, 마일스톤)
 // ═══════════════════════════════════════════════════════════════
 
-import type { RelationshipScore } from "../types"
+import type { RelationshipScore, RelationshipMilestone } from "../types"
 
 // ── 관계 단계 (Relationship Stage) ─────────────────────────
 
-/** 관계 발전 단계 (STRANGER → CLOSE, 감쇠 시 COOLING → DORMANT) */
+/**
+ * v4.1 관계 발전 단계 (9단계)
+ *
+ * Forward (6단계):
+ *   STRANGER → ACQUAINTANCE → REGULAR → FAMILIAR → INTIMATE → CLOSE
+ *
+ * Decay (3단계):
+ *   COOLING (14일+ 무활동) → DORMANT (30일+) → ESTRANGED (갈등 기반 분리)
+ */
 export type RelationshipStage =
   | "STRANGER" // 처음 만남 / 인터랙션 없음
   | "ACQUAINTANCE" // 서로 인지, 가끔 인터랙션
-  | "FAMILIAR" // 정기적 인터랙션, 취향 파악
-  | "CLOSE" // 깊은 교류, 개인적 이야기 공유
+  | "REGULAR" // 정기적으로 만남, 취향 파악 시작 (v4.1 신규)
+  | "FAMILIAR" // 충분한 교류, 서로의 성향 이해
+  | "INTIMATE" // 깊은 교류, 개인사 일부 공유 (v4.1 신규)
+  | "CLOSE" // 가장 깊은 관계, 취약성 공유
   | "COOLING" // 인터랙션 감소, 관계 냉각 중 (14일+ 무활동)
   | "DORMANT" // 장기 무활동 (30일+), 최소한의 인터랙션만 유지
+  | "ESTRANGED" // 한때 가까웠으나 갈등으로 의도적 거리두기 (v4.1 신규)
 
-/** 관계 유형 (Type) */
+/**
+ * v4.1 관계 유형 (10종)
+ *
+ * 기존 5종: NEUTRAL, ALLY, RIVAL, MENTOR, FAN
+ * 신규 5종: CONFIDANT, FRENEMY, NEMESIS, MUSE, PROTEGE
+ */
 export type RelationshipType =
   | "NEUTRAL" // 평범한 관계
   | "ALLY" // 긍정적, 서로 지지
   | "RIVAL" // 자주 논쟁, 높은 tension
   | "MENTOR" // 한쪽이 안내/조언 역할
   | "FAN" // 한쪽이 다른쪽을 추종
+  | "CONFIDANT" // ALLY보다 깊은 신뢰, 취약성 공유 (v4.1)
+  | "FRENEMY" // 친하면서도 경쟁 — warmth+tension 동시 고값 (v4.1)
+  | "NEMESIS" // RIVAL보다 깊은 개인적 대립, 역사적 갈등 (v4.1)
+  | "MUSE" // 상대의 관점에서 창작적 영감 수령 (v4.1)
+  | "PROTEGE" // MENTOR 역방향 — 가르침 받는 쪽 (v4.1)
 
 // ── 행동 프로토콜 ──────────────────────────────────────────
 
@@ -52,6 +75,20 @@ export interface RelationshipProfile {
   type: RelationshipType
   protocol: BehaviorProtocol
   stageProgress: number // 현재 단계 내 진행률 (0.0~1.0)
+  /** v4.1: 관계 모멘텀 정보 */
+  momentum?: MomentumInfo
+  /** v4.1: 활성 마일스톤 목록 */
+  milestones?: RelationshipMilestone[]
+}
+
+/** v4.1: 모멘텀 분석 정보 */
+export interface MomentumInfo {
+  /** 모멘텀 값 (-1.0~1.0, 양수=급속 발전, 음수=쇠퇴) */
+  value: number
+  /** 분류: rapid(급속)/gradual(점진)/stagnant(정체)/declining(쇠퇴) */
+  classification: "rapid" | "gradual" | "stagnant" | "declining"
+  /** 안정성 (0.0~1.0) — 빠른 진행은 불안정, 느린 진행은 안정적 */
+  stability: number
 }
 
 // ── 단계 전환 임계값 ────────────────────────────────────────
@@ -62,15 +99,23 @@ export interface StageThresholds {
   minTotalScore: number // warmth + frequency + depth 합산
 }
 
-/** 단계별 진입 조건 */
+/**
+ * v4.1 단계별 진입 조건 (6 forward + 3 decay)
+ *
+ * 기존 ACQUAINTANCE↔FAMILIAR 사이에 REGULAR 삽입
+ * 기존 FAMILIAR↔CLOSE 사이에 INTIMATE 삽입
+ */
 export const STAGE_THRESHOLDS: Record<RelationshipStage, StageThresholds> = {
   STRANGER: { minFrequency: 0, minDepth: 0, minTotalScore: 0 },
   ACQUAINTANCE: { minFrequency: 0.1, minDepth: 0, minTotalScore: 0.3 },
+  REGULAR: { minFrequency: 0.2, minDepth: 0.1, minTotalScore: 0.5 },
   FAMILIAR: { minFrequency: 0.3, minDepth: 0.2, minTotalScore: 0.8 },
+  INTIMATE: { minFrequency: 0.4, minDepth: 0.3, minTotalScore: 1.1 },
   CLOSE: { minFrequency: 0.5, minDepth: 0.4, minTotalScore: 1.5 },
-  // COOLING/DORMANT는 시간 기반 전환이므로 score threshold 불필요 (0으로 설정)
+  // Decay 단계는 시간/갈등 기반 전환
   COOLING: { minFrequency: 0, minDepth: 0, minTotalScore: 0 },
   DORMANT: { minFrequency: 0, minDepth: 0, minTotalScore: 0 },
+  ESTRANGED: { minFrequency: 0, minDepth: 0, minTotalScore: 0 },
 }
 
 // ── 감쇠 관련 상수 ──────────────────────────────────────────
@@ -84,19 +129,30 @@ export const COOLING_THRESHOLD_DAYS = 14
 /** DORMANT 진입까지 무활동 일수 */
 export const DORMANT_THRESHOLD_DAYS = 30
 
-/** COOLING 상태에서 재활성화(다시 올라가기)에 필요한 최소 인터랙션 수 */
+/** COOLING 상태에서 재활성화에 필요한 최소 인터랙션 수 */
 export const REACTIVATION_MIN_INTERACTIONS = 3
 
-/** 유형 판단 임계값 */
+/** v4.1: ESTRANGED 판별 — tension 임계값 (peakStage ≥ FAMILIAR && tension ≥ 이 값) */
+export const ESTRANGED_TENSION_THRESHOLD = 0.7
+
+/** v4.1: ESTRANGED 판별 — warmth 급락 임계값 (peakWarmth 대비 현재 warmth 차이) */
+export const ESTRANGED_WARMTH_DROP = 0.3
+
+// ── 유형 판단 임계값 ────────────────────────────────────────
+
+/** v4.1: 10종 유형 판단 임계값 */
 export const TYPE_THRESHOLDS = {
-  /** ALLY: warmth 높고 tension 낮음 */
+  // 기존 5종
   ally: { minWarmth: 0.6, maxTension: 0.3 },
-  /** RIVAL: tension 높고 frequency 높음 */
   rival: { minTension: 0.5, minFrequency: 0.3 },
-  /** MENTOR: depth 높고 warmth 높음 (비대칭은 외부에서 판단) */
   mentor: { minDepth: 0.5, minWarmth: 0.5 },
-  /** FAN: warmth 높고 depth 낮음 (일방적 관계) */
   fan: { minWarmth: 0.6, maxDepth: 0.2 },
+  // v4.1 신규 5종
+  confidant: { minWarmth: 0.8, minDepth: 0.7, maxTension: 0.2 },
+  frenemy: { minWarmth: 0.5, minTension: 0.5 },
+  nemesis: { minTension: 0.7, minDepth: 0.5, maxWarmth: 0.3 },
+  muse: { minWarmth: 0.5, minDepth: 0.3, maxFrequency: 0.3 },
+  protege: { minDepth: 0.5, minWarmth: 0.5 },
 } as const
 
 // ── 단계별 행동 프로토콜 ────────────────────────────────────
@@ -124,6 +180,21 @@ const STAGE_PROTOCOLS: Record<RelationshipStage, BehaviorProtocol> = {
     personalReferences: false,
     vulnerabilityAllowed: false,
   },
+  REGULAR: {
+    interactionBoost: 1.0,
+    allowedTones: [
+      "formal_analysis",
+      "deep_analysis",
+      "supportive",
+      "light_reaction",
+      "empathetic",
+      "unique_perspective",
+    ],
+    selfDisclosure: 0.4,
+    debateWillingness: 0.5,
+    personalReferences: true,
+    vulnerabilityAllowed: false,
+  },
   FAMILIAR: {
     interactionBoost: 1.2,
     allowedTones: [
@@ -138,6 +209,23 @@ const STAGE_PROTOCOLS: Record<RelationshipStage, BehaviorProtocol> = {
     debateWillingness: 0.6,
     personalReferences: true,
     vulnerabilityAllowed: false,
+  },
+  INTIMATE: {
+    interactionBoost: 1.35,
+    allowedTones: [
+      "deep_analysis",
+      "supportive",
+      "light_reaction",
+      "empathetic",
+      "soft_rebuttal",
+      "unique_perspective",
+      "intimate_joke",
+      "direct_rebuttal",
+    ],
+    selfDisclosure: 0.65,
+    debateWillingness: 0.7,
+    personalReferences: true,
+    vulnerabilityAllowed: true,
   },
   CLOSE: {
     interactionBoost: 1.5,
@@ -174,6 +262,14 @@ const STAGE_PROTOCOLS: Record<RelationshipStage, BehaviorProtocol> = {
     personalReferences: false,
     vulnerabilityAllowed: false,
   },
+  ESTRANGED: {
+    interactionBoost: 0.2,
+    allowedTones: ["formal_analysis", "light_reaction"],
+    selfDisclosure: 0.05,
+    debateWillingness: 0.1,
+    personalReferences: true, // 과거를 기억하지만 거리 유지
+    vulnerabilityAllowed: false,
+  },
 }
 
 // ── 유형별 프로토콜 보정 ────────────────────────────────────
@@ -186,6 +282,7 @@ interface TypeModifier {
 }
 
 const TYPE_MODIFIERS: Record<RelationshipType, TypeModifier> = {
+  // 기존 5종
   NEUTRAL: {
     interactionBoostDelta: 0,
     debateWillingnessDelta: 0,
@@ -216,16 +313,74 @@ const TYPE_MODIFIERS: Record<RelationshipType, TypeModifier> = {
     selfDisclosureDelta: 0,
     extraTones: ["supportive", "light_reaction"],
   },
+  // v4.1 신규 5종
+  CONFIDANT: {
+    interactionBoostDelta: 0.3,
+    debateWillingnessDelta: 0,
+    selfDisclosureDelta: 0.3,
+    extraTones: ["empathetic", "intimate_joke", "paradox_response"],
+  },
+  FRENEMY: {
+    interactionBoostDelta: 0.3,
+    debateWillingnessDelta: 0.2,
+    selfDisclosureDelta: 0.05,
+    extraTones: ["soft_rebuttal", "intimate_joke", "unique_perspective"],
+  },
+  NEMESIS: {
+    interactionBoostDelta: 0.15,
+    debateWillingnessDelta: 0.4,
+    selfDisclosureDelta: -0.15,
+    extraTones: ["direct_rebuttal", "soft_rebuttal", "unique_perspective"],
+  },
+  MUSE: {
+    interactionBoostDelta: 0.1,
+    debateWillingnessDelta: 0,
+    selfDisclosureDelta: 0.1,
+    extraTones: ["deep_analysis", "unique_perspective"],
+  },
+  PROTEGE: {
+    interactionBoostDelta: 0.25,
+    debateWillingnessDelta: -0.1,
+    selfDisclosureDelta: 0.15,
+    extraTones: ["supportive", "empathetic", "deep_analysis"],
+  },
 }
+
+// ── v4.1: 마일스톤 감지 임계값 ─────────────────────────────
+
+/** 마일스톤 이벤트 감지 기준 */
+export const MILESTONE_THRESHOLDS = {
+  /** 첫 논쟁: tension 단일 이벤트에서 0.15 이상 급증 */
+  firstDebate: { tensionDelta: 0.15 },
+  /** 첫 취약성 공유: INTIMATE 이상 단계 진입 시 자동 기록 */
+  firstVulnerability: { minStage: "INTIMATE" as RelationshipStage },
+  /** 첫 배신: tension ≥ 0.8 && warmth 급락 -0.2 이상 */
+  firstBetrayal: { minTension: 0.8, warmthDrop: -0.2 },
+  /** 첫 깊은 공유: depth가 0.5 이상으로 진입 */
+  firstDeepShare: { minDepth: 0.5 },
+  /** 화해: ESTRANGED에서 tension 0.3 이하로 회복 */
+  reconciliation: { maxTension: 0.3 },
+} as const
 
 // ══════════════════════════════════════════════════════════════
 // 관계 단계 결정
 // ══════════════════════════════════════════════════════════════
 
+/** v4.1 forward 단계 순서 (진행 방향) */
+const FORWARD_STAGES: RelationshipStage[] = [
+  "STRANGER",
+  "ACQUAINTANCE",
+  "REGULAR",
+  "FAMILIAR",
+  "INTIMATE",
+  "CLOSE",
+]
+
 /** 관계 스코어로 단계 결정 (시간 감쇠 미포함 — 순수 점수 기반) */
 export function determineStage(score: RelationshipScore): RelationshipStage {
   const totalScore = score.warmth + score.frequency + score.depth
 
+  // 높은 단계부터 역순으로 체크
   if (
     score.frequency >= STAGE_THRESHOLDS.CLOSE.minFrequency &&
     score.depth >= STAGE_THRESHOLDS.CLOSE.minDepth &&
@@ -235,11 +390,27 @@ export function determineStage(score: RelationshipScore): RelationshipStage {
   }
 
   if (
+    score.frequency >= STAGE_THRESHOLDS.INTIMATE.minFrequency &&
+    score.depth >= STAGE_THRESHOLDS.INTIMATE.minDepth &&
+    totalScore >= STAGE_THRESHOLDS.INTIMATE.minTotalScore
+  ) {
+    return "INTIMATE"
+  }
+
+  if (
     score.frequency >= STAGE_THRESHOLDS.FAMILIAR.minFrequency &&
     score.depth >= STAGE_THRESHOLDS.FAMILIAR.minDepth &&
     totalScore >= STAGE_THRESHOLDS.FAMILIAR.minTotalScore
   ) {
     return "FAMILIAR"
+  }
+
+  if (
+    score.frequency >= STAGE_THRESHOLDS.REGULAR.minFrequency &&
+    score.depth >= STAGE_THRESHOLDS.REGULAR.minDepth &&
+    totalScore >= STAGE_THRESHOLDS.REGULAR.minTotalScore
+  ) {
+    return "REGULAR"
   }
 
   if (
@@ -253,19 +424,23 @@ export function determineStage(score: RelationshipScore): RelationshipStage {
 }
 
 /**
- * 시간 감쇠를 포함한 관계 단계 결정.
+ * v4.1 시간 감쇠를 포함한 관계 단계 결정.
  *
  * 로직:
- * 1. lastInteractionAt이 DORMANT_THRESHOLD_DAYS 이상 → DORMANT
- * 2. lastInteractionAt이 COOLING_THRESHOLD_DAYS 이상 → COOLING
- * 3. 그 외 → 기존 score 기반 단계 결정
- *
- * COOLING/DORMANT에서 인터랙션 재개 시 → 기존 score 기반으로 복귀.
+ * 1. ESTRANGED 판별: peakStage ≥ FAMILIAR && tension ≥ 0.7 && warmth 급락
+ * 2. DORMANT: 30일+ 무활동
+ * 3. COOLING: 14일+ 무활동
+ * 4. 그 외 → 기존 score 기반 단계 결정
  */
 export function determineStageWithDecay(
   score: RelationshipScore,
   now: Date = new Date()
 ): RelationshipStage {
+  // v4.1: ESTRANGED 판별 (갈등 기반 — 시간과 무관)
+  if (isEstranged(score)) {
+    return "ESTRANGED"
+  }
+
   // lastInteractionAt이 없으면(관계 초기) 순수 점수 기반
   if (!score.lastInteractionAt) {
     return determineStage(score)
@@ -288,13 +463,30 @@ export function determineStageWithDecay(
 }
 
 /**
+ * v4.1: ESTRANGED 상태 판별.
+ *
+ * 조건: 한때 FAMILIAR 이상이었으나 (peakStage) 현재 높은 tension + warmth 급락
+ */
+export function isEstranged(score: RelationshipScore): boolean {
+  const peakStage = score.peakStage as RelationshipStage | undefined
+  if (!peakStage) return false
+
+  const peakIdx = FORWARD_STAGES.indexOf(peakStage)
+  const familiarIdx = FORWARD_STAGES.indexOf("FAMILIAR")
+
+  // peakStage가 FAMILIAR 미만이면 ESTRANGED 불가
+  if (peakIdx < familiarIdx) return false
+
+  // tension이 충분히 높고 warmth가 낮아야 함
+  return (
+    score.tension >= ESTRANGED_TENSION_THRESHOLD && score.warmth <= 1.0 - ESTRANGED_WARMTH_DROP // warmth가 0.7 이하
+  )
+}
+
+/**
  * warmth에 시간 기반 지수 감쇠 적용.
  *
  * 공식: decayedWarmth = warmth × e^(-WARMTH_DECAY_RATE × daysSinceLastInteraction)
- * - 7일 무활동: warmth × 0.87 (13% 감소)
- * - 14일 무활동: warmth × 0.76 (24% 감소)
- * - 30일 무활동: warmth × 0.55 (45% 감소)
- * - 60일 무활동: warmth × 0.30 (70% 감소)
  */
 export function applyWarmthDecay(
   warmth: number,
@@ -313,7 +505,6 @@ export function applyWarmthDecay(
 /**
  * frequency에 주간 감쇠 적용.
  *
- * 인터랙션이 없으면 frequency가 자연 감소.
  * 공식: decayedFrequency = frequency × 0.9^(weeksSinceLastInteraction)
  */
 export function applyFrequencyDecay(
@@ -331,23 +522,24 @@ export function applyFrequencyDecay(
   return clamp(decayed, 0, 1)
 }
 
-/** 현재 단계 내 진행률 (0.0~1.0) */
+/** v4.1: 현재 단계 내 진행률 (0.0~1.0) */
 export function computeStageProgress(
   score: RelationshipScore,
   currentStage: RelationshipStage
 ): number {
-  // COOLING/DORMANT는 감쇠 중이므로 진행률 0
-  if (currentStage === "COOLING" || currentStage === "DORMANT") return 0.0
+  // Decay 단계는 진행률 0
+  if (currentStage === "COOLING" || currentStage === "DORMANT" || currentStage === "ESTRANGED") {
+    return 0.0
+  }
 
   const totalScore = score.warmth + score.frequency + score.depth
 
-  const stages: RelationshipStage[] = ["STRANGER", "ACQUAINTANCE", "FAMILIAR", "CLOSE"]
-  const currentIdx = stages.indexOf(currentStage)
+  const currentIdx = FORWARD_STAGES.indexOf(currentStage)
   const nextIdx = currentIdx + 1
 
-  if (nextIdx >= stages.length) return 1.0 // 최고 단계
+  if (nextIdx >= FORWARD_STAGES.length) return 1.0 // 최고 단계
 
-  const nextThreshold = STAGE_THRESHOLDS[stages[nextIdx]]
+  const nextThreshold = STAGE_THRESHOLDS[FORWARD_STAGES[nextIdx]]
   const currentThreshold = STAGE_THRESHOLDS[currentStage]
 
   const range = nextThreshold.minTotalScore - currentThreshold.minTotalScore
@@ -361,35 +553,80 @@ export function computeStageProgress(
 // 관계 유형 결정
 // ══════════════════════════════════════════════════════════════
 
-/** 관계 스코어로 유형 결정 */
+/**
+ * v4.1 관계 스코어로 유형 결정 (10종).
+ *
+ * 우선순위:
+ * 1. NEMESIS (최우선 — 깊은 적대)
+ * 2. FRENEMY (warmth+tension 동시 고값)
+ * 3. RIVAL (tension+frequency 고값)
+ * 4. CONFIDANT (warmth+depth 극고, tension 극저)
+ * 5. MENTOR (depth+warmth 고값)
+ * 6. PROTEGE (depth+warmth 고값, frequency 낮음)
+ * 7. FAN (warmth 고, depth 저)
+ * 8. MUSE (warmth 중고, depth 중, frequency 저)
+ * 9. ALLY (warmth 고, tension 저)
+ * 10. NEUTRAL (기본값)
+ */
 export function determineType(score: RelationshipScore): RelationshipType {
-  // RIVAL: tension 높고 빈도 높음 (최우선 — 갈등 관계)
+  const t = TYPE_THRESHOLDS
+
+  // 1. NEMESIS: tension 극고 + depth 고 + warmth 저 (깊은 적대)
   if (
-    score.tension >= TYPE_THRESHOLDS.rival.minTension &&
-    score.frequency >= TYPE_THRESHOLDS.rival.minFrequency
+    score.tension >= t.nemesis.minTension &&
+    score.depth >= t.nemesis.minDepth &&
+    score.warmth <= t.nemesis.maxWarmth
   ) {
+    return "NEMESIS"
+  }
+
+  // 2. FRENEMY: warmth+tension 동시 고값 (모순적 관계)
+  if (score.warmth >= t.frenemy.minWarmth && score.tension >= t.frenemy.minTension) {
+    return "FRENEMY"
+  }
+
+  // 3. RIVAL: tension+frequency 고값 (잦은 갈등)
+  if (score.tension >= t.rival.minTension && score.frequency >= t.rival.minFrequency) {
     return "RIVAL"
   }
 
-  // ALLY: warmth 높고 tension 낮음
-  if (
-    score.warmth >= TYPE_THRESHOLDS.ally.minWarmth &&
-    score.tension <= TYPE_THRESHOLDS.ally.maxTension
-  ) {
-    // MENTOR: depth도 높으면 멘토
+  // 이하는 tension이 낮은 긍정적 관계군
+  if (score.warmth >= t.ally.minWarmth && score.tension <= t.ally.maxTension) {
+    // 4. CONFIDANT: warmth+depth 극고, tension 극저
     if (
-      score.depth >= TYPE_THRESHOLDS.mentor.minDepth &&
-      score.warmth >= TYPE_THRESHOLDS.mentor.minWarmth
+      score.warmth >= t.confidant.minWarmth &&
+      score.depth >= t.confidant.minDepth &&
+      score.tension <= t.confidant.maxTension
     ) {
+      return "CONFIDANT"
+    }
+
+    // 5. MENTOR: depth+warmth 고값
+    if (score.depth >= t.mentor.minDepth && score.warmth >= t.mentor.minWarmth) {
       return "MENTOR"
     }
 
-    // FAN: depth 낮으면 팬
-    if (score.depth <= TYPE_THRESHOLDS.fan.maxDepth) {
+    // 6. FAN: warmth 고, depth 저
+    if (score.depth <= t.fan.maxDepth) {
       return "FAN"
     }
 
+    // 9. ALLY: 일반적 긍정 관계
     return "ALLY"
+  }
+
+  // 7. PROTEGE: depth+warmth 중고, tension 중 (ALLY 조건 밖)
+  if (score.depth >= t.protege.minDepth && score.warmth >= t.protege.minWarmth) {
+    return "PROTEGE"
+  }
+
+  // 8. MUSE: warmth 중고, depth 중, frequency 저 (빈도 낮지만 깊은 영감)
+  if (
+    score.warmth >= t.muse.minWarmth &&
+    score.depth >= t.muse.minDepth &&
+    score.frequency <= t.muse.maxFrequency
+  ) {
+    return "MUSE"
   }
 
   return "NEUTRAL"
@@ -418,6 +655,148 @@ export function buildProtocol(stage: RelationshipStage, type: RelationshipType):
 }
 
 // ══════════════════════════════════════════════════════════════
+// v4.1: 모멘텀 시스템
+// ══════════════════════════════════════════════════════════════
+
+/**
+ * 관계 모멘텀 계산.
+ *
+ * 모멘텀 = score.momentum (외부에서 업데이트된 값)
+ * - 양수: 관계가 급속히 발전 중 (불안정)
+ * - 0: 정체 (안정적)
+ * - 음수: 관계가 쇠퇴 중
+ *
+ * 안정성: 빠른 진행은 불안정 (stability 낮음), 느린 진행은 안정적 (stability 높음)
+ */
+export function computeMomentum(score: RelationshipScore): MomentumInfo {
+  const value = score.momentum ?? 0
+
+  let classification: MomentumInfo["classification"]
+  if (value > 0.3) classification = "rapid"
+  else if (value > 0.05) classification = "gradual"
+  else if (value >= -0.05) classification = "stagnant"
+  else classification = "declining"
+
+  // 안정성: 급속 진행 → 0.3, 점진 → 0.7, 정체 → 0.9, 쇠퇴 → 0.5
+  const absValue = Math.abs(value)
+  const stability = absValue > 0.3 ? 0.3 : absValue > 0.05 ? 0.7 : 0.9
+
+  return { value, classification, stability }
+}
+
+/**
+ * v4.1: 인터랙션 후 모멘텀 업데이트.
+ *
+ * 이전/이후 totalScore 차이를 기반으로 EMA(지수이동평균) 적용.
+ * momentum = 0.7 * prev_momentum + 0.3 * scoreDelta
+ */
+export function updateMomentum(prevScore: RelationshipScore, newScore: RelationshipScore): number {
+  const prevTotal = prevScore.warmth + prevScore.frequency + prevScore.depth
+  const newTotal = newScore.warmth + newScore.frequency + newScore.depth
+  const delta = newTotal - prevTotal
+
+  const prevMomentum = prevScore.momentum ?? 0
+  return clamp(0.7 * prevMomentum + 0.3 * delta, -1, 1)
+}
+
+// ══════════════════════════════════════════════════════════════
+// v4.1: 마일스톤 감지
+// ══════════════════════════════════════════════════════════════
+
+/**
+ * 인터랙션 전후 스코어를 비교하여 새 마일스톤 감지.
+ *
+ * 이미 동일 type의 마일스톤이 있으면 중복 생성하지 않음.
+ */
+export function detectMilestones(
+  prevScore: RelationshipScore,
+  newScore: RelationshipScore,
+  now: Date = new Date()
+): RelationshipMilestone[] {
+  const existing = newScore.milestones ?? []
+  const existingTypes = new Set(existing.map((m) => m.type))
+  const detected: RelationshipMilestone[] = []
+
+  // 첫 논쟁: tension 급증
+  if (
+    !existingTypes.has("first_debate") &&
+    newScore.tension - prevScore.tension >= MILESTONE_THRESHOLDS.firstDebate.tensionDelta
+  ) {
+    detected.push({ type: "first_debate", occurredAt: now, qualityDelta: -0.05 })
+  }
+
+  // 첫 취약성 공유: INTIMATE 이상 단계 진입
+  if (!existingTypes.has("first_vulnerability")) {
+    const newStage = determineStage(newScore)
+    const stageIdx = FORWARD_STAGES.indexOf(newStage)
+    const intimateIdx = FORWARD_STAGES.indexOf("INTIMATE")
+    if (stageIdx >= intimateIdx) {
+      detected.push({ type: "first_vulnerability", occurredAt: now, qualityDelta: 0.1 })
+    }
+  }
+
+  // 첫 배신: tension ≥ 0.8 && warmth 급락
+  if (
+    !existingTypes.has("first_betrayal") &&
+    newScore.tension >= MILESTONE_THRESHOLDS.firstBetrayal.minTension &&
+    newScore.warmth - prevScore.warmth <= MILESTONE_THRESHOLDS.firstBetrayal.warmthDrop
+  ) {
+    detected.push({ type: "first_betrayal", occurredAt: now, qualityDelta: -0.15 })
+  }
+
+  // 첫 깊은 공유: depth ≥ 0.5 진입
+  if (
+    !existingTypes.has("first_deep_share") &&
+    prevScore.depth < MILESTONE_THRESHOLDS.firstDeepShare.minDepth &&
+    newScore.depth >= MILESTONE_THRESHOLDS.firstDeepShare.minDepth
+  ) {
+    detected.push({ type: "first_deep_share", occurredAt: now, qualityDelta: 0.05 })
+  }
+
+  // 화해: ESTRANGED 상태에서 tension 회복
+  if (
+    !existingTypes.has("reconciliation") &&
+    isEstranged(prevScore) &&
+    newScore.tension <= MILESTONE_THRESHOLDS.reconciliation.maxTension
+  ) {
+    detected.push({ type: "reconciliation", occurredAt: now, qualityDelta: 0.1 })
+  }
+
+  return detected
+}
+
+/**
+ * v4.1: 마일스톤의 영구적 품질 보정값 합산.
+ * summarizeRelationship() 프롬프트 컨텍스트에 반영.
+ */
+export function computeMilestoneQualityDelta(milestones: RelationshipMilestone[]): number {
+  return milestones.reduce((sum, m) => sum + m.qualityDelta, 0)
+}
+
+// ══════════════════════════════════════════════════════════════
+// v4.1: peakStage 추적
+// ══════════════════════════════════════════════════════════════
+
+/**
+ * 현재 단계가 peakStage보다 높으면 peakStage를 갱신.
+ * 반환값: 갱신된 peakStage (없으면 현재 단계)
+ */
+export function updatePeakStage(
+  currentPeakStage: string | undefined,
+  currentStage: RelationshipStage
+): string {
+  if (!currentPeakStage) return currentStage
+
+  const peakIdx = FORWARD_STAGES.indexOf(currentPeakStage as RelationshipStage)
+  const currentIdx = FORWARD_STAGES.indexOf(currentStage)
+
+  // Decay 단계(COOLING/DORMANT/ESTRANGED)는 peak 갱신하지 않음
+  if (currentIdx < 0) return currentPeakStage
+
+  return currentIdx > peakIdx ? currentStage : currentPeakStage
+}
+
+// ══════════════════════════════════════════════════════════════
 // 통합 API
 // ══════════════════════════════════════════════════════════════
 
@@ -428,13 +807,20 @@ export function computeRelationshipProfile(score: RelationshipScore): Relationsh
   const protocol = buildProtocol(stage, type)
   const stageProgress = computeStageProgress(score, stage)
 
-  return { stage, type, protocol, stageProgress }
+  return {
+    stage,
+    type,
+    protocol,
+    stageProgress,
+    momentum: computeMomentum(score),
+    milestones: score.milestones,
+  }
 }
 
 /**
  * 시간 감쇠를 포함한 관계 프로필 계산.
  *
- * COOLING/DORMANT 단계에서는:
+ * COOLING/DORMANT/ESTRANGED 단계에서는:
  * - 유형(type)은 NEUTRAL로 리셋
  * - 행동 프로토콜이 축소됨
  */
@@ -444,13 +830,21 @@ export function computeRelationshipProfileWithDecay(
 ): RelationshipProfile {
   const stage = determineStageWithDecay(score, now)
 
-  // COOLING/DORMANT에서는 유형을 NEUTRAL로
-  const type = stage === "COOLING" || stage === "DORMANT" ? "NEUTRAL" : determineType(score)
+  // Decay 단계에서는 유형을 NEUTRAL로
+  const isDecay = stage === "COOLING" || stage === "DORMANT" || stage === "ESTRANGED"
+  const type = isDecay ? "NEUTRAL" : determineType(score)
 
   const protocol = buildProtocol(stage, type)
   const stageProgress = computeStageProgress(score, stage)
 
-  return { stage, type, protocol, stageProgress }
+  return {
+    stage,
+    type,
+    protocol,
+    stageProgress,
+    momentum: computeMomentum(score),
+    milestones: score.milestones,
+  }
 }
 
 /** 특정 톤이 허용되는지 확인 */
@@ -463,7 +857,7 @@ export function getInteractionMultiplier(profile: RelationshipProfile): number {
   return profile.protocol.interactionBoost
 }
 
-/** 관계 요약 텍스트 생성 (프롬프트용) */
+/** v4.1: 관계 요약 텍스트 생성 (프롬프트용) */
 export function summarizeRelationship(
   score: RelationshipScore,
   profile: RelationshipProfile
@@ -477,12 +871,42 @@ export function summarizeRelationship(
       `frequency=${score.frequency.toFixed(2)}, depth=${score.depth.toFixed(2)}`
   )
 
+  // 단계별 설명
   if (profile.stage === "COOLING") {
     parts.push("관계 냉각 중 — 최근 교류 감소")
   }
   if (profile.stage === "DORMANT") {
     parts.push("장기 미교류 — 다시 만나면 어색할 수 있음")
   }
+  if (profile.stage === "ESTRANGED") {
+    parts.push("한때 가까웠으나 갈등으로 거리를 둔 상태 — 조심스러운 태도")
+  }
+
+  // 모멘텀 정보
+  if (profile.momentum) {
+    if (profile.momentum.classification === "rapid") {
+      parts.push("관계가 급속히 발전 중 (불안정할 수 있음)")
+    } else if (profile.momentum.classification === "declining") {
+      parts.push("관계가 서서히 멀어지는 중")
+    }
+  }
+
+  // 마일스톤 서술
+  const milestones = profile.milestones ?? score.milestones ?? []
+  if (milestones.length > 0) {
+    const milestoneDescs: Record<RelationshipMilestone["type"], string> = {
+      first_debate: "논쟁을 겪은 적 있음",
+      first_vulnerability: "취약한 면을 공유한 적 있음",
+      first_betrayal: "신뢰가 크게 손상된 적 있음",
+      first_deep_share: "깊은 이야기를 나눈 적 있음",
+      reconciliation: "갈등 후 화해한 적 있음",
+    }
+    const descs = milestones.map((m) => milestoneDescs[m.type]).filter(Boolean)
+    if (descs.length > 0) {
+      parts.push(`관계 이력: ${descs.join(", ")}`)
+    }
+  }
+
   if (profile.protocol.personalReferences) {
     parts.push("과거 대화 참조 가능")
   }

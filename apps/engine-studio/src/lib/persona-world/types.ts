@@ -68,6 +68,25 @@ export interface RelationshipScore {
   frequency: number // 주간 인터랙션 정규화
   depth: number // 답글 체인 길이 평균
   lastInteractionAt: Date | null
+  /** v4.1: 이 관계가 도달했던 최고 단계 (ESTRANGED 판별용) */
+  peakStage?: string
+  /** v4.1: 관계 발전 속도 (양수=급속, 음수=감속, 0=정체) */
+  momentum?: number
+  /** v4.1: 관계 마일스톤 이벤트 기록 */
+  milestones?: RelationshipMilestone[]
+}
+
+/** 관계 마일스톤 이벤트 */
+export interface RelationshipMilestone {
+  type:
+    | "first_debate"
+    | "first_vulnerability"
+    | "first_betrayal"
+    | "first_deep_share"
+    | "reconciliation"
+  occurredAt: Date
+  /** 마일스톤 발생 시 영구적 관계 품질 보정 */
+  qualityDelta: number
 }
 
 // ── 소비 기록 ────────────────────────────────────────────────
