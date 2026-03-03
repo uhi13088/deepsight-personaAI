@@ -6,7 +6,14 @@
 // ═══════════════════════════════════════════════════════════════
 
 import type { RelationshipScore } from "../types"
-import { applyWarmthDecay, applyFrequencyDecay } from "./relationship-protocol"
+import {
+  applyWarmthDecay,
+  applyFrequencyDecay,
+  updateMomentum,
+  detectMilestones,
+  updatePeakStage,
+  determineStage,
+} from "./relationship-protocol"
 
 /**
  * 인터랙션 데이터 (관계 업데이트 입력).
@@ -112,13 +119,32 @@ export function computeRelationshipUpdate(
     depth = clamp(current.depth * 0.7 + (event.chainLength / 10) * 0.3)
   }
 
-  return {
+  const baseUpdate: RelationshipScore = {
     warmth,
     tension,
     frequency,
     depth,
     lastInteractionAt: new Date(),
+    // v4.1: 기존 필드 보존
+    peakStage: current.peakStage,
+    momentum: current.momentum,
+    milestones: current.milestones,
   }
+
+  // v4.1: 모멘텀 업데이트 (EMA)
+  baseUpdate.momentum = updateMomentum(current, baseUpdate)
+
+  // v4.1: peakStage 갱신
+  const currentStage = determineStage(baseUpdate)
+  baseUpdate.peakStage = updatePeakStage(current.peakStage, currentStage)
+
+  // v4.1: 마일스톤 감지 + 기존 마일스톤에 추가
+  const newMilestones = detectMilestones(current, baseUpdate)
+  if (newMilestones.length > 0) {
+    baseUpdate.milestones = [...(current.milestones ?? []), ...newMilestones]
+  }
+
+  return baseUpdate
 }
 
 /**
@@ -215,6 +241,10 @@ export async function recalculateRelationship(
     frequency: clamp(frequency),
     depth: clamp(depth),
     lastInteractionAt: current.lastInteractionAt,
+    // v4.1: 기존 필드 보존 (배치 재계산에서는 모멘텀/마일스톤 변경 없음)
+    peakStage: current.peakStage,
+    momentum: current.momentum,
+    milestones: current.milestones,
   }
 
   await provider.upsertRelationship(personaAId, personaBId, updated)
