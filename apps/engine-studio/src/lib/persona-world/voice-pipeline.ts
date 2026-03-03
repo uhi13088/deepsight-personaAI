@@ -1,7 +1,10 @@
 // ═══════════════════════════════════════════════════════════════
 // PersonaWorld — Voice Pipeline (T337)
-// STT (Whisper API) + TTS (OpenAI/Google Neural) 통합 모듈
+// STT (Whisper API) + TTS (OpenAI/Google/ElevenLabs) 통합 모듈
+// + 인메모리 LRU 캐시 (동일 음성+텍스트 조합 재사용)
 // ═══════════════════════════════════════════════════════════════
+
+import { createHash } from "crypto"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
@@ -298,22 +301,137 @@ export async function textToSpeechElevenLabs(
   }
 }
 
-// ── 통합 TTS 디스패처 ─────────────────────────────────────────
+// ── TTS 캐시 (인메모리 LRU) ──────────────────────────────────
+//
+// 동일 (provider + voiceId + speed + text) 조합의 오디오를 캐싱.
+// 1000+ 페르소나 × 다수 유저 대화 시, 같은 페르소나의 동일 응답을
+// 반복 생성하지 않아 API 비용을 대폭 절감합니다.
+//
+// 스케일업 시 Redis/S3로 교체 가능 (인터페이스 동일).
+// ─────────────────────────────────────────────────────────────
+
+const TTS_CACHE_MAX_ENTRIES = parseInt(process.env.TTS_CACHE_MAX_ENTRIES ?? "5000", 10)
+
+export interface TtsCacheStats {
+  entries: number
+  hits: number
+  misses: number
+  hitRate: string
+  estimatedMemoryMB: string
+}
+
+interface CacheEntry {
+  result: TTSResult
+  sizeBytes: number
+  lastUsed: number
+}
+
+class TtsCacheStore {
+  private cache = new Map<string, CacheEntry>()
+  private hits = 0
+  private misses = 0
+  private totalSizeBytes = 0
+
+  /** provider + voiceId + speed + text → SHA-256 키 (16자) */
+  generateKey(text: string, config: TTSVoiceConfig): string {
+    const raw = `${config.provider}|${config.voiceId}|${config.speed ?? 1}|${text}`
+    return createHash("sha256").update(raw).digest("hex").slice(0, 16)
+  }
+
+  get(key: string): TTSResult | null {
+    const entry = this.cache.get(key)
+    if (!entry) {
+      this.misses++
+      return null
+    }
+    // LRU: 최근 사용 갱신
+    entry.lastUsed = Date.now()
+    this.hits++
+    return entry.result
+  }
+
+  set(key: string, result: TTSResult): void {
+    // 이미 캐시에 있으면 스킵
+    if (this.cache.has(key)) return
+
+    const sizeBytes = Math.ceil(result.audioBase64.length * 0.75) // base64 → 실제 바이트
+
+    // LRU eviction: 용량 초과 시 가장 오래된 항목 제거
+    while (this.cache.size >= TTS_CACHE_MAX_ENTRIES) {
+      this.evictOldest()
+    }
+
+    this.cache.set(key, { result, sizeBytes, lastUsed: Date.now() })
+    this.totalSizeBytes += sizeBytes
+  }
+
+  private evictOldest(): void {
+    let oldestKey: string | null = null
+    let oldestTime = Infinity
+    for (const [key, entry] of this.cache) {
+      if (entry.lastUsed < oldestTime) {
+        oldestTime = entry.lastUsed
+        oldestKey = key
+      }
+    }
+    if (oldestKey) {
+      const evicted = this.cache.get(oldestKey)
+      if (evicted) this.totalSizeBytes -= evicted.sizeBytes
+      this.cache.delete(oldestKey)
+    }
+  }
+
+  stats(): TtsCacheStats {
+    const total = this.hits + this.misses
+    return {
+      entries: this.cache.size,
+      hits: this.hits,
+      misses: this.misses,
+      hitRate: total > 0 ? `${((this.hits / total) * 100).toFixed(1)}%` : "0%",
+      estimatedMemoryMB: `${(this.totalSizeBytes / (1024 * 1024)).toFixed(1)}MB`,
+    }
+  }
+
+  clear(): void {
+    this.cache.clear()
+    this.totalSizeBytes = 0
+    this.hits = 0
+    this.misses = 0
+  }
+}
+
+/** 싱글턴 TTS 캐시 — 모듈 레벨에서 공유 */
+export const ttsCache = new TtsCacheStore()
+
+// ── 통합 TTS 디스패처 (캐시 적용) ────────────────────────────
 
 /**
- * provider 설정에 따라 OpenAI 또는 Google TTS를 호출.
+ * provider 설정에 따라 TTS API를 호출하되, 캐시에 있으면 바로 반환.
+ * 동일 텍스트+음성 조합은 한 번만 API 호출 → 비용 절감.
  */
 export async function textToSpeech(
   text: string,
   config: TTSVoiceConfig = DEFAULT_TTS_CONFIG
 ): Promise<TTSResult> {
+  // 1. 캐시 조회
+  const cacheKey = ttsCache.generateKey(text, config)
+  const cached = ttsCache.get(cacheKey)
+  if (cached) return cached
+
+  // 2. 캐시 미스 → API 호출
+  let result: TTSResult
   if (config.provider === "elevenlabs") {
-    return textToSpeechElevenLabs(text, config)
+    result = await textToSpeechElevenLabs(text, config)
+  } else if (config.provider === "google") {
+    result = await textToSpeechGoogle(text, config)
+  } else {
+    result = await textToSpeechOpenAI(text, config)
   }
-  if (config.provider === "google") {
-    return textToSpeechGoogle(text, config)
-  }
-  return textToSpeechOpenAI(text, config)
+
+  // 3. 캐시 저장
+  ttsCache.set(cacheKey, result)
+
+  return result
 }
 
 // ── 유틸리티 ──────────────────────────────────────────────────
