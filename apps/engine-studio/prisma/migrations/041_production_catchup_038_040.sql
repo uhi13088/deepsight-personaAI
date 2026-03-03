@@ -1,26 +1,32 @@
 -- ═══════════════════════════════════════════════════════════════════════
 -- 프로덕션 DB Catchup 마이그레이션 — Step 3 (038~040 + LlmUsageLog 누락 필드)
--- 생성일: 2026-03-03
+-- 생성일: 2026-03-03  /  수정: 2026-03-03 (v2 — 에러 처리 강화)
 --
--- ⚠️  실행 전제: apply_production_catchup_all.sql (018~037)이 이미 적용됨
+-- 실행 전제: apply_production_catchup_all.sql (018~037)이 이미 적용됨
 --
 -- 포함 항목:
---   1. LlmUsageLog 라우팅 추적 필드 (routingReason, batchGroupId, isRegenerated)
---   2. Migration 038: v4.0 Operations Models (T263~T275)
---   3. Migration 039: Chat & Call System + Persona TTS fields
---   4. Migration 040: Persona TTS seed data + ShopItem 테이블
+--   PART A: LlmUsageLog 라우팅 추적 필드 (routingReason, batchGroupId, isRegenerated)
+--   PART B: Migration 038 — v4.0 Operations Models (T263~T275)
+--   PART C: Migration 039 — Chat & Call System + Persona TTS fields
+--   PART D: Migration 040 — Persona TTS seed data + ShopItem 테이블
 --
--- 안전성: 모든 구문에 IF NOT EXISTS 가드 포함 → 재실행 가능
+-- 안전성:
+--   - 모든 구문에 IF NOT EXISTS 가드 → 재실행 가능
+--   - FK 제약조건: DROP IF EXISTS + ADD (EXCEPTION WHEN OTHERS 보호)
+--   - 각 PART 진행 상황을 RAISE NOTICE로 출력
 --
 -- 실행:
 --   Neon 콘솔 → SQL Editor → 파일 내용 붙여넣기 → Run
 --   또는: psql $DATABASE_URL -f 041_production_catchup_038_040.sql
+--
+-- 부분 실행: 에러 발생 시 PART 단위로 분리하여 개별 실행 가능
 -- ═══════════════════════════════════════════════════════════════════════
 
 
--- ╔═══════════════════════════════════════════════════════════════════╗
--- ║  LlmUsageLog: 라우팅 추적 필드 (T328~T329) — 마이그레이션 누락분   ║
--- ╚═══════════════════════════════════════════════════════════════════╝
+-- =====================================================================
+-- PART A: LlmUsageLog 라우팅 추적 필드 (T328~T329)
+-- =====================================================================
+DO $$ BEGIN RAISE NOTICE '=== PART A: LlmUsageLog 라우팅 추적 필드 시작 ==='; END $$;
 
 ALTER TABLE "llm_usage_logs" ADD COLUMN IF NOT EXISTS "routingReason" TEXT;
 ALTER TABLE "llm_usage_logs" ADD COLUMN IF NOT EXISTS "batchGroupId" TEXT;
@@ -28,10 +34,13 @@ ALTER TABLE "llm_usage_logs" ADD COLUMN IF NOT EXISTS "isRegenerated" BOOLEAN NO
 
 CREATE INDEX IF NOT EXISTS "llm_usage_logs_routingReason_idx" ON "llm_usage_logs"("routingReason");
 
+DO $$ BEGIN RAISE NOTICE '=== PART A 완료 ==='; END $$;
 
--- ╔═══════════════════════════════════════════════════════════════════╗
--- ║  038: v4.0 Operations Models (T263~T275)                         ║
--- ╚═══════════════════════════════════════════════════════════════════╝
+
+-- =====================================================================
+-- PART B: Migration 038 — v4.0 Operations Models (T263~T275)
+-- =====================================================================
+DO $$ BEGIN RAISE NOTICE '=== PART B: 038 Operations Models 시작 ==='; END $$;
 
 -- T263: PersonaRelationship v4.0 fields
 ALTER TABLE "persona_relationships"
@@ -71,18 +80,21 @@ CREATE TABLE IF NOT EXISTS "user_trust_scores" (
   "warnCount" INTEGER NOT NULL DEFAULT 0,
   "reportCount" INTEGER NOT NULL DEFAULT 0,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" TIMESTAMP(3) NOT NULL,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "user_trust_scores_pkey" PRIMARY KEY ("id")
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS "user_trust_scores_userId_key" ON "user_trust_scores"("userId");
 
 DO $$ BEGIN
+  ALTER TABLE "user_trust_scores" DROP CONSTRAINT IF EXISTS "user_trust_scores_userId_fkey";
   ALTER TABLE "user_trust_scores"
     ADD CONSTRAINT "user_trust_scores_userId_fkey"
     FOREIGN KEY ("userId") REFERENCES "persona_world_users"("id")
     ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
+  RAISE NOTICE '  FK user_trust_scores_userId_fkey created';
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE '  FK user_trust_scores_userId_fkey skipped: %', SQLERRM;
 END $$;
 
 -- T268: PWQuarantineEntry
@@ -107,11 +119,14 @@ CREATE INDEX IF NOT EXISTS "pw_quarantine_entries_personaId_idx" ON "pw_quaranti
 CREATE INDEX IF NOT EXISTS "pw_quarantine_entries_expiresAt_idx" ON "pw_quarantine_entries"("expiresAt");
 
 DO $$ BEGIN
+  ALTER TABLE "pw_quarantine_entries" DROP CONSTRAINT IF EXISTS "pw_quarantine_entries_personaId_fkey";
   ALTER TABLE "pw_quarantine_entries"
     ADD CONSTRAINT "pw_quarantine_entries_personaId_fkey"
     FOREIGN KEY ("personaId") REFERENCES "personas"("id")
     ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
+  RAISE NOTICE '  FK pw_quarantine_entries_personaId_fkey created';
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE '  FK pw_quarantine_entries_personaId_fkey skipped: %', SQLERRM;
 END $$;
 
 -- T269: ModerationLog
@@ -243,25 +258,32 @@ CREATE TABLE IF NOT EXISTS "budget_configs" (
   "costMode" TEXT NOT NULL DEFAULT 'BALANCE',
   "alertThresholds" JSONB,
   "autoActions" JSONB,
-  "updatedAt" TIMESTAMP(3) NOT NULL,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedBy" TEXT,
   CONSTRAINT "budget_configs_pkey" PRIMARY KEY ("id")
 );
 
+DO $$ BEGIN RAISE NOTICE '=== PART B 완료 ==='; END $$;
 
--- ╔═══════════════════════════════════════════════════════════════════╗
--- ║  039: Chat & Call System + Persona TTS Voice Profile              ║
--- ╚═══════════════════════════════════════════════════════════════════╝
+
+-- =====================================================================
+-- PART C: Migration 039 — Chat & Call System + Persona TTS Voice Profile
+-- =====================================================================
+DO $$ BEGIN RAISE NOTICE '=== PART C: 039 Chat/Call/TTS 시작 ==='; END $$;
 
 -- Enum 생성
 DO $$ BEGIN
   CREATE TYPE "ChatMessageRole" AS ENUM ('USER', 'PERSONA');
-EXCEPTION WHEN duplicate_object THEN NULL;
+  RAISE NOTICE '  ChatMessageRole enum created';
+EXCEPTION WHEN duplicate_object THEN
+  RAISE NOTICE '  ChatMessageRole enum already exists';
 END $$;
 
 DO $$ BEGIN
   CREATE TYPE "CallReservationStatus" AS ENUM ('PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'EXPIRED');
-EXCEPTION WHEN duplicate_object THEN NULL;
+  RAISE NOTICE '  CallReservationStatus enum created';
+EXCEPTION WHEN duplicate_object THEN
+  RAISE NOTICE '  CallReservationStatus enum already exists';
 END $$;
 
 -- Persona TTS Voice Profile 필드 추가
@@ -282,7 +304,7 @@ CREATE TABLE IF NOT EXISTS "chat_threads" (
   "totalMessages" INTEGER NOT NULL DEFAULT 0,
   "isActive" BOOLEAN NOT NULL DEFAULT true,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" TIMESTAMP(3) NOT NULL,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "chat_threads_pkey" PRIMARY KEY ("id")
 );
 
@@ -292,21 +314,30 @@ CREATE INDEX IF NOT EXISTS "chat_threads_personaId_idx" ON "chat_threads"("perso
 CREATE INDEX IF NOT EXISTS "chat_threads_userId_lastMessageAt_idx" ON "chat_threads"("userId", "lastMessageAt");
 
 DO $$ BEGIN
+  ALTER TABLE "chat_threads" DROP CONSTRAINT IF EXISTS "chat_threads_personaId_fkey";
   ALTER TABLE "chat_threads" ADD CONSTRAINT "chat_threads_personaId_fkey"
     FOREIGN KEY ("personaId") REFERENCES "personas"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
+  RAISE NOTICE '  FK chat_threads_personaId_fkey created';
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE '  FK chat_threads_personaId_fkey skipped: %', SQLERRM;
 END $$;
 
 DO $$ BEGIN
+  ALTER TABLE "chat_threads" DROP CONSTRAINT IF EXISTS "chat_threads_userId_fkey";
   ALTER TABLE "chat_threads" ADD CONSTRAINT "chat_threads_userId_fkey"
     FOREIGN KEY ("userId") REFERENCES "persona_world_users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
+  RAISE NOTICE '  FK chat_threads_userId_fkey created';
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE '  FK chat_threads_userId_fkey skipped: %', SQLERRM;
 END $$;
 
 DO $$ BEGIN
+  ALTER TABLE "chat_threads" DROP CONSTRAINT IF EXISTS "chat_threads_sessionId_fkey";
   ALTER TABLE "chat_threads" ADD CONSTRAINT "chat_threads_sessionId_fkey"
     FOREIGN KEY ("sessionId") REFERENCES "interaction_sessions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
+  RAISE NOTICE '  FK chat_threads_sessionId_fkey created';
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE '  FK chat_threads_sessionId_fkey skipped: %', SQLERRM;
 END $$;
 
 -- ChatMessage 테이블
@@ -325,9 +356,12 @@ CREATE TABLE IF NOT EXISTS "chat_messages" (
 CREATE INDEX IF NOT EXISTS "chat_messages_threadId_createdAt_idx" ON "chat_messages"("threadId", "createdAt");
 
 DO $$ BEGIN
+  ALTER TABLE "chat_messages" DROP CONSTRAINT IF EXISTS "chat_messages_threadId_fkey";
   ALTER TABLE "chat_messages" ADD CONSTRAINT "chat_messages_threadId_fkey"
     FOREIGN KEY ("threadId") REFERENCES "chat_threads"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
+  RAISE NOTICE '  FK chat_messages_threadId_fkey created';
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE '  FK chat_messages_threadId_fkey skipped: %', SQLERRM;
 END $$;
 
 -- CallReservation 테이블
@@ -339,7 +373,7 @@ CREATE TABLE IF NOT EXISTS "call_reservations" (
   "status" "CallReservationStatus" NOT NULL DEFAULT 'PENDING',
   "coinSpent" INTEGER NOT NULL,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" TIMESTAMP(3) NOT NULL,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "call_reservations_pkey" PRIMARY KEY ("id")
 );
 
@@ -349,15 +383,21 @@ CREATE INDEX IF NOT EXISTS "call_reservations_userId_scheduledAt_idx" ON "call_r
 CREATE INDEX IF NOT EXISTS "call_reservations_status_scheduledAt_idx" ON "call_reservations"("status", "scheduledAt");
 
 DO $$ BEGIN
+  ALTER TABLE "call_reservations" DROP CONSTRAINT IF EXISTS "call_reservations_personaId_fkey";
   ALTER TABLE "call_reservations" ADD CONSTRAINT "call_reservations_personaId_fkey"
     FOREIGN KEY ("personaId") REFERENCES "personas"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
+  RAISE NOTICE '  FK call_reservations_personaId_fkey created';
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE '  FK call_reservations_personaId_fkey skipped: %', SQLERRM;
 END $$;
 
 DO $$ BEGIN
+  ALTER TABLE "call_reservations" DROP CONSTRAINT IF EXISTS "call_reservations_userId_fkey";
   ALTER TABLE "call_reservations" ADD CONSTRAINT "call_reservations_userId_fkey"
     FOREIGN KEY ("userId") REFERENCES "persona_world_users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
+  RAISE NOTICE '  FK call_reservations_userId_fkey created';
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE '  FK call_reservations_userId_fkey skipped: %', SQLERRM;
 END $$;
 
 -- CallSession 테이블
@@ -379,40 +419,49 @@ CREATE UNIQUE INDEX IF NOT EXISTS "call_sessions_interactionSessionId_key" ON "c
 CREATE INDEX IF NOT EXISTS "call_sessions_reservationId_idx" ON "call_sessions"("reservationId");
 
 DO $$ BEGIN
+  ALTER TABLE "call_sessions" DROP CONSTRAINT IF EXISTS "call_sessions_reservationId_fkey";
   ALTER TABLE "call_sessions" ADD CONSTRAINT "call_sessions_reservationId_fkey"
     FOREIGN KEY ("reservationId") REFERENCES "call_reservations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
+  RAISE NOTICE '  FK call_sessions_reservationId_fkey created';
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE '  FK call_sessions_reservationId_fkey skipped: %', SQLERRM;
 END $$;
 
 DO $$ BEGIN
+  ALTER TABLE "call_sessions" DROP CONSTRAINT IF EXISTS "call_sessions_interactionSessionId_fkey";
   ALTER TABLE "call_sessions" ADD CONSTRAINT "call_sessions_interactionSessionId_fkey"
     FOREIGN KEY ("interactionSessionId") REFERENCES "interaction_sessions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
+  RAISE NOTICE '  FK call_sessions_interactionSessionId_fkey created';
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE '  FK call_sessions_interactionSessionId_fkey skipped: %', SQLERRM;
 END $$;
 
+DO $$ BEGIN RAISE NOTICE '=== PART C 완료 ==='; END $$;
 
--- ╔═══════════════════════════════════════════════════════════════════╗
--- ║  040: Persona TTS Seed Data + ShopItem 테이블                     ║
--- ╚═══════════════════════════════════════════════════════════════════╝
+
+-- =====================================================================
+-- PART D: Migration 040 — Persona TTS Seed Data + ShopItem 테이블
+-- =====================================================================
+DO $$ BEGIN RAISE NOTICE '=== PART D: 040 TTS Seed + ShopItem 시작 ==='; END $$;
 
 -- 페르소나별 TTS 음성 시드 데이터
-UPDATE personas SET
+UPDATE "personas" SET
   "ttsProvider" = 'openai', "ttsVoiceId" = 'onyx', "ttsPitch" = 0.0, "ttsSpeed" = 0.92, "ttsLanguage" = 'ko-KR'
 WHERE id = 'seed-논리적-평론가' AND "ttsProvider" IS NULL;
 
-UPDATE personas SET
+UPDATE "personas" SET
   "ttsProvider" = 'openai', "ttsVoiceId" = 'nova', "ttsPitch" = 0.0, "ttsSpeed" = 1.00, "ttsLanguage" = 'ko-KR'
 WHERE id = 'seed-감성-에세이스트' AND "ttsProvider" IS NULL;
 
-UPDATE personas SET
+UPDATE "personas" SET
   "ttsProvider" = 'openai', "ttsVoiceId" = 'shimmer', "ttsPitch" = 0.0, "ttsSpeed" = 1.15, "ttsLanguage" = 'ko-KR'
 WHERE id = 'seed-트렌드-헌터' AND "ttsProvider" IS NULL;
 
-UPDATE personas SET
+UPDATE "personas" SET
   "ttsProvider" = 'openai', "ttsVoiceId" = 'alloy', "ttsPitch" = 0.0, "ttsSpeed" = 1.05, "ttsLanguage" = 'ko-KR'
 WHERE id = 'seed-균형-잡힌-가이드' AND "ttsProvider" IS NULL;
 
-UPDATE personas SET
+UPDATE "personas" SET
   "ttsProvider" = 'openai', "ttsVoiceId" = 'echo', "ttsPitch" = 0.0, "ttsSpeed" = 0.88, "ttsLanguage" = 'ko-KR'
 WHERE id = 'seed-시네필-평론가' AND "ttsProvider" IS NULL;
 
@@ -450,9 +499,12 @@ VALUES
   ('frame_hologram',          '프로필 프레임: 홀로그램',   '프로필 이미지에 홀로그램 프레임을 적용합니다',            150, NULL,          'profile',  '💎', false, NULL,  11)
 ON CONFLICT ("item_key") DO NOTHING;
 
+DO $$ BEGIN RAISE NOTICE '=== PART D 완료 ==='; END $$;
+
 
 -- ═══════════════════════════════════════════════════════════════════════
--- 완료! 검증 쿼리:
+-- 전체 완료! 검증 쿼리:
+--
 --   SELECT column_name FROM information_schema.columns
 --   WHERE table_name = 'llm_usage_logs' AND column_name IN ('routingReason', 'batchGroupId', 'isRegenerated');
 --
@@ -461,4 +513,11 @@ ON CONFLICT ("item_key") DO NOTHING;
 --
 --   SELECT column_name FROM information_schema.columns
 --   WHERE table_name = 'persona_states' AND column_name IN ('lastActivityAt', 'postsThisWeek', 'commentsThisWeek');
+--
+--   SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+--   AND tablename IN ('user_trust_scores', 'pw_quarantine_entries', 'moderation_logs',
+--     'post_quality_logs', 'comment_quality_logs', 'interview_logs', 'kpi_snapshots',
+--     'daily_cost_reports', 'content_reports', 'budget_configs', 'chat_threads',
+--     'chat_messages', 'call_reservations', 'call_sessions', 'pw_shop_items')
+--   ORDER BY tablename;
 -- ═══════════════════════════════════════════════════════════════════════
