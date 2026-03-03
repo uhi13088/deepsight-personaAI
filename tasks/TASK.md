@@ -1,6 +1,6 @@
 # DeepSight v4.0 — TASK 관리
 
-> 마지막 업데이트: 2026-03-02
+> 마지막 업데이트: 2026-03-03
 
 ---
 
@@ -631,6 +631,38 @@
   - v4-operations cron: 월요일 주간 카운터 리셋
 
 - 테스트: 4308 PASS (108 파일), Build PASS
+
+---
+
+## DONE (v4.0 — TTS Voice Engine)
+
+- [x] **T327: ElevenLabs TTS 연동 + 성별 기반 음성 매칭** ✅ 2026-03-03
+  - AC1: ElevenLabs API 연동 — `textToSpeechElevenLabs()` (Eleven Multilingual v2)
+  - AC2: 18개 고유 base voice — 남성 8종 × 성격 유형 + 여성 8종 × 성격 유형 + 중성 2종
+  - AC3: 성별 기반 음성 매칭 — MALE/FEMALE/NON_BINARY × personality key (analytical/critical/social/emotional/default)
+  - AC4: TTS 성별 재추론 + 일괄 재설정 API — `POST /api/internal/personas/recalculate-tts`
+  - 변경: voice-pipeline.ts, character-generator.ts, recalculate-tts/route.ts
+  - 커밋: `1cc74fe`, `1487ddd`
+
+- [x] **T328: TTS 캐시 레이어** ✅ 2026-03-03
+  - AC1: LRU 인메모리 캐시 — `TtsCacheStore` (max 5000 entries, env `TTS_CACHE_MAX_ENTRIES`)
+  - AC2: SHA-256 캐시 키 — provider|voiceId|speed|stability|similarityBoost|style|text
+  - AC3: LRU 제거 — lastUsed 기준 가장 오래된 항목 제거
+  - AC4: 통계 API — `GET /api/internal/personas/tts-cache` (hits, misses, hitRate, estimatedMemoryMB)
+  - AC5: 캐시 초기화 — `DELETE /api/internal/personas/tts-cache`
+  - 변경: voice-pipeline.ts (TtsCacheStore), tts-cache/route.ts (신규)
+  - 커밋: `fb8e10b`
+
+- [x] **T329: Voice Engine 10D ↔ 페르소나 엔진 통합 파이프라인** ✅ 2026-03-03
+  - AC1: voice-engine.ts (신규) — 10D VoiceCharacter 타입 (warmth/authority/energy/expressiveness/clarity/intimacy/tempo/volatility/resonance/breathiness)
+  - AC2: `computeVoiceCharacter(l1, l2, l3)` — L1/L2/L3 벡터 → 10D 음성 특성 가중 합 매핑
+  - AC3: `voiceCharacterToElevenLabs(vc)` — 10D → ElevenLabs API params (stability/similarityBoost/style/speed/useSpeakerBoost)
+  - AC4: `voiceCharacterDistance(a, b)` — 유클리드 거리 (음성 다양성 검증)
+  - AC5: 페르소나 엔진 통합 — `inferTTSVoiceFromVectors()` L3 파라미터 추가 (backward compatible), ElevenLabs 경로에서 10D 파이프라인 사용
+  - AC6: 4개 호출 경로 모두 L3 + 자동 provider 감지 적용 (llm-character-generator, pipeline, recalculate-tts, auto)
+  - AC7: `TTSVoiceProfile.voiceCharacter` 필드 추가 — UI 레이더 차트 시각화 대비
+  - 변경: voice-engine.ts (신규), character-generator.ts, llm-character-generator.ts, pipeline.ts, recalculate-tts/route.ts, voice-pipeline.ts (useSpeakerBoost)
+  - 커밋: `5035d96`, `75a5843`
 
 ---
 
