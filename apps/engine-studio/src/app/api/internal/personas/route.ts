@@ -226,13 +226,26 @@ export async function GET(request: NextRequest) {
     let personas: PersonaWithRelations[]
     try {
       personas = await fullQuery()
-    } catch {
-      const base = await prisma.persona.findMany({ where, orderBy, skip, take: limit })
-      personas = base.map((p) => ({
-        ...p,
-        layerVectors: [],
-        personaState: null,
-      })) as PersonaWithRelations[]
+    } catch (fullErr) {
+      console.error(
+        "[personas API] Full query failed, trying fallback:",
+        fullErr instanceof Error ? fullErr.message : fullErr
+      )
+      try {
+        const base = await prisma.persona.findMany({ where, orderBy, skip, take: limit })
+        personas = base.map((p) => ({
+          ...p,
+          layerVectors: [],
+          personaState: null,
+        })) as PersonaWithRelations[]
+      } catch (baseErr) {
+        // Persona 테이블에 미적용 컬럼 존재 시 (TTS 등) — 빈 목록 반환 + 로그
+        console.error(
+          "[personas API] Base query also failed (DB migration needed):",
+          baseErr instanceof Error ? baseErr.message : baseErr
+        )
+        personas = []
+      }
     }
 
     const [totalCount, statusCounts] = await Promise.all([

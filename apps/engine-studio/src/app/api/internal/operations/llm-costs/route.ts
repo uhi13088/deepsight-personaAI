@@ -214,11 +214,25 @@ export async function GET(request: NextRequest) {
       // raw query 실패 시 빈 배열 유지
     }
 
-    // 최근 호출 목록
+    // 최근 호출 목록 (select 명시 — 마이그레이션 미적용 컬럼 SELECT 방지)
     const recentRaw = await prisma.llmUsageLog.findMany({
       where: { createdAt: { gte: since } },
       orderBy: { createdAt: "desc" },
       take: limit,
+      select: {
+        id: true,
+        personaId: true,
+        callType: true,
+        model: true,
+        inputTokens: true,
+        outputTokens: true,
+        totalTokens: true,
+        estimatedCostUsd: true,
+        durationMs: true,
+        status: true,
+        errorMessage: true,
+        createdAt: true,
+      },
     })
 
     const recentCalls: RecentCall[] = recentRaw.map((r) => ({

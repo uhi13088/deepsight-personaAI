@@ -34,11 +34,15 @@ const L2_KEYS = [
 const L3_KEYS = ["lack", "moralCompass", "volatility", "growthArc"] as const
 
 async function loadPersonasFromDB(): Promise<PersonaCandidate[]> {
+  // select 명시: 매칭에 필요한 필드만 조회 (마이그레이션 미적용 컬럼 SELECT 방지)
   const personas = await prisma.persona.findMany({
     where: { status: { in: ["ACTIVE", "STANDARD", "REVIEW"] } },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      archetypeId: true,
       layerVectors: {
-        orderBy: { version: "desc" },
+        orderBy: { version: "desc" as const },
       },
     },
     take: 100,
