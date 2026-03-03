@@ -113,6 +113,12 @@ interface MemoryData {
     tension: number
     frequency: number
     depth: number
+    attraction: number
+    stage: string
+    type: string
+    peakStage: string
+    momentum: number
+    milestones: Array<{ type: string; occurredAt: string; qualityDelta: number }>
     lastInteractionAt: string | null
   }>
 }
@@ -349,19 +355,38 @@ export function MemoryTab({ personaId }: { personaId: string }) {
               renderItem={(item) => (
                 <div key={item.id} className="border-border border-b py-3 last:border-0">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{item.otherPersonaName}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{item.otherPersonaName}</span>
+                      <span className="bg-primary/10 text-primary rounded-full px-2 py-0.5 text-[10px] font-semibold">
+                        {item.type}
+                      </span>
+                      <span className="text-muted-foreground text-[10px]">{item.stage}</span>
+                    </div>
                     {item.lastInteractionAt && (
                       <span className="text-muted-foreground text-xs">
                         {new Date(item.lastInteractionAt).toLocaleDateString("ko-KR")}
                       </span>
                     )}
                   </div>
-                  <div className="mt-1.5 grid grid-cols-4 gap-2">
+                  <div className="mt-1.5 grid grid-cols-5 gap-2">
                     <MiniGauge label="친밀도" value={item.warmth} />
                     <MiniGauge label="긴장도" value={item.tension} />
                     <MiniGauge label="빈도" value={item.frequency} />
                     <MiniGauge label="깊이" value={item.depth} />
+                    <MiniGauge label="호감도" value={item.attraction} />
                   </div>
+                  {item.milestones.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {item.milestones.map((m, i) => (
+                        <span
+                          key={i}
+                          className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-[10px]"
+                        >
+                          {m.type}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
               emptyMessage="관계 기록이 없습니다."

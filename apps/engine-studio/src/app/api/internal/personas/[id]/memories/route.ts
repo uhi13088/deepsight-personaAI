@@ -219,6 +219,12 @@ async function fetchRelationships(personaId: string) {
         tension: Number(rel.tension),
         frequency: Number(rel.frequency),
         depth: Number(rel.depth),
+        attraction: Number(rel.attraction),
+        stage: rel.stage,
+        type: rel.type,
+        peakStage: rel.peakStage,
+        momentum: Number(rel.momentum),
+        milestones: rel.milestones ?? [],
         lastInteractionAt: rel.lastInteractionAt?.toISOString() ?? null,
       }
     })

@@ -541,7 +541,7 @@ async function applyRelationshipDecay(): Promise<{ updated: number }> {
     where: {
       OR: [{ lastInteractionAt: null }, { lastInteractionAt: { lt: decayThreshold } }],
     },
-    select: { id: true, warmth: true, frequency: true },
+    select: { id: true, warmth: true, frequency: true, attraction: true },
     take: 1000,
   })
 
@@ -549,15 +549,18 @@ async function applyRelationshipDecay(): Promise<{ updated: number }> {
   for (const rel of staleRelationships) {
     const currentWarmth = Number(rel.warmth)
     const currentFrequency = Number(rel.frequency)
+    const currentAttraction = Number(rel.attraction)
 
     // 이미 거의 0이면 스킵
-    if (currentWarmth < 0.01 && currentFrequency < 0.01) continue
+    if (currentWarmth < 0.01 && currentFrequency < 0.01 && currentAttraction < 0.01) continue
 
     await prisma.personaRelationship.update({
       where: { id: rel.id },
       data: {
         warmth: Math.max(0, currentWarmth * 0.99),
         frequency: Math.max(0, currentFrequency * 0.98),
+        // v4.2: attraction 7%/주 감쇠 (warmth보다 빠름)
+        attraction: Math.max(0, currentAttraction * 0.93),
       },
     })
     updated++

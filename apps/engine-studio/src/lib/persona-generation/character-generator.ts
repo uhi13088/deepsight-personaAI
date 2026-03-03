@@ -53,7 +53,24 @@ export interface CharacterProfile {
 }
 
 export interface RelationshipSeed {
-  type: "mentor" | "rival" | "ally" | "student" | "antagonist"
+  type:
+    | "ally"
+    | "rival"
+    | "mentor"
+    | "fan"
+    | "confidant"
+    | "frenemy"
+    | "nemesis"
+    | "muse"
+    | "protege"
+    | "crush"
+    | "guardian"
+    | "companion"
+    | "bestie"
+    | "tsundere"
+    // 하위 호환용
+    | "student"
+    | "antagonist"
   description: string
   dynamic: string
 }
@@ -821,12 +838,30 @@ function generateRelationships(
     })
   }
 
-  // 성장 지향 → 학생 관계
+  // 성장 지향 → 프로테제 관계
   if (l1.purpose > 0.6) {
     relationships.push({
-      type: "student",
+      type: "protege",
       description: "새로운 시각을 배워가는 후배",
       dynamic: "성장 과정에서 멘토의 가르침을 흡수하는 관계",
+    })
+  }
+
+  // 높은 호감도 + 사교성 → 짝사랑 관계
+  if (l2.agreeableness > 0.7 && l1.sociability > 0.6) {
+    relationships.push({
+      type: "crush",
+      description: "은근히 호감을 품고 있는 상대",
+      dynamic: "속마음을 드러내지 못하는 미묘한 감정 관계",
+    })
+  }
+
+  // 감정 기복 + 비판 → 츤데레 관계
+  if (l2.emotionality > 0.6 && l1.stance > 0.5) {
+    relationships.push({
+      type: "tsundere",
+      description: "겉으론 차갑지만 속으론 관심 있는 상대",
+      dynamic: "밀당 속에 숨겨진 호감을 지닌 관계",
     })
   }
 
