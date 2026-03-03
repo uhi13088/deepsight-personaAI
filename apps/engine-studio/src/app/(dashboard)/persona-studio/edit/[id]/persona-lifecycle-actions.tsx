@@ -1,7 +1,15 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
-import { AlertTriangle, Loader2, Send, ChevronDown, ChevronUp } from "lucide-react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import {
+  AlertTriangle,
+  Loader2,
+  Send,
+  ChevronDown,
+  ChevronUp,
+  Phone,
+  RotateCcw,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { buildAllPrompts } from "@/lib/prompt-builder"
@@ -39,7 +47,7 @@ export function PromptTab({
 
 // ── Preview Tab (인터랙티브 페르소나 플레이그라운드) ─────────
 
-type PreviewPromptType = "review" | "post" | "comment" | "interaction"
+type PreviewPromptType = "review" | "post" | "comment" | "interaction" | "call"
 
 const PREVIEW_LABELS: Record<PreviewPromptType, { label: string; scenario: string }> = {
   review: {
@@ -58,6 +66,17 @@ const PREVIEW_LABELS: Record<PreviewPromptType, { label: string; scenario: strin
     label: "대화",
     scenario: "다른 사용자가 '요즘 뭐 재밌는거 있어요?'라고 물었습니다.",
   },
+  call: {
+    label: "통화",
+    scenario: "안녕하세요, 오늘 기분이 어때요?",
+  },
+}
+
+const CALL_MODE_TYPES: PreviewPromptType[] = ["call"]
+
+interface ConversationMessage {
+  role: "user" | "assistant"
+  content: string
 }
 
 interface GeneratedResult {
@@ -66,6 +85,7 @@ interface GeneratedResult {
   inputTokens: number
   outputTokens: number
   model: string
+  promptVersion?: "v3" | "v4"
 }
 
 export function PreviewTab({ data }: { data: PersonaData }) {
@@ -75,6 +95,14 @@ export function PreviewTab({ data }: { data: PersonaData }) {
   const [results, setResults] = useState<GeneratedResult[]>([])
   const [error, setError] = useState<string | null>(null)
   const [showSystemPrompt, setShowSystemPrompt] = useState(false)
+
+  // 통화 모드 멀티턴 상태
+  const [callMessages, setCallMessages] = useState<ConversationMessage[]>([])
+  const [callInput, setCallInput] = useState("")
+  const [callTokens, setCallTokens] = useState({ input: 0, output: 0 })
+  const chatEndRef = useRef<HTMLDivElement>(null)
+
+  const isCallMode = CALL_MODE_TYPES.includes(activeType)
 
   const l1 = data.vectors.l1 as SocialPersonaVector | null
   const l2 = data.vectors.l2 as CoreTemperamentVector | null
@@ -103,6 +131,12 @@ export function PreviewTab({ data }: { data: PersonaData }) {
 
   const currentScenario = customScenario || PREVIEW_LABELS[activeType].scenario
 
+  // 채팅 스크롤 자동 이동
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [callMessages])
+
+  // ── 싱글샷 생성 (리뷰/포스트/댓글/대화) ──
   const handleGenerate = useCallback(async () => {
     if (generating || !currentScenario.trim()) return
     setGenerating(true)
@@ -132,6 +166,57 @@ export function PreviewTab({ data }: { data: PersonaData }) {
     }
   }, [generating, currentScenario, data.id, activeType])
 
+  // ── 통화 모드 멀티턴 전송 ──
+  const handleCallSend = useCallback(async () => {
+    const message = callInput.trim()
+    if (generating || !message) return
+    setGenerating(true)
+    setError(null)
+    setCallInput("")
+
+    try {
+      const res = await fetch(`/api/internal/personas/${data.id}/test-generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "call",
+          scenario: message,
+          messages: callMessages,
+        }),
+      })
+      const json = await res.json()
+
+      if (!json.success) {
+        setError(json.error?.message ?? "생성에 실패했습니다.")
+        return
+      }
+
+      const responseData = json.data as {
+        output: string
+        messages: ConversationMessage[]
+        inputTokens: number
+        outputTokens: number
+        promptVersion?: "v3" | "v4"
+      }
+      setCallMessages(responseData.messages)
+      setCallTokens((prev) => ({
+        input: prev.input + responseData.inputTokens,
+        output: prev.output + responseData.outputTokens,
+      }))
+    } catch {
+      setError("네트워크 오류가 발생했습니다.")
+    } finally {
+      setGenerating(false)
+    }
+  }, [generating, callInput, data.id, callMessages])
+
+  const handleCallReset = () => {
+    setCallMessages([])
+    setCallTokens({ input: 0, output: 0 })
+    setCallInput("")
+    setError(null)
+  }
+
   if (!l1 || !l2 || !l3) {
     return (
       <div className="text-muted-foreground py-8 text-center text-sm">
@@ -147,11 +232,11 @@ export function PreviewTab({ data }: { data: PersonaData }) {
         <p className="mb-1 text-xs font-medium">페르소나 플레이그라운드</p>
         <p className="text-muted-foreground text-xs">
           시나리오를 입력하고 &quot;생성&quot;을 누르면 이 페르소나가 실제로 어떻게 응답하는지
-          확인할 수 있습니다. 리뷰, 포스트, 댓글, 대화 등 다양한 상황을 테스트하세요.
+          확인할 수 있습니다. 리뷰, 포스트, 댓글, 대화, 통화 등 다양한 상황을 테스트하세요.
         </p>
       </div>
 
-      {/* 성격 요약 (접이식) */}
+      {/* 성격 요약 */}
       {behaviorSummary && (
         <div className="border-border rounded-lg border p-4">
           <h4 className="mb-3 text-sm font-semibold">페르소나 성격 요약</h4>
@@ -173,7 +258,7 @@ export function PreviewTab({ data }: { data: PersonaData }) {
         </div>
       )}
 
-      {/* 유형 선택 + 시나리오 입력 + 생성 버튼 */}
+      {/* 유형 선택 탭 */}
       <div className="border-border rounded-lg border p-4">
         <div className="mb-3 flex items-center gap-2">
           {(Object.keys(PREVIEW_LABELS) as PreviewPromptType[]).map((type) => (
@@ -182,78 +267,201 @@ export function PreviewTab({ data }: { data: PersonaData }) {
               onClick={() => {
                 setActiveType(type)
                 setCustomScenario("")
+                if (CALL_MODE_TYPES.includes(type)) {
+                  handleCallReset()
+                }
               }}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                 activeType === type
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted hover:bg-accent"
               }`}
             >
+              {type === "call" && <Phone className="h-3 w-3" />}
               {PREVIEW_LABELS[type].label}
             </button>
           ))}
         </div>
 
-        <div className="mb-3">
-          <div className="mb-1 flex items-center justify-between">
-            <span className="text-muted-foreground text-xs">시나리오</span>
-            {customScenario && (
-              <button
-                onClick={() => setCustomScenario("")}
-                className="text-muted-foreground text-xs hover:underline"
-              >
-                기본값 복원
-              </button>
-            )}
+        {/* 통화 모드 안내 배너 */}
+        {isCallMode && (
+          <div className="mb-3 flex items-start gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2">
+            <Phone className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-500" />
+            <div>
+              <p className="text-xs font-medium text-blue-600">음성 통화 모드</p>
+              <p className="text-muted-foreground text-[11px]">
+                1~3문장 간결 응답 · 이모지 없음 · 자연스러운 턴테이킹 · 토큰 제한 200
+              </p>
+            </div>
           </div>
-          <textarea
-            className="border-border bg-background w-full rounded-lg border p-3 text-xs"
-            rows={3}
-            value={currentScenario}
-            onChange={(e) => setCustomScenario(e.target.value)}
-            placeholder="시나리오를 입력하세요..."
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault()
-                handleGenerate()
-              }
-            }}
-          />
-        </div>
+        )}
 
-        <div className="flex items-center justify-between">
-          <button
-            onClick={() => setShowSystemPrompt((v) => !v)}
-            className="text-muted-foreground flex items-center gap-1 text-xs hover:underline"
-          >
-            {showSystemPrompt ? (
-              <ChevronUp className="h-3 w-3" />
-            ) : (
-              <ChevronDown className="h-3 w-3" />
+        {/* ── 싱글샷 모드 (리뷰/포스트/댓글/대화) ── */}
+        {!isCallMode && (
+          <>
+            <div className="mb-3">
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-muted-foreground text-xs">시나리오</span>
+                {customScenario && (
+                  <button
+                    onClick={() => setCustomScenario("")}
+                    className="text-muted-foreground text-xs hover:underline"
+                  >
+                    기본값 복원
+                  </button>
+                )}
+              </div>
+              <textarea
+                className="border-border bg-background w-full rounded-lg border p-3 text-xs"
+                rows={3}
+                value={currentScenario}
+                onChange={(e) => setCustomScenario(e.target.value)}
+                placeholder="시나리오를 입력하세요..."
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault()
+                    handleGenerate()
+                  }
+                }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setShowSystemPrompt((v) => !v)}
+                className="text-muted-foreground flex items-center gap-1 text-xs hover:underline"
+              >
+                {showSystemPrompt ? (
+                  <ChevronUp className="h-3 w-3" />
+                ) : (
+                  <ChevronDown className="h-3 w-3" />
+                )}
+                시스템 프롬프트 보기
+              </button>
+
+              <Button size="sm" onClick={handleGenerate} disabled={generating}>
+                {generating ? (
+                  <>
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    생성 중...
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-1 h-3 w-3" />
+                    생성 (Ctrl+Enter)
+                  </>
+                )}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {/* ── 통화 모드 채팅 UI ── */}
+        {isCallMode && (
+          <>
+            {/* 채팅 이력 */}
+            <div className="border-border bg-muted/30 mb-3 max-h-80 min-h-[200px] overflow-y-auto rounded-lg border p-3">
+              {callMessages.length === 0 && !generating && (
+                <div className="text-muted-foreground flex h-full min-h-[176px] items-center justify-center text-xs">
+                  메시지를 입력해서 통화를 시작하세요
+                </div>
+              )}
+              <div className="space-y-3">
+                {callMessages.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-2xl px-3 py-2 text-xs ${
+                        msg.role === "user"
+                          ? "bg-primary text-primary-foreground rounded-br-md"
+                          : "bg-muted rounded-bl-md"
+                      }`}
+                    >
+                      {msg.role === "assistant" && (
+                        <p className="text-muted-foreground mb-0.5 text-[10px] font-medium">
+                          {data.name}
+                        </p>
+                      )}
+                      <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                    </div>
+                  </div>
+                ))}
+                {generating && (
+                  <div className="flex justify-start">
+                    <div className="bg-muted flex items-center gap-1 rounded-2xl rounded-bl-md px-3 py-2">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span className="text-muted-foreground text-xs">응답 중...</span>
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+            </div>
+
+            {/* 입력 + 전송 + 초기화 */}
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                className="border-border bg-background flex-1 rounded-lg border px-3 py-2 text-xs"
+                placeholder="메시지를 입력하세요..."
+                value={callInput}
+                onChange={(e) => setCallInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault()
+                    handleCallSend()
+                  }
+                }}
+                disabled={generating}
+              />
+              <Button size="sm" onClick={handleCallSend} disabled={generating || !callInput.trim()}>
+                <Send className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCallReset}
+                disabled={callMessages.length === 0}
+                title="대화 초기화"
+              >
+                <RotateCcw className="h-3 w-3" />
+              </Button>
+            </div>
+
+            {/* 토큰 사용량 */}
+            {callTokens.input + callTokens.output > 0 && (
+              <div className="text-muted-foreground mt-2 text-[10px]">
+                누적 {callTokens.input + callTokens.output} tokens (in:{callTokens.input} / out:
+                {callTokens.output}) · {callMessages.filter((m) => m.role === "assistant").length}턴
+              </div>
             )}
-            시스템 프롬프트 보기
-          </button>
+          </>
+        )}
 
-          <Button size="sm" onClick={handleGenerate} disabled={generating}>
-            {generating ? (
-              <>
-                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                생성 중...
-              </>
-            ) : (
-              <>
-                <Send className="mr-1 h-3 w-3" />
-                생성 (Ctrl+Enter)
-              </>
-            )}
-          </Button>
-        </div>
-
-        {/* 시스템 프롬프트 (접이식) */}
-        {showSystemPrompt && (
+        {/* 시스템 프롬프트 (접이식) — 싱글샷+통화 공통 */}
+        {!isCallMode && showSystemPrompt && (
           <div className="border-border bg-muted/50 mt-3 max-h-48 overflow-y-auto rounded-lg border p-3">
+            <div className="mb-2 flex items-center gap-2">
+              <Badge
+                variant="outline"
+                className={
+                  data.hasVoiceSpec
+                    ? "border-emerald-500/50 text-[10px] text-emerald-600"
+                    : "border-yellow-500/50 text-[10px] text-yellow-600"
+                }
+              >
+                {data.hasVoiceSpec ? "v4 프롬프트" : "v3 프롬프트"}
+              </Badge>
+              {!data.hasVoiceSpec && (
+                <span className="text-[10px] text-yellow-600">
+                  VoiceSpec을 설정하면 v4 프롬프트로 전환됩니다
+                </span>
+              )}
+            </div>
             <pre className="whitespace-pre-wrap text-xs">
-              {prompts?.[activeType] || data.basePrompt}
+              {(activeType !== "call" && prompts?.[activeType]) || data.basePrompt}
             </pre>
           </div>
         )}
@@ -269,18 +477,29 @@ export function PreviewTab({ data }: { data: PersonaData }) {
         </div>
       )}
 
-      {/* 생성 결과 목록 */}
-      {results.length > 0 && (
+      {/* 싱글샷 생성 결과 목록 */}
+      {!isCallMode && results.length > 0 && (
         <div className="space-y-4">
           <h4 className="text-sm font-semibold">생성 결과</h4>
           {results.map((result, idx) => (
             <div key={idx} className="border-border rounded-lg border">
-              {/* 결과 헤더 */}
               <div className="flex items-center justify-between border-b px-4 py-2">
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-[10px]">
                     {PREVIEW_LABELS[result.type].label}
                   </Badge>
+                  {result.promptVersion && (
+                    <Badge
+                      variant="outline"
+                      className={
+                        result.promptVersion === "v4"
+                          ? "border-emerald-500/50 text-[10px] text-emerald-600"
+                          : "border-yellow-500/50 text-[10px] text-yellow-600"
+                      }
+                    >
+                      {result.promptVersion}
+                    </Badge>
+                  )}
                   <span className="text-muted-foreground text-[10px]">{result.model}</span>
                 </div>
                 <span className="text-muted-foreground text-[10px]">
@@ -288,7 +507,6 @@ export function PreviewTab({ data }: { data: PersonaData }) {
                   {result.outputTokens})
                 </span>
               </div>
-              {/* 결과 본문 */}
               <div className="p-4">
                 <div className="whitespace-pre-wrap text-sm leading-relaxed">{result.output}</div>
               </div>
@@ -297,8 +515,8 @@ export function PreviewTab({ data }: { data: PersonaData }) {
         </div>
       )}
 
-      {/* 결과가 없을 때 안내 */}
-      {results.length === 0 && !generating && (
+      {/* 싱글샷 결과 없을 때 안내 */}
+      {!isCallMode && results.length === 0 && !generating && (
         <div className="text-muted-foreground py-8 text-center text-sm">
           시나리오를 입력하고 &quot;생성&quot; 버튼을 클릭하면
           <br />이 페르소나의 실제 응답을 확인할 수 있습니다.

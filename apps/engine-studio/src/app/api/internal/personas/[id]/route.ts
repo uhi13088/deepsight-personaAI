@@ -114,6 +114,15 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       educationLevel: persona.educationLevel ?? null,
       languages: persona.languages ?? [],
       knowledgeAreas: persona.knowledgeAreas ?? [],
+      // v4 프롬프트 여부
+      hasVoiceSpec: persona.voiceSpec !== null,
+      hasFactbook: persona.factbook !== null,
+      // TTS 음성 설정
+      ttsProvider: persona.ttsProvider ?? null,
+      ttsVoiceId: persona.ttsVoiceId ?? null,
+      ttsPitch: persona.ttsPitch ? Number(persona.ttsPitch) : null,
+      ttsSpeed: persona.ttsSpeed ? Number(persona.ttsSpeed) : null,
+      ttsLanguage: persona.ttsLanguage ?? null,
     }
 
     return NextResponse.json({ success: true, data: detail } satisfies ApiResponse<PersonaDetail>)
@@ -189,6 +198,45 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       )
     }
 
+    // Validate TTS fields
+    if (body.ttsProvider !== undefined && body.ttsProvider !== null) {
+      const validProviders = ["openai", "google", "elevenlabs"]
+      if (!validProviders.includes(body.ttsProvider)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `유효하지 않은 TTS 프로바이더: ${body.ttsProvider}`,
+            },
+          } satisfies ApiResponse<never>,
+          { status: 400 }
+        )
+      }
+    }
+    if (body.ttsSpeed !== undefined && body.ttsSpeed !== null) {
+      if (body.ttsSpeed < 0.5 || body.ttsSpeed > 2.0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "VALIDATION_ERROR", message: "TTS 속도는 0.5~2.0 범위여야 합니다." },
+          } satisfies ApiResponse<never>,
+          { status: 400 }
+        )
+      }
+    }
+    if (body.ttsPitch !== undefined && body.ttsPitch !== null) {
+      if (body.ttsPitch < -1.0 || body.ttsPitch > 1.0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "VALIDATION_ERROR", message: "TTS 피치는 -1.0~1.0 범위여야 합니다." },
+          } satisfies ApiResponse<never>,
+          { status: 400 }
+        )
+      }
+    }
+
     // Build update data
     const updateData: Record<string, unknown> = {}
     if (body.name !== undefined) updateData.name = body.name.trim()
@@ -201,6 +249,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       updateData.basePrompt = body.basePrompt
       updateData.promptTemplate = body.basePrompt
     }
+    // TTS 필드
+    if (body.ttsProvider !== undefined) updateData.ttsProvider = body.ttsProvider
+    if (body.ttsVoiceId !== undefined) updateData.ttsVoiceId = body.ttsVoiceId
+    if (body.ttsPitch !== undefined) updateData.ttsPitch = body.ttsPitch
+    if (body.ttsSpeed !== undefined) updateData.ttsSpeed = body.ttsSpeed
+    if (body.ttsLanguage !== undefined) updateData.ttsLanguage = body.ttsLanguage
 
     // Recompute paradox if vectors changed
     let newParadox: { overall: number; dimensionality: number } | null = null
