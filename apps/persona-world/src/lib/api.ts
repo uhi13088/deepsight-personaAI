@@ -24,6 +24,8 @@ import type {
   StartCallResponse,
   CallTurnResponse,
   EndCallResponse,
+  TasteResponse,
+  TasteSummary,
 } from "./types"
 
 // ── Client-side API (fetch) ─────────────────────────────────
@@ -99,6 +101,27 @@ export const clientApi = {
     if (!res.ok) throw new Error("Failed to fetch persona")
 
     const json: ApiResponse<PersonaFullDetail> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── 페르소나 취향 소비 기록 ─────────────────────────────
+  async getPersonaTaste(personaId: string, cursor?: string, limit = 20) {
+    const params = new URLSearchParams({ limit: String(limit) })
+    if (cursor) params.set("cursor", cursor)
+    const res = await fetch(`/api/public/personas/${personaId}/taste?${params}`)
+    if (!res.ok) throw new Error("Failed to fetch persona taste")
+
+    const json: ApiResponse<TasteResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  async getPersonaTasteSummary(personaId: string) {
+    const res = await fetch(`/api/public/personas/${personaId}/taste/summary`)
+    if (!res.ok) throw new Error("Failed to fetch persona taste summary")
+
+    const json: ApiResponse<TasteSummary> = await res.json()
     if (!json.success) throw new Error(json.error?.message || "Unknown error")
     return json.data!
   },

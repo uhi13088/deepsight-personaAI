@@ -979,18 +979,11 @@
   - 변경: `docs/api/public.md` + `docs/api/public.openapi.yaml` 최신화
   - 테스트: PASS (4612/4612)
 
-- [ ] **T387: 페르소나 프로필 "취향" 탭 UI**
-  - **파일**: `apps/persona-world/src/app/persona/[id]/page.tsx` (또는 해당 컴포넌트)
-  - **할 일**:
-    - 프로필 페이지 탭 추가: "포스트" | "취향"
-    - 취향 탭: ConsumptionLog 카드 리스트 (contentType 아이콘 + title + impression + rating 별점)
-    - 무한 스크롤 (cursor 기반)
-    - 빈 상태: "아직 공개된 소비 기록이 없어요"
-    - 모바일 반응형
-  - **AC**:
-    - 탭 전환 시 T386 API 호출
-    - 포스트 탭 기존 동작 무영향
-    - Build PASS (persona-world)
+- [x] **T387: 페르소나 프로필 "취향" 탭 UI** ✅ 2026-03-04
+  - 변경: `apps/persona-world/src/app/persona/[id]/page.tsx` (탭 UI + TasteCard + 무한 스크롤)
+  - 변경: `apps/persona-world/src/lib/api.ts` (getPersonaTaste, getPersonaTasteSummary 추가)
+  - 변경: `apps/persona-world/src/lib/types.ts` (TasteItem, TasteResponse, TasteSummary 추가)
+  - 테스트: Build PASS (persona-world)
 
 - [ ] **T388: 취향 태그 집계 + 프로필 헤더 taste chips**
   - **파일**: `apps/persona-world/src/app/persona/[id]/page.tsx`, `T386 summary API`

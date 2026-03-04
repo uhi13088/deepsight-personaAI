@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, memo } from "react"
+import { useEffect, useState, memo, useCallback, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
@@ -9,12 +9,13 @@ import {
   MessageCircle,
   Phone,
   Repeat2,
-  Share,
   Users,
   FileText,
   Loader2,
   UserPlus,
   UserMinus,
+  BookOpen,
+  Star,
 } from "lucide-react"
 import { toast } from "sonner"
 import { clientApi } from "@/lib/api"
@@ -28,7 +29,59 @@ import {
 } from "@/lib/role-config"
 import { formatTimeAgo } from "@/lib/format"
 import { PWCard, PWProfileRing } from "@/components/persona-world"
-import type { PersonaFullDetail } from "@/lib/types"
+import type { PersonaFullDetail, TasteItem } from "@/lib/types"
+
+// ── contentType 아이콘/라벨 ──────────────────────────────
+
+const CONTENT_TYPE_EMOJI: Record<string, string> = {
+  MOVIE: "🎬",
+  SERIES: "📺",
+  BOOK: "📚",
+  MUSIC: "🎵",
+  GAME: "🎮",
+  ARTICLE: "📰",
+  PODCAST: "🎙️",
+  OTHER: "✨",
+}
+
+// ── 취향 카드 ─────────────────────────────────────────────
+
+const TasteCard = memo(function TasteCard({ item }: { item: TasteItem }) {
+  const emoji = CONTENT_TYPE_EMOJI[item.contentType] ?? "✨"
+  const stars = item.rating !== null ? Math.round(item.rating * 5) : null
+
+  return (
+    <div className="rounded-xl border border-gray-100 bg-white p-4">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-600">
+          <span>{emoji}</span>
+          {item.contentType}
+        </span>
+        {stars !== null && (
+          <span className="flex items-center gap-0.5 text-xs text-amber-400">
+            {Array.from({ length: 5 }, (_, i) => (
+              <Star
+                key={i}
+                className={`h-3 w-3 ${i < stars ? "fill-amber-400 text-amber-400" : "text-gray-200"}`}
+              />
+            ))}
+          </span>
+        )}
+      </div>
+      <p className="mb-1.5 text-sm font-medium text-gray-900">{item.title}</p>
+      <p className="mb-2 line-clamp-2 text-xs text-gray-600">{item.impression}</p>
+      {item.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {item.tags.slice(0, 4).map((tag) => (
+            <span key={tag} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+})
 
 // ── 포스트 카드 ───────────────────────────────────────────
 
@@ -90,6 +143,18 @@ export default function PersonaDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // 탭 상태
+  const [activeTab, setActiveTab] = useState<"posts" | "taste">("posts")
+
+  // 취향 탭 상태
+  const [tasteItems, setTasteItems] = useState<TasteItem[]>([])
+  const [tasteLoading, setTasteLoading] = useState(false)
+  const [tasteCursor, setTasteCursor] = useState<string | null>(null)
+  const [tasteHasMore, setTasteHasMore] = useState(true)
+  const [tasteInitialized, setTasteInitialized] = useState(false)
+  const observerRef = useRef<IntersectionObserver | null>(null)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+
   const isFollowing = followedPersonas.some((f) => f.personaId === personaId)
 
   useEffect(() => {
@@ -111,6 +176,49 @@ export default function PersonaDetailPage() {
       fetchPersona()
     }
   }, [personaId])
+
+  const loadTaste = useCallback(
+    async (cursor?: string) => {
+      if (tasteLoading || (!tasteHasMore && cursor)) return
+      try {
+        setTasteLoading(true)
+        const data = await clientApi.getPersonaTaste(personaId, cursor)
+        setTasteItems((prev) => (cursor ? [...prev, ...data.items] : data.items))
+        setTasteCursor(data.nextCursor)
+        setTasteHasMore(data.hasMore)
+        setTasteInitialized(true)
+      } catch (err) {
+        console.error("Failed to fetch taste:", err)
+      } finally {
+        setTasteLoading(false)
+      }
+    },
+    [personaId, tasteLoading, tasteHasMore]
+  )
+
+  // 탭 전환 시 첫 로드
+  useEffect(() => {
+    if (activeTab === "taste" && !tasteInitialized) {
+      loadTaste()
+    }
+  }, [activeTab, tasteInitialized, loadTaste])
+
+  // 무한 스크롤 sentinel 관찰
+  useEffect(() => {
+    if (activeTab !== "taste") return
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && tasteHasMore && !tasteLoading) {
+          loadTaste(tasteCursor ?? undefined)
+        }
+      },
+      { threshold: 0.1 }
+    )
+    if (sentinelRef.current) {
+      observerRef.current.observe(sentinelRef.current)
+    }
+    return () => observerRef.current?.disconnect()
+  }, [activeTab, tasteHasMore, tasteLoading, tasteCursor, loadTaste])
 
   const handleFollowToggle = () => {
     if (!persona) return
@@ -337,25 +445,78 @@ export default function PersonaDetailPage() {
           </div>
         </PWCard>
 
-        {/* 최근 포스트 (AC5) */}
-        <PWCard className="!p-5">
-          <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-800">
-            <FileText className="h-4 w-4 text-violet-500" />
-            최근 포스트
-          </h3>
-          {persona.recentPosts && persona.recentPosts.length > 0 ? (
-            <div className="space-y-3">
-              {persona.recentPosts.map((post) => (
-                <PostCard key={post.id} post={post} />
-              ))}
-            </div>
-          ) : (
-            <div className="py-8 text-center">
-              <FileText className="mx-auto mb-2 h-8 w-8 text-gray-300" />
-              <p className="text-sm text-gray-500">아직 작성한 포스트가 없습니다</p>
-            </div>
-          )}
-        </PWCard>
+        {/* 탭 */}
+        <div className="flex overflow-hidden rounded-xl border border-gray-100 bg-white">
+          <button
+            onClick={() => setActiveTab("posts")}
+            className={`flex flex-1 items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
+              activeTab === "posts" ? "bg-violet-500 text-white" : "text-gray-500 hover:bg-gray-50"
+            }`}
+          >
+            <FileText className="h-4 w-4" />
+            포스트
+          </button>
+          <button
+            onClick={() => setActiveTab("taste")}
+            className={`flex flex-1 items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
+              activeTab === "taste" ? "bg-violet-500 text-white" : "text-gray-500 hover:bg-gray-50"
+            }`}
+          >
+            <BookOpen className="h-4 w-4" />
+            취향
+          </button>
+        </div>
+
+        {/* 포스트 탭 */}
+        {activeTab === "posts" && (
+          <PWCard className="!p-5">
+            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-800">
+              <FileText className="h-4 w-4 text-violet-500" />
+              최근 포스트
+            </h3>
+            {persona.recentPosts && persona.recentPosts.length > 0 ? (
+              <div className="space-y-3">
+                {persona.recentPosts.map((post) => (
+                  <PostCard key={post.id} post={post} />
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <FileText className="mx-auto mb-2 h-8 w-8 text-gray-300" />
+                <p className="text-sm text-gray-500">아직 작성한 포스트가 없습니다</p>
+              </div>
+            )}
+          </PWCard>
+        )}
+
+        {/* 취향 탭 */}
+        {activeTab === "taste" && (
+          <PWCard className="!p-5">
+            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-800">
+              <BookOpen className="h-4 w-4 text-violet-500" />
+              소비 취향
+            </h3>
+            {tasteInitialized && tasteItems.length === 0 && !tasteLoading ? (
+              <div className="py-8 text-center">
+                <BookOpen className="mx-auto mb-2 h-8 w-8 text-gray-300" />
+                <p className="text-sm text-gray-500">아직 공개된 소비 기록이 없어요</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {tasteItems.map((item) => (
+                  <TasteCard key={item.id} item={item} />
+                ))}
+                {/* 무한 스크롤 sentinel */}
+                <div ref={sentinelRef} className="h-1" />
+                {tasteLoading && (
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-violet-400" />
+                  </div>
+                )}
+              </div>
+            )}
+          </PWCard>
+        )}
       </main>
     </div>
   )

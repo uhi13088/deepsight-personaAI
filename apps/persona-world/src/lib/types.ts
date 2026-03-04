@@ -477,6 +477,39 @@ export interface EndCallResponse {
   totalDurationSec: number
 }
 
+// ── 취향 소비 기록 ───────────────────────────────────────
+export type ConsumptionContentType =
+  | "MOVIE"
+  | "SERIES"
+  | "BOOK"
+  | "MUSIC"
+  | "GAME"
+  | "ARTICLE"
+  | "PODCAST"
+  | "OTHER"
+
+export interface TasteItem {
+  id: string
+  contentType: ConsumptionContentType
+  title: string
+  impression: string
+  rating: number | null
+  tags: string[]
+  consumedAt: string
+}
+
+export interface TasteResponse {
+  items: TasteItem[]
+  nextCursor: string | null
+  hasMore: boolean
+}
+
+export interface TasteSummary {
+  totalPositiveConsumptions: number
+  topTags: { tag: string; count: number }[]
+  contentTypeDistribution: { contentType: string; count: number }[]
+}
+
 // ── 알림 환경설정 ────────────────────────────────────────
 export interface NotificationPreferenceData {
   likeEnabled: boolean
