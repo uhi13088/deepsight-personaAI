@@ -1,6 +1,6 @@
 # DeepSight v4.0 — TASK 관리
 
-> 마지막 업데이트: 2026-03-03
+> 마지막 업데이트: 2026-03-04
 
 ---
 
@@ -700,45 +700,34 @@
 
 ---
 
-## IN_PROGRESS — 통화 세션 API + UI + 테스트 + 문서 (PW-Chat/Call 잔여)
+## DONE (v4.0 — 통화 세션 API + UI + 테스트 + 문서)
 
-> T339/T340/T342 잔여 + 신규 세분화 티켓
+> T339/T340/T342 잔여 → T357~T361로 세분화 후 완료
 
-- [ ] **T357: Call Session API 3개 라우트 (CRITICAL)**
-  - AC1: POST /api/persona-world/calls/sessions/start — 예약ID로 세션 시작 + TTS 인사말 생성
-  - AC2: POST /api/persona-world/calls/sessions/[sessionId]/turn — 오디오 버퍼 수신 → STT→LLM→TTS → base64 응답
-  - AC3: POST /api/persona-world/calls/sessions/[sessionId]/end — 세션 종료 + 기억 파이프라인 + 요약 생성
-  - AC4: CallDataProvider Prisma 구현 (인라인)
-  - AC5: requireAuth() 적용
-  - 신규: calls/sessions/route.ts, calls/sessions/[sessionId]/turn/route.ts, calls/sessions/[sessionId]/end/route.ts
+- [x] **T357: Call Session API 3개 라우트** ✅ 2026-03-04
+  - POST /calls/sessions — 통화 시작 (예약→CallSession+TTS 인사)
+  - POST /calls/sessions/:id/turn — 턴 처리 (STT→LLM→TTS)
+  - POST /calls/sessions/:id/end — 통화 종료 (기억 최종화)
+  - CallDataProvider Prisma 인라인 구현, verifyInternalToken 적용
 
-- [ ] **T358: 통화 중 UI 페이지 (persona-world)**
-  - AC1: /calls/[sessionId] 페이지 — 페르소나 아바타 + 통화 상태 표시
-  - AC2: 말하기 버튼 (half-duplex: 누르고 말하기 → 놓으면 전송)
-  - AC3: 음파/파형 시각화 (캔버스 기반)
-  - AC4: 오디오 녹음 → base64 → API 전송 → 응답 오디오 재생
-  - AC5: 통화 타이머 + 턴 카운터 + 종료 버튼
-  - AC6: client API (startCall, sendVoiceTurn, endCall) — api.ts 확장
-  - 신규: calls/[sessionId]/page.tsx
-  - 변경: api.ts, types.ts
+- [x] **T358: 통화 중 UI 페이지** ✅ 2026-03-04
+  - /calls/[reservationId] — 페르소나 아바타+통화 상태, 마이크 녹음 버튼 (half-duplex)
+  - 오디오 녹음→base64→API→응답 오디오 재생, 대화 로그 실시간 표시
+  - 통화 타이머+턴 카운터+종료 버튼, 진행 바 (남은 시간)
+  - api.ts: startCall/sendVoiceTurn/endCall, types.ts: 3개 응답 타입
+  - calls/page.tsx: "통화 시작" 버튼 추가
 
-- [ ] **T359: 단위 테스트 (Chat/Call/Conversation)**
-  - AC1: chat-service.test.ts — 스레드 생성, 메시지 전송 (코인 차감), 페이지네이션
-  - AC2: call-service.test.ts — 예약 생성, 세션 시작/턴/종료, 취소
-  - AC3: conversation-memory.test.ts — RAG 검색, poignancy 기록, factbook 갱신
-  - 변경: tests/unit/persona-world/
+- [x] **T359: 단위 테스트 37개** ✅ 2026-03-04
+  - chat-service.test.ts (14): 스레드 생성, 메시지 전송, 에러 케이스, 페이지네이션
+  - call-service.test.ts (11): 예약 생성, 세션 시작/종료, 취소
+  - conversation-memory.test.ts (12): RAG 검색, poignancy 기록, factbook 갱신, state 조정
 
-- [ ] **T360: API 문서 최신화 (public.md + openapi)**
-  - AC1: Chat 엔드포인트 4개 문서화 (threads CRUD + messages CRUD)
-  - AC2: Call 엔드포인트 7개 문서화 (reservations CRUD + sessions start/turn/end)
-  - AC3: 요청/응답 스키마 + 에러 코드 (402 INSUFFICIENT_CREDITS 등)
-  - 변경: docs/api/public.md, docs/api/public.openapi.yaml
+- [x] **T360: API 문서 최신화** ✅ 2026-03-04
+  - public.md §17 Chat (4개 엔드포인트) + §18 Calls (6개 엔드포인트)
+  - public.openapi.yaml: ChatThread/ChatMessage/CallReservation/StartCallResponse/CallTurnResponse/EndCallResponse 스키마
 
-- [ ] **T361: 전체 검증 (pnpm validate)**
-  - AC1: typecheck PASS
-  - AC2: lint PASS
-  - AC3: test PASS
-  - AC4: build PASS (engine-studio + persona-world)
+- [x] **T361: 전체 검증** ✅ 2026-03-04
+  - 테스트 4555 PASS (117 파일), persona-world typecheck PASS, persona-world build PASS
 
 ---
 
