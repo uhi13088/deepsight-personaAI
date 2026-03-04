@@ -909,29 +909,31 @@
   - 로그: 시간대 내/인터랙션전용/에너지부족 3단계 분류 표시
   - 단위 테스트 15개 PASS (신규 T377 시나리오 3개 포함)
 
-**목적**: 현재 `computeActiveHours()`가 12~22시에만 집중되어 오전형·새벽형 페르소나가 생성되지 않는 문제 해결.
-L1/L2/L3 벡터로 4개 크로노타입을 분류하고, 야행성 조건을 점수 기반으로 확장.
+- [x] **T378: [CRITICAL] PersonaFollow DB 인덱스 추가** ✅ 2026-03-04
+  - `schema.prisma`: `@@index([followerUserId])`, `@@index([followingPersonaId])` 추가
+  - `CHANGELOG_SCHEMA.md` 업데이트
 
-**AC1**: 4개 크로노타입 분류 로직 도입
+- [x] **T379: [CRITICAL] followingIds 쿼리 3중 실행 → 1회 통합** ✅ 2026-03-04
+  - POST 핸들러 최상단에서 followingIds 1회 조회 후 handleFollowingTab/handleExploreTab/for-you 공유
+  - 불필요한 DB 쿼리 2회 제거
 
-- 새벽형 (peakHour 4~7): L2.conscientiousness > 0.7 AND L2.extraversion < 0.35 AND L2.neuroticism < 0.35
-- 오전형 (peakHour 8~11): L1.purpose > 0.6 AND L2.conscientiousness > 0.55
-- 야행형 (peakHour 21~1): 점수 = L2.neuroticism×0.4 + L3.volatility×0.3 + (1-L2.extraversion)×0.3 > 0.55
-- 오후형 (peakHour 13~18): 나머지 (현재 기본값)
+- [x] **T380: [MAJOR] 탭별 캐시 — 전환 시 즉시 표시** ✅ 2026-03-04
+  - `tabCacheRef: useRef<Map<FeedTab, TabCache>>` 도입
+  - 탭 재방문 시 캐시 즉시 표시 → 백그라운드 refresh 패턴
+  - loadMore 후 누적 포스트 캐시 갱신
+  - 첫 방문에만 loading skeleton
 
-**AC2**: 피크 시각을 각 크로노타입 내에서 벡터로 세분화
+- [x] **T381: [MODERATE] IntersectionObserver 안정화** ✅ 2026-03-04
+  - `loadMoreRef` 도입: observer가 항상 최신 loadMore 참조
+  - Observer 마운트 시 1회 생성 (deps 제거)
 
-- 오후형: 13 + round(L1.sociability × 5) → 13~18시
-- 야행형: 21 + round(L3.volatility × 4) → 21~01시
+- [x] **T382: [MINOR] feedPostSelect hashtags 누락 수정** ✅ 2026-03-04
+  - `feedPostSelect`: `hashtags: true` 추가
+  - for-you enrichedPosts, buildTabResponse 매핑에 hashtags 포함
 
-**AC3**: 윈도우 폭 균일화
+---
 
-- `windowTotal = 4 + round(endurance × 8)` → 4~12시간 (현재 start/end 분리 방식 → 단일 폭)
-- start = peak - round(windowTotal × 0.4), end = peak + round(windowTotal × 0.6)
-
-**AC4**: `ACTIVE_HOURS` constants 업데이트 (기존 상수 제거 + 새 상수 추가)
-
-**AC5**: 단위 테스트 — 4 크로노타입 각 시나리오 + 경계 케이스 PASS
+## QUEUE
 
 ---
 

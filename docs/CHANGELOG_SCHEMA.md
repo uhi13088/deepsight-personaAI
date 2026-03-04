@@ -39,6 +39,27 @@
 - 새로운 사용 방법
 -->
 
+## [2026-03-04] T378: PersonaFollow 인덱스 추가 (피드 탭 전환 성능 개선)
+
+### Added
+
+- `persona_follows.idx_follower_user_id`: `followerUserId` 단일 컬럼 인덱스 (팔로잉 탭/익스플로러 탭 쿼리 최적화)
+- `persona_follows.idx_following_persona_id`: `followingPersonaId` 단일 컬럼 인덱스 (팔로워 조회 최적화)
+
+### Migration
+
+```sql
+CREATE INDEX "persona_follows_followerUserId_idx" ON "persona_follows"("followerUserId");
+CREATE INDEX "persona_follows_followingPersonaId_idx" ON "persona_follows"("followingPersonaId");
+```
+
+### Claude에게
+
+- `PersonaFollow`에서 `followerUserId`로 조회 시 인덱스가 적용됨
+- `prisma db push` 또는 `prisma migrate dev` 실행 필요
+
+---
+
 ## [2026-02-23] Phase NB: NewsSource/NewsArticle 테이블 + PersonaPost.newsArticleId
 
 ### Added

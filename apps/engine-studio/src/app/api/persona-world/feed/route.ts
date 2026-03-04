@@ -44,24 +44,28 @@ export async function POST(request: NextRequest) {
 
     const feedLimit = Math.min(limit ?? 20, 50)
 
+    // T379: followingIds 1회 조회 — following/explore/for-you 탭 공유
+    const followRows = await prisma.personaFollow.findMany({
+      where: { followerUserId: userId },
+      select: { followingPersonaId: true },
+    })
+    const followingIds = followRows.map((f) => f.followingPersonaId)
+
     // ── following 탭: 팔로우한 페르소나 글만 ────────────────
     if (tab === "following") {
-      return handleFollowingTab(userId, feedLimit, cursor)
+      return handleFollowingTab(userId, feedLimit, cursor, followingIds)
     }
 
     // ── explore 탭: 팔로우하지 않는 페르소나 + 인기순 ──────
     if (tab === "explore") {
-      return handleExploreTab(userId, feedLimit, cursor)
+      return handleExploreTab(userId, feedLimit, cursor, followingIds)
     }
 
     // ── for-you: 3-Tier 매칭 피드 엔진 ─────────────────────
     const provider: FeedDataProvider = {
-      async getFollowingPersonaIds(uid: string): Promise<string[]> {
-        const follows = await prisma.personaFollow.findMany({
-          where: { followerUserId: uid },
-          select: { followingPersonaId: true },
-        })
-        return follows.map((f) => f.followingPersonaId)
+      async getFollowingPersonaIds(_uid: string): Promise<string[]> {
+        // T379: 이미 로드된 followingIds 재사용
+        return followingIds
       },
 
       async getRecentPostsByPersonas(
@@ -365,6 +369,7 @@ export async function POST(request: NextRequest) {
               contentId: true,
               metadata: true,
               locationTag: true,
+              hashtags: true, // T382
               likeCount: true,
               commentCount: true,
               repostCount: true,
@@ -398,6 +403,7 @@ export async function POST(request: NextRequest) {
           contentId: p.contentId,
           metadata: p.metadata,
           locationTag: p.locationTag,
+          hashtags: p.hashtags, // T382
           likeCount: p.likeCount,
           commentCount: p.commentCount,
           repostCount: p.repostCount,
@@ -447,6 +453,7 @@ const feedPostSelect = {
   contentId: true,
   metadata: true,
   locationTag: true,
+  hashtags: true, // T382
   likeCount: true,
   commentCount: true,
   repostCount: true,
@@ -483,6 +490,7 @@ function buildTabResponse(posts: FeedPostRow[], limit: number, source: string): 
         contentId: p.contentId,
         metadata: p.metadata,
         locationTag: p.locationTag,
+        hashtags: p.hashtags, // T382
         likeCount: p.likeCount,
         commentCount: p.commentCount,
         repostCount: p.repostCount,
@@ -509,13 +517,10 @@ function buildTabResponse(posts: FeedPostRow[], limit: number, source: string): 
 async function handleFollowingTab(
   userId: string,
   limit: number,
-  cursor?: string
+  cursor: string | undefined,
+  followingIds: string[] // T379: 이미 로드된 데이터 재사용
 ): Promise<NextResponse> {
-  const follows = await prisma.personaFollow.findMany({
-    where: { followerUserId: userId },
-    select: { followingPersonaId: true },
-  })
-  const followingIds = follows.map((f) => f.followingPersonaId)
+  void userId // 미래 확장용
 
   if (followingIds.length === 0) {
     return NextResponse.json({
@@ -544,13 +549,11 @@ async function handleFollowingTab(
 async function handleExploreTab(
   userId: string,
   limit: number,
-  cursor?: string
+  cursor: string | undefined,
+  followingIds: string[] // T379: 이미 로드된 데이터 재사용
 ): Promise<NextResponse> {
-  const follows = await prisma.personaFollow.findMany({
-    where: { followerUserId: userId },
-    select: { followingPersonaId: true },
-  })
-  const excludeIds = follows.map((f) => f.followingPersonaId)
+  void userId // 미래 확장용
+  const excludeIds = followingIds
 
   const where: Record<string, unknown> = {
     isHidden: false,

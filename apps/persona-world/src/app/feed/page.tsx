@@ -95,8 +95,12 @@ export default function FeedPage() {
   const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState(false)
 
-  const observerRef = useRef<IntersectionObserver | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
+
+  // T380: 탭별 캐시 — 전환 시 즉시 표시
+  const tabCacheRef = useRef<
+    Map<FeedTab, { posts: FeedPost[]; cursor: string | null; hasMore: boolean }>
+  >(new Map())
 
   const unreadNotifications = useMemo(
     () => notifications.filter((n) => !n.read).length,
@@ -165,13 +169,33 @@ export default function FeedPage() {
     [activeTab, profile?.id]
   )
 
-  // 탭 전환 또는 초기 로드
+  // T380: 탭 전환 또는 초기 로드 (캐시 우선)
   useEffect(() => {
     let cancelled = false
 
     const load = async () => {
-      setLoading(true)
       setError(false)
+
+      // 캐시 있으면 즉시 표시 (loading skeleton 없이)
+      const cached = tabCacheRef.current.get(activeTab)
+      if (cached) {
+        setPosts(cached.posts)
+        setNextCursor(cached.cursor)
+        setHasMore(cached.hasMore)
+        setLoading(false)
+        // 백그라운드 refresh (캐시 위에 덮어씌우기)
+        const fresh = await fetchFeed()
+        if (cancelled || !fresh) return
+        const updated = { posts: fresh.posts, cursor: fresh.nextCursor, hasMore: fresh.hasMore }
+        tabCacheRef.current.set(activeTab, updated)
+        setPosts(fresh.posts)
+        setNextCursor(fresh.nextCursor)
+        setHasMore(fresh.hasMore)
+        return
+      }
+
+      // 첫 방문 탭: loading skeleton 표시
+      setLoading(true)
       setPosts([])
       setNextCursor(null)
       setHasMore(false)
@@ -185,6 +209,11 @@ export default function FeedPage() {
         return
       }
 
+      tabCacheRef.current.set(activeTab, {
+        posts: data.posts,
+        cursor: data.nextCursor,
+        hasMore: data.hasMore,
+      })
       setPosts(data.posts)
       setNextCursor(data.nextCursor)
       setHasMore(data.hasMore)
@@ -195,7 +224,7 @@ export default function FeedPage() {
     return () => {
       cancelled = true
     }
-  }, [fetchFeed])
+  }, [fetchFeed, activeTab])
 
   // ── 무한 스크롤 ──────────────────────────────────────────
 
@@ -205,33 +234,44 @@ export default function FeedPage() {
     setLoadingMore(true)
     const data = await fetchFeed(nextCursor)
     if (data) {
-      setPosts((prev) => [...prev, ...data.posts])
+      setPosts((prev) => {
+        const newPosts = [...prev, ...data.posts]
+        // T380: 추가 로드 후 캐시 갱신 (누적 포스트 전체 저장)
+        tabCacheRef.current.set(activeTab, {
+          posts: newPosts,
+          cursor: data.nextCursor,
+          hasMore: data.hasMore,
+        })
+        return newPosts
+      })
       setNextCursor(data.nextCursor)
       setHasMore(data.hasMore)
     }
     setLoadingMore(false)
-  }, [nextCursor, loadingMore, fetchFeed])
+  }, [nextCursor, loadingMore, fetchFeed, activeTab])
 
-  // IntersectionObserver 연결
+  // T381: loadMoreRef — observer가 항상 최신 loadMore를 참조 (재생성 방지)
+  const loadMoreRef = useRef(loadMore)
   useEffect(() => {
-    if (observerRef.current) observerRef.current.disconnect()
+    loadMoreRef.current = loadMore
+  }, [loadMore])
 
-    observerRef.current = new IntersectionObserver(
+  // IntersectionObserver — sentinel 마운트 시 1회 생성 (hasMore/loadingMore 변경에 무관)
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+
+    const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting && hasMore && !loadingMore) {
-          loadMore()
+        if (entries[0]?.isIntersecting) {
+          void loadMoreRef.current()
         }
       },
       { rootMargin: "200px" }
     )
-
-    const sentinel = sentinelRef.current
-    if (sentinel) observerRef.current.observe(sentinel)
-
-    return () => {
-      observerRef.current?.disconnect()
-    }
-  }, [hasMore, loadingMore, loadMore])
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 핸들러 ────────────────────────────────────────────────
 

@@ -1266,6 +1266,8 @@ model PersonaFollow {
 
   @@unique([followerPersonaId, followingPersonaId])
   @@unique([followerUserId, followingPersonaId])
+  @@index([followerUserId])       // T378: 팔로잉 탭 쿼리 최적화
+  @@index([followingPersonaId])  // T378: 팔로워 조회 최적화
   @@map("persona_follows")
 }
 
