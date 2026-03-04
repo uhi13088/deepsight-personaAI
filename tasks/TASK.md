@@ -942,19 +942,13 @@
 
 ### 영역 1 — 벡터 매칭 실제 연결 (getCandidates 스텁 교체)
 
-- [ ] **T383: PersonaWorldUser 벡터 → matchAll() getCandidates 교체**
-  - **파일**: `apps/engine-studio/src/app/api/public/feed/route.ts`
-  - **현황**: `getCandidates()`가 `likeCount DESC` 단순 정렬 + `explorationScore: 0.5` 하드코딩
-  - **할 일**:
-    - `getCandidates()` 내부에서 `PersonaWorldUser`의 L1/L2/L3 벡터 로드
-    - 전체 활성 Persona + `PersonaLayerVector` 조회
-    - `matchAll(userVectors, personas)` 호출 (`three-tier-engine.ts` 기존 함수)
-    - 매칭 결과의 `basicScore` / `explorationScore` / `advancedScore` 그대로 반환
-    - **Fallback**: 유저 벡터 없는 경우 (온보딩 미완료) → 기존 likeCount 정렬 유지
-  - **AC**:
-    - 온보딩 완료 유저 피드 = 벡터 기반 추천 (likeCount 무관)
-    - 온보딩 미완료 유저 = 기존 fallback 동작
-    - 기존 테스트 PASS, Build PASS
+- [x] **T383: PersonaWorldUser 벡터 → matchAll() getCandidates 교체** ✅ 2026-03-04
+  - 변경: `apps/engine-studio/src/app/api/public/feed/route.ts`
+  - `buildVectorCandidates()` 헬퍼 추가: PersonaWorldUser L1/L2 → UserProfile → matchAll() → RecommendedCandidate[]
+  - L1 null 시 likeCount fallback 유지 (온보딩 미완료 대응)
+  - PersonaLayerVector SOCIAL/TEMPERAMENT/NARRATIVE → PersonaCandidate[] 조립
+  - scoreMap으로 personaId별 tier별 best score 집계 → 최근 포스트에 할당
+  - 테스트: 4601 PASS (119 files), Build PASS
 
 - [ ] **T384: Enrichment Context 실제 조립 (context-enricher 연동)**
   - **파일**: `apps/engine-studio/src/app/api/public/feed/route.ts`, `lib/matching/context-enricher.ts`

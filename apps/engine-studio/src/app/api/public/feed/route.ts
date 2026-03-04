@@ -4,6 +4,13 @@ import { verifyInternalToken } from "@/lib/internal-auth"
 import { generateFeed } from "@/lib/persona-world/feed/feed-engine"
 import type { FeedDataProvider } from "@/lib/persona-world/feed/feed-engine"
 import type { RecommendedCandidate } from "@/lib/persona-world/feed/recommended-posts"
+import { matchAll } from "@/lib/matching/three-tier-engine"
+import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
+import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
+import { calculateVFinal } from "@/lib/vector/v-final"
+import { DEFAULT_L1_VECTOR, DEFAULT_L2_VECTOR, DEFAULT_L3_VECTOR } from "@/constants/v3/dimensions"
+import type { SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector } from "@/types"
+import type { UserProfile, PersonaCandidate } from "@/lib/matching/three-tier-engine"
 
 // ── 공통 select / 응답 빌더 ──────────────────────────────────
 
@@ -73,6 +80,209 @@ function buildFeedResponse(posts: PostRow[], limit: number, source: string): Nex
       hasMore,
     },
   })
+}
+
+// ── 벡터 기반 추천 후보 빌더 ─────────────────────────────────
+
+const L1_KEYS = ["depth", "lens", "stance", "scope", "taste", "purpose", "sociability"] as const
+const L2_KEYS = [
+  "openness",
+  "conscientiousness",
+  "extraversion",
+  "agreeableness",
+  "neuroticism",
+] as const
+const L3_KEYS = ["lack", "moralCompass", "volatility", "growthArc"] as const
+
+/**
+ * PersonaWorldUser 벡터 → matchAll() 호출 → RecommendedCandidate[] 반환.
+ *
+ * 유저의 L1/L2 벡터가 존재하지 않으면 null 반환 (fallback to likeCount).
+ */
+async function buildVectorCandidates(
+  userId: string,
+  limit: number,
+  excludePostIds: string[]
+): Promise<RecommendedCandidate[] | null> {
+  // 1. PersonaWorldUser 벡터 조회
+  const pwUser = await prisma.personaWorldUser.findUnique({
+    where: { id: userId },
+    select: {
+      depth: true,
+      lens: true,
+      stance: true,
+      scope: true,
+      taste: true,
+      purpose: true,
+      sociability: true,
+      openness: true,
+      conscientiousness: true,
+      extraversion: true,
+      agreeableness: true,
+      neuroticism: true,
+      hasOceanProfile: true,
+    },
+  })
+
+  // L1 벡터가 없으면 (온보딩 미완료) null → fallback
+  if (!pwUser || pwUser.depth === null) return null
+
+  // 2. UserProfile 조립
+  const l1: SocialPersonaVector = Object.fromEntries(
+    L1_KEYS.map((k) => [k, Number(pwUser[k] ?? DEFAULT_L1_VECTOR[k])])
+  ) as unknown as SocialPersonaVector
+
+  const l2: CoreTemperamentVector = pwUser.hasOceanProfile
+    ? (Object.fromEntries(
+        L2_KEYS.map((k) => [k, Number(pwUser[k] ?? DEFAULT_L2_VECTOR[k])])
+      ) as unknown as CoreTemperamentVector)
+    : { ...DEFAULT_L2_VECTOR }
+
+  const l3: NarrativeDriveVector = { ...DEFAULT_L3_VECTOR }
+
+  const vFinal = calculateVFinal(l1, l2, l3)
+  const crossAxisProfile = calculateCrossAxisProfile(l1, l2, l3)
+  const paradoxProfile = calculateExtendedParadoxScore(l1, l2, l3)
+
+  const userProfile: UserProfile = {
+    id: userId,
+    l1,
+    l2,
+    l3,
+    vFinal,
+    crossAxisProfile,
+    paradoxProfile,
+  }
+
+  // 3. 활성 페르소나 + LayerVector 조회
+  const personas = await prisma.persona.findMany({
+    where: { status: { in: ["ACTIVE", "STANDARD"] } },
+    select: {
+      id: true,
+      name: true,
+      archetypeId: true,
+      layerVectors: {
+        select: {
+          layerType: true,
+          dim1: true,
+          dim2: true,
+          dim3: true,
+          dim4: true,
+          dim5: true,
+          dim6: true,
+          dim7: true,
+        },
+      },
+    },
+  })
+
+  // 4. PersonaCandidate[] 조립
+  const candidates: PersonaCandidate[] = personas.map((p) => {
+    const socialVec = p.layerVectors.find((v) => v.layerType === "SOCIAL")
+    const tempVec = p.layerVectors.find((v) => v.layerType === "TEMPERAMENT")
+    const narrVec = p.layerVectors.find((v) => v.layerType === "NARRATIVE")
+
+    const pL1: SocialPersonaVector = socialVec
+      ? (Object.fromEntries(
+          L1_KEYS.map((k, i) => [
+            k,
+            Number(socialVec[`dim${i + 1}` as keyof typeof socialVec] ?? DEFAULT_L1_VECTOR[k]),
+          ])
+        ) as unknown as SocialPersonaVector)
+      : { ...DEFAULT_L1_VECTOR }
+
+    const pL2: CoreTemperamentVector = tempVec
+      ? (Object.fromEntries(
+          L2_KEYS.map((k, i) => [
+            k,
+            Number(tempVec[`dim${i + 1}` as keyof typeof tempVec] ?? DEFAULT_L2_VECTOR[k]),
+          ])
+        ) as unknown as CoreTemperamentVector)
+      : { ...DEFAULT_L2_VECTOR }
+
+    const pL3: NarrativeDriveVector = narrVec
+      ? (Object.fromEntries(
+          L3_KEYS.map((k, i) => [
+            k,
+            Number(narrVec[`dim${i + 1}` as keyof typeof narrVec] ?? DEFAULT_L3_VECTOR[k]),
+          ])
+        ) as unknown as NarrativeDriveVector)
+      : { ...DEFAULT_L3_VECTOR }
+
+    return {
+      id: p.id,
+      name: p.name,
+      l1: pL1,
+      l2: pL2,
+      l3: pL3,
+      crossAxisProfile: calculateCrossAxisProfile(pL1, pL2, pL3),
+      paradoxProfile: calculateExtendedParadoxScore(pL1, pL2, pL3),
+      archetype: p.archetypeId ?? undefined,
+    } satisfies PersonaCandidate
+  })
+
+  if (candidates.length === 0) return null
+
+  // 5. matchAll() 실행
+  const matchResults = matchAll(userProfile, candidates)
+
+  // 6. personaId별 tier별 best score 집계
+  const scoreMap = new Map<
+    string,
+    { basicScore: number; explorationScore: number; advancedScore: number }
+  >()
+  for (const result of matchResults) {
+    const existing = scoreMap.get(result.personaId) ?? {
+      basicScore: 0,
+      explorationScore: 0,
+      advancedScore: 0,
+    }
+    if (result.tier === "basic") existing.basicScore = Math.max(existing.basicScore, result.score)
+    if (result.tier === "exploration")
+      existing.explorationScore = Math.max(existing.explorationScore, result.score)
+    if (result.tier === "advanced")
+      existing.advancedScore = Math.max(existing.advancedScore, result.score)
+    scoreMap.set(result.personaId, existing)
+  }
+
+  // 7. 매칭된 페르소나 상위 N개의 최근 포스트 조회
+  const topPersonaIds = [...scoreMap.entries()]
+    .sort((a, b) => {
+      const aMax = Math.max(a[1].basicScore, a[1].explorationScore, a[1].advancedScore)
+      const bMax = Math.max(b[1].basicScore, b[1].explorationScore, b[1].advancedScore)
+      return bMax - aMax
+    })
+    .slice(0, 10)
+    .map(([id]) => id)
+
+  const recentPosts = await prisma.personaPost.findMany({
+    where: {
+      personaId: { in: topPersonaIds },
+      isHidden: false,
+      id: { notIn: excludePostIds },
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit * 3,
+    select: { id: true, personaId: true },
+  })
+
+  // 8. 포스트에 매칭 스코어 할당
+  const result: RecommendedCandidate[] = recentPosts.map((post) => {
+    const scores = scoreMap.get(post.personaId) ?? {
+      basicScore: 0.5,
+      explorationScore: 0.5,
+      advancedScore: 0.5,
+    }
+    return {
+      postId: post.id,
+      personaId: post.personaId,
+      basicScore: scores.basicScore,
+      explorationScore: scores.explorationScore,
+      advancedScore: scores.advancedScore,
+    }
+  })
+
+  return result.length > 0 ? result : null
 }
 
 /**
@@ -181,11 +391,15 @@ async function handlePersonalizedFeed(
     },
 
     async getCandidates(
-      _uid: string,
+      uid: string,
       lim: number,
       excludePostIds: string[]
     ): Promise<RecommendedCandidate[]> {
-      // 인기도 기반 간소화 추천 (벡터 매칭 없이)
+      // 벡터 기반 3-Tier 매칭 시도
+      const vectorCandidates = await buildVectorCandidates(uid, lim, excludePostIds)
+      if (vectorCandidates) return vectorCandidates
+
+      // Fallback: 유저 벡터 없는 경우 likeCount 기반 정렬
       const posts = await prisma.personaPost.findMany({
         where: {
           isHidden: false,
