@@ -124,6 +124,103 @@ describe("distributeTiers", () => {
   })
 })
 
+it("T385: basicScore 높은 후보가 Basic에, explorationScore 높은 후보가 Exploration에 선택됨", () => {
+  // 후보 A: basicScore 압도적으로 높음 → Basic 선택
+  // 후보 B: explorationScore 압도적으로 높음 → Exploration 선택
+  const candidates: RecommendedCandidate[] = [
+    {
+      postId: "basic-winner",
+      personaId: "p1",
+      basicScore: 0.95,
+      explorationScore: 0.2,
+      advancedScore: 0.5,
+    },
+    {
+      postId: "basic-2",
+      personaId: "p2",
+      basicScore: 0.9,
+      explorationScore: 0.2,
+      advancedScore: 0.5,
+    },
+    {
+      postId: "basic-3",
+      personaId: "p3",
+      basicScore: 0.88,
+      explorationScore: 0.2,
+      advancedScore: 0.5,
+    },
+    {
+      postId: "basic-4",
+      personaId: "p4",
+      basicScore: 0.85,
+      explorationScore: 0.2,
+      advancedScore: 0.5,
+    },
+    {
+      postId: "basic-5",
+      personaId: "p5",
+      basicScore: 0.83,
+      explorationScore: 0.2,
+      advancedScore: 0.5,
+    },
+    {
+      postId: "basic-6",
+      personaId: "p6",
+      basicScore: 0.81,
+      explorationScore: 0.2,
+      advancedScore: 0.5,
+    },
+    {
+      postId: "exploration-winner",
+      personaId: "p7",
+      basicScore: 0.1,
+      explorationScore: 0.99,
+      advancedScore: 0.1,
+    },
+    {
+      postId: "exploration-2",
+      personaId: "p8",
+      basicScore: 0.1,
+      explorationScore: 0.95,
+      advancedScore: 0.1,
+    },
+    {
+      postId: "exploration-3",
+      personaId: "p9",
+      basicScore: 0.1,
+      explorationScore: 0.91,
+      advancedScore: 0.1,
+    },
+    {
+      postId: "advanced-winner",
+      personaId: "p10",
+      basicScore: 0.3,
+      explorationScore: 0.3,
+      advancedScore: 0.97,
+    },
+  ]
+  const result = distributeTiers(candidates, 10)
+
+  // Basic: basicScore 상위 6개 선택됨
+  expect(result.basic.map((p) => p.postId)).toContain("basic-winner")
+  expect(result.basic[0].postId).toBe("basic-winner")
+
+  // Exploration: explorationScore 상위 3개 선택됨 (Basic과 중복 제거 후)
+  expect(result.exploration.map((p) => p.postId)).toContain("exploration-winner")
+  expect(result.exploration[0].postId).toBe("exploration-winner")
+
+  // Advanced: advancedScore 최상위
+  expect(result.advanced.map((p) => p.postId)).toContain("advanced-winner")
+
+  // Tier 간 중복 없음
+  const allIds = [
+    ...result.basic.map((p) => p.postId),
+    ...result.exploration.map((p) => p.postId),
+    ...result.advanced.map((p) => p.postId),
+  ]
+  expect(new Set(allIds).size).toBe(allIds.length)
+})
+
 // ═══ getRecommendedPosts ═══
 
 describe("getRecommendedPosts", () => {

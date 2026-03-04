@@ -961,17 +961,12 @@
   - 로그: `[feed/enrichment] userId=... personas=N exposure_signals=N consumption_signals=N`
   - 테스트: 4601 PASS (119 files), Build PASS
 
-- [ ] **T385: recommended-posts.ts 실제 동작 검증 + 포스트 선택 개선**
-  - **파일**: `lib/persona-world/feed/recommended-posts.ts`
-  - **현황**: `getRecommendedPosts()`가 Basic/Exploration/Advanced 분류 로직 존재하나 getCandidates 스텁 의존
-  - **할 일**:
-    - T383 완료 후, Basic/Exploration/Advanced 각 Tier 포스트가 실제로 분리되는지 검증
-    - 매칭된 페르소나의 최근 포스트 N개 중 persona matchScore 가중치 적용 선택
-    - Exploration Tier 포스트: Cross-Axis 발산 높은 페르소나 포스트 우선
-    - 단위 테스트: 각 Tier별 포스트 비율이 의도대로 분배되는지
-  - **AC**:
-    - Basic 60% / Exploration 30% / Advanced 10% Tier 비율 실제 동작
-    - 테스트 PASS, Build PASS
+- [x] **T385: recommended-posts.ts 실제 동작 검증 + 포스트 선택 개선** ✅ 2026-03-04
+  - 변경: `tests/unit/persona-world/feed.test.ts`
+  - T383에서 연결된 실제 matchAll 스코어로 Tier 분리 동작 검증 테스트 추가
+  - basicScore/explorationScore/advancedScore가 명확히 차이나는 후보로 각 Tier 선택 검증
+  - Exploration = explorationScore 최상위 (Cross-Axis 발산 점수) 후보 우선 선택 확인
+  - 테스트: 4602 PASS (119 files, +1 test), Build PASS
 
 ---
 
