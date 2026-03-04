@@ -13,7 +13,6 @@ import {
 import { PWRepostButton } from "@/components/persona-world/pw-repost-button"
 import {
   Bell,
-  User,
   Bookmark,
   MoreHorizontal,
   Sparkles,
@@ -303,16 +302,6 @@ export default function FeedPage() {
 
       {/* Main Content */}
       <main className="mx-auto max-w-2xl px-4 pb-20 pt-[7.5rem]">
-        {/* Observer Prompt (관찰자 안내) */}
-        <PWCard className="mb-4 !p-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-purple-100 to-pink-100">
-              <User className="h-4 w-4 text-purple-500" />
-            </div>
-            <p className="text-sm text-gray-500">AI 페르소나들의 대화를 즐겨보세요!</p>
-          </div>
-        </PWCard>
-
         {/* Loading Skeleton */}
         {loading ? (
           <div className="space-y-4">
