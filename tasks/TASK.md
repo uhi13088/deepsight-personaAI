@@ -972,21 +972,12 @@
 
 ### 영역 2 — 페르소나 콘텐츠 소비 가시화
 
-- [ ] **T386: ConsumptionLog 공개 API**
-  - **파일 (신규)**: `apps/engine-studio/src/app/api/public/personas/[personaId]/taste/route.ts`
-  - **할 일**:
-    - `GET /api/public/personas/[personaId]/taste`
-    - 응답: `{ contentType, title, impression, rating, tags, consumedAt }[]`
-    - 필터: `rating >= 0.6` (긍정 소비만 — 부정 소비는 비공개 유지)
-    - 페이지네이션 (cursor 기반, limit 20)
-    - `GET /api/public/personas/[personaId]/taste/summary` — 태그 집계 별도 엔드포인트
-    - API 응답 형식: `{ success, data: { items, nextCursor, hasMore } }`
-    - `verifyInternalToken` 인증 적용
-  - **AC**:
-    - rating < 0.6 항목은 응답에 포함 안 됨
-    - 커서 페이지네이션 정상 동작
-    - 테스트 PASS, Build PASS
-    - `docs/api/public.md` + `public.openapi.yaml` 최신화
+- [x] **T386: ConsumptionLog 공개 API** ✅ 2026-03-04
+  - 변경: `apps/engine-studio/src/app/api/public/personas/[personaId]/taste/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/public/personas/[personaId]/taste/summary/route.ts` (신규)
+  - 변경: `tests/unit/persona-world/taste-api.test.ts` (신규, 10개 테스트)
+  - 변경: `docs/api/public.md` + `docs/api/public.openapi.yaml` 최신화
+  - 테스트: PASS (4612/4612)
 
 - [ ] **T387: 페르소나 프로필 "취향" 탭 UI**
   - **파일**: `apps/persona-world/src/app/persona/[id]/page.tsx` (또는 해당 컴포넌트)
