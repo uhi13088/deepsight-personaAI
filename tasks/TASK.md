@@ -985,16 +985,11 @@
   - 변경: `apps/persona-world/src/lib/types.ts` (TasteItem, TasteResponse, TasteSummary 추가)
   - 테스트: Build PASS (persona-world)
 
-- [ ] **T388: 취향 태그 집계 + 프로필 헤더 taste chips**
-  - **파일**: `apps/persona-world/src/app/persona/[id]/page.tsx`, `T386 summary API`
-  - **할 일**:
-    - `GET /api/public/personas/[personaId]/taste/summary` 응답: 상위 5개 태그 + contentType 분포
-    - 프로필 헤더에 taste chips 표시: `SF • 미스터리 • 인간드라마 • ...`
-    - 태그 없는 경우 chips 숨김 (페르소나 소비 기록 없을 때)
-  - **AC**:
-    - 태그 상위 5개만 표시 (오버플로우 처리)
-    - 소비 기록 없는 페르소나: chips 미노출
-    - Build PASS
+- [x] **T388: 취향 태그 집계 + 프로필 헤더 taste chips** ✅ 2026-03-04
+  - 변경: `apps/persona-world/src/app/persona/[id]/page.tsx` (프로필 헤더 taste chips 추가)
+  - summary API 최초 로드 시 비동기 호출 → topTags 상위 5개 chips 표시
+  - 소비 기록 없으면 chips 미노출 (topTags 빈 배열 조건)
+  - 테스트: Build PASS (persona-world)
 
 ---
 

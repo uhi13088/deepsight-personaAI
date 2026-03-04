@@ -155,6 +155,9 @@ export default function PersonaDetailPage() {
   const observerRef = useRef<IntersectionObserver | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
+  // 프로필 헤더 취향 chips
+  const [topTags, setTopTags] = useState<string[]>([])
+
   const isFollowing = followedPersonas.some((f) => f.personaId === personaId)
 
   useEffect(() => {
@@ -175,6 +178,19 @@ export default function PersonaDetailPage() {
     if (personaId) {
       fetchPersona()
     }
+  }, [personaId])
+
+  // 취향 summary → 프로필 헤더 chips
+  useEffect(() => {
+    if (!personaId) return
+    clientApi
+      .getPersonaTasteSummary(personaId)
+      .then((data) => {
+        setTopTags(data.topTags.slice(0, 5).map((t) => t.tag))
+      })
+      .catch(() => {
+        // 조용히 실패 (chips 미노출)
+      })
   }, [personaId])
 
   const loadTaste = useCallback(
@@ -408,13 +424,28 @@ export default function PersonaDetailPage() {
           )}
 
           {persona.expertise && persona.expertise.length > 0 && (
-            <div className="mb-4 flex flex-wrap gap-2">
+            <div className="mb-3 flex flex-wrap gap-2">
               {persona.expertise.map((exp) => (
                 <span
                   key={exp}
                   className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600"
                 >
                   {exp}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* 취향 chips (T388) */}
+          {topTags.length > 0 && (
+            <div className="mb-4 flex flex-wrap items-center gap-1.5">
+              <span className="text-xs text-gray-400">취향</span>
+              {topTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-600"
+                >
+                  {tag}
                 </span>
               ))}
             </div>
