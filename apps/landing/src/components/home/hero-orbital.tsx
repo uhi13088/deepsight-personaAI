@@ -1,56 +1,38 @@
 "use client"
 
 import { Check } from "lucide-react"
-import type { LucideIcon } from "lucide-react"
-
-interface VectorDimension {
-  id: string
-  name: string
-  label: string
-  low: string
-  high: string
-  icon: LucideIcon
-  color: string
-}
-
-interface HeroOrbitalProps {
-  dimensions: VectorDimension[]
-}
 
 const LAYER_RINGS = [
   {
-    id: "L3",
-    label: "L3 Narrative",
+    id: "취향",
     radius: 80,
     color: "#8B5CF6",
     bg: "rgba(139, 92, 246, 0.08)",
     borderColor: "rgba(139, 92, 246, 0.25)",
-    dims: ["Lack", "Moral", "Volatility", "Growth"],
+    dims: ["영화", "음악", "도서", "음식"],
     speed: "50s",
   },
   {
-    id: "L2",
-    label: "L2 Temperament",
+    id: "성격",
     radius: 150,
     color: "#F59E0B",
     bg: "rgba(245, 158, 11, 0.05)",
     borderColor: "rgba(245, 158, 11, 0.2)",
-    dims: ["O", "C", "E", "A", "N"],
+    dims: ["감성", "활동", "사교", "분석", "창의"],
     speed: "60s",
   },
   {
-    id: "L1",
-    label: "L1 Social Persona",
+    id: "발견",
     radius: 220,
     color: "#3B82F6",
     bg: "rgba(59, 130, 246, 0.04)",
     borderColor: "rgba(59, 130, 246, 0.15)",
-    dims: ["Depth", "Lens", "Stance", "Scope", "Taste", "Purpose", "Social"],
+    dims: ["새로움", "깊이", "공감", "재미", "감동", "도전", "영감"],
     speed: "80s",
   },
 ]
 
-export function HeroOrbital({ dimensions }: HeroOrbitalProps) {
+export function HeroOrbital() {
   return (
     <div className="relative flex h-[520px] items-center justify-center lg:h-[560px]">
       {/* Background glow */}
@@ -138,18 +120,18 @@ export function HeroOrbital({ dimensions }: HeroOrbitalProps) {
       {/* Center — Profile card */}
       <div className="absolute z-30 w-52 rounded-2xl border border-gray-200 bg-white/95 p-5 shadow-2xl backdrop-blur-sm">
         <div className="mb-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-400">
-          3-Layer Profile
+          나의 취향 프로필
         </div>
 
-        {/* 3-layer bars */}
+        {/* bars */}
         <div className="space-y-2.5">
           {[
-            { label: "L1", color: "#3B82F6", width: "78%" },
-            { label: "L2", color: "#F59E0B", width: "65%" },
-            { label: "L3", color: "#8B5CF6", width: "52%" },
+            { label: "취향", color: "#8B5CF6", width: "78%" },
+            { label: "성격", color: "#F59E0B", width: "65%" },
+            { label: "발견", color: "#3B82F6", width: "52%" },
           ].map((bar) => (
             <div key={bar.label} className="flex items-center gap-2">
-              <span className="w-5 text-[10px] font-bold" style={{ color: bar.color }}>
+              <span className="w-7 text-[10px] font-bold" style={{ color: bar.color }}>
                 {bar.label}
               </span>
               <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
@@ -162,16 +144,16 @@ export function HeroOrbital({ dimensions }: HeroOrbitalProps) {
           ))}
         </div>
 
-        {/* Paradox score */}
+        {/* Accuracy */}
         <div className="mt-3 rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 px-3 py-2 text-center">
-          <div className="text-[10px] text-gray-400">Paradox Score</div>
-          <div className="text-lg font-bold text-purple-600">0.72</div>
+          <div className="text-[10px] text-gray-400">취향 정확도</div>
+          <div className="text-lg font-bold text-purple-600">93%</div>
         </div>
 
         {/* Match result */}
         <div className="mt-2.5 flex items-center justify-center gap-1.5 rounded-lg bg-green-50 px-3 py-1.5 text-xs text-green-700">
           <Check className="h-3.5 w-3.5" />
-          3-Tier 매칭: 유나 (92%)
+          추천 페르소나: 유나
         </div>
       </div>
 
