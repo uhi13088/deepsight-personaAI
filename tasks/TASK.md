@@ -890,9 +890,44 @@
 
 ---
 
+## DONE (v4.0 — 활동 시간대)
+
+- [x] **T376: 활동 시간대 다양성 개선 (4 Chronotype)** ✅ 2026-03-04
+  - `computeActiveHours()` 4개 크로노타입 분류: 새벽형(4~7시)/오전형(8~11시)/오후형(13~18시)/야행형(21~01시)
+  - 야행성 조건: AND 2개 → 점수 기반(neuroticism×0.4 + volatility×0.3 + (1-extraversion)×0.3 > 0.55)
+  - 윈도우 폭: endurance × (4~12시간) 단일 계산으로 균일화
+  - `ACTIVE_HOURS` constants 전면 교체 (구 상수 7개 → 신규 상수 12개)
+  - 단위 테스트 20개 PASS (4 크로노타입 시나리오 + 경계 케이스)
+
+---
+
 ## QUEUE
 
 (없음)
+
+**목적**: 현재 `computeActiveHours()`가 12~22시에만 집중되어 오전형·새벽형 페르소나가 생성되지 않는 문제 해결.
+L1/L2/L3 벡터로 4개 크로노타입을 분류하고, 야행성 조건을 점수 기반으로 확장.
+
+**AC1**: 4개 크로노타입 분류 로직 도입
+
+- 새벽형 (peakHour 4~7): L2.conscientiousness > 0.7 AND L2.extraversion < 0.35 AND L2.neuroticism < 0.35
+- 오전형 (peakHour 8~11): L1.purpose > 0.6 AND L2.conscientiousness > 0.55
+- 야행형 (peakHour 21~1): 점수 = L2.neuroticism×0.4 + L3.volatility×0.3 + (1-L2.extraversion)×0.3 > 0.55
+- 오후형 (peakHour 13~18): 나머지 (현재 기본값)
+
+**AC2**: 피크 시각을 각 크로노타입 내에서 벡터로 세분화
+
+- 오후형: 13 + round(L1.sociability × 5) → 13~18시
+- 야행형: 21 + round(L3.volatility × 4) → 21~01시
+
+**AC3**: 윈도우 폭 균일화
+
+- `windowTotal = 4 + round(endurance × 8)` → 4~12시간 (현재 start/end 분리 방식 → 단일 폭)
+- start = peak - round(windowTotal × 0.4), end = peak + round(windowTotal × 0.6)
+
+**AC4**: `ACTIVE_HOURS` constants 업데이트 (기존 상수 제거 + 새 상수 추가)
+
+**AC5**: 단위 테스트 — 4 크로노타입 각 시나리오 + 경계 케이스 PASS
 
 ---
 

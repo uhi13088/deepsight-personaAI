@@ -97,31 +97,57 @@ export function computeActivityTraits(
 }
 
 /**
- * 벡터 → 활동 시간대 동적 도출.
+ * 벡터 → 활동 시간대 동적 도출 (T376: 4 Chronotype).
  *
  * 설계서 §4.4 참조.
  *
- * peakHour = 12 + round(L1.sociability × 10)
- * 활동 윈도우: ±endurance 기반 확장
- * 야행성 보정: extraversion < 0.3 AND neuroticism > 0.5 → +4시간
+ * 크로노타입 우선순위:
+ *   1. 새벽형 (4~7시): 높은 conscientiousness + 낮은 extraversion + 낮은 neuroticism
+ *   2. 오전형 (8~11시): 높은 purpose + 높은 conscientiousness
+ *   3. 야행형 (21~01시): 야행성 점수 (neuroticism×0.4 + volatility×0.3 + (1-extraversion)×0.3) > 0.55
+ *   4. 오후형 (13~18시): 기본값
+ *
+ * 윈도우 폭: 4 + round(endurance × 8) → 4~12시간
  */
 export function computeActiveHours(vectors: ThreeLayerVector, traits: ActivityTraitsV3): number[] {
-  const { social: l1, temperament: l2 } = vectors
+  const { social: l1, temperament: l2, narrative: l3 } = vectors
+  const C = ACTIVE_HOURS
 
-  let peakHour =
-    ACTIVE_HOURS.peakHourBase + Math.round(l1.sociability * ACTIVE_HOURS.sociabilityMultiplier)
+  // ── 크로노타입 분류 ──────────────────────────────────────────
+  let peakHour: number
 
-  // 야행성 보정
   if (
-    l2.extraversion < ACTIVE_HOURS.nightOwlExtraversionMax &&
-    l2.neuroticism > ACTIVE_HOURS.nightOwlNeuroticismMin
+    l2.conscientiousness > C.dawnConscientiousnessMin &&
+    l2.extraversion < C.dawnExtraversionMax &&
+    l2.neuroticism < C.dawnNeuroticismMax
   ) {
-    peakHour += ACTIVE_HOURS.nightOwlShift
+    // 새벽형
+    peakHour = C.dawnPeakBase + Math.round(l2.conscientiousness * 3)
+  } else if (
+    l1.purpose > C.morningPurposeMin &&
+    l2.conscientiousness > C.morningConscientiousnessMin
+  ) {
+    // 오전형
+    peakHour = C.morningPeakBase + Math.round(l1.purpose * 3)
+  } else {
+    // 야행성 점수 계산
+    const nightOwlScore = l2.neuroticism * 0.4 + l3.volatility * 0.3 + (1 - l2.extraversion) * 0.3
+    if (nightOwlScore > C.nightOwlScoreThreshold) {
+      // 야행형
+      peakHour = C.nightOwlPeakBase + Math.round(l3.volatility * 4)
+    } else {
+      // 오후형 (기본)
+      peakHour = C.afternoonPeakBase + Math.round(l1.sociability * 5)
+    }
   }
+
   peakHour = peakHour % 24
 
-  const windowStart = peakHour - Math.round(traits.endurance * ACTIVE_HOURS.windowStartMultiplier)
-  const windowEnd = peakHour + Math.round(traits.endurance * ACTIVE_HOURS.windowEndMultiplier)
+  // ── 윈도우 폭 계산 ───────────────────────────────────────────
+  const windowTotal =
+    C.windowMinHours + Math.round(traits.endurance * (C.windowMaxHours - C.windowMinHours))
+  const windowStart = peakHour - Math.round(windowTotal * C.windowStartRatio)
+  const windowEnd = peakHour + Math.round(windowTotal * C.windowEndRatio)
 
   const hours: number[] = []
   for (let h = windowStart; h <= windowEnd; h++) {
