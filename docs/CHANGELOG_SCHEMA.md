@@ -39,6 +39,43 @@
 - 새로운 사용 방법
 -->
 
+## [2026-03-04] T392: ContentItem + PersonaCuratedContent + UserContentFeedback (B2B 콘텐츠 파이프라인)
+
+### Added
+
+- `content_items` 테이블: B2B 고객사가 ingest API로 등록한 콘텐츠
+  - `tenantId, contentType(ContentItemType), title, description, sourceUrl, externalId`
+  - `genres String[], tags String[]`
+  - `contentVector Json?` — L1 7D 벡터 (vectorizeContent 호출 후 저장)
+  - `narrativeTheme Json?` — L3 4D 벡터
+  - `vectorizedAt DateTime?`
+  - `UNIQUE(tenantId, externalId)` — externalId 존재 시만 적용
+- `persona_curated_contents` 테이블: 페르소나-콘텐츠 큐레이션 매핑
+  - `personaId → personas, contentItemId → content_items`
+  - `curationScore Decimal(4,3), curationReason, highlights String[]`
+  - `status CurationStatus (PENDING|APPROVED|REJECTED)`
+  - `UNIQUE(personaId, contentItemId)`
+- `user_content_feedbacks` 테이블: 유저 콘텐츠 반응
+  - `userId → persona_world_users, contentItemId → content_items`
+  - `action ContentFeedbackAction (LIKE|SKIP|SAVE|CONSUME), viaPersonaId?`
+  - `UNIQUE(userId, contentItemId)`
+- enum: `ContentItemType`, `CurationStatus`, `ContentFeedbackAction`
+- `Persona.curatedContents PersonaCuratedContent[]` relation 추가
+- `PersonaWorldUser.contentFeedbacks UserContentFeedback[]` relation 추가
+
+### Migration
+
+`prisma/migrations/044_content_item_curation.sql`
+
+### Claude에게
+
+- `ContentItem.contentVector`는 벡터화 전까지 null — `vectorizedAt`로 상태 확인
+- `PersonaCuratedContent` APPROVED 상태만 B2B 추천 API에서 노출 (T399)
+- `UserContentFeedback`은 userId+contentItemId 중복 불가 (upsert 필요)
+- `ContentItemType`은 `ConsumptionContentType`과 별개 (GAME/OTHER 제거, PRODUCT/VIDEO/PODCAST 추가)
+
+---
+
 ## [2026-03-04] T378: PersonaFollow 인덱스 추가 (피드 탭 전환 성능 개선)
 
 ### Added

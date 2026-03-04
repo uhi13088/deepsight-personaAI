@@ -14,6 +14,10 @@
     {
       "path": "/api/cron/persona-scheduler",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/content-auto-curation",
+      "schedule": "0 3 * * *"
     }
   ]
 }

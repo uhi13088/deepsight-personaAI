@@ -1017,126 +1017,201 @@
 
 ---
 
-### 영역 4 — ContentItem 테이블 + B2B 인제스트
+### 영역 4 — ContentItem 테이블 + B2B 인제스트 파이프라인
 
-- [ ] **T392: ContentItem + PersonaCuratedContent + UserContentFeedback 스키마**
-  - **파일**: `apps/engine-studio/prisma/schema.prisma`, `migrations/`
+> **Phase 4-1: 데이터 계층** → **Phase 4-2: 자동화 파이프라인** → **Phase 4-3: B2B API** → **Phase 4-4: 관리 도구**
+
+---
+
+#### Phase 4-1: 데이터 계층
+
+- [x] **T392: ContentItem + PersonaCuratedContent + UserContentFeedback 스키마 + migration**
+  - **파일**: `apps/engine-studio/prisma/schema.prisma`, `apps/engine-studio/prisma/migrations/017_content_item_curation.sql`
   - **할 일**:
-    - `ContentItem` 모델 추가:
-      - `id, tenantId, contentType(enum), title, description, sourceUrl, externalId`
+    - `ContentType` enum 추가: `MOVIE | DRAMA | MUSIC | BOOK | ARTICLE | PRODUCT | VIDEO | PODCAST`
+    - `ContentItem` 모델:
+      - `id, tenantId, contentType(ContentType), title, description?, sourceUrl?, externalId?`
       - `genres String[], tags String[]`
       - `contentVector Json?` — L1 7D `{ depth, lens, stance, scope, taste, purpose, sociability }`
       - `narrativeTheme Json?` — L3 4D `{ lack, moralCompass, volatility, growthArc }`
-      - `vectorizedAt DateTime?`
+      - `vectorizedAt DateTime?, createdAt, updatedAt`
       - `@@unique([tenantId, externalId])`
-    - `PersonaCuratedContent` 모델 추가:
-      - `personaId, contentItemId, curationScore Decimal, curationReason String?, highlights String[]`
-      - `status: PENDING | APPROVED | REJECTED` (관리자 승인 플로우)
+    - `CurationStatus` enum: `PENDING | APPROVED | REJECTED`
+    - `PersonaCuratedContent` 모델:
+      - `id, personaId → Persona, contentItemId → ContentItem`
+      - `curationScore Decimal(4,3), curationReason String?, highlights String[]`
+      - `status CurationStatus @default(PENDING)`
+      - `createdAt, updatedAt`
       - `@@unique([personaId, contentItemId])`
-    - `UserContentFeedback` 모델 추가:
-      - `userId, contentItemId, action(LIKE|SKIP|SAVE|CONSUME), viaPersonaId?`
+    - `ContentFeedbackAction` enum: `LIKE | SKIP | SAVE | CONSUME`
+    - `UserContentFeedback` 모델:
+      - `id, userId → PersonaWorldUser, contentItemId → ContentItem`
+      - `action ContentFeedbackAction, viaPersonaId String?`
+      - `createdAt`
       - `@@unique([userId, contentItemId])`
-    - `ContentType` enum: `MOVIE | DRAMA | MUSIC | BOOK | ARTICLE | PRODUCT | VIDEO | PODCAST`
-    - 마이그레이션 SQL: `017_content_item_curation.sql`
+    - 마이그레이션 SQL: `CREATE TABLE IF NOT EXISTS` 스타일
   - **AC**:
     - `prisma generate` 성공
-    - 마이그레이션 SQL에 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` 완비
-    - 테스트 PASS, Build PASS
+    - 마이그레이션 SQL 완비 (3 테이블 + 3 enum)
     - `docs/CHANGELOG_SCHEMA.md` 업데이트
+    - Build PASS
 
-- [ ] **T393: 콘텐츠 벡터화 서비스**
+- [x] **T393: content-vectorizer.ts — Claude API 기반 콘텐츠 벡터화**
   - **파일 (신규)**: `apps/engine-studio/src/lib/content/content-vectorizer.ts`
+  - **파일 (신규)**: `apps/engine-studio/tests/unit/content/content-vectorizer.test.ts`
   - **할 일**:
-    - `vectorizeContent(item: ContentItem): Promise<{ contentVector, narrativeTheme }>` 함수
-    - Claude API 호출: title + description + genres + tags → L1 7D + L3 4D 벡터 추출
-    - 프롬프트: "이 콘텐츠가 어떤 취향/성향의 사람에게 울릴 것인지 7D + 4D 벡터로 추론"
-    - 결과 `clamp([0, 1])` 처리
-    - 배치 처리: `vectorizeBatch(items[], concurrency=5)`
-    - 단위 테스트: 프롬프트 구조 검증 (LLM mock)
+    - `ContentVectorResult` 타입: `{ contentVector: L1Vector7D, narrativeTheme: L3Vector4D }`
+    - `vectorizeContent(item: { title, description?, genres, tags }): Promise<ContentVectorResult>`
+      - Claude API (`claude-sonnet-4-6`) 호출
+      - 시스템 프롬프트: 콘텐츠 메타 → "이 콘텐츠에 끌릴 사람의 취향 프로필" 7D + 4D 추론
+      - 응답 JSON 파싱 + 전체 `clamp(0, 1)` 처리
+    - `vectorizeBatch(items[], concurrency = 5): Promise<ContentVectorResult[]>`
+      - p-limit 또는 직접 구현으로 동시 실행 제한
+    - 단위 테스트: Claude SDK mock → 프롬프트 구조 + clamp 동작 검증
   - **AC**:
-    - 출력 벡터 모든 값 [0, 1] 범위
-    - 배치 처리 concurrency 제한 동작
+    - 출력 벡터 11개 값 모두 [0, 1]
+    - concurrency=2 배치 → 순차 완료 순서 보장
     - 테스트 PASS, Build PASS
 
-- [ ] **T394: 자동 큐레이션 — ConsumptionLog → PersonaCuratedContent**
+---
+
+#### Phase 4-2: 자동화 파이프라인
+
+- [x] **T394: auto-curation.ts — ConsumptionLog → PersonaCuratedContent 비즈니스 로직**
   - **파일 (신규)**: `apps/engine-studio/src/lib/content/auto-curation.ts`
+  - **파일 (신규)**: `apps/engine-studio/tests/unit/content/auto-curation.test.ts`
   - **할 일**:
-    - `runAutoCuration(personaId)`: ConsumptionLog에서 `rating >= 0.7` 항목 조회
-    - 해당 contentId로 ContentItem 조회 (존재하는 경우만)
-    - `PersonaCuratedContent` `PENDING` 상태로 자동 생성
-    - `curationScore = rating`, `curationReason = impression`
-    - 이미 존재하는 큐레이션은 스킵 (upsert)
-    - cron에 연결: `cron/v4-operations` 또는 별도 cron 추가
+    - `runAutoCuration(personaId: string): Promise<{ created: number, skipped: number }>`
+      1. ConsumptionLog 조회: `personaId` + `rating >= 0.7` + `contentItemId IS NOT NULL`
+      2. 각 log → `PersonaCuratedContent` upsert (`PENDING`, `curationScore = rating`, `curationReason = impression`)
+      3. 이미 존재하면 skip (updateAt 갱신 안 함)
+    - `runAutoCurationAll(): Promise<void>` — 전체 페르소나 순회
+    - 단위 테스트: Prisma mock → rating 필터, upsert, skip 동작
   - **AC**:
-    - rating < 0.7 항목은 큐레이션 후보 미생성
-    - 중복 실행 시 기존 레코드 유지 (upsert)
+    - rating 0.69 → skip, 0.70 → 생성
+    - 중복 실행 → 기존 레코드 유지
     - 테스트 PASS, Build PASS
 
-- [ ] **T395: B2B Content Ingest API (Developer Console 경유)**
+- [x] **T395: cron/content-auto-curation — 자동 큐레이션 cron route**
+  - **파일 (신규)**: `apps/engine-studio/src/app/api/cron/content-auto-curation/route.ts`
+  - **할 일**:
+    - `GET` handler (Vercel cron 규칙)
+    - `verifyInternalToken` 인증
+    - `runAutoCurationAll()` 호출
+    - 응답: `{ success, data: { processed, created, skipped, durationMs } }`
+    - `vercel.json` cron 스케줄 추가: `0 3 * * *` (매일 새벽 3시)
+  - **AC**:
+    - 인증 없는 요청 401
+    - cron 스케줄 등록 확인
+    - Build PASS
+
+---
+
+#### Phase 4-3: B2B API
+
+- [x] **T396: Content Ingest API — 단건 등록 (POST /api/v1/content/ingest)**
   - **파일 (신규)**: `apps/engine-studio/src/app/api/v1/content/ingest/route.ts`
+  - **파일 (신규)**: `apps/engine-studio/tests/unit/content/ingest-validation.test.ts`
+  - **할 일**:
+    - `POST /api/v1/content/ingest`
+    - 인증: `verifyApiKey(request)` → `tenantId` 추출 (기존 Developer Console API Key)
+    - 입력 검증: `title` 필수, `contentType` enum 검증, `genres/tags` 배열
+    - `ContentItem` upsert (`@@unique([tenantId, externalId])`)
+    - 벡터화: 비동기 큐 (현재는 즉시 `vectorizeContent()` 호출 → DB 저장)
+    - 응답: `{ success, data: { id, vectorizedAt } }`
+  - **AC**:
+    - 인증 없으면 401
+    - title 누락 시 400 + `VALIDATION_ERROR`
+    - contentType 오류 시 400
+    - externalId 중복 → upsert (200, 에러 아님)
+    - 테스트 PASS, Build PASS
+
+- [x] **T397: Content Ingest Batch API + external-v1 docs**
   - **파일 (신규)**: `apps/engine-studio/src/app/api/v1/content/ingest/batch/route.ts`
   - **할 일**:
-    - `POST /api/v1/content/ingest` — 단건 등록
-      - 인증: Developer Console API Key (`x-api-key` 헤더)
-      - 입력: `{ contentType, title, description?, sourceUrl?, externalId?, genres[], tags[] }`
-      - 처리: ContentItem upsert → 벡터화 큐 추가 (비동기)
-      - 응답: `{ success, data: { id, vectorizedAt: null } }`
-    - `POST /api/v1/content/ingest/batch` — 배치 등록 (최대 100건)
-      - 입력: `{ items: [...] }`
-      - 응답: `{ success, data: { created, updated, failed, items[] } }`
-    - `tenantId` = API Key에서 추출
-    - 입력 검증: title 필수, contentType enum 검증
+    - `POST /api/v1/content/ingest/batch`
+    - 입력: `{ items: ContentIngestInput[] }` (최대 100건)
+    - 각 item 개별 upsert (실패해도 다음 진행)
+    - 응답: `{ success, data: { created, updated, failed, items: [{id, status}] } }`
+    - 100건 초과 시 400 반환
+    - `docs/api/external-v1.md` + `external-v1.openapi.yaml` — ingest 단건/배치 엔드포인트 추가
   - **AC**:
-    - API Key 없는 요청 401 반환
-    - 배치 100건 초과 시 400 반환
-    - externalId 중복 시 upsert (에러 아님)
+    - 101건 입력 → 400
+    - 일부 실패 시 `failed` 카운트 + 나머지 처리 계속
+    - docs 최신화
     - 테스트 PASS, Build PASS
-    - `docs/api/external-v1.md` + `external-v1.openapi.yaml` 최신화
 
-- [ ] **T396: B2B 추천 API — ContentItem 기반 피드**
+- [x] **T398: content-ranking.ts — ContentItem × Persona 매칭 스코어 계산**
+  - **파일 (신규)**: `apps/engine-studio/src/lib/content/content-ranking.ts`
+  - **파일 (신규)**: `apps/engine-studio/tests/unit/content/content-ranking.test.ts`
+  - **할 일**:
+    - `scoreContentForUser(userVector: L1Vector7D, content: ContentItem): number`
+      - L1 코사인 유사도 계산 (기존 `@deepsight/vector-core` 활용)
+      - narrativeTheme L3 보너스 (+0~0.1) 선택적 적용
+    - `rankContents(userVector, contents: ContentItem[], limit): RankedContent[]`
+      - `finalScore = matchScore × curationScore`
+      - 내림차순 정렬 → 상위 limit개
+    - 단위 테스트: 동일 벡터 → score 1.0, 직교 벡터 → score 0
+  - **AC**:
+    - score 범위 [0, 1]
+    - limit 적용 정확
+    - 테스트 PASS, Build PASS
+
+- [x] **T399: B2B Recommendations API + external-v1 docs**
   - **파일 (신규)**: `apps/engine-studio/src/app/api/v1/recommendations/route.ts`
   - **할 일**:
     - `POST /api/v1/recommendations`
-      - 입력: `{ userId, limit?: number, context?: string }`
-      - 처리:
-        1. `userId`로 PersonaWorldUser 벡터 조회
-        2. `matchAll()` → 상위 5개 페르소나 선택
-        3. 각 페르소나의 `PersonaCuratedContent (APPROVED)` 조회
-        4. `matchScore × curationScore` 가중 랭킹
-        5. 중복 제거 후 상위 N개 반환
-      - 응답:
-        ```json
-        {
-          "items": [{
-            "contentItem": { "title", "contentType", ... },
-            "recommendedBy": [{ "personaName", "matchScore", "curationScore" }],
-            "finalScore": 0.83,
-            "tier": "exploration"
-          }]
-        }
-        ```
-    - Fallback: 유저 벡터 없으면 tenantId 기준 최신 콘텐츠 반환
-    - API Key 인증
-  - **AC**:
-    - 응답에 `recommendedBy` (어느 페르소나 경유인지) 포함
-    - tier 포함 (exploration인지 기본인지)
-    - 테스트 PASS, Build PASS
+    - 입력: `{ userId, limit?: number (default 20, max 50) }`
+    - 처리 흐름:
+      1. `verifyApiKey` → `tenantId`
+      2. `PersonaWorldUser` 벡터 조회 → 없으면 fallback
+      3. `matchAll()` → 상위 5개 페르소나
+      4. 각 페르소나의 `PersonaCuratedContent (APPROVED)` + `ContentItem` 조회
+      5. `rankContents()` → `finalScore = matchScore × curationScore`
+      6. 중복 contentItemId 제거 (최고 score 유지)
+      7. 상위 limit개 반환
+    - Fallback (벡터 없음): `tenantId` 기준 최신 ContentItem limit개 반환
+    - 응답: `{ items: [{ contentItem, recommendedBy[], finalScore, tier }] }`
     - `docs/api/external-v1.md` + `external-v1.openapi.yaml` 최신화
-
-- [ ] **T397: Engine Studio — 큐레이션 관리 UI**
-  - **파일**: Engine Studio 관리자 페이지 (신규 섹션)
-  - **API (신규)**: `apps/engine-studio/src/app/api/internal/curation/`
-  - **할 일**:
-    - `GET /api/internal/curation/pending` — PENDING 상태 큐레이션 목록
-    - `PATCH /api/internal/curation/[id]/approve` — 승인 → APPROVED
-    - `PATCH /api/internal/curation/[id]/reject` — 거절 → REJECTED
-    - `POST /api/internal/curation/manual` — 수동 페르소나-콘텐츠 연결
-    - UI: 페르소나별 큐레이션 목록 + 승인/거절 버튼 + 수동 연결 폼
-    - 필터: 페르소나별, status별
   - **AC**:
-    - PENDING → APPROVED 전환 시 T396 API에 즉시 반영
-    - 수동 큐레이션 생성 시 APPROVED로 직접 저장
-    - 테스트 PASS, Build PASS (engine-studio)
+    - `recommendedBy` 포함 (페르소나명 + matchScore + curationScore)
+    - Fallback 동작 검증
+    - 테스트 PASS, Build PASS
+    - docs 최신화
+
+---
+
+#### Phase 4-4: 관리 도구
+
+- [x] **T400: internal curation CRUD API**
+  - **파일 (신규)**: `apps/engine-studio/src/app/api/internal/curation/pending/route.ts`
+  - **파일 (신규)**: `apps/engine-studio/src/app/api/internal/curation/[id]/approve/route.ts`
+  - **파일 (신규)**: `apps/engine-studio/src/app/api/internal/curation/[id]/reject/route.ts`
+  - **파일 (신규)**: `apps/engine-studio/src/app/api/internal/curation/manual/route.ts`
+  - **할 일**:
+    - `GET /api/internal/curation/pending?personaId=&page=` — PENDING 목록 (페이지네이션)
+    - `PATCH /api/internal/curation/[id]/approve` — status → APPROVED
+    - `PATCH /api/internal/curation/[id]/reject` — status → REJECTED
+    - `POST /api/internal/curation/manual` — 수동 연결 (status = APPROVED 직접 저장)
+    - 모두 `requireAuth` 보호
+  - **AC**:
+    - approve/reject 시 존재하지 않는 id → 404
+    - manual 시 `@@unique` 중복 → 400
+    - 테스트 PASS, Build PASS
+
+- [x] **T401: Engine Studio — 큐레이션 관리 UI**
+  - **파일 (신규)**: `apps/engine-studio/src/app/(dashboard)/curation/page.tsx`
+  - **파일 (신규)**: `apps/engine-studio/src/app/(dashboard)/curation/components/CurationCard.tsx`
+  - **할 일**:
+    - 페르소나 선택 드롭다운 + status 필터 탭 (PENDING | APPROVED | REJECTED)
+    - `CurationCard`: contentItem 메타 + curationScore + curationReason + 승인/거절 버튼
+    - 수동 연결 폼: 페르소나 선택 + ContentItem ID 입력 + 제출
+    - Optimistic update (버튼 클릭 → 즉시 제거 → 서버 확인)
+    - 사이드바 네비게이션에 "큐레이션" 메뉴 추가
+  - **AC**:
+    - PENDING → APPROVED 클릭 → 목록에서 즉시 제거
+    - 수동 연결 후 APPROVED 탭에 노출
+    - Build PASS (engine-studio)
 
 ---
 

@@ -20,6 +20,7 @@ import {
   Swords,
   LogOut,
   Shield,
+  Sparkles,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { signOut } from "next-auth/react"
@@ -77,6 +78,12 @@ const navSections: NavSection[] = [
     label: "Arena",
     icon: Swords,
     basePath: "/arena",
+    children: [],
+  },
+  {
+    label: "큐레이션 관리",
+    icon: Sparkles,
+    basePath: "/curation",
     children: [],
   },
   {
