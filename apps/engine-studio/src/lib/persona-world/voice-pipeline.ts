@@ -33,6 +33,57 @@ export interface TTSResult {
   audioBase64: string
   contentType: string
   durationEstimateSec: number
+  /** TTS 검증 실패 시 true — 클라이언트에서 텍스트 폴백 처리 */
+  audioFailed?: boolean
+}
+
+// ── TTS 검증 결과 ────────────────────────────────────────────
+
+export interface TTSValidationResult {
+  valid: boolean
+  /** 실패 원인 코드 */
+  failureCode?:
+    | "EMPTY_AUDIO"
+    | "OVERSIZED"
+    | "INVALID_FORMAT"
+    | "SILENT_AUDIO"
+    | "DURATION_MISMATCH"
+  /** 상세 메시지 */
+  message?: string
+}
+
+/** 검증 실패 메트릭 (프로바이더별 추적) */
+export interface TTSValidationMetrics {
+  totalChecks: number
+  failures: number
+  retries: number
+  fallbacks: number
+  failuresByCode: Record<string, number>
+  failuresByProvider: Record<string, number>
+}
+
+const validationMetrics: TTSValidationMetrics = {
+  totalChecks: 0,
+  failures: 0,
+  retries: 0,
+  fallbacks: 0,
+  failuresByCode: {},
+  failuresByProvider: {},
+}
+
+/** 검증 메트릭 조회 */
+export function getTTSValidationMetrics(): TTSValidationMetrics {
+  return { ...validationMetrics }
+}
+
+/** 검증 메트릭 초기화 (테스트용) */
+export function resetTTSValidationMetrics(): void {
+  validationMetrics.totalChecks = 0
+  validationMetrics.failures = 0
+  validationMetrics.retries = 0
+  validationMetrics.fallbacks = 0
+  validationMetrics.failuresByCode = {}
+  validationMetrics.failuresByProvider = {}
 }
 
 // ── 기본 설정 ─────────────────────────────────────────────────
@@ -306,6 +357,228 @@ export async function textToSpeechElevenLabs(
   }
 }
 
+// ── TTS 자체검증 (Voice Self-Verification) ──────────────────
+//
+// L1: 크기 기반 빠른 거부 (빈 오디오 / 과대 응답)
+// L2: MP3 포맷 유효성 (프레임 싱크 바이트 / ID3 헤더)
+// L3: 무음 비율 감지 (MP3 프레임 바이트 패턴 분석)
+// L4: 텍스트-오디오 길이 정합성 (예상 vs 실제 비율)
+//
+// 모든 검증이 순수 바이트 연산 → 추가 API 비용 없음 (~1ms)
+// ─────────────────────────────────────────────────────────────
+
+/** 최소 오디오 크기 (base64 기준, ~75바이트 실제 데이터) */
+const MIN_AUDIO_BASE64_LENGTH = 100
+/** 최대 오디오 크기 (base64 기준, ~7.5MB 실제 데이터) */
+const MAX_AUDIO_BASE64_LENGTH = 10_000_000
+/** 무음 프레임 비율 임계값 — 이 이상이면 무음 판정 */
+const SILENT_FRAME_RATIO_THRESHOLD = 0.9
+/** 길이 정합성 허용 비율 범위 (실제/예상) */
+const DURATION_RATIO_MIN = 0.3
+const DURATION_RATIO_MAX = 3.0
+/** 한국어 평균 발화 속도 (분당 글자 수) */
+const CHARS_PER_MINUTE = 250
+
+/**
+ * TTS 결과의 오디오 품질을 로컬에서 검증.
+ * L1~L4 4단계 검증으로 빈 오디오, 깨진 포맷, 무음, 길이 불일치를 감지.
+ * 추가 API 비용 없이 ~1ms 내 완료.
+ */
+export function validateTTSResult(result: TTSResult, inputTextLength: number): TTSValidationResult {
+  const { audioBase64 } = result
+
+  // L1: 크기 기반 빠른 거부
+  if (inputTextLength > 0 && audioBase64.length < MIN_AUDIO_BASE64_LENGTH) {
+    return {
+      valid: false,
+      failureCode: "EMPTY_AUDIO",
+      message: `Audio too small: ${audioBase64.length} chars (min ${MIN_AUDIO_BASE64_LENGTH})`,
+    }
+  }
+  if (audioBase64.length > MAX_AUDIO_BASE64_LENGTH) {
+    return {
+      valid: false,
+      failureCode: "OVERSIZED",
+      message: `Audio too large: ${audioBase64.length} chars (max ${MAX_AUDIO_BASE64_LENGTH})`,
+    }
+  }
+
+  // 빈 텍스트에 대한 TTS는 검증 스킵 (빈 인사말 등)
+  if (inputTextLength === 0) {
+    return { valid: true }
+  }
+
+  // L2: MP3 포맷 유효성 — 첫 몇 바이트로 매직 넘버 확인
+  const formatCheck = validateMp3Format(audioBase64)
+  if (!formatCheck.valid) {
+    return formatCheck
+  }
+
+  // L3: 무음 비율 감지 — MP3 프레임의 데이터 밀도 분석
+  const silenceCheck = checkSilentAudio(audioBase64)
+  if (!silenceCheck.valid) {
+    return silenceCheck
+  }
+
+  // L4: 텍스트-오디오 길이 정합성
+  const durationCheck = checkDurationConsistency(audioBase64, inputTextLength)
+  if (!durationCheck.valid) {
+    return durationCheck
+  }
+
+  return { valid: true }
+}
+
+/**
+ * L2: MP3 포맷 유효성 검증.
+ * MP3 프레임 싱크(0xFF 0xFx) 또는 ID3v2 헤더(0x49 0x44 0x33) 확인.
+ */
+function validateMp3Format(audioBase64: string): TTSValidationResult {
+  try {
+    // 첫 4바이트만 디코딩하여 확인
+    const headerBytes = Buffer.from(audioBase64.slice(0, 8), "base64")
+    if (headerBytes.length < 3) {
+      return {
+        valid: false,
+        failureCode: "INVALID_FORMAT",
+        message: "Audio data too short for header check",
+      }
+    }
+
+    const b0 = headerBytes[0]
+    const b1 = headerBytes[1]
+    const b2 = headerBytes[2]
+
+    // MP3 프레임 싱크: 0xFF 0xFB/0xF3/0xF2/0xFA/0xE0 등
+    const isMp3Sync = b0 === 0xff && (b1 & 0xe0) === 0xe0
+    // ID3v2 헤더: "ID3"
+    const isId3 = b0 === 0x49 && b1 === 0x44 && b2 === 0x33
+
+    if (!isMp3Sync && !isId3) {
+      return {
+        valid: false,
+        failureCode: "INVALID_FORMAT",
+        message: `Invalid MP3 header: 0x${b0.toString(16)} 0x${b1.toString(16)} 0x${b2.toString(16)}`,
+      }
+    }
+
+    return { valid: true }
+  } catch {
+    return { valid: false, failureCode: "INVALID_FORMAT", message: "Failed to decode audio base64" }
+  }
+}
+
+/**
+ * L3: 무음 오디오 감지.
+ * MP3 데이터의 바이트 엔트로피(다양성)를 분석하여 실질 오디오인지 판별.
+ * 무음 MP3는 프레임 데이터가 거의 0x00으로 채워짐.
+ */
+function checkSilentAudio(audioBase64: string): TTSValidationResult {
+  try {
+    const buf = Buffer.from(audioBase64, "base64")
+
+    // 최소 1KB 이상이어야 의미 있는 분석 가능
+    if (buf.length < 1024) {
+      return { valid: true } // 너무 짧으면 스킵 (L1에서 이미 크기 검증)
+    }
+
+    // ID3 태그 건너뛰기
+    let offset = 0
+    if (buf[0] === 0x49 && buf[1] === 0x44 && buf[2] === 0x33 && buf.length > 10) {
+      // ID3v2 크기: synchsafe integer (4바이트)
+      const id3Size =
+        ((buf[6] & 0x7f) << 21) | ((buf[7] & 0x7f) << 14) | ((buf[8] & 0x7f) << 7) | (buf[9] & 0x7f)
+      offset = 10 + id3Size
+    }
+
+    // 오디오 데이터 영역에서 샘플링 (256바이트 간격으로 스캔)
+    const sampleInterval = 256
+    let totalSamples = 0
+    let silentSamples = 0
+
+    for (let i = offset; i < buf.length - sampleInterval; i += sampleInterval) {
+      totalSamples++
+      // 256바이트 블록의 바이트 분산을 계산
+      let zeroCount = 0
+      for (let j = 0; j < sampleInterval && i + j < buf.length; j++) {
+        if (buf[i + j] === 0x00) zeroCount++
+      }
+      // 블록의 80% 이상이 0x00이면 무음 블록
+      if (zeroCount / sampleInterval > 0.8) {
+        silentSamples++
+      }
+    }
+
+    if (totalSamples > 0 && silentSamples / totalSamples > SILENT_FRAME_RATIO_THRESHOLD) {
+      return {
+        valid: false,
+        failureCode: "SILENT_AUDIO",
+        message: `Audio is ${Math.round((silentSamples / totalSamples) * 100)}% silent (threshold: ${SILENT_FRAME_RATIO_THRESHOLD * 100}%)`,
+      }
+    }
+
+    return { valid: true }
+  } catch {
+    return { valid: true } // 분석 실패 시 통과 (보수적)
+  }
+}
+
+/**
+ * L4: 텍스트-오디오 길이 정합성 검증.
+ * MP3 비트레이트 기반으로 실제 오디오 길이를 추정하고,
+ * 텍스트 길이 기반 예상 길이와 비교.
+ */
+function checkDurationConsistency(audioBase64: string, textLength: number): TTSValidationResult {
+  // 예상 길이 (초)
+  const expectedDurationSec = (textLength / CHARS_PER_MINUTE) * 60
+
+  // MP3 비트레이트 기반 실제 길이 추정
+  // MP3 평균 비트레이트: 128kbps → 16KB/s
+  const audioBytes = Math.ceil(audioBase64.length * 0.75) // base64 → 실제 바이트
+  const estimatedBitrate = 128_000 // 128kbps (일반적인 TTS 출력)
+  const actualDurationSec = (audioBytes * 8) / estimatedBitrate
+
+  // 예상 길이가 0.5초 미만이면 정합성 체크 스킵 (너무 짧은 텍스트)
+  if (expectedDurationSec < 0.5) {
+    return { valid: true }
+  }
+
+  const ratio = actualDurationSec / expectedDurationSec
+  if (ratio < DURATION_RATIO_MIN || ratio > DURATION_RATIO_MAX) {
+    return {
+      valid: false,
+      failureCode: "DURATION_MISMATCH",
+      message: `Duration ratio ${ratio.toFixed(2)} out of range [${DURATION_RATIO_MIN}, ${DURATION_RATIO_MAX}] (expected: ${expectedDurationSec.toFixed(1)}s, estimated: ${actualDurationSec.toFixed(1)}s)`,
+    }
+  }
+
+  return { valid: true }
+}
+
+/** TTS 프로바이더 간 fallback 순서 */
+const PROVIDER_FALLBACK: Record<TTSProvider, TTSProvider | null> = {
+  elevenlabs: "openai",
+  openai: "google",
+  google: null,
+}
+
+/** fallback 시 provider에 맞는 기본 voiceId */
+const FALLBACK_VOICE_IDS: Record<TTSProvider, string> = {
+  openai: "alloy",
+  google: "ko-KR-Neural2-A",
+  elevenlabs: "21m00Tcm4TlvDq8ikWAM", // Rachel
+}
+
+/** 검증 실패 시 메트릭에 기록 */
+function recordValidationFailure(provider: string, failureCode: string): void {
+  validationMetrics.failures++
+  validationMetrics.failuresByCode[failureCode] =
+    (validationMetrics.failuresByCode[failureCode] ?? 0) + 1
+  validationMetrics.failuresByProvider[provider] =
+    (validationMetrics.failuresByProvider[provider] ?? 0) + 1
+  console.warn(`[TTS Validation] FAIL — provider: ${provider}, code: ${failureCode}`)
+}
+
 // ── TTS 캐시 (인메모리 LRU) ──────────────────────────────────
 //
 // 동일 (provider + voiceId + speed + text) 조합의 오디오를 캐싱.
@@ -397,6 +670,15 @@ class TtsCacheStore {
     }
   }
 
+  /** 특정 캐시 항목 제거 (검증 실패 시 불량 캐시 삭제) */
+  remove(key: string): boolean {
+    const entry = this.cache.get(key)
+    if (!entry) return false
+    this.totalSizeBytes -= entry.sizeBytes
+    this.cache.delete(key)
+    return true
+  }
+
   clear(): void {
     this.cache.clear()
     this.totalSizeBytes = 0
@@ -408,35 +690,137 @@ class TtsCacheStore {
 /** 싱글턴 TTS 캐시 — 모듈 레벨에서 공유 */
 export const ttsCache = new TtsCacheStore()
 
-// ── 통합 TTS 디스패처 (캐시 적용) ────────────────────────────
+// ── 통합 TTS 디스패처 (캐시 + 자체검증 적용) ────────────────
+
+/** provider에 따라 적절한 TTS 함수를 호출 */
+async function callTTSProvider(text: string, config: TTSVoiceConfig): Promise<TTSResult> {
+  if (config.provider === "elevenlabs") {
+    return textToSpeechElevenLabs(text, config)
+  } else if (config.provider === "google") {
+    return textToSpeechGoogle(text, config)
+  } else {
+    return textToSpeechOpenAI(text, config)
+  }
+}
 
 /**
- * provider 설정에 따라 TTS API를 호출하되, 캐시에 있으면 바로 반환.
- * 동일 텍스트+음성 조합은 한 번만 API 호출 → 비용 절감.
+ * provider 설정에 따라 TTS API를 호출하되, 캐시 + 자체검증을 적용.
+ *
+ * 파이프라인:
+ * 1. 캐시 조회 → HIT → 검증 → PASS → 반환 / FAIL → 캐시 제거 → 재생성
+ * 2. API 호출 → 검증 → PASS → 캐시 저장 → 반환
+ * 3. 검증 FAIL → 1회 재시도 → 검증 → PASS → 캐시 저장 → 반환
+ * 4. 재시도 FAIL → fallback provider → 검증 → PASS → 반환
+ * 5. 전부 FAIL → { audioFailed: true }
  */
 export async function textToSpeech(
   text: string,
   config: TTSVoiceConfig = DEFAULT_TTS_CONFIG
 ): Promise<TTSResult> {
+  const textLength = text.length
+
   // 1. 캐시 조회
   const cacheKey = ttsCache.generateKey(text, config)
   const cached = ttsCache.get(cacheKey)
-  if (cached) return cached
+  if (cached) {
+    // 캐시된 항목도 검증 (이전에 불량이 캐시되었을 수 있음)
+    validationMetrics.totalChecks++
+    const validation = validateTTSResult(cached, textLength)
+    if (validation.valid) return cached
 
-  // 2. 캐시 미스 → API 호출
-  let result: TTSResult
-  if (config.provider === "elevenlabs") {
-    result = await textToSpeechElevenLabs(text, config)
-  } else if (config.provider === "google") {
-    result = await textToSpeechGoogle(text, config)
-  } else {
-    result = await textToSpeechOpenAI(text, config)
+    // 캐시된 불량 항목 제거
+    ttsCache.remove(cacheKey)
+    recordValidationFailure(config.provider, validation.failureCode ?? "UNKNOWN")
   }
 
-  // 3. 캐시 저장
-  ttsCache.set(cacheKey, result)
+  // 2. API 호출 + 검증
+  let result: TTSResult
+  try {
+    result = await callTTSProvider(text, config)
+  } catch (err) {
+    console.error(`[TTS] Provider ${config.provider} call failed:`, err)
+    // API 호출 자체가 실패하면 바로 fallback으로
+    return await attemptFallback(text, config, textLength)
+  }
 
-  return result
+  validationMetrics.totalChecks++
+  const validation = validateTTSResult(result, textLength)
+  if (validation.valid) {
+    ttsCache.set(cacheKey, result)
+    return result
+  }
+
+  // 3. 검증 실패 → 1회 재시도
+  recordValidationFailure(config.provider, validation.failureCode ?? "UNKNOWN")
+  validationMetrics.retries++
+
+  try {
+    result = await callTTSProvider(text, config)
+    validationMetrics.totalChecks++
+    const retryValidation = validateTTSResult(result, textLength)
+    if (retryValidation.valid) {
+      ttsCache.set(cacheKey, result)
+      return result
+    }
+    recordValidationFailure(config.provider, retryValidation.failureCode ?? "UNKNOWN")
+  } catch {
+    // 재시도도 실패
+  }
+
+  // 4. Fallback provider
+  return await attemptFallback(text, config, textLength)
+}
+
+/** Fallback provider로 TTS 시도 */
+async function attemptFallback(
+  text: string,
+  originalConfig: TTSVoiceConfig,
+  textLength: number
+): Promise<TTSResult> {
+  const fallbackProvider = PROVIDER_FALLBACK[originalConfig.provider]
+
+  if (!fallbackProvider) {
+    // fallback 없음 → 실패 반환
+    return {
+      audioBase64: "",
+      contentType: "audio/mpeg",
+      durationEstimateSec: 0,
+      audioFailed: true,
+    }
+  }
+
+  validationMetrics.fallbacks++
+  const fallbackConfig: TTSVoiceConfig = {
+    ...originalConfig,
+    provider: fallbackProvider,
+    voiceId: FALLBACK_VOICE_IDS[fallbackProvider],
+    // fallback 시 ElevenLabs 전용 설정 제거
+    stability: undefined,
+    similarityBoost: undefined,
+    style: undefined,
+    useSpeakerBoost: undefined,
+  }
+
+  try {
+    const result = await callTTSProvider(text, fallbackConfig)
+    validationMetrics.totalChecks++
+    const validation = validateTTSResult(result, textLength)
+    if (validation.valid) {
+      // fallback 결과는 캐시하지 않음 (원본 config과 다른 provider이므로)
+      return result
+    }
+    recordValidationFailure(fallbackProvider, validation.failureCode ?? "UNKNOWN")
+  } catch {
+    // fallback도 API 호출 실패
+  }
+
+  // 모든 시도 실패
+  return {
+    audioBase64: "",
+    contentType: "audio/mpeg",
+    durationEstimateSec: 0,
+    audioFailed: true,
+  }
 }
 
 // ── 유틸리티 ──────────────────────────────────────────────────

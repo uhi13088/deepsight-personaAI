@@ -814,6 +814,46 @@
 
 ---
 
+## IN PROGRESS (v4.0 — TTS 자체검증 루프)
+
+> 페르소나 생성 시 TTS 음성 추론 → 검증 샘플 생성 → 자동 검증 파이프라인
+
+- [ ] **T362: validateTTSResult() 검증 함수 (L1~L4)**
+  - L1: 크기 기반 빠른 거부 (빈 오디오 / 과대 응답)
+  - L2: MP3 포맷 유효성 (프레임 싱크 바이트 / ID3 헤더)
+  - L3: 무음 비율 감지 (MP3 프레임 바이트 패턴 분석)
+  - L4: 텍스트-오디오 길이 정합성 (예상 vs 실제 비율)
+  - AC: 정상/빈/무음/과대/깨진 MP3 모두 정확히 판별
+
+- [ ] **T363: textToSpeech() 자체검증 + 재시도 + fallback 통합**
+  - 캐시 HIT 시에도 검증 (불량 캐시 자동 제거)
+  - 검증 FAIL → 1회 재시도 → fallback provider 전환
+  - 전부 실패 시 `audioFailed: true` 플래그로 텍스트 폴백
+  - AC: 불량 TTS 시 fallback 후 정상 음성 반환
+
+- [ ] **T364: TTSResult 타입 확장 + 검증 메트릭 로깅**
+  - `audioFailed?: boolean` 추가
+  - 프로바이더별/실패코드별 메트릭 수집
+  - `getTTSValidationMetrics()` 조회 함수
+  - AC: 메트릭에서 실패율/재시도율/fallback율 확인 가능
+
+- [ ] **T365: 페르소나 생성 파이프라인 음성 검증 통합**
+  - `pipeline.ts` 자동 모드: TTS 추론 후 샘플 생성 → 검증
+  - 검증 실패 시 fallback provider로 재추론 + DB 저장
+  - `recalculate-tts` API에도 검증 추가
+  - AC: 페르소나 생성 시 TTS 품질 자동 보장
+
+- [ ] **T366: TTS 검증 단위 테스트**
+  - `validateTTSResult()`: 정상/빈/과대/깨진/무음/길이불일치 시나리오
+  - `textToSpeech()` 통합: 캐시 불량 제거, 재시도, fallback
+  - 페르소나 파이프라인 검증 통합 테스트
+  - AC: 20+ 테스트 PASS
+
+- [ ] **T367: 전체 검증 + 커밋**
+  - typecheck PASS
+  - 기존 4555+ 테스트 + 신규 테스트 전부 PASS
+  - 커밋 및 푸시
+
 ## QUEUE
 
 (없음)
