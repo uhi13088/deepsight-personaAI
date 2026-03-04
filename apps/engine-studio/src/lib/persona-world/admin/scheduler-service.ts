@@ -633,10 +633,15 @@ export async function runDailyNewsReactionPipeline(
 
   const createdPosts: Array<{ personaId: string; postId: string; articleId: string }> = []
   const schedulerDP = createSchedulerDataProvider()
+  // 동일 배치 실행 내 페르소나당 1개 포스트 제한 (동시 다중 포스팅 방지)
+  const postedInBatch = new Set<string>()
+  const schedulerPersonas = await schedulerDP.getActiveStatusPersonas()
 
   for (const reaction of scheduled) {
+    // 이미 이번 배치에서 포스팅한 페르소나는 다음 배치로 이월
+    if (postedInBatch.has(reaction.personaId)) continue
+
     try {
-      const schedulerPersonas = await schedulerDP.getActiveStatusPersonas()
       const persona = schedulerPersonas.find((p) => p.id === reaction.personaId)
       if (!persona) continue
 
@@ -675,6 +680,7 @@ export async function runDailyNewsReactionPipeline(
         data: { newsArticleId: reaction.articleId },
       })
 
+      postedInBatch.add(reaction.personaId)
       createdPosts.push({
         personaId: reaction.personaId,
         postId: postResult.postId,
@@ -724,6 +730,23 @@ export function createSchedulerDataProvider(): SchedulerDataProvider {
           status: true,
           paradoxScore: true,
           layerVectors: true,
+          // LLM 프롬프트 개인화용 프로필 필드
+          role: true,
+          expertise: true,
+          description: true,
+          region: true,
+          speechPatterns: true,
+          quirks: true,
+          postPrompt: true,
+          commentPrompt: true,
+          voiceSpec: true,
+          factbook: true,
+          // 활동 스케줄링 필드
+          postFrequency: true,
+          activeHours: true,
+          peakHours: true,
+          triggerMap: true,
+          knowledgeAreas: true,
         },
       })
 
@@ -766,6 +789,21 @@ export function createSchedulerDataProvider(): SchedulerDataProvider {
             status: p.status,
             vectors,
             paradoxScore: Number(p.paradoxScore ?? 0),
+            role: p.role ?? null,
+            expertise: (p.expertise as string[]) ?? [],
+            description: p.description ?? null,
+            region: p.region ?? null,
+            speechPatterns: (p.speechPatterns as string[]) ?? [],
+            quirks: (p.quirks as string[]) ?? [],
+            postPrompt: p.postPrompt ?? null,
+            commentPrompt: p.commentPrompt ?? null,
+            voiceSpec: p.voiceSpec ?? null,
+            factbook: p.factbook ?? null,
+            postFrequency: p.postFrequency,
+            activeHours: (p.activeHours as number[]) ?? [],
+            peakHours: (p.peakHours as number[]) ?? [],
+            triggerMap: p.triggerMap ?? null,
+            knowledgeAreas: (p.knowledgeAreas as string[]) ?? [],
           },
         ]
       })

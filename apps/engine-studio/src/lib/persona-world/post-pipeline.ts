@@ -202,6 +202,10 @@ export async function executePostCreation(
     personaState: state,
     personaProfile,
     availablePersonaHandles,
+    hashtagRange: computeHashtagRange(
+      persona.vectors.temperament.extraversion,
+      persona.vectors.temperament.openness
+    ),
   }
 
   // Step 3: LLM 콘텐츠 생성
@@ -474,6 +478,23 @@ export async function executePostCreation(
 }
 
 // ── 유틸리티 ─────────────────────────────────────────────────
+
+/**
+ * temperament 벡터 기반 해시태그 수 범위 결정.
+ *
+ * extraversion(공개 반응 의지) + openness(관심 다양성) 평균으로 산출:
+ * - ≥0.7: 외향적·개방적 → 5~10개
+ * - 0.5~0.7: 중간 → 3~7개
+ * - 0.3~0.5: 소극적 → 2~5개
+ * - <0.3: 내향적·폐쇄적 → 2~3개
+ */
+function computeHashtagRange(extraversion: number, openness: number): { min: number; max: number } {
+  const avg = (extraversion + openness) / 2
+  if (avg >= 0.7) return { min: 5, max: 10 }
+  if (avg >= 0.5) return { min: 3, max: 7 }
+  if (avg >= 0.3) return { min: 2, max: 5 }
+  return { min: 2, max: 3 }
+}
 
 function describeEmotionalState(state: PersonaStateData): string {
   const parts: string[] = []
