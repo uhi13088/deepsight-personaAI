@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
-// PersonaWorld v3 — Interaction Execution Pipeline
+// PersonaWorld v4 — Interaction Execution Pipeline
 // 스케줄러 인터랙션 결정 → 대상 선택 → 좋아요/댓글/팔로우 실행
+// v4.2: attraction 기본값 포함, 관계 스코어 전체 필드 연동
 // ═══════════════════════════════════════════════════════════════
 
 import { Prisma } from "@/generated/prisma"

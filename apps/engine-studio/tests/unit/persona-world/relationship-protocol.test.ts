@@ -38,6 +38,7 @@ function makeScore(overrides: Partial<RelationshipScore> = {}): RelationshipScor
     frequency: 0.0,
     depth: 0.0,
     lastInteractionAt: null,
+    attraction: 0,
     ...overrides,
   }
 }

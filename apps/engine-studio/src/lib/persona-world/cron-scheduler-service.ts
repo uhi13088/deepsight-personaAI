@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
-// Cron Scheduler Service
+// Cron Scheduler Service (v4.2)
 // Business logic extracted from /api/cron/persona-scheduler route
+// v4.2: 전체 관계 계산 파이프라인 (attraction + 자율 stage/type)
 // ═══════════════════════════════════════════════════════════════
 
 import { prisma } from "@/lib/prisma"
@@ -13,6 +14,15 @@ import { executePostCreation } from "@/lib/persona-world/post-pipeline"
 import type { PostPipelineDataProvider } from "@/lib/persona-world/post-pipeline"
 import { executeInteractions } from "@/lib/persona-world/interaction-pipeline"
 import type { InteractionPipelineDataProvider } from "@/lib/persona-world/interaction-pipeline"
+import {
+  computeRelationshipUpdate,
+  type InteractionEvent,
+} from "@/lib/persona-world/interactions/relationship-manager"
+import {
+  determineStage,
+  determineType,
+} from "@/lib/persona-world/interactions/relationship-protocol"
+import type { RelationshipMilestone } from "@/lib/persona-world/types"
 import {
   createPostLLMProvider,
   createCommentLLMProvider,
@@ -702,7 +712,11 @@ function createInteractionProvider(): InteractionPipelineDataProvider {
         tension: Number(rel.tension),
         frequency: Number(rel.frequency),
         depth: Number(rel.depth),
-        lastInteractionAt: rel.updatedAt ?? null,
+        lastInteractionAt: rel.lastInteractionAt ?? null,
+        attraction: Number(rel.attraction),
+        peakStage: rel.peakStage,
+        momentum: Number(rel.momentum),
+        milestones: (rel.milestones as RelationshipMilestone[]) ?? [],
       }
     },
 
@@ -781,22 +795,77 @@ function createInteractionProvider(): InteractionPipelineDataProvider {
       return { id: comment.id }
     },
 
-    async updateRelationship(personaAId, personaBId) {
+    async updateRelationship(personaAId, personaBId, eventType) {
+      // v4.2: 전체 관계 계산 파이프라인 (자율 자동 업데이트)
+      const rel = await prisma.personaRelationship.findFirst({
+        where: {
+          OR: [
+            { personaAId, personaBId },
+            { personaAId: personaBId, personaBId: personaAId },
+          ],
+        },
+      })
+
+      const current = rel
+        ? {
+            warmth: Number(rel.warmth),
+            tension: Number(rel.tension),
+            frequency: Number(rel.frequency),
+            depth: Number(rel.depth),
+            lastInteractionAt: rel.lastInteractionAt ?? null,
+            attraction: Number(rel.attraction),
+            peakStage: rel.peakStage,
+            momentum: Number(rel.momentum),
+            milestones: (rel.milestones as RelationshipMilestone[]) ?? [],
+          }
+        : {
+            warmth: 0.1,
+            tension: 0,
+            frequency: 0,
+            depth: 0,
+            lastInteractionAt: null,
+            attraction: 0,
+          }
+
+      const event: InteractionEvent = {
+        type: eventType as InteractionEvent["type"],
+      }
+      const updated = computeRelationshipUpdate(current, event)
+      // v4.2: 자율 자동 — 단계/유형도 자동 계산
+      const autoStage = determineStage(updated)
+      const autoType = determineType(updated)
+
       await prisma.personaRelationship.upsert({
         where: {
           personaAId_personaBId: { personaAId, personaBId },
         },
         update: {
-          frequency: { increment: 0.01 },
+          warmth: updated.warmth,
+          tension: updated.tension,
+          frequency: updated.frequency,
+          depth: updated.depth,
+          attraction: updated.attraction ?? 0,
+          peakStage: updated.peakStage ?? "STRANGER",
+          momentum: updated.momentum ?? 0,
+          milestones: (updated.milestones as unknown as Prisma.JsonArray) ?? [],
+          stage: autoStage,
+          type: autoType,
           lastInteractionAt: new Date(),
         },
         create: {
           personaAId,
           personaBId,
-          warmth: 0.1,
-          tension: 0,
-          frequency: 0.01,
-          depth: 0,
+          warmth: updated.warmth,
+          tension: updated.tension,
+          frequency: updated.frequency,
+          depth: updated.depth,
+          attraction: updated.attraction ?? 0,
+          peakStage: updated.peakStage ?? "STRANGER",
+          momentum: updated.momentum ?? 0,
+          milestones: (updated.milestones as unknown as Prisma.JsonArray) ?? [],
+          stage: autoStage,
+          type: autoType,
+          lastInteractionAt: new Date(),
         },
       })
     },

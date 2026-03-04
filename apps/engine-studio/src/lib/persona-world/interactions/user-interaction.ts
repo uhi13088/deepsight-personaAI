@@ -1,7 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
-// PersonaWorld v3 — User↔Persona Interaction
+// PersonaWorld v4 — User↔Persona Interaction
 // 구현계획서 §6.5, 설계서 §5.5
 // 유저 댓글 → UIV 분석 → Adapt → Override → RAG → LLM → Express
+// v4.1/v4.2: 관계 스코어 전체 필드 연동
 // ═══════════════════════════════════════════════════════════════
 
 import type { ThreeLayerVector } from "@/types/persona-v3"

@@ -1594,12 +1594,21 @@ model PersonaRelationship {
 
   lastInteractionAt DateTime?
 
-  // v4.0 관계 단계/유형 + 카운터 (T263)
-  stage             String   @default("STRANGER")              // STRANGER/ACQUAINTANCE/FAMILIAR/CLOSE/COOLING/DORMANT
-  type              String   @default("NEUTRAL")               // NEUTRAL/ALLY/RIVAL/MENTOR/FAN
+  // v4.1: 관계 단계 9종 (T263, T352) / v4.2: 관계 유형 22종 (T355, T356)
+  stage             String   @default("STRANGER")              // v4.1: STRANGER/ACQUAINTANCE/REGULAR/FAMILIAR/INTIMATE/CLOSE/COOLING/DORMANT/ESTRANGED (9종)
+  type              String   @default("NEUTRAL")               // v4.1: 10종 → v4.2: 22종 (NEUTRAL~PUSH_PULL)
   positiveComments  Int      @default(0)                       // 긍정 댓글 누적
   negativeComments  Int      @default(0)                       // 부정 댓글 누적
   totalInteractions Int      @default(0)                       // 총 인터랙션 누적
+
+  // v4.2: 로맨틱 감정 지표 (0.00~1.00)
+  attraction        Decimal  @db.Decimal(3, 2) @default(0.00)
+  // v4.1: 최고 도달 관계 단계 (ESTRANGED 판별용)
+  peakStage         String   @default("STRANGER") @map("peak_stage")
+  // v4.1: 관계 발전 속도 (-1.0~1.0)
+  momentum          Decimal  @db.Decimal(4, 3) @default(0.000)
+  // v4.1/v4.2: 관계 마일스톤 이벤트 기록 (JSON)
+  milestones        Json     @default("[]")
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

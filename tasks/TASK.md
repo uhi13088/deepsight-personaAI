@@ -856,6 +856,28 @@
   - 변경: types.ts, relationship-protocol.ts, relationship-manager.ts, interaction-pipeline.ts, relationship-protocol.test.ts
   - 테스트: 4518 PASS (114 파일)
 
+- [x] **T356: v4.2 기억저장소 연동 + DB 영속화 + 자율 자동화 + UI** ✅ 2026-03-03
+  - **T356-1: makeScore() 테스트 헬퍼에 attraction: 0 기본값 추가**
+  - **T356-2: DB 스키마 + 마이그레이션 (042)**
+    - PersonaRelationship에 attraction(Decimal 3,2), peak_stage(Text), momentum(Decimal 4,3), milestones(JSONB) 컬럼 추가
+    - 스키마 코멘트 최신화: stage 9종, type 22종
+  - **T356-3: 스케줄러 3곳 자율 자동 업데이트**
+    - cron-scheduler, pw-scheduler, admin-scheduler의 getRelationship: v4.2 필드 로드
+    - updateRelationship: computeRelationshipUpdate → determineStage/determineType 자동 계산 → DB 전체 upsert
+    - 관리자 개입 없이 인터랙션마다 자동으로 22종 유형 + 9종 단계 + attraction + momentum + milestones 업데이트
+  - **T356-4: v4-operations 배치 감쇠**
+    - applyRelationshipDecay: attraction 7%/주 감쇠 추가 (warmth 1%, frequency 2%와 함께)
+  - **T356-5: LLM 캐릭터 생성기 확장**
+    - RelationshipSeed 타입: 5→16종 (ally/rival/mentor/fan/confidant/frenemy/nemesis/muse/protege/crush/guardian/companion/bestie/tsundere + 하위호환 student/antagonist)
+    - VALID_RELATIONSHIP_TYPES: LLM 프롬프트 + 검증 + 벡터 기반 생성 함수 모두 갱신
+    - generateRelationships: crush(호감+사교), tsundere(감정기복+비판) 추가
+  - **T356-6: 기억 API + 뷰어 UI (읽기전용 모니터링)**
+    - memories API: attraction, stage, type, peakStage, momentum, milestones 반환
+    - 관계 탭 UI: type 뱃지(primary) + stage 라벨 + attraction 게이지(5열) + 마일스톤 칩
+    - 관리자 직접 컨트롤 최소화 — 전부 자동 계산 결과 읽기전용 표시
+  - 변경: schema.prisma, 042 마이그레이션, cron-scheduler-service.ts, pw-scheduler-service.ts, admin/scheduler-service.ts, v4-operations/route.ts, character-generator.ts, llm-character-generator.ts, memories/route.ts, persona-dimension-editor.tsx, relationship-protocol.test.ts, persona-generation.test.ts
+  - 테스트: 4518 PASS (114 파일)
+
 ---
 
 ## QUEUE

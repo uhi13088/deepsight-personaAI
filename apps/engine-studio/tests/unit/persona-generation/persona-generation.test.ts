@@ -302,7 +302,24 @@ describe("Character Generator (AC4)", () => {
 
   it("relationship types should be valid", () => {
     const character = generateCharacter(IRONIC_L1, IRONIC_L2, IRONIC_L3)
-    const validTypes = ["mentor", "rival", "ally", "student", "antagonist"]
+    const validTypes = [
+      "ally",
+      "rival",
+      "mentor",
+      "fan",
+      "confidant",
+      "frenemy",
+      "nemesis",
+      "muse",
+      "protege",
+      "crush",
+      "guardian",
+      "companion",
+      "bestie",
+      "tsundere",
+      "student",
+      "antagonist",
+    ]
     for (const rel of character.relationships) {
       expect(validTypes).toContain(rel.type)
       expect(rel.description).toBeTruthy()
