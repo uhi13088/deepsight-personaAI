@@ -108,6 +108,7 @@ export interface SchedulerStatusData {
     id: string
     personaId: string
     activityType: string
+    trigger: string
     createdAt: string
   }>
 }
@@ -153,6 +154,7 @@ export async function getSchedulerStatus(): Promise<SchedulerStatusData> {
     id: string
     personaId: string
     activityType: string
+    trigger: string
     createdAt: Date
   }> = []
 
@@ -167,9 +169,10 @@ export async function getSchedulerStatus(): Promise<SchedulerStatusData> {
       }),
       prisma.personaPost.count({ where: { createdAt: { gte: todayStart } } }),
       prisma.personaActivityLog.findMany({
-        where: { trigger: { in: ["SCHEDULED", "MANUAL"] } },
+        where: { trigger: { in: ["SCHEDULED", "MANUAL", "TRENDING"] } },
         orderBy: { createdAt: "desc" },
         take: 20,
+        select: { id: true, personaId: true, activityType: true, trigger: true, createdAt: true },
       }),
       isSchedulerEnabled(),
     ])
@@ -190,6 +193,7 @@ export async function getSchedulerStatus(): Promise<SchedulerStatusData> {
       id: log.id,
       personaId: log.personaId,
       activityType: log.activityType,
+      trigger: log.trigger,
       createdAt: log.createdAt.toISOString(),
     })),
   }
