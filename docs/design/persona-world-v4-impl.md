@@ -27,6 +27,7 @@
 10. [품질 측정 통합](#10-품질-측정-통합)
 11. [모더레이션 & 운영](#11-모더레이션--운영)
 12. [비용 모니터링 & 제어](#12-비용-모니터링--제어)
+    12A. [채팅 + 통화 + Voice Pipeline 구현](#12a-채팅--통화--voice-pipeline-구현)
 13. [구현 페이즈 및 태스크](#13-구현-페이즈-및-태스크)
 14. [파일 변경 맵](#14-파일-변경-맵)
 
@@ -1405,6 +1406,64 @@ optimizeLlmCallOrdering(pendingCalls): OrderedCalls
 
 ---
 
+## 12A. 채팅 + 통화 + Voice Pipeline 구현
+
+### Chat Service
+
+**파일**: `src/lib/persona-world/chat-service.ts`
+
+```
+createThread(userId, personaId): ChatThread
+sendMessage(threadId, userId, content): ChatMessage
+├── Credit check (10 coins)
+├── Conversation memory retrieval
+├── Conversation engine response
+├── Memory recording
+└── State adjustment
+getThreads(userId): ChatThread[]
+getMessages(threadId, cursor): ChatMessage[]
+```
+
+### Call Service
+
+**파일**: `src/lib/persona-world/call-service.ts`
+
+```
+createReservation(userId, personaId): CallReservation
+startCall(reservationId): StartCallResponse
+├── Status: PENDING → ACTIVE
+├── Coin deduction (200)
+├── TTS greeting generation
+└── CallSession + InteractionSession creation
+processCallTurn(sessionId, audioBase64): CallTurnResponse
+├── STT (Whisper)
+├── Conversation engine response
+├── TTS synthesis + L1~L4 validation
+└── Memory recording
+endCall(sessionId): EndCallResponse
+├── Status: ACTIVE → COMPLETED
+└── Conversation memory finalization
+```
+
+### Voice Pipeline
+
+**파일**: `src/lib/persona-world/voice-pipeline.ts`
+
+```
+textToSpeech(text, config): Promise<TTSResult>
+├── LRU cache check
+├── Provider dispatch (ElevenLabs/OpenAI/Google)
+├── L1~L4 validation
+├── Retry + fallback
+└── Cache set
+
+sttLanguageToBcp47(lang): string
+buildTTSConfig(persona): TTSVoiceConfig
+isVoiceConfigured(): { stt: boolean, tts: boolean }
+```
+
+---
+
 ## 13. 구현 페이즈 및 태스크
 
 ### Phase 0: 기반 (DB + 타입)
@@ -1502,6 +1561,22 @@ optimizeLlmCallOrdering(pendingCalls): OrderedCalls
 | 49  | 비용 모드 (QUALITY/BALANCE/COST_PRIORITY)                  | TODO |
 | 50  | 비용 최적화 실행 (적응적 스케줄링, 배치 처리, 캐시 최적화) | TODO |
 
+### Phase 9: 채팅 + 통화 시스템 (T330~T367)
+
+| #         | 태스크                                           | 상태 |
+| --------- | ------------------------------------------------ | ---- |
+| T330      | DB 스키마 — ChatThread + ChatMessage + Call 모델 | DONE |
+| T331      | Conversation Engine                              | DONE |
+| T332      | 기억 파이프라인 통합                             | DONE |
+| T333      | Chat Service                                     | DONE |
+| T334      | Chat API 4개 엔드포인트                          | DONE |
+| T335~T336 | Chat UI (메시지 + 대화 목록)                     | DONE |
+| T337      | Voice Pipeline — STT + TTS 통합                  | DONE |
+| T338      | Call Service                                     | DONE |
+| T339~T340 | Call API + UI                                    | DONE |
+| T357~T361 | 통화 세션 API + UI + 테스트 + 문서               | DONE |
+| T362~T367 | TTS 자체검증 루프 + 테스트                       | DONE |
+
 ---
 
 ## 14. 파일 변경 맵
@@ -1518,6 +1593,12 @@ src/lib/persona-world/
   ├── consumption-logger.ts        // 소비 기록
   ├── feed-engine.ts               // 피드 알고리즘
   ├── security-middleware.ts       // v4.0 보안 파이프라인
+  ├── chat-service.ts              // T333
+  ├── call-service.ts              // T338
+  ├── conversation-engine.ts       // T331
+  ├── conversation-memory.ts       // T332
+  ├── voice-engine.ts              // T329
+  ├── voice-pipeline.ts            // T337, T362~T364
   │
   ├── interactions/
   │   ├── like.ts                  // 좋아요 판정
@@ -1565,7 +1646,14 @@ src/app/api/persona-world/
   ├── onboarding/*/route.ts
   ├── posts/route.ts
   ├── interactions/route.ts
-  └── explore/route.ts
+  ├── explore/route.ts
+  ├── chat/threads/route.ts                        // T334
+  ├── chat/threads/[threadId]/messages/route.ts    // T334
+  ├── calls/reservations/route.ts                  // T339
+  ├── calls/reservations/[reservationId]/route.ts  // T339
+  ├── calls/sessions/route.ts                      // T357
+  ├── calls/sessions/[sessionId]/turn/route.ts     // T357
+  └── calls/sessions/[sessionId]/end/route.ts      // T357
 
 src/app/api/admin/persona-world/   // v4.0 관리자 API
   ├── dashboard/route.ts
@@ -1574,6 +1662,13 @@ src/app/api/admin/persona-world/   // v4.0 관리자 API
   ├── quarantine/[id]/review/route.ts
   ├── reports/route.ts
   └── reports/[id]/resolve/route.ts
+
+tests/unit/persona-world/
+  ├── chat-service.test.ts         // T359
+  ├── call-service.test.ts         // T359
+  ├── conversation-memory.test.ts  // T359
+  ├── voice-pipeline.test.ts       // T366
+  └── tts-validation.test.ts       // T366
 ```
 
 ### 수정 파일
