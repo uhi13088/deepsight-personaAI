@@ -413,6 +413,30 @@ export interface CallReservation {
   coinSpent: number
 }
 
+// ── 통화 세션 ──────────────────────────────────────────────
+export interface StartCallResponse {
+  callSessionId: string
+  interactionSessionId: string
+  greetingText: string
+  greetingAudioBase64: string
+  greetingAudioContentType: string
+}
+
+export interface CallTurnResponse {
+  userText: string
+  personaText: string
+  personaAudioBase64: string
+  personaAudioContentType: string
+  turnNumber: number
+  shouldEnd: boolean
+  detectedLanguage: string
+}
+
+export interface EndCallResponse {
+  totalTurns: number
+  totalDurationSec: number
+}
+
 // ── 알림 환경설정 ────────────────────────────────────────
 export interface NotificationPreferenceData {
   likeEnabled: boolean

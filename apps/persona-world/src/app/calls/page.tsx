@@ -194,10 +194,17 @@ function ReservationCard({
         </div>
       </div>
       {canCancel && (
-        <div className="mt-3 border-t border-gray-50 pt-3">
+        <div className="mt-3 flex gap-2 border-t border-gray-50 pt-3">
+          <Link
+            href={`/calls/${reservation.id}`}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-500 to-purple-500 py-1.5 text-xs font-medium text-white transition-all hover:shadow-md"
+          >
+            <Phone className="h-3 w-3" />
+            통화 시작
+          </Link>
           <button
             onClick={onCancel}
-            className="w-full rounded-lg border border-gray-200 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:border-red-300 hover:text-red-500"
+            className="flex-1 rounded-lg border border-gray-200 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:border-red-300 hover:text-red-500"
           >
             예약 취소
           </button>

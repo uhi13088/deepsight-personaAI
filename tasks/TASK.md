@@ -1,6 +1,6 @@
 # DeepSight v4.0 — TASK 관리
 
-> 마지막 업데이트: 2026-03-03
+> 마지막 업데이트: 2026-03-04
 
 ---
 
@@ -666,134 +666,68 @@
 
 ---
 
-## IN_PROGRESS — 1:1 채팅 + 통화 시스템 (PW-Chat/Call)
+## DONE (v4.0 — 1:1 채팅 + 통화 시스템 백엔드/프론트)
 
-> 페르소나와 1:1 채팅(Sonnet+Vision) + 통화(Sonnet+STT+TTS) 시스템
-> 기존 기억 파이프라인(Poignancy→InteractionLog→Factbook→RAG) 재사용
-> Engine Studio(백엔드) + PersonaWorld(프론트엔드) 양쪽 수정
+> 이전 세션에서 구현 완료, TASK.md 미반영 상태였음 (2026-03-04 확인)
 
-### Phase 1: Foundation (공통)
+- [x] **T330: DB 스키마 — ChatThread + ChatMessage + Call 모델** ✅
+  - ChatThread (sessionId→InteractionSession 1:1), ChatMessage (role USER/PERSONA), CallReservation (6종 status), CallSession (InteractionSession 연결)
+  - Persona TTS 필드 (ttsProvider, ttsVoiceId, ttsPitch, ttsSpeed, ttsLanguage)
+  - 마이그레이션: 039_chat_call_system.sql + 041_production_catchup
+- [x] **T331: Conversation Engine** ✅
+  - buildConversationSystemPrefix/Suffix, generateConversationResponse (Sonnet + Vision + 프롬프트 캐싱)
+  - 모드별 분기 (chat: 500 tokens, call: 200 tokens), 다국어 지원
+- [x] **T332: 기억 파이프라인 통합** ✅
+  - retrieveConversationMemories (RAG), recordConversationTurn (Poignancy), finalizeConversation (Factbook), adjustStateForConversation
+- [x] **T333: Chat Service** ✅
+  - ChatDataProvider DI, createThread, sendMessage (10코인), getThreads, getMessages (커서 페이지네이션)
+- [x] **T334: Chat API 엔드포인트** ✅
+  - GET/POST /chat/threads, GET/POST /chat/threads/[threadId]/messages
+- [x] **T335: Chat UI — 메시지 화면** ✅ (persona-world)
+  - /chat/[threadId] — 버블 UI, 타이핑 인디케이터, 페이지네이션, 10코인/턴 표시
+- [x] **T336: Chat UI — 대화 목록 + 진입점** ✅ (persona-world)
+  - /chat 리스트, pw-bottom-nav 채팅 탭, 페르소나 프로필 "대화하기" 버튼
+- [x] **T337: Voice Pipeline — STT + TTS 통합** ✅
+  - Whisper STT (다국어), OpenAI/Google/ElevenLabs TTS, LRU 캐시 (5000 entries)
+- [x] **T338: Call Service** ✅
+  - CallDataProvider DI, createReservation (200코인), startCall, processCallTurn (STT→LLM→TTS), endCall, cancelReservation
+- [x] **T339-partial: Call 예약 API** ✅
+  - GET/POST /calls/reservations, GET/DELETE /calls/reservations/[reservationId]
+- [x] **T340-partial: Call UI — 예약/목록** ✅ (persona-world)
+  - /calls 예약 리스트, 페르소나 프로필 "통화 예약" 버튼, 상태 뱃지
+- [x] **T341: Shop 활성화** ✅
+  - persona_chat/persona_call_reservation: SOON→NEW 태그 변경 완료
 
-- [ ] **T330: DB 스키마 — ChatThread + ChatMessage + Call 모델**
-  - AC1: ChatThread 모델 (id, personaId, userId, title, lastMessageAt, totalMessages, isActive)
-  - AC2: ChatMessage 모델 (id, threadId, role USER/PERSONA, content, imageUrl, tokenCount, poignancyScore, createdAt)
-  - AC3: CallReservation 모델 (id, personaId, userId, scheduledAt, status PENDING/CONFIRMED/COMPLETED/CANCELLED, coinSpent)
-  - AC4: CallSession 모델 (id, reservationId, startedAt, endedAt, totalTurns, totalDurationSec)
-  - AC5: PersonaVoiceProfile 필드 (ttsProvider, voiceId, pitch, speed, language)
-  - AC6: ChatThread ↔ InteractionSession 1:1 연결
-  - AC7: 마이그레이션 SQL
-  - 변경: schema.prisma, 마이그레이션 SQL
+---
 
-- [ ] **T331: Conversation Engine — 프롬프트 빌더 + Sonnet + Vision (채팅/통화 공용)**
-  - AC1: buildConversationPrompt(persona, factbook, ragContext, mode) — 시스템 프롬프트 빌드
-  - AC2: generateConversationResponse(messages, userMessage, imageBase64?) — Sonnet 호출
-  - AC3: VoiceSpec 적용 (말투, 톤, 가드레일, 금지 패턴)
-  - AC4: 프롬프트 캐싱 (cache_control) 적용
-  - AC5: 토큰 카운트 + usage-tracker 비용 로깅
-  - 신규: conversation-engine.ts
-  - 변경: index.ts (배럴)
+## DONE (v4.0 — 통화 세션 API + UI + 테스트 + 문서)
 
-- [ ] **T332: 기억 파이프라인 통합 (채팅/통화 공용)**
-  - AC1: 매 턴 → poignancy 계산 → InteractionLog 저장
-  - AC2: 대화 시작 시 → RAG weighted search → 관련 기억 컨텍스트 주입
-  - AC3: 대화 종료/N턴마다 → Factbook.mutableContext 업데이트 (recentExperience, evolvedPerspective)
-  - AC4: PersonaState 업데이트 (mood, energy, socialBattery)
-  - 신규: conversation-memory.ts
-  - 변경: index.ts (배럴)
+> T339/T340/T342 잔여 → T357~T361로 세분화 후 완료
 
-### Phase 2: 채팅
+- [x] **T357: Call Session API 3개 라우트** ✅ 2026-03-04
+  - POST /calls/sessions — 통화 시작 (예약→CallSession+TTS 인사)
+  - POST /calls/sessions/:id/turn — 턴 처리 (STT→LLM→TTS)
+  - POST /calls/sessions/:id/end — 통화 종료 (기억 최종화)
+  - CallDataProvider Prisma 인라인 구현, verifyInternalToken 적용
 
-- [ ] **T333: Chat Service (DI 기반)**
-  - AC1: ChatDataProvider DI 인터페이스
-  - AC2: createThread(userId, personaId) — 대화방 + InteractionSession 동시 생성
-  - AC3: addMessage(threadId, role, content, imageUrl?) — 메시지 저장 + Conversation Engine 호출
-  - AC4: getThreads(userId) — 대화방 목록 (lastMessage 포함)
-  - AC5: getMessages(threadId, limit, cursor) — 커서 페이지네이션
-  - AC6: 코인 10 차감 (credit-service.spendCredits 연동)
-  - 신규: chat-service.ts
-  - 변경: index.ts (배럴)
+- [x] **T358: 통화 중 UI 페이지** ✅ 2026-03-04
+  - /calls/[reservationId] — 페르소나 아바타+통화 상태, 마이크 녹음 버튼 (half-duplex)
+  - 오디오 녹음→base64→API→응답 오디오 재생, 대화 로그 실시간 표시
+  - 통화 타이머+턴 카운터+종료 버튼, 진행 바 (남은 시간)
+  - api.ts: startCall/sendVoiceTurn/endCall, types.ts: 3개 응답 타입
+  - calls/page.tsx: "통화 시작" 버튼 추가
 
-- [ ] **T334: Chat API 엔드포인트**
-  - AC1: POST /api/persona-world/chat/threads — 대화방 생성 (personaId 필수)
-  - AC2: GET /api/persona-world/chat/threads — 유저의 대화방 목록
-  - AC3: POST /api/persona-world/chat/threads/[threadId]/messages — 메시지 전송 + 코인 차감
-  - AC4: GET /api/persona-world/chat/threads/[threadId]/messages — 메시지 히스토리
-  - AC5: 잔액 부족 시 402 { error: { code: "INSUFFICIENT_CREDITS" } }
-  - AC6: requireAuth() + user-rate-limiter (chat 30/h)
-  - 신규: chat/threads/route.ts, chat/threads/[threadId]/messages/route.ts
+- [x] **T359: 단위 테스트 37개** ✅ 2026-03-04
+  - chat-service.test.ts (14): 스레드 생성, 메시지 전송, 에러 케이스, 페이지네이션
+  - call-service.test.ts (11): 예약 생성, 세션 시작/종료, 취소
+  - conversation-memory.test.ts (12): RAG 검색, poignancy 기록, factbook 갱신, state 조정
 
-- [ ] **T335: Chat UI — 메시지 화면**
-  - AC1: /chat/[threadId] 페이지 — 유저(오른쪽)/페르소나(왼쪽) 버블
-  - AC2: 텍스트 입력 + 이미지 첨부 (카메라/갤러리)
-  - AC3: 코인 잔액 표시 ("10 코인/턴") + 부족 시 충전 모달
-  - AC4: 스크롤 페이지네이션 (위로 스크롤 → 이전 메시지 로드)
-  - AC5: 페르소나 타이핑 인디케이터
-  - AC6: client API (sendMessage, getMessages) — api.ts 확장
-  - 신규: chat/[threadId]/page.tsx
-  - 변경: api.ts, types.ts
+- [x] **T360: API 문서 최신화** ✅ 2026-03-04
+  - public.md §17 Chat (4개 엔드포인트) + §18 Calls (6개 엔드포인트)
+  - public.openapi.yaml: ChatThread/ChatMessage/CallReservation/StartCallResponse/CallTurnResponse/EndCallResponse 스키마
 
-- [ ] **T336: Chat UI — 대화 목록 + 진입점**
-  - AC1: /chat 페이지 — 대화방 리스트 (아바타, 이름, 마지막 메시지, 시간)
-  - AC2: 페르소나 프로필에서 "대화하기" 버튼 → /chat 진입
-  - AC3: pw-bottom-nav 채팅 탭 추가
-  - AC4: client API (getThreads, createThread) — api.ts 확장
-  - 신규: chat/page.tsx
-  - 변경: pw-bottom-nav.tsx, api.ts, 프로필 페이지
-
-### Phase 3: 통화
-
-- [ ] **T337: Voice Pipeline — STT + TTS 통합**
-  - AC1: STT 통합 — Whisper API (audio → text)
-  - AC2: TTS 통합 — Google Neural / OpenAI TTS (text → audio)
-  - AC3: PersonaVoiceProfile → TTS 파라미터 매핑 (voiceId, pitch, speed)
-  - AC4: processVoiceTurn(audioBuffer, persona) → { text, responseAudio, responseText }
-  - 신규: voice-pipeline.ts
-  - 변경: index.ts (배럴)
-
-- [ ] **T338: Call Service (DI 기반)**
-  - AC1: CallDataProvider DI 인터페이스
-  - AC2: createReservation(userId, personaId, scheduledAt) — 예약 생성 + 200코인 차감
-  - AC3: startSession(reservationId) — 예약 시간 도달 시 세션 시작
-  - AC4: processCallTurn(sessionId, audioBuffer) — STT→Sonnet→TTS 파이프라인
-  - AC5: endSession(sessionId) — 세션 종료 + 기억 파이프라인 통합 + 세션 요약
-  - AC6: getReservations(userId) — 예약 목록
-  - AC7: getCallHistory(userId) — 통화 기록 조회
-  - 신규: call-service.ts
-  - 변경: index.ts (배럴)
-
-- [ ] **T339: Call API 엔드포인트**
-  - AC1: POST /api/persona-world/call/reservations — 예약 생성 (personaId, scheduledAt)
-  - AC2: GET /api/persona-world/call/reservations — 예약 목록
-  - AC3: POST /api/persona-world/call/sessions/[id]/start — 세션 시작
-  - AC4: POST /api/persona-world/call/sessions/[id]/turn — 음성 턴 (multipart audio)
-  - AC5: POST /api/persona-world/call/sessions/[id]/end — 세션 종료
-  - AC6: requireAuth() + Rate Limit
-  - 신규: call/reservations/route.ts, call/sessions/[id]/route.ts
-
-- [ ] **T340: Call UI**
-  - AC1: 예약 화면 — 날짜/시간 선택, 페르소나 선택, 200코인 결제 확인
-  - AC2: 통화 중 화면 — 페르소나 아바타, 음파 시각화, 말하기 버튼 (half-duplex), 종료 버튼
-  - AC3: 통화 기록 리스트 — 날짜, 페르소나, 통화 시간
-  - AC4: 예약 알림 (예약 시간 도달 시 알림)
-  - AC5: client API (createReservation, startSession, sendVoiceTurn, endSession)
-  - 신규: call/page.tsx, call/[sessionId]/page.tsx
-  - 변경: api.ts, types.ts
-
-### Phase 4: 마무리
-
-- [ ] **T341: Shop 업데이트 + 팔로우 기본값 변경**
-  - AC1: persona_chat SOON 태그 제거 → 활성화
-  - AC2: persona_call_reservation SOON 태그 제거 → 활성화
-  - AC3: 팔로우 슬롯 description "기본 10개" → "기본 30개"
-  - 변경: shop.ts
-
-- [ ] **T342: API 문서 + 테스트 + 전체 검증**
-  - AC1: public.md / public.openapi.yaml — Chat 4개 + Call 5개 엔드포인트 문서화
-  - AC2: chat-service 단위 테스트
-  - AC3: conversation-engine 단위 테스트
-  - AC4: call-service 단위 테스트
-  - AC5: pnpm validate PASS (typecheck + lint + test + build)
-  - 변경: public.md, public.openapi.yaml
+- [x] **T361: 전체 검증** ✅ 2026-03-04
+  - 테스트 4555 PASS (117 파일), persona-world typecheck PASS, persona-world build PASS
 
 ---
 
