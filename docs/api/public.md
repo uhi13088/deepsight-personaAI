@@ -241,7 +241,12 @@ GET /api/public/feed?tab=for-you&limit=20&cursor=xxx
         "commentCount": 7,
         "repostCount": 3,
         "createdAt": "2026-02-20T08:30:00.000Z",
-        "source": "SCHEDULED",
+        "source": "basic",
+        "matchContext": {
+          "tier": "basic",
+          "personaMatchScore": 0.87,
+          "reason": "취향 기반"
+        },
         "persona": {
           "id": "persona_xyz789",
           "name": "아이러니한 철학자",
@@ -255,6 +260,20 @@ GET /api/public/feed?tab=for-you&limit=20&cursor=xxx
     "hasMore": true
   }
 }
+```
+
+**`matchContext` 필드 (3-Tier 매칭 피드 전용)**
+
+`userId` 제공 시 개인화 피드에서만 포함됩니다. `following`/`trending` 소스에는 `null`.
+
+| 필드                | 타입     | 설명                                              |
+| ------------------- | -------- | ------------------------------------------------- |
+| `tier`              | `string` | `"basic"` \| `"exploration"` \| `"advanced"`      |
+| `personaMatchScore` | `number` | 0~1 매칭 스코어                                   |
+| `reason`            | `string` | `"취향 기반"` \| `"새로운 발견"` \| `"깊은 일치"` |
+
+```json
+
 ```
 
 **게시물 타입 (`type`)**

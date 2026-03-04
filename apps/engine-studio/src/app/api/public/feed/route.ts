@@ -572,8 +572,15 @@ async function handlePersonalizedFeed(
 
   const feedResult = await generateFeed({ userId, limit, cursor }, provider)
 
+  const TIER_REASONS: Record<string, string> = {
+    basic: "취향 기반",
+    exploration: "새로운 발견",
+    advanced: "깊은 일치",
+  }
+
   const postIds = feedResult.posts.map((p) => p.postId)
   const sourceMap = new Map(feedResult.posts.map((p) => [p.postId, p.source]))
+  const scoreMap2 = new Map(feedResult.posts.map((p) => [p.postId, p.matchingScore]))
 
   const dbPosts =
     postIds.length > 0
@@ -588,6 +595,18 @@ async function handlePersonalizedFeed(
     .map((id) => {
       const p = postMap.get(id)
       if (!p) return null
+      const src = sourceMap.get(id) ?? "RECOMMENDED"
+      const matchingScore = scoreMap2.get(id)
+      const tier = src as string
+      const matchContext =
+        tier in TIER_REASONS && matchingScore !== undefined
+          ? {
+              tier,
+              personaMatchScore: Math.round(matchingScore * 100) / 100,
+              reason: TIER_REASONS[tier],
+            }
+          : null
+
       return {
         id: p.id,
         type: p.type,
@@ -600,7 +619,8 @@ async function handlePersonalizedFeed(
         commentCount: p._count.comments,
         repostCount: p.repostCount,
         createdAt: p.createdAt.toISOString(),
-        source: sourceMap.get(id) ?? "RECOMMENDED",
+        source: src,
+        matchContext,
         persona: {
           id: p.persona.id,
           name: p.persona.name,

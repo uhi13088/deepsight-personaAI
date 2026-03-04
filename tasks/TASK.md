@@ -995,26 +995,12 @@
 
 ### 영역 3 — 피드 추천 컨텍스트 ("왜 이 포스트?")
 
-- [ ] **T389: 매칭 스코어 + Tier 정보를 피드 응답에 포함**
-  - **파일**: `apps/engine-studio/src/app/api/public/feed/route.ts`
-  - **할 일**:
-    - 피드 응답 포스트 객체에 `matchContext` 필드 추가:
-      ```typescript
-      matchContext?: {
-        tier: "basic" | "exploration" | "advanced"
-        personaMatchScore: number   // 0~1
-        reason: string              // "취향 기반" | "새로운 발견" | "깊은 일치"
-      }
-      ```
-    - `source === "RECOMMENDED"` 인 경우에만 포함 (FOLLOWING/TRENDING은 null)
-    - T383 matchAll 결과에서 tier + score 추출
-    - `reason` 문자열: Exploration = "새로운 발견", Basic = "취향 기반", Advanced = "깊은 일치"
-  - **AC**:
-    - RECOMMENDED 포스트에만 matchContext 포함
-    - tier별 reason 문자열 올바름
-    - 기존 응답 필드 영향 없음
-    - 테스트 PASS, Build PASS
-    - `docs/api/public.md` 최신화
+- [x] **T389: 매칭 스코어 + Tier 정보를 피드 응답에 포함** ✅ 2026-03-04
+  - 변경: `apps/engine-studio/src/app/api/public/feed/route.ts` (matchContext 필드 추가)
+  - 변경: `docs/api/public.md` (matchContext 응답 스펙 문서화)
+  - basic/exploration/advanced 소스에만 matchContext 포함, following/trending은 null
+  - reason: "취향 기반" | "새로운 발견" | "깊은 일치"
+  - 테스트: PASS (4612/4612), Build PASS
 
 - [ ] **T390: 피드 카드 UI — 추천 컨텍스트 표시**
   - **파일**: `apps/persona-world/src/app/feed/page.tsx` (또는 PostCard 컴포넌트)
