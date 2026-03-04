@@ -11,11 +11,17 @@ import {
   PWProfileLevelBadge,
   PWSnsConnect,
 } from "@/components/persona-world"
-import { ArrowRight, ArrowLeft, Sparkles, AlertTriangle, Coins, Link2 } from "lucide-react"
+import { ArrowRight, ArrowLeft, Sparkles, AlertTriangle, Coins, Link2, Target } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useUserStore } from "@/lib/user-store"
 import { clientApi } from "@/lib/api"
-import type { OnboardingQuestion, OnboardingAnswer } from "@/lib/types"
+import type {
+  OnboardingQuestion,
+  OnboardingAnswer,
+  AdaptiveQuestionWithMeta,
+  AdaptiveProgress,
+  AdaptiveAnswerResponse,
+} from "@/lib/types"
 import { getProfileLevelByPhase, PHASE_CREDITS } from "@/lib/profile-level"
 
 // ── Phase 설정 ──────────────────────────────────────────────
@@ -47,9 +53,26 @@ const PHASE_INFO = [
   },
 ]
 
+// ── 적응형 질문 → OnboardingQuestion 변환 ───────────────────
+
+function adaptiveToOnboardingQuestion(q: AdaptiveQuestionWithMeta): OnboardingQuestion {
+  return {
+    id: q.id,
+    order: 0,
+    text: q.text,
+    type: q.type as OnboardingQuestion["type"],
+    options: q.options.map((o) => ({ id: o.key, label: o.label, value: o.key })),
+    targetDimensions: q.focusDimensions,
+  }
+}
+
+// ── 적응형 온보딩 크레딧 ───────────────────────────────────
+const ADAPTIVE_CREDITS = 450 // Phase 1+2+3 합산 (100+150+200)
+
 // ── 온보딩 플로우 상태 ──────────────────────────────────────
 
 type FlowStep = "intro" | "questions" | "preview" | "complete"
+type OnboardingMode = "adaptive" | "phase"
 
 export default function OnboardingPage() {
   return (
@@ -66,6 +89,22 @@ export default function OnboardingPage() {
 }
 
 function OnboardingContent() {
+  const searchParams = useSearchParams()
+  const { onboarding } = useUserStore()
+
+  // 모드 선택: ?mode=phase → 기존 Phase 방식, 기본값 = adaptive
+  const mode: OnboardingMode = searchParams.get("mode") === "phase" ? "phase" : "adaptive"
+
+  // 적응형 모드 (Phase 3 미완료 시) → 별도 컴포넌트
+  if (mode === "adaptive" && !onboarding.completedPhases.includes(3)) {
+    return <AdaptiveOnboardingFlow />
+  }
+
+  // Phase 기반 모드 (기존 호환)
+  return <PhaseOnboardingFlow />
+}
+
+function PhaseOnboardingFlow() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const {
@@ -564,6 +603,388 @@ function PhaseIntro({ info, onStart }: { info: (typeof PHASE_INFO)[number]; onSt
           시작하기
         </PWButton>
       </div>
+    </div>
+  )
+}
+
+// ── 적응형 온보딩 플로우 ────────────────────────────────────
+
+type AdaptiveStep = "intro" | "questions" | "complete"
+
+function AdaptiveOnboardingFlow() {
+  const router = useRouter()
+  const { profile, setProfile, completeOnboarding, completePhase } = useUserStore()
+
+  // 플로우 상태
+  const [step, setStep] = useState<AdaptiveStep>("intro")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // 적응형 세션 상태
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [currentQuestion, setCurrentQuestion] = useState<AdaptiveQuestionWithMeta | null>(null)
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
+  const [progress, setProgress] = useState<AdaptiveProgress>({
+    answered: 0,
+    estimatedTotal: 24,
+    estimatedRemaining: 24,
+    convergencePercent: 0,
+    uncertainDimensions: [],
+  })
+
+  // 완료 결과
+  const [result, setResult] = useState<AdaptiveAnswerResponse["result"] | null>(null)
+
+  // 이탈 경고
+  const [showExitWarning, setShowExitWarning] = useState(false)
+
+  // 게이미피케이션
+  const [showMilestone, setShowMilestone] = useState(false)
+  const [milestoneText, setMilestoneText] = useState("")
+
+  // 마일스톤 체크
+  const checkMilestone = useCallback((answered: number, convergence: number) => {
+    let text = ""
+    if (answered === 10) {
+      text = "절반 가까이 왔어요! 벡터가 선명해지고 있어요"
+    } else if (answered === 20) {
+      text = "거의 다 왔어요! 정밀한 프로필이 완성되고 있어요"
+    } else if (convergence >= 70 && answered >= 15) {
+      text = "당신의 취향 패턴이 뚜렷하게 드러나고 있어요"
+    }
+    if (text) {
+      setMilestoneText(text)
+      setShowMilestone(true)
+      setTimeout(() => setShowMilestone(false), 2500)
+    }
+  }, [])
+
+  // 적응형 온보딩 시작
+  const handleStart = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      let userId = profile?.id
+      if (!userId) {
+        userId = crypto.randomUUID()
+        setProfile({
+          id: userId,
+          nickname: "관찰자",
+          vector: null,
+          vectorConfidence: null,
+          completedOnboarding: false,
+          createdAt: new Date().toISOString(),
+        })
+      }
+
+      const data = await clientApi.startAdaptiveOnboarding(userId)
+      setSessionId(data.sessionId)
+      setCurrentQuestion(data.firstQuestion)
+      setProgress({
+        answered: 0,
+        estimatedTotal: data.totalEstimated,
+        estimatedRemaining: data.totalEstimated,
+        convergencePercent: 0,
+        uncertainDimensions: [],
+      })
+      setStep("questions")
+    } catch {
+      setError("시작에 실패했습니다. 다시 시도해주세요.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 답변 제출
+  const handleSubmitAnswer = async () => {
+    if (!sessionId || !currentQuestion || !selectedAnswer) return
+
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await clientApi.submitAdaptiveAnswer(
+        sessionId,
+        currentQuestion.id,
+        selectedAnswer
+      )
+
+      setProgress(data.progress)
+      setSelectedAnswer(null)
+
+      if (data.completed && data.result) {
+        // 완료 처리
+        setResult(data.result)
+
+        // 스토어 업데이트: 모든 Phase를 완료로 표시
+        completePhase(1, 100, "BASIC")
+        completePhase(2, 150, "STANDARD")
+        completePhase(3, 200, "ADVANCED")
+
+        setStep("complete")
+      } else if (data.nextQuestion) {
+        setCurrentQuestion(data.nextQuestion)
+        checkMilestone(data.progress.answered, data.progress.convergencePercent)
+      }
+    } catch {
+      setError("답변 제출에 실패했습니다. 다시 시도해주세요.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 이탈 처리
+  const handleExit = () => {
+    if (step === "questions" && progress.answered > 0) {
+      setShowExitWarning(true)
+    } else {
+      completeOnboarding()
+      router.push("/feed")
+    }
+  }
+
+  const confirmExit = () => {
+    setShowExitWarning(false)
+    completeOnboarding()
+    router.push("/feed")
+  }
+
+  // 완료 → 피드 이동
+  const handleFinish = () => {
+    completeOnboarding()
+    router.push("/feed")
+  }
+
+  // ── 진행률 계산 ──────────────────────────────────────────
+  const progressPercent =
+    progress.estimatedTotal > 0
+      ? Math.round((progress.answered / progress.estimatedTotal) * 100)
+      : 0
+
+  return (
+    <div className="flex min-h-screen flex-col bg-white">
+      {/* Header */}
+      <header className="border-b border-gray-100 px-6 py-4">
+        <div className="mx-auto flex max-w-md items-center justify-between">
+          <PWLogoWithText size="sm" />
+          <div className="flex items-center gap-3">
+            <button onClick={handleExit} className="text-sm text-gray-400 hover:text-gray-600">
+              {step === "intro" ? "건너뛰기" : "나중에"}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* 적응형 진행 바 */}
+      {step === "questions" && (
+        <div className="relative h-1.5 w-full bg-gray-100">
+          <div
+            className="pw-gradient h-full transition-all duration-500"
+            style={{ width: `${progressPercent}%` }}
+          />
+          {/* 수렴도 인디케이터 */}
+          {progress.convergencePercent >= 50 && (
+            <div
+              className="absolute top-0 h-full bg-green-400/30 transition-all duration-500"
+              style={{ width: `${progress.convergencePercent}%` }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Main Content */}
+      <main className="flex flex-1 flex-col items-center overflow-y-auto px-6 py-8">
+        {/* ── INTRO ── */}
+        {step === "intro" && (
+          <div className="w-full max-w-md text-center">
+            <div className="mb-4 inline-flex rounded-full bg-purple-100 p-4">
+              <Target className="h-10 w-10 text-purple-600" />
+            </div>
+            <h1 className="mb-2 text-2xl font-bold text-gray-900">맞춤형 취향 분석</h1>
+            <p className="mb-1 text-sm font-medium text-purple-600">
+              당신에게 딱 맞는 질문으로 취향을 파악해요
+            </p>
+            <p className="mb-6 text-sm text-gray-500">
+              답변에 따라 질문이 달라지며, 더 정확한 프로필을 만들어드려요
+            </p>
+            <div className="mb-8 flex items-center justify-center gap-3">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-3 py-1.5 text-xs text-gray-500">
+                <span>⏱️</span> ~3분
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-3 py-1.5 text-xs text-gray-500">
+                <span>📝</span> 20~28문항
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 px-3 py-1.5 text-xs text-purple-600">
+                <Coins className="h-3 w-3" /> +{ADAPTIVE_CREDITS} 코인
+              </span>
+            </div>
+
+            {error && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-center text-sm text-red-600">
+                {error}
+              </div>
+            )}
+
+            <PWButton onClick={handleStart} icon={ArrowRight} className="px-8" disabled={loading}>
+              {loading ? "준비 중..." : "시작하기"}
+            </PWButton>
+
+            {/* Phase 모드 대안 링크 */}
+            <p className="mt-6 text-xs text-gray-400">
+              <button
+                onClick={() => router.replace("/onboarding?mode=phase")}
+                className="underline hover:text-gray-600"
+              >
+                단계별로 나누어 진행하고 싶다면
+              </button>
+            </p>
+          </div>
+        )}
+
+        {/* ── QUESTIONS ── */}
+        {step === "questions" && (
+          <div className="w-full max-w-md">
+            {loading && !currentQuestion ? (
+              <div className="flex flex-col items-center gap-4 py-16">
+                <PWSpinner size="md" />
+                <p className="text-sm text-gray-500">질문을 준비하는 중...</p>
+              </div>
+            ) : currentQuestion ? (
+              <>
+                {/* 진행 상태 */}
+                <div className="mb-6">
+                  <div className="mb-1 flex justify-between text-xs text-gray-400">
+                    <span>맞춤형 분석</span>
+                    <span>
+                      {progress.answered + 1} / ~{progress.estimatedTotal}
+                    </span>
+                  </div>
+                  <div className="h-1 w-full overflow-hidden rounded-full bg-gray-100">
+                    <div
+                      className="pw-gradient h-full transition-all duration-300"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                  {/* 수렴 정보 */}
+                  {progress.convergencePercent > 0 && (
+                    <div className="mt-1 text-right text-xs text-purple-400">
+                      분석 정확도 {Math.round(progress.convergencePercent)}%
+                    </div>
+                  )}
+                </div>
+
+                {/* 마일스톤 피드백 */}
+                {showMilestone && (
+                  <div className="mb-4 animate-pulse rounded-lg bg-purple-50 p-3 text-center text-sm font-medium text-purple-700">
+                    {milestoneText}
+                  </div>
+                )}
+
+                {/* 에러 메시지 */}
+                {error && (
+                  <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-center text-sm text-red-600">
+                    {error}
+                  </div>
+                )}
+
+                {/* 질문 */}
+                <div className="mb-6 text-center">
+                  <div className="mb-3 inline-flex rounded-full bg-purple-50 p-2.5">
+                    <Sparkles className="h-5 w-5 text-purple-500" />
+                  </div>
+                  <h1 className="text-lg font-bold text-gray-900">{currentQuestion.text}</h1>
+                </div>
+
+                {/* 질문 카드 */}
+                <PWQuestionCard
+                  question={adaptiveToOnboardingQuestion(currentQuestion)}
+                  selectedValue={selectedAnswer}
+                  onSelect={setSelectedAnswer}
+                />
+              </>
+            ) : null}
+          </div>
+        )}
+
+        {/* ── COMPLETE ── */}
+        {step === "complete" && (
+          <div className="w-full max-w-md text-center">
+            <div className="mb-4 text-4xl">🎉</div>
+            <h1 className="mb-2 text-2xl font-bold text-gray-900">분석 완료!</h1>
+            <p className="mb-2 text-sm text-gray-500">
+              {result?.totalQuestions ?? progress.answered}개 질문으로 정밀한 프로필이 완성되었어요
+            </p>
+            <p className="mb-4 text-sm text-gray-500">+{ADAPTIVE_CREDITS} 코인 획득!</p>
+            <PWProfileLevelBadge level="ADVANCED" />
+
+            {/* 수렴 결과 요약 */}
+            {result && (
+              <div className="mx-auto mt-6 max-w-xs rounded-xl border border-gray-100 bg-gray-50 p-4">
+                <p className="mb-2 text-xs font-medium text-gray-600">프로필 정확도</p>
+                <div className="mb-3 h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                  <div
+                    className="pw-gradient h-full transition-all"
+                    style={{ width: `${Math.round(result.confidence * 100)}%` }}
+                  />
+                </div>
+                <p className="text-lg font-bold text-purple-600">
+                  {Math.round(result.confidence * 100)}%
+                </p>
+              </div>
+            )}
+
+            <PWButton onClick={handleFinish} icon={ArrowRight} className="mt-6">
+              PersonaWorld 시작하기
+            </PWButton>
+          </div>
+        )}
+      </main>
+
+      {/* Footer: 질문 네비게이션 (적응형) */}
+      {step === "questions" && currentQuestion && (
+        <footer className="border-t border-gray-100 px-6 py-4">
+          <div className="mx-auto flex max-w-md items-center justify-end">
+            <PWButton
+              onClick={handleSubmitAnswer}
+              disabled={!selectedAnswer || loading}
+              icon={ArrowRight}
+              className={!selectedAnswer ? "opacity-50" : ""}
+            >
+              {loading ? "분석 중..." : "다음"}
+            </PWButton>
+          </div>
+        </footer>
+      )}
+
+      {/* 이탈 경고 다이얼로그 */}
+      {showExitWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6">
+          <PWCard className="w-full max-w-sm p-6">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-100">
+                <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">분석을 중단할까요?</h3>
+            </div>
+            <p className="mb-6 text-sm text-gray-600">
+              지금까지의 진행({progress.answered}문항)이 초기화됩니다. 나중에 다시 시작할 수 있어요.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowExitWarning(false)}
+                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                계속하기
+              </button>
+              <button
+                onClick={confirmExit}
+                className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-medium text-white hover:bg-red-600"
+              >
+                나가기
+              </button>
+            </div>
+          </PWCard>
+        </div>
+      )}
     </div>
   )
 }

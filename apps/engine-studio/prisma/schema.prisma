@@ -590,6 +590,12 @@ model PsychProfileTemplate {
   weightFormula   Json?
   isRequired      Boolean  @default(true)
 
+  // v4.0 적응형 온보딩 메타데이터
+  isAdaptive      Boolean  @default(false)  @map("is_adaptive")       // 적응형 풀 포함 여부
+  poolCategory    String   @default("core") @map("pool_category")     // core|deepening|cross_layer|verification|narrative
+  informationGain Decimal  @default(0.5) @db.Decimal(3, 2) @map("information_gain") // 기대 정보 획득량
+  minPriorAnswers Int      @default(0) @map("min_prior_answers")      // 최소 사전 응답 수
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
