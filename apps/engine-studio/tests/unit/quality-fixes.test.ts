@@ -13,7 +13,7 @@ import type { OnboardingApiResponse } from "@deepsight/vector-core"
 describe("T216: API 벡터 누적 포화 수정", () => {
   it("30개 동일 방향 응답에서도 벡터가 포화되지 않음", () => {
     const responses: OnboardingApiResponse[] = Array.from({ length: 30 }, (_, i) => ({
-      questionId: `q_${i}`,
+      question_id: `q_${i}`,
       answer: "A",
       l1_weights: { depth: 0.08, lens: 0.05 },
       l2_weights: { openness: 0.06 },
@@ -30,8 +30,8 @@ describe("T216: API 벡터 누적 포화 수정", () => {
 
   it("응답 수가 적으면 정상 범위 유지", () => {
     const responses: OnboardingApiResponse[] = [
-      { questionId: "q1", answer: "A", l1_weights: { depth: 0.3 } },
-      { questionId: "q2", answer: "B", l1_weights: { depth: 0.2 } },
+      { question_id: "q1", answer: "A", l1_weights: { depth: 0.3 } },
+      { question_id: "q2", answer: "B", l1_weights: { depth: 0.2 } },
     ]
 
     const result = computeVectorsFromApiResponses(responses)
@@ -41,7 +41,7 @@ describe("T216: API 벡터 누적 포화 수정", () => {
 
   it("L2도 응답 수로 정규화됨", () => {
     const responses: OnboardingApiResponse[] = Array.from({ length: 20 }, () => ({
-      questionId: "q",
+      question_id: "q",
       answer: "A",
       l2_weights: { openness: 0.1 },
     }))

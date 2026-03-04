@@ -42,7 +42,7 @@ function buildCallProvider(): CallDataProvider {
     async updateReservationStatus(reservationId, status) {
       await prisma.callReservation.update({
         where: { id: reservationId },
-        data: { status },
+        data: { status: status as import("@/generated/prisma").CallReservationStatus },
       })
     },
 

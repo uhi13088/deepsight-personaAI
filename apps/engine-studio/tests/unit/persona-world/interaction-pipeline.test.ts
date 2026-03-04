@@ -307,7 +307,7 @@ describe("executeInteractions", () => {
     vi.mocked(decideEngagement).mockReturnValue({
       action: "comment",
       reason: "balanced",
-      suppressedBy: null,
+      suppressedBy: undefined,
     })
 
     const dp = createMockDP({
