@@ -6,6 +6,8 @@ import type {
   OnboardingQuestionsResponse,
   OnboardingAnswer,
   OnboardingAnswersResponse,
+  AdaptiveStartResponse,
+  AdaptiveAnswerResponse,
   MatchingPreviewResponse,
   ExploreResponse,
   Comment,
@@ -149,6 +151,31 @@ export const clientApi = {
       vectorUpdate: data.l1Vector,
     }
     return result
+  },
+
+  // ── 적응형 온보딩 ─────────────────────────────────────────
+  async startAdaptiveOnboarding(userId: string) {
+    const res = await fetch(`/api/persona-world/onboarding/adaptive/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    })
+    if (!res.ok) throw new Error("Failed to start adaptive onboarding")
+    const json: ApiResponse<AdaptiveStartResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  async submitAdaptiveAnswer(sessionId: string, questionId: string, value: string) {
+    const res = await fetch(`/api/persona-world/onboarding/adaptive/answer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, questionId, value }),
+    })
+    if (!res.ok) throw new Error("Failed to submit adaptive answer")
+    const json: ApiResponse<AdaptiveAnswerResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
   },
 
   // ── 온보딩: 매칭 프리뷰 ──────────────────────────────────

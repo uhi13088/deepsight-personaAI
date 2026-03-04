@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-// PersonaWorld v3 — Onboarding Module
-// 온보딩 질문 + 벡터 생성 + SNS 처리
+// PersonaWorld v4.0 — Onboarding Module
+// 온보딩 질문 + 벡터 생성 + SNS 처리 + 적응형 온보딩
 // ═══════════════════════════════════════════════════════════════
 
 // ── Questions ──
@@ -44,3 +44,17 @@ export type { SnsAnalysisResult, SnsExtractedProfile } from "./sns-analyzer"
 // ── Activity Learner ──
 export { learnFromActivity, activityToUIV } from "./activity-learner"
 export type { ActivityLearnerProvider, ActivityLearnResult } from "./activity-learner"
+
+// ── Adaptive Onboarding Engine ──
+export {
+  createAdaptiveSession,
+  selectNextQuestion,
+  processAdaptiveAnswer,
+  checkTermination,
+  buildAdaptiveResult,
+  buildAdaptiveProgress,
+  toQuestionWithMeta,
+  startAdaptiveOnboarding,
+  processAdaptiveOnboardingAnswer,
+} from "./adaptive-engine"
+export type { AdaptiveOnboardingProvider, AdaptivePoolQuestion } from "./adaptive-engine"

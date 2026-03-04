@@ -814,6 +814,82 @@
 
 ---
 
+## DONE (v4.0 — TTS 자체검증 루프)
+
+> 페르소나 생성 시 TTS 음성 추론 → 검증 샘플 생성 → 자동 검증 파이프라인
+
+- [x] **T362: validateTTSResult() 검증 함수 (L1~L4)** ✅ 2026-03-04
+  - L1: 크기 기반 빠른 거부 (빈 오디오 / 과대 응답)
+  - L2: MP3 포맷 유효성 (프레임 싱크 바이트 / ID3 헤더)
+  - L3: 무음 비율 감지 (MP3 프레임 바이트 패턴 분석)
+  - L4: 텍스트-오디오 길이 정합성 (예상 vs 실제 비율)
+
+- [x] **T363: textToSpeech() 자체검증 + 재시도 + fallback 통합** ✅ 2026-03-04
+  - 캐시 HIT 시에도 검증 (불량 캐시 자동 제거 → `ttsCache.remove()`)
+  - 검증 FAIL → 1회 재시도 → fallback provider 전환 (elevenlabs→openai→google)
+  - 전부 실패 시 `audioFailed: true` 플래그로 텍스트 폴백
+
+- [x] **T364: TTSResult 타입 확장 + 검증 메트릭 로깅** ✅ 2026-03-04
+  - `audioFailed?: boolean` 추가
+  - `TTSValidationMetrics` 프로바이더별/실패코드별 메트릭 수집
+  - `getTTSValidationMetrics()` / `resetTTSValidationMetrics()` API
+
+- [x] **T365: 페르소나 생성 파이프라인 음성 검증 통합** ✅ 2026-03-04
+  - `pipeline.ts` auto/manual 모드 모두 `verifyTTSVoice()` 통합
+  - TTS API 키 없으면 검증 스킵 (음성 설정만 저장)
+  - 검증 실패 시 fallback provider로 재추론 + DB 저장
+
+- [x] **T366: TTS 검증 단위 테스트** ✅ 2026-03-04
+  - `tts-validation.test.ts` 20개 테스트
+  - L1~L4 정상/빈/과대/깨진/무음/길이불일치 시나리오
+  - 메트릭 초기화/조회 테스트 + audioFailed 플래그 테스트
+
+- [x] **T367: 전체 검증 + 커밋** ✅ 2026-03-04
+  - typecheck PASS, 4575 테스트 PASS (118 files)
+  - 커밋 `492b913`, 푸시 완료
+
+## DONE (v4.0 — 적응형 온보딩)
+
+> 고정 24문항 → 적응형 20~28문항 가변 시스템
+> 답변 기반 불확실도 분석 → 가장 정보 획득량 높은 질문 자동 선택
+> CAT(Computerized Adaptive Testing) 기법 적용
+
+- [x] **T370: 적응형 타입 + 알고리즘 코어** ✅ 2026-03-04
+  - vector-core/adaptive.ts — 16D 불확실도 프로필, 정보 획득량 계산, 종료 판정
+  - adaptive-engine.ts — 세션 생성, 질문 선택(phase-aware), 점진 벡터 업데이트, 결과 빌드
+  - 기존 phase 기반 onboarding-engine과 공존, DI 프로바이더 패턴
+
+- [x] **T371: 질문 풀 확장 (24→45문항)** ✅ 2026-03-04
+  - 추가 21문항 (L1 Deepening 7, L2 Deepening 5, L3 Narrative 4, Cross-Layer 3, Verification 2)
+  - PsychProfileTemplate 스키마 확장 — isAdaptive, poolCategory, informationGain, minPriorAnswers
+  - 마이그레이션 043_adaptive_onboarding.sql (ALTER + INSERT)
+  - 기존 24문항에 poolCategory 태깅 (Phase 1→core, Phase 2→cross_layer, Phase 3→verification)
+
+- [x] **T372: 적응형 온보딩 API 3개 라우트** ✅ 2026-03-04
+  - POST /adaptive/start — 세션 시작 + 첫 질문 반환 (in-memory store MVP)
+  - POST /adaptive/answer — 답변 → 벡터 업데이트 → 다음 질문 or 완료
+  - GET /adaptive/status — 세션 상태 (진행률, 불확실도, 벡터)
+  - 기존 phase 기반 cold-start API 하위 호환 유지
+
+- [x] **T373: Persona World UI 적응형 온보딩 플로우** ✅ 2026-03-04
+  - AdaptiveOnboardingFlow 컴포넌트 (intro → questions → complete)
+  - 기본 모드 = adaptive, ?mode=phase로 기존 Phase 방식 선택 가능
+  - 동적 프로그레스 바 (20~28 가변), 수렴도 표시, 마일스톤 피드백
+  - PWQuestionCard 재사용 (adaptiveToOnboardingQuestion 변환)
+
+- [x] **T374: Engine Studio 질문 풀 관리 UI** ✅ 2026-03-04
+  - /user-insight/question-pool 페이지 — 45문항 테이블, 카테고리/레벨/적응형 필터
+  - 인라인 편집 (poolCategory, isAdaptive, informationGain, minPriorAnswers)
+  - 질문 상세 확장 패널 (옵션별 L1/L2/L3 가중치 시각화)
+  - GET/PATCH /api/internal/user-insight/question-pool API
+
+- [x] **T375: 테스트 + API 문서 + 전체 검증** ✅ 2026-03-04
+  - adaptive-onboarding.test.ts — 19 테스트 PASS (불확실도, 평균, 상위 차원, 세션, 답변, 종료, 진행, 결과, 선택)
+  - public.md 적응형 API 3개 문서화, internal.md question-pool API 문서화
+  - pnpm test — 119 파일, 4594 테스트 ALL PASS
+
+---
+
 ## QUEUE
 
 (없음)

@@ -13,7 +13,16 @@ import {
 } from "@/lib/persona-generation/structured-fields"
 import { inferActivitySettings } from "@/lib/persona-generation/activity-inference"
 import { generateCharacterWithLLM } from "@/lib/persona-generation/llm-character-generator"
-import { inferTTSVoiceFromVectors } from "@/lib/persona-generation/character-generator"
+import {
+  inferTTSVoiceFromVectors,
+  type TTSVoiceProfile,
+} from "@/lib/persona-generation/character-generator"
+import {
+  textToSpeech,
+  validateTTSResult,
+  isVoiceConfigured,
+} from "@/lib/persona-world/voice-pipeline"
+import type { TTSVoiceConfig, TTSProvider } from "@/lib/persona-world/voice-pipeline"
 import { buildAllPrompts } from "@/lib/prompt-builder"
 import {
   generateAllQualitativeDimensions,
@@ -47,6 +56,95 @@ import {
   type PostFrequency as PrismaPostFrequency,
 } from "@/generated/prisma"
 import { ARCHETYPES } from "@/lib/persona-generation/archetypes"
+
+// ── TTS 음성 검증 (T365) ─────────────────────────────────────
+//
+// 페르소나 생성 시 TTS 음성 추론 → 샘플 음성 생성 → 자체검증.
+// 검증 실패 시 fallback provider로 재추론.
+// TTS API 키가 없으면 검증 스킵 (음성 설정만 저장).
+// ─────────────────────────────────────────────────────────────
+
+interface VerifiedTTSResult {
+  ttsProvider: string
+  ttsVoiceId: string
+  ttsSpeed: number
+  ttsLanguage: string
+  /** 검증 통과 여부 (TTS 미설정 시 null) */
+  verified: boolean | null
+}
+
+/**
+ * TTS 음성을 추론하고, 샘플 오디오를 생성하여 검증.
+ * TTS API 키가 설정되어 있으면 실제 샘플을 생성하여 검증,
+ * 없으면 음성 설정만 반환 (검증 스킵).
+ */
+async function verifyTTSVoice(
+  l1: SocialPersonaVector,
+  l2: CoreTemperamentVector,
+  l3: NarrativeDriveVector,
+  gender: "MALE" | "FEMALE" | "NON_BINARY",
+  personaName: string
+): Promise<VerifiedTTSResult> {
+  const preferredProvider = process.env.ELEVENLABS_API_KEY
+    ? ("elevenlabs" as const)
+    : ("openai" as const)
+
+  const tts = inferTTSVoiceFromVectors(l1, l2, gender, preferredProvider, l3)
+
+  // TTS API 키가 없으면 검증 스킵
+  const { tts: ttsConfigured } = isVoiceConfigured()
+  if (!ttsConfigured) {
+    return {
+      ttsProvider: tts.provider,
+      ttsVoiceId: tts.voiceId,
+      ttsSpeed: tts.speed,
+      ttsLanguage: tts.language,
+      verified: null,
+    }
+  }
+
+  // 샘플 텍스트로 TTS 호출 + 자체검증
+  const sampleText = `안녕하세요, 저는 ${personaName}입니다.`
+  const config: TTSVoiceConfig = {
+    provider: tts.provider as TTSProvider,
+    voiceId: tts.voiceId,
+    speed: tts.speed,
+    language: tts.language,
+    stability: tts.stability,
+    similarityBoost: tts.similarityBoost,
+    style: tts.style,
+    useSpeakerBoost: tts.useSpeakerBoost,
+  }
+
+  try {
+    const result = await textToSpeech(sampleText, config)
+    if (!result.audioFailed) {
+      console.log(`[TTS Verify] ${personaName}: ${tts.provider}/${tts.voiceId} PASS`)
+      return {
+        ttsProvider: tts.provider,
+        ttsVoiceId: tts.voiceId,
+        ttsSpeed: tts.speed,
+        ttsLanguage: tts.language,
+        verified: true,
+      }
+    }
+  } catch {
+    // 검증 실패 — fallback 시도
+  }
+
+  // 원본 provider 검증 실패 → fallback provider로 재추론
+  console.warn(`[TTS Verify] ${personaName}: ${tts.provider} FAIL → fallback`)
+  const fallbackProvider = preferredProvider === "elevenlabs" ? "openai" : "openai"
+  const fallbackTts = inferTTSVoiceFromVectors(l1, l2, gender, fallbackProvider, l3)
+
+  return {
+    ttsProvider: fallbackTts.provider,
+    ttsVoiceId: fallbackTts.voiceId,
+    ttsSpeed: fallbackTts.speed,
+    ttsLanguage: fallbackTts.language,
+    verified: false,
+  }
+}
 
 // ── 벡터 기반 PersonaRole 추론 ──────────────────────────────
 function inferPersonaRole(
@@ -487,10 +585,17 @@ async function executeAutoPipeline(options?: AutoPipelineInput): Promise<Generat
     languages: demographics.languages,
     knowledgeAreas: demographics.knowledgeAreas,
     height: demographics.height,
-    ttsProvider: character.ttsVoice.provider,
-    ttsVoiceId: character.ttsVoice.voiceId,
-    ttsSpeed: character.ttsVoice.speed,
-    ttsLanguage: character.ttsVoice.language,
+    // TTS 음성 검증 후 적용 (T365)
+    ...(await (async () => {
+      const { verified: _, ...ttsFields } = await verifyTTSVoice(
+        l1,
+        l2,
+        l3,
+        demographics.gender as "MALE" | "FEMALE" | "NON_BINARY",
+        character.name
+      )
+      return ttsFields
+    })()),
   })
 
   // T161-AC4: 커버리지 리포트
@@ -602,24 +707,17 @@ async function executeManualPipeline(input: ManualPipelineInput): Promise<Genera
     languages: demographics.languages,
     knowledgeAreas: demographics.knowledgeAreas,
     height: demographics.height,
-    ...(() => {
-      const preferredProvider = process.env.ELEVENLABS_API_KEY
-        ? ("elevenlabs" as const)
-        : ("openai" as const)
-      const tts = inferTTSVoiceFromVectors(
+    // TTS 음성 검증 후 적용 (T365)
+    ...(await (async () => {
+      const { verified: _, ...ttsFields } = await verifyTTSVoice(
         l1,
         l2,
+        l3,
         (demographics.gender as "MALE" | "FEMALE" | "NON_BINARY") ?? "NON_BINARY",
-        preferredProvider,
-        l3
+        input.name
       )
-      return {
-        ttsProvider: tts.provider,
-        ttsVoiceId: tts.voiceId,
-        ttsSpeed: tts.speed,
-        ttsLanguage: tts.language,
-      }
-    })(),
+      return ttsFields
+    })()),
   })
 
   return {

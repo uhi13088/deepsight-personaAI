@@ -29,3 +29,29 @@ export type {
   OnboardingApiResponse,
   OnboardingQuestionsProvider,
 } from "./types"
+
+// ── Adaptive Onboarding ──
+export {
+  computeDimensionUncertainty,
+  computeAverageUncertainty,
+  getTopUncertainDimensions,
+  computeQuestionInfoGain,
+  DEFAULT_TERMINATION_CONFIG,
+} from "./adaptive"
+
+export type {
+  AdaptiveSession,
+  UncertaintyProfile,
+  DimensionUncertainty,
+  TerminationConfig,
+  TerminationResult,
+  QuestionPoolCategory,
+  AdaptiveQuestionMeta,
+  AdaptiveStartRequest,
+  AdaptiveStartResponse,
+  AdaptiveAnswerRequest,
+  AdaptiveAnswerResponse,
+  AdaptiveProgress,
+  AdaptiveQuestionWithMeta,
+  AdaptiveOnboardingResult,
+} from "./adaptive"

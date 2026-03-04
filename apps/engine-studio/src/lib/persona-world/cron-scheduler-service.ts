@@ -716,7 +716,7 @@ function createInteractionProvider(): InteractionPipelineDataProvider {
         attraction: Number(rel.attraction),
         peakStage: rel.peakStage,
         momentum: Number(rel.momentum),
-        milestones: (rel.milestones as RelationshipMilestone[]) ?? [],
+        milestones: (rel.milestones as unknown as RelationshipMilestone[]) ?? [],
       }
     },
 
@@ -816,7 +816,7 @@ function createInteractionProvider(): InteractionPipelineDataProvider {
             attraction: Number(rel.attraction),
             peakStage: rel.peakStage,
             momentum: Number(rel.momentum),
-            milestones: (rel.milestones as RelationshipMilestone[]) ?? [],
+            milestones: (rel.milestones as unknown as RelationshipMilestone[]) ?? [],
           }
         : {
             warmth: 0.1,

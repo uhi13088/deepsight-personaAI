@@ -54,6 +54,9 @@ Public API 엔드포인트는 크게 두 종류로 나뉩니다.
     - [GET /onboarding/questions](#get-onboardingquestions)
     - [GET /onboarding/preview](#get-onboardingpreview)
     - [POST /persona-world/onboarding/cold-start](#post-persona-worldonboardingcold-start)
+    - [POST /persona-world/onboarding/adaptive/start](#post-persona-worldonboardingadaptivestart)
+    - [POST /persona-world/onboarding/adaptive/answer](#post-persona-worldonboardingadaptiveanswer)
+    - [GET /persona-world/onboarding/adaptive/status](#get-persona-worldonboardingadaptivestatus)
 11. [Blog API](#11-blog-api)
     - [GET /blog](#get-blog)
     - [GET /blog/:slug](#get-blogslug)
@@ -1085,6 +1088,161 @@ Content-Type: application/json
       "agreeableness": 0.62,
       "neuroticism": 0.41
     }
+  }
+}
+```
+
+---
+
+### POST /persona-world/onboarding/adaptive/start
+
+적응형 온보딩 세션을 시작합니다. CAT(Computerized Adaptive Testing) 기반으로 20~28문항을 가변 출제합니다.
+
+**인증**: Internal Token 필요
+
+**Request Body**
+
+```json
+{ "userId": "user_cuid" }
+```
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "sessionId": "session_cuid",
+    "firstQuestion": {
+      "id": "q_001",
+      "text": "일요일 오후에 여유 시간이 생겼을 때...",
+      "type": "MULTIPLE_CHOICE",
+      "options": [
+        { "key": "A", "label": "다큐멘터리를 본다" },
+        { "key": "B", "label": "친구들과 놀러 간다" }
+      ],
+      "category": "core",
+      "focusDimensions": ["depth", "sociability"],
+      "currentInfoGain": 0.6
+    },
+    "totalEstimated": 24
+  }
+}
+```
+
+---
+
+### POST /persona-world/onboarding/adaptive/answer
+
+적응형 세션에 답변을 제출합니다. 벡터가 점진 업데이트되며, 다음 질문 또는 완료 결과가 반환됩니다.
+
+**인증**: Internal Token 필요
+
+**Request Body**
+
+```json
+{ "sessionId": "session_cuid", "questionId": "q_001", "value": "A" }
+```
+
+**응답 (200 OK) — 진행 중**
+
+```json
+{
+  "success": true,
+  "data": {
+    "completed": false,
+    "nextQuestion": {
+      "id": "q_025",
+      "text": "...",
+      "type": "MULTIPLE_CHOICE",
+      "options": [],
+      "category": "deepening",
+      "focusDimensions": ["depth"],
+      "currentInfoGain": 0.55
+    },
+    "progress": {
+      "answered": 5,
+      "estimatedTotal": 23,
+      "estimatedRemaining": 18,
+      "convergencePercent": 25,
+      "uncertainDimensions": ["L3.lack", "L2.neuroticism"]
+    }
+  }
+}
+```
+
+**응답 (200 OK) — 완료**
+
+```json
+{
+  "success": true,
+  "data": {
+    "completed": true,
+    "progress": {
+      "answered": 22,
+      "estimatedTotal": 22,
+      "estimatedRemaining": 0,
+      "convergencePercent": 100,
+      "uncertainDimensions": []
+    },
+    "result": {
+      "l1Vector": {
+        "depth": 0.72,
+        "lens": 0.45,
+        "stance": 0.58,
+        "scope": 0.63,
+        "taste": 0.81,
+        "purpose": 0.47,
+        "sociability": 0.35
+      },
+      "l2Vector": {
+        "openness": 0.68,
+        "conscientiousness": 0.55,
+        "extraversion": 0.42,
+        "agreeableness": 0.61,
+        "neuroticism": 0.38
+      },
+      "l3Vector": { "lack": 0.52, "moralCompass": 0.65, "volatility": 0.33, "growthArc": 0.71 },
+      "profileLevel": "ADVANCED",
+      "confidence": 0.93,
+      "totalQuestions": 22
+    }
+  }
+}
+```
+
+---
+
+### GET /persona-world/onboarding/adaptive/status
+
+진행 중인 적응형 세션의 상태를 조회합니다.
+
+**인증**: Internal Token 필요
+
+**Query**: `?sessionId=session_cuid`
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "sessionId": "session_cuid",
+    "userId": "user_cuid",
+    "status": "active",
+    "questionCount": 12,
+    "progress": {
+      "answered": 12,
+      "estimatedTotal": 24,
+      "estimatedRemaining": 12,
+      "convergencePercent": 45,
+      "uncertainDimensions": ["L3.lack"]
+    },
+    "uncertainty": {
+      "average": 0.42,
+      "topUncertain": [{ "dimension": "lack", "layer": "L3", "uncertainty": 0.78 }]
+    },
+    "currentVectors": { "l1": {}, "l2": {}, "l3": {} }
   }
 }
 ```

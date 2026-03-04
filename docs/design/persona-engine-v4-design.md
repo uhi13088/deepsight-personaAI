@@ -2,7 +2,7 @@
 
 **버전**: v4.0
 **작성일**: 2026-02-16
-**최종 수정**: 2026-02-17
+**최종 수정**: 2026-03-04
 **상태**: Active
 
 ---
@@ -24,6 +24,7 @@
 13. [품질 피드백 루프 (Quality Feedback Loop)](#13-품질-피드백-루프)
 14. [LLM 모델 전략](#14-llm-모델-전략)
 15. [로드맵 (v4.1 ~ v6.0)](#15-로드맵)
+16. [TTS Voice Engine + 음성 자체검증](#16-tts-voice-engine--음성-자체검증)
 
 ---
 
@@ -35,13 +36,14 @@ DeepSight Persona Engine v4.0은 AI 페르소나 기반 콘텐츠 추천 B2B Saa
 
 ### 1.2 v4.0 핵심 목표
 
-| 영역     | 목표                  | 핵심 지표             |
-| -------- | --------------------- | --------------------- |
-| 보안     | 인젝션·유출·변조 방어 | 차단률 99%+           |
-| 기억     | 인간적 기억 모델      | 핵심 기억 유지율 95%+ |
-| 자기교정 | 아레나 기반 품질 루프 | 일관성 점수 0.85+     |
-| 비용     | 프롬프트 캐싱 + 배치  | LLM 비용 80%+ 절감    |
-| 캐릭터   | 바이블 4모듈 통합     | 보이스 드리프트 < 0.1 |
+| 영역     | 목표                      | 핵심 지표                |
+| -------- | ------------------------- | ------------------------ |
+| 보안     | 인젝션·유출·변조 방어     | 차단률 99%+              |
+| 기억     | 인간적 기억 모델          | 핵심 기억 유지율 95%+    |
+| 자기교정 | 아레나 기반 품질 루프     | 일관성 점수 0.85+        |
+| 비용     | 프롬프트 캐싱 + 배치      | LLM 비용 80%+ 절감       |
+| 캐릭터   | 바이블 4모듈 통합         | 보이스 드리프트 < 0.1    |
+| 음성/TTS | 벡터→음성 매핑 + 자체검증 | 4-Layer 검증 통과율 99%+ |
 
 ### 1.3 설계 원칙
 
@@ -218,7 +220,7 @@ type Expression =
 
 페르소나 간 관계의 구조화된 발전 모델.
 
-**4단계 관계 발전**
+**4단계 관계 발전 (v4.0 기본)**
 
 ```
 STRANGER → ACQUAINTANCE → FAMILIAR → CLOSE
@@ -236,6 +238,18 @@ STRANGER → ACQUAINTANCE → FAMILIAR → CLOSE
 
 - 단계(stage)와 유형(type)의 조합으로 행동 프로토콜 결정
 - 단계 전환: 인터랙션 빈도, warmth/tension 임계값 기반 자동 감지
+
+**v4.2 확장 — 9단계 + 22유형**
+
+> v4.2에서 관계 모델이 대폭 확장되었다.
+
+- **Stage**: 4 → 9단계 (전진 6단계 + 쇠퇴 3단계)
+- **Type**: 5 → 22유형 (로맨틱 6종, 소셜 3종, 복합 3종 등 추가)
+- **신규 필드**:
+  - `attraction`: 끌림 수치 (로맨틱/소셜 관계에서 활용)
+  - `peakStage`: 도달한 최고 관계 단계 (쇠퇴 후에도 기록 유지)
+  - `momentum`: 관계 발전/쇠퇴 속도 (양수=발전, 음수=쇠퇴)
+  - `milestones`: 관계 이정표 이벤트 기록 (첫 대화, 첫 갈등, 화해 등)
 
 ### 4.3 보이스 스펙 (Voice Spec)
 
@@ -903,6 +917,198 @@ TRUST_MAX_WEIGHT = 0.2 (최대 20% 영향)
 | 품질 측정              | ~0.1M     | ~$0.3     |
 | **소계**               | ~7.5M     | ~$22.3    |
 | **캐싱 후 (82% 절감)** | —         | **~$4.0** |
+
+---
+
+## 16. TTS Voice Engine + 음성 자체검증
+
+3-Layer 벡터에서 음성 캐릭터를 추론하고, TTS 생성 후 로컬에서 자체검증하는 파이프라인. 외부 API 비용 없이 4계층 검증으로 오디오 품질을 보장한다.
+
+### 16.1 Voice Engine 10D
+
+3-Layer 벡터(L1/L2/L3)로부터 10차원 음성 캐릭터를 추론한다.
+
+**VoiceCharacter 10D 타입**
+
+| 차원           | 축                       | 주요 소스                        |
+| -------------- | ------------------------ | -------------------------------- |
+| warmth         | 차가운(0) ↔ 따뜻한(1)    | L1.sociability, L2.agreeableness |
+| authority      | 부드러운(0) ↔ 권위적(1)  | L2.conscientiousness, L1.stance  |
+| energy         | 차분한(0) ↔ 에너지틱(1)  | L2.extraversion, L1.scope        |
+| expressiveness | 절제된(0) ↔ 표현적(1)    | L2.openness, L3.volatility       |
+| clarity        | 모호한(0) ↔ 명확한(1)    | L1.depth, L2.conscientiousness   |
+| intimacy       | 거리감(0) ↔ 친밀한(1)    | L1.sociability, L3.lack          |
+| tempo          | 느린(0) ↔ 빠른(1)        | L2.extraversion, L3.volatility   |
+| volatility     | 일정한(0) ↔ 변화무쌍(1)  | L3.volatility, L2.neuroticism    |
+| resonance      | 가벼운(0) ↔ 깊은(1)      | L1.depth, L3.moralCompass        |
+| breathiness    | 단단한(0) ↔ 숨결 있는(1) | L2.neuroticism, L3.lack          |
+
+**핵심 함수**
+
+```typescript
+computeVoiceCharacter(l1: L1Vector, l2: L2Vector, l3: L3Vector): VoiceCharacter
+```
+
+- L1/L2/L3 벡터의 가중 조합으로 10D VoiceCharacter 산출
+- 각 차원은 [0, 1] 범위로 클램프
+
+```typescript
+voiceCharacterToElevenLabs(vc: VoiceCharacter): ElevenLabsParams
+```
+
+- VoiceCharacter → ElevenLabs API 파라미터 변환
+- 출력: `{ stability, similarityBoost, style, speed, useSpeakerBoost }`
+
+```typescript
+voiceCharacterDistance(a: VoiceCharacter, b: VoiceCharacter): number
+```
+
+- 두 VoiceCharacter 간 유클리드 거리 계산
+- 다양성 검증 및 음성 클러스터링에 활용
+
+### 16.2 TTS 프로바이더
+
+**3종 프로바이더**
+
+| 프로바이더   | 역할     | 모델                   | 특징               |
+| ------------ | -------- | ---------------------- | ------------------ |
+| ElevenLabs   | Primary  | Eleven Multilingual v2 | 최고 품질, 다국어  |
+| OpenAI TTS   | Fallback | tts-1 / tts-1-hd       | 안정적, 빠른 응답  |
+| Google Cloud | Fallback | Cloud Text-to-Speech   | 넓은 언어 커버리지 |
+
+**18종 기본 음성**
+
+- 8 Male: 성격 키(personality key) 기반 매핑
+- 8 Female: 성격 키 기반 매핑
+- 2 Non-binary: 중성 음역대
+
+**성별 기반 음성 매칭**: `MALE` / `FEMALE` / `NON_BINARY` × personality key 조합으로 최적 base voice 선택
+
+**프로바이더 자동 감지**: API 키 존재 여부에 따라 사용 가능 프로바이더 자동 결정. 키가 없는 프로바이더는 fallback 목록에서 제외.
+
+**TTS 캐시**
+
+- 방식: LRU 인메모리 캐시
+- 최대 엔트리: 5,000건
+- 키 생성: SHA-256(provider + voiceId + text + params)
+- 캐시 히트 시 TTS API 호출 생략 → 검증만 수행
+
+### 16.3 TTS 자체검증 루프 (Self-Verification Loop)
+
+외부 API 비용 없이 로컬에서 4계층 검증을 수행하여 TTS 출력 품질을 보장한다.
+
+**4-Layer 검증**
+
+```
+L1: 크기 기반 빠른 거부
+ ↓ PASS
+L2: MP3 포맷 유효성
+ ↓ PASS
+L3: 무음 비율 감지
+ ↓ PASS
+L4: 텍스트-오디오 길이 정합성
+ ↓ PASS
+→ 검증 통과
+```
+
+| Layer | 검증 내용                 | 방법                                                             | 비용 |
+| ----- | ------------------------- | ---------------------------------------------------------------- | ---- |
+| L1    | 크기 기반 빠른 거부       | 빈 오디오: base64 길이 < 100자 거부, 초과: > 10MB 거부           | Zero |
+| L2    | MP3 포맷 유효성           | Frame sync (`0xFF 0xFB`), ID3v2 헤더 (`"ID3"`), synchsafe 파싱   | Zero |
+| L3    | 무음 비율 감지            | 256-byte 블록 스캐닝, zero-byte 비율 > 90% 시 무음 판정          | Zero |
+| L4    | 텍스트-오디오 길이 정합성 | 128kbps 비트레이트 추정, 한국어 250자/분 기준, 비율 0.3~3.0 허용 | Zero |
+
+**실패 코드**
+
+| 코드              | Layer | 의미                    |
+| ----------------- | ----- | ----------------------- |
+| EMPTY_AUDIO       | L1    | 빈 오디오 데이터        |
+| OVERSIZED         | L1    | 10MB 초과               |
+| INVALID_FORMAT    | L2    | MP3 포맷 불일치         |
+| SILENT_AUDIO      | L3    | 무음 비율 90% 초과      |
+| DURATION_MISMATCH | L4    | 텍스트 대비 길이 비정상 |
+
+### 16.4 재시도 + Fallback 파이프라인
+
+TTS 생성 실패 시 자동 재시도 및 프로바이더 전환을 수행하는 파이프라인.
+
+**파이프라인 흐름**
+
+```
+Cache HIT → 검증 → PASS → 반환
+                  → FAIL → 캐시 제거 + 재생성
+                            ↓
+API 호출 → 검증 → PASS → 캐시 저장 + 반환
+                 → FAIL → 1회 재시도 → 검증
+                                      → PASS → 캐시 저장 + 반환
+                                      → FAIL → Fallback 프로바이더
+                                                → PASS → 반환
+                                                → FAIL → { audioFailed: true }
+```
+
+**프로바이더 Fallback 순서**
+
+```
+ElevenLabs → OpenAI TTS → Google Cloud TTS → null (text-only)
+```
+
+- `PROVIDER_FALLBACK`: 프로바이더별 다음 fallback 매핑
+- `FALLBACK_VOICE_IDS`: 프로바이더별 기본 fallback 음성 ID
+- 모든 프로바이더 실패 시 `{ audioFailed: true }` 반환 → 텍스트 전용 폴백
+
+### 16.5 페르소나 생성 파이프라인 통합
+
+**`verifyTTSVoice()` 함수**
+
+페르소나 생성/수정 시 TTS 음성을 추론하고 검증하는 통합 함수.
+
+```
+verifyTTSVoice(persona)
+  → TTS 설정 추론 (벡터 → VoiceCharacter → provider params)
+  → 샘플 음성 생성
+  → 4-Layer 검증
+  → PASS → TTS 설정 저장
+  → FAIL → Fallback 프로바이더로 재시도
+```
+
+**적용 모드**
+
+| 모드   | 트리거                | VoiceCharacter 소스                   |
+| ------ | --------------------- | ------------------------------------- |
+| Auto   | LLM 캐릭터 자동 생성  | LLM 생성 벡터 → computeVoiceCharacter |
+| Manual | 관리자 벡터 직접 입력 | 입력 벡터 → computeVoiceCharacter     |
+
+**예외 처리**
+
+- TTS 미설정 (API 키 없음) → 검증 스킵, TTS config만 저장
+- `audioFailed = true` → fallback 프로바이더 시도 후 재추론
+- 모든 프로바이더 실패 → TTS 없이 텍스트 전용으로 페르소나 생성 완료
+
+### 16.6 검증 메트릭
+
+TTS 검증 파이프라인의 운영 상태를 추적하는 메트릭 시스템.
+
+**TTSValidationMetrics**
+
+| 필드               | 타입                        | 설명                   |
+| ------------------ | --------------------------- | ---------------------- |
+| totalChecks        | number                      | 총 검증 횟수           |
+| failures           | number                      | 실패 횟수              |
+| retries            | number                      | 재시도 횟수            |
+| fallbacks          | number                      | Fallback 전환 횟수     |
+| failuresByCode     | Record<FailureCode, number> | 실패 코드별 횟수       |
+| failuresByProvider | Record<Provider, number>    | 프로바이더별 실패 횟수 |
+
+**메트릭 API**
+
+```typescript
+getTTSValidationMetrics(): TTSValidationMetrics   // 현재 메트릭 조회
+resetTTSValidationMetrics(): void                  // 메트릭 초기화
+```
+
+- 운영 대시보드에서 실시간 모니터링 가능
+- `failuresByCode` 분포로 검증 계층별 문제 식별
+- `failuresByProvider` 분포로 프로바이더 안정성 비교
 
 ---
 

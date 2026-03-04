@@ -9,7 +9,7 @@ https://engine.deepsight.ai/api/internal
 ```
 
 **인증**: 세션 기반 (`requireAuth()` — 내부 팀 전용)
-**최종 업데이트**: 2026-02-25
+**최종 업데이트**: 2026-03-04
 
 > **주의**: 이 API는 내부 운영 도구입니다. 외부에 노출하거나 B2B 고객에게 공개하지 마세요.
 
@@ -46,6 +46,7 @@ https://engine.deepsight.ai/api/internal
    - [GET/POST /team/members](#getpost-teammembers)
 9. [User Insight](#9-user-insight)
    - [GET/POST /user-insight/cold-start](#getpost-user-insightcold-start)
+   - [GET/PATCH /user-insight/question-pool](#getpatch-user-insightquestion-pool)
 10. [Incubator (품질 관리)](#10-incubator-품질-관리)
     - [GET/POST /incubator/golden-samples](#getpost-incubatorgolden-samples)
 11. [PersonaWorld 모더레이션](#13-personaworld-모더레이션)
@@ -1282,6 +1283,89 @@ GET /api/internal/security/dashboard
 | `reorder_questions` | `mode`, `questionIds[]`                                                     | 순서 변경 |
 
 **`mode` 값**: `quick` \| `standard` \| `deep`
+
+---
+
+### GET /user-insight/question-pool
+
+적응형 온보딩 질문 풀 목록을 조회합니다.
+
+**Query Parameters**
+
+| 파라미터   | 설명                                                                    |
+| ---------- | ----------------------------------------------------------------------- |
+| `category` | `core` \| `deepening` \| `cross_layer` \| `verification` \| `narrative` |
+| `level`    | `QUICK` \| `STANDARD` \| `DEEP`                                         |
+| `adaptive` | `true` \| `false` — 적응형 질문만/기존만                                |
+| `search`   | 질문 텍스트 검색 (대소문자 무시)                                        |
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "questions": [
+      {
+        "id": "cuid...",
+        "questionText": "...",
+        "questionOrder": 1,
+        "onboardingLevel": "QUICK",
+        "questionType": "MULTIPLE_CHOICE",
+        "targetDimensions": ["depth", "lens"],
+        "options": [{ "key": "A", "label": "...", "l1Weights": { "depth": 0.15 } }],
+        "poolCategory": "core",
+        "isAdaptive": true,
+        "informationGain": 0.6,
+        "minPriorAnswers": 0
+      }
+    ],
+    "stats": {
+      "total": 45,
+      "byCategory": {
+        "core": 24,
+        "deepening": 12,
+        "cross_layer": 3,
+        "verification": 2,
+        "narrative": 4
+      },
+      "adaptive": 21,
+      "nonAdaptive": 24
+    }
+  }
+}
+```
+
+---
+
+### PATCH /user-insight/question-pool
+
+질문의 적응형 속성을 업데이트합니다.
+
+**Request Body**
+
+| 필드              | 타입      | 필수 | 설명                |
+| ----------------- | --------- | ---- | ------------------- |
+| `id`              | `string`  | ✅   | 질문 ID             |
+| `poolCategory`    | `string`  | —    | 풀 카테고리 변경    |
+| `isAdaptive`      | `boolean` | —    | 적응형 플래그 변경  |
+| `informationGain` | `number`  | —    | 정보 이득 (0.0~1.0) |
+| `minPriorAnswers` | `number`  | —    | 최소 사전 답변 수   |
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "cuid...",
+    "poolCategory": "deepening",
+    "isAdaptive": true,
+    "informationGain": 0.7,
+    "minPriorAnswers": 3
+  }
+}
+```
 
 ---
 

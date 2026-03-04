@@ -58,6 +58,7 @@ const navSections: NavSection[] = [
     basePath: "/user-insight",
     children: [
       { label: "Cold Start Strategy", href: "/user-insight/cold-start" },
+      { label: "Question Pool", href: "/user-insight/question-pool" },
       { label: "Psychometric Simulator", href: "/user-insight/psychometric" },
       { label: "Archetype Manager", href: "/user-insight/archetype" },
     ],

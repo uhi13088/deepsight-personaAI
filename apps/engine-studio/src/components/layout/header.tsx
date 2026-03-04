@@ -24,6 +24,7 @@ const SEARCH_ITEMS: SearchItem[] = [
     section: "Persona Studio",
   },
   { label: "Cold Start Strategy", href: "/user-insight/cold-start", section: "User Insight" },
+  { label: "Question Pool", href: "/user-insight/question-pool", section: "User Insight" },
   {
     label: "Psychometric Simulator",
     href: "/user-insight/psychometric",

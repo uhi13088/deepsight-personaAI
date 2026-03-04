@@ -857,7 +857,7 @@ function generateRelationships(
   }
 
   // 감정 기복 + 비판 → 츤데레 관계
-  if (l2.emotionality > 0.6 && l1.stance > 0.5) {
+  if (l2.neuroticism > 0.6 && l1.stance > 0.5) {
     relationships.push({
       type: "tsundere",
       description: "겉으론 차갑지만 속으론 관심 있는 상대",

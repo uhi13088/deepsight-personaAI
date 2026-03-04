@@ -157,6 +157,46 @@ export interface OnboardingAnswersResponse {
   vectorUpdate: Record<string, number>
 }
 
+// ── 적응형 온보딩 타입 ────────────────────────────────────────
+
+export interface AdaptiveQuestionWithMeta {
+  id: string
+  text: string
+  type: string
+  options: Array<{ key: string; label: string }>
+  category: string
+  focusDimensions: string[]
+  currentInfoGain: number
+}
+
+export interface AdaptiveProgress {
+  answered: number
+  estimatedTotal: number
+  estimatedRemaining: number
+  convergencePercent: number
+  uncertainDimensions: string[]
+}
+
+export interface AdaptiveStartResponse {
+  sessionId: string
+  firstQuestion: AdaptiveQuestionWithMeta
+  totalEstimated: number
+}
+
+export interface AdaptiveAnswerResponse {
+  completed: boolean
+  nextQuestion?: AdaptiveQuestionWithMeta
+  progress: AdaptiveProgress
+  result?: {
+    l1Vector: Record<string, number>
+    l2Vector: Record<string, number>
+    l3Vector: Record<string, number>
+    profileLevel: string
+    confidence: number
+    totalQuestions: number
+  }
+}
+
 export interface MatchingPreviewPersona {
   personaId: string
   name: string
