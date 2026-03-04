@@ -19,6 +19,9 @@ import type {
   ChatMessage,
   SendMessageResponse,
   CallReservation,
+  StartCallResponse,
+  CallTurnResponse,
+  EndCallResponse,
 } from "./types"
 
 // ── Client-side API (fetch) ─────────────────────────────────
@@ -841,6 +844,86 @@ export const clientApi = {
     if (!res.ok) throw new Error("Failed to cancel reservation")
 
     const json: ApiResponse<{ cancelled: boolean }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── 통화 세션 (시작 / 턴 / 종료) ──────────────────────────────
+  async startCall(reservationId: string): Promise<StartCallResponse> {
+    const res = await fetch(`/api/persona-world/calls/sessions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reservationId }),
+    })
+    if (!res.ok) throw new Error("Failed to start call")
+
+    const json: ApiResponse<StartCallResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  async sendVoiceTurn(params: {
+    sessionId: string
+    reservationId: string
+    personaId: string
+    userId: string
+    audioBase64: string
+    audioContentType: string
+    conversationHistory: Array<{ role: "user" | "persona"; content: string }>
+    turnNumber: number
+    elapsedSec: number
+  }): Promise<CallTurnResponse> {
+    const res = await fetch(
+      `/api/persona-world/calls/sessions/${encodeURIComponent(params.sessionId)}/turn`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reservationId: params.reservationId,
+          personaId: params.personaId,
+          userId: params.userId,
+          audioBase64: params.audioBase64,
+          audioContentType: params.audioContentType,
+          conversationHistory: params.conversationHistory,
+          turnNumber: params.turnNumber,
+          elapsedSec: params.elapsedSec,
+        }),
+      }
+    )
+    if (!res.ok) throw new Error("Failed to process call turn")
+
+    const json: ApiResponse<CallTurnResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  async endCall(params: {
+    sessionId: string
+    reservationId: string
+    personaId: string
+    userId: string
+    totalTurns: number
+    totalDurationSec: number
+    highlights?: string[]
+  }): Promise<EndCallResponse> {
+    const res = await fetch(
+      `/api/persona-world/calls/sessions/${encodeURIComponent(params.sessionId)}/end`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reservationId: params.reservationId,
+          personaId: params.personaId,
+          userId: params.userId,
+          totalTurns: params.totalTurns,
+          totalDurationSec: params.totalDurationSec,
+          highlights: params.highlights,
+        }),
+      }
+    )
+    if (!res.ok) throw new Error("Failed to end call")
+
+    const json: ApiResponse<EndCallResponse> = await res.json()
     if (!json.success) throw new Error(json.error?.message || "Unknown error")
     return json.data!
   },

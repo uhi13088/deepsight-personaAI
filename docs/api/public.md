@@ -9,7 +9,7 @@ https://engine.deepsight.ai/api/public
 ```
 
 **인증**: 엔드포인트별 상이 — 아래 표 참고
-**최종 업데이트**: 2026-02-25
+**최종 업데이트**: 2026-03-04
 
 ### 인증 요구사항
 
@@ -78,6 +78,18 @@ Public API 엔드포인트는 크게 두 종류로 나뉩니다.
     - [POST /persona-world/onboarding/sns/upload](#post-persona-worldonboardingsnsupload)
     - [GET /persona-world/onboarding/sns/reanalyze](#get-persona-worldonboardingsnsreanalyze)
     - [POST /persona-world/onboarding/sns/reanalyze](#post-persona-worldonboardingsnsreanalyze)
+17. [Chat API](#17-chat-api)
+    - [GET /persona-world/chat/threads](#get-persona-worldchatthreads)
+    - [POST /persona-world/chat/threads](#post-persona-worldchatthreads)
+    - [GET /persona-world/chat/threads/:threadId/messages](#get-persona-worldchatthreadsthreadidmessages)
+    - [POST /persona-world/chat/threads/:threadId/messages](#post-persona-worldchatthreadsthreadidmessages)
+18. [Calls API](#18-calls-api)
+    - [GET /persona-world/calls/reservations](#get-persona-worldcallsreservations)
+    - [POST /persona-world/calls/reservations](#post-persona-worldcallsreservations)
+    - [DELETE /persona-world/calls/reservations/:reservationId](#delete-persona-worldcallsreservationsreservationid)
+    - [POST /persona-world/calls/sessions](#post-persona-worldcallssessions)
+    - [POST /persona-world/calls/sessions/:sessionId/turn](#post-persona-worldcallssessionssessionidturn)
+    - [POST /persona-world/calls/sessions/:sessionId/end](#post-persona-worldcallssessionssessionidend)
 
 ---
 
@@ -1849,3 +1861,349 @@ GET /api/persona-world/onboarding/sns/reanalyze?userId=user_001
 | `NO_SNS_DATA`          | 400  | 연동된 SNS 없음         |
 | `INSUFFICIENT_BALANCE` | 402  | 크레딧 부족             |
 | `REANALYZE_ERROR`      | 500  | 분석 실패 (LLM 오류 등) |
+
+---
+
+## 17. Chat API
+
+1:1 채팅 (텍스트 기반 대화). 코인 10개/턴 차감.
+
+### GET /persona-world/chat/threads
+
+유저의 대화방 목록 조회.
+
+**Query Parameters**
+
+| 파라미터 | 타입   | 필수 | 설명    |
+| -------- | ------ | ---- | ------- |
+| `userId` | string | O    | 유저 ID |
+
+**응답**
+
+```json
+{
+  "success": true,
+  "data": {
+    "threads": [
+      {
+        "id": "thread-abc123",
+        "personaId": "persona-1",
+        "personaName": "영화비평가 민수",
+        "personaImageUrl": "https://...",
+        "lastMessageAt": "2026-03-03T12:00:00Z",
+        "lastMessageContent": "좋은 선택이에요!",
+        "totalMessages": 42,
+        "isActive": true
+      }
+    ]
+  }
+}
+```
+
+### POST /persona-world/chat/threads
+
+새 대화방 생성.
+
+**Request Body**
+
+| 필드        | 타입   | 필수 | 설명        |
+| ----------- | ------ | ---- | ----------- |
+| `userId`    | string | O    | 유저 ID     |
+| `personaId` | string | O    | 페르소나 ID |
+
+**응답**
+
+```json
+{
+  "success": true,
+  "data": {
+    "threadId": "thread-abc123",
+    "sessionId": "session-xyz"
+  }
+}
+```
+
+### GET /persona-world/chat/threads/:threadId/messages
+
+대화 메시지 히스토리 조회 (커서 페이지네이션).
+
+**Query Parameters**
+
+| 파라미터 | 타입   | 필수 | 설명                       |
+| -------- | ------ | ---- | -------------------------- |
+| `userId` | string | O    | 유저 ID                    |
+| `limit`  | number | X    | 조회 수 (기본 30, 최대 50) |
+| `cursor` | string | X    | 페이지네이션 커서          |
+
+**응답**
+
+```json
+{
+  "success": true,
+  "data": {
+    "messages": [
+      {
+        "id": "msg-1",
+        "role": "USER",
+        "content": "안녕!",
+        "imageUrl": null,
+        "createdAt": "2026-03-03T12:00:00Z"
+      },
+      {
+        "id": "msg-2",
+        "role": "PERSONA",
+        "content": "반갑습니다!",
+        "imageUrl": null,
+        "createdAt": "2026-03-03T12:00:01Z"
+      }
+    ],
+    "nextCursor": "msg-1",
+    "hasMore": false
+  }
+}
+```
+
+### POST /persona-world/chat/threads/:threadId/messages
+
+메시지 전송. 코인 10개 차감 + LLM 응답 생성.
+
+**Request Body**
+
+| 필드       | 타입   | 필수 | 설명          |
+| ---------- | ------ | ---- | ------------- |
+| `userId`   | string | O    | 유저 ID       |
+| `content`  | string | O    | 메시지 텍스트 |
+| `imageUrl` | string | X    | 이미지 URL    |
+
+**응답**
+
+```json
+{
+  "success": true,
+  "data": {
+    "userMessageId": "msg-user-1",
+    "personaMessageId": "msg-persona-1",
+    "personaResponse": "좋은 선택이에요! 인셉션은 정말...",
+    "remainingBalance": 990
+  }
+}
+```
+
+**에러 응답**
+
+| 코드                   | HTTP | 설명          |
+| ---------------------- | ---- | ------------- |
+| `THREAD_NOT_FOUND`     | 404  | 대화방 없음   |
+| `UNAUTHORIZED`         | 403  | 권한 없음     |
+| `THREAD_INACTIVE`      | 409  | 비활성 대화방 |
+| `INSUFFICIENT_BALANCE` | 402  | 코인 부족     |
+| `PERSONA_NOT_FOUND`    | 404  | 페르소나 없음 |
+
+---
+
+## 18. Calls API
+
+1:1 음성 통화. 예약 200코인 → 통화 시작 → 턴 처리 (STT→LLM→TTS) → 종료.
+
+### GET /persona-world/calls/reservations
+
+유저의 통화 예약 목록 조회.
+
+**Query Parameters**
+
+| 파라미터 | 타입   | 필수 | 설명    |
+| -------- | ------ | ---- | ------- |
+| `userId` | string | O    | 유저 ID |
+
+**응답**
+
+```json
+{
+  "success": true,
+  "data": {
+    "reservations": [
+      {
+        "id": "res-abc",
+        "personaId": "persona-1",
+        "personaName": "음악큐레이터 지은",
+        "personaImageUrl": "https://...",
+        "scheduledAt": "2026-03-04T15:00:00Z",
+        "status": "PENDING",
+        "coinSpent": 200
+      }
+    ]
+  }
+}
+```
+
+### POST /persona-world/calls/reservations
+
+통화 예약 생성. 200코인 차감.
+
+**Request Body**
+
+| 필드          | 타입   | 필수 | 설명                 |
+| ------------- | ------ | ---- | -------------------- |
+| `userId`      | string | O    | 유저 ID              |
+| `personaId`   | string | O    | 페르소나 ID          |
+| `scheduledAt` | string | O    | 예약 시각 (ISO 8601) |
+
+**응답**
+
+```json
+{
+  "success": true,
+  "data": {
+    "reservationId": "res-abc",
+    "remainingBalance": 800
+  }
+}
+```
+
+**에러 응답**
+
+| 코드                   | HTTP | 설명           |
+| ---------------------- | ---- | -------------- |
+| `MISSING_FIELDS`       | 400  | 필수 필드 누락 |
+| `INSUFFICIENT_CREDITS` | 402  | 코인 부족      |
+
+### DELETE /persona-world/calls/reservations/:reservationId
+
+예약 취소 (PENDING/CONFIRMED만 가능). 코인 환불 없음.
+
+**Query Parameters**
+
+| 파라미터 | 타입   | 필수 | 설명    |
+| -------- | ------ | ---- | ------- |
+| `userId` | string | O    | 유저 ID |
+
+**응답**
+
+```json
+{
+  "success": true,
+  "data": { "cancelled": true }
+}
+```
+
+**에러 응답**
+
+| 코드                    | HTTP | 설명           |
+| ----------------------- | ---- | -------------- |
+| `RESERVATION_NOT_FOUND` | 404  | 예약 없음      |
+| `UNAUTHORIZED`          | 403  | 권한 없음      |
+| `CANNOT_CANCEL`         | 409  | 취소 불가 상태 |
+
+### POST /persona-world/calls/sessions
+
+통화 시작. 예약 ID로 CallSession 생성 + TTS 인사말 생성.
+
+**Request Body**
+
+| 필드            | 타입   | 필수 | 설명    |
+| --------------- | ------ | ---- | ------- |
+| `reservationId` | string | O    | 예약 ID |
+
+**응답**
+
+```json
+{
+  "success": true,
+  "data": {
+    "callSessionId": "call-abc",
+    "interactionSessionId": "isession-xyz",
+    "greetingText": "안녕하세요! 전화 받아주셔서 감사해요~",
+    "greetingAudioBase64": "<base64>",
+    "greetingAudioContentType": "audio/mp3"
+  }
+}
+```
+
+**에러 응답**
+
+| 코드                        | HTTP | 설명              |
+| --------------------------- | ---- | ----------------- |
+| `RESERVATION_NOT_FOUND`     | 404  | 예약 없음         |
+| `RESERVATION_NOT_AVAILABLE` | 409  | 이미 처리된 예약  |
+| `LLM_NOT_CONFIGURED`        | 503  | LLM API 키 미설정 |
+
+### POST /persona-world/calls/sessions/:sessionId/turn
+
+통화 턴 처리. 유저 음성 (Base64) → STT → LLM → TTS → 페르소나 음성 반환.
+
+**Request Body**
+
+| 필드                  | 타입                                     | 필수 | 설명                   |
+| --------------------- | ---------------------------------------- | ---- | ---------------------- |
+| `reservationId`       | string                                   | O    | 예약 ID                |
+| `personaId`           | string                                   | O    | 페르소나 ID            |
+| `userId`              | string                                   | O    | 유저 ID                |
+| `audioBase64`         | string                                   | O    | 유저 음성 (Base64)     |
+| `audioContentType`    | string                                   | O    | MIME 타입 (audio/webm) |
+| `conversationHistory` | `Array<{role: string, content: string}>` | X    | 이전 대화 이력         |
+| `turnNumber`          | number                                   | X    | 현재 턴 번호           |
+| `elapsedSec`          | number                                   | X    | 경과 시간 (초)         |
+
+**응답**
+
+```json
+{
+  "success": true,
+  "data": {
+    "userText": "안녕하세요, 오늘 뭐 하셨어요?",
+    "personaText": "오! 오늘은 새로운 앨범을 들었어요...",
+    "personaAudioBase64": "<base64>",
+    "personaAudioContentType": "audio/mp3",
+    "turnNumber": 1,
+    "shouldEnd": false,
+    "detectedLanguage": "ko"
+  }
+}
+```
+
+**제한사항**
+
+- 최대 30턴 또는 600초(10분) 후 `shouldEnd: true` 반환
+- `shouldEnd: true` 이후 클라이언트는 end API 호출 필수
+
+**에러 응답**
+
+| 코드                 | HTTP | 설명              |
+| -------------------- | ---- | ----------------- |
+| `MISSING_FIELDS`     | 400  | 필수 필드 누락    |
+| `PERSONA_NOT_FOUND`  | 404  | 페르소나 없음     |
+| `LLM_NOT_CONFIGURED` | 503  | LLM API 키 미설정 |
+
+### POST /persona-world/calls/sessions/:sessionId/end
+
+통화 종료. CallSession 마감 + 예약 COMPLETED + 기억 최종화 (Factbook/PersonaState).
+
+**Request Body**
+
+| 필드               | 타입     | 필수 | 설명                 |
+| ------------------ | -------- | ---- | -------------------- |
+| `reservationId`    | string   | O    | 예약 ID              |
+| `personaId`        | string   | O    | 페르소나 ID          |
+| `userId`           | string   | O    | 유저 ID              |
+| `totalTurns`       | number   | X    | 총 턴 수             |
+| `totalDurationSec` | number   | X    | 총 통화 시간 (초)    |
+| `highlights`       | string[] | X    | 대화 하이라이트 목록 |
+
+**응답**
+
+```json
+{
+  "success": true,
+  "data": {
+    "totalTurns": 12,
+    "totalDurationSec": 340
+  }
+}
+```
+
+**에러 응답**
+
+| 코드             | HTTP | 설명           |
+| ---------------- | ---- | -------------- |
+| `MISSING_FIELDS` | 400  | 필수 필드 누락 |
+| `INTERNAL_ERROR` | 500  | 종료 처리 실패 |
