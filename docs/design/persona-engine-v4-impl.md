@@ -2,7 +2,7 @@
 
 **버전**: v4.0
 **작성일**: 2026-02-16
-**최종 수정**: 2026-02-17
+**최종 수정**: 2026-03-04
 **상태**: Active
 **설계서 참조**: `docs/design/persona-engine-v4-design.md`
 
@@ -24,8 +24,9 @@
 12. [매칭 알고리즘 구현](#12-매칭-알고리즘-구현)
 13. [품질 피드백 루프 구현](#13-품질-피드백-루프-구현)
 14. [LLM 모델 전략](#14-llm-모델-전략)
-15. [구현 페이즈 및 태스크](#15-구현-페이즈-및-태스크)
-16. [파일 변경 맵](#16-파일-변경-맵)
+15. [TTS Voice Engine 구현](#15-tts-voice-engine-구현)
+16. [구현 페이즈 및 태스크](#16-구현-페이즈-및-태스크)
+17. [파일 변경 맵](#17-파일-변경-맵)
 
 ---
 
@@ -550,6 +551,67 @@ interface LlmUsageRecord {
   cacheWriteTokens: number
   cost: number
   timestamp: Date
+}
+```
+
+### 1.8 TTS Voice Engine 타입
+
+```typescript
+// === TTS Voice Engine ===
+interface VoiceCharacter {
+  warmth: number // 0.0~1.0
+  authority: number
+  energy: number
+  expressiveness: number
+  clarity: number
+  intimacy: number
+  tempo: number
+  volatility: number
+  resonance: number
+  breathiness: number
+}
+
+type TTSProvider = "openai" | "google" | "elevenlabs"
+
+interface TTSVoiceConfig {
+  provider: TTSProvider
+  voiceId: string
+  speed: number
+  pitch: number
+  language: string
+}
+
+interface TTSVoiceProfile extends TTSVoiceConfig {
+  voiceCharacter?: VoiceCharacter
+}
+
+interface TTSResult {
+  audioBase64: string
+  contentType: string
+  durationEstimateSec: number
+  audioFailed?: boolean
+}
+
+type TTSValidationFailureCode =
+  | "EMPTY_AUDIO"
+  | "OVERSIZED"
+  | "INVALID_FORMAT"
+  | "SILENT_AUDIO"
+  | "DURATION_MISMATCH"
+
+interface TTSValidationResult {
+  valid: boolean
+  failureCode?: TTSValidationFailureCode
+  details?: string
+}
+
+interface TTSValidationMetrics {
+  totalChecks: number
+  failures: number
+  retries: number
+  fallbacks: number
+  failuresByCode: Record<string, number>
+  failuresByProvider: Record<string, number>
 }
 ```
 
@@ -1369,7 +1431,67 @@ const MONTHLY_COST_ESTIMATE = {
 
 ---
 
-## 15. 구현 페이즈 및 태스크
+## 15. TTS Voice Engine 구현
+
+### 15.1 Voice Engine 10D
+
+**파일**: `src/lib/persona-world/voice-engine.ts`
+
+페르소나 3-Layer 벡터로부터 10차원 음성 캐릭터를 계산하고, TTS 프로바이더 파라미터로 변환.
+
+```
+computeVoiceCharacter(l1, l2, l3): VoiceCharacter
+voiceCharacterToElevenLabs(vc): ElevenLabsVoiceParams
+voiceCharacterDistance(a, b): number
+```
+
+### 15.2 Voice Pipeline
+
+**파일**: `src/lib/persona-world/voice-pipeline.ts`
+
+TTS 호출 → 캐시 → 검증 → 재시도 → 폴백 파이프라인.
+
+```
+textToSpeech(text, config): Promise<TTSResult>
+├── Cache check (LRU, SHA-256 key)
+├── callTTSProvider(text, config): TTSResult
+├── validateTTSResult(result, inputTextLength): TTSValidationResult
+├── On FAIL: retry 1x
+├── On FAIL: attemptFallback(text, config)
+├── On all FAIL: { audioFailed: true }
+└── Cache set
+
+validateTTSResult(result, textLength): TTSValidationResult
+├── L1: size check (< 100 = EMPTY, > 10M = OVERSIZED)
+├── L2: validateMp3Format (frame sync / ID3)
+├── L3: checkSilentAudio (zero-byte ratio)
+└── L4: checkDurationConsistency (128kbps / 250 chars/min)
+
+sttLanguageToBcp47(lang): string
+buildTTSConfig(persona): TTSVoiceConfig
+isVoiceConfigured(): { stt: boolean, tts: boolean }
+getTTSValidationMetrics(): TTSValidationMetrics
+resetTTSValidationMetrics(): void
+```
+
+### 15.3 Pipeline Integration
+
+**파일**: `src/lib/persona-generation/pipeline.ts`
+
+페르소나 생성 파이프라인에서 TTS 음성 검증을 통합.
+
+```
+verifyTTSVoice(l1, l2, l3, gender, name): Promise<VerifiedTTSResult>
+├── inferTTSVoiceFromVectors(l1, l2, gender, provider, l3)
+├── If !ttsConfigured → return config only (skip verification)
+├── textToSpeech(sampleText, config)
+├── If audioFailed → try fallback provider
+└── Return verified TTS config
+```
+
+---
+
+## 16. 구현 페이즈 및 태스크
 
 ### Phase 0: 보안 3계층 (T137~T140)
 
@@ -1437,9 +1559,22 @@ const MONTHLY_COST_ESTIMATE = {
 | T-I | LLM 2-Tier 라우팅 (LLM vs Rule-based 분기)                            | TODO |
 | T-J | 토큰 예산 관리 (작업별 예산 상수, 예산 체크)                          | TODO |
 
+### Phase 7: TTS Voice Engine (T327~T329, T362~T367)
+
+| #    | 태스크                                      | 상태 |
+| ---- | ------------------------------------------- | ---- |
+| T327 | ElevenLabs TTS 연동 + 성별 기반 음성 매칭   | DONE |
+| T328 | TTS 캐시 레이어 (LRU 5000 entries)          | DONE |
+| T329 | Voice Engine 10D ↔ 페르소나 엔진 통합       | DONE |
+| T362 | validateTTSResult() L1~L4 검증 함수         | DONE |
+| T363 | textToSpeech() 자체검증 + 재시도 + fallback | DONE |
+| T364 | TTSResult 타입 확장 + 검증 메트릭           | DONE |
+| T365 | 페르소나 생성 파이프라인 음성 검증 통합     | DONE |
+| T366 | TTS 검증 단위 테스트 (20개)                 | DONE |
+
 ---
 
-## 16. 파일 변경 맵
+## 17. 파일 변경 맵
 
 ### 신규 파일
 
@@ -1507,6 +1642,10 @@ src/lib/quality/                     // Phase 6: 품질 피드백 루프
 src/lib/llm/                         // Phase 6: LLM 전략
   ├── model-router.ts                // T-I: 2-Tier 라우팅
   └── token-budget.ts                // T-J: 토큰 예산 관리
+
+src/lib/persona-world/               // Phase 7: TTS Voice Engine
+  ├── voice-engine.ts                // T329
+  └── voice-pipeline.ts              // T327, T328, T362~T364
 ```
 
 ### 수정 파일

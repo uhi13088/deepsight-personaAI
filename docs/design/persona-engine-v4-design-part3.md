@@ -1,7 +1,7 @@
 # DeepSight Persona Engine v4.0 — 설계서 Part 3: Operations
 
 **버전**: v4.0
-**작성일**: 2026-02-17
+**작성일**: 2026-03-04
 **상태**: Active
 **설계서 참조**: [`persona-engine-v4-design.md`](./persona-engine-v4-design.md)
 **Part 1 (§1~§5)**: [`persona-engine-v4-design-part1.md`](./persona-engine-v4-design-part1.md)
@@ -16,6 +16,7 @@
 13. [품질 피드백 루프 (Quality Feedback Loop)](#13-품질-피드백-루프-quality-feedback-loop)
 14. [LLM 모델 전략](#14-llm-모델-전략)
 15. [로드맵 (v4.1 ~ v6.0)](#15-로드맵-v41--v60)
+16. [TTS Voice Engine + 음성 자체검증](#16-tts-voice-engine--음성-자체검증)
 
 ---
 
@@ -1940,6 +1941,189 @@ v4.0 Foundation
 | 텍스트 전용 콘텐츠 벡터 | v4.0      | v4.2      | 멀티모달 콘텐츠 매칭 불가    |
 | 관리자 의존 교정 승인   | v4.0      | v5.0      | 교정 주기 병목               |
 | 개별 페르소나 단위 운영 | v4.0      | v5.1      | 집단 역학 미반영             |
+
+---
+
+## 16. TTS Voice Engine + 음성 자체검증
+
+페르소나의 **3-Layer 벡터에서 고유 음성을 자동 생성**하고, TTS 출력의 품질을 **로컬에서 검증**하는 시스템. API 비용 추가 없이 불량 오디오를 감지·재시도·교체한다.
+
+### 16.1 Voice Engine 10D
+
+L1/L2/L3 벡터에서 10차원 음성 특성(VoiceCharacter)을 도출한다.
+
+**파일**: `src/lib/persona-world/voice-engine.ts`
+
+```
+┌───────────────────────────────────────────────────────┐
+│                Voice Engine 10D                        │
+│                                                       │
+│  L1 (Social)  ──┐                                    │
+│  L2 (OCEAN)   ──┼──→ computeVoiceCharacter()         │
+│  L3 (Narrative)─┘          │                          │
+│                            ▼                          │
+│                    VoiceCharacter (10D)                │
+│                            │                          │
+│                            ▼                          │
+│               voiceCharacterToElevenLabs()            │
+│                            │                          │
+│                            ▼                          │
+│                   ElevenLabs API Params                │
+│               (stability, similarity,                 │
+│                style, speed, boost)                   │
+└───────────────────────────────────────────────────────┘
+```
+
+**10D VoiceCharacter 차원**
+
+| 차원           | 범위    | 주요 벡터 기여                   | 설명          |
+| -------------- | ------- | -------------------------------- | ------------- |
+| warmth         | 0.0~1.0 | L2.agreeableness, L1.sociability | 따뜻함/친근감 |
+| authority      | 0.0~1.0 | L1.stance, L2.conscientiousness  | 권위감/신뢰감 |
+| energy         | 0.0~1.0 | L2.extraversion, L1.purpose      | 활력/에너지   |
+| expressiveness | 0.0~1.0 | L1.depth, L2.openness            | 표현력        |
+| clarity        | 0.0~1.0 | L2.conscientiousness, L1.lens    | 명료함        |
+| intimacy       | 0.0~1.0 | L1.sociability, L2.agreeableness | 친밀감        |
+| tempo          | 0.0~1.0 | L2.extraversion, L1.scope        | 말 속도       |
+| volatility     | 0.0~1.0 | L2.neuroticism, L3.volatility    | 감정 변동     |
+| resonance      | 0.0~1.0 | L1.depth, L3.lack                | 깊이/울림     |
+| breathiness    | 0.0~1.0 | L2.neuroticism, L3.growthArc     | 숨결/공기감   |
+
+**10D → ElevenLabs 매핑**
+
+```
+stability       = clamp(clarity × 0.3 + (1 - volatility) × 0.4 + authority × 0.3, 0, 1)
+similarityBoost = clamp(warmth × 0.3 + intimacy × 0.3 + resonance × 0.4, 0, 1)
+style           = clamp(expressiveness × 0.4 + energy × 0.3 + breathiness × 0.3, 0, 1)
+speed           = clamp(0.8 + tempo × 0.4, 0.8, 1.2)
+useSpeakerBoost = (authority > 0.6) || (energy > 0.7)
+```
+
+### 16.2 TTS 프로바이더
+
+| 프로바이더 | 음성 수              | 특징                             | 사용 조건          |
+| ---------- | -------------------- | -------------------------------- | ------------------ |
+| ElevenLabs | 18종 (남8/여8/중성2) | Eleven Multilingual v2, 10D 매핑 | ELEVENLABS_API_KEY |
+| OpenAI     | 6종                  | TTS-1 모델, 기본 fallback        | OPENAI_API_KEY     |
+| Google     | 4종                  | Cloud TTS, 마지막 fallback       | GOOGLE_TTS_API_KEY |
+
+**성별 기반 음성 매칭**
+
+| 성격 키    | MALE   | FEMALE    |
+| ---------- | ------ | --------- |
+| analytical | Daniel | Rachel    |
+| critical   | George | Charlotte |
+| social     | Chris  | Aria      |
+| emotional  | Brian  | Lily      |
+| default    | Adam   | Sarah     |
+
+**TTS 캐시**
+
+- LRU 인메모리 캐시 (기본 5000 entries, `TTS_CACHE_MAX_ENTRIES` 환경변수)
+- SHA-256 캐시 키: `provider|voiceId|speed|stability|similarityBoost|style|text`
+- LRU 제거: `lastUsed` 기준 가장 오래된 항목 삭제
+- `ttsCache.remove(key)`: 검증 실패 시 불량 캐시 즉시 제거
+
+### 16.3 TTS 자체검증 루프 (Self-Verification Loop)
+
+TTS API 응답을 **로컬에서 4계층으로 검증**하여 불량 오디오를 즉시 감지한다. 추가 API 호출 비용 없이 품질을 보장한다.
+
+```
+TTS API 응답
+  │
+  ├── L1: 크기 기반 빠른 거부 (~0ms)
+  │     • base64 < 100자 → EMPTY_AUDIO
+  │     • base64 > 10MB → OVERSIZED
+  │     • 텍스트 0자 → 검증 스킵 (PASS)
+  │
+  ├── L2: MP3 포맷 유효성 (~0ms)
+  │     • Frame sync: 0xFF 0xFB/0xFA/0xF3/0xF2
+  │     • ID3v2 header: "ID3" magic bytes
+  │     • 그 외 → INVALID_FORMAT
+  │
+  ├── L3: 무음 비율 감지 (~1ms)
+  │     • 256-byte 블록 단위 스캔
+  │     • 0x00 비율 > 90% → SILENT_AUDIO
+  │     • 1KB 미만 → 분석 스킵
+  │
+  └── L4: 텍스트-오디오 길이 정합성 (~0ms)
+        • 예상 길이 = 텍스트길이 / (250자/60초)
+        • 실제 길이 = 바이트 / (128kbps/8)
+        • ratio = 실제/예상
+        • 0.3 < ratio < 3.0 → PASS
+        • 그 외 → DURATION_MISMATCH
+        • 예상 < 0.5초 → 스킵 (짧은 텍스트)
+```
+
+### 16.4 재시도 + Fallback 파이프라인
+
+```
+textToSpeech(text, config)
+  │
+  ├── 1. 캐시 확인
+  │     HIT → L1~L4 검증 → PASS → 반환
+  │                       → FAIL → 캐시 제거 → 재생성
+  │
+  ├── 2. TTS API 호출 → L1~L4 검증
+  │     PASS → 캐시 저장 → 반환
+  │
+  ├── 3. FAIL → 동일 프로바이더 1회 재시도
+  │     PASS → 캐시 저장 → 반환
+  │
+  ├── 4. FAIL → Fallback 프로바이더 전환
+  │     elevenlabs → openai → google → null
+  │     새 프로바이더로 TTS → L1~L4 검증
+  │
+  └── 5. 전부 FAIL → { audioFailed: true }
+        텍스트 전용 fallback (음성 없이 텍스트만 반환)
+```
+
+**Fallback 맵**
+
+| 원래 프로바이더 | Fallback 순서              |
+| --------------- | -------------------------- |
+| elevenlabs      | openai → google → null     |
+| openai          | elevenlabs → google → null |
+| google          | openai → elevenlabs → null |
+
+### 16.5 페르소나 생성 파이프라인 통합
+
+페르소나 생성 시 TTS 음성을 자동으로 추론하고 검증한다.
+
+```
+verifyTTSVoice(l1, l2, l3, gender, name)
+  │
+  ├── inferTTSVoiceFromVectors(l1, l2, gender, provider, l3)
+  │     └── Voice Engine 10D 경유
+  │
+  ├── TTS API 키 없음? → 검증 스킵, config만 반환
+  │
+  ├── 샘플 텍스트 생성 → textToSpeech()
+  │
+  ├── audioFailed? → fallback provider로 재추론
+  │
+  └── DB 저장 (ttsProvider, ttsVoiceId, ttsSpeed, ttsLanguage)
+```
+
+- Auto 모드 (LLM 캐릭터 생성): `character.name` 기반 샘플
+- Manual 모드 (벡터 기반 추론): `input.name` 기반 샘플
+
+### 16.6 검증 메트릭
+
+```typescript
+interface TTSValidationMetrics {
+  totalChecks: number
+  failures: number
+  retries: number
+  fallbacks: number
+  failuresByCode: Record<TTSValidationFailureCode, number>
+  failuresByProvider: Record<string, number>
+}
+```
+
+- `getTTSValidationMetrics()`: 불변 사본 반환
+- `resetTTSValidationMetrics()`: 초기화
+- 프로바이더별 × 실패코드별 교차 집계
 
 ---
 

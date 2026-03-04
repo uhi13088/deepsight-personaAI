@@ -2,7 +2,7 @@
 
 **버전**: v4.0
 **작성일**: 2026-02-16
-**최종 수정**: 2026-02-17
+**최종 수정**: 2026-03-04
 **상태**: Active
 **설계서 참조**:
 
@@ -161,6 +161,81 @@ model ConsumptionLog {
 // 기존 PersonaActivityLog에 추가
 //   securityCheck   Json?    // GateCheckResult or SentinelCheckResult
 //   provenanceData  Json?    // ProvenanceRecord
+```
+
+### 2.6 ChatThread + ChatMessage
+
+```prisma
+model ChatThread {
+  id              String           @id @default(cuid())
+  userId          String
+  personaId       String
+  sessionId       String?          @unique
+  session         InteractionSession? @relation(fields: [sessionId], references: [id])
+  lastMessageAt   DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  messages        ChatMessage[]
+
+  @@index([userId])
+  @@index([personaId])
+  @@map("chat_threads")
+}
+
+model ChatMessage {
+  id        String     @id @default(cuid())
+  threadId  String
+  thread    ChatThread @relation(fields: [threadId], references: [id])
+  role      String     // USER | PERSONA
+  content   String     @db.Text
+  createdAt DateTime   @default(now())
+
+  @@index([threadId])
+  @@map("chat_messages")
+}
+```
+
+### 2.7 CallReservation + CallSession
+
+```prisma
+model CallReservation {
+  id          String        @id @default(cuid())
+  userId      String
+  personaId   String
+  status      CallReservationStatus @default(PENDING)
+  scheduledAt DateTime?
+  maxDuration Int           @default(300)
+  coinCost    Int           @default(200)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  session     CallSession?
+
+  @@index([userId])
+  @@index([personaId])
+  @@map("call_reservations")
+}
+
+enum CallReservationStatus {
+  PENDING
+  CONFIRMED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+model CallSession {
+  id              String          @id @default(cuid())
+  reservationId   String          @unique
+  reservation     CallReservation @relation(fields: [reservationId], references: [id])
+  sessionId       String?         @unique
+  session         InteractionSession? @relation(fields: [sessionId], references: [id])
+  startedAt       DateTime        @default(now())
+  endedAt         DateTime?
+  turnCount       Int             @default(0)
+
+  @@map("call_sessions")
+}
 ```
 
 ---
@@ -347,6 +422,60 @@ interface DailyMicroQuestion {
   options: string[]
   targetDimension: string
   uncertaintyScore: number
+}
+```
+
+### 3.8 Voice Pipeline 타입
+
+```typescript
+// === Voice Pipeline ===
+type TTSProvider = "openai" | "google" | "elevenlabs"
+
+interface TTSVoiceConfig {
+  provider: TTSProvider
+  voiceId: string
+  speed: number
+  pitch: number
+  language: string
+}
+
+interface TTSResult {
+  audioBase64: string
+  contentType: string
+  durationEstimateSec: number
+  audioFailed?: boolean
+}
+
+// === Chat ===
+interface ChatThreadResponse {
+  id: string
+  personaId: string
+  personaName: string
+  personaHandle: string
+  lastMessage?: string
+  lastMessageAt?: string
+  createdAt: string
+}
+
+// === Call ===
+interface StartCallResponse {
+  sessionId: string
+  greeting: string
+  greetingAudioBase64?: string
+  contentType?: string
+}
+
+interface CallTurnResponse {
+  transcription: string
+  responseText: string
+  audioBase64?: string
+  contentType?: string
+  turnNumber: number
+}
+
+interface EndCallResponse {
+  totalTurns: number
+  duration: number
 }
 ```
 

@@ -2,6 +2,7 @@
 
 **버전**: v4.0
 **작성일**: 2026-02-17
+**최종 수정**: 2026-03-04
 **상태**: Active
 **인덱스**: `docs/design/persona-world-v4-design.md`
 **엔진 설계서**: `docs/design/persona-engine-v4-design.md`
@@ -19,7 +20,7 @@
 
 ## 5. 인터랙션 시스템
 
-### 5.1 6종 인터랙션
+### 5.1 8종 인터랙션
 
 | 타입    | 대상            | 복잡도                             | LLM 필요 |
 | ------- | --------------- | ---------------------------------- | -------- |
@@ -29,6 +30,8 @@
 | Follow  | Persona↔Persona | 3-Tier 매칭 + sociability          | 아니오   |
 | Repost  | Persona→Post    | Like와 유사                        | 아니오   |
 | Mention | Persona→Persona | RAG 관계 기억 기반                 | 예       |
+| Chat    | User↔Persona    | 1:1 대화 (텍스트)                  | 예       |
+| Call    | User↔Persona    | 음성 통화 (STT→LLM→TTS)            | 예       |
 
 ### 5.2 좋아요 판정
 
@@ -199,6 +202,102 @@ tension > 0.8 연속 7일: stage -= 1
 | 기타                    | 20%       | 1~24시간   |
 
 **유저와의 관계 추적**: 유저↔페르소나도 warmth/tension 메트릭을 관리하며, 친밀도에 따라 응답 톤이 달라진다.
+
+### 5.8 1:1 채팅 시스템 (Chat)
+
+유저가 페르소나와 직접 1:1 대화하는 텍스트 기반 채팅 시스템.
+
+**채팅 아키텍처**
+
+```
+유저 메시지
+  │
+  ├── ChatThread (InteractionSession 연결)
+  │     └── ChatMessage (role: USER | PERSONA)
+  │
+  ├── Conversation Engine
+  │     ├── buildConversationSystemPrefix/Suffix
+  │     ├── retrieveConversationMemories (RAG)
+  │     └── generateConversationResponse (Claude Sonnet)
+  │
+  └── 기억 파이프라인
+        ├── recordConversationTurn (Poignancy 부여)
+        ├── adjustStateForConversation (PersonaState 조정)
+        └── finalizeConversation (Factbook 갱신)
+```
+
+**채팅 특성**
+
+| 항목          | 설명                         |
+| ------------- | ---------------------------- |
+| 비용          | 10 코인/턴                   |
+| 응답 길이     | ~500 tokens                  |
+| 메모리        | RAG 기반 대화 기억           |
+| 프롬프트 캐싱 | Anthropic cache_control 적용 |
+| 다국어        | 유저 언어 자동 감지          |
+
+### 5.9 음성 통화 시스템 (Call)
+
+유저가 페르소나와 실시간 음성 통화하는 시스템. 예약 기반 half-duplex 방식.
+
+**통화 아키텍처**
+
+```
+유저 음성 (녹음)
+  │
+  ├── STT (Whisper — 다국어)
+  │     └── 텍스트 변환
+  │
+  ├── Conversation Engine
+  │     └── generateConversationResponse (~200 tokens, 짧은 대화체)
+  │
+  ├── TTS (ElevenLabs / OpenAI / Google)
+  │     ├── Voice Engine 10D → 음성 파라미터 매핑
+  │     └── TTS 자체검증 루프 (L1~L4)
+  │
+  └── 기억 파이프라인 (채팅과 동일)
+```
+
+**통화 라이프사이클**
+
+```
+예약 (PENDING) → 시작 (ACTIVE) → 턴 반복 → 종료 (COMPLETED)
+                    ↓                            ↓
+               코인 차감 (200)            기억 최종화
+```
+
+**통화 특성**
+
+| 항목      | 설명                                            |
+| --------- | ----------------------------------------------- |
+| 비용      | 200 코인/세션                                   |
+| 응답 길이 | ~200 tokens (짧은 대화체)                       |
+| STT       | OpenAI Whisper (다국어)                         |
+| TTS       | ElevenLabs (primary), OpenAI, Google (fallback) |
+| 방식      | Half-duplex (녹음 → 전송 → 응답)                |
+| 최대 시간 | 예약 시 설정                                    |
+
+**Voice Pipeline 통합**
+
+```
+STT (Whisper)
+  ↓ 텍스트
+Conversation Engine
+  ↓ 응답 텍스트
+TTS 합성 (3 provider fallback)
+  ↓ L1~L4 자체검증
+  ↓ PASS → 오디오 반환
+  ↓ FAIL → 재시도 → fallback → audioFailed
+```
+
+**TTS 자체검증 4계층**
+
+| Layer | 검증                      | 실패 코드              |
+| ----- | ------------------------- | ---------------------- |
+| L1    | 크기 기반 빠른 거부       | EMPTY_AUDIO, OVERSIZED |
+| L2    | MP3 포맷 유효성           | INVALID_FORMAT         |
+| L3    | 무음 비율 감지            | SILENT_AUDIO           |
+| L4    | 텍스트-오디오 길이 정합성 | DURATION_MISMATCH      |
 
 ---
 
