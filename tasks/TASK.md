@@ -950,19 +950,16 @@
   - scoreMap으로 personaId별 tier별 best score 집계 → 최근 포스트에 할당
   - 테스트: 4601 PASS (119 files), Build PASS
 
-- [ ] **T384: Enrichment Context 실제 조립 (context-enricher 연동)**
-  - **파일**: `apps/engine-studio/src/app/api/public/feed/route.ts`, `lib/matching/context-enricher.ts`
-  - **현황**: `context-enricher.ts`가 구현돼 있으나 feed에서 호출 안 됨
-  - **할 일**:
-    - `handlePersonalizedFeed()`에서 `buildEnrichedContext()` 호출
-    - DB 조회: 팔로우 목록 → `fatiguePrevention` 신호 (노출 이력)
-    - DB 조회: `ConsumptionLog` 최근 30건 → `consumptionPatterns` 신호
-    - DB 조회: 유저 좋아요 이력 → `engagementBoost` 신호
-    - `applyEnrichmentSignals()` 결과를 `getCandidates()` 점수에 반영
-  - **AC**:
-    - 동일 페르소나 반복 노출 감소 (fatiguePrevention 동작)
-    - Enrichment 시그널 적용 여부 로그 확인 가능
-    - 기존 테스트 PASS, Build PASS
+- [x] **T384: Enrichment Context 실제 조립 (context-enricher 연동)** ✅ 2026-03-04
+  - 변경: `apps/engine-studio/src/app/api/public/feed/route.ts`
+  - `buildVectorCandidates()` 내 DB 3개 병렬 조회 추가:
+    - 유저 좋아요 이력(7d) → ExposureSignal (fatiguePrevention 프록시)
+    - 페르소나 포스트 engagement 집계(30d) → EngagementSignal
+    - 페르소나 ConsumptionLog 태그/rating → ConsumptionSignal
+    - PersonaWorldUser.preferences → preferredTags
+  - `EnrichedMatchingContext` 조립 → `matchAll(context.enrichment)` 주입
+  - 로그: `[feed/enrichment] userId=... personas=N exposure_signals=N consumption_signals=N`
+  - 테스트: 4601 PASS (119 files), Build PASS
 
 - [ ] **T385: recommended-posts.ts 실제 동작 검증 + 포스트 선택 개선**
   - **파일**: `lib/persona-world/feed/recommended-posts.ts`

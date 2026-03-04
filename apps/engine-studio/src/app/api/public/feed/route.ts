@@ -10,7 +10,19 @@ import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
 import { calculateVFinal } from "@/lib/vector/v-final"
 import { DEFAULT_L1_VECTOR, DEFAULT_L2_VECTOR, DEFAULT_L3_VECTOR } from "@/constants/v3/dimensions"
 import type { SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector } from "@/types"
-import type { UserProfile, PersonaCandidate } from "@/lib/matching/three-tier-engine"
+import type {
+  UserProfile,
+  PersonaCandidate,
+  MatchingContext,
+} from "@/lib/matching/three-tier-engine"
+import type {
+  EnrichedMatchingContext,
+  PersonaEnrichedSignals,
+  UserEnrichedContext,
+  EngagementSignal,
+  ConsumptionSignal,
+  ExposureSignal,
+} from "@/lib/matching/context-enricher"
 
 // ── 공통 select / 응답 빌더 ──────────────────────────────────
 
@@ -223,8 +235,125 @@ async function buildVectorCandidates(
 
   if (candidates.length === 0) return null
 
-  // 5. matchAll() 실행
-  const matchResults = matchAll(userProfile, candidates)
+  // 5. Enrichment Context 조립 (DB 3개 병렬 조회)
+  const personaIds = candidates.map((c) => c.id)
+  const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
+  const [userLikes, personaEngagement, personaConsumption, userPreferences] = await Promise.all([
+    // 유저가 최근 7일간 각 페르소나 포스트에 남긴 좋아요 (ExposureSignal 프록시)
+    prisma.personaPostLike.findMany({
+      where: {
+        userId: userId,
+        createdAt: { gte: since7d },
+        post: { personaId: { in: personaIds } },
+      },
+      select: { createdAt: true, post: { select: { personaId: true } } },
+    }),
+    // 페르소나별 최근 30일 포스트 engagement 집계
+    prisma.personaPost.groupBy({
+      by: ["personaId"],
+      where: { personaId: { in: personaIds }, createdAt: { gte: since30d }, isHidden: false },
+      _avg: { likeCount: true },
+      _count: { id: true },
+    }),
+    // 페르소나별 ConsumptionLog 태그 + 평균 rating
+    prisma.consumptionLog.findMany({
+      where: { personaId: { in: personaIds } },
+      select: { personaId: true, tags: true, rating: true },
+      orderBy: { consumedAt: "desc" },
+      take: personaIds.length * 20, // 페르소나당 최대 20건
+    }),
+    // 유저 선호 태그 (preferences JSON)
+    prisma.personaWorldUser.findUnique({
+      where: { id: userId },
+      select: { preferences: true },
+    }),
+  ])
+
+  // exposure: personaId → { count, lastAt }
+  const exposureMap = new Map<string, { count: number; lastAt: Date | null }>()
+  for (const like of userLikes) {
+    const pid = like.post.personaId
+    const cur = exposureMap.get(pid) ?? { count: 0, lastAt: null }
+    cur.count += 1
+    if (!cur.lastAt || like.createdAt > cur.lastAt) cur.lastAt = like.createdAt
+    exposureMap.set(pid, cur)
+  }
+
+  // engagement: personaId → EngagementSignal
+  const engagementMap = new Map<string, EngagementSignal>()
+  for (const row of personaEngagement) {
+    engagementMap.set(row.personaId, {
+      avgLikes: Number(row._avg.likeCount ?? 0),
+      avgComments: 0,
+      postCount30d: row._count.id,
+      engagementVelocity: 1.0,
+    })
+  }
+
+  // consumption: personaId → ConsumptionSignal
+  const consumptionRaw = new Map<string, { tags: string[]; ratings: number[] }>()
+  for (const log of personaConsumption) {
+    const cur = consumptionRaw.get(log.personaId) ?? { tags: [], ratings: [] }
+    cur.tags.push(...log.tags)
+    if (log.rating !== null) cur.ratings.push(Number(log.rating))
+    consumptionRaw.set(log.personaId, cur)
+  }
+  const consumptionMap = new Map<string, ConsumptionSignal>()
+  for (const [pid, { tags, ratings }] of consumptionRaw) {
+    // 태그 빈도 집계 → 상위 5개
+    const freq = new Map<string, number>()
+    for (const t of tags) freq.set(t, (freq.get(t) ?? 0) + 1)
+    const topTags = [...freq.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([t]) => t)
+    const avgRating = ratings.length > 0 ? ratings.reduce((s, r) => s + r, 0) / ratings.length : 0.5
+    consumptionMap.set(pid, { topTags, avgRating, contentTypeDistribution: {} })
+  }
+
+  // 유저 선호 태그 (preferences.favoriteGenres 등)
+  const prefJson = userPreferences?.preferences as Record<string, unknown> | null
+  const preferredTags: string[] = Array.isArray(prefJson?.favoriteGenres)
+    ? (prefJson.favoriteGenres as string[])
+    : []
+
+  // EnrichedMatchingContext 조립
+  const personaSignals = new Map<string, PersonaEnrichedSignals>()
+  for (const pid of personaIds) {
+    const exposure = exposureMap.get(pid)
+    const daysSince = exposure?.lastAt
+      ? Math.floor((Date.now() - exposure.lastAt.getTime()) / 86400000)
+      : 999
+
+    const signals: PersonaEnrichedSignals = {
+      exposure: {
+        appearanceCount7d: exposure?.count ?? 0,
+        lastShownAt: exposure?.lastAt ?? null,
+        daysSinceLastShown: daysSince,
+      } satisfies ExposureSignal,
+      engagement: engagementMap.get(pid),
+      consumption: consumptionMap.get(pid),
+    }
+    personaSignals.set(pid, signals)
+  }
+
+  const userContext: UserEnrichedContext = {
+    preferredTags: preferredTags.length > 0 ? preferredTags : undefined,
+  }
+
+  const enrichment: EnrichedMatchingContext = { personaSignals, userContext }
+
+  const matchingContext: MatchingContext = { enrichment }
+
+  console.log(
+    `[feed/enrichment] userId=${userId} personas=${personaIds.length} ` +
+      `exposure_signals=${exposureMap.size} consumption_signals=${consumptionMap.size}`
+  )
+
+  // 6. matchAll() with enrichment
+  const matchResults = matchAll(userProfile, candidates, undefined, matchingContext)
 
   // 6. personaId별 tier별 best score 집계
   const scoreMap = new Map<
