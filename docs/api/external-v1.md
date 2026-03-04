@@ -34,6 +34,11 @@ https://api.deepsight.ai
    - [POST /v1/users/:id/onboarding](#post-v1usersidonboarding)
    - [GET /v1/users/:id/consent](#get-v1usersidconsent)
    - [POST /v1/users/:id/consent](#post-v1usersidconsent)
+10. [Content Ingest API](#10-content-ingest-api)
+    - [POST /v1/content/ingest](#post-v1contentingest)
+    - [POST /v1/content/ingest/batch](#post-v1contentingestbatch)
+11. [Recommendations API](#11-recommendations-api)
+    - [POST /v1/recommendations](#post-v1recommendations)
 
 ---
 
@@ -1132,6 +1137,271 @@ Content-Type: application/json
 
 ---
 
+## 10. Content Ingest API
+
+B2B 고객이 자신의 콘텐츠를 DeepSight에 등록하는 API입니다. 등록된 콘텐츠는 비동기로 벡터화된 후, Recommendations API에서 사용됩니다.
+
+### 지원 콘텐츠 타입
+
+| 값        | 설명          |
+| --------- | ------------- |
+| `MOVIE`   | 영화          |
+| `DRAMA`   | 드라마/시리즈 |
+| `MUSIC`   | 음악          |
+| `BOOK`    | 도서          |
+| `ARTICLE` | 아티클/뉴스   |
+| `PRODUCT` | 상품          |
+| `VIDEO`   | 동영상        |
+| `PODCAST` | 팟캐스트      |
+
+---
+
+### POST /v1/content/ingest
+
+콘텐츠 단건 등록. `externalId`를 제공하면 기존 항목을 갱신(upsert)합니다.
+
+**요청**
+
+```http
+POST /v1/content/ingest
+x-api-key: {API_KEY}
+Content-Type: application/json
+```
+
+**Request Body**
+
+| 필드          | 타입       | 필수 | 설명                                  |
+| ------------- | ---------- | ---- | ------------------------------------- |
+| `contentType` | `string`   | ✅   | 콘텐츠 타입 (위 목록 참조)            |
+| `title`       | `string`   | ✅   | 콘텐츠 제목                           |
+| `description` | `string`   | -    | 콘텐츠 설명 (벡터화 품질 향상에 사용) |
+| `sourceUrl`   | `string`   | -    | 원본 URL                              |
+| `externalId`  | `string`   | -    | 외부 시스템 ID (upsert 키)            |
+| `genres`      | `string[]` | -    | 장르 목록                             |
+| `tags`        | `string[]` | -    | 태그 목록                             |
+
+**요청 예시**
+
+```json
+{
+  "contentType": "MOVIE",
+  "title": "기생충",
+  "description": "봉준호 감독의 2019년 칸 황금종려상 수상작",
+  "sourceUrl": "https://example.com/movies/parasite",
+  "externalId": "movie_parasite_2019",
+  "genres": ["드라마", "스릴러"],
+  "tags": ["봉준호", "칸영화제", "아카데미"]
+}
+```
+
+**응답 (201 Created)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "clxyz123abc",
+    "vectorizedAt": null
+  }
+}
+```
+
+> `vectorizedAt`이 `null`이면 벡터화가 아직 진행 중입니다. 벡터화 완료 후 Recommendations API에서 활용됩니다.
+
+**에러 응답**
+
+| HTTP | code               | 설명                             |
+| ---- | ------------------ | -------------------------------- |
+| 400  | `VALIDATION_ERROR` | title 누락 또는 contentType 무효 |
+| 401  | `UNAUTHORIZED`     | API 키 인증 실패                 |
+| 500  | `INGEST_ERROR`     | 서버 내부 오류                   |
+
+---
+
+### POST /v1/content/ingest/batch
+
+콘텐츠 배치 등록 (최대 100건). 개별 항목 실패가 전체 배치를 중단하지 않습니다.
+
+**요청**
+
+```http
+POST /v1/content/ingest/batch
+x-api-key: {API_KEY}
+Content-Type: application/json
+```
+
+**Request Body**
+
+| 필드    | 타입    | 필수 | 설명                  |
+| ------- | ------- | ---- | --------------------- |
+| `items` | `array` | ✅   | 콘텐츠 목록 (1~100건) |
+
+각 `items` 항목은 단건 등록과 동일한 필드 구조를 사용합니다.
+
+**요청 예시**
+
+```json
+{
+  "items": [
+    {
+      "contentType": "BOOK",
+      "title": "채식주의자",
+      "externalId": "book_vegetarian",
+      "genres": ["소설"],
+      "tags": ["한강", "부커상"]
+    },
+    {
+      "contentType": "MUSIC",
+      "title": "LILAC",
+      "externalId": "music_iu_lilac",
+      "genres": ["K-POP"],
+      "tags": ["IU", "2021"]
+    }
+  ]
+}
+```
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "created": 1,
+    "updated": 0,
+    "failed": 1,
+    "items": [
+      { "index": 0, "status": "created", "id": "clxyz111aaa" },
+      { "index": 1, "status": "failed", "error": "title은 필수입니다" }
+    ]
+  }
+}
+```
+
+**응답 필드**
+
+| 필드             | 타입     | 설명                               |
+| ---------------- | -------- | ---------------------------------- |
+| `created`        | `number` | 신규 생성 건수                     |
+| `updated`        | `number` | 업데이트(upsert) 건수              |
+| `failed`         | `number` | 실패 건수                          |
+| `items[].index`  | `number` | 요청 배열 내 인덱스 (0부터 시작)   |
+| `items[].status` | `string` | `created` \| `updated` \| `failed` |
+| `items[].id`     | `string` | 생성/갱신된 ContentItem ID         |
+| `items[].error`  | `string` | 실패 시 오류 메시지                |
+
+**에러 응답**
+
+| HTTP | code                 | 설명                          |
+| ---- | -------------------- | ----------------------------- |
+| 400  | `VALIDATION_ERROR`   | 배열 비어있음 또는 100건 초과 |
+| 401  | `UNAUTHORIZED`       | API 키 인증 실패              |
+| 500  | `BATCH_INGEST_ERROR` | 서버 내부 오류                |
+
+---
+
+## 11. Recommendations API
+
+유저 벡터 × 페르소나 큐레이션 기반으로 맞춤 콘텐츠를 추천합니다.
+
+### POST /v1/recommendations
+
+**요청**
+
+```http
+POST /v1/recommendations
+x-api-key: {API_KEY}
+Content-Type: application/json
+```
+
+**Request Body**
+
+| 필드     | 타입     | 필수 | 설명                             |
+| -------- | -------- | ---- | -------------------------------- |
+| `userId` | `string` | ✅   | PersonaWorld 유저 ID             |
+| `limit`  | `number` | -    | 반환 개수 (default: 20, max: 50) |
+
+**요청 예시**
+
+```json
+{
+  "userId": "user_abc123",
+  "limit": 10
+}
+```
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "userId": "user_abc123",
+    "total": 10,
+    "items": [
+      {
+        "contentItem": {
+          "id": "clxyz123abc",
+          "contentType": "MOVIE",
+          "title": "기생충",
+          "description": "봉준호 감독의 2019년 칸 황금종려상 수상작",
+          "sourceUrl": "https://example.com/movies/parasite",
+          "genres": ["드라마", "스릴러"],
+          "tags": ["봉준호", "칸영화제"]
+        },
+        "recommendedBy": [
+          {
+            "personaId": "persona_xyz789",
+            "personaName": "비판적 사유자",
+            "matchScore": 0.92,
+            "curationScore": 0.88
+          }
+        ],
+        "finalScore": 0.81,
+        "matchScore": 0.92
+      }
+    ]
+  }
+}
+```
+
+**응답 필드**
+
+| 필드                                    | 타입      | 설명                                                      |
+| --------------------------------------- | --------- | --------------------------------------------------------- |
+| `userId`                                | `string`  | 요청한 유저 ID                                            |
+| `total`                                 | `number`  | 반환된 콘텐츠 수                                          |
+| `isFallback`                            | `boolean` | 벡터 없음으로 fallback 실행 시 `true`                     |
+| `items[].contentItem`                   | `object`  | ContentItem 상세 정보                                     |
+| `items[].recommendedBy`                 | `array`   | 이 콘텐츠를 큐레이션한 페르소나 목록                      |
+| `items[].recommendedBy[].matchScore`    | `number`  | 유저↔페르소나 매칭 스코어 (0~1)                           |
+| `items[].recommendedBy[].curationScore` | `number`  | 페르소나↔콘텐츠 큐레이션 스코어 (0~1)                     |
+| `items[].finalScore`                    | `number?` | `matchScore × curationScore` 최종 점수 (fallback 시 null) |
+| `items[].matchScore`                    | `number?` | 유저↔콘텐츠 L1 코사인 유사도 (fallback 시 null)           |
+
+**추천 알고리즘**
+
+1. `userId` → `PersonaWorldUser` L1 벡터 조회
+2. 전체 활성 페르소나 대상 `matchAll()` 실행 → 상위 5개 페르소나 선정
+3. 선정된 페르소나의 `APPROVED` 큐레이션 콘텐츠 조회 (테넌트 필터 적용)
+4. `finalScore = cosineSim(userL1, contentL1) × curationScore` 계산
+5. `contentItemId` 기준 중복 제거 (최고 score 유지, `recommendedBy` 병합)
+6. 내림차순 정렬 후 상위 `limit`개 반환
+
+**Fallback (벡터 없는 경우)**
+
+유저 벡터가 없거나 매칭 가능한 큐레이션이 없는 경우, 해당 테넌트의 최신 ContentItem `limit`개를 반환합니다. 응답에 `isFallback: true`가 포함됩니다.
+
+**에러 응답**
+
+| HTTP | code                    | 설명             |
+| ---- | ----------------------- | ---------------- |
+| 400  | `VALIDATION_ERROR`      | userId 누락      |
+| 401  | `UNAUTHORIZED`          | API 키 인증 실패 |
+| 500  | `RECOMMENDATIONS_ERROR` | 서버 내부 오류   |
+
+---
+
 ## 부록
 
 ### SDK 사용 예시 (TypeScript)
@@ -1164,6 +1434,7 @@ await client.feedback.submit({
 
 ### Changelog
 
-| 날짜       | 버전 | 변경 내용                                   |
-| ---------- | ---- | ------------------------------------------- |
-| 2026-02-20 | v1.0 | 초기 릴리스 — 매칭·페르소나·피드백·유저 API |
+| 날짜       | 버전 | 변경 내용                                                 |
+| ---------- | ---- | --------------------------------------------------------- |
+| 2026-03-04 | v1.1 | Content Ingest API (단건/배치) + Recommendations API 추가 |
+| 2026-02-20 | v1.0 | 초기 릴리스 — 매칭·페르소나·피드백·유저 API               |
