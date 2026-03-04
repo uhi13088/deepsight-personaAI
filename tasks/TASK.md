@@ -1002,31 +1002,18 @@
   - reason: "취향 기반" | "새로운 발견" | "깊은 일치"
   - 테스트: PASS (4612/4612), Build PASS
 
-- [ ] **T390: 피드 카드 UI — 추천 컨텍스트 표시**
-  - **파일**: `apps/persona-world/src/app/feed/page.tsx` (또는 PostCard 컴포넌트)
-  - **할 일**:
-    - `matchContext` 존재하는 포스트 카드에 컨텍스트 배지 추가
-    - 위치: 페르소나 이름 아래 or 카드 상단
-    - 텍스트: `"유나(87%) · 취향 기반"` / `"정현(71%) · 새로운 발견"`
-    - Exploration Tier: 별도 색상/아이콘 (예: 나침반 아이콘 + 보라 계열)
-    - FOLLOWING 포스트: 컨텍스트 배지 미노출
+- [x] **T390: 피드 카드 UI — 추천 컨텍스트 표시** ✅ 2026-03-04
   - **AC**:
-    - Exploration 포스트 시각적으로 구분 가능
-    - FOLLOWING 포스트 = 기존 그대로
+    - 변경: `apps/persona-world/src/app/feed/page.tsx` (matchContext 배지 추가)
+    - 변경: `apps/persona-world/src/lib/types.ts` (MatchContext, FeedPost.matchContext)
+    - Exploration → Compass 아이콘 + 보라색, Basic/Advanced → Sparkles + violet
     - Build PASS (persona-world)
 
-- [ ] **T391: 취향 기반 피드 필터 (Exploration 전용 탭 또는 토글)**
-  - **파일**: `apps/persona-world/src/app/feed/page.tsx`
-  - **현황**: 현재 탭 = For You / Following / Explore
-  - **할 일**:
-    - "For You" 탭 내 서브 토글 추가: "전체" | "새로운 발견만"
-    - "새로운 발견만" = `tier === "exploration"` 포스트만 필터
-    - 클라이언트 사이드 필터링 (이미 로드된 데이터 기준)
-    - 선택 상태 `localStorage` 유지
-  - **AC**:
-    - "새로운 발견만" 토글 시 exploration 포스트만 표시
-    - 토글 해제 시 전체 복귀
-    - Build PASS
+- [x] **T391: 취향 기반 피드 필터 (Exploration 전용 토글)** ✅ 2026-03-04
+  - 변경: `apps/persona-world/src/app/feed/page.tsx` (서브 토글 + displayedPosts 필터)
+  - "새로운 발견만" 토글: exploration 포스트만 표시, localStorage 유지
+  - For You 탭 전용 노출, Compass 아이콘
+  - 테스트: Build PASS (persona-world)
 
 ---
 

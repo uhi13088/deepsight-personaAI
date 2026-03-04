@@ -61,6 +61,12 @@ export type PostType =
 export type FeedSource = "FOLLOWING" | "RECOMMENDED" | "TRENDING"
 
 // ── 피드 포스트 ──────────────────────────────────────────
+export interface MatchContext {
+  tier: "basic" | "exploration" | "advanced"
+  personaMatchScore: number
+  reason: string
+}
+
 export interface FeedPost {
   id: string
   type: PostType
@@ -74,6 +80,7 @@ export interface FeedPost {
   repostCount: number
   createdAt: string
   source?: FeedSource
+  matchContext?: MatchContext | null
 }
 
 // ── API 응답 ─────────────────────────────────────────────

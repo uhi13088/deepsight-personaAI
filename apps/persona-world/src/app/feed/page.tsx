@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   Flag,
   MessageCircle,
+  Compass,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -94,6 +95,28 @@ export default function FeedPage() {
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState(false)
+
+  // T391: "새로운 발견만" 필터 토글 (localStorage 유지)
+  const [explorationOnly, setExplorationOnly] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false
+    return localStorage.getItem("pw-exploration-only") === "true"
+  })
+
+  const handleExplorationToggle = useCallback(() => {
+    setExplorationOnly((prev) => {
+      const next = !prev
+      localStorage.setItem("pw-exploration-only", String(next))
+      return next
+    })
+  }, [])
+
+  const displayedPosts = useMemo(
+    () =>
+      explorationOnly && activeTab === "for-you"
+        ? posts.filter((p) => p.matchContext?.tier === "exploration")
+        : posts,
+    [posts, explorationOnly, activeTab]
+  )
 
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
@@ -338,10 +361,27 @@ export default function FeedPage() {
             ))}
           </div>
         </div>
+
+        {/* T391: 서브 토글 — For You 탭 전용 */}
+        {activeTab === "for-you" && (
+          <div className="mx-auto max-w-2xl px-4 py-2">
+            <button
+              onClick={handleExplorationToggle}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                explorationOnly
+                  ? "bg-purple-500 text-white"
+                  : "border border-gray-200 bg-white text-gray-500 hover:border-purple-300 hover:text-purple-500"
+              }`}
+            >
+              <Compass className="h-3.5 w-3.5" />
+              새로운 발견만
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Main Content */}
-      <main className="mx-auto max-w-2xl px-4 pb-20 pt-[7.5rem]">
+      <main className="mx-auto max-w-2xl px-4 pb-20 pt-[8.5rem]">
         {/* Loading Skeleton */}
         {loading ? (
           <div className="space-y-4">
@@ -389,7 +429,7 @@ export default function FeedPage() {
         ) : (
           /* Posts Feed */
           <div className="space-y-4">
-            {posts.map((post) => (
+            {displayedPosts.map((post) => (
               <FeedPostCard
                 key={post.id}
                 post={post}
@@ -488,6 +528,22 @@ const FeedPostCard = memo(function FeedPostCard({
               )}
             </div>
             <div className="text-sm text-gray-500">{post.persona.handle}</div>
+            {/* 추천 컨텍스트 배지 (T390) */}
+            {post.matchContext && (
+              <div
+                className={`mt-0.5 flex items-center gap-1 text-[10px] font-medium ${
+                  post.matchContext.tier === "exploration" ? "text-purple-500" : "text-violet-400"
+                }`}
+              >
+                {post.matchContext.tier === "exploration" ? (
+                  <Compass className="h-3 w-3" />
+                ) : (
+                  <Sparkles className="h-3 w-3" />
+                )}
+                {Math.round(post.matchContext.personaMatchScore * 100)}% ·{" "}
+                {post.matchContext.reason}
+              </div>
+            )}
           </div>
         </Link>
         <div className="relative flex items-center gap-2">
