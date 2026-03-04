@@ -545,6 +545,10 @@ async function handleFollowingTab(
 }
 
 // ── Explore 탭 ────────────────────────────────────────────────
+//
+// 순수 likeCount 정렬은 좋아요 1개만 눌려도 오래된 포스트가 영구 1위 고착되는
+// 문제가 있음. HackerNews 스타일 time-decay 점수로 신선도 + 인기도를 균형 있게 반영.
+// score = (likeCount + 1) / (ageHours + 2)^1.5
 
 async function handleExploreTab(
   userId: string,
@@ -555,21 +559,71 @@ async function handleExploreTab(
   void userId // 미래 확장용
   const excludeIds = followingIds
 
+  // 30일 이내 후보 over-fetch (커서 전 구간 포함하도록 충분히 확보)
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
   const where: Record<string, unknown> = {
     isHidden: false,
+    createdAt: { gte: since },
     persona: { status: { in: ["ACTIVE", "STANDARD"] } },
   }
   if (excludeIds.length > 0) {
     where.personaId = { notIn: excludeIds }
   }
 
-  const posts = await prisma.personaPost.findMany({
+  const candidates = await prisma.personaPost.findMany({
     where,
-    orderBy: [{ likeCount: "desc" as const }, { createdAt: "desc" as const }],
-    take: limit + 1,
-    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    orderBy: { createdAt: "desc" as const },
+    take: Math.max((limit + 1) * 5, 100),
     select: feedPostSelect,
   })
 
-  return buildTabResponse(posts, limit, "TRENDING")
+  // Time-decay 점수 계산 후 정렬
+  const now = Date.now()
+  const scored = candidates
+    .map((p) => {
+      const ageHours = (now - p.createdAt.getTime()) / 3_600_000
+      const score = (p.likeCount + 1) / Math.pow(ageHours + 2, 1.5)
+      return { p, score }
+    })
+    .sort((a, b) => b.score - a.score)
+
+  // 커서 기반 슬라이싱
+  const cursorIdx = cursor ? scored.findIndex((s) => s.p.id === cursor) : -1
+  const sliceFrom = cursorIdx >= 0 ? cursorIdx + 1 : 0
+  const page = scored.slice(sliceFrom, sliceFrom + limit + 1)
+
+  const hasMore = page.length > limit
+  const sliced = hasMore ? page.slice(0, limit) : page
+  const nextCursor = hasMore ? (sliced.at(-1)?.p.id ?? null) : null
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      posts: sliced.map(({ p }) => ({
+        id: p.id,
+        type: p.type,
+        content: p.content,
+        contentId: p.contentId,
+        metadata: p.metadata,
+        locationTag: p.locationTag,
+        hashtags: p.hashtags,
+        likeCount: p.likeCount,
+        commentCount: p.commentCount,
+        repostCount: p.repostCount,
+        createdAt: p.createdAt.toISOString(),
+        source: "TRENDING",
+        persona: {
+          id: p.persona.id,
+          name: p.persona.name,
+          handle: p.persona.handle ?? "",
+          tagline: p.persona.tagline,
+          role: p.persona.role,
+          profileImageUrl: p.persona.profileImageUrl,
+          warmth: p.persona.warmth ? Number(p.persona.warmth) : 0.5,
+        },
+      })),
+      nextCursor,
+      hasMore,
+    },
+  })
 }
