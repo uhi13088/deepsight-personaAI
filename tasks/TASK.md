@@ -890,9 +890,328 @@
 
 ---
 
+## DONE (v4.0 — 활동 시간대)
+
+- [x] **T376: 활동 시간대 다양성 개선 (4 Chronotype)** ✅ 2026-03-04
+  - `computeActiveHours()` 4개 크로노타입 분류: 새벽형(4~7시)/오전형(8~11시)/오후형(13~18시)/야행형(21~01시)
+  - 야행성 조건: AND 2개 → 점수 기반(neuroticism×0.4 + volatility×0.3 + (1-extraversion)×0.3 > 0.55)
+  - 윈도우 폭: endurance × (4~12시간) 단일 계산으로 균일화
+  - `ACTIVE_HOURS` constants 전면 교체 (구 상수 7개 → 신규 상수 12개)
+  - 단위 테스트 20개 PASS (4 크로노타입 시나리오 + 경계 케이스)
+
+---
+
+## DONE (v4.0 — 자율 스케줄러)
+
+- [x] **T377: 자율 스케줄러 인터랙션 시간대 분리** ✅ 2026-03-04
+  - `getActivePersonas()`: 시간대 필터 제거 → `isInActiveHours: boolean` 플래그로 교체 (에너지 필터만 유지)
+  - `decideActivity()`: `isInActiveHours=false` 시 포스팅 차단 + 인터랙션 확률 50% 감소
+  - 로그: 시간대 내/인터랙션전용/에너지부족 3단계 분류 표시
+  - 단위 테스트 15개 PASS (신규 T377 시나리오 3개 포함)
+
+- [x] **T378: [CRITICAL] PersonaFollow DB 인덱스 추가** ✅ 2026-03-04
+  - `schema.prisma`: `@@index([followerUserId])`, `@@index([followingPersonaId])` 추가
+  - `CHANGELOG_SCHEMA.md` 업데이트
+
+- [x] **T379: [CRITICAL] followingIds 쿼리 3중 실행 → 1회 통합** ✅ 2026-03-04
+  - POST 핸들러 최상단에서 followingIds 1회 조회 후 handleFollowingTab/handleExploreTab/for-you 공유
+  - 불필요한 DB 쿼리 2회 제거
+
+- [x] **T380: [MAJOR] 탭별 캐시 — 전환 시 즉시 표시** ✅ 2026-03-04
+  - `tabCacheRef: useRef<Map<FeedTab, TabCache>>` 도입
+  - 탭 재방문 시 캐시 즉시 표시 → 백그라운드 refresh 패턴
+  - loadMore 후 누적 포스트 캐시 갱신
+  - 첫 방문에만 loading skeleton
+
+- [x] **T381: [MODERATE] IntersectionObserver 안정화** ✅ 2026-03-04
+  - `loadMoreRef` 도입: observer가 항상 최신 loadMore 참조
+  - Observer 마운트 시 1회 생성 (deps 제거)
+
+- [x] **T382: [MINOR] feedPostSelect hashtags 누락 수정** ✅ 2026-03-04
+  - `feedPostSelect`: `hashtags: true` 추가
+  - for-you enrichedPosts, buildTabResponse 매핑에 hashtags 포함
+
+---
+
 ## QUEUE
 
-(없음)
+> 마지막 업데이트: 2026-03-04
+> 방향: 벡터 매칭 실제 연결 → 소비 가시화 → 추천 컨텍스트 → ContentItem B2B
+
+---
+
+### 영역 1 — 벡터 매칭 실제 연결 (getCandidates 스텁 교체)
+
+- [x] **T383: PersonaWorldUser 벡터 → matchAll() getCandidates 교체** ✅ 2026-03-04
+  - 변경: `apps/engine-studio/src/app/api/public/feed/route.ts`
+  - `buildVectorCandidates()` 헬퍼 추가: PersonaWorldUser L1/L2 → UserProfile → matchAll() → RecommendedCandidate[]
+  - L1 null 시 likeCount fallback 유지 (온보딩 미완료 대응)
+  - PersonaLayerVector SOCIAL/TEMPERAMENT/NARRATIVE → PersonaCandidate[] 조립
+  - scoreMap으로 personaId별 tier별 best score 집계 → 최근 포스트에 할당
+  - 테스트: 4601 PASS (119 files), Build PASS
+
+- [x] **T384: Enrichment Context 실제 조립 (context-enricher 연동)** ✅ 2026-03-04
+  - 변경: `apps/engine-studio/src/app/api/public/feed/route.ts`
+  - `buildVectorCandidates()` 내 DB 3개 병렬 조회 추가:
+    - 유저 좋아요 이력(7d) → ExposureSignal (fatiguePrevention 프록시)
+    - 페르소나 포스트 engagement 집계(30d) → EngagementSignal
+    - 페르소나 ConsumptionLog 태그/rating → ConsumptionSignal
+    - PersonaWorldUser.preferences → preferredTags
+  - `EnrichedMatchingContext` 조립 → `matchAll(context.enrichment)` 주입
+  - 로그: `[feed/enrichment] userId=... personas=N exposure_signals=N consumption_signals=N`
+  - 테스트: 4601 PASS (119 files), Build PASS
+
+- [x] **T385: recommended-posts.ts 실제 동작 검증 + 포스트 선택 개선** ✅ 2026-03-04
+  - 변경: `tests/unit/persona-world/feed.test.ts`
+  - T383에서 연결된 실제 matchAll 스코어로 Tier 분리 동작 검증 테스트 추가
+  - basicScore/explorationScore/advancedScore가 명확히 차이나는 후보로 각 Tier 선택 검증
+  - Exploration = explorationScore 최상위 (Cross-Axis 발산 점수) 후보 우선 선택 확인
+  - 테스트: 4602 PASS (119 files, +1 test), Build PASS
+
+---
+
+### 영역 2 — 페르소나 콘텐츠 소비 가시화
+
+- [x] **T386: ConsumptionLog 공개 API** ✅ 2026-03-04
+  - 변경: `apps/engine-studio/src/app/api/public/personas/[personaId]/taste/route.ts` (신규)
+  - 변경: `apps/engine-studio/src/app/api/public/personas/[personaId]/taste/summary/route.ts` (신규)
+  - 변경: `tests/unit/persona-world/taste-api.test.ts` (신규, 10개 테스트)
+  - 변경: `docs/api/public.md` + `docs/api/public.openapi.yaml` 최신화
+  - 테스트: PASS (4612/4612)
+
+- [x] **T387: 페르소나 프로필 "취향" 탭 UI** ✅ 2026-03-04
+  - 변경: `apps/persona-world/src/app/persona/[id]/page.tsx` (탭 UI + TasteCard + 무한 스크롤)
+  - 변경: `apps/persona-world/src/lib/api.ts` (getPersonaTaste, getPersonaTasteSummary 추가)
+  - 변경: `apps/persona-world/src/lib/types.ts` (TasteItem, TasteResponse, TasteSummary 추가)
+  - 테스트: Build PASS (persona-world)
+
+- [x] **T388: 취향 태그 집계 + 프로필 헤더 taste chips** ✅ 2026-03-04
+  - 변경: `apps/persona-world/src/app/persona/[id]/page.tsx` (프로필 헤더 taste chips 추가)
+  - summary API 최초 로드 시 비동기 호출 → topTags 상위 5개 chips 표시
+  - 소비 기록 없으면 chips 미노출 (topTags 빈 배열 조건)
+  - 테스트: Build PASS (persona-world)
+
+---
+
+### 영역 3 — 피드 추천 컨텍스트 ("왜 이 포스트?")
+
+- [x] **T389: 매칭 스코어 + Tier 정보를 피드 응답에 포함** ✅ 2026-03-04
+  - 변경: `apps/engine-studio/src/app/api/public/feed/route.ts` (matchContext 필드 추가)
+  - 변경: `docs/api/public.md` (matchContext 응답 스펙 문서화)
+  - basic/exploration/advanced 소스에만 matchContext 포함, following/trending은 null
+  - reason: "취향 기반" | "새로운 발견" | "깊은 일치"
+  - 테스트: PASS (4612/4612), Build PASS
+
+- [x] **T390: 피드 카드 UI — 추천 컨텍스트 표시** ✅ 2026-03-04
+  - **AC**:
+    - 변경: `apps/persona-world/src/app/feed/page.tsx` (matchContext 배지 추가)
+    - 변경: `apps/persona-world/src/lib/types.ts` (MatchContext, FeedPost.matchContext)
+    - Exploration → Compass 아이콘 + 보라색, Basic/Advanced → Sparkles + violet
+    - Build PASS (persona-world)
+
+- [x] **T391: 취향 기반 피드 필터 (Exploration 전용 토글)** ✅ 2026-03-04
+  - 변경: `apps/persona-world/src/app/feed/page.tsx` (서브 토글 + displayedPosts 필터)
+  - "새로운 발견만" 토글: exploration 포스트만 표시, localStorage 유지
+  - For You 탭 전용 노출, Compass 아이콘
+  - 테스트: Build PASS (persona-world)
+
+---
+
+### 영역 4 — ContentItem 테이블 + B2B 인제스트 파이프라인
+
+> **Phase 4-1: 데이터 계층** → **Phase 4-2: 자동화 파이프라인** → **Phase 4-3: B2B API** → **Phase 4-4: 관리 도구**
+
+---
+
+#### Phase 4-1: 데이터 계층
+
+- [x] **T392: ContentItem + PersonaCuratedContent + UserContentFeedback 스키마 + migration**
+  - **파일**: `apps/engine-studio/prisma/schema.prisma`, `apps/engine-studio/prisma/migrations/017_content_item_curation.sql`
+  - **할 일**:
+    - `ContentType` enum 추가: `MOVIE | DRAMA | MUSIC | BOOK | ARTICLE | PRODUCT | VIDEO | PODCAST`
+    - `ContentItem` 모델:
+      - `id, tenantId, contentType(ContentType), title, description?, sourceUrl?, externalId?`
+      - `genres String[], tags String[]`
+      - `contentVector Json?` — L1 7D `{ depth, lens, stance, scope, taste, purpose, sociability }`
+      - `narrativeTheme Json?` — L3 4D `{ lack, moralCompass, volatility, growthArc }`
+      - `vectorizedAt DateTime?, createdAt, updatedAt`
+      - `@@unique([tenantId, externalId])`
+    - `CurationStatus` enum: `PENDING | APPROVED | REJECTED`
+    - `PersonaCuratedContent` 모델:
+      - `id, personaId → Persona, contentItemId → ContentItem`
+      - `curationScore Decimal(4,3), curationReason String?, highlights String[]`
+      - `status CurationStatus @default(PENDING)`
+      - `createdAt, updatedAt`
+      - `@@unique([personaId, contentItemId])`
+    - `ContentFeedbackAction` enum: `LIKE | SKIP | SAVE | CONSUME`
+    - `UserContentFeedback` 모델:
+      - `id, userId → PersonaWorldUser, contentItemId → ContentItem`
+      - `action ContentFeedbackAction, viaPersonaId String?`
+      - `createdAt`
+      - `@@unique([userId, contentItemId])`
+    - 마이그레이션 SQL: `CREATE TABLE IF NOT EXISTS` 스타일
+  - **AC**:
+    - `prisma generate` 성공
+    - 마이그레이션 SQL 완비 (3 테이블 + 3 enum)
+    - `docs/CHANGELOG_SCHEMA.md` 업데이트
+    - Build PASS
+
+- [x] **T393: content-vectorizer.ts — Claude API 기반 콘텐츠 벡터화**
+  - **파일 (신규)**: `apps/engine-studio/src/lib/content/content-vectorizer.ts`
+  - **파일 (신규)**: `apps/engine-studio/tests/unit/content/content-vectorizer.test.ts`
+  - **할 일**:
+    - `ContentVectorResult` 타입: `{ contentVector: L1Vector7D, narrativeTheme: L3Vector4D }`
+    - `vectorizeContent(item: { title, description?, genres, tags }): Promise<ContentVectorResult>`
+      - Claude API (`claude-sonnet-4-6`) 호출
+      - 시스템 프롬프트: 콘텐츠 메타 → "이 콘텐츠에 끌릴 사람의 취향 프로필" 7D + 4D 추론
+      - 응답 JSON 파싱 + 전체 `clamp(0, 1)` 처리
+    - `vectorizeBatch(items[], concurrency = 5): Promise<ContentVectorResult[]>`
+      - p-limit 또는 직접 구현으로 동시 실행 제한
+    - 단위 테스트: Claude SDK mock → 프롬프트 구조 + clamp 동작 검증
+  - **AC**:
+    - 출력 벡터 11개 값 모두 [0, 1]
+    - concurrency=2 배치 → 순차 완료 순서 보장
+    - 테스트 PASS, Build PASS
+
+---
+
+#### Phase 4-2: 자동화 파이프라인
+
+- [x] **T394: auto-curation.ts — ConsumptionLog → PersonaCuratedContent 비즈니스 로직**
+  - **파일 (신규)**: `apps/engine-studio/src/lib/content/auto-curation.ts`
+  - **파일 (신규)**: `apps/engine-studio/tests/unit/content/auto-curation.test.ts`
+  - **할 일**:
+    - `runAutoCuration(personaId: string): Promise<{ created: number, skipped: number }>`
+      1. ConsumptionLog 조회: `personaId` + `rating >= 0.7` + `contentItemId IS NOT NULL`
+      2. 각 log → `PersonaCuratedContent` upsert (`PENDING`, `curationScore = rating`, `curationReason = impression`)
+      3. 이미 존재하면 skip (updateAt 갱신 안 함)
+    - `runAutoCurationAll(): Promise<void>` — 전체 페르소나 순회
+    - 단위 테스트: Prisma mock → rating 필터, upsert, skip 동작
+  - **AC**:
+    - rating 0.69 → skip, 0.70 → 생성
+    - 중복 실행 → 기존 레코드 유지
+    - 테스트 PASS, Build PASS
+
+- [x] **T395: cron/content-auto-curation — 자동 큐레이션 cron route**
+  - **파일 (신규)**: `apps/engine-studio/src/app/api/cron/content-auto-curation/route.ts`
+  - **할 일**:
+    - `GET` handler (Vercel cron 규칙)
+    - `verifyInternalToken` 인증
+    - `runAutoCurationAll()` 호출
+    - 응답: `{ success, data: { processed, created, skipped, durationMs } }`
+    - `vercel.json` cron 스케줄 추가: `0 3 * * *` (매일 새벽 3시)
+  - **AC**:
+    - 인증 없는 요청 401
+    - cron 스케줄 등록 확인
+    - Build PASS
+
+---
+
+#### Phase 4-3: B2B API
+
+- [x] **T396: Content Ingest API — 단건 등록 (POST /api/v1/content/ingest)**
+  - **파일 (신규)**: `apps/engine-studio/src/app/api/v1/content/ingest/route.ts`
+  - **파일 (신규)**: `apps/engine-studio/tests/unit/content/ingest-validation.test.ts`
+  - **할 일**:
+    - `POST /api/v1/content/ingest`
+    - 인증: `verifyApiKey(request)` → `tenantId` 추출 (기존 Developer Console API Key)
+    - 입력 검증: `title` 필수, `contentType` enum 검증, `genres/tags` 배열
+    - `ContentItem` upsert (`@@unique([tenantId, externalId])`)
+    - 벡터화: 비동기 큐 (현재는 즉시 `vectorizeContent()` 호출 → DB 저장)
+    - 응답: `{ success, data: { id, vectorizedAt } }`
+  - **AC**:
+    - 인증 없으면 401
+    - title 누락 시 400 + `VALIDATION_ERROR`
+    - contentType 오류 시 400
+    - externalId 중복 → upsert (200, 에러 아님)
+    - 테스트 PASS, Build PASS
+
+- [x] **T397: Content Ingest Batch API + external-v1 docs**
+  - **파일 (신규)**: `apps/engine-studio/src/app/api/v1/content/ingest/batch/route.ts`
+  - **할 일**:
+    - `POST /api/v1/content/ingest/batch`
+    - 입력: `{ items: ContentIngestInput[] }` (최대 100건)
+    - 각 item 개별 upsert (실패해도 다음 진행)
+    - 응답: `{ success, data: { created, updated, failed, items: [{id, status}] } }`
+    - 100건 초과 시 400 반환
+    - `docs/api/external-v1.md` + `external-v1.openapi.yaml` — ingest 단건/배치 엔드포인트 추가
+  - **AC**:
+    - 101건 입력 → 400
+    - 일부 실패 시 `failed` 카운트 + 나머지 처리 계속
+    - docs 최신화
+    - 테스트 PASS, Build PASS
+
+- [x] **T398: content-ranking.ts — ContentItem × Persona 매칭 스코어 계산**
+  - **파일 (신규)**: `apps/engine-studio/src/lib/content/content-ranking.ts`
+  - **파일 (신규)**: `apps/engine-studio/tests/unit/content/content-ranking.test.ts`
+  - **할 일**:
+    - `scoreContentForUser(userVector: L1Vector7D, content: ContentItem): number`
+      - L1 코사인 유사도 계산 (기존 `@deepsight/vector-core` 활용)
+      - narrativeTheme L3 보너스 (+0~0.1) 선택적 적용
+    - `rankContents(userVector, contents: ContentItem[], limit): RankedContent[]`
+      - `finalScore = matchScore × curationScore`
+      - 내림차순 정렬 → 상위 limit개
+    - 단위 테스트: 동일 벡터 → score 1.0, 직교 벡터 → score 0
+  - **AC**:
+    - score 범위 [0, 1]
+    - limit 적용 정확
+    - 테스트 PASS, Build PASS
+
+- [x] **T399: B2B Recommendations API + external-v1 docs**
+  - **파일 (신규)**: `apps/engine-studio/src/app/api/v1/recommendations/route.ts`
+  - **할 일**:
+    - `POST /api/v1/recommendations`
+    - 입력: `{ userId, limit?: number (default 20, max 50) }`
+    - 처리 흐름:
+      1. `verifyApiKey` → `tenantId`
+      2. `PersonaWorldUser` 벡터 조회 → 없으면 fallback
+      3. `matchAll()` → 상위 5개 페르소나
+      4. 각 페르소나의 `PersonaCuratedContent (APPROVED)` + `ContentItem` 조회
+      5. `rankContents()` → `finalScore = matchScore × curationScore`
+      6. 중복 contentItemId 제거 (최고 score 유지)
+      7. 상위 limit개 반환
+    - Fallback (벡터 없음): `tenantId` 기준 최신 ContentItem limit개 반환
+    - 응답: `{ items: [{ contentItem, recommendedBy[], finalScore, tier }] }`
+    - `docs/api/external-v1.md` + `external-v1.openapi.yaml` 최신화
+  - **AC**:
+    - `recommendedBy` 포함 (페르소나명 + matchScore + curationScore)
+    - Fallback 동작 검증
+    - 테스트 PASS, Build PASS
+    - docs 최신화
+
+---
+
+#### Phase 4-4: 관리 도구
+
+- [x] **T400: internal curation CRUD API**
+  - **파일 (신규)**: `apps/engine-studio/src/app/api/internal/curation/pending/route.ts`
+  - **파일 (신규)**: `apps/engine-studio/src/app/api/internal/curation/[id]/approve/route.ts`
+  - **파일 (신규)**: `apps/engine-studio/src/app/api/internal/curation/[id]/reject/route.ts`
+  - **파일 (신규)**: `apps/engine-studio/src/app/api/internal/curation/manual/route.ts`
+  - **할 일**:
+    - `GET /api/internal/curation/pending?personaId=&page=` — PENDING 목록 (페이지네이션)
+    - `PATCH /api/internal/curation/[id]/approve` — status → APPROVED
+    - `PATCH /api/internal/curation/[id]/reject` — status → REJECTED
+    - `POST /api/internal/curation/manual` — 수동 연결 (status = APPROVED 직접 저장)
+    - 모두 `requireAuth` 보호
+  - **AC**:
+    - approve/reject 시 존재하지 않는 id → 404
+    - manual 시 `@@unique` 중복 → 400
+    - 테스트 PASS, Build PASS
+
+- [x] **T401: Engine Studio — 큐레이션 관리 UI**
+  - **파일 (신규)**: `apps/engine-studio/src/app/(dashboard)/curation/page.tsx`
+  - **파일 (신규)**: `apps/engine-studio/src/app/(dashboard)/curation/components/CurationCard.tsx`
+  - **할 일**:
+    - 페르소나 선택 드롭다운 + status 필터 탭 (PENDING | APPROVED | REJECTED)
+    - `CurationCard`: contentItem 메타 + curationScore + curationReason + 승인/거절 버튼
+    - 수동 연결 폼: 페르소나 선택 + ContentItem ID 입력 + 제출
+    - Optimistic update (버튼 클릭 → 즉시 제거 → 서버 확인)
+    - 사이드바 네비게이션에 "큐레이션" 메뉴 추가
+  - **AC**:
+    - PENDING → APPROVED 클릭 → 목록에서 즉시 제거
+    - 수동 연결 후 APPROVED 탭에 노출
+    - Build PASS (engine-studio)
 
 ---
 

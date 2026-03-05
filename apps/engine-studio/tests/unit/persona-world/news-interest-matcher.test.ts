@@ -253,36 +253,52 @@ describe("getImportanceGrade", () => {
 })
 
 describe("getGradeConfig", () => {
+  // 퍼센트 기반 + sqrt 스케일링: scale = sqrt(REF_COUNT/count), REF_COUNT=10
+  // 100명 기준: scale = sqrt(10/100) = 0.3162
+  // BREAKING: ceil(100 × 0.4 × 0.3162) = 13
+  // HIGH:     ceil(100 × 0.2 × 0.3162) = 7
+  // NORMAL:   ceil(100 × 0.15 × 0.3162) = 5
+  // LOW:      ceil(100 × 0.1 × 0.3162) = 4
   const activePersonaCount = 100
   const normalBudget = 20
 
-  it("BREAKING: threshold 0.15, maxReactors = normalBudget × 3", () => {
+  it("BREAKING: threshold 0.15, maxReactors = 페르소나 수 증가에 따라 감소하는 40%", () => {
     const config = getGradeConfig("BREAKING", activePersonaCount, normalBudget)
     expect(config.threshold).toBe(0.15)
-    expect(config.maxReactors).toBe(60)
+    expect(config.maxReactors).toBe(13)
   })
 
-  it("HIGH: threshold 0.25, maxReactors = 활성 페르소나의 50%", () => {
+  it("HIGH: threshold 0.25, maxReactors = 페르소나 수 증가에 따라 감소하는 20%", () => {
     const config = getGradeConfig("HIGH", activePersonaCount, normalBudget)
     expect(config.threshold).toBe(0.25)
-    expect(config.maxReactors).toBe(50)
+    expect(config.maxReactors).toBe(7)
   })
 
-  it("NORMAL: threshold 0.35, maxReactors = normalBudget", () => {
+  it("NORMAL: threshold 0.35, maxReactors = 페르소나 수 증가에 따라 감소하는 15%", () => {
     const config = getGradeConfig("NORMAL", activePersonaCount, normalBudget)
     expect(config.threshold).toBe(0.35)
-    expect(config.maxReactors).toBe(20)
+    expect(config.maxReactors).toBe(5)
   })
 
-  it("LOW: threshold 0.45, maxReactors = normalBudget/2", () => {
+  it("LOW: threshold 0.45, maxReactors = 페르소나 수 증가에 따라 감소하는 10%", () => {
     const config = getGradeConfig("LOW", activePersonaCount, normalBudget)
     expect(config.threshold).toBe(0.45)
-    expect(config.maxReactors).toBe(10)
+    expect(config.maxReactors).toBe(4)
   })
 
-  it("LOW maxReactors 최소 1", () => {
+  it("LOW maxReactors 최소 1 보장", () => {
     const config = getGradeConfig("LOW", 1, 1)
     expect(config.maxReactors).toBeGreaterThanOrEqual(1)
+  })
+
+  it("소규모(10명) HIGH: scale=1.0, ceil(10 × 0.2 × 1.0) = 2", () => {
+    const config = getGradeConfig("HIGH", 10, 20)
+    expect(config.maxReactors).toBe(2)
+  })
+
+  it("중규모(20명) HIGH: scale=0.707, ceil(20 × 0.2 × 0.707) = 3", () => {
+    const config = getGradeConfig("HIGH", 20, 20)
+    expect(config.maxReactors).toBe(3)
   })
 })
 

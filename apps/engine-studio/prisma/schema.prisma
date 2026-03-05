@@ -233,6 +233,9 @@ model Persona {
   chatThreads         ChatThread[]
   callReservations    CallReservation[]
 
+  // B2B 콘텐츠 큐레이션 (T392)
+  curatedContents     PersonaCuratedContent[]
+
   @@map("personas")
 }
 
@@ -1266,6 +1269,8 @@ model PersonaFollow {
 
   @@unique([followerPersonaId, followingPersonaId])
   @@unique([followerUserId, followingPersonaId])
+  @@index([followerUserId])       // T378: 팔로잉 탭 쿼리 최적화
+  @@index([followingPersonaId])  // T378: 팔로워 조회 최적화
   @@map("persona_follows")
 }
 
@@ -1370,6 +1375,9 @@ model PersonaWorldUser {
   // Chat & Call (1:1 대화/통화)
   chatThreads     ChatThread[]
   callReservations CallReservation[]
+
+  // B2B 콘텐츠 피드백 (T392)
+  contentFeedbacks UserContentFeedback[]
 
   @@map("persona_world_users")
 }
@@ -2751,4 +2759,105 @@ model PWShopItem {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("pw_shop_items")
+}
+
+// ============================================
+// B2B ContentItem — T392 (2026-03-04)
+// ============================================
+
+enum ContentItemType {
+  MOVIE
+  DRAMA
+  MUSIC
+  BOOK
+  ARTICLE
+  PRODUCT
+  VIDEO
+  PODCAST
+}
+
+enum CurationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ContentFeedbackAction {
+  LIKE
+  SKIP
+  SAVE
+  CONSUME
+}
+
+/// B2B 고객사가 등록한 콘텐츠 아이템 (ingest API 경유)
+model ContentItem {
+  id              String          @id @default(cuid())
+  tenantId        String          // Developer Console API Key → tenantId
+  contentType     ContentItemType
+  title           String
+  description     String?         @db.Text
+  sourceUrl       String?
+  externalId      String?         // 고객사 측 원본 ID
+
+  genres          String[]        @default([])
+  tags            String[]        @default([])
+
+  // 벡터화 결과 (L1 7D + L3 4D) — vectorizeContent() 호출 후 저장
+  contentVector   Json?           // { depth, lens, stance, scope, taste, purpose, sociability }
+  narrativeTheme  Json?           // { lack, moralCompass, volatility, growthArc }
+  vectorizedAt    DateTime?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  curatedBy       PersonaCuratedContent[]
+  feedbacks       UserContentFeedback[]
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId])
+  @@index([contentType])
+  @@map("content_items")
+}
+
+/// 페르소나가 추천하는 콘텐츠 큐레이션 (자동 또는 수동)
+model PersonaCuratedContent {
+  id              String         @id @default(cuid())
+  personaId       String
+  persona         Persona        @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  contentItemId   String
+  contentItem     ContentItem    @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+
+  curationScore   Decimal        @db.Decimal(4, 3)  // 0.000~1.000
+  curationReason  String?        @db.Text            // LLM 생성 또는 impression 복사
+  highlights      String[]       @default([])        // 핵심 인상 키워드
+
+  status          CurationStatus @default(PENDING)
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@unique([personaId, contentItemId])
+  @@index([personaId, status])
+  @@index([contentItemId])
+  @@map("persona_curated_contents")
+}
+
+/// 유저의 콘텐츠 피드백 (LIKE / SKIP / SAVE / CONSUME)
+model UserContentFeedback {
+  id              String                @id @default(cuid())
+  userId          String
+  user            PersonaWorldUser      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentItemId   String
+  contentItem     ContentItem           @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+
+  action          ContentFeedbackAction
+  viaPersonaId    String?               // 어느 페르소나 추천으로 소비했는지
+
+  createdAt       DateTime              @default(now())
+
+  @@unique([userId, contentItemId])
+  @@index([userId])
+  @@index([contentItemId])
+  @@map("user_content_feedbacks")
 }

@@ -8,6 +8,7 @@ import {
   selectPersonasForArticle,
   allocateDailyReactions,
   getImportanceGrade,
+  getGradeConfig,
   INTEREST_THRESHOLD,
 } from "./news-interest-matcher"
 import type {
@@ -72,8 +73,9 @@ export interface NewsReactionDataProvider {
 /**
  * 단일 뉴스 기사에 대한 페르소나 반응 트리거 (수동).
  *
- * 점수 분포가 반응 인원을 결정. 하드코딩 상한 없음.
- * - 대형 GLOBAL 이슈 → 개방적·외향적 페르소나 다수 반응
+ * importance 등급 기반 퍼센트 캡 적용:
+ * - BREAKING(≥0.9): 상위 40%, HIGH(≥0.7): 상위 20%
+ * - NORMAL(≥0.5): 상위 15%, LOW: 상위 10%
  * - 지역 특화 뉴스 → 해당 국가 페르소나만 반응
  */
 export async function triggerNewsReactionPosts(
@@ -98,12 +100,14 @@ export async function triggerNewsReactionPosts(
     importanceScore: article.importanceScore,
   }
 
-  // 수동 트리거 = 낮은 임계값 (0.25)
+  // 수동 트리거: importance 등급 기반 퍼센트 캡
+  const grade = getImportanceGrade(article.importanceScore)
+  const config = getGradeConfig(grade, personasForMatching.length, 20)
   const selected = selectPersonasForArticle(
     articleForMatching,
     personasForMatching,
-    INTEREST_THRESHOLD
-  )
+    config.threshold
+  ).slice(0, config.maxReactors)
 
   if (selected.length === 0) {
     console.log(`[news-reaction] 기사 ${article.id}: 반응할 페르소나 없음`)

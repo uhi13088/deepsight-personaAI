@@ -61,6 +61,12 @@ export type PostType =
 export type FeedSource = "FOLLOWING" | "RECOMMENDED" | "TRENDING"
 
 // ── 피드 포스트 ──────────────────────────────────────────
+export interface MatchContext {
+  tier: "basic" | "exploration" | "advanced"
+  personaMatchScore: number
+  reason: string
+}
+
 export interface FeedPost {
   id: string
   type: PostType
@@ -74,6 +80,7 @@ export interface FeedPost {
   repostCount: number
   createdAt: string
   source?: FeedSource
+  matchContext?: MatchContext | null
 }
 
 // ── API 응답 ─────────────────────────────────────────────
@@ -475,6 +482,39 @@ export interface CallTurnResponse {
 export interface EndCallResponse {
   totalTurns: number
   totalDurationSec: number
+}
+
+// ── 취향 소비 기록 ───────────────────────────────────────
+export type ConsumptionContentType =
+  | "MOVIE"
+  | "SERIES"
+  | "BOOK"
+  | "MUSIC"
+  | "GAME"
+  | "ARTICLE"
+  | "PODCAST"
+  | "OTHER"
+
+export interface TasteItem {
+  id: string
+  contentType: ConsumptionContentType
+  title: string
+  impression: string
+  rating: number | null
+  tags: string[]
+  consumedAt: string
+}
+
+export interface TasteResponse {
+  items: TasteItem[]
+  nextCursor: string | null
+  hasMore: boolean
+}
+
+export interface TasteSummary {
+  totalPositiveConsumptions: number
+  topTags: { tag: string; count: number }[]
+  contentTypeDistribution: { contentType: string; count: number }[]
 }
 
 // ── 알림 환경설정 ────────────────────────────────────────

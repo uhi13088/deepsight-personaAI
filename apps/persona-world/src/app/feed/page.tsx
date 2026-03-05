@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   Flag,
   MessageCircle,
+  Compass,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -95,8 +96,34 @@ export default function FeedPage() {
   const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState(false)
 
-  const observerRef = useRef<IntersectionObserver | null>(null)
+  // T391: "새로운 발견만" 필터 토글 (localStorage 유지)
+  const [explorationOnly, setExplorationOnly] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false
+    return localStorage.getItem("pw-exploration-only") === "true"
+  })
+
+  const handleExplorationToggle = useCallback(() => {
+    setExplorationOnly((prev) => {
+      const next = !prev
+      localStorage.setItem("pw-exploration-only", String(next))
+      return next
+    })
+  }, [])
+
+  const displayedPosts = useMemo(
+    () =>
+      explorationOnly && activeTab === "for-you"
+        ? posts.filter((p) => p.matchContext?.tier === "exploration")
+        : posts,
+    [posts, explorationOnly, activeTab]
+  )
+
   const sentinelRef = useRef<HTMLDivElement | null>(null)
+
+  // T380: 탭별 캐시 — 전환 시 즉시 표시
+  const tabCacheRef = useRef<
+    Map<FeedTab, { posts: FeedPost[]; cursor: string | null; hasMore: boolean }>
+  >(new Map())
 
   const unreadNotifications = useMemo(
     () => notifications.filter((n) => !n.read).length,
@@ -165,13 +192,33 @@ export default function FeedPage() {
     [activeTab, profile?.id]
   )
 
-  // 탭 전환 또는 초기 로드
+  // T380: 탭 전환 또는 초기 로드 (캐시 우선)
   useEffect(() => {
     let cancelled = false
 
     const load = async () => {
-      setLoading(true)
       setError(false)
+
+      // 캐시 있으면 즉시 표시 (loading skeleton 없이)
+      const cached = tabCacheRef.current.get(activeTab)
+      if (cached) {
+        setPosts(cached.posts)
+        setNextCursor(cached.cursor)
+        setHasMore(cached.hasMore)
+        setLoading(false)
+        // 백그라운드 refresh (캐시 위에 덮어씌우기)
+        const fresh = await fetchFeed()
+        if (cancelled || !fresh) return
+        const updated = { posts: fresh.posts, cursor: fresh.nextCursor, hasMore: fresh.hasMore }
+        tabCacheRef.current.set(activeTab, updated)
+        setPosts(fresh.posts)
+        setNextCursor(fresh.nextCursor)
+        setHasMore(fresh.hasMore)
+        return
+      }
+
+      // 첫 방문 탭: loading skeleton 표시
+      setLoading(true)
       setPosts([])
       setNextCursor(null)
       setHasMore(false)
@@ -185,6 +232,11 @@ export default function FeedPage() {
         return
       }
 
+      tabCacheRef.current.set(activeTab, {
+        posts: data.posts,
+        cursor: data.nextCursor,
+        hasMore: data.hasMore,
+      })
       setPosts(data.posts)
       setNextCursor(data.nextCursor)
       setHasMore(data.hasMore)
@@ -195,7 +247,7 @@ export default function FeedPage() {
     return () => {
       cancelled = true
     }
-  }, [fetchFeed])
+  }, [fetchFeed, activeTab])
 
   // ── 무한 스크롤 ──────────────────────────────────────────
 
@@ -205,33 +257,44 @@ export default function FeedPage() {
     setLoadingMore(true)
     const data = await fetchFeed(nextCursor)
     if (data) {
-      setPosts((prev) => [...prev, ...data.posts])
+      setPosts((prev) => {
+        const newPosts = [...prev, ...data.posts]
+        // T380: 추가 로드 후 캐시 갱신 (누적 포스트 전체 저장)
+        tabCacheRef.current.set(activeTab, {
+          posts: newPosts,
+          cursor: data.nextCursor,
+          hasMore: data.hasMore,
+        })
+        return newPosts
+      })
       setNextCursor(data.nextCursor)
       setHasMore(data.hasMore)
     }
     setLoadingMore(false)
-  }, [nextCursor, loadingMore, fetchFeed])
+  }, [nextCursor, loadingMore, fetchFeed, activeTab])
 
-  // IntersectionObserver 연결
+  // T381: loadMoreRef — observer가 항상 최신 loadMore를 참조 (재생성 방지)
+  const loadMoreRef = useRef(loadMore)
   useEffect(() => {
-    if (observerRef.current) observerRef.current.disconnect()
+    loadMoreRef.current = loadMore
+  }, [loadMore])
 
-    observerRef.current = new IntersectionObserver(
+  // IntersectionObserver — sentinel 마운트 시 1회 생성 (hasMore/loadingMore 변경에 무관)
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+
+    const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting && hasMore && !loadingMore) {
-          loadMore()
+        if (entries[0]?.isIntersecting) {
+          void loadMoreRef.current()
         }
       },
       { rootMargin: "200px" }
     )
-
-    const sentinel = sentinelRef.current
-    if (sentinel) observerRef.current.observe(sentinel)
-
-    return () => {
-      observerRef.current?.disconnect()
-    }
-  }, [hasMore, loadingMore, loadMore])
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 핸들러 ────────────────────────────────────────────────
 
@@ -298,10 +361,27 @@ export default function FeedPage() {
             ))}
           </div>
         </div>
+
+        {/* T391: 서브 토글 — For You 탭 전용 */}
+        {activeTab === "for-you" && (
+          <div className="mx-auto max-w-2xl px-4 py-2">
+            <button
+              onClick={handleExplorationToggle}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                explorationOnly
+                  ? "bg-purple-500 text-white"
+                  : "border border-gray-200 bg-white text-gray-500 hover:border-purple-300 hover:text-purple-500"
+              }`}
+            >
+              <Compass className="h-3.5 w-3.5" />
+              새로운 발견만
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Main Content */}
-      <main className="mx-auto max-w-2xl px-4 pb-20 pt-[7.5rem]">
+      <main className="mx-auto max-w-2xl px-4 pb-20 pt-[8.5rem]">
         {/* Loading Skeleton */}
         {loading ? (
           <div className="space-y-4">
@@ -349,7 +429,7 @@ export default function FeedPage() {
         ) : (
           /* Posts Feed */
           <div className="space-y-4">
-            {posts.map((post) => (
+            {displayedPosts.map((post) => (
               <FeedPostCard
                 key={post.id}
                 post={post}
@@ -448,6 +528,22 @@ const FeedPostCard = memo(function FeedPostCard({
               )}
             </div>
             <div className="text-sm text-gray-500">{post.persona.handle}</div>
+            {/* 추천 컨텍스트 배지 (T390) */}
+            {post.matchContext && (
+              <div
+                className={`mt-0.5 flex items-center gap-1 text-[10px] font-medium ${
+                  post.matchContext.tier === "exploration" ? "text-purple-500" : "text-violet-400"
+                }`}
+              >
+                {post.matchContext.tier === "exploration" ? (
+                  <Compass className="h-3 w-3" />
+                ) : (
+                  <Sparkles className="h-3 w-3" />
+                )}
+                {Math.round(post.matchContext.personaMatchScore * 100)}% ·{" "}
+                {post.matchContext.reason}
+              </div>
+            )}
           </div>
         </Link>
         <div className="relative flex items-center gap-2">

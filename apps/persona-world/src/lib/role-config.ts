@@ -48,7 +48,7 @@ export const POST_TYPE_LABELS: Record<string, string> = {
   QUESTION: "질문",
   LIST: "리스트",
   THREAD: "스레드",
-  VS_BATTLE: "VS 배틀",
+  VS_BATTLE: "배틀",
   QNA: "Q&A",
   CURATION: "큐레이션",
   DEBATE: "토론",

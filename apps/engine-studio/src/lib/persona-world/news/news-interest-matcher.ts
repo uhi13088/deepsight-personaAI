@@ -61,27 +61,61 @@ export function getImportanceGrade(score: number): ImportanceGrade {
 }
 
 /**
+ * 페르소나 수 증가에 따라 반응 비율을 점진적으로 감소시키는 스케일 팩터.
+ *
+ * sqrt(REF_COUNT / count) 기반: 페르소나가 많을수록 비율이 줄어 피드 단조로움 방지.
+ * - 10명: scale=1.00 (기준)
+ * - 20명: scale=0.71
+ * - 50명: scale=0.45
+ * - 100명: scale=0.32
+ */
+const GRADE_REF_COUNT = 10
+
+function scaleByCount(count: number): number {
+  return Math.sqrt(GRADE_REF_COUNT / Math.max(count, GRADE_REF_COUNT))
+}
+
+/**
  * 등급별 동적 threshold + maxReactors 결정.
  *
- * BREAKING: threshold 0.15 (거의 모든 페르소나 참여), cap = normalBudget×3
- * HIGH:     threshold 0.25, cap = 활성 페르소나의 50%
- * NORMAL:   threshold 0.35, cap = normalBudget
- * LOW:      threshold 0.45 (정확 매칭만), cap = normalBudget/2
+ * 기사 중요도와 페르소나 수 모두 반영:
+ * - 기본 비율(baseRate)에 scaleByCount를 곱해 페르소나 수 증가 시 비율 감소
+ * - BREAKING(≥0.9): baseRate 40%, HIGH(≥0.7): 20%, NORMAL(≥0.5): 15%, LOW: 10%
+ *
+ * 예시 (baseRate=20%, HIGH):
+ *   10명→2명(20%), 20명→3명(14%), 50명→5명(9%), 100명→7명(7%)
  */
 export function getGradeConfig(
   grade: ImportanceGrade,
   activePersonaCount: number,
   normalBudget: number
 ): DynamicGradeConfig {
+  const scale = scaleByCount(activePersonaCount)
   switch (grade) {
     case "BREAKING":
-      return { grade, threshold: 0.15, maxReactors: normalBudget * 3 }
+      return {
+        grade,
+        threshold: 0.15,
+        maxReactors: Math.max(1, Math.ceil(activePersonaCount * 0.4 * scale)),
+      }
     case "HIGH":
-      return { grade, threshold: 0.25, maxReactors: Math.floor(activePersonaCount * 0.5) }
+      return {
+        grade,
+        threshold: 0.25,
+        maxReactors: Math.max(1, Math.ceil(activePersonaCount * 0.2 * scale)),
+      }
     case "NORMAL":
-      return { grade, threshold: 0.35, maxReactors: normalBudget }
+      return {
+        grade,
+        threshold: 0.35,
+        maxReactors: Math.max(1, Math.ceil(activePersonaCount * 0.15 * scale)),
+      }
     case "LOW":
-      return { grade, threshold: 0.45, maxReactors: Math.max(1, Math.floor(normalBudget * 0.5)) }
+      return {
+        grade,
+        threshold: 0.45,
+        maxReactors: Math.max(1, Math.ceil(activePersonaCount * 0.1 * scale)),
+      }
   }
 }
 
@@ -261,11 +295,10 @@ function buildPersonaKeywords(expertise: string[], role?: string | null): Set<st
 // ── 페르소나 선정 ────────────────────────────────────────────────
 
 /**
- * 뉴스 기사에 반응할 페르소나 선정.
+ * 뉴스 기사에 반응할 페르소나 선정 (점수 내림차순 정렬).
  *
- * 하드코딩 상한 없음 — 점수 분포가 자연스럽게 반응 인원을 결정.
- * 대형 글로벌 이슈 → 많은 페르소나가 threshold 초과 → 많이 반응.
- * 지역 특화 뉴스  → 해당 국가 페르소나만 초과 → 소수 반응.
+ * threshold 초과 페르소나를 점수 순으로 반환.
+ * 실제 인원 제한은 allocateDailyReactions → getGradeConfig의 maxReactors(퍼센트 기반)가 담당.
  *
  * @param threshold 0.25(수동) 또는 0.35(자동)
  */

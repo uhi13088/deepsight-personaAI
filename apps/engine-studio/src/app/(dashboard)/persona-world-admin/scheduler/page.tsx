@@ -28,6 +28,7 @@ interface SchedulerData {
     id: string
     personaId: string
     activityType: string
+    trigger: string
     createdAt: string
   }>
 }
@@ -452,9 +453,27 @@ export default function SchedulerPage() {
                 <div className="space-y-1">
                   {schedulerData.recentRuns.map((run) => (
                     <div key={run.id} className="flex items-center justify-between text-sm">
-                      <Badge variant="outline" className="text-xs">
-                        {run.activityType}
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant="outline" className="text-xs">
+                          {run.activityType}
+                        </Badge>
+                        <Badge
+                          variant="secondary"
+                          className={`text-xs ${
+                            run.trigger === "TRENDING"
+                              ? "bg-blue-50 text-blue-700"
+                              : run.trigger === "MANUAL"
+                                ? "bg-orange-50 text-orange-700"
+                                : "bg-gray-50 text-gray-600"
+                          }`}
+                        >
+                          {run.trigger === "TRENDING"
+                            ? "뉴스"
+                            : run.trigger === "MANUAL"
+                              ? "수동"
+                              : "스케줄"}
+                        </Badge>
+                      </div>
                       <span className="text-muted-foreground text-xs">
                         {new Date(run.createdAt).toLocaleString("ko-KR")}
                       </span>

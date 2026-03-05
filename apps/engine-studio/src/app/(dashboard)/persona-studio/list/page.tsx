@@ -157,7 +157,7 @@ export default function PersonaListPage() {
               ) : (
                 <Volume2 className="mr-1 h-4 w-4" />
               )}
-              {isRecalculating ? "재설정 중..." : "음성 일괄 재설정"}
+              {isRecalculating ? "변경 중..." : "일래븐랩스로 일괄변경"}
             </Button>
 
             {/* 랜덤 생성 버튼 (드롭다운) */}

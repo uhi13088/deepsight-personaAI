@@ -297,6 +297,147 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /personas/{personaId}/taste:
+    get:
+      operationId: getPersonaTaste
+      tags: [Personas]
+      summary: 페르소나 소비 기록 조회 (긍정 소비만)
+      description: |
+        rating >= 0.6 인 소비 기록만 반환합니다. X-Internal-Token 필수.
+        cursor 기반 페이지네이션.
+      security:
+        - InternalToken: []
+      parameters:
+        - name: personaId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "persona_xyz789"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 50
+          description: 페이지 크기
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 이전 페이지 마지막 항목 ID
+      responses:
+        "200":
+          description: 소비 기록 조회 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            contentType:
+                              type: string
+                              enum: [MOVIE, SERIES, BOOK, MUSIC, GAME, OTHER]
+                            title:
+                              type: string
+                            impression:
+                              type: string
+                            rating:
+                              type: number
+                              nullable: true
+                              minimum: 0.6
+                              maximum: 1.0
+                            tags:
+                              type: array
+                              items:
+                                type: string
+                            consumedAt:
+                              type: string
+                              format: date-time
+                      nextCursor:
+                        type: string
+                        nullable: true
+                      hasMore:
+                        type: boolean
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /personas/{personaId}/taste/summary:
+    get:
+      operationId: getPersonaTasteSummary
+      tags: [Personas]
+      summary: 페르소나 소비 취향 요약
+      description: |
+        상위 5개 태그 + contentType 분포를 반환합니다. X-Internal-Token 필수.
+      security:
+        - InternalToken: []
+      parameters:
+        - name: personaId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "persona_xyz789"
+      responses:
+        "200":
+          description: 취향 요약 조회 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      totalPositiveConsumptions:
+                        type: integer
+                      topTags:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            tag:
+                              type: string
+                            count:
+                              type: integer
+                      contentTypeDistribution:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            contentType:
+                              type: string
+                            count:
+                              type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /follows:
     get:
       operationId: getFollows

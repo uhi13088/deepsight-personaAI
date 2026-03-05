@@ -44,24 +44,28 @@ export async function POST(request: NextRequest) {
 
     const feedLimit = Math.min(limit ?? 20, 50)
 
+    // T379: followingIds 1회 조회 — following/explore/for-you 탭 공유
+    const followRows = await prisma.personaFollow.findMany({
+      where: { followerUserId: userId },
+      select: { followingPersonaId: true },
+    })
+    const followingIds = followRows.map((f) => f.followingPersonaId)
+
     // ── following 탭: 팔로우한 페르소나 글만 ────────────────
     if (tab === "following") {
-      return handleFollowingTab(userId, feedLimit, cursor)
+      return handleFollowingTab(userId, feedLimit, cursor, followingIds)
     }
 
     // ── explore 탭: 팔로우하지 않는 페르소나 + 인기순 ──────
     if (tab === "explore") {
-      return handleExploreTab(userId, feedLimit, cursor)
+      return handleExploreTab(userId, feedLimit, cursor, followingIds)
     }
 
     // ── for-you: 3-Tier 매칭 피드 엔진 ─────────────────────
     const provider: FeedDataProvider = {
-      async getFollowingPersonaIds(uid: string): Promise<string[]> {
-        const follows = await prisma.personaFollow.findMany({
-          where: { followerUserId: uid },
-          select: { followingPersonaId: true },
-        })
-        return follows.map((f) => f.followingPersonaId)
+      async getFollowingPersonaIds(_uid: string): Promise<string[]> {
+        // T379: 이미 로드된 followingIds 재사용
+        return followingIds
       },
 
       async getRecentPostsByPersonas(
@@ -365,6 +369,7 @@ export async function POST(request: NextRequest) {
               contentId: true,
               metadata: true,
               locationTag: true,
+              hashtags: true, // T382
               likeCount: true,
               commentCount: true,
               repostCount: true,
@@ -398,6 +403,7 @@ export async function POST(request: NextRequest) {
           contentId: p.contentId,
           metadata: p.metadata,
           locationTag: p.locationTag,
+          hashtags: p.hashtags, // T382
           likeCount: p.likeCount,
           commentCount: p.commentCount,
           repostCount: p.repostCount,
@@ -447,6 +453,7 @@ const feedPostSelect = {
   contentId: true,
   metadata: true,
   locationTag: true,
+  hashtags: true, // T382
   likeCount: true,
   commentCount: true,
   repostCount: true,
@@ -483,6 +490,7 @@ function buildTabResponse(posts: FeedPostRow[], limit: number, source: string): 
         contentId: p.contentId,
         metadata: p.metadata,
         locationTag: p.locationTag,
+        hashtags: p.hashtags, // T382
         likeCount: p.likeCount,
         commentCount: p.commentCount,
         repostCount: p.repostCount,
@@ -509,13 +517,10 @@ function buildTabResponse(posts: FeedPostRow[], limit: number, source: string): 
 async function handleFollowingTab(
   userId: string,
   limit: number,
-  cursor?: string
+  cursor: string | undefined,
+  followingIds: string[] // T379: 이미 로드된 데이터 재사용
 ): Promise<NextResponse> {
-  const follows = await prisma.personaFollow.findMany({
-    where: { followerUserId: userId },
-    select: { followingPersonaId: true },
-  })
-  const followingIds = follows.map((f) => f.followingPersonaId)
+  void userId // 미래 확장용
 
   if (followingIds.length === 0) {
     return NextResponse.json({
@@ -540,33 +545,85 @@ async function handleFollowingTab(
 }
 
 // ── Explore 탭 ────────────────────────────────────────────────
+//
+// 순수 likeCount 정렬은 좋아요 1개만 눌려도 오래된 포스트가 영구 1위 고착되는
+// 문제가 있음. HackerNews 스타일 time-decay 점수로 신선도 + 인기도를 균형 있게 반영.
+// score = (likeCount + 1) / (ageHours + 2)^1.5
 
 async function handleExploreTab(
   userId: string,
   limit: number,
-  cursor?: string
+  cursor: string | undefined,
+  followingIds: string[] // T379: 이미 로드된 데이터 재사용
 ): Promise<NextResponse> {
-  const follows = await prisma.personaFollow.findMany({
-    where: { followerUserId: userId },
-    select: { followingPersonaId: true },
-  })
-  const excludeIds = follows.map((f) => f.followingPersonaId)
+  void userId // 미래 확장용
+  const excludeIds = followingIds
 
+  // 30일 이내 후보 over-fetch (커서 전 구간 포함하도록 충분히 확보)
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
   const where: Record<string, unknown> = {
     isHidden: false,
+    createdAt: { gte: since },
     persona: { status: { in: ["ACTIVE", "STANDARD"] } },
   }
   if (excludeIds.length > 0) {
     where.personaId = { notIn: excludeIds }
   }
 
-  const posts = await prisma.personaPost.findMany({
+  const candidates = await prisma.personaPost.findMany({
     where,
-    orderBy: [{ likeCount: "desc" as const }, { createdAt: "desc" as const }],
-    take: limit + 1,
-    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    orderBy: { createdAt: "desc" as const },
+    take: Math.max((limit + 1) * 5, 100),
     select: feedPostSelect,
   })
 
-  return buildTabResponse(posts, limit, "TRENDING")
+  // Time-decay 점수 계산 후 정렬
+  const now = Date.now()
+  const scored = candidates
+    .map((p) => {
+      const ageHours = (now - p.createdAt.getTime()) / 3_600_000
+      const score = (p.likeCount + 1) / Math.pow(ageHours + 2, 1.5)
+      return { p, score }
+    })
+    .sort((a, b) => b.score - a.score)
+
+  // 커서 기반 슬라이싱
+  const cursorIdx = cursor ? scored.findIndex((s) => s.p.id === cursor) : -1
+  const sliceFrom = cursorIdx >= 0 ? cursorIdx + 1 : 0
+  const page = scored.slice(sliceFrom, sliceFrom + limit + 1)
+
+  const hasMore = page.length > limit
+  const sliced = hasMore ? page.slice(0, limit) : page
+  const nextCursor = hasMore ? (sliced.at(-1)?.p.id ?? null) : null
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      posts: sliced.map(({ p }) => ({
+        id: p.id,
+        type: p.type,
+        content: p.content,
+        contentId: p.contentId,
+        metadata: p.metadata,
+        locationTag: p.locationTag,
+        hashtags: p.hashtags,
+        likeCount: p.likeCount,
+        commentCount: p.commentCount,
+        repostCount: p.repostCount,
+        createdAt: p.createdAt.toISOString(),
+        source: "TRENDING",
+        persona: {
+          id: p.persona.id,
+          name: p.persona.name,
+          handle: p.persona.handle ?? "",
+          tagline: p.persona.tagline,
+          role: p.persona.role,
+          profileImageUrl: p.persona.profileImageUrl,
+          warmth: p.persona.warmth ? Number(p.persona.warmth) : 0.5,
+        },
+      })),
+      nextCursor,
+      hasMore,
+    },
+  })
 }

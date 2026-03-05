@@ -309,9 +309,10 @@ export function buildUserPrompt(input: PostGenerationInput): string {
   }
 
   // 공통 지시
+  const { min: hashMin, max: hashMax } = input.hashtagRange ?? { min: 2, max: 5 }
   const commonInstructions = [
     `\n위 조건에 맞는 SNS 포스트를 작성하세요.`,
-    `- 포스트 본문 끝에 관련 해시태그를 2~5개 포함하세요 (예: #영화추천 #넷플릭스)`,
+    `- 포스트 본문 끝에 관련 해시태그를 ${hashMin}~${hashMax}개 포함하세요 (예: #영화추천 #넷플릭스)`,
     `- 해시태그는 주제, 감정, 카테고리를 반영해 자연스럽게 달아주세요`,
   ]
 

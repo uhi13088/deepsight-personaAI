@@ -107,8 +107,8 @@ export async function runScheduler(
   const decisions: SchedulerResult["decisions"] = []
 
   // Step 3-5: 각 페르소나별 활동 결정
-  for (const { persona, traits, state } of activePersonas) {
-    const decision = decideActivity(persona, traits, state, context)
+  for (const { persona, traits, state, isInActiveHours } of activePersonas) {
+    const decision = decideActivity(persona, traits, state, context, isInActiveHours)
 
     decisions.push({
       personaId: persona.id,
@@ -133,28 +133,36 @@ export async function runScheduler(
 }
 
 /**
- * 현재 시간에 활동 가능한 페르소나 필터링.
+ * 현재 시간에 활동 가능한 페르소나 필터링 (T377: 인터랙션 시간대 분리).
  *
  * 설계서 §4.2:
- * 조건: currentHour ∈ activeHours(persona) AND energy > 0.2
+ * - 포스팅: activeHours 안에서만 허용
+ * - 인터랙션(좋아요/리포스트/댓글): 24시간 허용, 시간대 밖이면 확률 50% 감소
+ * - 공통 필터: energy > 0.2
  */
 export async function getActivePersonas(
   currentHour: number,
   provider: SchedulerDataProvider
 ): Promise<
-  Array<{ persona: SchedulerPersona; traits: ActivityTraitsV3; state: PersonaStateData }>
+  Array<{
+    persona: SchedulerPersona
+    traits: ActivityTraitsV3
+    state: PersonaStateData
+    isInActiveHours: boolean
+  }>
 > {
   const personas = await provider.getActiveStatusPersonas()
   const result: Array<{
     persona: SchedulerPersona
     traits: ActivityTraitsV3
     state: PersonaStateData
+    isInActiveHours: boolean
   }> = []
 
   console.log(`[Scheduler] 활성 페르소나 ${personas.length}명 평가 (hour=${currentHour})`)
 
-  let filteredByHour = 0
   let filteredByEnergy = 0
+  let outOfActiveHours = 0
 
   for (const persona of personas) {
     // 1. 벡터 → 활동 특성 계산
@@ -166,11 +174,9 @@ export async function getActivePersonas(
         ? persona.activeHours
         : computeActiveHours(persona.vectors, traits)
 
-    // 3. 현재 시간이 활동 시간대에 포함되는지
-    if (!activeHours.includes(currentHour)) {
-      filteredByHour++
-      continue
-    }
+    // 3. 시간대 포함 여부 체크 (필터 제거 → 플래그로 전환)
+    const isInActiveHours = activeHours.includes(currentHour)
+    if (!isInActiveHours) outOfActiveHours++
 
     // 4. idle 시간 계산 → 에너지 회복 적용
     const lastActivityAt = await provider.getLastActivityAt(persona.id)
@@ -192,13 +198,15 @@ export async function getActivePersonas(
     // 6. triggerMap 효과 적용 (벡터 임시 보정)
     const effectiveTraits = applyTriggerMapToTraits(persona, state, traits)
 
-    result.push({ persona, traits: effectiveTraits, state })
+    result.push({ persona, traits: effectiveTraits, state, isInActiveHours })
   }
 
   if (personas.length > 0) {
+    const inHours = result.filter((r) => r.isInActiveHours).length
+    const outHours = result.filter((r) => !r.isInActiveHours).length
     console.log(
-      `[Scheduler] 필터 결과: ${result.length}명 통과, ` +
-        `${filteredByHour}명 시간대 불일치, ` +
+      `[Scheduler] 필터 결과: ${result.length}명 통과 (시간대 내 ${inHours}명 + 인터랙션전용 ${outHours}명), ` +
+        `${outOfActiveHours - outHours}명 시간대 불일치(에너지부족 제외), ` +
         `${filteredByEnergy}명 에너지 부족`
     )
   }
@@ -207,13 +215,13 @@ export async function getActivePersonas(
 }
 
 /**
- * 개별 페르소나의 활동 결정.
+ * 개별 페르소나의 활동 결정 (T377: 시간대 분리).
  *
  * 설계서 §4.5 포스트 타입 친화도 + §3.6 상태 보정.
  *
  * 1. 활동 확률 계산
- * 2. 포스트 여부 결정 (random vs probability)
- * 3. 인터랙션 여부 결정
+ * 2. 포스트 여부 결정: 활동 시간대 밖이면 false
+ * 3. 인터랙션 여부 결정: 활동 시간대 밖이면 확률 50% 감소
  * 4. 포스트 타입 선택
  * 5. Paradox 발현 체크
  */
@@ -221,7 +229,8 @@ export function decideActivity(
   persona: SchedulerPersona,
   traits: ActivityTraitsV3,
   state: PersonaStateData,
-  context: SchedulerContext
+  context: SchedulerContext,
+  isInActiveHours = true
 ): ActivityDecision {
   // 1. 활동 확률 (postFrequency 반영)
   const { postProbability, interactionProbability } = computeActivityProbabilities(
@@ -230,13 +239,16 @@ export function decideActivity(
     persona.postFrequency
   )
 
-  // 2. 포스트 여부
-  const shouldPost = Math.random() < postProbability
+  // 2. 포스트 여부: 활동 시간대 밖이면 포스팅 차단
+  const shouldPost = isInActiveHours && Math.random() < postProbability
 
-  // 3. 인터랙션 여부
+  // 3. 인터랙션 여부: 시간대 밖이면 확률 50% 감소 (수시 반응은 허용)
+  const effectiveInteractionProbability = isInActiveHours
+    ? interactionProbability
+    : interactionProbability * 0.5
   const shouldInteract =
     state.socialBattery > ACTIVITY_THRESHOLDS.minSocialBattery &&
-    Math.random() < interactionProbability
+    Math.random() < effectiveInteractionProbability
 
   if (!shouldPost && !shouldInteract) {
     return { shouldPost: false, shouldInteract: false }

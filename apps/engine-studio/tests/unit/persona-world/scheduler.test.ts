@@ -205,11 +205,11 @@ describe("decideActivity", () => {
   })
 })
 
-// ═══ getActivePersonas ═══
+// ═══ getActivePersonas (T377: 인터랙션 시간대 분리) ═══
 
 describe("getActivePersonas", () => {
-  it("활동 시간대에 속하는 페르소나만 필터링", async () => {
-    // sociability=0.5 → peakHour = 12 + round(0.5 × 10) = 17
+  it("활동 시간대 내 페르소나 → isInActiveHours=true", async () => {
+    // 오후형: peak = 13 + round(0.5 × 5) = 16, 16시는 활동 시간대 내
     const persona = makePersona({
       vectors: makeVectors({
         social: {
@@ -225,14 +225,14 @@ describe("getActivePersonas", () => {
     })
     const provider = makeMockProvider([persona])
 
-    // 17시에 활동 가능 (peakHour = 17)
-    const result = await getActivePersonas(17, provider)
+    const result = await getActivePersonas(16, provider)
     expect(result.length).toBeGreaterThanOrEqual(1)
     expect(result[0].persona.id).toBe("persona-1")
+    expect(result[0].isInActiveHours).toBe(true)
   })
 
-  it("활동 시간대 밖이면 빈 배열", async () => {
-    // sociability=0.5 → peakHour=17, 새벽 3시는 활동 시간 밖
+  it("활동 시간대 밖 페르소나 → 필터링 안 되고 isInActiveHours=false (T377)", async () => {
+    // 오후형: 새벽 3시는 활동 시간대 밖 → 인터랙션 전용으로 남아있어야 함
     const persona = makePersona({
       vectors: makeVectors({
         social: {
@@ -249,7 +249,8 @@ describe("getActivePersonas", () => {
     const provider = makeMockProvider([persona])
 
     const result = await getActivePersonas(3, provider)
-    expect(result).toHaveLength(0)
+    expect(result).toHaveLength(1) // 필터링되지 않고 남음
+    expect(result[0].isInActiveHours).toBe(false)
   })
 
   it("빈 페르소나 목록 → 빈 결과", async () => {
@@ -259,7 +260,7 @@ describe("getActivePersonas", () => {
     expect(result).toHaveLength(0)
   })
 
-  it("traits와 state가 포함된 결과", async () => {
+  it("결과에 traits, state, isInActiveHours 포함", async () => {
     const persona = makePersona({
       vectors: makeVectors({
         social: {
@@ -275,13 +276,72 @@ describe("getActivePersonas", () => {
     })
     const provider = makeMockProvider([persona])
 
-    const result = await getActivePersonas(17, provider)
+    const result = await getActivePersonas(16, provider)
     if (result.length > 0) {
       expect(result[0].traits).toHaveProperty("sociability")
       expect(result[0].traits).toHaveProperty("endurance")
       expect(result[0].state).toHaveProperty("mood")
       expect(result[0].state).toHaveProperty("energy")
+      expect(result[0]).toHaveProperty("isInActiveHours")
     }
+  })
+})
+
+// ═══ decideActivity — T377 시간대 분리 ═══
+
+describe("decideActivity — 시간대 분리 (T377)", () => {
+  const traits = {
+    sociability: 0.9,
+    initiative: 0.9,
+    expressiveness: 0.9,
+    interactivity: 0.9,
+    endurance: 0.9,
+    volatility: 0.5,
+    depthSeeking: 0.5,
+    growthDrive: 0.5,
+  }
+
+  it("isInActiveHours=false → shouldPost 항상 false", () => {
+    const persona = makePersona()
+    const state = makeState({ energy: 1.0, mood: 1.0, socialBattery: 1.0 })
+    const context = makeContext()
+
+    for (let i = 0; i < 20; i++) {
+      const decision = decideActivity(persona, traits, state, context, false)
+      expect(decision.shouldPost).toBe(false)
+    }
+  })
+
+  it("isInActiveHours=true → shouldPost 가능 (고확률 조건)", () => {
+    const persona = makePersona()
+    const state = makeState({ energy: 1.0, mood: 1.0, socialBattery: 1.0 })
+    const context = makeContext()
+
+    let posted = false
+    for (let i = 0; i < 30; i++) {
+      const decision = decideActivity(persona, traits, state, context, true)
+      if (decision.shouldPost) {
+        posted = true
+        break
+      }
+    }
+    expect(posted).toBe(true)
+  })
+
+  it("isInActiveHours=false → shouldInteract 가능 (50% 감소지만 차단 아님)", () => {
+    const persona = makePersona()
+    const state = makeState({ energy: 1.0, mood: 1.0, socialBattery: 1.0 })
+    const context = makeContext()
+
+    let interacted = false
+    for (let i = 0; i < 50; i++) {
+      const decision = decideActivity(persona, traits, state, context, false)
+      if (decision.shouldInteract) {
+        interacted = true
+        break
+      }
+    }
+    expect(interacted).toBe(true)
   })
 })
 

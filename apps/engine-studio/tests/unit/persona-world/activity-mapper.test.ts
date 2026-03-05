@@ -132,7 +132,7 @@ describe("computeActivityTraits", () => {
   })
 })
 
-// ── computeActiveHours ──
+// ── computeActiveHours (T376: 4 Chronotype) ──
 
 describe("computeActiveHours", () => {
   it("returns array of hours in [0, 23]", () => {
@@ -146,30 +146,69 @@ describe("computeActiveHours", () => {
     }
   })
 
-  it("peakHour = 12 + round(sociability × 10) for default", () => {
-    // sociability 0.5 → peakHour = 12 + 5 = 17
+  it("오후형(기본): sociability=0.5 → peakHour 16 포함", () => {
+    // 오후형: peak = 13 + round(0.5 × 5) = 13 + 3 = 16
     const vectors = makeVectors()
     const traits = computeActivityTraits(vectors, 0.3)
     const hours = computeActiveHours(vectors, traits)
 
-    // peakHour 17 should be in the active hours
-    expect(hours).toContain(17)
+    expect(hours).toContain(16)
   })
 
-  it("night owl shift for introvert + neurotic persona", () => {
+  it("새벽형: 높은 conscientiousness + 낮은 extraversion + 낮은 neuroticism → 4~7시 범위", () => {
     const vectors = makeVectors({
-      social: { ...makeVectors().social, sociability: 0.4 },
       temperament: {
         ...makeVectors().temperament,
-        extraversion: 0.2, // < 0.3
-        neuroticism: 0.7, // > 0.5
+        conscientiousness: 0.85,
+        extraversion: 0.2,
+        neuroticism: 0.15,
       },
     })
-    const traits = computeActivityTraits(vectors, 0.3)
+    const traits = computeActivityTraits(vectors, 0.5)
     const hours = computeActiveHours(vectors, traits)
 
-    // peakHour = 12 + round(0.4×10) = 16, +4 night owl = 20
-    expect(hours).toContain(20)
+    // 새벽형 peak = 4 + round(0.85 × 3) = 4 + 3 = 7, 윈도우 안에 5~8시 포함
+    const dawnHours = hours.filter((h) => h >= 4 && h <= 9)
+    expect(dawnHours.length).toBeGreaterThan(0)
+    // 오후 시간대(15시 이후)는 포함되지 않아야 함
+    expect(hours.some((h) => h >= 15 && h <= 20)).toBe(false)
+  })
+
+  it("오전형: 높은 purpose + 높은 conscientiousness → 8~12시 범위", () => {
+    const vectors = makeVectors({
+      social: { ...makeVectors().social, purpose: 0.8 },
+      temperament: {
+        ...makeVectors().temperament,
+        conscientiousness: 0.7,
+        extraversion: 0.5, // 새벽형 조건 불만족
+        neuroticism: 0.5,
+      },
+    })
+    const traits = computeActivityTraits(vectors, 0.5)
+    const hours = computeActiveHours(vectors, traits)
+
+    // 오전형 peak = 8 + round(0.8 × 3) = 8 + 2 = 10, 8~12시 포함
+    const morningHours = hours.filter((h) => h >= 8 && h <= 12)
+    expect(morningHours.length).toBeGreaterThan(0)
+  })
+
+  it("야행형: 높은 nightOwlScore → 21시 이후 포함", () => {
+    // score = 0.8×0.4 + 0.8×0.3 + (1-0.2)×0.3 = 0.32 + 0.24 + 0.24 = 0.80 > 0.55
+    const vectors = makeVectors({
+      temperament: {
+        ...makeVectors().temperament,
+        neuroticism: 0.8,
+        extraversion: 0.2,
+        conscientiousness: 0.3, // 새벽형 조건 불만족
+      },
+      narrative: { ...makeVectors().narrative, volatility: 0.8 },
+    })
+    const traits = computeActivityTraits(vectors, 0.4)
+    const hours = computeActiveHours(vectors, traits)
+
+    // 야행형 peak = 21 + round(0.8 × 4) = 21 + 3 = 24 → 0시
+    const nightHours = hours.filter((h) => h >= 21 || h <= 2)
+    expect(nightHours.length).toBeGreaterThan(0)
   })
 
   it("high endurance → wider activity window", () => {
@@ -194,8 +233,12 @@ describe("computeActiveHours", () => {
       0.3
     )
 
-    const hoursHigh = computeActiveHours(makeVectors(), highEnd)
-    const hoursLow = computeActiveHours(makeVectors(), lowEnd)
+    // 오후형 기준 벡터로 비교 (새벽형/오전형 조건 미충족)
+    const baseVectors = makeVectors({
+      social: { ...makeVectors().social, purpose: 0.3 },
+    })
+    const hoursHigh = computeActiveHours(baseVectors, highEnd)
+    const hoursLow = computeActiveHours(baseVectors, lowEnd)
 
     expect(hoursHigh.length).toBeGreaterThan(hoursLow.length)
   })

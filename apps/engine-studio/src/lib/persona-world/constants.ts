@@ -394,15 +394,31 @@ export const POST_TYPE_STATE_MODIFIERS = {
 } as const
 
 // ── 활동 시간대 공식 상수 ────────────────────────────────────
-// 설계서 §4.4 활동 시간대 결정
+// T376: 4 Chronotype 분류 (새벽형/오전형/오후형/야행형)
 export const ACTIVE_HOURS = {
-  peakHourBase: 12, // peakHour = 12 + round(sociability × 10)
-  sociabilityMultiplier: 10,
-  windowStartMultiplier: 6, // 시작 = peak - round(endurance × 6)
-  windowEndMultiplier: 4, // 종료 = peak + round(endurance × 4)
-  nightOwlShift: 4, // 야행성 보정 +4시간
-  nightOwlExtraversionMax: 0.3, // extraversion < 0.3
-  nightOwlNeuroticismMin: 0.5, // neuroticism > 0.5
+  // ── 새벽형 조건 (peakHour 4~7) ──
+  dawnConscientiousnessMin: 0.7, // L2.conscientiousness > 0.7
+  dawnExtraversionMax: 0.35, // L2.extraversion < 0.35
+  dawnNeuroticismMax: 0.35, // L2.neuroticism < 0.35
+  dawnPeakBase: 4, // peak = 4 + round(conscientiousness × 3) → 4~7시
+
+  // ── 오전형 조건 (peakHour 8~11) ──
+  morningPurposeMin: 0.6, // L1.purpose > 0.6
+  morningConscientiousnessMin: 0.55, // L2.conscientiousness > 0.55
+  morningPeakBase: 8, // peak = 8 + round(purpose × 3) → 8~11시
+
+  // ── 야행형 조건 (peakHour 21~24+) ──
+  nightOwlScoreThreshold: 0.55, // score = neuroticism×0.4 + volatility×0.3 + (1-extraversion)×0.3
+  nightOwlPeakBase: 21, // peak = 21 + round(volatility × 4) → 21~01시
+
+  // ── 오후형 기본값 (peakHour 13~18) ──
+  afternoonPeakBase: 13, // peak = 13 + round(sociability × 5) → 13~18시
+
+  // ── 윈도우 폭 (endurance 기반 균일 계산) ──
+  windowMinHours: 4, // 최소 활동 폭 (endurance=0)
+  windowMaxHours: 12, // 최대 활동 폭 (endurance=1)
+  windowStartRatio: 0.4, // 시작 = peak - round(total × 0.4)
+  windowEndRatio: 0.6, // 종료 = peak + round(total × 0.6)
 } as const
 
 // ── 스케줄러 페르소나 간 딜레이 ──────────────────────────────

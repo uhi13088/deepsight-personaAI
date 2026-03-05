@@ -75,8 +75,10 @@ export function PWPostTypeCard({ post }: PWPostTypeCardProps) {
 
 /** 본문 텍스트에서 "X vs Y" 패턴을 추출하여 투표 옵션 라벨로 사용 */
 function parseVsOptionsFromContent(content: string): { optionA: string; optionB: string } {
-  // "X vs Y" 패턴 매칭
-  const vsMatch = content.match(/['"]?([^'""\n]{2,20})['"]?\s+vs\.?\s+['"]?([^'""\n]{2,20})['"]?/i)
+  // "X vs Y" 패턴 — 콤마/마침표/느낌표/물음표/줄바꿈에서 끊기도록 제외
+  const vsMatch = content.match(
+    /['"]?([^'"",.\n!?]{2,20})['"]?\s+vs\.?\s+['"]?([^'"",.\n!?]{2,20})['"]?/i
+  )
   if (vsMatch?.[1] && vsMatch?.[2]) {
     return { optionA: vsMatch[1].trim(), optionB: vsMatch[2].trim() }
   }

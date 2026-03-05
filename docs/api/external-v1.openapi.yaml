@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
   title: DeepSight External API
-  version: "1.0.0"
+  version: "1.1.0"
   description: |
     DeepSight AI 페르소나 기반 콘텐츠 추천 B2B API.
 
@@ -41,6 +41,10 @@ tags:
     description: 매칭 결과 피드백 API
   - name: Users
     description: 사용자 프로필 · 온보딩 · 동의 API
+  - name: Content
+    description: B2B 콘텐츠 인제스트 API
+  - name: Recommendations
+    description: 유저 맞춤 콘텐츠 추천 API
 
 # ============================================================
 # Paths
@@ -594,6 +598,271 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /v1/content/ingest:
+    post:
+      operationId: ingestContent
+      tags: [Content]
+      summary: 콘텐츠 단건 등록
+      description: |
+        B2B 고객의 콘텐츠를 단건 등록합니다. `externalId`를 제공하면 기존 항목을 upsert합니다.
+        등록 후 비동기로 벡터화가 진행되며, 벡터화 완료 후 Recommendations API에서 활용됩니다.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContentIngestInput"
+            example:
+              contentType: "MOVIE"
+              title: "기생충"
+              description: "봉준호 감독의 2019년 칸 황금종려상 수상작"
+              sourceUrl: "https://example.com/movies/parasite"
+              externalId: "movie_parasite_2019"
+              genres: ["드라마", "스릴러"]
+              tags: ["봉준호", "칸영화제", "아카데미"]
+      responses:
+        "200":
+          description: 등록 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum: [true]
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        description: 생성된 ContentItem ID
+                        example: "clxyz123abc"
+                      vectorizedAt:
+                        type: string
+                        format: date-time
+                        nullable: true
+                        description: 벡터화 완료 시각 (null이면 아직 진행 중)
+        "400":
+          description: 입력값 오류
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error:
+                  code: "VALIDATION_ERROR"
+                  message: "title은 필수입니다"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/content/ingest/batch:
+    post:
+      operationId: ingestContentBatch
+      tags: [Content]
+      summary: 콘텐츠 배치 등록
+      description: |
+        B2B 고객의 콘텐츠를 배치로 등록합니다 (최대 100건).
+        개별 항목 실패가 전체 배치를 중단하지 않습니다.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items:
+                    $ref: "#/components/schemas/ContentIngestInput"
+            example:
+              items:
+                - contentType: "BOOK"
+                  title: "채식주의자"
+                  externalId: "book_vegetarian"
+                  genres: ["소설"]
+                  tags: ["한강", "부커상"]
+                - contentType: "MUSIC"
+                  title: "LILAC"
+                  externalId: "music_iu_lilac"
+                  genres: ["K-POP"]
+                  tags: ["IU", "2021"]
+      responses:
+        "200":
+          description: 배치 처리 완료 (부분 실패 포함 가능)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum: [true]
+                  data:
+                    type: object
+                    properties:
+                      created:
+                        type: integer
+                        description: 신규 생성 건수
+                      updated:
+                        type: integer
+                        description: 업데이트(upsert) 건수
+                      failed:
+                        type: integer
+                        description: 실패 건수
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            index:
+                              type: integer
+                            status:
+                              type: string
+                              enum: [created, updated, failed]
+                            id:
+                              type: string
+                              nullable: true
+                            error:
+                              type: string
+                              nullable: true
+              example:
+                success: true
+                data:
+                  created: 1
+                  updated: 0
+                  failed: 1
+                  items:
+                    - index: 0
+                      status: "created"
+                      id: "clxyz111aaa"
+                    - index: 1
+                      status: "failed"
+                      error: "title은 필수입니다"
+        "400":
+          description: 입력값 오류 (배열 비어있음 또는 100건 초과)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/recommendations:
+    post:
+      operationId: getRecommendations
+      tags: [Recommendations]
+      summary: 유저 맞춤 콘텐츠 추천
+      description: |
+        유저 벡터 × 페르소나 큐레이션 기반으로 맞춤 콘텐츠를 추천합니다.
+
+        **알고리즘**
+        1. `userId` → `PersonaWorldUser` L1 벡터 조회
+        2. 전체 활성 페르소나 대상 `matchAll()` 실행 → 상위 5개 페르소나
+        3. 선정 페르소나의 `APPROVED` 큐레이션 콘텐츠 조회 (테넌트 필터 적용)
+        4. `finalScore = cosineSim(userL1, contentL1) × curationScore` 계산
+        5. `contentItemId` 기준 중복 제거, 내림차순 정렬 후 상위 `limit`개 반환
+
+        **Fallback**: 유저 벡터가 없거나 매칭 가능한 큐레이션이 없으면 해당 테넌트의 최신 콘텐츠를 반환합니다.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId:
+                  type: string
+                  description: PersonaWorld 유저 ID
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+                  default: 20
+                  description: 반환 개수 (default 20, max 50)
+            example:
+              userId: "user_abc123"
+              limit: 10
+      responses:
+        "200":
+          description: 추천 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecommendationsResponse"
+              examples:
+                normal:
+                  summary: 정상 추천
+                  value:
+                    success: true
+                    data:
+                      userId: "user_abc123"
+                      total: 1
+                      items:
+                        - contentItem:
+                            id: "clxyz123abc"
+                            contentType: "MOVIE"
+                            title: "기생충"
+                            description: "봉준호 감독의 2019년 칸 황금종려상 수상작"
+                            sourceUrl: "https://example.com/movies/parasite"
+                            genres: ["드라마", "스릴러"]
+                            tags: ["봉준호"]
+                          recommendedBy:
+                            - personaId: "persona_xyz789"
+                              personaName: "비판적 사유자"
+                              matchScore: 0.92
+                              curationScore: 0.88
+                          finalScore: 0.81
+                          matchScore: 0.92
+                fallback:
+                  summary: Fallback (벡터 없음)
+                  value:
+                    success: true
+                    data:
+                      userId: null
+                      total: 5
+                      isFallback: true
+                      items:
+                        - contentItem:
+                            id: "clxyz456def"
+                            contentType: "BOOK"
+                            title: "채식주의자"
+                            genres: ["소설"]
+                            tags: []
+                          recommendedBy: []
+                          finalScore: null
+                          matchScore: null
+        "400":
+          description: userId 누락
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error:
+                  code: "VALIDATION_ERROR"
+                  message: "userId는 필수입니다"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
 # ============================================================
 # Components
 # ============================================================
@@ -604,6 +873,11 @@ components:
       type: http
       scheme: bearer
       description: Developer Console에서 발급받은 API 키
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: Developer Console에서 발급받은 API 키 (Content/Recommendations API용)
 
   headers:
     X-RateLimit-Limit:
@@ -1548,6 +1822,110 @@ components:
               additionalProperties: true
         meta:
           $ref: "#/components/schemas/Meta"
+
+    ContentIngestInput:
+      type: object
+      required: [contentType, title]
+      properties:
+        contentType:
+          type: string
+          enum: [MOVIE, DRAMA, MUSIC, BOOK, ARTICLE, PRODUCT, VIDEO, PODCAST]
+          description: 콘텐츠 타입
+        title:
+          type: string
+          description: 콘텐츠 제목
+        description:
+          type: string
+          nullable: true
+          description: 콘텐츠 설명 (벡터화 품질 향상에 사용)
+        sourceUrl:
+          type: string
+          nullable: true
+          description: 원본 URL
+        externalId:
+          type: string
+          nullable: true
+          description: 외부 시스템 ID (upsert 키)
+        genres:
+          type: array
+          items:
+            type: string
+          description: 장르 목록
+        tags:
+          type: array
+          items:
+            type: string
+          description: 태그 목록
+
+    RecommendationsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          properties:
+            userId:
+              type: string
+              nullable: true
+            total:
+              type: integer
+            isFallback:
+              type: boolean
+              description: Fallback 실행 시 true
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  contentItem:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      contentType:
+                        type: string
+                        enum: [MOVIE, DRAMA, MUSIC, BOOK, ARTICLE, PRODUCT, VIDEO, PODCAST]
+                      title:
+                        type: string
+                      description:
+                        type: string
+                        nullable: true
+                      sourceUrl:
+                        type: string
+                        nullable: true
+                      genres:
+                        type: array
+                        items:
+                          type: string
+                      tags:
+                        type: array
+                        items:
+                          type: string
+                  recommendedBy:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        personaId:
+                          type: string
+                        personaName:
+                          type: string
+                        matchScore:
+                          type: number
+                          format: float
+                        curationScore:
+                          type: number
+                          format: float
+                  finalScore:
+                    type: number
+                    nullable: true
+                    description: matchScore × curationScore (fallback 시 null)
+                  matchScore:
+                    type: number
+                    nullable: true
+                    description: 유저↔콘텐츠 L1 코사인 유사도 (fallback 시 null)
 
   # ----------------------------------------------------------
   # Common Responses

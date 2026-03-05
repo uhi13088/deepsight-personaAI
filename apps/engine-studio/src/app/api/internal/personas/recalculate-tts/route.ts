@@ -125,6 +125,12 @@ export async function POST() {
       const gender = (p.gender as "MALE" | "FEMALE" | "NON_BINARY") ?? "NON_BINARY"
 
       // ── TTS 재추론 ──────────────────────────────────────
+      // 이미 ElevenLabs인 페르소나는 건너뜀
+      if (p.ttsProvider === "elevenlabs") {
+        skipped++
+        continue
+      }
+
       // ElevenLabs API 키가 있으면 ElevenLabs 우선 사용 (18개 고유 음성)
       const preferredProvider = process.env.ELEVENLABS_API_KEY ? "elevenlabs" : "openai"
       const ttsProfile = inferTTSVoiceFromVectors(l1, l2, gender, preferredProvider, l3)
