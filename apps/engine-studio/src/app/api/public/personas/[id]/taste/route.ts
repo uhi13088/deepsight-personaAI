@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
- * GET /api/public/personas/[personaId]/taste
+ * GET /api/public/personas/[id]/taste
  *
  * 페르소나 소비 기록 공개 API — rating >= 0.6 (긍정 소비만)
  * cursor 기반 페이지네이션 (limit 20)
@@ -12,15 +12,12 @@ import { verifyInternalToken } from "@/lib/internal-auth"
 const MIN_RATING = 0.6
 const DEFAULT_LIMIT = 20
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ personaId: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const authError = verifyInternalToken(request)
   if (authError) return authError
 
   try {
-    const { personaId } = await params
+    const { id: personaId } = await params
     const { searchParams } = request.nextUrl
 
     const limitParam = searchParams.get("limit")

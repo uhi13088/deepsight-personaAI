@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { verifyInternalToken } from "@/lib/internal-auth"
 
 /**
- * GET /api/public/personas/[personaId]/taste/summary
+ * GET /api/public/personas/[id]/taste/summary
  *
  * 페르소나 소비 취향 요약 — 상위 5개 태그 + contentType 분포
  * rating >= 0.6 (긍정 소비만)
@@ -12,15 +12,12 @@ import { verifyInternalToken } from "@/lib/internal-auth"
 const MIN_RATING = 0.6
 const TOP_TAGS_LIMIT = 5
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ personaId: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const authError = verifyInternalToken(request)
   if (authError) return authError
 
   try {
-    const { personaId } = await params
+    const { id: personaId } = await params
 
     // 페르소나 존재 확인
     const persona = await prisma.persona.findUnique({
