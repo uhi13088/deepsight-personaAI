@@ -1173,6 +1173,10 @@ model PersonaPost {
   newsArticleId String?
   newsArticle   NewsArticle? @relation(fields: [newsArticleId], references: [id])
 
+  // Phase CON-EXT: 엔터테인먼트 미디어 반응 포스트 연결 (REVIEW/CURATION 타입일 때)
+  mediaItemId   String?
+  mediaItem     MediaItem?   @relation(fields: [mediaItemId], references: [id])
+
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -2918,4 +2922,74 @@ enum SemanticMemoryCategory {
   RELATIONSHIP_MODEL // 특정 관계 패턴
   LEARNED_PATTERN    // 행동/반응 패턴
   SELF_NARRATIVE     // 자아 서사 (성장 방향)
+}
+
+// ============================================
+// Phase CON-EXT: 엔터테인먼트 미디어 소스 (T351)
+// ============================================
+
+enum MediaSourceType {
+  TMDB_MOVIE        // The Movie Database — 영화
+  TMDB_TV           // The Movie Database — TV 시리즈
+  KOPIS_PERFORMANCE // 공연예술통합전산망 — 공연
+  KOPIS_EXHIBITION  // 공연예술통합전산망 — 전시
+  ALADIN_BOOK       // 알라딘 Open API — 도서
+  LASTFM_MUSIC      // Last.fm — 음악 차트
+}
+
+enum MediaItemType {
+  MOVIE
+  TV
+  PERFORMANCE
+  EXHIBITION
+  BOOK
+  MUSIC
+}
+
+/// 엔터테인먼트 콘텐츠 외부 소스 (TMDB, KOPIS, 알라딘, Last.fm)
+model MediaSource {
+  id                  String          @id @default(cuid())
+  name                String
+  sourceType          MediaSourceType
+  apiEndpoint         String?
+  region              String          @default("KR")  // "KR"|"JP"|"US"|"GLOBAL"
+  isActive            Boolean         @default(true)
+  lastFetchAt         DateTime?
+  consecutiveFailures Int             @default(0)     // 3회 연속 실패 시 자동 비활성화
+  lastError           String?
+
+  items               MediaItem[]
+
+  createdAt           DateTime        @default(now())
+
+  @@map("media_sources")
+}
+
+/// 외부 API에서 수집한 엔터테인먼트 미디어 아이템 (영화/TV/공연/전시/도서/음악)
+model MediaItem {
+  id              String        @id @default(cuid())
+  sourceId        String
+  source          MediaSource   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  mediaType       MediaItemType
+  title           String
+  originalId      String        // 외부 API 원본 ID (tmdb_12345, kopis_ABC123 등)
+  description     String?       @db.Text
+  releaseDate     DateTime?     // 개봉일 / 출판일 / 공연 시작일
+  venue           String?       // 공연장 / 전시관
+  creator         String?       // 감독 / 저자 / 아티스트
+  genres          String[]      @default([])
+  tags            String[]      @default([])
+  region          String        @default("KR")
+  importanceScore Decimal       @default(0.50) @db.Decimal(3, 2)  // 0.00~1.00
+  rawData         Json?         // 원본 API 응답 (필요 필드 캐시)
+
+  reactingPosts   PersonaPost[]
+
+  createdAt       DateTime      @default(now())
+
+  @@unique([sourceId, originalId])
+  @@index([mediaType, createdAt])
+  @@index([region])
+  @@map("media_items")
 }

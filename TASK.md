@@ -1988,6 +1988,103 @@
   - AC3: 주간 리셋 cron (월요일 00:00 UTC 카운터 0으로 리셋)
   - AC4: 테스트 + Build PASS
 
+### Phase CON-EXT: 엔터테인먼트 콘텐츠 소스 확장 (T351~T360)
+
+> 뉴스 파이프라인(ContentSource → ContentItem → 매처 → 트리거) 아키텍처 재사용.
+> 영화/TV(TMDB), 공연·전시(KOPIS), 도서(알라딘), 음악(Last.fm) 4개 무료 API 통합.
+> 페르소나가 실시간 엔터테인먼트 콘텐츠에 반응하는 REVIEW/CURATION 포스트 자동 생성.
+> **원칙**: 뉴스 파이프라인 패턴 동일 재사용. ContentSource/ContentItem은 NewsSource/NewsArticle과 병렬 구조.
+
+- [x] **T351: ContentSource + ContentItem DB 모델 신규 생성** ✅ 2026-03-05
+  - 배경: 뉴스와 동일한 두 테이블 구조 필요. ContentType enum으로 MOVIE/TV/PERFORMANCE/EXHIBITION/BOOK/MUSIC 분류.
+  - AC1: `ContentSource` 모델 — id, name, sourceType(ContentSourceType enum), apiEndpoint, apiKey?, region, isActive, lastFetchAt, consecutiveFailures, lastError, createdAt
+  - AC2: `ContentItem` 모델 — id, sourceId(FK), contentType(ContentType enum), title, originalId(외부 API ID), description, releaseDate?, venue?, genres(String[]), tags(String[]), region, importanceScore(Decimal), rawData(Json?), reactingPosts(PersonaPost[]), createdAt. `@unique([sourceId, originalId])`
+  - AC3: `ContentSourceType` enum — TMDB_MOVIE, TMDB_TV, KOPIS_PERFORMANCE, KOPIS_EXHIBITION, ALADIN_BOOK, LASTFM_MUSIC
+  - AC4: `ContentType` enum — MOVIE, TV, PERFORMANCE, EXHIBITION, BOOK, MUSIC
+  - AC5: PersonaPost에 `contentItemId String?` + `contentItem ContentItem?` 관계 추가
+  - AC6: Prisma 마이그레이션 생성 + Build PASS
+
+- [x] **T352: 콘텐츠 관심사 매처 — 페르소나 × 콘텐츠 태그 스코어링 (content-interest-matcher.ts)** ✅ 2026-03-05
+  - 배경: news-interest-matcher.ts 패턴 동일 재사용. 페르소나 벡터 × 콘텐츠 태그 기반 매칭.
+  - AC1: `computeContentInterestScore(persona, item)` — tagOverlap(40%) + openness(20%) + extraversion(15%) + regional(15%) + contentTypeAffinity(10%)
+  - AC2: `computeContentTypeAffinity()` — openness↑ → EXHIBITION/BOOK 선호, extraversion↑ → PERFORMANCE/MOVIE 선호
+  - AC3: `selectPersonasForContent(item, personas)` — threshold 0.30, importanceScore 기반 동적 할당 (뉴스와 동일 로직)
+  - AC4: DI 인터페이스 패턴 (ContentInterestMatcherDataProvider)
+  - AC5: Vitest 단위 테스트 15개 이상 + Build PASS
+
+- [x] **T353: 콘텐츠 반응 트리거 — REVIEW/CURATION 포스트 생성 (content-reaction-trigger.ts)** ✅ 2026-03-05
+  - 배경: news-reaction-trigger.ts 패턴 동일. REVIEW(단일 아이템 리뷰) / CURATION(큐레이션 추천) 2가지 포스트 타입.
+  - AC1: `triggerContentReactionPosts(item, personas)` — 단건 아이템 → 매처로 페르소나 선정 → REVIEW 포스트 스케줄
+  - AC2: `runDailyContentReactions(provider)` — 최근 24h 신규 ContentItem 배치 처리 (최대 20개)
+  - AC3: `formatContentItemTopic(item)` — 콘텐츠 타입별 topic 포맷 (MOVIE: "영화 [제목] 관람", BOOK: "도서 [제목] 독서" 등)
+  - AC4: 포스트 생성 시 `contentItemId` 연결 (ConsumptionLog 자동 기록 T262 연동)
+  - AC5: 비용 체크 통합 (NEWS_REACTION 대신 CONTENT_REACTION budgetType)
+  - AC6: DI 인터페이스 패턴 (ContentReactionDataProvider)
+  - AC7: Vitest 단위 테스트 10개 이상 + Build PASS
+
+- [x] **T354: TMDB 영화/TV 콘텐츠 페처 (content-fetcher-tmdb.ts)**
+  - 배경: TMDB API v3 무료 (40req/10s). 한국 개봉작 + 글로벌 인기작. API Key: `TMDB_API_KEY` env.
+  - AC1: `fetchTmdbMovies(apiKey, region)` — GET /movie/now_playing + /movie/upcoming (language=ko-KR 우선, fallback en-US)
+  - AC2: `fetchTmdbTvShows(apiKey, region)` — GET /tv/on_the_air + /tv/popular
+  - AC3: `mapTmdbToContentItem(raw, sourceId)` — genres → tags 변환, importanceScore = popularity/100 (clamp 0~1)
+  - AC4: 중복 방지 — `originalId = tmdb_{id}` upsert 패턴
+  - AC5: 10s timeout + 연속 3회 실패 시 source disable
+  - AC6: Vitest 단위 테스트 (mock fetch) + Build PASS
+
+- [x] **T355: KOPIS 공연/전시 콘텐츠 페처 (content-fetcher-kopis.ts)**
+  - 배경: 공연예술통합전산망 KOPIS API 완전 무료 (국내 공연/전시 실시간 데이터). API Key: `KOPIS_API_KEY` env.
+  - AC1: `fetchKopisPerformances(apiKey)` — GET /pblprfr (공연 목록) stdate=오늘, eddate=+30일, rows=20
+  - AC2: `fetchKopisExhibitions(apiKey)` — GET /pblprfr?shcate=GGBAM (전시 카테고리 필터)
+  - AC3: `mapKopisToContentItem(raw, sourceId)` — prfnm(제목), prfpdfrom/to(기간), fcltynm(장소), genrenm → tags
+  - AC4: venue 필드 저장 (공연장 이름), region = "KR"
+  - AC5: XML 응답 파싱 (KOPIS는 XML 반환) — news-fetcher.ts의 parseRssXml 패턴 재사용
+  - AC6: Vitest 단위 테스트 (mock XML) + Build PASS
+
+- [x] **T356: 알라딘 도서 콘텐츠 페처 (content-fetcher-aladin.ts)**
+  - 배경: 알라딘 Open API 무료 (국내 도서 신간/베스트셀러). API Key: `ALADIN_API_KEY` env.
+  - AC1: `fetchAladinNewBooks(apiKey)` — GET /ttb/api/ItemList.aspx?QueryType=NewSpecial (신간 특별) + QueryType=Bestseller
+  - AC2: `mapAladinToContentItem(raw, sourceId)` — title, author, publisher, categoryName → tags, cover → rawData
+  - AC3: importanceScore — 베스트셀러 rank 기반 (1위=1.0, 10위=0.5, 비베스트=0.3)
+  - AC4: categoryName → ContentType.BOOK 고정, 장르 태그 자동 추출
+  - AC5: JSON 응답 (ttbKey 파라미터 필요, output=js, Version=20131101)
+  - AC6: Vitest 단위 테스트 (mock JSON) + Build PASS
+
+- [x] **T357: Last.fm 음악 콘텐츠 페처 (content-fetcher-lastfm.ts)**
+  - 배경: Last.fm API 완전 무료 (글로벌 + 국가별 차트). API Key: `LASTFM_API_KEY` env.
+  - AC1: `fetchLastfmTopTracks(apiKey, country?)` — GET chart.getTopTracks (글로벌) + geo.getTopTracks (KR)
+  - AC2: `fetchLastfmTopArtists(apiKey)` — GET chart.getTopArtists
+  - AC3: `mapLastfmToContentItem(raw, sourceId)` — track name + artist → title, tags from top tags API
+  - AC4: importanceScore — listeners/playcount 기반 정규화 (상위 10% = 0.8+)
+  - AC5: Last.fm tags → ContentItem.tags 변환 (장르 태그 자동 매핑)
+  - AC6: Vitest 단위 테스트 (mock JSON) + Build PASS
+
+- [x] **T358: 콘텐츠 자동 페치 서비스 + 스케줄러 통합 (content-auto-fetch.ts)**
+  - 배경: news-auto-fetch.ts 패턴 동일. 4개 소스 배치 페치 + cron 연동.
+  - AC1: `ensureContentPresetsSeeded(provider)` — DB에 ContentSource 0개면 TMDB/KOPIS/Aladin/LastFM 4개 자동 등록
+  - AC2: `executeContentAutoFetch(provider, llmProvider, reactionRunner)` — 활성 소스 순회 → 각 페처 호출 → ContentItem upsert → 반응 트리거
+  - AC3: 소스별 페처 라우팅 (sourceType switch문)
+  - AC4: 연속 3회 실패 → source.isActive = false (뉴스와 동일)
+  - AC5: 전체 결과 반환 (fetchedCount, newItems, triggeredReactions, errors)
+  - AC6: Vitest 단위 테스트 10개 이상 + Build PASS
+
+- [x] **T359: Admin 콘텐츠 소스 관리 API (engine-studio)**
+  - 배경: 뉴스 소스 관리 API 패턴 동일. ContentSource CRUD + 수동 페치 트리거.
+  - AC1: `GET /api/internal/content-sources` — 소스 목록 (isActive, lastFetchAt, consecutiveFailures 포함)
+  - AC2: `POST /api/internal/content-sources` — 신규 소스 등록 (sourceType, name, region, apiKey?)
+  - AC3: `PATCH /api/internal/content-sources/[id]` — isActive 토글 + 설정 수정
+  - AC4: `POST /api/internal/content-sources/[id]/fetch` — 수동 즉시 페치 트리거
+  - AC5: `GET /api/internal/content-items` — 최근 수집 아이템 목록 (contentType, sourceId, importanceScore)
+  - AC6: requireAuth() 가드 + Build PASS
+
+- [x] **T360: cron/content-fetch 라우트 + 엔진 스튜디오 콘텐츠 소스 관리 UI**
+  - 배경: 뉴스 cron 라우트 패턴 동일. 스케줄러에 콘텐츠 페치 자동화 추가.
+  - AC1: `POST /api/cron/content-fetch` — executeContentAutoFetch() 호출, CRON_SECRET 인증
+  - AC2: cron-scheduler-service에 content-fetch 작업 등록 (6시간마다 실행)
+  - AC3: 엔진 스튜디오 `/content-sources` 페이지 — 소스 목록 테이블 (상태, 마지막 페치, 실패 횟수)
+  - AC4: 소스별 isActive 토글 버튼 + 수동 페치 버튼
+  - AC5: 최근 수집 ContentItem 미리보기 (타입별 필터, 상위 20개)
+  - AC6: Build PASS + 전체 테스트 PASS
+
 ### Phase v4.1-OPT: 비용 최적화 자동화 + 품질 보호 (T327~T332)
 
 > v4.1 핵심: 품질 게이트 자동 재생성 + Haiku 화이트리스트 라우팅 + A/B 모니터링 자동화.
