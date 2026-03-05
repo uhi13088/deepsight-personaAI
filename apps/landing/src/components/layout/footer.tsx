@@ -22,7 +22,9 @@ export function Footer() {
               </div>
               <span className="text-lg font-bold">DeepSight</span>
             </Link>
-            <p className="mt-3 text-sm text-gray-500">AI 페르소나 기반 3-Layer 벡터 추천 플랫폼</p>
+            <p className="mt-3 text-sm text-gray-500">
+              당신의 취향을 가장 잘 이해하는 AI 추천 서비스
+            </p>
           </div>
 
           {/* Products */}

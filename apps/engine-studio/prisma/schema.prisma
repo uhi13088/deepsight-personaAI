@@ -236,6 +236,9 @@ model Persona {
   // B2B 콘텐츠 큐레이션 (T392)
   curatedContents     PersonaCuratedContent[]
 
+  // v5.0 의미 기억 (T408)
+  semanticMemories    SemanticMemory[]
+
   @@map("personas")
 }
 
@@ -2860,4 +2863,59 @@ model UserContentFeedback {
   @@index([userId])
   @@index([contentItemId])
   @@map("user_content_feedbacks")
+}
+
+// ============================================
+// v5.0 의미 기억 (Semantic Memory)
+// ============================================
+
+/// 페르소나의 압축된 자아관 — 에피소드 기억을 주 1회 LLM으로 증류한 결과
+/// 에피소드(InteractionLog/ConsumptionLog)가 망각되어도 핵심 학습은 영구 보존
+model SemanticMemory {
+  id               String   @id @default(cuid())
+  personaId        String
+  persona          Persona  @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  /// BELIEF: "나는 공포 콘텐츠에서 카타르시스를 느낀다"
+  /// RELATIONSHIP_MODEL: "Yu-na는 내가 약한 모습을 보일 때 더 가까워진다"
+  /// LEARNED_PATTERN: "오전 9시 포스팅이 반응률 3배"
+  /// SELF_NARRATIVE: "나는 점점 타인의 시선에서 자유로워지고 있다"
+  category         SemanticMemoryCategory
+
+  /// 검색/중복 감지 키 (같은 subject면 confidence 업데이트)
+  subject          String
+
+  /// 압축된 자아관 텍스트 (~100자)
+  belief           String   @db.Text
+
+  /// 신뢰도: 지지 에피소드가 많을수록 높아짐 (0.00~1.00)
+  confidence       Decimal  @db.Decimal(3, 2) @default(0.50)
+
+  /// 이 믿음을 뒷받침한 에피소드 수
+  evidenceCount    Int      @default(1)
+
+  /// 원본 에피소드 ID 목록 (InteractionLog / ConsumptionLog / PersonaPost)
+  sourceEpisodeIds String[] @default([])
+
+  /// L3 영향 벡터 — 이 믿음이 growth arc 업데이트에 기여한 값 (JSON)
+  /// { lack: 0.0, moralCompass: 0.0, volatility: 0.001, growthArc: 0.002 }
+  l3Influence      Json?
+
+  /// 마지막 consolidation 시각
+  consolidatedAt   DateTime @default(now())
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([personaId, category])
+  @@index([personaId, confidence])
+  @@index([personaId, consolidatedAt])
+  @@map("semantic_memories")
+}
+
+enum SemanticMemoryCategory {
+  BELIEF             // 세계관/취향에 대한 믿음
+  RELATIONSHIP_MODEL // 특정 관계 패턴
+  LEARNED_PATTERN    // 행동/반응 패턴
+  SELF_NARRATIVE     // 자아 서사 (성장 방향)
 }

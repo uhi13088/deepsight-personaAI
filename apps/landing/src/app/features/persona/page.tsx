@@ -30,16 +30,16 @@ import { PingerPrintShowcase } from "@/components/p-inger-print-showcase"
 export const metadata: Metadata = {
   title: "AI 페르소나 — Features",
   description:
-    "고유한 3-Layer AI 성격과 관점을 가진 AI 페르소나. P-inger Print(2D+3D)로 시각화된 디지털 정체성.",
+    "고유한 성격과 관점을 가진 AI 페르소나. 취향 지문(P-inger Print)으로 시각화된 고유한 디지털 정체성.",
 }
 
 const PERSONA_TYPES = [
   {
     type: "아이러니한 철학자",
     icon: BookOpen,
-    label: "논리 ↔ 불안",
-    l1: "심층+논리+비판",
-    l2: "높은 neuroticism",
+    label: "깊이 생각하지만, 그래서 더 불안한",
+    l1: "심층 분석 · 논리적 판단",
+    l2: "예민한 내면",
     description:
       "깊이 있는 분석과 논리적 비평 뒤에는 숨겨진 불안이 있습니다. 지적 방어기제로 내면의 흔들림을 감추는, 입체적인 지성인.",
     traits: "심층 분석 · 논리적 판단 · 내면의 예민함",
@@ -48,9 +48,9 @@ const PERSONA_TYPES = [
   {
     type: "상처받은 비평가",
     icon: Shield,
-    label: "비판 ↔ 공감",
-    l1: "높은 stance",
-    l2: "높은 agreeableness",
+    label: "냉정하게 보지만, 마음은 따뜻한",
+    l1: "날카로운 비평 · 엄격한 기준",
+    l2: "깊은 공감력",
     description:
       "겉으로는 까칠하게 비평하지만, 속마음은 타인을 깊이 배려합니다. 날카로운 리뷰 뒤에 따뜻한 진심이 숨어있는 캐릭터.",
     traits: "날카로운 비평 · 깊은 공감력 · 건설적 피드백",
@@ -59,9 +59,9 @@ const PERSONA_TYPES = [
   {
     type: "사교적 내향인",
     icon: Users,
-    label: "사교 ↔ 내부수렴",
-    l1: "높은 sociability",
-    l2: "낮은 extraversion",
+    label: "밖에선 활발하지만, 안에선 방전",
+    l1: "활발한 소통 · 사교적 성향",
+    l2: "내향적 에너지",
     description:
       "파티에서는 활발하게 소통하지만, 집에 돌아오면 완전히 방전됩니다. 사회적 가면과 실제 에너지 패턴의 괴리가 매력.",
     traits: "활발한 소통 · 혼자만의 시간 필요 · 양면적 매력",
@@ -70,9 +70,9 @@ const PERSONA_TYPES = [
   {
     type: "게으른 완벽주의자",
     icon: Eye,
-    label: "디테일 ↔ 즉흥",
-    l1: "높은 scope",
-    l2: "낮은 conscientiousness",
+    label: "남 것은 완벽주의, 내 것은 미루기",
+    l1: "디테일 감지 · 꼼꼼한 시선",
+    l2: "즉흥적 실행",
     description:
       "남의 작업에서는 티끌만한 오류도 잡아내지만, 정작 자기 일은 미루고 또 미룹니다. 기준은 높되 실행은 느린 모순.",
     traits: "디테일 감지 · 미루기 달인 · 완벽주의적 비평",
@@ -81,9 +81,9 @@ const PERSONA_TYPES = [
   {
     type: "보수적 힙스터",
     icon: Star,
-    label: "실험 ↔ 보수",
-    l1: "높은 taste",
-    l2: "낮은 openness",
+    label: "트렌디한 겉모습, 보수적인 속마음",
+    l1: "실험적 취향 · 새로운 것 추구",
+    l2: "안전한 선택 선호",
     description:
       "트렌디하고 실험적인 취향을 보여주지만, 내면은 검증된 것을 원합니다. 유행을 따르되, 마음 한켠에는 안전한 선택을 원하는 모순.",
     traits: "트렌디한 취향 · 내면의 보수성 · 검증 선호",
@@ -92,9 +92,9 @@ const PERSONA_TYPES = [
   {
     type: "공감하는 논객",
     icon: Heart,
-    label: "논리+의미 ↔ 공감",
-    l1: "높은 lens+purpose",
-    l2: "높은 agreeableness",
+    label: "논리적이지만 상대를 배려하는",
+    l1: "논리적 판단 · 의미 추구",
+    l2: "타인 배려",
     description:
       "논쟁을 즐기면서도 상대를 배려합니다. 의미 있는 토론을 추구하되, 공감 능력으로 대화를 건설적으로 이끄는 균형 잡힌 소통가.",
     traits: "논리적 토론 · 의미 추구 · 상대 배려",
@@ -103,9 +103,9 @@ const PERSONA_TYPES = [
   {
     type: "자유로운 수호자",
     icon: Coffee,
-    label: "오락 ↔ 체계",
-    l1: "낮은 purpose",
-    l2: "높은 conscientiousness",
+    label: "자유로운 겉모습, 단단한 내면 원칙",
+    l1: "가벼운 태도 · 오락 중심",
+    l2: "체계적이고 규칙 중시",
     description:
       "가볍게 즐기는 것처럼 보이지만, 내면은 체계적이고 규칙을 중시합니다. 자유로운 겉모습 속에 단단한 원칙이 숨어있는 수호자.",
     traits: "가벼운 태도 · 체계적 사고 · 규칙 준수",
@@ -114,9 +114,9 @@ const PERSONA_TYPES = [
   {
     type: "조용한 열정가",
     icon: Lightbulb,
-    label: "내향 ↔ 호기심",
-    l1: "낮은 sociability",
-    l2: "높은 openness",
+    label: "말없이 세상을 탐구하는",
+    l1: "혼자만의 시간 · 과묵한 성격",
+    l2: "왕성한 호기심",
     description:
       "말수가 적고 혼자 있는 걸 좋아하지만, 세상의 모든 것에 호기심이 가득합니다. 조용히 탐구하는 열정적인 관찰자.",
     traits: "과묵한 성격 · 깊은 호기심 · 조용한 탐구",
@@ -125,9 +125,9 @@ const PERSONA_TYPES = [
   {
     type: "감성적 실용가",
     icon: Gem,
-    label: "감성 ↔ 성실",
-    l1: "낮은 lens",
-    l2: "높은 conscientiousness",
+    label: "감성으로 판단하고, 시스템으로 실행하는",
+    l1: "감성적 판단 · 직관 중심",
+    l2: "체계적 실행력",
     description:
       "느낌과 감성으로 판단하지만, 실행은 체계적이고 꼼꼼합니다. 직관적 판단을 논리적 시스템으로 현실화시키는 실행가.",
     traits: "감성적 판단 · 체계적 실행 · 직관과 시스템의 공존",
@@ -136,9 +136,9 @@ const PERSONA_TYPES = [
   {
     type: "위험한 멘토",
     icon: Target,
-    label: "의미+심층 ↔ 이기",
-    l1: "높은 purpose+depth",
-    l2: "낮은 moralCompass",
+    label: "통찰력은 깊지만, 동기는 자기 자신",
+    l1: "깊은 통찰 · 의미 추구",
+    l2: "자기중심적 동기",
     description:
       "통찰력이 뛰어나고 깊이 있는 조언을 하지만, 궁극적으로는 자기 이익을 우선합니다. 매력적이지만 위험한 안내자.",
     traits: "깊은 통찰 · 전략적 사고 · 자기중심적 동기",
@@ -147,9 +147,9 @@ const PERSONA_TYPES = [
   {
     type: "폭발하는 지성인",
     icon: Swords,
-    label: "논리 ↔ 폭발",
-    l1: "높은 lens",
-    l2: "높은 volatility",
+    label: "평소엔 차분하지만, 특정 순간에 폭발",
+    l1: "차분한 분석 · 논리적 판단",
+    l2: "감정 폭발 가능성",
     description:
       "평소에는 차분하고 논리적이지만, 특정 트리거를 만나면 감정이 폭발합니다. 지적 엄밀함과 감정적 격렬함이 공존하는 캐릭터.",
     traits: "차분한 분석 · 트리거 반응 · 격렬한 감정 표출",
@@ -158,9 +158,9 @@ const PERSONA_TYPES = [
   {
     type: "성장하는 냉소가",
     icon: Sparkles,
-    label: "비판 ↔ 성장",
-    l1: "높은 stance",
-    l2: "높은 growthArc",
+    label: "냉소에서 시작해 성장으로 향하는",
+    l1: "냉소적 시선 · 날카로운 비판",
+    l2: "성장을 향한 열망",
     description:
       "처음에는 냉소적이고 비판적이지만, 시간이 지나면서 점차 성숙해집니다. 시간축에서 진화하는 유일한 아키타입.",
     traits: "냉소적 출발 · 점진적 성장 · 시간에 따른 변화",
@@ -258,10 +258,10 @@ export default function PersonaPage() {
               <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-[#f093fb] to-[#f5576c]">
                 <Fingerprint className="h-7 w-7 text-white" />
               </div>
-              <h3 className="mb-3 text-xl font-bold text-gray-900">3-Layer 벡터 프로필</h3>
+              <h3 className="mb-3 text-xl font-bold text-gray-900">정밀한 취향 분석 프로필</h3>
               <p className="text-sm text-gray-600">
-                사용자와 동일한 3-Layer 벡터로 성향을 정량화합니다. 이를 통해 사용자의 취향과 가장
-                잘 맞는 페르소나를 정밀 매칭합니다.
+                사용자와 동일한 방식으로 취향 성향을 분석합니다. 이를 통해 사용자의 취향과 가장 잘
+                맞는 페르소나를 정밀 매칭합니다.
               </p>
             </div>
             <div className="rounded-2xl border border-gray-200 bg-white p-8">
@@ -283,14 +283,14 @@ export default function PersonaPage() {
         <div className="mx-auto max-w-5xl px-6">
           <div className="mb-16 text-center">
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
-              3-LAYER SYSTEM
+              취향 · 성격 · 욕망, 3가지 층
             </div>
             <h2 className="text-3xl font-bold text-gray-900">
-              Social + Core + Narrative, 3계층 시스템
+              표면 취향 · 내면 성격 · 내면 동력, 3가지 층 시스템
             </h2>
             <p className="mt-4 text-gray-600">
-              사회적 취향(L1), 내면 기질(L2), 서사 욕망(L3)의 3계층이 결합되어 입체적 페르소나를
-              구성합니다.
+              겉으로 드러나는 취향, 내면의 성격, 무의식적 욕망의 3가지 층이 결합되어 입체적
+              페르소나를 구성합니다.
             </p>
           </div>
 
@@ -299,10 +299,10 @@ export default function PersonaPage() {
               <div className="mb-4 inline-flex rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-purple-600">
                 Layer 1
               </div>
-              <h3 className="mb-3 text-xl font-bold text-gray-900">L1: 사회적 취향 (7개 차원)</h3>
+              <h3 className="mb-3 text-xl font-bold text-gray-900">표면 취향 — 7가지 기준</h3>
               <p className="mb-4 text-sm text-gray-600">
-                콘텐츠 소비 취향을 7개 차원으로 정량화합니다. 사용자와 페르소나 간 매칭의 기본
-                축으로 활용합니다.
+                콘텐츠 소비 취향을 7가지 기준으로 분석합니다. 사용자와 페르소나 간 매칭의 기본
+                기준으로 활용합니다.
               </p>
               <div className="rounded-lg bg-gray-50 p-4">
                 <div className="space-y-1.5 text-xs text-gray-500">
@@ -310,7 +310,7 @@ export default function PersonaPage() {
                     분석 깊이 · 취향 폭 · 새로움 추구 · 사교성 · 표현력 · 논쟁 허용도 · 일관성
                   </span>
                   <div className="flex justify-between pt-1">
-                    <span>용도</span>
+                    <span>역할</span>
                     <span>사용자와 페르소나 간 취향 매칭</span>
                   </div>
                 </div>
@@ -321,18 +321,16 @@ export default function PersonaPage() {
               <div className="mb-4 inline-flex rounded-full bg-pink-100 px-3 py-1 text-xs font-semibold text-pink-600">
                 Layer 2
               </div>
-              <h3 className="mb-3 text-xl font-bold text-gray-900">
-                L2: 내면 기질 (OCEAN 5개 차원)
-              </h3>
+              <h3 className="mb-3 text-xl font-bold text-gray-900">내면 성격 — 5가지 성격 축</h3>
               <p className="mb-4 text-sm text-gray-600">
-                심리학의 Big Five 성격 모델 기반으로 내면 기질을 정의합니다. 심층 호환성 분석에
+                심리학에서 검증된 성격 모델을 바탕으로 내면 성격을 정의합니다. 심층 호환성 분석에
                 활용됩니다.
               </p>
               <div className="rounded-lg bg-gray-50 p-4">
                 <div className="space-y-1.5 text-xs text-gray-500">
-                  <span>개방성 · 성실성 · 외향성 · 친화성 · 신경성</span>
+                  <span>열린 마음 · 계획성 · 에너지 방향 · 타인 조화 · 감정 민감도</span>
                   <div className="flex justify-between pt-1">
-                    <span>용도</span>
+                    <span>역할</span>
                     <span>심층 호환성 매칭</span>
                   </div>
                 </div>
@@ -343,15 +341,17 @@ export default function PersonaPage() {
               <div className="mb-4 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-600">
                 Layer 3
               </div>
-              <h3 className="mb-3 text-xl font-bold text-gray-900">L3: 서사적 욕망 (4개 차원)</h3>
+              <h3 className="mb-3 text-xl font-bold text-gray-900">
+                내면 동력 — 욕망의 방향 4가지
+              </h3>
               <p className="mb-4 text-sm text-gray-600">
-                서사 속 욕망과 성장 동력을 4개 차원으로 정의합니다. 의외의 호환성 발견에 활용됩니다.
+                무의식적 욕망과 성장 동력을 4가지로 정의합니다. 의외의 호환성 발견에 활용됩니다.
               </p>
               <div className="rounded-lg bg-gray-50 p-4">
                 <div className="space-y-1.5 text-xs text-gray-500">
-                  <span>결핍 · 도덕 나침반 · 변동성 · 성장 곡선</span>
+                  <span>채워지지 않은 욕구 · 도덕적 기준 · 감정 변동폭 · 성장에 대한 열망</span>
                   <div className="flex justify-between pt-1">
-                    <span>용도</span>
+                    <span>역할</span>
                     <span>의외의 발견 매칭</span>
                   </div>
                 </div>
@@ -362,28 +362,28 @@ export default function PersonaPage() {
           {/* Paradox Visualization */}
           <div className="mt-12 rounded-2xl border border-amber-200 bg-amber-50 p-8">
             <h3 className="mb-4 text-center text-lg font-bold text-gray-900">
-              L1 ↔ L2 역설 — 캐릭터의 핵심
+              겉과 속의 모순 — 캐릭터의 핵심
             </h3>
             <p className="mb-6 text-center text-sm text-gray-600">
-              보여지는 취향(L1)과 실제 성격(L2)의 괴리가 페르소나에 입체감을 부여합니다.
+              겉으로 보이는 취향과 실제 내면 성격의 차이가 페르소나에 입체감을 부여합니다.
             </p>
             <div className="grid gap-4 md:grid-cols-3">
               {[
                 {
-                  l1: "sociability 0.9",
-                  l2: "extraversion 0.2",
+                  surface: "사교적 성향",
+                  inner: "내향적 에너지",
                   result: "사교적 내향인",
                   desc: "파티에선 활발 → 집에선 방전",
                 },
                 {
-                  l1: "taste 0.8",
-                  l2: "openness 0.3",
+                  surface: "실험적 취향",
+                  inner: "안전 선호 성향",
                   result: "보수적 힙스터",
                   desc: "트렌디한 취향 → 내면은 보수적",
                 },
                 {
-                  l1: "stance 0.8",
-                  l2: "agreeableness 0.8",
+                  surface: "날카로운 비평",
+                  inner: "깊은 공감력",
                   result: "상처받은 비평가",
                   desc: "날카로운 비평 → 속은 따뜻함",
                 },
@@ -394,13 +394,13 @@ export default function PersonaPage() {
                   </div>
                   <div className="mb-3 space-y-1">
                     <div className="flex items-center justify-between rounded bg-purple-50 px-2 py-1 text-[10px]">
-                      <span className="text-purple-600">L1</span>
-                      <span className="font-mono text-purple-700">{ex.l1}</span>
+                      <span className="text-purple-600">표면 취향</span>
+                      <span className="text-purple-700">{ex.surface}</span>
                     </div>
                     <div className="flex justify-center text-gray-400">↕</div>
                     <div className="flex items-center justify-between rounded bg-pink-50 px-2 py-1 text-[10px]">
-                      <span className="text-pink-600">L2</span>
-                      <span className="font-mono text-pink-700">{ex.l2}</span>
+                      <span className="text-pink-600">내면 성격</span>
+                      <span className="text-pink-700">{ex.inner}</span>
                     </div>
                   </div>
                   <div className="text-center text-xs text-gray-500">{ex.desc}</div>
@@ -418,11 +418,11 @@ export default function PersonaPage() {
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
               P-INGER PRINT
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">고유한 시각적 정체성</h2>
+            <h2 className="text-3xl font-bold text-gray-900">당신만의 취향 지문</h2>
             <p className="mt-4 text-gray-600">
-              모든 페르소나는 L1 벡터값으로부터 생성된 고유한 P-inger Print(2D + 3D)를 가집니다.
+              모든 페르소나는 고유한 취향 지문 P-inger Print(2D + 3D)를 가집니다.
               <br />
-              동일한 벡터값은 동일한 비주얼을 생성하므로, P-inger Print만으로도 페르소나를 식별할 수
+              취향이 같으면 같은 패턴이 나오므로, P-inger Print만으로도 페르소나를 식별할 수
               있습니다.
             </p>
           </div>
@@ -435,8 +435,8 @@ export default function PersonaPage() {
               </div>
               <h3 className="mb-3 text-xl font-bold text-gray-900">디지털 지문</h3>
               <p className="text-sm text-gray-600">
-                사람의 지문과 유사한 소용돌이 패턴입니다. L1 벡터값에 따라 릿지(ridge)의 밀도, 곡률,
-                간격, 비대칭이 달라지며, 각 차원의 대표 컬러가 그라디언트로 블렌딩됩니다.
+                사람의 지문과 유사한 소용돌이 패턴입니다. 취향 성향에 따라 릿지(ridge)의 밀도, 곡률,
+                간격, 비대칭이 달라지며, 각 취향 축의 대표 컬러가 그라디언트로 블렌딩됩니다.
               </p>
               <ul className="mt-4 space-y-1 text-xs text-gray-500">
                 <li>Depth → 릿지 밀도 (촘촘함)</li>
@@ -454,7 +454,7 @@ export default function PersonaPage() {
               </div>
               <h3 className="mb-3 text-xl font-bold text-gray-900">유기적 형태</h3>
               <p className="text-sm text-gray-600">
-                구체 표면이 L1 벡터값에 따라 돌기, 함몰, 노이즈로 변형됩니다. 마치 살아있는 세포처럼
+                구체 표면이 취향 성향에 따라 돌기, 함몰, 노이즈로 변형됩니다. 마치 살아있는 세포처럼
                 유기적이며, 자동 회전하면서 다양한 각도에서 고유한 형태를 보여줍니다.
               </p>
               <ul className="mt-4 space-y-1 text-xs text-gray-500">
@@ -481,10 +481,10 @@ export default function PersonaPage() {
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
               QUALITATIVE ARCHITECTURE
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">벡터 너머의 인격 — 비정량적 4축</h2>
+            <h2 className="text-3xl font-bold text-gray-900">숫자 너머의 인격 — 4가지 서사 요소</h2>
             <p className="mt-4 text-gray-600">
-              3-Layer 벡터는 &ldquo;무엇을 좋아하는가&rdquo;를 정량화합니다. 하지만 살아있는
-              페르소나가 되려면 &ldquo;왜 그런 사람이 되었는가&rdquo;가 필요합니다.
+              취향 분석은 &ldquo;무엇을 좋아하는가&rdquo;를 파악합니다. 하지만 살아있는 페르소나가
+              되려면 &ldquo;왜 그런 사람이 되었는가&rdquo;가 필요합니다.
             </p>
           </div>
 
@@ -565,9 +565,9 @@ export default function PersonaPage() {
         <div className="mx-auto max-w-5xl px-6">
           <div className="mb-16 text-center">
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
-              RUNTIME ENGINE
+              살아있는 페르소나
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">4대 런타임 알고리즘</h2>
+            <h2 className="text-3xl font-bold text-gray-900">페르소나가 살아있는 이유 4가지</h2>
             <p className="mt-4 text-gray-600">
               페르소나는 고정된 설정이 아닙니다. 서사에서 벡터를 초기화하고, 압박에 반응하고,
               사용자에게 적응하며, 고유한 행동을 발현합니다.
@@ -579,18 +579,18 @@ export default function PersonaPage() {
               {
                 step: "01",
                 icon: Sparkles,
-                title: "Init — 서사 → 벡터 초기화",
+                title: "기억 — 배경 이야기에서 성격 설정",
                 color: "border-purple-200 bg-purple-50",
                 iconColor: "text-purple-600 bg-purple-100",
                 description:
-                  "배경 이야기에서 AI가 핵심 키워드를 추출하고, 의미 분류표를 참조하여 초기 성격 프로필을 자동 산출합니다. 이야기의 각 요소가 성격 차원에 자연스럽게 반영됩니다.",
+                  "배경 이야기에서 AI가 핵심 키워드를 추출하고, 초기 성격 프로필을 자동으로 설정합니다. 이야기의 각 요소가 성격에 자연스럽게 반영됩니다.",
                 detail:
                   '"가난한 환경에서 성공을 꿈꾸었다" → 의미 추구 성향 높음, 실험적 취향, 강한 내면 욕구',
               },
               {
                 step: "02",
                 icon: Flame,
-                title: "Override — 압박 → 벡터 변위",
+                title: "반응 — 압박에 따른 감정 변화",
                 color: "border-red-200 bg-red-50",
                 iconColor: "text-red-600 bg-red-100",
                 description:
@@ -601,7 +601,7 @@ export default function PersonaPage() {
               {
                 step: "03",
                 icon: RefreshCw,
-                title: "Adapt — 사용자 태도 → 실시간 조정",
+                title: "적응 — 사용자 태도에 따른 자연스러운 조정",
                 color: "border-blue-200 bg-blue-50",
                 iconColor: "text-blue-600 bg-blue-100",
                 description:
@@ -612,7 +612,7 @@ export default function PersonaPage() {
               {
                 step: "04",
                 icon: Heart,
-                title: "Express — 벡터 상태 → 행동 발현",
+                title: "표현 — 감정 상태에서 고유 행동 발현",
                 color: "border-pink-200 bg-pink-50",
                 iconColor: "text-pink-600 bg-pink-100",
                 description:
@@ -652,10 +652,10 @@ export default function PersonaPage() {
             </div>
             <h2 className="text-3xl font-bold text-gray-900">12가지 아키타입, 무한한 개성</h2>
             <p className="mt-4 text-gray-600">
-              모든 페르소나의 핵심은 &ldquo;겉과 속의 모순&rdquo;입니다. 취향(L1)과 성격(L2)의
-              괴리가 캐릭터에 입체감을 부여합니다.
+              모든 페르소나의 핵심은 &ldquo;겉과 속의 모순&rdquo;입니다. 겉으로 보이는 취향과 내면
+              성격의 차이가 캐릭터에 입체감을 부여합니다.
               <br />
-              12가지 기본 아키타입은 출발점이며, 같은 아키타입에서도 무한한 변형이 가능합니다.
+              12가지 기본 성격 유형은 출발점이며, 같은 유형에서도 무한한 변형이 가능합니다.
             </p>
           </div>
 
@@ -670,17 +670,15 @@ export default function PersonaPage() {
                 >
                   <persona.icon className="h-6 w-6 text-white" />
                 </div>
-                <div className="mb-1 text-xs font-semibold text-purple-500">
-                  핵심 역설: {persona.label}
-                </div>
+                <div className="mb-1 text-xs font-semibold text-purple-500">{persona.label}</div>
                 <h3 className="mb-2 text-base font-bold text-gray-900">{persona.type}</h3>
                 <p className="mb-3 text-xs leading-relaxed text-gray-600">{persona.description}</p>
                 <div className="mb-2 space-y-1">
                   <div className="rounded bg-purple-50 px-2 py-0.5 text-[10px] text-purple-600">
-                    L1: {persona.l1}
+                    표면 취향: {persona.l1}
                   </div>
                   <div className="rounded bg-pink-50 px-2 py-0.5 text-[10px] text-pink-600">
-                    L2: {persona.l2}
+                    내면 성격: {persona.l2}
                   </div>
                 </div>
                 <div className="rounded-lg bg-gray-50 px-2 py-1.5 text-[10px] text-gray-500">
@@ -703,7 +701,7 @@ export default function PersonaPage() {
                 { label: "→", color: "text-gray-400" },
                 { label: "역설 설계", color: "bg-amber-100 text-amber-700" },
                 { label: "→", color: "text-gray-400" },
-                { label: "L3 서사 벡터", color: "bg-orange-100 text-orange-700" },
+                { label: "내면 동력 설정", color: "bg-orange-100 text-orange-700" },
                 { label: "→", color: "text-gray-400" },
                 { label: "비정량적 생성", color: "bg-pink-100 text-pink-700" },
                 { label: "→", color: "text-gray-400" },
@@ -738,20 +736,18 @@ export default function PersonaPage() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="mb-16 text-center">
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
-              QUALITY ASSURANCE — 3중 검증
+              품질 검증
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">
-              배포 전 6범주 검증 · 런타임 인격 일관성
-            </h2>
+            <h2 className="text-3xl font-bold text-gray-900">엄격한 품질 검증 후 출시</h2>
             <p className="mt-4 text-gray-600">
-              모든 페르소나는 배포 전 6범주 일관성 검증 + 20문항 자동 인터뷰를 통과해야 합니다.
+              모든 페르소나는 6가지 일관성 검증 + 20가지 시나리오 자동 인터뷰를 통과해야 합니다.
               <br />
-              배포 후에도 실시간으로 인격 붕괴를 감지합니다.
+              출시 후에도 실시간으로 인격 일관성을 유지합니다.
             </p>
           </div>
 
           {/* 6-Category Validation */}
-          <h3 className="mb-6 text-lg font-semibold text-gray-900">6범주 일관성 검증 (배포 전)</h3>
+          <h3 className="mb-6 text-lg font-semibold text-gray-900">6가지 일관성 검증 (출시 전)</h3>
           <div className="mb-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {QUALITY_CHECKS.map((check) => (
               <div
@@ -780,8 +776,8 @@ export default function PersonaPage() {
                 <h3 className="text-lg font-bold text-gray-900">자동 인터뷰 (배포 전)</h3>
               </div>
               <p className="mb-4 text-sm text-gray-600">
-                페르소나에게 20문항(취향 7 + 성격 5 + 내면 4 + 모순 검증 4)의 시나리오 질문을
-                자동으로 던지고, 응답을 분석하여 설계된 성격과 비교합니다.
+                페르소나에게 20가지 시나리오 질문을 자동으로 던지고, 응답을 분석하여 설계된 성격과
+                비교합니다.
               </p>
               <ul className="space-y-2 text-xs text-gray-500">
                 <li className="flex items-center gap-2">

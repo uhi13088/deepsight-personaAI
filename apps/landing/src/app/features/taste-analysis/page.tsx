@@ -30,9 +30,9 @@ import {
 } from "lucide-react"
 
 export const metadata: Metadata = {
-  title: "소비자 취향 분석 — Features",
+  title: "취향 분석 — Features",
   description:
-    "3-Layer 벡터 프로파일링으로 취향(L1), 성격(L2), 내면 동력(L3)까지 심층 분석. 비정량적 요소와 24문항 온보딩, SNS 분석을 결합합니다.",
+    "겉으로 드러나는 취향부터 내면 성격, 그리고 무의식적 욕망까지 3가지 층으로 심층 분석. 24문항 온보딩과 SNS 분석을 결합합니다.",
 }
 
 const L1_DIMENSIONS = [
@@ -110,34 +110,34 @@ const L1_DIMENSIONS = [
 
 const L2_DIMENSIONS = [
   {
-    name: "개방성 (Openness)",
+    name: "새로운 것에 열린 마음",
     low: "보수적 · 관습적",
     high: "호기심 · 개방적",
     description:
       "새로운 경험과 아이디어에 대한 태도. 실험적 콘텐츠를 즐기는지, 익숙한 것을 선호하는지 결정합니다.",
   },
   {
-    name: "성실성 (Conscientiousness)",
+    name: "계획적인 성향",
     low: "즉흥적 · 자유로운",
     high: "원칙적 · 체계적",
     description:
       "계획과 규율에 대한 태도. 콘텐츠를 체계적으로 소비하는지, 그때그때 기분에 따르는지 영향을 줍니다.",
   },
   {
-    name: "외향성 (Extraversion)",
+    name: "사람을 향한 에너지",
     low: "내향적 · 에너지 소모",
     high: "외향적 · 에너지 충전",
     description:
       "사회적 상호작용에서의 에너지 흐름. 혼자만의 감상을 즐기는지, 함께 나누는 것을 좋아하는지.",
   },
   {
-    name: "우호성 (Agreeableness)",
+    name: "타인과의 조화",
     low: "경쟁적 · 솔직한",
     high: "협조적 · 공감하는",
     description: "타인에 대한 기본 태도. 논쟁을 즐기는지, 조화로운 소통을 선호하는지 결정합니다.",
   },
   {
-    name: "감수성 (Neuroticism)",
+    name: "감정의 민감도",
     low: "정서적 안정",
     high: "정서적 민감",
     description: "감정의 진폭. 콘텐츠에 쉽게 감정이입하는지, 냉정하게 거리를 두는지 영향을 줍니다.",
@@ -146,7 +146,7 @@ const L2_DIMENSIONS = [
 
 const L3_DIMENSIONS = [
   {
-    name: "결핍 (Lack)",
+    name: "채워지지 않은 욕구",
     low: "충족 · 안정적",
     high: "결핍 · 갈망",
     description:
@@ -154,7 +154,7 @@ const L3_DIMENSIONS = [
     icon: Heart,
   },
   {
-    name: "도덕 나침반 (Moral Compass)",
+    name: "도덕적 기준",
     low: "유연 · 상황적",
     high: "엄격 · 절대적",
     description:
@@ -162,7 +162,7 @@ const L3_DIMENSIONS = [
     icon: Compass,
   },
   {
-    name: "변동성 (Volatility)",
+    name: "감정의 변동폭",
     low: "안정 · 예측가능",
     high: "불안정 · 예측불가",
     description:
@@ -170,7 +170,7 @@ const L3_DIMENSIONS = [
     icon: Flame,
   },
   {
-    name: "성장 곡선 (Growth Arc)",
+    name: "성장에 대한 열망",
     low: "정체 · 안주",
     high: "성장 · 변화",
     description:
@@ -183,10 +183,10 @@ const COLD_START_METHODS = [
   {
     icon: MessageSquare,
     title: "24문항 시나리오 질문",
-    badge: "3-Phase 하이브리드",
+    badge: "3단계 분석",
     badgeColor: "bg-purple-100 text-purple-600",
     description:
-      "일상 시나리오 속 4지선다 질문으로, 한 문항이 취향(L1)과 성격(L2)을 동시에 측정합니다. 3단계로 나뉘어 중간에 그만둬도 이전 단계 결과는 유지됩니다.",
+      "일상 시나리오 속 4지선다 질문으로, 한 문항이 취향과 성격을 동시에 측정합니다. 3단계로 나뉘어 중간에 그만둬도 이전 단계 결과는 유지됩니다.",
     features: [
       "Phase 1 (8문항): 취향 성향 중심 측정 → 65% 정확도",
       "Phase 2 (8문항): 성격 기질 중심 + 교차 검증 → 80% 정확도",
@@ -201,11 +201,11 @@ const COLD_START_METHODS = [
     badge: "8개 플랫폼 지원",
     badgeColor: "bg-green-100 text-green-600",
     description:
-      "넷플릭스 시청기록, 유튜브 구독, 인스타그램 활동, 스포티파이 음악 취향 등 실제 행동 데이터에서 3-Layer 프로필을 즉시 추론합니다. 원본 데이터는 저장하지 않습니다.",
+      "넷플릭스 시청기록, 유튜브 구독, 인스타그램 활동, 스포티파이 음악 취향 등 실제 행동 데이터에서 취향 프로필을 즉시 생성합니다. 원본 데이터는 저장하지 않습니다.",
     features: [
       "실제 행동 기반이라 높은 정확도",
       "질문 없이 즉시 프로필 생성",
-      "원시 데이터 저장 없이 벡터만 산출",
+      "원시 데이터 저장 없이 취향 분석값만 산출",
     ],
     accuracy: 3,
     speed: "즉시",
@@ -297,9 +297,9 @@ export default function TasteAnalysisPage() {
             소비자 <span className="ds-text-gradient">취향 분석</span>
           </h1>
           <p className="max-w-2xl text-lg text-gray-600">
-            단순한 &ldquo;좋아요/싫어요&rdquo;를 넘어, 사용자의 콘텐츠 소비 성향을{" "}
-            <strong>취향(L1)</strong> · <strong>성격(L2)</strong> · <strong>내면 동력(L3)</strong>{" "}
-            세 겹으로 심층 분석합니다. 24문항 시나리오 온보딩과 SNS 행동 데이터를 결합해, 사용할수록
+            단순한 &ldquo;좋아요/싫어요&rdquo;를 넘어, 당신의 콘텐츠 소비 성향을{" "}
+            <strong>표면 취향</strong> · <strong>내면 성격</strong> · <strong>내면 동력</strong> 세
+            겹으로 심층 분석합니다. 24문항 시나리오 온보딩과 SNS 행동 데이터를 결합해, 사용할수록
             정확해지는 프로필을 만듭니다.
           </p>
         </div>
@@ -310,10 +310,10 @@ export default function TasteAnalysisPage() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="mb-16 text-center">
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
-              3-LAYER PROFILING
+              취향 분석의 3가지 층
             </div>
             <h2 className="text-3xl font-bold text-gray-900">
-              세 겹의 레이어로 사용자를 입체적으로 이해
+              세 가지 층으로 당신을 입체적으로 이해
             </h2>
             <p className="mt-4 text-gray-600">
               사람은 겉으로 보이는 모습과 내면이 다릅니다.
@@ -325,13 +325,15 @@ export default function TasteAnalysisPage() {
           <div className="grid gap-6 md:grid-cols-3">
             <div className="rounded-2xl border-2 border-blue-200 bg-blue-50/50 p-8">
               <div className="mb-4 inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-600">
-                Layer 1 · 취향
+                Layer 1 · 표면 취향
               </div>
-              <h3 className="mb-3 text-xl font-bold text-gray-900">사회적 취향 (7개 차원)</h3>
+              <h3 className="mb-3 text-xl font-bold text-gray-900">
+                표면 취향 — 내가 좋아한다고 아는 것들
+              </h3>
               <p className="mb-4 text-sm text-gray-600">
                 콘텐츠를 소비할 때 <strong>외부에 드러나는 성향</strong>입니다. 깊게 파는지 vs
                 가볍게 즐기는지, 실험적인 걸 좋아하는지 vs 검증된 걸 선호하는지 — 일상에서 관찰
-                가능한 취향 패턴을 7개 독립 축으로 측정합니다.
+                가능한 취향 패턴을 7가지로 측정합니다.
               </p>
               <div className="text-xs text-blue-600">
                 분석 깊이 · 판단 렌즈 · 평가 태도 · 관심 범위 · 취향 성향 · 소비 목적 · 사회적 성향
@@ -340,16 +342,18 @@ export default function TasteAnalysisPage() {
 
             <div className="rounded-2xl border-2 border-amber-200 bg-amber-50/50 p-8">
               <div className="mb-4 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-600">
-                Layer 2 · 성격
+                Layer 2 · 내면 성격
               </div>
-              <h3 className="mb-3 text-xl font-bold text-gray-900">내면 기질 (OCEAN 5개 차원)</h3>
+              <h3 className="mb-3 text-xl font-bold text-gray-900">
+                내면 성격 — 나를 움직이는 감정과 태도
+              </h3>
               <p className="mb-4 text-sm text-gray-600">
-                심리학의 Big Five 성격 모델 기반으로,{" "}
+                심리학에서 오랫동안 검증된 성격 모델을 바탕으로,{" "}
                 <strong>평소에는 숨겨져 있다가 특정 상황에서 드러나는 본성</strong>을 측정합니다.
-                겉으로는 까칠하지만 속으로는 배려심 깊은 사람처럼, L1과 다를 수 있습니다.
+                겉으로는 까칠하지만 속으로는 배려심 깊은 사람처럼, 표면 취향과 다를 수 있습니다.
               </p>
               <div className="text-xs text-amber-600">
-                개방성 · 성실성 · 외향성 · 우호성 · 감수성
+                열린 마음 · 계획성 · 에너지 방향 · 타인과의 조화 · 감정 민감도
               </div>
             </div>
 
@@ -357,21 +361,25 @@ export default function TasteAnalysisPage() {
               <div className="mb-4 inline-flex rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-600">
                 Layer 3 · 내면 동력
               </div>
-              <h3 className="mb-3 text-xl font-bold text-gray-900">서사적 욕망 (4개 차원)</h3>
+              <h3 className="mb-3 text-xl font-bold text-gray-900">
+                욕망의 방향 — 내가 진짜 원하는 것
+              </h3>
               <p className="mb-4 text-sm text-gray-600">
                 <strong>&ldquo;왜 그런 취향을 가지게 되었는가&rdquo;</strong>의 근원. 채워지지 않은
-                욕구, 도덕적 기준, 감정의 변동성, 성장에 대한 열망 — 의식하지 못하지만 콘텐츠 선택에
+                욕구, 도덕적 기준, 감정의 변동폭, 성장에 대한 열망 — 의식하지 못하지만 콘텐츠 선택에
                 깊이 영향을 주는 내면 동력입니다.
               </p>
-              <div className="text-xs text-violet-600">결핍 · 도덕 나침반 · 변동성 · 성장 곡선</div>
+              <div className="text-xs text-violet-600">
+                채워지지 않은 욕구 · 도덕적 기준 · 감정의 변동폭 · 성장에 대한 열망
+              </div>
             </div>
           </div>
 
           {/* Paradox callout */}
           <div className="mt-8 rounded-xl border border-purple-100 bg-purple-50/50 p-6 text-center">
             <p className="text-sm text-gray-700">
-              <span className="font-semibold text-purple-700">겉과 속의 모순 탐지</span> —
-              L1(취향)과 L2(성격) 사이의 모순을 자동으로 감지합니다. 예를 들어, 겉으로는
+              <span className="font-semibold text-purple-700">겉과 속의 모순 탐지</span> — 겉으로
+              보이는 취향과 실제 내면 성격 사이의 모순을 자동으로 감지합니다. 예를 들어, 겉으로는
               사교적이지만 실제로는 혼자 있고 싶어하는 성향 — 이런 복잡한 인간다움까지 프로필에
               반영됩니다.
             </p>
@@ -384,13 +392,13 @@ export default function TasteAnalysisPage() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="mb-16 text-center">
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-blue-600">
-              LAYER 1 — 사회적 취향
+              LAYER 1 — 표면 취향
             </div>
             <h2 className="text-3xl font-bold text-gray-900">
-              7개 차원으로 콘텐츠 취향을 정밀 분석
+              7가지 기준으로 콘텐츠 취향을 정밀 분석
             </h2>
             <p className="mt-4 text-gray-600">
-              일상에서 관찰할 수 있는 콘텐츠 소비 패턴을 7개 독립 축으로 측정합니다.
+              일상에서 관찰할 수 있는 콘텐츠 소비 패턴을 7가지 기준으로 측정합니다.
             </p>
           </div>
 
@@ -426,11 +434,11 @@ export default function TasteAnalysisPage() {
         <div className="mx-auto max-w-5xl px-6">
           <div className="mb-16 text-center">
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-amber-600">
-              LAYER 2 — 내면 기질
+              LAYER 2 — 내면 성격
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">Big Five 성격 모델로 본성을 분석</h2>
+            <h2 className="text-3xl font-bold text-gray-900">내면 성격으로 당신의 본성을 분석</h2>
             <p className="mt-4 text-gray-600">
-              심리학에서 가장 검증된 성격 모델(OCEAN)로 내면 기질을 측정합니다.
+              심리학에서 가장 널리 검증된 성격 모델로 내면 성격을 측정합니다.
               <br />
               평소에는 숨겨져 있지만, 스트레스 상황이나 중요한 선택의 순간에 드러나는 진짜
               모습입니다.
@@ -456,9 +464,9 @@ export default function TasteAnalysisPage() {
           <div className="mt-8 rounded-xl border border-amber-200 bg-amber-50 p-6">
             <p className="text-sm text-gray-700">
               <span className="font-semibold text-amber-700">왜 성격까지 분석하나요?</span> — 같은
-              &ldquo;실험적 취향&rdquo;이라도, 성격이 개방적인 사람은 정말로 새로운 것을 좋아하지만,
-              보수적인 성격의 사람은 유행을 따르는 것일 수 있습니다. L1(취향)과 L2(성격) 사이의 이런
-              미묘한 차이가 더 정밀한 매칭을 가능하게 합니다.
+              &ldquo;실험적 취향&rdquo;이라도, 열린 마음의 사람은 정말로 새로운 것을 좋아하지만,
+              보수적인 성격의 사람은 유행을 따르는 것일 수 있습니다. 겉으로 보이는 취향과 내면 성격
+              사이의 이런 미묘한 차이가 더 정밀한 매칭을 가능하게 합니다.
             </p>
           </div>
         </div>
@@ -469,7 +477,7 @@ export default function TasteAnalysisPage() {
         <div className="mx-auto max-w-5xl px-6">
           <div className="mb-16 text-center">
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-violet-600">
-              LAYER 3 — 서사적 욕망
+              LAYER 3 — 내면 동력
             </div>
             <h2 className="text-3xl font-bold text-gray-900">무의식적 욕망과 내면 동력</h2>
             <p className="mt-4 text-gray-600">
@@ -507,10 +515,10 @@ export default function TasteAnalysisPage() {
 
           <div className="mt-8 rounded-xl border border-violet-200 bg-violet-50 p-6">
             <p className="text-sm text-gray-700">
-              <span className="font-semibold text-violet-700">L3는 어떻게 측정하나요?</span> — L3는
-              사용자에게 직접 물어보는 것이 아닙니다. 24문항 온보딩의 Phase 3에서 겉과 속의 모순
-              패턴을 탐지하고, 이를 통해 간접적으로 추론합니다. 또한 시간이 지나면서 콘텐츠 소비
-              패턴에서 점차 정교하게 포착됩니다.
+              <span className="font-semibold text-violet-700">내면 동력은 어떻게 측정하나요?</span>{" "}
+              — 직접 물어보는 것이 아닙니다. 24문항 온보딩의 마지막 단계에서 겉과 속의 모순 패턴을
+              탐지하고, 이를 통해 간접적으로 추론합니다. 또한 시간이 지나면서 콘텐츠 소비 패턴에서
+              점차 정교하게 포착됩니다.
             </p>
           </div>
         </div>
@@ -525,10 +533,10 @@ export default function TasteAnalysisPage() {
             </div>
             <h2 className="text-3xl font-bold text-gray-900">숫자로 담을 수 없는 것들</h2>
             <p className="mt-4 text-gray-600">
-              3-Layer 벡터는 &ldquo;무엇을 좋아하는가&rdquo;를 정량화합니다. 하지만 살아있는
-              프로필이 되려면 &ldquo;왜 그런 사람이 되었는가&rdquo;까지 이해해야 합니다.
+              취향 분석은 &ldquo;무엇을 좋아하는가&rdquo;를 정량화합니다. 하지만 살아있는 프로필이
+              되려면 &ldquo;왜 그런 사람이 되었는가&rdquo;까지 이해해야 합니다.
               <br />
-              DeepSight는 온보딩 응답 패턴과 SNS 행동에서 이런 비정량적 신호도 함께 포착합니다.
+              DeepSight는 온보딩 응답 패턴과 SNS 행동에서 이런 맥락적 신호도 함께 포착합니다.
             </p>
           </div>
 
@@ -615,12 +623,12 @@ export default function TasteAnalysisPage() {
               SNS BEHAVIORAL ANALYSIS
             </div>
             <h2 className="text-3xl font-bold text-gray-900">
-              SNS 행동 데이터에서 3-Layer 프로필 추론
+              SNS 행동 데이터에서 취향 프로필 추론
             </h2>
             <p className="mt-4 text-gray-600">
               이미 사용 중인 서비스의 행동 데이터를 분석하여
               <br />
-              질문 없이도 정확한 3-Layer 프로필을 즉시 생성합니다.
+              질문 없이도 정확한 취향 프로필을 즉시 생성합니다.
             </p>
           </div>
 
@@ -642,7 +650,7 @@ export default function TasteAnalysisPage() {
               <div className="text-center">
                 <div className="mb-2 text-3xl font-bold text-purple-600">0개</div>
                 <p className="text-sm text-gray-600">원시 데이터 저장</p>
-                <p className="text-xs text-gray-400">프로필 벡터만 산출, 원본 미보관</p>
+                <p className="text-xs text-gray-400">취향 분석값만 산출, 원본 미보관</p>
               </div>
               <div className="text-center">
                 <div className="mb-2 text-3xl font-bold text-purple-600">즉시</div>
@@ -664,7 +672,7 @@ export default function TasteAnalysisPage() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="mb-16 text-center">
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
-              COLD-START SOLUTION
+              처음부터 맞는 추천
             </div>
             <h2 className="text-3xl font-bold text-gray-900">처음 만나도 바로 추천, 3가지 방법</h2>
             <p className="mt-4 text-gray-600">
@@ -807,13 +815,13 @@ export default function TasteAnalysisPage() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="mb-16 text-center">
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
-              PROFILING ARCHITECTURE
+              분석에서 추천까지
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">정량 데이터와 정성 신호의 융합</h2>
+            <h2 className="text-3xl font-bold text-gray-900">수치와 맥락을 함께 읽는 분석</h2>
             <p className="mt-4 text-gray-600">
-              3-Layer 벡터 측정과 비정량적 신호 포착이 동시에 일어납니다.
+              취향 분석과 맥락 포착이 동시에 일어납니다.
               <br />
-              하나의 질문, 하나의 SNS 데이터에서 숫자와 맥락을 함께 읽어냅니다.
+              하나의 질문, 하나의 SNS 데이터에서 숫자와 이야기를 함께 읽어냅니다.
             </p>
           </div>
 
@@ -827,8 +835,8 @@ export default function TasteAnalysisPage() {
                 <h3 className="text-lg font-bold text-gray-900">시나리오 질문의 이중 역할</h3>
               </div>
               <p className="mb-4 text-sm text-gray-600">
-                24문항 시나리오 질문은 L1·L2 벡터값을 측정하는 것뿐 아니라, 응답 패턴에서 비정량적
-                신호를 함께 수집합니다. 어떤 선택지에서 오래 고민했는지, Phase별로 태도가 어떻게
+                24문항 시나리오 질문은 취향과 성격을 측정하는 것뿐 아니라, 응답 패턴에서 맥락적
+                신호를 함께 수집합니다. 어떤 선택지에서 오래 고민했는지, 단계별로 태도가 어떻게
                 변했는지까지 프로필에 반영됩니다.
               </p>
               <ul className="space-y-2">
@@ -854,9 +862,8 @@ export default function TasteAnalysisPage() {
                 <h3 className="text-lg font-bold text-gray-900">SNS 데이터의 이중 역할</h3>
               </div>
               <p className="mb-4 text-sm text-gray-600">
-                SNS 행동 데이터는 3-Layer 벡터 산출과 동시에 비정량적 신호원으로도 활용됩니다.
-                게시글의 표현 방식, 문화적 소비 패턴, 세대적 코드에서 프로필의 고유한 맥락을
-                읽어냅니다.
+                SNS 행동 데이터는 취향 분석과 동시에 맥락적 신호원으로도 활용됩니다. 게시글의 표현
+                방식, 문화적 소비 패턴, 세대적 코드에서 프로필의 고유한 맥락을 읽어냅니다.
               </p>
               <ul className="space-y-2">
                 {[
@@ -884,7 +891,7 @@ export default function TasteAnalysisPage() {
                   프로파일링에서 페르소나 매칭까지의 여정
                 </h4>
                 <p className="text-sm text-gray-600">
-                  수집된 3-Layer 벡터와 비정량적 신호는 통합 프로필로 구축됩니다. 이 프로필은 AI
+                  수집된 취향 데이터와 맥락적 신호는 통합 프로필로 구축됩니다. 이 프로필은 AI
                   페르소나의 프로필과 3단계 매칭(취향 유사도 → 심층 호환성 → 의외의 발견)을 거쳐,
                   &ldquo;왜 이 페르소나가 당신에게 맞는지&rdquo;를 설명할 수 있는 투명한 추천으로
                   이어집니다.
