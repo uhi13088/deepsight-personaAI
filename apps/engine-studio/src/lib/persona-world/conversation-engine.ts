@@ -28,6 +28,16 @@ export interface ConversationContext {
   mode: ConversationMode
   /** 유저의 감지된 사용 언어 (ISO 639-1, e.g. "ko", "en", "ja"). STT 또는 텍스트에서 감지. */
   userLanguage?: string
+  /** v5.0: 압축된 자아관 (SemanticMemory) — confidence 높은 순 TOP-10 */
+  semanticMemories?: SemanticMemoryItem[]
+}
+
+/** Conversation Engine에 주입되는 SemanticMemory 요약 */
+export interface SemanticMemoryItem {
+  category: string
+  subject: string
+  belief: string
+  confidence: number
 }
 
 export interface ConversationInput {
@@ -67,10 +77,14 @@ const TEMPERATURE = 0.8
 // ── 시스템 프롬프트 빌더: 정적 PREFIX (캐시 대상) ─────────────
 
 /**
- * 페르소나 정의 + VoiceSpec + Factbook → 정적 시스템 프롬프트.
+ * 페르소나 정의 + VoiceSpec + Factbook + SemanticMemory → 정적 시스템 프롬프트.
  * 매 호출 동일하므로 Anthropic cache_control로 캐시.
+ * v5.0: semanticMemories 파라미터 추가 (압축된 자아관 주입)
  */
-export function buildConversationSystemPrefix(persona: PersonaProfileSnapshot): string {
+export function buildConversationSystemPrefix(
+  persona: PersonaProfileSnapshot,
+  semanticMemories?: SemanticMemoryItem[]
+): string {
   const lines: string[] = []
 
   // ── 페르소나 정의 ──
@@ -160,6 +174,22 @@ export function buildConversationSystemPrefix(persona: PersonaProfileSnapshot): 
       for (const ctx of mutableContext) {
         lines.push(`- [${ctx.category}] ${ctx.content}`)
       }
+    }
+  }
+
+  // ── v5.0: Semantic Memory (압축된 자아관) ──
+  // 에피소드가 망각된 후에도 핵심 학습/믿음은 영구 보존
+  if (semanticMemories && semanticMemories.length > 0) {
+    lines.push("\n## 내면에 쌓인 자아관 (경험에서 증류된 믿음)")
+    const CATEGORY_LABELS: Record<string, string> = {
+      BELIEF: "믿음",
+      RELATIONSHIP_MODEL: "관계 패턴",
+      LEARNED_PATTERN: "학습된 패턴",
+      SELF_NARRATIVE: "자아 서사",
+    }
+    for (const mem of semanticMemories.slice(0, 10)) {
+      const label = CATEGORY_LABELS[mem.category] ?? mem.category
+      lines.push(`- [${label}] ${mem.belief}`)
     }
   }
 
@@ -316,10 +346,11 @@ export async function generateConversationResponse(
   input: ConversationInput
 ): Promise<ConversationResult> {
   const { context, history, userMessage, imageBase64, imageMediaType } = input
-  const { persona, personaId, personaState, ragContext, mode, userLanguage } = context
+  const { persona, personaId, personaState, ragContext, mode, userLanguage, semanticMemories } =
+    context
 
-  // 시스템 프롬프트 빌드
-  const prefix = buildConversationSystemPrefix(persona)
+  // 시스템 프롬프트 빌드 (v5.0: SemanticMemory 주입)
+  const prefix = buildConversationSystemPrefix(persona, semanticMemories)
   const suffix = buildConversationSystemSuffix(personaState, ragContext, mode, userLanguage)
 
   // Anthropic 메시지 빌드

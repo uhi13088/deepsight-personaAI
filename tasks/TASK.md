@@ -1,6 +1,6 @@
 # DeepSight v4.0 — TASK 관리
 
-> 마지막 업데이트: 2026-03-04
+> 마지막 업데이트: 2026-03-05
 
 ---
 
@@ -935,7 +935,7 @@
 
 ## QUEUE
 
-> 마지막 업데이트: 2026-03-04
+> 마지막 업데이트: 2026-03-05
 > 방향: 벡터 매칭 실제 연결 → 소비 가시화 → 추천 컨텍스트 → ContentItem B2B
 
 ---
@@ -1308,6 +1308,47 @@
   - **AC**:
     - FAQ 카테고리 제목에서 L1/L2/L3/OCEAN/106D 미노출
     - Build PASS (landing)
+
+## DONE — Phase 6: v5.0 Semantic Memory Architecture ✅ 2026-03-05
+
+> 에피소드 기억을 압축해 자아관을 유지하고, L3 벡터를 조금씩 진화시키며, 정체성 드리프트를 감지하는 3계층 기억 시스템.
+
+- [x] **T408: SemanticMemory DB 모델 + migration** ✅ 2026-03-05
+  - Prisma schema: `SemanticMemory` 모델 + `SemanticMemoryCategory` enum
+  - 인덱스: personaId×category, personaId×confidence, personaId×consolidatedAt
+  - migration 045: `semantic_memories` 테이블 + FK + 3개 인덱스
+  - Persona 모델에 `semanticMemories` relation 추가
+
+- [x] **T409: Memory Consolidation Scheduler** ✅ 2026-03-05
+  - `memory-consolidation.ts`: 주 1회 LLM(Haiku) 호출 → 에피소드 압축 → SemanticMemory upsert
+  - poignancy ≥ 0.5 에피소드 최대 30개 수집 (InteractionLog + ConsumptionLog + PersonaPost)
+  - subject 기준 중복 병합 (confidence 가중 평균)
+  - Factbook.mutableContext 업데이트
+  - `consolidateAllPersonas()` 배치 함수
+
+- [x] **T410: Growth Arc Updater (L3 진화)** ✅ 2026-03-05
+  - `growth-arc-updater.ts`: SemanticMemory.l3Influence 누적 → L3 벡터 조금씩 업데이트
+  - 경계 규칙: lack/moralCompass ±0.10, volatility ±0.20, growthArc ±0.40 (생애 최대)
+  - 단일 consolidation 최대: lack/moralCompass 0.001, volatility 0.002, growthArc 0.005
+  - PersonaLayerVector version++ 이력 보존
+
+- [x] **T411: Identity Drift Detector** ✅ 2026-03-05
+  - `identity-drift-detector.ts`: 최근 24h 생성 출력 vs ImmutableCore 비교
+  - 키워드 overlap + 금지 패턴 위반 → driftScore 계산
+  - driftScore > 0.30 → consistencyScore 하락 + 경고
+  - driftScore > 0.50 → DEGRADED 자동 전환 (T140 kill switch 연동)
+  - LLM 비용 0 (순수 규칙 기반)
+
+- [x] **T412: Context Enricher SemanticMemory 주입** ✅ 2026-03-05
+  - `conversation-engine.ts`: ConversationContext에 `semanticMemories` 옵셔널 필드 추가
+  - `buildConversationSystemPrefix()`: SemanticMemory TOP-10 → "내면에 쌓인 자아관" 섹션 주입
+  - 토큰 효율: 에피소드 대비 10배 이상 (10항목 ≈ 400토큰)
+
+- [x] **T413: cron + 테스트 + 전체 검증** ✅ 2026-03-05
+  - `api/cron/v5-memory/route.ts`: 주간 배치 3단계 (Consolidation → GrowthArc → DriftDetection)
+  - 단위 테스트 36개: growth-arc-updater(13) + identity-drift-detector(18) + memory-consolidation(5)
+  - 전체 4692 테스트 PASS
+  - Build PASS (engine-studio)
 
 ## BLOCKED
 
