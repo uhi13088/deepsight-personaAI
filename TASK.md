@@ -2285,6 +2285,35 @@
   - AC6: ✅ 테스트 37개 PASS (전체 108파일 4308 tests ALL PASS)
   - 변경파일: consumption-manager.ts, post-pipeline.ts, cron-scheduler-service.ts, pw-scheduler-service.ts, consumption-manager.test.ts
 
+### Phase PW-UI: PersonaWorld UI/UX 개선 — ui-ux-pro-max-skill 적용 (T361~T364)
+
+> ui-ux-pro-max-skill 분석 결과를 PersonaWorld에 적용.
+> DM Sans 폰트, Glassmorphism 카드, Bento Grid 피드, Storytelling 랜딩 4단계.
+
+- [x] **T361: DM Sans 폰트 전환 — Inter → DM Sans** ✅ 2026-03-05
+  - AC1: ✅ layout.tsx Google Fonts 링크에 DM Sans (400,500,600,700) 추가, Inter 제거
+  - AC2: ✅ globals.css `--font-sans` → `"DM Sans"` 로 변경
+  - AC3: ✅ Build PASS
+
+- [x] **T362: Glassmorphism 페르소나 카드 variant 추가** ✅ 2026-03-05
+  - AC1: ✅ pw-card.tsx에 `glass` boolean prop 추가 (기본값 false)
+  - AC2: ✅ globals.css `.pw-glass-light` 클래스 추가 (흰 배경 위 glassmorphism)
+  - AC3: ✅ feed/page.tsx Bento Grid 첫 번째 카드(피처 카드)에 `<PWCard glass>` 적용
+  - AC4: ✅ Build PASS
+
+- [x] **T363: Bento Grid 피드 레이아웃 — 첫 6개 포스트** ✅ 2026-03-05
+  - AC1: ✅ feed/page.tsx 첫 6개 포스트 2열 CSS grid (inline, 별도 컴포넌트 불필요)
+  - AC2: ✅ 첫 번째 카드 col-span-2(피처 + glass), 나머지 2열 배치
+  - AC3: ✅ 7번째부터 기존 세로 리스트 유지
+  - AC4: ✅ 모바일 < 640px: `sm:hidden` / `sm:block` 분기로 단일 열 폴백
+  - AC5: ✅ Build PASS
+
+- [x] **T364: 랜딩 페이지 Storytelling 패턴 적용** ✅ 2026-03-05
+  - AC1: ✅ page.tsx 로고 아래 "지금 이 순간에도 살아있는" 페르소나 쇼케이스 섹션 추가
+  - AC2: ✅ SAMPLE_PERSONAS 3개 (에이다/루카스/세라) glassmorphism + pw-profile-ring-animated
+  - AC3: ✅ pw-fade-in-up-1/2/3 CSS keyframes (delay 0.1s/0.3s/0.5s)
+  - AC4: ✅ Build PASS
+
 ---
 
 ## ✅ DONE (최근 완료)

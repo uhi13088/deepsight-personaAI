@@ -428,19 +428,55 @@ export default function FeedPage() {
           </div>
         ) : (
           /* Posts Feed */
-          <div className="space-y-4">
-            {displayedPosts.map((post) => (
-              <FeedPostCard
-                key={post.id}
-                post={post}
-                liked={likedSet.has(post.id)}
-                reposted={repostedSet.has(post.id)}
-                bookmarked={bookmarkedSet.has(post.id)}
-                onLike={handleLike}
-                onRepost={handleRepost}
-                onBookmark={handleBookmark}
-              />
-            ))}
+          <div>
+            {/* Bento Grid — 첫 6개 (sm 이상) */}
+            {displayedPosts.length > 0 && (
+              <div className="mb-4 hidden grid-cols-2 gap-4 sm:grid">
+                {displayedPosts.slice(0, 6).map((post, idx) => (
+                  <div key={post.id} className={idx === 0 ? "col-span-2" : "col-span-1"}>
+                    <FeedPostCard
+                      post={post}
+                      liked={likedSet.has(post.id)}
+                      reposted={repostedSet.has(post.id)}
+                      bookmarked={bookmarkedSet.has(post.id)}
+                      onLike={handleLike}
+                      onRepost={handleRepost}
+                      onBookmark={handleBookmark}
+                      glass={idx === 0}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* 모바일: 전체 단일 열 / sm 이상: 7번째부터 */}
+            <div className="space-y-4 sm:hidden">
+              {displayedPosts.map((post) => (
+                <FeedPostCard
+                  key={post.id}
+                  post={post}
+                  liked={likedSet.has(post.id)}
+                  reposted={repostedSet.has(post.id)}
+                  bookmarked={bookmarkedSet.has(post.id)}
+                  onLike={handleLike}
+                  onRepost={handleRepost}
+                  onBookmark={handleBookmark}
+                />
+              ))}
+            </div>
+            <div className="hidden space-y-4 sm:block">
+              {displayedPosts.slice(6).map((post) => (
+                <FeedPostCard
+                  key={post.id}
+                  post={post}
+                  liked={likedSet.has(post.id)}
+                  reposted={repostedSet.has(post.id)}
+                  bookmarked={bookmarkedSet.has(post.id)}
+                  onLike={handleLike}
+                  onRepost={handleRepost}
+                  onBookmark={handleBookmark}
+                />
+              ))}
+            </div>
           </div>
         )}
 
@@ -470,6 +506,7 @@ interface FeedPostCardProps {
   onLike: (postId: string) => void
   onRepost: (postId: string) => void
   onBookmark: (postId: string) => void
+  glass?: boolean
 }
 
 const FeedPostCard = memo(function FeedPostCard({
@@ -480,6 +517,7 @@ const FeedPostCard = memo(function FeedPostCard({
   onLike,
   onRepost,
   onBookmark,
+  glass = false,
 }: FeedPostCardProps) {
   const sourceConfig = post.source ? FEED_SOURCE_CONFIG[post.source] : null
   const [menuOpen, setMenuOpen] = useState(false)
@@ -502,7 +540,7 @@ const FeedPostCard = memo(function FeedPostCard({
   const toggleComments = useCallback(() => setCommentOpen((prev) => !prev), [])
 
   return (
-    <PWCard className="!p-4">
+    <PWCard className="!p-4" glass={glass}>
       {/* Post Header */}
       <div className="mb-3 flex items-start justify-between">
         <Link href={`/persona/${post.persona.id}`} className="flex items-center gap-3">
