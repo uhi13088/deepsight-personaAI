@@ -201,12 +201,12 @@ export default function HomePage() {
                   },
                   {
                     icon: Users,
-                    title: "콜드스타트 문제",
+                    title: "처음 시작해도 맞는 추천이 없음",
                     desc: "신규 유저에겐 무의미한 인기 콘텐츠만 보여줍니다",
                   },
                   {
                     icon: TrendingUp,
-                    title: "필터버블",
+                    title: "비슷한 것만 반복되는 문제",
                     desc: "비슷한 콘텐츠만 반복, 새로운 발견이 없습니다",
                   },
                 ].map((item, idx) => (

@@ -104,11 +104,11 @@ const OVERAGE_PRICING = [
 const FAQS = [
   {
     q: "모든 플랜에서 매칭 품질이 동일한가요?",
-    a: "네, 모든 플랜에서 동일한 품질의 페르소나와 3단계 매칭(취향 유사도 → 심층 호환성 → 의외의 발견)을 제공합니다. 플랜 간 차이는 사용량(API 호출, 페르소나 수, 팀원 수)뿐입니다.",
+    a: "네, 모든 플랜에서 동일한 품질의 페르소나와 3단계 매칭(취향 유사도 → 심층 호환성 → 의외의 발견)을 제공합니다. 플랜 간 차이는 사용량(월 추천 요청 수, 페르소나 수, 팀원 수)뿐입니다.",
   },
   {
-    q: "API 호출량이 초과되면 어떻게 되나요?",
-    a: "서비스가 즉시 중단되지 않습니다. 초과량에 대해 종량제로 과금되며(Starter/Pro: $0.001/call, Max: $0.0008/call), 사전에 알림을 보내드립니다. 필요시 언제든 플랜을 업그레이드할 수 있습니다.",
+    q: "월 추천 요청 수를 초과하면 어떻게 되나요?",
+    a: "서비스가 즉시 중단되지 않습니다. 초과분에 대해 종량제로 과금되며(Starter/Pro: $0.001/건, Max: $0.0008/건), 사전에 알림을 보내드립니다. 필요시 언제든 플랜을 업그레이드할 수 있습니다.",
   },
   {
     q: "연간 결제 시 혜택이 있나요?",
@@ -139,7 +139,7 @@ export default function PricingPage() {
           <p className="mx-auto max-w-2xl text-lg text-gray-600">
             모든 플랜에 동일한 페르소나 품질과 3단계 매칭이 포함됩니다.
             <br />
-            플랜 간 차이는 사용량(API 호출, 페르소나 수)뿐입니다.
+            플랜 간 차이는 사용량(월 추천 요청 수, 페르소나 수)뿐입니다.
           </p>
           <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-green-50 px-4 py-2 text-sm text-green-700">
             <Sparkles className="h-4 w-4" />
@@ -201,21 +201,21 @@ export default function PricingPage() {
                   </div>
                   <div className="flex items-center gap-2.5 text-sm">
                     <Zap className="h-4 w-4 flex-shrink-0 text-purple-500" />
-                    <span className="text-gray-600">매칭 API 호출</span>
+                    <span className="text-gray-600">월 추천 요청 수</span>
                     <span className="ml-auto font-semibold text-gray-900">
                       {plan.specs.apiCalls}
                     </span>
                   </div>
                   <div className="flex items-center gap-2.5 text-sm">
                     <Clock className="h-4 w-4 flex-shrink-0 text-purple-500" />
-                    <span className="text-gray-600">Rate Limit</span>
+                    <span className="text-gray-600">분당 요청 제한</span>
                     <span className="ml-auto font-semibold text-gray-900">
                       {plan.specs.rateLimit}
                     </span>
                   </div>
                   <div className="flex items-center gap-2.5 text-sm">
                     <Key className="h-4 w-4 flex-shrink-0 text-purple-500" />
-                    <span className="text-gray-600">API Keys</span>
+                    <span className="text-gray-600">API 키</span>
                     <span className="ml-auto font-semibold text-gray-900">
                       {plan.specs.apiKeys}
                     </span>
@@ -238,7 +238,7 @@ export default function PricingPage() {
                 <div className="mb-6 space-y-2 border-t border-gray-100 pt-4">
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <Check className="h-4 w-4 flex-shrink-0 text-green-500" />
-                    Webhook
+                    실시간 이벤트 연동
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     {plan.specs.sso ? (
@@ -315,22 +315,18 @@ export default function PricingPage() {
               },
               {
                 title: "동일한 페르소나 품질",
-                desc: "모든 플랜에서 동일한 3-Layer 프로필 품질. 비정량적 요소(서사·음성·감정)까지 동일",
+                desc: "모든 플랜에서 동일한 취향 분석 품질. 서사·음성·감정 표현까지 동일하게 제공",
               },
               {
                 title: "설명 가능한 추천",
                 desc: "'왜 이 콘텐츠인지' 매칭 근거를 자연어로 투명하게 설명",
               },
               {
-                title: "스마트 캐싱",
-                desc: "동일 콘텐츠 매칭 결과를 7일간 캐싱하여 비용 절감 (예상 히트율 70%+)",
+                title: "빠른 응답 속도",
+                desc: "동일 콘텐츠 추천 결과를 자동으로 재사용하여 빠른 응답 속도를 유지합니다.",
               },
               {
-                title: "프롬프트 캐싱",
-                desc: "페르소나 설정을 캐싱하여 LLM 호출 비용 90% 절감. 생성 품질 영향 없음",
-              },
-              {
-                title: "Webhook + TypeScript SDK",
+                title: "실시간 연동 + 개발자 도구 (SDK)",
                 desc: "실시간 이벤트 알림과 상세한 API 문서로 빠르고 쉬운 연동",
               },
             ].map((item) => (

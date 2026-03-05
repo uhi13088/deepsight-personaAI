@@ -1215,6 +1215,100 @@
 
 ---
 
+---
+
+## DONE — Phase 5: 랜딩페이지 소비자 친화화 ✅ 2026-03-05
+
+> 기술 용어를 소비자 친화 언어로 교체. 기능·수치는 유지, 표현만 변경.
+
+### Phase 5-1: 고노출 페이지 (기술 용어 다수)
+
+- [x] **T402: landing — features/taste-analysis 소비자 친화화**
+  - **파일**: `apps/landing/src/app/features/taste-analysis/page.tsx`
+  - **할 일**:
+    - "3-Layer 벡터 시스템" → "나를 이해하는 3가지 층"
+    - "L1 — 사회적 취향 (7개 차원)" → "표면 취향 — 내가 좋아한다고 아는 것들"
+    - "L2 — 내면 기질 (OCEAN 5개 차원)" → "내면 성격 — 나를 움직이는 감정과 태도"
+    - "L3 — 서사적 욕망 (4개 차원)" → "욕망의 방향 — 내가 진짜 원하는 것"
+    - "106D+" 수치 → 숨김 (미노출)
+    - "Big Five / OCEAN" → "5가지 내면 성격"
+    - L1 7개 차원 이름 → 질문형 소비자 언어 변환 (기획서 참고)
+    - "콜드스타트 해결" → "처음부터 맞는 추천, 3가지 방법"
+    - Phase 1/2/3 단계명 → 입문·발전·심화 (정확도 % 수치는 유지)
+  - **AC**:
+    - 페이지 내 L1/L2/L3/OCEAN/Big Five/106D 문자열 미노출
+    - Build PASS (landing)
+
+- [x] **T403: landing — features/persona 소비자 친화화**
+  - **파일**: `apps/landing/src/app/features/persona/page.tsx`
+  - **할 일**:
+    - "P-inger Print (2D/3D 시각적 정체성)" → "취향 지문 — 당신만의 고유한 취향 패턴"
+    - "3-Layer 벡터 프로필: 사용자와 동일한 방식으로 정량화" → "당신의 취향을 깊이 이해한 AI"
+    - 4대 런타임 알고리즘 명칭 (Init/Override/Adapt/Express) → 기억·반응·적응·표현
+    - 배포 전 6범주 검증 섹션 → "엄격한 품질 검증 후 출시" (상세 분류 숨김)
+    - 12 아키타입 설명: "논리↔불안" 등 기호 제거, 서사형 한 줄 설명으로 변환
+  - **AC**:
+    - "런타임 알고리즘", "3-Layer 벡터" 문자열 미노출
+    - Build PASS (landing)
+
+### Phase 5-2: 중노출 페이지
+
+- [x] **T404: landing — features/matching 소비자 친화화**
+  - **파일**: `apps/landing/src/app/features/matching/page.tsx`
+  - **할 일**:
+    - "3-Tier 매칭" → "3단계 맞춤 추천"
+    - "L1 벡터 기반 기본 매칭" → "취향 유사도 분석"
+    - "L1+L2 종합 고려" 등 벡터 코드 → 결과 설명으로 대체
+    - "매칭 파이프라인 4단계" → "추천이 만들어지는 과정"
+    - 피드 구성 비율 (60%/30%/10%) → "팔로우 중심 + 새로운 발견 혼합" (수치 숨김)
+  - **AC**:
+    - "L1", "L2", "파이프라인", "3-Tier" 문자열 미노출
+    - Build PASS (landing)
+
+- [x] **T405: landing — pricing 소비자 친화화**
+  - **파일**: `apps/landing/src/app/pricing/page.tsx`
+  - **할 일**:
+    - "API 호출 N만/월" → "월 추천 요청 N만 건"
+    - "Rate Limit N/분" → 툴팁으로 이동 (테이블에서 숨김) or "초당 처리 속도"
+    - "TypeScript SDK" → "개발자 도구 (SDK)"
+    - "Webhook" → "실시간 이벤트 연동"
+    - "Prompt Caching (LLM 비용 90% 절감)" → 숨김 (내부 지표)
+    - "스마트 캐싱 (70% 히트율)" → 숨김
+    - "초과 과금: $0.001/call" → "추가 사용 시 건당 $0.001"
+  - **AC**:
+    - "Rate Limit", "Webhook", "TypeScript SDK", "LLM", "Prompt Caching" 미노출
+    - Build PASS (landing)
+
+### Phase 5-3: 소노출 페이지
+
+- [x] **T406: landing — home + footer + features-hub 소노출 수정**
+  - **파일**:
+    - `apps/landing/src/app/page.tsx`
+    - `apps/landing/src/components/layout/footer.tsx`
+    - `apps/landing/src/app/features/page.tsx`
+  - **할 일**:
+    - Home Problem 섹션: "콜드스타트 문제" → "처음 시작해도 바로 맞는 추천"
+    - Home Problem 섹션: "필터버블" → "비슷한 것만 반복되는 문제"
+    - Footer 슬로건: "AI 페르소나 기반 3-Layer 벡터 추천 플랫폼" → "당신의 취향을 가장 잘 이해하는 AI 추천 서비스"
+    - Features Hub 카드 설명 문구 순화 (L1/L2 등 미노출)
+  - **AC**:
+    - "3-Layer 벡터", "콜드스타트", "필터버블" 문자열 미노출
+    - Build PASS (landing)
+
+- [x] **T407: landing — faq 항목 제목 순화**
+  - **파일**: `apps/landing/src/app/faq/page.tsx`
+  - **할 일**:
+    - FAQ 카테고리 "3-Layer 벡터 시스템" → "취향 분석 시스템"
+    - FAQ 카테고리 "12 아키타입" → "12가지 성격 유형"
+    - FAQ 카테고리 "P-inger Print" → "취향 지문 (P-inger Print)" (브랜드명은 유지, 설명 추가)
+    - FAQ 카테고리 "콜드스타트 해결" → "처음 시작할 때"
+    - FAQ 카테고리 "Developer Console & API" → "개발자 연동"
+    - 개별 Q 제목 내 "L1/L2/L3", "OCEAN", "106D+" 표현 → 소비자 언어
+    - (내용 본문은 설명 목적이므로 기술 용어 일부 유지 허용)
+  - **AC**:
+    - FAQ 카테고리 제목에서 L1/L2/L3/OCEAN/106D 미노출
+    - Build PASS (landing)
+
 ## BLOCKED
 
 (없음)

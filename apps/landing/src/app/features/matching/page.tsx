@@ -30,7 +30,7 @@ const PIPELINE_STEPS = [
     step: "01",
     icon: Search,
     title: "프로필 분석",
-    description: "사용자의 3-Layer 프로필(취향·성격·내면)을 분석하여 매칭 대상을 준비합니다.",
+    description: "사용자의 취향·성격·내면 프로필을 분석하여 매칭 대상을 준비합니다.",
     output: "매칭 준비 완료된 통합 프로필",
   },
   {
@@ -204,11 +204,11 @@ export default function MatchingPage() {
         <div className="mx-auto max-w-5xl px-6">
           <div className="mb-16 text-center">
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
-              MATCHING PIPELINE
+              추천이 만들어지는 과정
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">프로필 → 매칭 → 추천</h2>
+            <h2 className="text-3xl font-bold text-gray-900">분석 → 매칭 → 추천</h2>
             <p className="mt-4 text-gray-600">
-              사용자 프로필이 추천으로 이어지는 4단계 파이프라인입니다.
+              사용자 프로필이 추천으로 이어지는 4단계 과정입니다.
             </p>
           </div>
 
@@ -245,7 +245,7 @@ export default function MatchingPage() {
         <div className="mx-auto max-w-5xl px-6">
           <div className="mb-16 text-center">
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
-              VECTOR MATCHING
+              3단계 맞춤 추천
             </div>
             <h2 className="text-3xl font-bold text-gray-900">3단계 매칭 시스템</h2>
             <p className="mt-4 text-gray-600">
@@ -369,9 +369,9 @@ export default function MatchingPage() {
         <div className="mx-auto max-w-5xl px-6">
           <div className="mb-16 text-center">
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
-              FEED MIXING
+              피드 구성
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">피드 구성 알고리즘</h2>
+            <h2 className="text-3xl font-bold text-gray-900">피드 구성 방식</h2>
             <p className="mt-4 text-gray-600">
               매칭 점수만으로 피드를 구성하지 않습니다. 팔로우, 유사도, 트렌딩을 혼합하여 균형 잡힌
               피드를 제공합니다.
@@ -413,7 +413,7 @@ export default function MatchingPage() {
         <div className="mx-auto max-w-5xl px-6">
           <div className="mb-16 text-center">
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
-              EXPLAINABLE AI
+              투명한 추천
             </div>
             <h2 className="text-3xl font-bold text-gray-900">&ldquo;왜&rdquo;를 설명하는 추천</h2>
             <p className="mt-4 text-gray-600">
@@ -468,13 +468,13 @@ export default function MatchingPage() {
         <div className="mx-auto max-w-7xl px-6">
           <div className="mb-16 text-center">
             <div className="mb-4 text-sm font-semibold uppercase tracking-wider text-purple-600">
-              DIVERSITY
+              다양한 발견
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">필터 버블 탈출</h2>
+            <h2 className="text-3xl font-bold text-gray-900">비슷한 것만 반복되는 추천을 탈출</h2>
             <p className="mt-4 text-gray-600">
               유사한 취향만 강화되는 기존 추천 시스템의 한계를 극복합니다.
               <br />
-              의도적으로 다양한 관점을 노출하여 사용자의 시야를 넓힙니다.
+              의도적으로 다양한 관점을 노출하여 새로운 발견의 즐거움을 제공합니다.
             </p>
           </div>
 

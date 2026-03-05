@@ -55,11 +55,11 @@ const FAQ_DATA: FaqSection[] = [
     ],
   },
   {
-    category: "3-Layer 벡터 시스템",
-    description: "DeepSight의 핵심 기술인 3-Layer 벡터 아키텍처를 이해하세요.",
+    category: "취향 분석 시스템",
+    description: "DeepSight가 취향을 3가지 층으로 나눠 분석하는 방식을 이해하세요.",
     items: [
       {
-        question: "3-Layer 벡터란 무엇인가요?",
+        question: "취향 분석 시스템이란 무엇인가요?",
         answer:
           "3-Layer 벡터는 사용자의 콘텐츠 소비 성향을 3개 레이어로 정량화하는 프레임워크입니다. 각 차원은 0.0~1.0 범위의 값을 가집니다. L1 사회적 취향(7개 차원): 분석 깊이, 판단 렌즈, 평가 태도, 관심 범위, 취향 성향, 소비 목적, 사회적 성향. L2 내면 기질(OCEAN 5개 차원): 개방성, 성실성, 외향성, 우호성, 민감성. L3 서사적 욕망(4개 차원): 결핍(채워지지 않은 욕구), 도덕 나침반(윤리적 기준), 변동성(감정 기복), 성장 곡선(성장 여정의 단계)으로 구성됩니다.",
       },
@@ -69,17 +69,17 @@ const FAQ_DATA: FaqSection[] = [
           "3-Layer 구조는 콘텐츠 소비 성향을 충분히 구분하면서도, 계층적으로 구조화하여 설명 가능한 추천을 제공하는 균형점입니다. L1 사회적 취향은 '보여지는 콘텐츠 소비 스타일', L2 내면 기질(OCEAN)은 '실제 심리적 성향', L3 서사적 욕망은 '행동의 동기와 성장 여정'을 각각 담당합니다. L1과 L2 사이의 괴리가 바로 '겉과 속의 모순' — 예를 들어 사교적으로 행동하지만 실제로는 내향적인 — 캐릭터의 입체감을 만드는 핵심입니다.",
       },
       {
-        question: "L1 사회적 취향의 7가지 차원은 무엇인가요?",
+        question: "표면 취향의 7가지 기준은 무엇인가요?",
         answer:
           "L1은 콘텐츠를 소비하는 '보여지는 스타일'을 7차원으로 정량화합니다. (1) 분석 깊이(depth): 가볍게 소비 ↔ 심층 분석. (2) 판단 렌즈(lens): 감정 기반 ↔ 논리 기반 판단. (3) 평가 태도(stance): 수용적 ↔ 비판적 평가. (4) 관심 범위(scope): 좁고 깊은 ↔ 넓고 다양한 관심. (5) 취향 성향(taste): 검증된 것 선호 ↔ 실험적 취향. (6) 소비 목적(purpose): 오락 ↔ 의미 추구. (7) 사회적 성향(sociability): 혼자 소비 ↔ 함께 공유. 이 7가지가 사용자와 페르소나 간 취향 매칭의 기본 축으로 활용됩니다.",
       },
       {
-        question: "L2 내면 기질은 왜 OCEAN 모델을 사용하나요?",
+        question: "내면 성격 분석은 어떻게 이루어지나요?",
         answer:
           "OCEAN(Big Five)은 심리학에서 가장 널리 검증된 성격 모델로, 개방성(Openness)·성실성(Conscientiousness)·외향성(Extraversion)·우호성(Agreeableness)·민감성(Neuroticism) 5개 차원으로 구성됩니다. L1이 '보여지는 취향'이라면, L2는 '실제 내면 기질'입니다. 핵심은 L1과 L2의 괴리입니다. 예를 들어 L1.sociability = 0.9(매우 사교적으로 보임)인데 L2.extraversion = 0.2(실제로는 내향적)이면, '파티에서는 활발하지만 집에 오면 완전히 방전되는' 사교적 내향인 캐릭터가 만들어집니다.",
       },
       {
-        question: "L3 서사적 욕망의 4가지 차원은 구체적으로 무엇인가요?",
+        question: "내면 동력의 4가지 요소는 무엇인가요?",
         answer:
           "L3는 행동의 '이유'를 설명하는 내면 동력입니다. (1) 결핍(Lack): 채워지지 않은 핵심 욕구의 강도. 높을수록 강렬한 동기 부여. (2) 도덕 나침반(Moral Compass): 윤리적 기준의 방향. 낮으면 이익 중심, 높으면 원칙 중심. (3) 변동성(Volatility): 감정 기복과 예측 불가능성. 높을수록 트리거에 강하게 반응하고 회복이 느림. (4) 성장 곡선(Growth Arc): 성장 여정의 현재 단계. 겉과 속의 모순이 수렴하는지(통합) 또는 벌어지는지(분열)를 결정합니다. L3는 L1↔L2 역설의 '원인'과 '방향'을 제공합니다.",
       },
@@ -122,8 +122,8 @@ const FAQ_DATA: FaqSection[] = [
     ],
   },
   {
-    category: "P-inger Print",
-    description: "페르소나의 시각적 정체성인 P-inger Print를 알아보세요.",
+    category: "취향 지문 (P-inger Print)",
+    description: "페르소나의 시각적 정체성인 취향 지문(P-inger Print)을 알아보세요.",
     items: [
       {
         question: "P-inger Print란 무엇인가요?",
@@ -149,10 +149,10 @@ const FAQ_DATA: FaqSection[] = [
   },
   {
     category: "온보딩 & 프로파일링",
-    description: "사용자의 3-Layer 프로필이 만들어지는 과정을 알아보세요.",
+    description: "나의 취향 분석 프로필이 만들어지는 과정을 알아보세요.",
     items: [
       {
-        question: "3-Layer 프로필은 어떻게 만들어지나요?",
+        question: "취향 분석 프로필은 어떻게 만들어지나요?",
         answer:
           "PersonaWorld에서 3단계 24문항(8+8+8) 시나리오 질문으로 프로필을 생성합니다. 각 문항은 하이브리드 방식으로 설계되어 하나의 시나리오에서 L1 + L2 두 축을 동시에 측정합니다. Phase 1(8문항): L1 주력 측정, ~65% 신뢰도. Phase 2(8문항): L2 주력 측정, 누적 ~80% 신뢰도. Phase 3(8문항): L1↔L2 역설 교차 검증, 누적 ~93% 신뢰도. 전체 소요 시간은 약 4분입니다.",
       },
@@ -189,16 +189,16 @@ const FAQ_DATA: FaqSection[] = [
     ],
   },
   {
-    category: "콜드스타트 해결",
+    category: "처음 시작할 때",
     description: "신규 사용자에게도 즉시 개인화된 추천을 제공하는 방법을 알아보세요.",
     items: [
       {
-        question: "콜드스타트 문제란 무엇인가요?",
+        question: "처음 시작해도 왜 맞는 추천이 없을까요?",
         answer:
           "콜드스타트는 신규 사용자의 행동 데이터가 없어서 개인화된 추천을 할 수 없는 문제입니다. 기존 추천 시스템은 사용자가 충분한 행동(클릭, 구매, 평가 등)을 해야만 패턴을 파악할 수 있습니다. 이로 인해 신규 사용자에게는 인기 콘텐츠만 일괄 추천하게 되어 이탈률이 높아집니다.",
       },
       {
-        question: "DeepSight는 콜드스타트를 어떻게 해결하나요?",
+        question: "DeepSight는 처음 시작할 때 어떻게 맞는 추천을 제공하나요?",
         answer:
           "세 가지 방법을 제공합니다. (1) 문답 방식: 3단계 24문항 시나리오 질문으로 3-Layer 벡터를 빠르게 생성합니다. 단계별로 취향 성향(L1), 성격 기질(L2), 겉과 속의 모순(L3)을 체계적으로 측정합니다. (2) SNS 연동: 사용자의 소셜 미디어 데이터(좋아요, 팔로우, 관심사 등)를 분석하여 3-Layer 벡터를 추론합니다. 질문 없이도 프로필을 생성할 수 있습니다. (3) 문답 + SNS 병행: 두 데이터 소스를 결합하여 더 높은 정확도의 프로필을 생성합니다.",
       },
@@ -255,7 +255,7 @@ const FAQ_DATA: FaqSection[] = [
           "기존 추천 시스템은 '왜 이것이 추천됐는지' 사용자가 알 수 없는 블랙박스입니다. DeepSight에서는 매칭된 페르소나가 자신의 관점에서 추천 이유를 설명합니다. 예를 들어, '당신과 비슷한 심층 분석 성향의 리뷰어가 이 영화의 서사 구조를 높이 평가했습니다'와 같이 구체적인 이유를 제공합니다. 이는 사용자의 신뢰를 높이고 추천 수용률을 향상시킵니다.",
       },
       {
-        question: "필터버블은 어떻게 해결하나요?",
+        question: "비슷한 것만 반복되는 추천은 어떻게 해결하나요?",
         answer:
           "3-Tier 매칭 전략에서 Tier 3 Exploration이 핵심 역할을 합니다. 사용자와 완전히 동일한 성향의 페르소나만 매칭하지 않고, 피드의 10%를 '의외의 발견'에 할당합니다. 이 Tier에서는 다양성을 극대화하고, 비정량적 요소(목소리 스타일, 서사적 배경)까지 보정하여 색다른 관점을 제공합니다. 또한 역설 패턴 분석을 통해 사용자의 '숨겨진 취향'까지 감지하여 추천합니다.",
       },
@@ -286,7 +286,7 @@ const FAQ_DATA: FaqSection[] = [
           "PersonaWorld 기본 이용은 무료입니다. 3-Phase 24문항을 통한 3-Layer 프로필 생성, 페르소나 팔로우, 피드 확인 등 핵심 기능을 무료로 사용할 수 있습니다. 데일리 마이크로 질문에 답변하면 내부 화폐(코인)를 얻을 수 있으며, 이를 통해 추가 기능을 해금할 수 있습니다. 향후 프리미엄 기능에 대한 가격 정책은 별도 공개 예정입니다.",
       },
       {
-        question: "내 3-Layer 프로필을 직접 확인할 수 있나요?",
+        question: "내 취향 분석 프로필을 직접 확인할 수 있나요?",
         answer:
           "네, PersonaWorld에서 자신의 3-Layer 벡터 프로필을 시각적으로 확인할 수 있습니다. 각 레이어 및 차원별 수치와 의미를 볼 수 있으며, 프로필 품질 등급(STARTER → STANDARD → ADVANCED → EXPERT)도 배지로 표시됩니다. 콘텐츠 소비 패턴에 따라 벡터값이 어떻게 변화하는지도 추적할 수 있습니다.",
       },
@@ -314,7 +314,7 @@ const FAQ_DATA: FaqSection[] = [
     ],
   },
   {
-    category: "Developer Console & API",
+    category: "개발자 연동",
     description: "외부 서비스에 DeepSight를 연동하는 방법과 API 상세를 알아보세요.",
     items: [
       {
@@ -346,7 +346,7 @@ const FAQ_DATA: FaqSection[] = [
       {
         question: "요금제는 어떻게 구성되나요?",
         answer:
-          "일반 플랜 3종 + Enterprise가 있습니다. Starter($199/월): 활성 페르소나 50개, 매칭 API 50만 회/월, Rate Limit 100/분, API Key 5개, 팀원 3명. Pro($499/월): 활성 페르소나 100개, 매칭 API 100만 회/월, Rate Limit 500/분, API Key 10개, 팀원 5명. Max($1,499/월): 활성 페르소나 350개, 매칭 API 300만 회/월, Rate Limit 1,000/분, API Key 20개, 팀원 10명. Enterprise는 별도 문의(Ent. Starter $3,500~/월 부터).",
+          "일반 플랜 3종 + Enterprise가 있습니다. Starter($199/월): 활성 페르소나 50개, 월 추천 요청 50만 건, 분당 요청 100건, API 키 5개, 팀원 3명. Pro($499/월): 활성 페르소나 100개, 월 추천 요청 100만 건, 분당 요청 500건, API 키 10개, 팀원 5명. Max($1,499/월): 활성 페르소나 350개, 월 추천 요청 300만 건, 분당 요청 1,000건, API 키 20개, 팀원 10명. Enterprise는 별도 문의(Ent. Starter $3,500~/월 부터).",
       },
       {
         question: "연간 결제 할인이 있나요?",
@@ -356,7 +356,7 @@ const FAQ_DATA: FaqSection[] = [
       {
         question: "플랜 간 매칭 품질 차이가 있나요?",
         answer:
-          "아닙니다. 모든 플랜의 페르소나는 동일한 품질로 생성 및 운영됩니다. 3-Tier 매칭(Basic/Advanced/Exploration) 전체가 모든 플랜에 포함되어 있으며, 스마트 캐싱과 Prompt Caching도 모든 플랜에서 사용 가능합니다. 플랜 간 차이는 활성 페르소나 수, API 호출량, Rate Limit, 팀원 수 등 '용량'에만 있습니다.",
+          "아닙니다. 모든 플랜의 페르소나는 동일한 품질로 생성 및 운영됩니다. 3단계 매칭(취향 유사도/심층 호환성/의외의 발견) 전체가 모든 플랜에 포함되어 있습니다. 플랜 간 차이는 활성 페르소나 수, 월 추천 요청 수, 분당 요청 제한, 팀원 수 등 '용량'에만 있습니다.",
       },
       {
         question: "무료 체험이 있나요?",
@@ -366,7 +366,7 @@ const FAQ_DATA: FaqSection[] = [
       {
         question: "초과 요금은 어떻게 부과되나요?",
         answer:
-          "매칭 API 초과 시: Starter/Pro $0.001/call, Max $0.0008/call. Enterprise는 플랜별 차등($0.0006~포함량 내 운영). PW 페르소나 초과 시: Starter/Pro $2.50/개/월, Max $2.00/개/월, Enterprise $1.50~$2.00/개/월. 초과 과금은 해당 월에 활성 상태인 페르소나 수 기준입니다.",
+          "추천 요청 초과 시: Starter/Pro $0.001/건, Max $0.0008/건. Enterprise는 플랜별 차등($0.0006~포함량 내 운영). 페르소나 초과 시: Starter/Pro $2.50/개/월, Max $2.00/개/월, Enterprise $1.50~$2.00/개/월. 초과 과금은 해당 월에 활성 상태인 페르소나 수 기준입니다.",
       },
     ],
   },
@@ -395,16 +395,16 @@ const FAQ_DATA: FaqSection[] = [
 
 const CATEGORY_ICONS: Record<string, string> = {
   "DeepSight 소개": "01",
-  "3-Layer 벡터 시스템": "02",
+  "취향 분석 시스템": "02",
   "12 아키타입": "03",
-  "P-inger Print": "04",
+  "취향 지문 (P-inger Print)": "04",
   "온보딩 & 프로파일링": "05",
-  "콜드스타트 해결": "06",
+  "처음 시작할 때": "06",
   "AI 페르소나": "07",
   "매칭 & 추천": "08",
   PersonaWorld: "09",
   "Engine Studio": "10",
-  "Developer Console & API": "11",
+  "개발자 연동": "11",
   "요금제 & 가격": "12",
   "개인정보 & 보안": "13",
 }
@@ -461,7 +461,7 @@ export default function FaqPage() {
           </div>
           <h1 className="mb-6 text-5xl font-bold text-gray-900">자주 묻는 질문</h1>
           <p className="mx-auto max-w-2xl text-lg text-gray-600">
-            DeepSight의 기술, 제품, 서비스에 대해 궁금한 점을 확인하세요.
+            DeepSight 서비스에 대해 자주 묻는 질문들을 모았습니다.
           </p>
           <div className="mt-6 flex justify-center gap-6">
             <div className="rounded-lg bg-white px-4 py-2 text-sm shadow-sm">
@@ -480,7 +480,7 @@ export default function FaqPage() {
       <section className="border-b border-gray-100 py-16">
         <div className="mx-auto max-w-4xl px-6">
           <h2 className="mb-8 text-center text-xl font-bold text-gray-900">
-            DeepSight 3-Layer 벡터 아키텍처 한눈에 보기
+            DeepSight 취향 분석 구조 한눈에 보기
           </h2>
           <div className="rounded-2xl border border-gray-200 bg-gradient-to-b from-gray-50 to-white p-8">
             {/* Layer diagram */}
@@ -491,7 +491,7 @@ export default function FaqPage() {
                   <span className="rounded-full bg-purple-600 px-3 py-1 text-xs font-bold text-white">
                     L1
                   </span>
-                  <span className="font-bold text-purple-900">사회적 취향 — 7개 차원</span>
+                  <span className="font-bold text-purple-900">표면 취향 — 7가지 기준</span>
                   <span className="ml-auto text-xs text-purple-500">보여지는 스타일</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -529,7 +529,7 @@ export default function FaqPage() {
                   <span className="rounded-full bg-pink-600 px-3 py-1 text-xs font-bold text-white">
                     L2
                   </span>
-                  <span className="font-bold text-pink-900">내면 기질 (OCEAN) — 5개 차원</span>
+                  <span className="font-bold text-pink-900">내면 성격 — 5가지 성격 축</span>
                   <span className="ml-auto text-xs text-pink-500">실제 성격</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -559,7 +559,7 @@ export default function FaqPage() {
                   <span className="rounded-full bg-amber-600 px-3 py-1 text-xs font-bold text-white">
                     L3
                   </span>
-                  <span className="font-bold text-amber-900">서사적 욕망 — 4개 차원</span>
+                  <span className="font-bold text-amber-900">내면 동력 — 욕망의 방향 4가지</span>
                   <span className="ml-auto text-xs text-amber-500">내면 동력</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -578,7 +578,7 @@ export default function FaqPage() {
             {/* Non-quantitative axes */}
             <div className="mt-6 rounded-xl border border-dashed border-gray-300 bg-white p-4">
               <div className="mb-2 text-center text-xs font-semibold text-gray-500">
-                + 비정량적 4축 (벡터에 인과적 맥락 부여)
+                + 숫자 너머의 4가지 인격 요소
               </div>
               <div className="flex flex-wrap justify-center gap-3">
                 {[
