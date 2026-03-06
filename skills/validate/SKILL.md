@@ -26,6 +26,23 @@ API 관련 변경이 있었다면:
 - 불일치 발견 시 → 완료 처리 금지, 사용자에게 보고
 - 의심스러우면 `/sync-check` 스킬 실행
 
+### Step 2.5: 2단계 코드 리뷰 (복잡 티켓만)
+
+> ref: github.com/obra/superpowers (subagent-driven-development)
+> **트리거**: AC 3개 이상이거나 변경 파일 5개 이상인 티켓
+
+**Stage 1 — 사양 검증**: 구현한 것이 요청한 것과 일치하는가?
+
+- TASK.md 해당 티켓의 모든 AC 충족 여부 확인
+- 요청하지 않은 기능 추가 여부 확인 (over-engineering 금지)
+- API/스키마 변경 시 `docs/api/` 문서 업데이트 여부 확인
+
+**Stage 2 — 코드 품질**: 구현 방식이 올바른가?
+
+- 공유 패키지(`@deepsight/*`) 활용 여부 (재구현 금지)
+- 타입 안전성, 에러 처리, 사이드이펙트 확인
+- `references/quality-checklist.md` 2단계 리뷰 항목 전체 확인
+
 ### Step 3: 품질 체크리스트 확인
 
 - `references/quality-checklist.md` 기준으로 코드 품질 검토

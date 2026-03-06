@@ -4,12 +4,14 @@ import {
   buildUserPrompt,
   generatePostContent,
   buildVoiceStyleInstruction,
+  buildFewShotSnippet,
   extractPostTypeMetadata,
 } from "@/lib/persona-world/content-generator"
 import type {
   PostGenerationInput,
   PersonaPostType,
   VoiceStyleParams,
+  SocialPersonaVector,
 } from "@/lib/persona-world/types"
 
 // ── 테스트용 입력 생성 ──
@@ -39,7 +41,7 @@ const makeInput = (overrides?: Partial<PostGenerationInput>): PostGenerationInpu
 describe("buildSystemPrompt", () => {
   it("상태 설명 포함", () => {
     const input = makeInput()
-    const prompt = buildSystemPrompt(input)
+    const { prompt } = buildSystemPrompt(input)
 
     expect(prompt).toContain("현재 기분")
     expect(prompt).toContain("에너지")
@@ -49,14 +51,14 @@ describe("buildSystemPrompt", () => {
 
   it("Voice 앵커 포함", () => {
     const input = makeInput()
-    const prompt = buildSystemPrompt(input)
+    const { prompt } = buildSystemPrompt(input)
 
     expect(prompt).toContain("논리적이고 분석적인 어투")
   })
 
   it("감정 상태 포함", () => {
     const input = makeInput()
-    const prompt = buildSystemPrompt(input)
+    const { prompt } = buildSystemPrompt(input)
 
     expect(prompt).toContain("기분이 좋고 에너지가 충분")
   })
@@ -65,7 +67,7 @@ describe("buildSystemPrompt", () => {
     const input = makeInput({
       personaState: { mood: 0.9, energy: 0.5, socialBattery: 0.5, paradoxTension: 0.1 },
     })
-    const prompt = buildSystemPrompt(input)
+    const { prompt } = buildSystemPrompt(input)
 
     expect(prompt).toContain("극긍정")
   })
@@ -74,7 +76,7 @@ describe("buildSystemPrompt", () => {
     const input = makeInput({
       personaState: { mood: 0.1, energy: 0.5, socialBattery: 0.5, paradoxTension: 0.1 },
     })
-    const prompt = buildSystemPrompt(input)
+    const { prompt } = buildSystemPrompt(input)
 
     expect(prompt).toContain("극부정")
   })
@@ -83,7 +85,7 @@ describe("buildSystemPrompt", () => {
     const input = makeInput({
       personaState: { mood: 0.5, energy: 0.5, socialBattery: 0.5, paradoxTension: 0.9 },
     })
-    const prompt = buildSystemPrompt(input)
+    const { prompt } = buildSystemPrompt(input)
 
     expect(prompt).toContain("폭발 직전")
   })
@@ -336,7 +338,7 @@ describe("buildSystemPrompt with voiceStyle", () => {
         vocabularyLevel: 0.8,
       },
     })
-    const prompt = buildSystemPrompt(input)
+    const { prompt } = buildSystemPrompt(input)
 
     expect(prompt).toContain("[말투 스타일]")
     expect(prompt).toContain("격식")
@@ -345,7 +347,7 @@ describe("buildSystemPrompt with voiceStyle", () => {
 
   it("voiceStyle 미제공 시 말투 스타일 섹션 없음", () => {
     const input = makeInput()
-    const prompt = buildSystemPrompt(input)
+    const { prompt } = buildSystemPrompt(input)
 
     expect(prompt).not.toContain("[말투 스타일]")
   })
@@ -361,8 +363,91 @@ describe("buildSystemPrompt with voiceStyle", () => {
         vocabularyLevel: 0.5,
       },
     })
-    const prompt = buildSystemPrompt(input)
+    const { prompt } = buildSystemPrompt(input)
 
     expect(prompt).not.toContain("[말투 스타일]")
+  })
+})
+
+// ═══ buildFewShotSnippet ═══
+
+const makeL1 = (overrides?: Partial<SocialPersonaVector>): SocialPersonaVector => ({
+  depth: 0.5,
+  lens: 0.5,
+  stance: 0.5,
+  scope: 0.5,
+  taste: 0.5,
+  purpose: 0.5,
+  sociability: 0.5,
+  ...overrides,
+})
+
+describe("buildFewShotSnippet", () => {
+  it("fewShotKey 형식: {soc}|{sta}|{len}", () => {
+    const { fewShotKey } = buildFewShotSnippet(makeL1({ sociability: 0.1, stance: 0.9, lens: 0.5 }))
+    expect(fewShotKey).toBe("low|high|mid")
+  })
+
+  it("low sociability → 독백 예시 포함", () => {
+    const { text } = buildFewShotSnippet(makeL1({ sociability: 0.1 }))
+    expect(text).toContain("혼자")
+  })
+
+  it("high sociability → 대화 예시 포함", () => {
+    const { text } = buildFewShotSnippet(makeL1({ sociability: 0.9 }))
+    expect(text).toContain("너도 봤어?")
+  })
+
+  it("high stance → 비판 예시 포함", () => {
+    const { text } = buildFewShotSnippet(makeL1({ stance: 0.9 }))
+    expect(text).toContain("기대 이하")
+  })
+
+  it("low lens → 감성 예시 포함", () => {
+    const { text } = buildFewShotSnippet(makeL1({ lens: 0.1 }))
+    expect(text).toContain("감정이 계속 올라오는")
+  })
+
+  it("high lens → 논리 예시 포함", () => {
+    const { text } = buildFewShotSnippet(makeL1({ lens: 0.9 }))
+    expect(text).toContain("서사 구조")
+  })
+})
+
+// ═══ buildSystemPrompt + fewShot ═══
+
+describe("buildSystemPrompt with fewShot", () => {
+  it("fewShotEnabled=true + l1Vector 있으면 문체 예시 섹션 포함 + fewShotKey 반환", () => {
+    const l1 = makeL1({ sociability: 0.9, stance: 0.1, lens: 0.9 })
+    const input = makeInput({
+      personaProfile: { name: "테스터", fewShotEnabled: true },
+      l1Vector: l1,
+    })
+    const { prompt, fewShotKey } = buildSystemPrompt(input)
+
+    expect(prompt).toContain("[문체 예시")
+    expect(fewShotKey).toBe("high|low|high")
+  })
+
+  it("fewShotEnabled=false → 문체 예시 없음, fewShotKey undefined", () => {
+    const l1 = makeL1({ sociability: 0.9 })
+    const input = makeInput({
+      personaProfile: { name: "테스터", fewShotEnabled: false },
+      l1Vector: l1,
+    })
+    const { prompt, fewShotKey } = buildSystemPrompt(input)
+
+    expect(prompt).not.toContain("[문체 예시")
+    expect(fewShotKey).toBeUndefined()
+  })
+
+  it("l1Vector 없으면 fewShotEnabled=true여도 문체 예시 없음", () => {
+    const input = makeInput({
+      personaProfile: { name: "테스터", fewShotEnabled: true },
+    })
+    const { prompt, fewShotKey } = buildSystemPrompt(input)
+
+    expect(prompt).not.toContain("[문체 예시")
+    expect(fewShotKey).toBeUndefined()
   })
 })

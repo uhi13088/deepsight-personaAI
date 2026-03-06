@@ -47,6 +47,7 @@ export interface SchedulerPersona {
   commentPrompt?: string | null
   voiceSpec?: unknown | null
   factbook?: unknown | null
+  fewShotEnabled?: boolean | null
   // Activity scheduling fields
   postFrequency?: string // PostFrequency enum value
   activeHours?: number[] // DB 저장 활동 시간대

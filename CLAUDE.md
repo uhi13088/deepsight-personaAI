@@ -72,24 +72,27 @@ pnpm --filter engine-studio build  # 앱별 빌드
 반복적인 워크플로우는 `skills/` 디렉터리에 독립 스킬로 분리되어 있습니다.
 각 스킬은 `references/` 폴더에 체크리스트 등 참조 자료를 포함할 수 있습니다.
 
-| 스킬            | 경로                           | 설명                                                      |
-| --------------- | ------------------------------ | --------------------------------------------------------- |
-| `/next`         | `skills/next/SKILL.md`         | 다음 작업 진행 (lessons.md 자동 참조 + 티켓 품질 검증)    |
-| `/validate`     | `skills/validate/SKILL.md`     | 전체 검증 + 품질 체크리스트 + lessons.md 교차 확인        |
-| `/status`       | `skills/status/SKILL.md`       | 프로젝트 상태 요약                                        |
-| `/pr`           | `skills/pr/SKILL.md`           | PR 설명 자동 생성                                         |
-| `/debug`        | `skills/debug/SKILL.md`        | 구조적 디버깅 (가설 수립 → 검증 → 근본 해결)              |
-| `/sync-check`   | `skills/sync-check/SKILL.md`   | API 문서 / DB 스키마 불일치 감지                          |
-| `/session-wrap` | `skills/session-wrap/SKILL.md` | 세션 마무리 (TASK.md 동기화 + lessons.md 확인 + 핸드오프) |
+| 스킬             | 경로                            | 설명                                                                 |
+| ---------------- | ------------------------------- | -------------------------------------------------------------------- |
+| `/next`          | `skills/next/SKILL.md`          | 다음 작업 진행 (lessons.md 자동 참조 + 티켓 품질 검증)               |
+| `/validate`      | `skills/validate/SKILL.md`      | 전체 검증 + 2단계 코드 리뷰 + 품질 체크리스트 + lessons.md 교차 확인 |
+| `/status`        | `skills/status/SKILL.md`        | 프로젝트 상태 요약                                                   |
+| `/pr`            | `skills/pr/SKILL.md`            | PR 설명 자동 생성                                                    |
+| `/debug`         | `skills/debug/SKILL.md`         | 구조적 디버깅 (가설 수립 → 검증 → 근본 해결)                         |
+| `/sync-check`    | `skills/sync-check/SKILL.md`    | API 문서 / DB 스키마 불일치 감지                                     |
+| `/session-wrap`  | `skills/session-wrap/SKILL.md`  | 세션 마무리 (TASK.md 동기화 + lessons.md 확인 + 핸드오프)            |
+| `/brainstorm`    | `skills/brainstorm/SKILL.md`    | 설계 승인 전 구현 금지 — 소크라테스식 질문 → 방식 제안 → 승인 → 계획 |
+| `/writing-plans` | `skills/writing-plans/SKILL.md` | 대형 티켓 실행 계획 (2-5분 단위 태스크 분해 → `docs/plans/` 문서화)  |
 
 ## 보안 훅 (Hooks)
 
 자동으로 실행되는 보안 가드입니다 (`.claude/settings.json`에 등록됨).
 
-| 훅                     | 경로                            | 타이밍      | 역할                                                    |
-| ---------------------- | ------------------------------- | ----------- | ------------------------------------------------------- |
-| `output-secret-filter` | `hooks/output-secret-filter.sh` | PostToolUse | 도구 출력에서 API 키/토큰/DB URL 등 시크릿 감지 시 경고 |
-| `db-guard`             | `hooks/db-guard.sh`             | PreToolUse  | DROP/TRUNCATE/DELETE(WHERE 없음) 등 파괴적 SQL 차단     |
+| 훅                     | 경로                            | 타이밍       | 역할                                                              |
+| ---------------------- | ------------------------------- | ------------ | ----------------------------------------------------------------- |
+| `session-start`        | `hooks/session-start.sh`        | SessionStart | 세션 시작 시 lessons.md 교훈 + TASK.md IN_PROGRESS 티켓 자동 표시 |
+| `output-secret-filter` | `hooks/output-secret-filter.sh` | PostToolUse  | 도구 출력에서 API 키/토큰/DB URL 등 시크릿 감지 시 경고           |
+| `db-guard`             | `hooks/db-guard.sh`             | PreToolUse   | DROP/TRUNCATE/DELETE(WHERE 없음) 등 파괴적 SQL 차단               |
 
 - 훅 로그: `~/.claude/logs/security.log`
 - 훅 수정 시 `.claude/settings.json`의 hooks 섹션도 함께 확인

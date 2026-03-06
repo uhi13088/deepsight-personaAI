@@ -24,6 +24,7 @@ import {
   CASUAL_L1 as casualL1,
   EXTROVERT_L2 as extrovertL2,
   VOLATILE_L3 as volatileL3,
+  HIGH_L1 as highL1,
 } from "../fixtures"
 
 // ── 테스트 데이터 ────────────────────────────────────────────
@@ -94,6 +95,35 @@ describe("generateGuardrails", () => {
   it("친화적 페르소나 → 낮은 공격성 상한", () => {
     const guardrails = generateGuardrails(formalL1, introvertL2, stableL3)
     expect(guardrails.toneBoundaries.maxAggression).toBeLessThanOrEqual(0.5)
+  })
+
+  // ── Humanizer rules ────────────────────────────────────────
+
+  it("모든 페르소나 → 챗봇식 클로징 금지 (universal humanizer rule)", () => {
+    const guardrails = generateGuardrails(casualL1, extrovertL2, volatileL3)
+    const hasRule = guardrails.forbiddenBehaviors.some((b) => b.includes("챗봇식 클로징"))
+    expect(hasRule).toBe(true)
+  })
+
+  it("내향적 페르소나 (sociability < 0.4) → 독자 호명 금지", () => {
+    // formalL1.sociability = 0.3 < 0.4
+    const guardrails = generateGuardrails(formalL1, introvertL2, stableL3)
+    const hasRule = guardrails.forbiddenBehaviors.some((b) => b.includes("독자에게 직접 말걸기"))
+    expect(hasRule).toBe(true)
+  })
+
+  it("단정적 페르소나 (stance > 0.7) → Generic Conclusion 금지", () => {
+    // highL1.stance = 0.85 > 0.7
+    const guardrails = generateGuardrails(highL1, introvertL2, stableL3)
+    const hasRule = guardrails.forbiddenBehaviors.some((b) => b.includes("Generic Conclusion"))
+    expect(hasRule).toBe(true)
+  })
+
+  it("외향적 페르소나 (sociability >= 0.4) → 독자 호명 금지 규칙 없음", () => {
+    // casualL1.sociability = 0.7 >= 0.4
+    const guardrails = generateGuardrails(casualL1, extrovertL2, volatileL3)
+    const hasRule = guardrails.forbiddenBehaviors.some((b) => b.includes("독자에게 직접 말걸기"))
+    expect(hasRule).toBe(false)
   })
 })
 

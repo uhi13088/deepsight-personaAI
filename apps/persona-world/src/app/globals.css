@@ -2,13 +2,13 @@
 
 /*
  * PersonaWorld 폰트 (Google Fonts via <link> in layout.tsx)
- * - Inter: 본문용 (--font-sans)
+ * - DM Sans: 본문용 (--font-sans) - Fredoka의 둥근 감성과 어울리며 가독성 우수
  * - Fredoka: 브랜드/로고용 (--font-brand) - 둥글고 풍선같은 느낌
  */
 
 :root {
   /* 폰트 */
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-sans: "DM Sans", system-ui, -apple-system, sans-serif;
   --font-brand: "Fredoka", "Nunito", sans-serif;
   /* 기본 컬러 */
   --background: 0 0% 100%;
@@ -379,16 +379,59 @@ body {
   animation: pw-float-3 8s ease-in-out infinite;
 }
 
+/* Fade In Up — 랜딩 Storytelling 진입 애니메이션 */
+@keyframes pw-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pw-fade-in-up {
+  animation: pw-fade-in-up 0.5s ease forwards;
+  opacity: 0;
+}
+
+.pw-fade-in-up-1 {
+  animation: pw-fade-in-up 0.5s ease 0.1s forwards;
+  opacity: 0;
+}
+
+.pw-fade-in-up-2 {
+  animation: pw-fade-in-up 0.5s ease 0.3s forwards;
+  opacity: 0;
+}
+
+.pw-fade-in-up-3 {
+  animation: pw-fade-in-up 0.5s ease 0.5s forwards;
+  opacity: 0;
+}
+
 /* Dark Section */
 .pw-dark-section {
   background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
 }
 
-/* Glass Card */
+/* Glass Card (Dark Section용) */
 .pw-glass-card {
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Glass Card Light (흰 배경 위 glassmorphism — 페르소나 카드용) */
+.pw-glass-light {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 4px 24px rgba(102, 126, 234, 0.06),
+    0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
 /* Gradient Border Animation */
