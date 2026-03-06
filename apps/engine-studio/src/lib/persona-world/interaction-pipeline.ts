@@ -39,6 +39,7 @@ import { securityOutputMiddleware, createSecurityQuarantine } from "./security/s
 import { isFeatureEnabled, type PWKillSwitchConfig } from "./security/pw-kill-switch"
 import type { ImmutableFact } from "@/types"
 import { runModerationPipeline } from "./moderation/auto-moderator"
+import { INTERACTION_LIMITS } from "./constants"
 
 // ── 타입 정의 ────────────────────────────────────────────────
 
@@ -183,8 +184,11 @@ export async function executeInteractions(
     }
   }
 
-  // Step 1: 최근 피드 포스트 조회 (최대 10개)
-  const feedPosts = await dataProvider.getRecentFeedPosts(persona.id, 10)
+  // Step 1: 최근 피드 포스트 조회 (세션 당 최대 maxFeedPostsPerRun개)
+  const feedPosts = await dataProvider.getRecentFeedPosts(
+    persona.id,
+    INTERACTION_LIMITS.maxFeedPostsPerRun
+  )
 
   if (feedPosts.length === 0) {
     return { likes, comments, reposts, follows, totalTokensUsed: 0 }
@@ -196,10 +200,24 @@ export async function executeInteractions(
   const l2Result = classifyL2Pattern(personaVectors.temperament)
   const l2Pattern = l2Result.pattern // L2ConflictPattern 문자열
 
+  // 세션 당 인터랙션 카운터
+  let likeCount = 0
+  let commentCount = 0
+  let repostCount = 0
+
   // Step 2-3: 각 포스트에 대해 인터랙션 판정
   for (const post of feedPosts) {
     // 자기 글 스킵
     if (post.authorId === persona.id) continue
+
+    // 세션 한도 초과 시 루프 조기 종료
+    if (
+      likeCount >= INTERACTION_LIMITS.maxLikesPerRun &&
+      commentCount >= INTERACTION_LIMITS.maxCommentsPerRun &&
+      repostCount >= INTERACTION_LIMITS.maxRepostsPerRun
+    ) {
+      break
+    }
 
     const [matchScore, isFollowingAuthor, relationship] = await Promise.all([
       dataProvider.getBasicMatchScore(persona.id, post.authorId),
@@ -227,7 +245,7 @@ export async function executeInteractions(
     // 좋아요 실행 (출처 태깅 포함)
     // P2002(unique constraint) 방어: 이미 좋아요한 포스트면 중복 저장 스킵하고 liked로 처리
     let alreadyLiked = false
-    if (Math.random() < adjustedLikeProbability) {
+    if (likeCount < INTERACTION_LIMITS.maxLikesPerRun && Math.random() < adjustedLikeProbability) {
       const likeProvenance = computeInteractionProvenance({
         source: "SYSTEM",
         propagationDepth: 0,
@@ -236,6 +254,7 @@ export async function executeInteractions(
       try {
         await dataProvider.saveLike(persona.id, post.id, likeProvenance)
         likes.push({ postId: post.id, authorId: post.authorId })
+        likeCount++
 
         await dataProvider.updateRelationship(persona.id, post.authorId, "like")
 
@@ -263,12 +282,13 @@ export async function executeInteractions(
     const liked = alreadyLiked || likes.some((l) => l.postId === post.id)
     if (!liked) continue // 좋아요 없으면 리포스트/댓글도 없음
 
-    if (dataProvider.saveRepost) {
+    if (dataProvider.saveRepost && repostCount < INTERACTION_LIMITS.maxRepostsPerRun) {
       const repostProb = computeRepostProbability(matchScore, interactivity, state.mood)
       if (Math.random() < repostProb) {
         try {
           await dataProvider.saveRepost(persona.id, post.id)
           reposts.push({ postId: post.id, authorId: post.authorId })
+          repostCount++
 
           await dataProvider.updateRelationship(persona.id, post.authorId, "repost")
 
@@ -289,6 +309,9 @@ export async function executeInteractions(
 
     // Phase RA: 댓글 여부 결정 — L2 기질 + tension 기반 Engagement Decision
     // L2 패턴 + tension → skip/react_only/comment 확률적 결정
+
+    // 세션 댓글 한도 초과 시 스킵
+    if (commentCount >= INTERACTION_LIMITS.maxCommentsPerRun) continue
 
     // 이미 이 포스트에 댓글을 달았으면 스킵 (중복 댓글 방지)
     if (dataProvider.hasCommented) {
@@ -455,6 +478,7 @@ export async function executeInteractions(
       commentProvenance
     )
     comments.push({ postId: post.id, authorId: post.authorId, commentId: saved.id })
+    commentCount++
 
     await dataProvider.updateRelationship(persona.id, post.authorId, "comment")
 
