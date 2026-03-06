@@ -9,11 +9,12 @@ import {
   computeActivityTraits,
   computeActiveHours,
   computeActivityProbabilities,
+  computePostRateLimits,
 } from "./activity-mapper"
 import { getPersonaState } from "./state-manager"
 import { selectPostType } from "./post-type-selector"
 import { decideParadoxActivity } from "./paradox-activity"
-import { ACTIVITY_THRESHOLDS, DAILY_POST_LIMITS, MIN_POST_INTERVAL_HOURS } from "./constants"
+import { ACTIVITY_THRESHOLDS } from "./constants"
 import { updatePersonaState } from "./state-manager"
 import type {
   ActivityDecision,
@@ -280,8 +281,9 @@ export function decideActivity(
     persona.postFrequency
   )
 
-  // 2. 포스트 여부: 시간대 + 하드 리밋 체크
-  const dailyLimit = DAILY_POST_LIMITS[persona.postFrequency ?? ""] ?? DAILY_POST_LIMITS.DEFAULT
+  // 2. 포스트 여부: 시간대 + 벡터 기반 동적 리밋 체크
+  // endurance(지속성) × postFrequency(빈도 배수) → 일일 한도 + 최소 간격 동적 산출
+  const { dailyLimit, minIntervalHours } = computePostRateLimits(traits, persona.postFrequency)
 
   // 일일 한도 초과 체크
   if (todayPostCount >= dailyLimit) {
@@ -295,17 +297,17 @@ export function decideActivity(
     }
   }
 
-  // 마지막 포스팅 이후 최소 간격 체크 (MIN_POST_INTERVAL_HOURS)
+  // 마지막 포스팅 이후 최소 간격 체크 (endurance × postFrequency 기반 동적 산출)
   if (lastPostAt) {
     const hoursSinceLastPost = (Date.now() - lastPostAt.getTime()) / (1000 * 60 * 60)
-    if (hoursSinceLastPost < MIN_POST_INTERVAL_HOURS) {
+    if (hoursSinceLastPost < minIntervalHours) {
       const shouldInteract =
         state.socialBattery > ACTIVITY_THRESHOLDS.minSocialBattery &&
         Math.random() < (isInActiveHours ? interactionProbability : interactionProbability * 0.5)
       return {
         shouldPost: false,
         shouldInteract,
-        blockedReason: `min_interval(${hoursSinceLastPost.toFixed(1)}h < ${MIN_POST_INTERVAL_HOURS}h)`,
+        blockedReason: `min_interval(${hoursSinceLastPost.toFixed(1)}h < ${minIntervalHours.toFixed(1)}h)`,
       }
     }
   }

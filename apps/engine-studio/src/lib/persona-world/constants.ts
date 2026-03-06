@@ -219,20 +219,22 @@ export const ACTIVITY_THRESHOLDS = {
   paradoxExplosion: 0.9, // paradoxTension > 0.9 → 강제 Paradox 발현
 } as const
 
-// ── 일일 포스트 하드 리밋 ────────────────────────────────────
-// postFrequency별 하루 최대 포스트 수 (비용 폭탄 + 도배 방지)
-export const DAILY_POST_LIMITS: Record<string, number> = {
-  RARE: 1,
-  OCCASIONAL: 2,
-  MODERATE: 3,
-  ACTIVE: 5,
-  HYPERACTIVE: 7,
-  DEFAULT: 3,
-}
-
-// 마지막 포스팅 이후 최소 경과 시간 (시간 단위)
-// 동일 페르소나의 연속 포스팅 방지
-export const MIN_POST_INTERVAL_HOURS = 2
+// ── 포스트 빈도 제어 기반 파라미터 ──────────────────────────
+// 하드코딩 대신 벡터 기반 동적 산출 (activity-mapper.computePostRateLimits 참조)
+// 공식:
+//   dailyLimit       = ceil(baseDailyPosts × freqMultiplier × enduranceFactor)
+//   minIntervalHours = clamp(baseIntervalHours ÷ (freqMultiplier × enduranceFactor), floor, ceil)
+//   enduranceFactor  = 0.5 + traits.endurance × 0.5  (0.5~1.0)
+export const POST_RATE_PARAMS = {
+  /** 사람이 하루에 올리는 기본 포스트 수 */
+  baseDailyPosts: 4,
+  /** 포스팅 간 기본 최소 간격 (시간) */
+  baseIntervalHours: 4,
+  /** 최소 간격 하한 (시간) */
+  intervalFloorHours: 1,
+  /** 최소 간격 상한 (시간) */
+  intervalCeilHours: 12,
+} as const
 
 // ── 피드 비율 ────────────────────────────────────────────────
 // 설계서 §6.1 유저 피드 구성

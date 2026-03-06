@@ -6,7 +6,7 @@
 
 import { clamp } from "@/lib/vector/utils"
 import type { ThreeLayerVector } from "@/types/persona-v3"
-import { ACTIVE_HOURS, TRAIT_WEIGHTS } from "./constants"
+import { ACTIVE_HOURS, TRAIT_WEIGHTS, POST_RATE_PARAMS } from "./constants"
 import type { ActivityTraitsV3, PersonaStateData, VoiceStyleParams } from "./types"
 
 /**
@@ -229,4 +229,40 @@ export function computeActivityProbabilities(
   )
 
   return { postProbability, interactionProbability }
+}
+
+/**
+ * 페르소나 트레이트 기반 포스트 빈도 제한 동적 산출.
+ *
+ * 하드코딩 대신 endurance(지속성) + postFrequency(빈도 배수)를 조합:
+ *
+ *   enduranceFactor  = 0.5 + endurance × 0.5            (0.5~1.0)
+ *   dailyLimit       = ceil(baseDailyPosts × freqMultiplier × enduranceFactor)
+ *   minIntervalHours = clamp(baseInterval ÷ (freqMultiplier × enduranceFactor), floor, ceil)
+ *
+ * 예시 (baseDailyPosts=4, baseInterval=4h):
+ *   MODERATE  + endurance 0.5 → dailyLimit=3,  minInterval=5.3h
+ *   ACTIVE    + endurance 0.7 → dailyLimit=5,  minInterval=3.1h
+ *   HYPERACTIVE + endurance 0.9 → dailyLimit=8, minInterval=2.1h
+ *   RARE      + endurance 0.2 → dailyLimit=1,  minInterval=12h (상한)
+ */
+export function computePostRateLimits(
+  traits: ActivityTraitsV3,
+  postFrequency?: string
+): { dailyLimit: number; minIntervalHours: number } {
+  const freqMultiplier = postFrequency ? (POST_FREQUENCY_MULTIPLIERS[postFrequency] ?? 1.0) : 1.0
+  // endurance 0~1 → 0.5~1.0 범위로 스케일 (너무 낮아도 최소한의 지속성 보장)
+  const enduranceFactor = 0.5 + traits.endurance * 0.5
+
+  const combined = freqMultiplier * enduranceFactor
+
+  const dailyLimit = Math.max(1, Math.ceil(POST_RATE_PARAMS.baseDailyPosts * combined))
+
+  const rawInterval = POST_RATE_PARAMS.baseIntervalHours / combined
+  const minIntervalHours = Math.max(
+    POST_RATE_PARAMS.intervalFloorHours,
+    Math.min(POST_RATE_PARAMS.intervalCeilHours, rawInterval)
+  )
+
+  return { dailyLimit, minIntervalHours }
 }
