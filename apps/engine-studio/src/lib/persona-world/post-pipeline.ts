@@ -354,6 +354,21 @@ export async function executePostCreation(
     })
   }
 
+  // Step 5.9: 중복 콘텐츠 탐지 — 최근 포스트와 도입부 80자 비교
+  if (recentTexts.length > 0) {
+    const newLead = result.content.slice(0, 80).replace(/\s+/g, " ").trim()
+    const isDuplicate = recentTexts.some((prev) => {
+      const prevLead = prev.slice(0, 80).replace(/\s+/g, " ").trim()
+      // 80자 중 60자 이상 일치하면 중복으로 판단
+      return prevLead.length > 0 && newLead.startsWith(prevLead.slice(0, 60))
+    })
+    if (isDuplicate) {
+      throw new Error(
+        "[PostPipeline] Duplicate content detected — skipping post to prevent repetition"
+      )
+    }
+  }
+
   // Step 6: 해시태그 추출
   const hashtags = extractHashtags(result.content)
 

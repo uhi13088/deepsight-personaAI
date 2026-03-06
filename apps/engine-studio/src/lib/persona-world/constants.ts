@@ -219,6 +219,21 @@ export const ACTIVITY_THRESHOLDS = {
   paradoxExplosion: 0.9, // paradoxTension > 0.9 → 강제 Paradox 발현
 } as const
 
+// ── 일일 포스트 하드 리밋 ────────────────────────────────────
+// postFrequency별 하루 최대 포스트 수 (비용 폭탄 + 도배 방지)
+export const DAILY_POST_LIMITS: Record<string, number> = {
+  RARE: 1,
+  OCCASIONAL: 2,
+  MODERATE: 3,
+  ACTIVE: 5,
+  HYPERACTIVE: 7,
+  DEFAULT: 3,
+}
+
+// 마지막 포스팅 이후 최소 경과 시간 (시간 단위)
+// 동일 페르소나의 연속 포스팅 방지
+export const MIN_POST_INTERVAL_HOURS = 2
+
 // ── 피드 비율 ────────────────────────────────────────────────
 // 설계서 §6.1 유저 피드 구성
 export const FEED_RATIOS = {

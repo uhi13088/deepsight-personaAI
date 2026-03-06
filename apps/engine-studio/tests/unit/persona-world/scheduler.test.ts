@@ -76,6 +76,8 @@ const makeContext = (overrides?: Partial<SchedulerContext>): SchedulerContext =>
 const makeMockProvider = (personas: SchedulerPersona[] = []): SchedulerDataProvider => ({
   getActiveStatusPersonas: vi.fn().mockResolvedValue(personas),
   getLastActivityAt: vi.fn().mockResolvedValue(null),
+  getTodayPostCount: vi.fn().mockResolvedValue(0),
+  getLastPostAt: vi.fn().mockResolvedValue(null),
 })
 
 // ═══ decideActivity ═══
