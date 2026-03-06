@@ -187,24 +187,68 @@ export function computeVoiceParams(vectors: ThreeLayerVector): VoiceStyleParams 
 }
 
 /**
+ * 인터랙션 스타일 5단계 분류.
+ *
+ * engagementScore = (sociability + interactivity) / 2
+ *
+ * | 유형        | 조건                                         | 특징                   |
+ * |-------------|----------------------------------------------|------------------------|
+ * | OBSERVER    | score < 0.20                                 | 피드만 훑음, 반응 최소 |
+ * | LURKER      | score < 0.40                                 | 좋아요만, 댓글 없음    |
+ * | CASUAL      | score < 0.60                                 | 보통 참여              |
+ * | SOCIAL      | score < 0.80 (단, volatility < 0.70)         | 활발한 참여            |
+ * | HYPERACTIVE | score ≥ 0.80 또는 SOCIAL 범위 + volatility ≥ 0.70 | 충동적 과반응     |
+ */
+export type InteractionStyle = "OBSERVER" | "LURKER" | "CASUAL" | "SOCIAL" | "HYPERACTIVE"
+
+export function classifyInteractionStyle(traits: ActivityTraitsV3): InteractionStyle {
+  const engagementScore = (traits.sociability + traits.interactivity) / 2
+
+  if (engagementScore < 0.2) return "OBSERVER"
+  if (engagementScore < 0.4) return "LURKER"
+  if (engagementScore < 0.6) return "CASUAL"
+  // SOCIAL 범위(0.60~0.80)이더라도 volatility가 높으면 충동적 과반응으로 승급
+  if (engagementScore < 0.8 && traits.volatility < 0.7) return "SOCIAL"
+  return "HYPERACTIVE"
+}
+
+/** 유형별 세션당 인터랙션 한도 테이블 */
+const INTERACTION_STYLE_LIMITS: Record<
+  InteractionStyle,
+  {
+    maxFeedPostsPerRun: number
+    maxLikesPerRun: number
+    maxCommentsPerRun: number
+    maxRepostsPerRun: number
+  }
+> = {
+  OBSERVER: { maxFeedPostsPerRun: 3, maxLikesPerRun: 1, maxCommentsPerRun: 0, maxRepostsPerRun: 0 },
+  LURKER: { maxFeedPostsPerRun: 4, maxLikesPerRun: 2, maxCommentsPerRun: 0, maxRepostsPerRun: 0 },
+  CASUAL: { maxFeedPostsPerRun: 5, maxLikesPerRun: 3, maxCommentsPerRun: 1, maxRepostsPerRun: 1 },
+  SOCIAL: { maxFeedPostsPerRun: 6, maxLikesPerRun: 4, maxCommentsPerRun: 2, maxRepostsPerRun: 1 },
+  HYPERACTIVE: {
+    maxFeedPostsPerRun: 7,
+    maxLikesPerRun: 5,
+    maxCommentsPerRun: 2,
+    maxRepostsPerRun: 2,
+  },
+}
+
+/**
  * 트레이트 기반 인터랙션 세션당 한도 동적 산출.
  *
- * - maxLikesPerRun:     sociability × interactivity × 6, 범위 1~5
- * - maxCommentsPerRun:  expressiveness × endurance × 2, 범위 0~2
- * - maxRepostsPerRun:   initiative × sociability × 2, 범위 0~2
- * - maxFeedPostsPerRun: 3 + interactivity × 4, 범위 3~7
+ * 5단계 InteractionStyle 분류 후 테이블 조회.
+ * style 필드를 함께 반환하므로 파이프라인 로그/디버깅에 활용 가능.
  */
 export function computeInteractionLimits(traits: ActivityTraitsV3): {
+  style: InteractionStyle
   maxFeedPostsPerRun: number
   maxLikesPerRun: number
   maxCommentsPerRun: number
   maxRepostsPerRun: number
 } {
-  const maxLikesPerRun = Math.max(1, Math.round(traits.sociability * traits.interactivity * 6))
-  const maxCommentsPerRun = Math.max(0, Math.round(traits.expressiveness * traits.endurance * 2))
-  const maxRepostsPerRun = Math.max(0, Math.round(traits.initiative * traits.sociability * 2))
-  const maxFeedPostsPerRun = 3 + Math.round(traits.interactivity * 4)
-  return { maxFeedPostsPerRun, maxLikesPerRun, maxCommentsPerRun, maxRepostsPerRun }
+  const style = classifyInteractionStyle(traits)
+  return { style, ...INTERACTION_STYLE_LIMITS[style] }
 }
 
 /**
