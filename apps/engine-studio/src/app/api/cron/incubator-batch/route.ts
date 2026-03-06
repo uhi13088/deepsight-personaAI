@@ -31,11 +31,22 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // 설정에서 dailyLimit, passThreshold 조회
+    // 설정에서 enabled, dailyLimit, passThreshold 조회
     const configRows = await prisma.systemConfig
       .findMany({ where: { category: "INCUBATOR" } })
       .catch(() => [])
     const configMap = Object.fromEntries(configRows.map((r) => [r.key, r.value]))
+
+    // 인큐베이터 비활성화 상태면 실행 스킵
+    const isEnabled = configMap.enabled !== false && configMap.enabled !== "false"
+    if (!isEnabled) {
+      console.log("[IncubatorBatch] 인큐베이터가 비활성화 상태입니다. 실행 건너뜀.")
+      return NextResponse.json<ApiResponse<{ skipped: boolean; reason: string }>>({
+        success: true,
+        data: { skipped: true, reason: "incubator_disabled" },
+      })
+    }
+
     const dailyLimit = (configMap.dailyLimit as number) ?? 10
     const passThreshold = (configMap.passThreshold as number) ?? 0.9
 

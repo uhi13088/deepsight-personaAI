@@ -6,7 +6,7 @@
 
 import { clamp } from "@/lib/vector/utils"
 import type { ThreeLayerVector } from "@/types/persona-v3"
-import { ACTIVE_HOURS, TRAIT_WEIGHTS } from "./constants"
+import { ACTIVE_HOURS, TRAIT_WEIGHTS, POST_RATE_PARAMS } from "./constants"
 import type { ActivityTraitsV3, PersonaStateData, VoiceStyleParams } from "./types"
 
 /**
@@ -187,6 +187,71 @@ export function computeVoiceParams(vectors: ThreeLayerVector): VoiceStyleParams 
 }
 
 /**
+ * 인터랙션 스타일 5단계 분류.
+ *
+ * engagementScore = (sociability + interactivity) / 2
+ *
+ * | 유형        | 조건                                         | 특징                   |
+ * |-------------|----------------------------------------------|------------------------|
+ * | OBSERVER    | score < 0.20                                 | 피드만 훑음, 반응 최소 |
+ * | LURKER      | score < 0.40                                 | 좋아요만, 댓글 없음    |
+ * | CASUAL      | score < 0.60                                 | 보통 참여              |
+ * | SOCIAL      | score < 0.80 (단, volatility < 0.70)         | 활발한 참여            |
+ * | HYPERACTIVE | score ≥ 0.80 또는 SOCIAL 범위 + volatility ≥ 0.70 | 충동적 과반응     |
+ */
+export type InteractionStyle = "OBSERVER" | "LURKER" | "CASUAL" | "SOCIAL" | "HYPERACTIVE"
+
+export function classifyInteractionStyle(traits: ActivityTraitsV3): InteractionStyle {
+  const engagementScore = (traits.sociability + traits.interactivity) / 2
+
+  if (engagementScore < 0.2) return "OBSERVER"
+  if (engagementScore < 0.4) return "LURKER"
+  if (engagementScore < 0.6) return "CASUAL"
+  // SOCIAL 범위(0.60~0.80)이더라도 volatility가 높으면 충동적 과반응으로 승급
+  if (engagementScore < 0.8 && traits.volatility < 0.7) return "SOCIAL"
+  return "HYPERACTIVE"
+}
+
+/** 유형별 세션당 인터랙션 한도 테이블 */
+const INTERACTION_STYLE_LIMITS: Record<
+  InteractionStyle,
+  {
+    maxFeedPostsPerRun: number
+    maxLikesPerRun: number
+    maxCommentsPerRun: number
+    maxRepostsPerRun: number
+  }
+> = {
+  OBSERVER: { maxFeedPostsPerRun: 3, maxLikesPerRun: 1, maxCommentsPerRun: 0, maxRepostsPerRun: 0 },
+  LURKER: { maxFeedPostsPerRun: 4, maxLikesPerRun: 2, maxCommentsPerRun: 0, maxRepostsPerRun: 0 },
+  CASUAL: { maxFeedPostsPerRun: 5, maxLikesPerRun: 3, maxCommentsPerRun: 1, maxRepostsPerRun: 1 },
+  SOCIAL: { maxFeedPostsPerRun: 6, maxLikesPerRun: 4, maxCommentsPerRun: 2, maxRepostsPerRun: 1 },
+  HYPERACTIVE: {
+    maxFeedPostsPerRun: 7,
+    maxLikesPerRun: 5,
+    maxCommentsPerRun: 2,
+    maxRepostsPerRun: 2,
+  },
+}
+
+/**
+ * 트레이트 기반 인터랙션 세션당 한도 동적 산출.
+ *
+ * 5단계 InteractionStyle 분류 후 테이블 조회.
+ * style 필드를 함께 반환하므로 파이프라인 로그/디버깅에 활용 가능.
+ */
+export function computeInteractionLimits(traits: ActivityTraitsV3): {
+  style: InteractionStyle
+  maxFeedPostsPerRun: number
+  maxLikesPerRun: number
+  maxCommentsPerRun: number
+  maxRepostsPerRun: number
+} {
+  const style = classifyInteractionStyle(traits)
+  return { style, ...INTERACTION_STYLE_LIMITS[style] }
+}
+
+/**
  * postFrequency 값 → 활동 확률 배수.
  *
  * RARE=0.3, OCCASIONAL=0.5, MODERATE=1.0, ACTIVE=1.5, HYPERACTIVE=2.0
@@ -229,4 +294,40 @@ export function computeActivityProbabilities(
   )
 
   return { postProbability, interactionProbability }
+}
+
+/**
+ * 페르소나 트레이트 기반 포스트 빈도 제한 동적 산출.
+ *
+ * 하드코딩 대신 endurance(지속성) + postFrequency(빈도 배수)를 조합:
+ *
+ *   enduranceFactor  = 0.5 + endurance × 0.5            (0.5~1.0)
+ *   dailyLimit       = ceil(baseDailyPosts × freqMultiplier × enduranceFactor)
+ *   minIntervalHours = clamp(baseInterval ÷ (freqMultiplier × enduranceFactor), floor, ceil)
+ *
+ * 예시 (baseDailyPosts=4, baseInterval=4h):
+ *   MODERATE  + endurance 0.5 → dailyLimit=3,  minInterval=5.3h
+ *   ACTIVE    + endurance 0.7 → dailyLimit=5,  minInterval=3.1h
+ *   HYPERACTIVE + endurance 0.9 → dailyLimit=8, minInterval=2.1h
+ *   RARE      + endurance 0.2 → dailyLimit=1,  minInterval=12h (상한)
+ */
+export function computePostRateLimits(
+  traits: ActivityTraitsV3,
+  postFrequency?: string
+): { dailyLimit: number; minIntervalHours: number } {
+  const freqMultiplier = postFrequency ? (POST_FREQUENCY_MULTIPLIERS[postFrequency] ?? 1.0) : 1.0
+  // endurance 0~1 → 0.5~1.0 범위로 스케일 (너무 낮아도 최소한의 지속성 보장)
+  const enduranceFactor = 0.5 + traits.endurance * 0.5
+
+  const combined = freqMultiplier * enduranceFactor
+
+  const dailyLimit = Math.max(1, Math.ceil(POST_RATE_PARAMS.baseDailyPosts * combined))
+
+  const rawInterval = POST_RATE_PARAMS.baseIntervalHours / combined
+  const minIntervalHours = Math.max(
+    POST_RATE_PARAMS.intervalFloorHours,
+    Math.min(POST_RATE_PARAMS.intervalCeilHours, rawInterval)
+  )
+
+  return { dailyLimit, minIntervalHours }
 }

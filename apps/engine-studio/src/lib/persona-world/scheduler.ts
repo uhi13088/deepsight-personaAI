@@ -9,6 +9,7 @@ import {
   computeActivityTraits,
   computeActiveHours,
   computeActivityProbabilities,
+  computePostRateLimits,
 } from "./activity-mapper"
 import { getPersonaState } from "./state-manager"
 import { selectPostType } from "./post-type-selector"
@@ -67,6 +68,10 @@ export interface SchedulerDataProvider {
   getActiveStatusPersonas(): Promise<SchedulerPersona[]>
   /** 페르소나의 마지막 활동 시간 조회 (없으면 null) */
   getLastActivityAt(personaId: string): Promise<Date | null>
+  /** 오늘(KST 기준) 포스팅 횟수 조회 */
+  getTodayPostCount(personaId: string): Promise<number>
+  /** 마지막 포스팅 시간 조회 (없으면 null) */
+  getLastPostAt(personaId: string): Promise<Date | null>
 }
 
 /**
@@ -82,6 +87,7 @@ export interface SchedulerResult {
     shouldInteract: boolean
     postType?: string
     paradoxTriggered: boolean
+    blockedReason?: string
   }>
 }
 
@@ -108,8 +114,23 @@ export async function runScheduler(
   const decisions: SchedulerResult["decisions"] = []
 
   // Step 3-5: 각 페르소나별 활동 결정
-  for (const { persona, traits, state, isInActiveHours } of activePersonas) {
-    const decision = decideActivity(persona, traits, state, context, isInActiveHours)
+  for (const {
+    persona,
+    traits,
+    state,
+    isInActiveHours,
+    todayPostCount,
+    lastPostAt,
+  } of activePersonas) {
+    const decision = decideActivity(
+      persona,
+      traits,
+      state,
+      context,
+      isInActiveHours,
+      todayPostCount,
+      lastPostAt
+    )
 
     decisions.push({
       personaId: persona.id,
@@ -120,6 +141,7 @@ export async function runScheduler(
       paradoxTriggered: decision.postTypeReason
         ? decision.postTypeReason.selectedType.includes("BEHIND_STORY")
         : false,
+      blockedReason: decision.blockedReason,
     })
 
     // Step 7: 로깅 — 실행 파이프라인(post-pipeline, interaction-pipeline)에서
@@ -150,6 +172,8 @@ export async function getActivePersonas(
     traits: ActivityTraitsV3
     state: PersonaStateData
     isInActiveHours: boolean
+    todayPostCount: number
+    lastPostAt: Date | null
   }>
 > {
   const personas = await provider.getActiveStatusPersonas()
@@ -158,6 +182,8 @@ export async function getActivePersonas(
     traits: ActivityTraitsV3
     state: PersonaStateData
     isInActiveHours: boolean
+    todayPostCount: number
+    lastPostAt: Date | null
   }> = []
 
   console.log(`[Scheduler] 활성 페르소나 ${personas.length}명 평가 (hour=${currentHour})`)
@@ -199,7 +225,20 @@ export async function getActivePersonas(
     // 6. triggerMap 효과 적용 (벡터 임시 보정)
     const effectiveTraits = applyTriggerMapToTraits(persona, state, traits)
 
-    result.push({ persona, traits: effectiveTraits, state, isInActiveHours })
+    // 7. 일일 포스트 수 + 마지막 포스팅 시간 조회 (하드 리밋용)
+    const [todayPostCount, lastPostAt] = await Promise.all([
+      provider.getTodayPostCount(persona.id),
+      provider.getLastPostAt(persona.id),
+    ])
+
+    result.push({
+      persona,
+      traits: effectiveTraits,
+      state,
+      isInActiveHours,
+      todayPostCount,
+      lastPostAt,
+    })
   }
 
   if (personas.length > 0) {
@@ -231,8 +270,10 @@ export function decideActivity(
   traits: ActivityTraitsV3,
   state: PersonaStateData,
   context: SchedulerContext,
-  isInActiveHours = true
-): ActivityDecision {
+  isInActiveHours = true,
+  todayPostCount = 0,
+  lastPostAt: Date | null = null
+): ActivityDecision & { blockedReason?: string } {
   // 1. 활동 확률 (postFrequency 반영)
   const { postProbability, interactionProbability } = computeActivityProbabilities(
     traits,
@@ -240,7 +281,37 @@ export function decideActivity(
     persona.postFrequency
   )
 
-  // 2. 포스트 여부: 활동 시간대 밖이면 포스팅 차단
+  // 2. 포스트 여부: 시간대 + 벡터 기반 동적 리밋 체크
+  // endurance(지속성) × postFrequency(빈도 배수) → 일일 한도 + 최소 간격 동적 산출
+  const { dailyLimit, minIntervalHours } = computePostRateLimits(traits, persona.postFrequency)
+
+  // 일일 한도 초과 체크
+  if (todayPostCount >= dailyLimit) {
+    const shouldInteract =
+      state.socialBattery > ACTIVITY_THRESHOLDS.minSocialBattery &&
+      Math.random() < (isInActiveHours ? interactionProbability : interactionProbability * 0.5)
+    return {
+      shouldPost: false,
+      shouldInteract,
+      blockedReason: `daily_limit(${todayPostCount}/${dailyLimit})`,
+    }
+  }
+
+  // 마지막 포스팅 이후 최소 간격 체크 (endurance × postFrequency 기반 동적 산출)
+  if (lastPostAt) {
+    const hoursSinceLastPost = (Date.now() - lastPostAt.getTime()) / (1000 * 60 * 60)
+    if (hoursSinceLastPost < minIntervalHours) {
+      const shouldInteract =
+        state.socialBattery > ACTIVITY_THRESHOLDS.minSocialBattery &&
+        Math.random() < (isInActiveHours ? interactionProbability : interactionProbability * 0.5)
+      return {
+        shouldPost: false,
+        shouldInteract,
+        blockedReason: `min_interval(${hoursSinceLastPost.toFixed(1)}h < ${minIntervalHours.toFixed(1)}h)`,
+      }
+    }
+  }
+
   const shouldPost = isInActiveHours && Math.random() < postProbability
 
   // 3. 인터랙션 여부: 시간대 밖이면 확률 50% 감소 (수시 반응은 허용)

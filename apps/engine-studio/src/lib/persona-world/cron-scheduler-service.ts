@@ -516,6 +516,27 @@ function createSchedulerDataProvider(): SchedulerDataProvider {
       return log?.createdAt ?? null
     },
 
+    async getTodayPostCount(personaId: string): Promise<number> {
+      // KST 기준 오늘 0시
+      const now = new Date()
+      const kstOffset = 9 * 60 * 60 * 1000
+      const todayKst = new Date(
+        Math.floor((now.getTime() + kstOffset) / 86400000) * 86400000 - kstOffset
+      )
+      return prisma.personaPost.count({
+        where: { personaId, createdAt: { gte: todayKst } },
+      })
+    },
+
+    async getLastPostAt(personaId: string): Promise<Date | null> {
+      const post = await prisma.personaPost.findFirst({
+        where: { personaId },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      })
+      return post?.createdAt ?? null
+    },
+
     async getActiveStatusPersonas(): Promise<SchedulerPersona[]> {
       const personas = await prisma.persona.findMany({
         where: { status: { in: ["ACTIVE", "STANDARD"] } },

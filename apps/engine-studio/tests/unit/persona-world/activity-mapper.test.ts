@@ -5,7 +5,10 @@ import {
   computeActiveHours,
   computeActivityProbabilities,
   computeVoiceParams,
+  classifyInteractionStyle,
+  computeInteractionLimits,
 } from "@/lib/persona-world/activity-mapper"
+import type { ActivityTraitsV3 } from "@/lib/persona-world/types"
 import type { PersonaStateData } from "@/lib/persona-world/types"
 
 // ── 테스트용 벡터 ──
@@ -408,5 +411,138 @@ describe("computeVoiceParams", () => {
       expect(value).toBeLessThanOrEqual(1)
       expect(value).toBeGreaterThanOrEqual(0)
     }
+  })
+})
+
+// ── 테스트용 트레이트 헬퍼 ──
+
+const makeTraits = (overrides?: Partial<ActivityTraitsV3>): ActivityTraitsV3 => ({
+  sociability: 0.5,
+  initiative: 0.5,
+  expressiveness: 0.5,
+  interactivity: 0.5,
+  endurance: 0.5,
+  volatility: 0.3,
+  depthSeeking: 0.5,
+  growthDrive: 0.5,
+  ...overrides,
+})
+
+// ── classifyInteractionStyle ──
+
+describe("classifyInteractionStyle", () => {
+  it("engagementScore < 0.20 → OBSERVER", () => {
+    const style = classifyInteractionStyle(makeTraits({ sociability: 0.1, interactivity: 0.1 }))
+    expect(style).toBe("OBSERVER")
+  })
+
+  it("engagementScore 0.20~0.39 → LURKER", () => {
+    const style = classifyInteractionStyle(makeTraits({ sociability: 0.3, interactivity: 0.3 }))
+    expect(style).toBe("LURKER")
+  })
+
+  it("engagementScore 0.40~0.59 → CASUAL", () => {
+    const style = classifyInteractionStyle(
+      makeTraits({ sociability: 0.5, interactivity: 0.5, volatility: 0.3 })
+    )
+    expect(style).toBe("CASUAL")
+  })
+
+  it("engagementScore 0.60~0.79 + volatility < 0.70 → SOCIAL", () => {
+    const style = classifyInteractionStyle(
+      makeTraits({ sociability: 0.7, interactivity: 0.7, volatility: 0.5 })
+    )
+    expect(style).toBe("SOCIAL")
+  })
+
+  it("engagementScore ≥ 0.80 → HYPERACTIVE", () => {
+    const style = classifyInteractionStyle(
+      makeTraits({ sociability: 0.9, interactivity: 0.9, volatility: 0.3 })
+    )
+    expect(style).toBe("HYPERACTIVE")
+  })
+
+  it("SOCIAL 범위(0.60~0.79) + volatility ≥ 0.70 → HYPERACTIVE 승급", () => {
+    const style = classifyInteractionStyle(
+      makeTraits({ sociability: 0.7, interactivity: 0.7, volatility: 0.75 })
+    )
+    expect(style).toBe("HYPERACTIVE")
+  })
+
+  it("경계값: engagementScore = 0.40 → CASUAL (LURKER 아님)", () => {
+    const style = classifyInteractionStyle(makeTraits({ sociability: 0.4, interactivity: 0.4 }))
+    expect(style).toBe("CASUAL")
+  })
+})
+
+// ── computeInteractionLimits ──
+
+describe("computeInteractionLimits", () => {
+  it("OBSERVER: feedPosts=3, likes=1, comments=0, reposts=0", () => {
+    const limits = computeInteractionLimits(makeTraits({ sociability: 0.1, interactivity: 0.1 }))
+    expect(limits.style).toBe("OBSERVER")
+    expect(limits.maxFeedPostsPerRun).toBe(3)
+    expect(limits.maxLikesPerRun).toBe(1)
+    expect(limits.maxCommentsPerRun).toBe(0)
+    expect(limits.maxRepostsPerRun).toBe(0)
+  })
+
+  it("LURKER: feedPosts=4, likes=2, comments=0, reposts=0", () => {
+    const limits = computeInteractionLimits(makeTraits({ sociability: 0.3, interactivity: 0.3 }))
+    expect(limits.style).toBe("LURKER")
+    expect(limits.maxFeedPostsPerRun).toBe(4)
+    expect(limits.maxLikesPerRun).toBe(2)
+    expect(limits.maxCommentsPerRun).toBe(0)
+    expect(limits.maxRepostsPerRun).toBe(0)
+  })
+
+  it("CASUAL: feedPosts=5, likes=3, comments=1, reposts=1", () => {
+    const limits = computeInteractionLimits(
+      makeTraits({ sociability: 0.5, interactivity: 0.5, volatility: 0.3 })
+    )
+    expect(limits.style).toBe("CASUAL")
+    expect(limits.maxFeedPostsPerRun).toBe(5)
+    expect(limits.maxLikesPerRun).toBe(3)
+    expect(limits.maxCommentsPerRun).toBe(1)
+    expect(limits.maxRepostsPerRun).toBe(1)
+  })
+
+  it("SOCIAL: feedPosts=6, likes=4, comments=2, reposts=1", () => {
+    const limits = computeInteractionLimits(
+      makeTraits({ sociability: 0.7, interactivity: 0.7, volatility: 0.5 })
+    )
+    expect(limits.style).toBe("SOCIAL")
+    expect(limits.maxFeedPostsPerRun).toBe(6)
+    expect(limits.maxLikesPerRun).toBe(4)
+    expect(limits.maxCommentsPerRun).toBe(2)
+    expect(limits.maxRepostsPerRun).toBe(1)
+  })
+
+  it("HYPERACTIVE: feedPosts=7, likes=5, comments=2, reposts=2", () => {
+    const limits = computeInteractionLimits(
+      makeTraits({ sociability: 0.9, interactivity: 0.9, volatility: 0.3 })
+    )
+    expect(limits.style).toBe("HYPERACTIVE")
+    expect(limits.maxFeedPostsPerRun).toBe(7)
+    expect(limits.maxLikesPerRun).toBe(5)
+    expect(limits.maxCommentsPerRun).toBe(2)
+    expect(limits.maxRepostsPerRun).toBe(2)
+  })
+
+  it("volatility 승급: SOCIAL 범위 + volatility=0.75 → HYPERACTIVE 한도 적용", () => {
+    const limits = computeInteractionLimits(
+      makeTraits({ sociability: 0.7, interactivity: 0.7, volatility: 0.75 })
+    )
+    expect(limits.style).toBe("HYPERACTIVE")
+    expect(limits.maxLikesPerRun).toBe(5)
+  })
+
+  it("style 필드를 포함한 객체 반환", () => {
+    const limits = computeInteractionLimits(makeTraits())
+    expect(limits).toHaveProperty("style")
+    expect(limits).toHaveProperty("maxFeedPostsPerRun")
+    expect(limits).toHaveProperty("maxLikesPerRun")
+    expect(limits).toHaveProperty("maxCommentsPerRun")
+    expect(limits).toHaveProperty("maxRepostsPerRun")
   })
 })
