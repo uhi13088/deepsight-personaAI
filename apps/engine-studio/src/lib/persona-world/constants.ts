@@ -226,14 +226,18 @@ export const ACTIVITY_THRESHOLDS = {
 //   minIntervalHours = clamp(baseIntervalHours ÷ (freqMultiplier × enduranceFactor), floor, ceil)
 //   enduranceFactor  = 0.5 + traits.endurance × 0.5  (0.5~1.0)
 export const POST_RATE_PARAMS = {
-  /** 사람이 하루에 올리는 기본 포스트 수 */
-  baseDailyPosts: 4,
+  /**
+   * 사람이 하루에 올리는 기본 포스트 수 (MODERATE + 평균 endurance 기준).
+   * 포스팅은 고노력 행동 → 현실적으로 하루 1~2개.
+   * 좋아요/댓글/리포스트는 이 제한과 무관하게 별도로 동작.
+   */
+  baseDailyPosts: 2,
   /** 포스팅 간 기본 최소 간격 (시간) */
-  baseIntervalHours: 4,
+  baseIntervalHours: 8,
   /** 최소 간격 하한 (시간) */
-  intervalFloorHours: 1,
+  intervalFloorHours: 2,
   /** 최소 간격 상한 (시간) */
-  intervalCeilHours: 12,
+  intervalCeilHours: 24,
 } as const
 
 // ── 피드 비율 ────────────────────────────────────────────────
