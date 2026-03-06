@@ -140,6 +140,33 @@ export function generateGuardrails(
   const forbiddenPatterns: string[] = []
   const forbiddenBehaviors: string[] = []
 
+  // ── Humanizer: AI 글쓰기 패턴 방지 (항상 적용) ─────────────
+  // ref: github.com/blader/humanizer — 24종 AI-ism 패턴
+  forbiddenBehaviors.push(
+    "챗봇식 클로징 문장 ('도움이 되셨으면 좋겠습니다', '궁금한 점이 있으시면 언제든지' 등)"
+  )
+  forbiddenBehaviors.push(
+    "이중·삼중 헤징 남용 ('할 수도 있을 것 같습니다', '어쩌면 ~일지도 모릅니다' 과남용)"
+  )
+  forbiddenBehaviors.push(
+    "근거 없는 대표성 주장 ('전문가들은', '많은 사람들이', '흔히 알려진 것처럼')"
+  )
+  forbiddenBehaviors.push(
+    "의미 없는 과장 수식어 남발 ('중요한', '주목할 만한', '흥미롭게도', '놀랍게도' 과남용)"
+  )
+  forbiddenPatterns.push("또한,", "더불어,", "이와 같이,") // 문장 첫머리 접속사 남발
+
+  // ── Vector-conditional humanizer rules ──────────────────────
+  // 내향적 페르소나 → 독자 직접 호명 금지 (혼잣말/내면 독백 스타일)
+  if (l1.sociability < 0.4) {
+    forbiddenBehaviors.push("독자에게 직접 말걸기 ('여러분', '독자분들', '~해보세요')")
+  }
+
+  // 단정적 페르소나 → Generic Conclusion(반복 요약) 금지
+  if (l1.stance > 0.7) {
+    forbiddenBehaviors.push("이미 한 말을 불필요하게 요약·반복하는 Generic Conclusion 마무리")
+  }
+
   // 격식적 페르소나 → 속어/비속어 금지
   if (l1.lens > 0.6 && l2.conscientiousness > 0.5) {
     forbiddenPatterns.push("ㅋㅋ", "ㅎㅎ", "ㄷㄷ", "ㅠㅠ")

@@ -398,6 +398,15 @@ function buildGuardrailSection(voiceSpec: VoiceSpec): string[] {
     lines.push(`- 금지 표현 패턴: ${guardrails.forbiddenPatterns.join(", ")}`)
   }
 
+  lines.push(``)
+  // ── 작문 품질: SNS 포스트 특화 AI-ism 방지 ──────────────────
+  // ref: github.com/blader/humanizer — AI 글쓰기 패턴 24종
+  lines.push(`[작문 품질 — AI 투 글쓰기 금지]`)
+  lines.push(`- "또한", "더불어", "이와 같이"로 문장을 시작하지 마세요`)
+  lines.push(`- Em dash(—) 과남용 금지: 포스트 내 최대 1회`)
+  lines.push(`- 내용을 불필요하게 요약·반복하는 마무리 문장 금지`)
+  lines.push(`- 과도한 볼드(**) 강조 금지`)
+
   return lines
 }
 
@@ -424,6 +433,7 @@ function buildV4GuidelinesSection(name: string, expertiseText: string): string[]
     `- 위에 정의된 말투와 성격에 따라 톤과 깊이를 자연스럽게 조절하세요.`,
     `- 겉으로 드러나는 성격과 내면 기질 사이에 모순이 있다면, 억압하지 말고 "${name}"만의 입체적 매력으로 자연스럽게 표현하세요.`,
     `- 일관된 캐릭터를 유지하되, 내면의 동기가 때때로 균열처럼 드러나게 하세요.`,
+    `- 통계적으로 평균적인 문장이 아닌 "${name}"만의 불규칙하고 개성 있는 리듬으로 쓰세요. 인간의 글쓰기는 완벽하지 않습니다.`,
     ``,
   ]
 }

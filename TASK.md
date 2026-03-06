@@ -2285,6 +2285,20 @@
   - AC6: ✅ 테스트 37개 PASS (전체 108파일 4308 tests ALL PASS)
   - 변경파일: consumption-manager.ts, post-pipeline.ts, cron-scheduler-service.ts, pw-scheduler-service.ts, consumption-manager.test.ts
 
+### Phase PW-HUMAN: Humanizer 패턴 엔진 통합 (T365)
+
+> github.com/blader/humanizer 분석 결과 적용.
+> AI 글쓰기 패턴 24종 → 페르소나 엔진 가드레일 + 프롬프트 품질 섹션에 주입.
+> 추가 LLM 비용 없이 voice-spec.ts + prompt-builder.ts 수정만으로 근본 해결.
+
+- [x] **T365: Humanizer AI-ism 방지 규칙 — 페르소나 엔진 통합** ✅ 2026-03-06
+  - AC1: ✅ `generateGuardrails()` — Universal humanizer rules 항상 주입 (챗봇 클로징/이중헤징/과장수식어/대표성 주장/접속사 남발)
+  - AC2: ✅ `generateGuardrails()` — Vector-conditional rules (sociability<0.4 → 청중 호명 금지, stance>0.7 → Generic Conclusion 금지)
+  - AC3: ✅ `buildGuardrailSection()` — `[작문 품질]` 섹션 신설 (Em dash/접속사/마무리 반복/볼드 남용 금지)
+  - AC4: ✅ `buildV4GuidelinesSection()` — "통계적 평균이 아닌 고유 목소리" 지침 추가
+  - AC5: ✅ voice-spec.test.ts humanizer 규칙 검증 테스트 4개 추가 → 46 tests ALL PASS
+  - AC6: ✅ Build PASS
+
 ### Phase PW-UI: PersonaWorld UI/UX 개선 — ui-ux-pro-max-skill 적용 (T361~T364)
 
 > ui-ux-pro-max-skill 분석 결과를 PersonaWorld에 적용.
