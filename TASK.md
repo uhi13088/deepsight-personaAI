@@ -2299,6 +2299,41 @@
   - AC5: ✅ voice-spec.test.ts humanizer 규칙 검증 테스트 4개 추가 → 46 tests ALL PASS
   - AC6: ✅ Build PASS
 
+---
+
+### Phase SUPERPOWERS: obra/superpowers 스킬 프레임워크 통합 (T366~T369)
+
+> github.com/obra/superpowers 분석 결과 적용.
+> AI 에이전트 워크플로우 체계화 — session-start 훅, brainstorm/writing-plans 스킬,
+> validate 2단계 리뷰 통합. 추가 코드 없이 스킬 파일 + 훅 설정 변경만으로 달성.
+
+- [x] **T366: session-start 훅 — 세션 자동 컨텍스트 로드** ✅ 2026-03-06
+  - AC1: ✅ `hooks/session-start.sh` 생성 — lessons.md 최근 교훈 TOP 5 출력 + TASK.md IN_PROGRESS 티켓 표시 + 날짜
+  - AC2: ✅ `.claude/settings.json` SessionStart 이벤트 훅 등록
+  - AC3: ✅ 훅 실행 테스트 완료 — 교훈 5개 + 대기 티켓 수 출력 정상
+
+- [x] **T367: /brainstorm 스킬 — 설계 승인 전 구현 금지** ✅ 2026-03-06
+  - AC1: ✅ `skills/brainstorm/SKILL.md` 생성 — 소크라테스식 질문 → 2-3가지 방식 제안 → 설계 승인 강제 프로세스
+  - AC2: ✅ `.claude/commands/brainstorm.md` 생성
+  - AC3: ✅ CLAUDE.md 스킬 테이블에 `/brainstorm` 등록
+
+- [x] **T368: /validate 2단계 코드 리뷰 통합** ✅ 2026-03-06
+  - AC1: ✅ `skills/validate/SKILL.md` — Step 2.5 추가 (Stage 1: 사양 검증 → Stage 2: 코드 품질 검증)
+  - AC2: ✅ `skills/validate/references/quality-checklist.md` — 2단계 리뷰 체크리스트 항목 추가 (Stage 1 + Stage 2)
+
+- [x] **T369: /writing-plans 스킬 — 대형 티켓 실행 단계 구조화** ✅ 2026-03-06
+  - AC1: ✅ `skills/writing-plans/SKILL.md` 생성 — `docs/plans/YYYY-MM-DD-feature.md` 표준 포맷
+  - AC2: ✅ `.claude/commands/writing-plans.md` 생성
+  - AC3: ✅ `docs/plans/.gitkeep` — 디렉토리 초기화
+  - AC4: ✅ CLAUDE.md 스킬 테이블에 `/writing-plans` 등록
+
+  - AC1: ✅ `generateGuardrails()` — Universal humanizer rules 항상 주입 (챗봇 클로징/이중헤징/과장수식어/대표성 주장/접속사 남발)
+  - AC2: ✅ `generateGuardrails()` — Vector-conditional rules (sociability<0.4 → 청중 호명 금지, stance>0.7 → Generic Conclusion 금지)
+  - AC3: ✅ `buildGuardrailSection()` — `[작문 품질]` 섹션 신설 (Em dash/접속사/마무리 반복/볼드 남용 금지)
+  - AC4: ✅ `buildV4GuidelinesSection()` — "통계적 평균이 아닌 고유 목소리" 지침 추가
+  - AC5: ✅ voice-spec.test.ts humanizer 규칙 검증 테스트 4개 추가 → 46 tests ALL PASS
+  - AC6: ✅ Build PASS
+
 ### Phase PW-UI: PersonaWorld UI/UX 개선 — ui-ux-pro-max-skill 적용 (T361~T364)
 
 > ui-ux-pro-max-skill 분석 결과를 PersonaWorld에 적용.
