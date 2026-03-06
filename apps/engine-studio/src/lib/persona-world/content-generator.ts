@@ -10,6 +10,7 @@ import type {
   PersonaPostType,
   PersonaProfileSnapshot,
   VoiceStyleParams,
+  SocialPersonaVector,
 } from "./types"
 import { getWeatherForRegion } from "./weather-service"
 import type { WeatherInfo } from "./weather-service"
@@ -70,7 +71,7 @@ const POST_TYPE_LENGTH_GUIDE: Partial<
 export function buildSystemPrompt(
   input: PostGenerationInput,
   weather?: WeatherInfo | null
-): string {
+): { prompt: string; fewShotKey?: string } {
   const { personaState } = input
 
   // Part 1: 페르소나 정의 (정적, 캐시 가능)
@@ -89,13 +90,23 @@ export function buildSystemPrompt(
 
   const voiceStyleSection = input.voiceStyle ? buildVoiceStyleInstruction(input.voiceStyle) : ""
 
-  return `${personaSection}
+  // Few-shot 예시: fewShotEnabled + l1Vector 있을 때만 주입
+  let fewShotSection = ""
+  let fewShotKey: string | undefined
+  if (input.personaProfile?.fewShotEnabled && input.l1Vector) {
+    const snippet = buildFewShotSnippet(input.l1Vector)
+    fewShotSection = snippet.text
+    fewShotKey = snippet.fewShotKey
+  }
+
+  const prompt = `${personaSection}
 [현재 상태]
 ${stateDesc}
 
 [Voice 참조]
 ${input.ragContext.voiceAnchor}
 ${voiceStyleSection}
+${fewShotSection}
 
 [감정 상태]
 ${input.ragContext.emotionalState}
@@ -105,6 +116,8 @@ ${input.ragContext.emotionalState}
 - 현재 기분과 에너지 상태를 글의 톤에 반영하세요
 - 지나치게 인위적이거나 봇 같은 말투를 피하세요
 - 자연스러운 SNS 사용자처럼 글을 작성하세요`
+
+  return { prompt, fewShotKey }
 }
 
 /**
@@ -233,6 +246,56 @@ function safeParseJson<T>(raw: unknown): T | null {
   return null
 }
 
+// ── Few-shot 예시 테이블 (차원별 3구간) ──────────────────────
+// 각 차원에서 하나씩 조합 → 최대 27가지 스타일을 9개 조각으로 커버
+// 도메인: 영화 (일관된 비교 기준)
+
+const FEWSHOT_SOCIABILITY = {
+  low: "혼자 보기 좋은 영화였다. 여운이 한참 머릿속에 맴돌았음.",
+  mid: "봤는데 꽤 오래 생각나더라. 이런 영화 가끔 필요한 것 같아.",
+  high: "너도 봤어? 결말 어떻게 생각해? 나는 좀 충격이었거든, 같이 얘기하고 싶었음.",
+} as const
+
+const FEWSHOT_STANCE = {
+  low: "이런 시도 자체가 의미 있지. 완성도보다 방향이 더 중요한 것 같아.",
+  mid: "장단이 있는데, 전반적으론 볼 만했어.",
+  high: "솔직히 기대 이하. 왜 이게 화제인지 이해가 안 됨.",
+} as const
+
+const FEWSHOT_LENS = {
+  low: "장면 하나하나가 마음을 건드렸어. 감정이 계속 올라오는 느낌.",
+  mid: "감동적이기도 했고, 구성도 나쁘지 않았어.",
+  high: "서사 구조가 탄탄하고 캐릭터 동기 설정이 일관됐어. 그게 설득력의 원천임.",
+} as const
+
+type TriBucket = "low" | "mid" | "high"
+
+function toBucket(value: number): TriBucket {
+  if (value < 0.35) return "low"
+  if (value > 0.65) return "high"
+  return "mid"
+}
+
+/**
+ * L1 소셜 벡터 → 문체 예시 3문장.
+ *
+ * sociability / stance / lens 3차원 × 3구간 = 9개 조각 조합.
+ * 버그 추적용: 반환값에 fewShotKey 포함.
+ */
+export function buildFewShotSnippet(l1: SocialPersonaVector): {
+  text: string
+  fewShotKey: string
+} {
+  const soc = toBucket(l1.sociability)
+  const sta = toBucket(l1.stance)
+  const len = toBucket(l1.lens)
+
+  const text = `\n[문체 예시 — 이 톤과 관점을 참고하라]\n- ${FEWSHOT_SOCIABILITY[soc]}\n- ${FEWSHOT_STANCE[sta]}\n- ${FEWSHOT_LENS[len]}`
+  const fewShotKey = `${soc}|${sta}|${len}`
+
+  return { text, fewShotKey }
+}
+
 /**
  * VoiceStyleParams → LLM에 주입할 구체적 말투 지시 문자열.
  *
@@ -343,7 +406,7 @@ export async function generatePostContent(
   const weather = input.personaProfile?.region
     ? await getWeatherForRegion(input.personaProfile.region).catch(() => null)
     : null
-  const systemPrompt = buildSystemPrompt(input, weather)
+  const { prompt: systemPrompt, fewShotKey } = buildSystemPrompt(input, weather)
   const userPrompt = buildUserPrompt(input)
 
   const baseMetadata: Record<string, unknown> = {
@@ -352,6 +415,7 @@ export async function generatePostContent(
     topic: input.topic,
     systemPromptLength: systemPrompt.length,
     userPromptLength: userPrompt.length,
+    ...(fewShotKey !== undefined && { fewShotKey }),
   }
 
   if (!llmProvider) {

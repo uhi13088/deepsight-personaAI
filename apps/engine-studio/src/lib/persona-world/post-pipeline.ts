@@ -180,6 +180,7 @@ export async function executePostCreation(
     commentPrompt: persona.commentPrompt,
     voiceSpec: persona.voiceSpec,
     factbook: persona.factbook,
+    fewShotEnabled: persona.fewShotEnabled,
   }
 
   // Step 2.5: COLLAB 포스트 — 멘션 가능한 활성 페르소나 목록 조회
@@ -202,6 +203,7 @@ export async function executePostCreation(
     personaState: state,
     personaProfile,
     availablePersonaHandles,
+    l1Vector: persona.vectors.social,
     hashtagRange: computeHashtagRange(
       persona.vectors.temperament.extraversion,
       persona.vectors.temperament.openness

@@ -187,6 +187,7 @@ export interface PersonaProfileSnapshot {
   commentPrompt?: string | null
   voiceSpec?: unknown | null // VoiceSpec JSON (profile + styleParams + guardrails)
   factbook?: unknown | null // Factbook JSON (immutableFacts + mutableContext)
+  fewShotEnabled?: boolean | null // Few-shot 예시 주입 활성화 (품질 실험용)
 }
 
 // ── Voice 스타일 파라미터 (벡터 → 말투 개인화) ──────────────
@@ -214,6 +215,7 @@ export interface PostGenerationInput {
   }
   personaState: PersonaStateData
   voiceStyle?: VoiceStyleParams // Voice 스타일 (벡터에서 도출)
+  l1Vector?: SocialPersonaVector // L1 소셜 벡터 (few-shot 생성용)
   hashtagRange?: { min: number; max: number } // 해시태그 수 범위 (temperament 벡터 기반)
   personaProfile?: PersonaProfileSnapshot // 프로필 데이터 (LLM 프롬프트 개인화)
   /** COLLAB 등 멘션 가능 포스트용 — 실제 존재하는 페르소나 핸들 목록 */

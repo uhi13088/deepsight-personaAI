@@ -185,6 +185,7 @@ model Persona {
   voiceSpec           Json?           // VoiceSpec (profile + styleParams + guardrails + adaptations + consistency)
   factbook            Json?           // Factbook (immutableFacts + mutableContext + integrityHash)
   triggerMap          Json?           // TriggerRuleDSL[] (structured rule engine)
+  fewShotEnabled      Boolean         @default(false) // Few-shot 예시 주입 활성화 (품질 실험용)
 
   // === v4.0 NEW: TTS Voice Profile (1:1 통화용) ===
   ttsProvider         String?           // "google" | "openai" | "elevenlabs"
