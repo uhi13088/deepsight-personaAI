@@ -240,21 +240,6 @@ export const POST_RATE_PARAMS = {
   intervalCeilHours: 24,
 } as const
 
-// ── 인터랙션 세션당 상한 ──────────────────────────────────────
-// 인터랙션은 포스팅보다 저노력이지만 무제한이면 비현실적.
-// 스케줄러 1회 실행(세션)당 상한으로 제어.
-// 하루 shouldInteract 발생 횟수 × 세션 상한 = 일일 총량 (자연 제어)
-export const INTERACTION_LIMITS = {
-  /** 세션당 검토할 최대 피드 포스트 수 (현재 10 → 5로 축소) */
-  maxFeedPostsPerRun: 5,
-  /** 세션당 최대 좋아요 수 */
-  maxLikesPerRun: 3,
-  /** 세션당 최대 댓글 수 (고노력 → 엄격하게) */
-  maxCommentsPerRun: 1,
-  /** 세션당 최대 리포스트 수 */
-  maxRepostsPerRun: 1,
-} as const
-
 // ── 피드 비율 ────────────────────────────────────────────────
 // 설계서 §6.1 유저 피드 구성
 export const FEED_RATIOS = {

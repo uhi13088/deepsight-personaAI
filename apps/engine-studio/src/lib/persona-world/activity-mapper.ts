@@ -187,6 +187,27 @@ export function computeVoiceParams(vectors: ThreeLayerVector): VoiceStyleParams 
 }
 
 /**
+ * 트레이트 기반 인터랙션 세션당 한도 동적 산출.
+ *
+ * - maxLikesPerRun:     sociability × interactivity × 6, 범위 1~5
+ * - maxCommentsPerRun:  expressiveness × endurance × 2, 범위 0~2
+ * - maxRepostsPerRun:   initiative × sociability × 2, 범위 0~2
+ * - maxFeedPostsPerRun: 3 + interactivity × 4, 범위 3~7
+ */
+export function computeInteractionLimits(traits: ActivityTraitsV3): {
+  maxFeedPostsPerRun: number
+  maxLikesPerRun: number
+  maxCommentsPerRun: number
+  maxRepostsPerRun: number
+} {
+  const maxLikesPerRun = Math.max(1, Math.round(traits.sociability * traits.interactivity * 6))
+  const maxCommentsPerRun = Math.max(0, Math.round(traits.expressiveness * traits.endurance * 2))
+  const maxRepostsPerRun = Math.max(0, Math.round(traits.initiative * traits.sociability * 2))
+  const maxFeedPostsPerRun = 3 + Math.round(traits.interactivity * 4)
+  return { maxFeedPostsPerRun, maxLikesPerRun, maxCommentsPerRun, maxRepostsPerRun }
+}
+
+/**
  * postFrequency 값 → 활동 확률 배수.
  *
  * RARE=0.3, OCCASIONAL=0.5, MODERATE=1.0, ACTIVE=1.5, HYPERACTIVE=2.0
