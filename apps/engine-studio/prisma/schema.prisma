@@ -2022,6 +2022,7 @@ enum InteractionSource {
   PERSONA_RELAY
   EXTERNAL_FEED
   SYSTEM
+  KAKAO         // T370: 카카오톡 채널 대화
 }
 
 enum PostSource {
