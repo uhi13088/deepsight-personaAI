@@ -14,6 +14,9 @@ import {
   LogOut,
   Loader2,
   CreditCard,
+  MessageCircle,
+  Link2,
+  Unlink,
 } from "lucide-react"
 import { PWLogoWithText, PWCard, PWBottomNav } from "@/components/persona-world"
 import { useUserStore } from "@/lib/user-store"
@@ -29,12 +32,21 @@ type Transaction = {
   createdAt: string
 }
 
-type ActiveTab = "account" | "notifications" | "payment"
+type KakaoLinkState = {
+  linked: boolean
+  personaId: string | null
+  personaName: string | null
+  personaImageUrl: string | null
+  kakaoUserKey: string | null
+}
+
+type ActiveTab = "account" | "notifications" | "payment" | "kakao"
 
 const TAB_CONFIG = [
   { key: "account" as const, label: "계정", icon: User },
   { key: "notifications" as const, label: "알림", icon: Bell },
   { key: "payment" as const, label: "결제", icon: CreditCard },
+  { key: "kakao" as const, label: "카카오", icon: MessageCircle },
 ] as const
 
 const TX_TYPE_LABELS: Record<string, { label: string; color: string }> = {
@@ -53,6 +65,21 @@ export default function SettingsPage() {
   const [txLoading, setTxLoading] = useState(false)
   const [serverBalance, setServerBalance] = useState<number | null>(null)
 
+  // 카카오 연동
+  const [kakaoLink, setKakaoLink] = useState<KakaoLinkState>({
+    linked: false,
+    personaId: null,
+    personaName: null,
+    personaImageUrl: null,
+    kakaoUserKey: null,
+  })
+  const [kakaoLoading, setKakaoLoading] = useState(false)
+  const [kakaoActionLoading, setKakaoActionLoading] = useState(false)
+  const [chattedPersonas, setChattedPersonas] = useState<
+    Array<{ id: string; personaId: string; personaName: string; personaImageUrl: string | null }>
+  >([])
+  const [selectedPersonaId, setSelectedPersonaId] = useState<string>("")
+
   // 거래 내역 로드
   const loadTransactions = useCallback(async () => {
     if (!userId) return
@@ -68,11 +95,62 @@ export default function SettingsPage() {
     }
   }, [userId])
 
+  // 카카오 연동 상태 로드
+  const loadKakaoLink = useCallback(async () => {
+    if (!userId) return
+    setKakaoLoading(true)
+    try {
+      const data = await clientApi.getKakaoLink(userId)
+      if (data) {
+        setKakaoLink({
+          linked: data.linked,
+          personaId: data.link?.personaId ?? null,
+          personaName: data.link?.personaName ?? null,
+          personaImageUrl: data.link?.personaImageUrl ?? null,
+          kakaoUserKey: data.link?.kakaoUserKey ?? null,
+        })
+      }
+    } catch {
+      console.error("Failed to load kakao link")
+    } finally {
+      setKakaoLoading(false)
+    }
+  }, [userId])
+
+  // 채팅한 페르소나 목록 로드
+  const loadChattedPersonas = useCallback(async () => {
+    if (!userId) return
+    try {
+      const threads = await clientApi.getChatThreads(userId)
+      const unique = new Map<
+        string,
+        { id: string; personaId: string; personaName: string; personaImageUrl: string | null }
+      >()
+      for (const t of threads) {
+        if (!unique.has(t.personaId)) {
+          unique.set(t.personaId, {
+            id: t.id,
+            personaId: t.personaId,
+            personaName: t.personaName,
+            personaImageUrl: t.personaImageUrl,
+          })
+        }
+      }
+      setChattedPersonas(Array.from(unique.values()))
+    } catch {
+      console.error("Failed to load chatted personas")
+    }
+  }, [userId])
+
   useEffect(() => {
     if (activeTab === "payment") {
       loadTransactions()
     }
-  }, [activeTab, loadTransactions])
+    if (activeTab === "kakao") {
+      loadKakaoLink()
+      loadChattedPersonas()
+    }
+  }, [activeTab, loadTransactions, loadKakaoLink, loadChattedPersonas])
 
   const handleLogout = async () => {
     reset()
@@ -83,6 +161,57 @@ export default function SettingsPage() {
     localStorage.clear()
     sessionStorage.clear()
     await signOut({ callbackUrl: "/" })
+  }
+
+  const handleKakaoLink = async () => {
+    if (!userId || !selectedPersonaId) {
+      toast.error("연동할 페르소나를 선택해주세요")
+      return
+    }
+    setKakaoActionLoading(true)
+    try {
+      // kakaoUserKey는 카카오톡에서 첫 메시지 시 자동 매핑되므로,
+      // 유저가 직접 입력하지 않고 placeholder로 설정
+      // 실제 매핑은 카카오톡에서 첫 메시지를 보낼 때 업데이트됨
+      const kakaoUserKey = `pending_${userId}`
+
+      await clientApi.createKakaoLink({
+        userId,
+        personaId: selectedPersonaId,
+        kakaoUserKey,
+      })
+
+      await loadKakaoLink()
+      setSelectedPersonaId("")
+      toast.success("카카오톡 연동이 완료되었습니다!")
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "연동에 실패했습니다"
+      toast.error(msg)
+    } finally {
+      setKakaoActionLoading(false)
+    }
+  }
+
+  const handleKakaoUnlink = async () => {
+    if (!userId) return
+    if (!window.confirm("카카오톡 연동을 해제하시겠습니까?")) return
+
+    setKakaoActionLoading(true)
+    try {
+      await clientApi.deleteKakaoLink(userId)
+      setKakaoLink({
+        linked: false,
+        personaId: null,
+        personaName: null,
+        personaImageUrl: null,
+        kakaoUserKey: null,
+      })
+      toast.success("카카오톡 연동이 해제되었습니다")
+    } catch {
+      toast.error("연동 해제에 실패했습니다")
+    } finally {
+      setKakaoActionLoading(false)
+    }
   }
 
   const handleReset = () => {
@@ -312,6 +441,164 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+        {/* ── 카카오 탭 ── */}
+        {activeTab === "kakao" && (
+          <div className="space-y-4">
+            <div className="mb-6">
+              <h1 className="text-xl font-bold">카카오톡 연동</h1>
+              <p className="mt-1 text-sm text-gray-400">카카오톡에서 페르소나와 대화하세요</p>
+            </div>
+
+            {kakaoLoading ? (
+              <div className="flex h-32 items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
+              </div>
+            ) : kakaoLink.linked ? (
+              /* 연동 완료 상태 */
+              <div className="space-y-4">
+                <PWCard className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 p-5">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-amber-400">
+                      {kakaoLink.personaImageUrl ? (
+                        <img
+                          src={kakaoLink.personaImageUrl}
+                          alt={kakaoLink.personaName ?? ""}
+                          className="h-14 w-14 rounded-full object-cover"
+                        />
+                      ) : (
+                        <MessageCircle className="h-7 w-7 text-white" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <Link2 className="h-4 w-4 text-green-500" />
+                        <span className="text-sm font-medium text-green-600">연동 중</span>
+                      </div>
+                      <div className="mt-1 text-lg font-semibold text-gray-900">
+                        {kakaoLink.personaName}
+                      </div>
+                      <div className="mt-0.5 text-xs text-gray-500">
+                        카카오톡에서 이 페르소나와 대화할 수 있습니다
+                      </div>
+                    </div>
+                  </div>
+                </PWCard>
+
+                <PWCard className="p-4">
+                  <h3 className="mb-3 text-sm font-medium text-gray-700">사용 방법</h3>
+                  <ol className="space-y-2 text-sm text-gray-500">
+                    <li className="flex gap-2">
+                      <span className="font-medium text-purple-400">1.</span>
+                      카카오톡에서 &quot;DeepSight&quot; 채널을 검색하고 친구 추가
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="font-medium text-purple-400">2.</span>
+                      채팅방에서 메시지를 보내면 연동된 페르소나가 답변
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="font-medium text-purple-400">3.</span>
+                      대화 내용은 PersonaWorld 채팅과 기억을 공유합니다
+                    </li>
+                  </ol>
+                </PWCard>
+
+                <button
+                  onClick={handleKakaoUnlink}
+                  disabled={kakaoActionLoading}
+                  className="flex w-full items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-left transition-colors hover:bg-red-500/20 disabled:opacity-50"
+                >
+                  {kakaoActionLoading ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-red-400" />
+                  ) : (
+                    <Unlink className="h-5 w-5 text-red-400" />
+                  )}
+                  <div>
+                    <div className="text-sm font-medium text-red-400">연동 해제</div>
+                    <div className="text-xs text-gray-500">카카오톡 대화 연동을 해제합니다</div>
+                  </div>
+                </button>
+              </div>
+            ) : (
+              /* 미연동 상태 */
+              <div className="space-y-4">
+                <PWCard className="p-5">
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-100">
+                      <MessageCircle className="h-5 w-5 text-yellow-600" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">
+                        카카오톡에서 페르소나와 대화
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        채팅했던 페르소나 1명을 연동할 수 있습니다
+                      </div>
+                    </div>
+                  </div>
+
+                  {chattedPersonas.length === 0 ? (
+                    <div className="rounded-lg bg-gray-50 p-4 text-center">
+                      <p className="text-sm text-gray-500">아직 대화한 페르소나가 없습니다.</p>
+                      <p className="mt-1 text-xs text-gray-400">
+                        먼저 페르소나와 채팅을 시작해주세요.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <label className="mb-2 block text-sm font-medium text-gray-700">
+                        연동할 페르소나 선택
+                      </label>
+                      <div className="space-y-2">
+                        {chattedPersonas.map((p) => (
+                          <button
+                            key={p.personaId}
+                            onClick={() => setSelectedPersonaId(p.personaId)}
+                            className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
+                              selectedPersonaId === p.personaId
+                                ? "border-purple-400 bg-purple-50"
+                                : "border-gray-200 hover:bg-gray-50"
+                            }`}
+                          >
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-pink-400">
+                              {p.personaImageUrl ? (
+                                <img
+                                  src={p.personaImageUrl}
+                                  alt={p.personaName}
+                                  className="h-10 w-10 rounded-full object-cover"
+                                />
+                              ) : (
+                                <User className="h-5 w-5 text-white" />
+                              )}
+                            </div>
+                            <span className="text-sm font-medium text-gray-900">
+                              {p.personaName}
+                            </span>
+                            {selectedPersonaId === p.personaId && (
+                              <div className="ml-auto h-2 w-2 rounded-full bg-purple-500" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={handleKakaoLink}
+                        disabled={kakaoActionLoading || !selectedPersonaId}
+                        className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-yellow-400 py-3 text-sm font-semibold text-gray-900 transition-opacity hover:opacity-90 disabled:opacity-50"
+                      >
+                        {kakaoActionLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Link2 className="h-4 w-4" />
+                        )}
+                        카카오톡 연동하기
+                      </button>
+                    </>
+                  )}
+                </PWCard>
+              </div>
+            )}
           </div>
         )}
       </main>

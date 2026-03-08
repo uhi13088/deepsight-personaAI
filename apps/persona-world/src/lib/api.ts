@@ -987,6 +987,61 @@ export const clientApi = {
     if (!json.success) return null
     return json.data!
   },
+
+  // ── 카카오톡 연동 (T374) ───────────────────────────────────
+  async getKakaoLink(userId: string) {
+    const res = await fetch(`/api/persona-world/kakao/link?userId=${encodeURIComponent(userId)}`)
+    if (!res.ok) return null
+
+    const json: ApiResponse<KakaoLinkResponse> = await res.json()
+    if (!json.success) return null
+    return json.data!
+  },
+
+  async createKakaoLink(params: { userId: string; personaId: string; kakaoUserKey: string }) {
+    const res = await fetch("/api/persona-world/kakao/link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    })
+
+    const json: ApiResponse<KakaoLinkData> = await res.json()
+    if (!json.success) {
+      throw new Error(json.error?.message || "Failed to create kakao link")
+    }
+    return json.data!
+  },
+
+  async deleteKakaoLink(userId: string) {
+    const res = await fetch(`/api/persona-world/kakao/link?userId=${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    })
+
+    const json: ApiResponse<{ unlinked: boolean }> = await res.json()
+    if (!json.success) {
+      throw new Error(json.error?.message || "Failed to unlink kakao")
+    }
+    return json.data!
+  },
+}
+
+/** 카카오톡 연동 데이터 */
+export interface KakaoLinkData {
+  id: string
+  personaId: string
+  kakaoUserKey: string
+  isActive: boolean
+  createdAt: string
+}
+
+export interface KakaoLinkResponse {
+  linked: boolean
+  link:
+    | (KakaoLinkData & {
+        personaName: string
+        personaImageUrl: string | null
+      })
+    | null
 }
 
 /** API에서 반환하는 상점 아이템 형태 */
