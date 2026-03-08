@@ -240,6 +240,9 @@ model Persona {
   // v5.0 의미 기억 (T408)
   semanticMemories    SemanticMemory[]
 
+  // 카카오톡 연동 (T370)
+  kakaoLinks          KakaoLink[]
+
   @@map("personas")
 }
 
@@ -1386,6 +1389,9 @@ model PersonaWorldUser {
 
   // B2B 콘텐츠 피드백 (T392)
   contentFeedbacks UserContentFeedback[]
+
+  // 카카오톡 연동 (T370)
+  kakaoLink       KakaoLink?
 
   @@map("persona_world_users")
 }
@@ -2993,4 +2999,25 @@ model MediaItem {
   @@index([mediaType, createdAt])
   @@index([region])
   @@map("media_items")
+}
+
+// ============================================
+// 카카오톡 페르소나 연동 (T370)
+// ============================================
+
+/// 유저 1명 = 페르소나 1개 카카오톡 연동
+model KakaoLink {
+  id            String           @id @default(cuid())
+  userId        String           @unique
+  user          PersonaWorldUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  personaId     String
+  persona       Persona          @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  kakaoUserKey  String           @unique // 카카오 오픈빌더 userRequest.user.id
+  isActive      Boolean          @default(true)
+
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([kakaoUserKey])
+  @@map("kakao_links")
 }
