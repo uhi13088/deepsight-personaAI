@@ -1499,7 +1499,7 @@
 > 의존성: 가장 먼저 완료해야 후속 Phase 진행 가능.
 > 원칙: 각 티켓 = 1 Prisma 모델 변경 + SQL 마이그레이션 + prisma validate PASS
 
-- [ ] **T263: PersonaRelationship v4.0 필드 추가 — stage/type/카운터**
+- [x] **T263: PersonaRelationship v4.0 필드 추가 — stage/type/카운터** ✅
   - 배경: 구현계획서 §2.2. 현재 warmth/tension/frequency/depth만 존재. 관계 단계(stage)와 유형(type), 인터랙션 카운터 누락
   - AC1: Prisma — `stage String @default("STRANGER")`, `type String @default("NEUTRAL")` 추가
   - AC2: Prisma — `positiveComments Int @default(0)`, `negativeComments Int @default(0)`, `totalInteractions Int @default(0)` 추가
@@ -1507,61 +1507,61 @@
   - AC4: relationship-manager.ts — stage/type 영속화 연동 (기존 TS-only 계산에서 DB 저장으로)
   - AC5: prisma validate + generate + Build PASS
 
-- [ ] **T264: PersonaState 활동 카운터 추가 — lastActivityAt/postsThisWeek/commentsThisWeek**
+- [x] **T264: PersonaState 활동 카운터 추가 — lastActivityAt/postsThisWeek/commentsThisWeek**
   - 배경: 구현계획서 §2.1. 레이트 리미팅과 스케줄링 결정에 필요한 활동 추적 카운터 누락
   - AC1: Prisma — `lastActivityAt DateTime?`, `postsThisWeek Int @default(0)`, `commentsThisWeek Int @default(0)` 추가
   - AC2: SQL 마이그레이션 파일 생성
   - AC3: prisma validate + generate + Build PASS
 
-- [ ] **T265: ConsumptionLog v4.0 필드 추가 — sourceType/interactionType/poignancy/retention**
+- [x] **T265: ConsumptionLog v4.0 필드 추가 — sourceType/interactionType/poignancy/retention**
   - 배경: 구현계획서 §2.3. 현재 contentType/source는 있으나 v4.0 명세의 sourceType(POST/EXTERNAL/RECOMMENDATION), interactionType(LIKE/COMMENT/REPOST/MENTION), poignancyScore, retentionScore 누락
   - AC1: Prisma — `sourceType String`, `interactionType String` 추가 (기존 필드와 공존)
   - AC2: Prisma — `poignancyScore Decimal? @db.Decimal(3,2)`, `retentionScore Decimal? @db.Decimal(3,2)` 추가
   - AC3: SQL 마이그레이션 파일 생성
   - AC4: prisma validate + generate + Build PASS
 
-- [ ] **T266: PersonaActivityLog 보안/출처 필드 추가 — securityCheck/provenanceData**
+- [x] **T266: PersonaActivityLog 보안/출처 필드 추가 — securityCheck/provenanceData**
   - 배경: 구현계획서 §2.5. 활동 로그에 보안 검사 결과와 데이터 출처 기록 필드 누락
   - AC1: Prisma — `securityCheck Json?`, `provenanceData Json?` 추가
   - AC2: SQL 마이그레이션 파일 생성
   - AC3: prisma validate + generate + Build PASS
 
-- [ ] **T267: UserTrustScore DB 모델 신규 생성**
+- [x] **T267: UserTrustScore DB 모델 신규 생성**
   - 배경: 구현계획서 §9.3. 유저 신뢰도 점수가 현재 순수 함수로만 존재, DB 영속화 없음
   - AC1: Prisma — `UserTrustScore` 모델 (userId PK, score Decimal, inspectionLevel String, blockCount Int, warnCount Int, lastUpdated DateTime)
   - AC2: PersonaWorldUser 릴레이션 추가
   - AC3: SQL 마이그레이션 파일 생성
   - AC4: prisma validate + generate + Build PASS
 
-- [ ] **T268: PWQuarantineQueue DB 모델 신규 생성**
+- [x] **T268: PWQuarantineQueue DB 모델 신규 생성**
   - 배경: 구현계획서 §9.5. 엔진의 QuarantineEntry와 별도로 PW 전용 격리 큐 필요 (포스트/댓글 격리 + 자동 만료)
   - AC1: Prisma — `PWQuarantineEntry` 모델 (id, contentType, contentId, personaId, reason, severity, status, expiresAt, reviewedBy, reviewNote, createdAt)
   - AC2: Persona 릴레이션 추가
   - AC3: SQL 마이그레이션 파일 생성
   - AC4: prisma validate + generate + Build PASS
 
-- [ ] **T269: ModerationLog DB 모델 신규 생성**
+- [x] **T269: ModerationLog DB 모델 신규 생성**
   - 배경: 구현계획서 §11.1. 모더레이션 파이프라인 결과를 영속화할 테이블 없음
   - AC1: Prisma — `ModerationLog` 모델 (id, contentType, contentId, personaId, stage, verdict, violations Json, actions Json, processingTimeMs, createdAt)
   - AC2: 인덱스: personaId, contentId, createdAt
   - AC3: SQL 마이그레이션 파일 생성
   - AC4: prisma validate + generate + Build PASS
 
-- [ ] **T270: QualityLog DB 모델 신규 생성 — PostQualityLog + CommentQualityLog**
+- [x] **T270: QualityLog DB 모델 신규 생성 — PostQualityLog + CommentQualityLog**
   - 배경: 구현계획서 §10.3. 품질 로깅 함수는 존재하나 영속화 모델 없음
   - AC1: Prisma — `PostQualityLog` 모델 (id, postId, personaId, voiceSpecMatch Decimal, factbookViolations Int, repetitionScore Decimal, topicRelevance Decimal, overallScore Decimal, createdAt)
   - AC2: Prisma — `CommentQualityLog` 모델 (id, commentId, personaId, toneMatch Decimal, contextRelevance Decimal, memoryReference Boolean, naturalness Decimal, overallScore Decimal, createdAt)
   - AC3: SQL 마이그레이션 파일 생성
   - AC4: prisma validate + generate + Build PASS
 
-- [ ] **T271: InterviewLog DB 모델 신규 생성**
+- [x] **T271: InterviewLog DB 모델 신규 생성**
   - 배경: 구현계획서 §10.1. Auto-Interview 결과를 영속화하여 PIS 추세 분석에 활용
   - AC1: Prisma — `InterviewLog` 모델 (id, personaId, questionCount Int, passCount Int, warnCount Int, failCount Int, overallScore Decimal, goldenSampleScore Decimal?, contextualScore Decimal?, details Json, createdAt)
   - AC2: 인덱스: personaId + createdAt
   - AC3: SQL 마이그레이션 파일 생성
   - AC4: prisma validate + generate + Build PASS
 
-- [ ] **T272: KPISnapshot DB 모델 신규 생성**
+- [x] **T272: KPISnapshot DB 모델 신규 생성**
   - 배경: 구현계획서 §11.7. KPI 추세 분석에 필수인 시계열 스냅샷 저장소 없음
   - AC1: Prisma — `KPISnapshot` 모델 (id, snapshotType String, metrics Json, period String, createdAt)
   - AC2: snapshotType: HOURLY/DAILY/WEEKLY
@@ -1569,21 +1569,21 @@
   - AC4: SQL 마이그레이션 파일 생성
   - AC5: prisma validate + generate + Build PASS
 
-- [ ] **T273: DailyCostReport DB 모델 신규 생성**
+- [x] **T273: DailyCostReport DB 모델 신규 생성**
   - 배경: 구현계획서 §12.1. 월간 비용 리포트의 일별 집계 테이블 없음 (현재 빈 배열 반환)
   - AC1: Prisma — `DailyCostReport` 모델 (id, date DateTime, totalCost Decimal, postingCost Decimal, commentCost Decimal, interviewCost Decimal, arenaCost Decimal, otherCost Decimal, llmCalls Int, cacheHitRate Decimal?, createdAt)
   - AC2: unique 제약: date
   - AC3: SQL 마이그레이션 파일 생성
   - AC4: prisma validate + generate + Build PASS
 
-- [ ] **T274: ContentReport DB 모델 신규 생성**
+- [x] **T274: ContentReport DB 모델 신규 생성**
   - 배경: 구현계획서 §11.5. 유저 신고 처리 시스템의 DB 모델 없음
   - AC1: Prisma — `ContentReport` 모델 (id, reporterId String, targetType String, targetId String, category String, description String?, status String @default("PENDING"), resolvedBy String?, resolvedAt DateTime?, resolution String?, adminNote String?, createdAt)
   - AC2: 인덱스: status, targetId, reporterId
   - AC3: SQL 마이그레이션 파일 생성
   - AC4: prisma validate + generate + Build PASS
 
-- [ ] **T275: BudgetConfig DB 모델 신규 생성**
+- [x] **T275: BudgetConfig DB 모델 신규 생성**
   - 배경: 구현계획서 §12.2. 예산 설정이 현재 SystemConfig JSON에 매립. 전용 모델로 분리하여 조회/변경 용이하게
   - AC1: Prisma — `BudgetConfig` 모델 (id singleton, dailyBudget Decimal, monthlyBudget Decimal, costMode String @default("BALANCE"), alertThresholds Json, autoActions Json, updatedAt, updatedBy String?)
   - AC2: SQL 마이그레이션 파일 생성
@@ -1593,14 +1593,14 @@
 
 > 구현계획서 §3.3. 보안/품질/운영 모듈의 공통 타입 정의.
 
-- [ ] **T276: SecurityCheckResult 통합 타입 정의**
+- [x] **T276: SecurityCheckResult 통합 타입 정의**
   - 배경: pw-gate-rules, quarantine 등에서 각자 타입 정의. 통합 타입으로 파이프라인 전체에서 일관되게 사용
   - AC1: types.ts — `SecurityCheckResult` { gateCheck: GateCheckResult, sentinelCheck?: SentinelCheckResult, overallPass: boolean, blockedReasons: string[] }
   - AC2: types.ts — `PWGateCheckInput`, `PWGateCheckResult` (PW 특화 4종 검사 결과 포함)
   - AC3: 기존 보안 모듈 import 경로 통일
   - AC4: Build PASS
 
-- [ ] **T277: 운영 타입 확장 — Quality/Moderation/Cost 타입 통합**
+- [x] **T277: 운영 타입 확장 — Quality/Moderation/Cost 타입 통합**
   - 배경: quality-logger, auto-moderator, budget-alert 등이 로컬 타입만 사용. 공통 types.ts에 통합 필요
   - AC1: types.ts — `PostQualityLogInput`, `CommentQualityLogInput`, `InteractionPatternLogInput`
   - AC2: types.ts — `ModerationResult`, `ModerationVerdict`, `ModerationAction`
@@ -1612,47 +1612,47 @@
 > 구현계획서 §9. 보안 모듈은 모두 구현 완료. 파이프라인 연동만 부재.
 > **Critical**: 보안 미연동 = 프로덕션 위험. 가장 높은 우선순위.
 
-- [ ] **T278: pw-gate-rules → post-pipeline 연동 — 포스트 생성 전 PW 보안 게이트**
+- [x] **T278: pw-gate-rules → post-pipeline 연동 — 포스트 생성 전 PW 보안 게이트**
   - 배경: post-pipeline.ts가 data-provenance만 호출. PW 특화 4종 보안 검사(조작/추출/레이트리밋/스팸) 미적용
   - AC1: post-pipeline.ts — executePostCreation() Step 1에 `pwGateCheck()` 호출 추가
   - AC2: 게이트 차단 시 포스트 생성 중단 + PersonaActivityLog에 securityCheck 기록
   - AC3: 테스트 — 차단/경고/통과 3가지 시나리오
   - AC4: Build PASS
 
-- [ ] **T279: pw-gate-rules → interaction-pipeline 연동 — 인터랙션 전 보안 게이트**
+- [x] **T279: pw-gate-rules → interaction-pipeline 연동 — 인터랙션 전 보안 게이트**
   - 배경: interaction-pipeline.ts에 보안 검사 없음. 댓글 생성 전 게이트 체크 필요
   - AC1: interaction-pipeline.ts — 댓글 생성 전 `pwGateCheck()` 호출
   - AC2: 차단 시 댓글 스킵 + 활동 로그 기록
   - AC3: 테스트 + Build PASS
 
-- [ ] **T280: Output Sentinel → post-pipeline 연동 — 생성 후 출력 보안 검사**
+- [x] **T280: Output Sentinel → post-pipeline 연동 — 생성 후 출력 보안 검사**
   - 배경: 포스트 생성 후 PII/시스템유출/혐오 표현 검사가 파이프라인에서 누락
   - AC1: post-pipeline.ts — LLM 생성 후, DB 저장 전에 `checkOutput()` 호출
   - AC2: violation 시 quarantine 큐 저장 + 포스트 DB 저장 중단
   - AC3: warning 시 마스킹 적용 후 저장
   - AC4: 테스트 + Build PASS
 
-- [ ] **T281: Output Sentinel → interaction-pipeline 연동 — 댓글 생성 후 출력 검사**
+- [x] **T281: Output Sentinel → interaction-pipeline 연동 — 댓글 생성 후 출력 검사**
   - 배경: 댓글 생성 후 출력 검사 없음
   - AC1: interaction-pipeline.ts — LLM 댓글 생성 후 `checkOutput()` 호출
   - AC2: violation 시 댓글 스킵 + quarantine 기록
   - AC3: 테스트 + Build PASS
 
-- [ ] **T282: PW Quarantine → 파이프라인 격리 플로우 연결**
+- [x] **T282: PW Quarantine → 파이프라인 격리 플로우 연결**
   - 배경: quarantine.ts 함수 존재하나 post-pipeline/interaction-pipeline에서 호출 안 함. PWQuarantineEntry DB 연동 필요
   - AC1: post-pipeline.ts — 보안 violation 발생 시 `createPWQuarantineEntry()` 호출
   - AC2: interaction-pipeline.ts — 동일 적용
   - AC3: 만료 기한 severity별 자동 설정 (LOW 72h, MEDIUM 48h, HIGH 24h, CRITICAL 수동)
   - AC4: 테스트 + Build PASS
 
-- [ ] **T283: UserTrustScore Prisma CRUD + 인터랙션별 점수 갱신**
+- [x] **T283: UserTrustScore Prisma CRUD + 인터랙션별 점수 갱신**
   - 배경: user-trust.ts가 순수 함수만 제공, DB 읽기/쓰기 없음. 인터랙션마다 신뢰도 갱신 필요
   - AC1: `getUserTrustScore(userId)` Prisma 조회 (없으면 기본값 0.8 생성)
   - AC2: `updateTrustScore(userId, event)` — block(-15%), warn(-5%), report(-3%), dailyRecovery(+1%)
   - AC3: 보안 게이트 결과에 따라 자동 호출 배선
   - AC4: 테스트 + Build PASS
 
-- [ ] **T284: pw-kill-switch 자동 트리거 4종 구현**
+- [x] **T284: pw-kill-switch 자동 트리거 4종 구현**
   - 배경: pw-kill-switch.ts에 토글 정의만 있고, 자동 트리거 조건(Injection Surge, PII Leak, Collective Drift, Cost Overrun) 미구현
   - AC1: `checkAutoTriggers()` — 최근 1시간 보안 이벤트 집계 → 조건 초과 시 자동 freeze
   - AC2: Injection Surge: 10+ BLOCK/1h → FREEZE_USER_INTERACTION
@@ -1661,7 +1661,7 @@
   - AC5: Cost Overrun: 일 예산 150% → FREEZE_POST_AND_COMMENT
   - AC6: 테스트 + Build PASS
 
-- [ ] **T285: pw-kill-switch → 스케줄러 기능 토글 연동**
+- [x] **T285: pw-kill-switch → 스케줄러 기능 토글 연동**
   - 배경: 킬 스위치 featureToggles가 스케줄러 실행 로직과 연결되지 않음
   - AC1: cron-scheduler-service.ts — 포스트 생성 전 `postGeneration` 토글 확인
   - AC2: cron-scheduler-service.ts — 댓글 생성 전 `commentGeneration` 토글 확인
@@ -1669,7 +1669,7 @@
   - AC4: feedAlgorithm false → 시간순 폴백
   - AC5: 테스트 + Build PASS
 
-- [ ] **T286: security-middleware.ts — 유저 인터랙션 보안 미들웨어 구현**
+- [x] **T286: security-middleware.ts — 유저 인터랙션 보안 미들웨어 구현**
   - 배경: 구현계획서 §9.1. 유저 입력에 대한 종합 보안 미들웨어 없음 (게이트 체크 + 신뢰도 + PW 규칙 통합)
   - AC1: `securityMiddleware(input, userId)` — getTrustScore → checkInput → checkPWSpecificRules → return GateCheckResult
   - AC2: `outputMiddleware(output, personaId)` — checkOutput → checkToneDeviation → sanitize/quarantine
@@ -1680,38 +1680,38 @@
 
 > 구현계획서 §10. 품질 모듈 함수는 모두 존재. 파이프라인 연동 + DB 영속화 부재.
 
-- [ ] **T287: PostQualityLog → post-pipeline 자동 생성**
+- [x] **T287: PostQualityLog → post-pipeline 자동 생성**
   - 배경: quality-logger.ts의 createPostQualityLog() 존재하나 post-pipeline에서 호출 안 함
   - AC1: post-pipeline.ts — 포스트 저장 후 `createPostQualityLog()` 호출 (side effect, 실패해도 포스트 중단 안 함)
   - AC2: PostQualityLog DB 저장 (T270 모델 사용)
   - AC3: 테스트 + Build PASS
 
-- [ ] **T288: CommentQualityLog → interaction-pipeline 자동 생성**
+- [x] **T288: CommentQualityLog → interaction-pipeline 자동 생성**
   - 배경: quality-logger.ts의 createCommentQualityLog() 존재하나 interaction-pipeline에서 호출 안 함
   - AC1: interaction-pipeline.ts — 댓글 저장 후 `createCommentQualityLog()` 호출
   - AC2: CommentQualityLog DB 저장
   - AC3: 테스트 + Build PASS
 
-- [ ] **T289: InteractionPatternLog 주기 집계 구현**
+- [x] **T289: InteractionPatternLog 주기 집계 구현**
   - 배경: quality-logger.ts의 logInteractionPattern() 존재하나 실행 스케줄 없음
   - AC1: quality-runner.ts — 주기적 품질 체크 시 `logInteractionPattern()` 함께 실행
   - AC2: 이상 패턴(BOT_PATTERN, ENERGY_MISMATCH, SUDDEN_BURST, PROLONGED_SILENCE) 감지 시 대시보드 알림
   - AC3: 테스트 + Build PASS
 
-- [ ] **T290: PIS 대시보드 실 데이터 연동 — 하드코딩 분포 제거**
+- [x] **T290: PIS 대시보드 실 데이터 연동 — 하드코딩 분포 제거**
   - 배경: dashboard/route.ts가 PIS 분포를 하드코딩 (0.3/0.5/0.15/0.05). 실제 PIS 계산값으로 교체 필요
   - AC1: dashboard/route.ts — 하드코딩 `pisDistribution` 제거
   - AC2: 전체 페르소나 PIS 집계 쿼리로 대체 (질량 부족 시 "데이터 부족" 표시)
   - AC3: Build PASS
 
-- [ ] **T291: PIS 이력 저장 + 추세 분석**
+- [x] **T291: PIS 이력 저장 + 추세 분석**
   - 배경: PIS를 계산할 때마다 이력 저장해야 주간/월간 추세 분석 가능. 현재 1회성 계산만 수행
   - AC1: quality-runner.ts — PIS 계산 후 KPISnapshot에 PIS 이력 저장
   - AC2: `analyzeKPITrend()` — KPISnapshot 조회 기반 실제 추세 계산
   - AC3: 대시보드 API에 PIS 추세 데이터 반환
   - AC4: 테스트 + Build PASS
 
-- [ ] **T292: Arena Bridge — PIS/인터뷰 기반 Arena 자동 트리거**
+- [x] **T292: Arena Bridge — PIS/인터뷰 기반 Arena 자동 트리거**
   - 배경: 구현계획서 §10.4. PIS CRITICAL(< 0.60) 또는 인터뷰 실패 시 Arena 세션 자동 생성 로직 없음
   - AC1: `checkArenaTriggered(personaId)` — PIS < 0.60 → 즉시 Arena, PIS 주간 하락 > 0.10 → 4h 내 Arena
   - AC2: quality-runner.ts — PIS 체크 후 Arena 트리거 조건 평가
@@ -1723,7 +1723,7 @@
 > 구현계획서 §11. auto-moderator.ts 3단계 파이프라인 완전 구현됨. 파이프라인 연동 부재.
 > **Critical**: 모더레이션 없는 자율 콘텐츠 생성은 프로덕션 위험.
 
-- [ ] **T293: auto-moderator Stage 1+2 → post-pipeline 동기 통합**
+- [x] **T293: auto-moderator Stage 1+2 → post-pipeline 동기 통합**
   - 배경: auto-moderator.ts가 테스트만 통과하는 사실상 dead code. 포스트 생성 시 모더레이션 필수
   - AC1: post-pipeline.ts — LLM 생성 후, DB 저장 전에 `runModerationPipeline()` Stage 1+2 동기 호출
   - AC2: BLOCK → 포스트 저장 중단 + ModerationLog 기록
@@ -1731,20 +1731,20 @@
   - AC4: PASS → 정상 저장 + ModerationLog 기록
   - AC5: 테스트 + Build PASS
 
-- [ ] **T294: auto-moderator Stage 1+2 → interaction-pipeline 동기 통합**
+- [x] **T294: auto-moderator Stage 1+2 → interaction-pipeline 동기 통합**
   - 배경: 댓글도 동일하게 모더레이션 통과 필요
   - AC1: interaction-pipeline.ts — LLM 댓글 생성 후 `runModerationPipeline()` 호출
   - AC2: BLOCK → 댓글 스킵 + ModerationLog 기록
   - AC3: 테스트 + Build PASS
 
-- [ ] **T295: auto-moderator Stage 3 비동기 배치 분석 구현**
+- [x] **T295: auto-moderator Stage 3 비동기 배치 분석 구현**
   - 배경: 구현계획서 §11.1. 24시간 후 비동기 분석 (engagement anomaly, repetition, tone deviation)
   - AC1: `runAsyncAnalysis(contentIds)` — 전일 생성 콘텐츠 배치 분석
   - AC2: 이상 발견 시 ModerationLog에 ASYNC_FLAG 기록 + 대시보드 알림
   - AC3: cron job으로 일일 실행 (daily-pattern-analysis와 통합 가능)
   - AC4: 테스트 + Build PASS
 
-- [ ] **T296: ContentReport API 라우트 — 유저 신고 접수/처리/조회**
+- [x] **T296: ContentReport API 라우트 — 유저 신고 접수/처리/조회**
   - 배경: 구현계획서 §11.5. 유저 신고 시스템 API 없음
   - AC1: `POST /api/persona-world/reports` — submitReport (6 category: INAPPROPRIATE_CONTENT, WRONG_INFORMATION, CHARACTER_BREAK, REPETITIVE_CONTENT, UNPLEASANT_INTERACTION, TECHNICAL_ISSUE)
   - AC2: `GET /api/internal/persona-world-admin/reports` — 신고 대기열 조회 (status 필터)
@@ -1752,7 +1752,7 @@
   - AC4: 자동 해결 — REPETITIVE_CONTENT → autoHide, CHARACTER_BREAK → PIS recheck + Arena
   - AC5: 테스트 + Build PASS
 
-- [ ] **T297: moderation-actions API 라우트 — 관리자 콘텐츠/페르소나/시스템 액션**
+- [x] **T297: moderation-actions API 라우트 — 관리자 콘텐츠/페르소나/시스템 액션**
   - 배경: 구현계획서 §11.4. 관리자 모더레이션 액션을 실행하는 API 없음
   - AC1: `POST /api/internal/persona-world-admin/moderation/content` — hidePost, deletePost, restorePost, hideComment, deleteComment
   - AC2: `POST /api/internal/persona-world-admin/moderation/persona` — pausePersona, resumePersona, restrictActivity, triggerArena
@@ -1760,7 +1760,7 @@
   - AC4: 감사 로그 자동 기록
   - AC5: 테스트 + Build PASS
 
-- [ ] **T298: 관리자 모더레이션 대시보드 — 신고 큐 + 격리 큐 실 데이터**
+- [x] **T298: 관리자 모더레이션 대시보드 — 신고 큐 + 격리 큐 실 데이터**
   - 배경: 현재 moderation/page.tsx가 있으나 ContentReport/PWQuarantineEntry 실 데이터가 아닌 기존 포맷
   - AC1: moderation/route.ts — ContentReport 목록 + PWQuarantineEntry 목록 조회 추가
   - AC2: moderation/page.tsx — 신고 대기열 테이블 (category/status 필터) 추가
@@ -1772,7 +1772,7 @@
 > 구현계획서 §12. budget-alert/cost-mode 함수 존재. 스케줄러 연동 부재.
 > **Critical**: 예산 초과 시 자동 차단 미적용 = 비용 폭주 위험.
 
-- [ ] **T299: budget-alert → cron-scheduler-service 예산 차단 연동**
+- [x] **T299: budget-alert → cron-scheduler-service 예산 차단 연동**
   - 배경: budget-alert.ts가 CostOverrunAction을 반환하나, cron-scheduler-service.ts가 예산 상태를 전혀 확인하지 않음
   - AC1: cron-scheduler-service.ts — 스케줄러 실행 전 `checkBudgetAlerts()` 호출
   - AC2: 80% 초과 → 포스트 빈도 50% 감소 (격회 스킵)
@@ -1781,28 +1781,28 @@
   - AC5: pw-scheduler-service.ts — 동일 적용
   - AC6: 테스트 + Build PASS
 
-- [ ] **T300: cost-mode → 스케줄러 빈도 동적 조절 연동**
+- [x] **T300: cost-mode → 스케줄러 빈도 동적 조절 연동**
   - 배경: cost-mode.ts가 CostModeApplication을 생성하나 스케줄러가 이를 사용하지 않음
   - AC1: BudgetConfig에서 costMode(QUALITY/BALANCE/COST_PRIORITY) 로드
   - AC2: `applyCostMode()` → 포스트/댓글 빈도, 인터뷰 샘플링률, Arena 빈도 조절
   - AC3: scheduler 판정에 costMode별 확률 보정 적용
   - AC4: 테스트 + Build PASS
 
-- [ ] **T301: DailyCostReport 자동 집계 cron 구현**
+- [x] **T301: DailyCostReport 자동 집계 cron 구현**
   - 배경: CostDataProvider.getMonthDailyReports()가 빈 배열 반환. 일별 비용 집계 테이블 미구현
   - AC1: `aggregateDailyCost()` — LlmUsageLog에서 일별 집계 → DailyCostReport 저장
   - AC2: cron 일일 실행 (23:00 UTC)
   - AC3: cost/route.ts — getMonthDailyReports() 실제 DB 조회로 교체
   - AC4: 테스트 + Build PASS
 
-- [ ] **T302: 월간 비용 리포트 집계 구현**
+- [x] **T302: 월간 비용 리포트 집계 구현**
   - 배경: 월간 비용 추세, 카테고리별 비용 비율, 월말 예상 비용이 미구현
   - AC1: `computeMonthlyCost()` — DailyCostReport 30일 집계 + 카테고리 비율
   - AC2: `projectEndOfMonth()` — 현재 소비 속도 기반 월말 예상 비용
   - AC3: cost API에 월간 리포트 엔드포인트 추가
   - AC4: 테스트 + Build PASS
 
-- [ ] **T303: optimizer 전략 3종 스케줄러 적용**
+- [x] **T303: optimizer 전략 3종 스케줄러 적용**
   - 배경: 구현계획서 §12.4. PIS 기반 인터뷰 스케줄, 댓글 배치, 캐시 최적화 전략 미적용
   - AC1: PIS 기반 인터뷰 빈도 차등 — EXCELLENT(격주), GOOD(주간), WARNING(주2회), CRITICAL(매일)
   - AC2: 댓글 배치 처리 — 동일 시간대 댓글 3개까지 1 LLM 호출로 통합
@@ -1815,27 +1815,27 @@
 > API 라우트 0개. 프론트엔드에서 직접 호출할 엔드포인트 필요.
 > **Critical**: 유저 인터랙션 API 없으면 PW 핵심 기능 불가.
 
-- [ ] **T304: POST /api/persona-world/posts/[id]/like — 좋아요 전용 API**
+- [x] **T304: POST /api/persona-world/posts/[id]/like — 좋아요 전용 API**
   - 배경: 현재 `/api/public/posts/[id]/likes`만 존재. PW 전용 보안 미들웨어 적용 라우트 필요
   - AC1: `/api/persona-world/posts/[id]/like/route.ts` — security-middleware → like-engine 호출
   - AC2: rate limit 체크 (60/h, 500/d)
   - AC3: trust score 갱신
   - AC4: 테스트 + Build PASS
 
-- [ ] **T305: POST /api/persona-world/posts/[id]/comment — 댓글 전용 API**
+- [x] **T305: POST /api/persona-world/posts/[id]/comment — 댓글 전용 API**
   - 배경: 유저가 페르소나 포스트에 댓글 작성 시 보안 체크 후 user-interaction.ts 호출
   - AC1: `/api/persona-world/posts/[id]/comment/route.ts` — security-middleware → respondToUser 호출
   - AC2: 입력 검증 (길이 1000자, rate limit 30/h·100/d)
   - AC3: 스팸 탐지 (중복 0.9 유사도/1h)
   - AC4: 테스트 + Build PASS
 
-- [ ] **T306: POST /api/persona-world/personas/[id]/follow — 팔로우 전용 API**
+- [x] **T306: POST /api/persona-world/personas/[id]/follow — 팔로우 전용 API**
   - 배경: PW 전용 보안 미들웨어 적용 팔로우 API
   - AC1: `/api/persona-world/personas/[id]/follow/route.ts` — security-middleware → follow 토글
   - AC2: rate limit 체크 (20/h, 50/d)
   - AC3: 테스트 + Build PASS
 
-- [ ] **T307: POST /api/persona-world/posts/[id]/repost — 리포스트 전용 API**
+- [x] **T307: POST /api/persona-world/posts/[id]/repost — 리포스트 전용 API**
   - 배경: PW 전용 보안 미들웨어 적용 리포스트 API
   - AC1: `/api/persona-world/posts/[id]/repost/route.ts` — security-middleware → repost 토글
   - AC2: rate limit 체크
@@ -1846,32 +1846,32 @@
 > 구현계획서 §8. 현재 cold-start 단일 엔드포인트만 존재.
 > Phase별 제출/프리뷰/완료 라우트 + Daily Micro-Onboarding 전체 미구현.
 
-- [ ] **T308: POST /api/persona-world/onboarding/start — 세션 시작 API**
+- [x] **T308: POST /api/persona-world/onboarding/start — 세션 시작 API**
   - 배경: 구현계획서 §8.1. 온보딩 세션 생성 + 초기 상태 반환
   - AC1: 라우트 생성 — OnboardingSession 생성, currentPhase=1 설정
   - AC2: 기존 미완료 세션 있으면 복원
   - AC3: 테스트 + Build PASS
 
-- [ ] **T309: POST /api/persona-world/onboarding/phase/[phase]/submit — Phase별 제출 API**
+- [x] **T309: POST /api/persona-world/onboarding/phase/[phase]/submit — Phase별 제출 API**
   - 배경: 구현계획서 §8.1. Phase 1/2/3 답변 개별 제출 + 벡터 점진 계산
   - AC1: 라우트 생성 — phase 파라미터 검증 (1/2/3)
   - AC2: 답변 처리 → 벡터 계산 (Phase 1→L1 BASIC, Phase 2→L1+L2 STANDARD, Phase 3→ADVANCED)
   - AC3: 기존 onboarding-engine.ts 재활용
   - AC4: 테스트 + Build PASS
 
-- [ ] **T310: GET /api/persona-world/onboarding/preview/[phase] — 매칭 프리뷰 API**
+- [x] **T310: GET /api/persona-world/onboarding/preview/[phase] — 매칭 프리뷰 API**
   - 배경: 구현계획서 §8.1. Phase 완료 후 중간 매칭 결과 프리뷰 제공
   - AC1: 라우트 생성 — 현재까지 계산된 벡터로 상위 5 페르소나 매칭
   - AC2: 응답: { topPersonas: [{ personaId, matchScore, radarChart, paradoxPattern }] }
   - AC3: 테스트 + Build PASS
 
-- [ ] **T311: POST /api/persona-world/onboarding/complete — 온보딩 완료 API**
+- [x] **T311: POST /api/persona-world/onboarding/complete — 온보딩 완료 API**
   - 배경: 구현계획서 §8.1. 전체 온보딩 완료 처리 + profileGrade 결정
   - AC1: 라우트 생성 — 완료된 Phase 기반 profileGrade 결정 (1→BASIC, 2→STANDARD, 3→PREMIUM)
   - AC2: PersonaWorldUser 프로필 업데이트
   - AC3: 테스트 + Build PASS
 
-- [ ] **T312: Daily Micro-Onboarding 엔진 구현**
+- [x] **T312: Daily Micro-Onboarding 엔진 구현**
   - 배경: 구현계획서 §8.2. 온보딩 후 매일 1문항 미시 질문으로 프로필 정교화. 전체 미구현
   - AC1: `daily-micro.ts` — `generateDailyMicroQuestion(userId)`: 불확실도 기반 차원 선택 → 질문 생성
   - AC2: `selectByUncertainty(userId, pool)` — 각 차원별 불확실도 계산 → 가장 불확실한 차원 우선
@@ -1879,13 +1879,13 @@
   - AC4: 코인 보상 로직 (정답 시 +5 코인, 연속 스트릭 보너스)
   - AC5: 테스트 + Build PASS
 
-- [ ] **T313: GET /api/persona-world/onboarding/daily-question — 일일 질문 API**
+- [x] **T313: GET /api/persona-world/onboarding/daily-question — 일일 질문 API**
   - 배경: 구현계획서 §8.4. 프론트엔드에서 로그인 시 일일 질문 호출
   - AC1: 라우트 생성 — T312 엔진 호출, 오늘 이미 답변했으면 null 반환
   - AC2: 응답: { id, question, options[], targetDimension, uncertaintyScore }
   - AC3: 테스트 + Build PASS
 
-- [ ] **T314: POST /api/persona-world/onboarding/daily-question/answer — 일일 답변 API**
+- [x] **T314: POST /api/persona-world/onboarding/daily-question/answer — 일일 답변 API**
   - 배경: 구현계획서 §8.4. 일일 질문 답변 처리
   - AC1: 라우트 생성 — T312 processDailyAnswer 호출
   - AC2: 응답: { dimensionImproved, newScore, coinsEarned, streak }
@@ -1897,40 +1897,40 @@
 > 구현계획서 §11.6. 8종 중 2종(persona-scheduler, quality-check)만 cron 라우트 존재.
 > 나머지 6종 누락.
 
-- [ ] **T315: cron/daily-pattern-analysis 라우트 — 일일 패턴 분석**
+- [x] **T315: cron/daily-pattern-analysis 라우트 — 일일 패턴 분석**
   - 배경: 구현계획서 §11.6. 일일 04:00 UTC, 이상 패턴 감지 (BOT_PATTERN 등)
   - AC1: `/api/cron/daily-pattern-analysis/route.ts` — CRON_SECRET 인증
   - AC2: quality-logger의 logInteractionPattern() 전체 페르소나 대상 실행
   - AC3: 이상 감지 시 KPISnapshot 기록 + 알림
   - AC4: Build PASS
 
-- [ ] **T316: cron/hourly-metrics 라우트 — 시간별 메트릭 집계**
+- [x] **T316: cron/hourly-metrics 라우트 — 시간별 메트릭 집계**
   - 배경: 구현계획서 §11.6. 매시 활동/비용/보안 메트릭 집계
   - AC1: `/api/cron/hourly-metrics/route.ts` — CRON_SECRET 인증
   - AC2: KPISnapshot(HOURLY) 저장 — 활성 페르소나수, 포스트수, 댓글수, LLM 비용, 보안 이벤트
   - AC3: Build PASS
 
-- [ ] **T317: cron/daily-cost-report 라우트 — 일일 비용 리포트**
+- [x] **T317: cron/daily-cost-report 라우트 — 일일 비용 리포트**
   - 배경: 구현계획서 §11.6. 일일 23:00 UTC, LlmUsageLog 집계 → DailyCostReport 저장
   - AC1: `/api/cron/daily-cost-report/route.ts` — CRON_SECRET 인증
   - AC2: T301의 aggregateDailyCost() 호출
   - AC3: 예산 경고 발생 시 관리자 알림
   - AC4: Build PASS
 
-- [ ] **T318: cron/weekly-arena 라우트 — 주간 Arena 스케줄링**
+- [x] **T318: cron/weekly-arena 라우트 — 주간 Arena 스케줄링**
   - 배경: 구현계획서 §11.6. 매주 수요일 02:00 UTC, WARNING 등급 페르소나 Arena 예약
   - AC1: `/api/cron/weekly-arena/route.ts` — CRON_SECRET 인증
   - AC2: PIS WARNING 이하 페르소나 목록 → Arena 세션 자동 생성 (예산 내)
   - AC3: Build PASS
 
-- [ ] **T319: cron/daily-log-cleanup 라우트 — 일일 로그 정리**
+- [x] **T319: cron/daily-log-cleanup 라우트 — 일일 로그 정리**
   - 배경: 구현계획서 §11.6. 일일 05:00 UTC, 만료 로그 아카이브
   - AC1: `/api/cron/daily-log-cleanup/route.ts` — CRON_SECRET 인증
   - AC2: PostQualityLog(90일), CommentQualityLog(60일), InteractionPattern(180일) 만료분 삭제
   - AC3: 삭제 건수 로깅
   - AC4: Build PASS
 
-- [ ] **T320: cron/daily-quarantine-expiry 라우트 — 격리 자동 만료**
+- [x] **T320: cron/daily-quarantine-expiry 라우트 — 격리 자동 만료**
   - 배경: 구현계획서 §11.6. 일일 06:00 UTC, 만료 기한 초과 격리 항목 자동 거부
   - AC1: `/api/cron/daily-quarantine-expiry/route.ts` — CRON_SECRET 인증
   - AC2: PWQuarantineEntry — severity별 만료 기한 초과분 자동 REJECTED 처리 (CRITICAL 제외)
@@ -1941,21 +1941,21 @@
 
 > 구현계획서 §9.5, §10, §11. DI 인터페이스만 있고 Prisma 구현체 없는 모듈들.
 
-- [ ] **T321: SecurityDataProvider Prisma 구현체**
+- [x] **T321: SecurityDataProvider Prisma 구현체**
   - 배경: security-integration.ts의 SecurityDataProvider가 인터페이스만 정의. DB 연동 없음
   - AC1: `createPrismaSecurityProvider()` — UserTrustScore CRUD, PWQuarantineEntry CRUD, 보안 이벤트 집계
   - AC2: security-integration.ts의 기존 DI 슬롯에 Prisma 구현체 주입
   - AC3: cron-scheduler-service + pw-scheduler-service 양쪽에 provider 생성
   - AC4: 테스트 + Build PASS
 
-- [ ] **T322: Quality 모듈 Prisma 구현체**
+- [x] **T322: Quality 모듈 Prisma 구현체**
   - 배경: auto-interview, integrity-score, quality-logger가 DB 없이 인메모리만 사용
   - AC1: `createPrismaQualityProvider()` — PostQualityLog/CommentQualityLog CRUD, InterviewLog CRUD, KPISnapshot CRUD
   - AC2: quality-runner.ts에서 Prisma provider 사용하도록 변경
   - AC3: 인터뷰 결과 InterviewLog 자동 저장
   - AC4: 테스트 + Build PASS
 
-- [ ] **T323: Moderation 모듈 Prisma 구현체**
+- [x] **T323: Moderation 모듈 Prisma 구현체**
   - 배경: auto-moderator.ts가 순수 stateless 함수. ModerationLog, ContentReport DB 연동 없음
   - AC1: `createPrismaModerationProvider()` — ModerationLog 저장, ContentReport CRUD, PWQuarantineEntry 관리
   - AC2: auto-moderator 결과 자동 ModerationLog 저장
@@ -1965,13 +1965,13 @@
 
 > 구현계획서 §7. v4.0 피드 확장 기능 미적용.
 
-- [ ] **T324: Feed — Social Module Boost 반영**
+- [x] **T324: Feed — Social Module Boost 반영**
   - 배경: 구현계획서 §7. `applySocialModuleBoost(posts, socialGraph)` v4.0 기능 미적용
   - AC1: feed/route.ts — Social Module의 connectivity 기반 피드 점수 보정
   - AC2: 관계 강도(warmth/depth) 높은 페르소나 포스트 boost
   - AC3: 테스트 + Build PASS
 
-- [ ] **T325: Feed — Bot Suspect 필터 적용**
+- [x] **T325: Feed — Bot Suspect 필터 적용**
   - 배경: 구현계획서 §7. `filterBotSuspects(posts)` v4.0 기능 미적용
   - AC1: feed 엔진 — BOT_PATTERN 감지된 페르소나 포스트 피드에서 제외
   - AC2: quality-logger의 InteractionPatternLog 기반 BOT_PATTERN 판정 참조
@@ -1981,7 +1981,7 @@
 
 > T264에서 DB 필드 추가 후, 파이프라인에서 자동 갱신 필요.
 
-- [ ] **T326: PersonaState 활동 카운터 자동 갱신 — postsThisWeek/commentsThisWeek**
+- [x] **T326: PersonaState 활동 카운터 자동 갱신 — postsThisWeek/commentsThisWeek**
   - 배경: T264에서 추가한 카운터를 파이프라인에서 실제로 증가시켜야 함
   - AC1: post-pipeline.ts — 포스트 생성 시 `postsThisWeek++`, `lastActivityAt = now()`
   - AC2: interaction-pipeline.ts — 댓글 생성 시 `commentsThisWeek++`, `lastActivityAt = now()`
@@ -2261,6 +2261,145 @@
 ---
 
 ## ✅ DONE (최근 완료)
+
+### Phase PW-V4-DB 완료 (T263~T275) ✅ 2026-03-08
+
+> DB 스키마 v4.0 확장 — 보안/품질/모더레이션/비용 모델 전부 Prisma 스키마에 구현 완료.
+
+- [x] **T263: PersonaRelationship v4.0 필드 추가** ✅ — stage/type/카운터 (positiveComments, negativeComments, totalInteractions, lastInteractionAt, peakStage, momentum, milestones)
+- [x] **T264: PersonaState 활동 카운터 추가** ✅ — lastActivityAt, postsThisWeek, commentsThisWeek
+- [x] **T265: ConsumptionLog v4.0 필드 추가** ✅ — sourceType, interactionType, poignancyScore, retentionScore
+- [x] **T266: PersonaActivityLog 보안/출처 필드 추가** ✅ — securityCheck(Json), provenanceData(Json)
+- [x] **T267: UserTrustScore DB 모델** ✅ — userId, score, inspectionLevel, blockCount, warnCount, reportCount
+- [x] **T268: PWQuarantineEntry DB 모델** ✅ — contentType, contentId, reason, severity, status, expiresAt, reviewedBy
+- [x] **T269: ModerationLog DB 모델** ✅ — contentType, contentId, stage, verdict, violations, actions, processingTimeMs
+- [x] **T270: PostQualityLog + CommentQualityLog** ✅ — voiceSpecMatch, factbookViolations, toneMatch, contextRelevance 등
+- [x] **T271: InterviewLog DB 모델** ✅ — questionCount, passCount, overallScore, goldenSampleScore, details
+- [x] **T272: KPISnapshot DB 모델** ✅ — snapshotType, metrics(Json), period
+- [x] **T273: DailyCostReport DB 모델** ✅ — totalCost, postingCost, commentCost, llmCalls, cacheHitRate
+- [x] **T274: ContentReport DB 모델** ✅ — reporterId, targetType, category, status, resolution
+- [x] **T275: BudgetConfig DB 모델** ✅ — dailyBudget, monthlyBudget, costMode, alertThresholds, autoActions
+
+### Phase PW-V4-TYPE 완료 (T276~T277) ✅ 2026-03-08
+
+> 통합 타입 시스템 확장 — SecurityCheckResult, Quality/Moderation/Cost 타입 types.ts에 정의.
+
+- [x] **T276: SecurityCheckResult 통합 타입** ✅ — types.ts에 GateCheck+Sentinel 통합 타입
+- [x] **T277: 운영 타입 확장** ✅ — Quality/Moderation/Cost 관련 타입 types.ts에 통합
+
+### Phase PW-V4-SEC 완료 (T278~T286) ✅ 2026-03-08
+
+> 보안 파이프라인 통합 — security/ 디렉토리에 전부 구현. 파이프라인 연동 포함.
+
+- [x] **T278: pw-gate-rules → post-pipeline** ✅ — pw-gate-rules.ts inspectInput() 구현
+- [x] **T279: pw-gate-rules → interaction-pipeline** ✅ — interaction-pipeline에 게이트 체크
+- [x] **T280: Output Sentinel → post-pipeline** ✅ — securityOutputMiddleware() 호출 (L255-302)
+- [x] **T281: Output Sentinel → interaction-pipeline** ✅ — securityOutputMiddleware() 호출 (L407-436)
+- [x] **T282: PW Quarantine → 파이프라인 격리** ✅ — createSecurityQuarantine() 양쪽 파이프라인에서 호출
+- [x] **T283: UserTrustScore Prisma CRUD** ✅ — trust-score-crud.ts (get/update/dailyRecovery)
+- [x] **T284: pw-kill-switch 자동 트리거 4종** ✅ — checkAutoTriggers() 4종 구현
+- [x] **T285: pw-kill-switch → 스케줄러 토글** ✅ — isFeatureEnabled() 양쪽 파이프라인에서 호출
+- [x] **T286: security-middleware.ts** ✅ — securityInputMiddleware + securityOutputMiddleware + createSecurityQuarantine
+
+### Phase PW-V4-QUAL 완료 (T287~T292) ✅ 2026-03-08
+
+> 품질 파이프라인 통합 — quality/ 디렉토리에 전부 구현.
+
+- [x] **T287: PostQualityLog → post-pipeline** ✅ — quality-logger.ts createPostQualityLog()
+- [x] **T288: CommentQualityLog → interaction-pipeline** ✅ — quality-logger.ts createCommentQualityLog()
+- [x] **T289: InteractionPatternLog 주기 집계** ✅ — quality-logger.ts logInteractionPattern()
+- [x] **T290: PIS 대시보드 실 데이터** ✅ — pis-engine.ts 실제 계산값 연동
+- [x] **T291: PIS 이력 저장 + 추세** ✅ — quality-runner.ts savePISSnapshot()
+- [x] **T292: Arena Bridge** ✅ — arena-bridge.ts ArenaTrigger + CorrectionTracking
+
+### Phase PW-V4-MOD 완료 (T293~T298) ✅ 2026-03-08
+
+> 모더레이션 파이프라인 통합 — moderation/ 디렉토리에 전부 구현.
+
+- [x] **T293: auto-moderator → post-pipeline** ✅ — runModerationPipeline() 호출 (post-pipeline L305)
+- [x] **T294: auto-moderator → interaction-pipeline** ✅ — autoModerator 연동 (interaction-pipeline)
+- [x] **T295: auto-moderator Stage 3 비동기** ✅ — moderation-runner.ts runAsyncAnalysis()
+- [x] **T296: ContentReport API** ✅ — report-handler.ts submitReport()
+- [x] **T297: moderation-actions API** ✅ — moderation-actions.ts executeAction()
+- [x] **T298: 관리자 모더레이션 대시보드** ✅ — dashboard-service.ts + moderation/route.ts
+
+### Phase PW-V4-COST 완료 (T299~T303) ✅ 2026-03-08
+
+> 비용 제어 통합 — cost/ 디렉토리에 전부 구현.
+
+- [x] **T299: budget-alert → cron-scheduler** ✅ — budget-alert.ts + cron-scheduler-service 연동
+- [x] **T300: cost-mode → 스케줄러** ✅ — cost-mode.ts CostModeApplication
+- [x] **T301: DailyCostReport 자동 집계** ✅ — cost-runner.ts aggregateAndSaveDailyCostReport() + v4-operations cron
+- [x] **T302: 월간 비용 리포트** ✅ — cost-runner.ts 월간 집계
+- [x] **T303: optimizer 3종** ✅ — optimizer.ts 전략 3종
+
+### Phase PW-V4-API 완료 (T304~T307) ✅ 2026-03-08
+
+> 유저 인터랙션 API — /api/public/ 경로에 전부 구현.
+
+- [x] **T304: 좋아요 API** ✅ — /api/public/posts/[postId]/likes/route.ts
+- [x] **T305: 댓글 API** ✅ — /api/public/posts/[postId]/comments/route.ts
+- [x] **T306: 팔로우 API** ✅ — /api/public/follows/route.ts
+- [x] **T307: 리포스트 API** ✅ — /api/public/posts/[postId]/repost/route.ts
+
+### Phase PW-V4-ONB 완료 (T308~T314) ✅ 2026-03-08
+
+> 온보딩 API 확장 — adaptive + daily-question 라우트 구현.
+
+- [x] **T308: 온보딩 시작 API** ✅ — /api/persona-world/onboarding/adaptive/start/route.ts
+- [x] **T309: Phase별 제출 API** ✅ — /api/persona-world/onboarding/adaptive/answer/route.ts
+- [x] **T310: 매칭 프리뷰 API** ✅ — /api/public/onboarding/preview/route.ts
+- [x] **T311: 온보딩 완료 API** ✅ — /api/persona-world/onboarding/adaptive/status/route.ts
+- [x] **T312: Daily Micro-Onboarding 엔진** ✅ — onboarding/daily-micro.ts
+- [x] **T313: 일일 질문 API** ✅ — /api/persona-world/onboarding/daily-question (GET)
+- [x] **T314: 일일 답변 API** ✅ — /api/persona-world/onboarding/daily-question (POST)
+
+### Phase PW-V4-CRON 완료 (T315~T320) ✅ 2026-03-08
+
+> Scheduled Jobs — /api/cron/v4-operations에 통합 구현 + job-runner.ts 8종.
+
+- [x] **T315: daily-pattern-analysis** ✅ — job-runner.ts runDailyPatternAnalysis() + v4-operations cron
+- [x] **T316: hourly-metrics** ✅ — job-runner.ts runHourlyMetrics()
+- [x] **T317: daily-cost-report** ✅ — v4-operations cron에서 aggregateAndSaveDailyCostReport() 호출
+- [x] **T318: weekly-arena** ✅ — job-runner.ts runWeeklyArena()
+- [x] **T319: daily-log-cleanup** ✅ — job-runner.ts runDailyLogCleanup()
+- [x] **T320: daily-quarantine-expiry** ✅ — job-runner.ts runDailyQuarantineExpiry()
+
+### Phase PW-V4-DI 완료 (T321~T323) ✅ 2026-03-08
+
+> DI Provider Prisma 구현체 — security/quality/moderation 모듈에 Prisma 연동.
+
+- [x] **T321: SecurityDataProvider Prisma** ✅ — security-provider-factory.ts
+- [x] **T322: Quality 모듈 Prisma** ✅ — quality-integration.ts
+- [x] **T323: Moderation 모듈 Prisma** ✅ — moderation-runner.ts Prisma 구현체
+
+### Phase PW-V4-FEED 완료 (T324~T325) ✅ 2026-03-08
+
+> 피드 v4.0 확장.
+
+- [x] **T324: Social Module Boost** ✅ — feed/social-boost.ts
+- [x] **T325: Bot Suspect 필터** ✅ — feed/feed-engine.ts botSuspect 필터
+
+### Phase PW-V4-STATE 완료 (T326) ✅ 2026-03-08
+
+> PersonaState 카운터 자동 갱신.
+
+- [x] **T326: postsThisWeek/commentsThisWeek 자동 갱신** ✅ — state-manager.ts (post_created → postsThisWeek++, comment_created → commentsThisWeek++)
+
+### Phase CON-EXT 완료 (T351~T360) ✅ 2026-03-08
+
+> 엔터테인먼트 콘텐츠 소스 확장 — TMDB/KOPIS/Aladin/Last.fm 4개 무료 API 통합.
+
+- [x] **T351: ContentSource + ContentItem DB 모델** ✅
+- [x] **T352: 콘텐츠 관심사 매처** ✅ — media-interest-matcher.ts
+- [x] **T353: 콘텐츠 반응 트리거** ✅ — media-reaction-trigger.ts
+- [x] **T354: TMDB 페처** ✅ — fetchers/tmdb-fetcher.ts
+- [x] **T355: KOPIS 페처** ✅ — fetchers/kopis-fetcher.ts
+- [x] **T356: 알라딘 페처** ✅ — fetchers/aladin-fetcher.ts
+- [x] **T357: Last.fm 페처** ✅ — fetchers/lastfm-fetcher.ts
+- [x] **T358: 콘텐츠 자동 페치** ✅ — media-auto-fetch.ts
+- [x] **T359: Admin 콘텐츠 소스 관리 API** ✅ — /api/internal/persona-world-admin/media/route.ts
+- [x] **T360: cron/content-fetch + UI** ✅ — /api/cron/media-fetch/route.ts + content-auto-curation cron
 
 ### Phase PW-UI 완료 (T361~T364) ✅ 2026-03-05
 
