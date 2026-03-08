@@ -2256,116 +2256,49 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-### Phase INT: 페르소나 자율 인터랙션 확장 (T258~T259)
-
-> 현재 인터랙션 파이프라인은 좋아요+댓글만 실행.
-> 팔로우(로직 존재, 파이프라인 미연동)와 리포스트(DB만 존재, 엔진 미구현)를 스케줄러에 통합.
-
-- [x] **T258: 페르소나 자율 팔로우 — 스케줄러 파이프라인 연동** ✅ 2026-03-01
-  - (DONE 섹션에 상세 기록)
-
-- [x] **T259: 페르소나 자율 리포스트 — 리포스트 엔진 + 파이프라인 통합** ✅ 2026-03-01
-  - (DONE 섹션에 상세 기록)
-
-- [x] **T260: COLLAB 포스트 팬텀 멘션 방지** ✅ 2026-03-01
-  - (DONE 섹션에 상세 기록)
-
-### Phase CON: 소비 기억 자동 기록 (T262)
-
-> 포스트 생성 시 CURATION/REVIEW/NEWS_REACTION 콘텐츠를 ConsumptionLog에 자동 저장.
-> 현재 recordConsumption() 함수는 존재하지만 파이프라인에서 호출되지 않아 소비 기억이 비어있음.
-
-- [ ] **T262: 포스트 → 소비 기억 자동 기록 — ConsumptionLog 파이프라인 연동**
-  - 배경: CURATION/REVIEW/NEWS_REACTION 포스트 생성 시 콘텐츠 아이템이 ConsumptionLog에 저장되지 않음
-  - AC1: ✅ `extractConsumptionFromPost()` 순수 함수 — CURATION(items), REVIEW(단일), NEWS_REACTION(기사) 추출
-  - AC2: ✅ `inferContentType()` — 해시태그+토픽 키워드 기반 콘텐츠 타입 추론 (MOVIE/DRAMA/MUSIC/BOOK/ARTICLE/GAME/OTHER)
-  - AC3: ✅ `PostPipelineDataProvider.recordConsumption?` 옵셔널 메서드 추가
-  - AC4: ✅ `executePostCreation()` Step 7.5 — 포스트 저장 후 소비 기록 추출+저장 (실패해도 포스트 생성 중단 안 함)
-  - AC5: ✅ cron-scheduler-service + pw-scheduler-service 양쪽 provider에 recordConsumption 구현체 추가
-  - AC6: ✅ 테스트 37개 PASS (전체 108파일 4308 tests ALL PASS)
-  - 변경파일: consumption-manager.ts, post-pipeline.ts, cron-scheduler-service.ts, pw-scheduler-service.ts, consumption-manager.test.ts
-
-### Phase PW-HUMAN: Humanizer 패턴 엔진 통합 (T365)
-
-> github.com/blader/humanizer 분석 결과 적용.
-> AI 글쓰기 패턴 24종 → 페르소나 엔진 가드레일 + 프롬프트 품질 섹션에 주입.
-> 추가 LLM 비용 없이 voice-spec.ts + prompt-builder.ts 수정만으로 근본 해결.
-
-- [x] **T365: Humanizer AI-ism 방지 규칙 — 페르소나 엔진 통합** ✅ 2026-03-06
-  - AC1: ✅ `generateGuardrails()` — Universal humanizer rules 항상 주입 (챗봇 클로징/이중헤징/과장수식어/대표성 주장/접속사 남발)
-  - AC2: ✅ `generateGuardrails()` — Vector-conditional rules (sociability<0.4 → 청중 호명 금지, stance>0.7 → Generic Conclusion 금지)
-  - AC3: ✅ `buildGuardrailSection()` — `[작문 품질]` 섹션 신설 (Em dash/접속사/마무리 반복/볼드 남용 금지)
-  - AC4: ✅ `buildV4GuidelinesSection()` — "통계적 평균이 아닌 고유 목소리" 지침 추가
-  - AC5: ✅ voice-spec.test.ts humanizer 규칙 검증 테스트 4개 추가 → 46 tests ALL PASS
-  - AC6: ✅ Build PASS
-
----
-
-### Phase SUPERPOWERS: obra/superpowers 스킬 프레임워크 통합 (T366~T369)
-
-> github.com/obra/superpowers 분석 결과 적용.
-> AI 에이전트 워크플로우 체계화 — session-start 훅, brainstorm/writing-plans 스킬,
-> validate 2단계 리뷰 통합. 추가 코드 없이 스킬 파일 + 훅 설정 변경만으로 달성.
-
-- [x] **T366: session-start 훅 — 세션 자동 컨텍스트 로드** ✅ 2026-03-06
-  - AC1: ✅ `hooks/session-start.sh` 생성 — lessons.md 최근 교훈 TOP 5 출력 + TASK.md IN_PROGRESS 티켓 표시 + 날짜
-  - AC2: ✅ `.claude/settings.json` SessionStart 이벤트 훅 등록
-  - AC3: ✅ 훅 실행 테스트 완료 — 교훈 5개 + 대기 티켓 수 출력 정상
-
-- [x] **T367: /brainstorm 스킬 — 설계 승인 전 구현 금지** ✅ 2026-03-06
-  - AC1: ✅ `skills/brainstorm/SKILL.md` 생성 — 소크라테스식 질문 → 2-3가지 방식 제안 → 설계 승인 강제 프로세스
-  - AC2: ✅ `.claude/commands/brainstorm.md` 생성
-  - AC3: ✅ CLAUDE.md 스킬 테이블에 `/brainstorm` 등록
-
-- [x] **T368: /validate 2단계 코드 리뷰 통합** ✅ 2026-03-06
-  - AC1: ✅ `skills/validate/SKILL.md` — Step 2.5 추가 (Stage 1: 사양 검증 → Stage 2: 코드 품질 검증)
-  - AC2: ✅ `skills/validate/references/quality-checklist.md` — 2단계 리뷰 체크리스트 항목 추가 (Stage 1 + Stage 2)
-
-- [x] **T369: /writing-plans 스킬 — 대형 티켓 실행 단계 구조화** ✅ 2026-03-06
-  - AC1: ✅ `skills/writing-plans/SKILL.md` 생성 — `docs/plans/YYYY-MM-DD-feature.md` 표준 포맷
-  - AC2: ✅ `.claude/commands/writing-plans.md` 생성
-  - AC3: ✅ `docs/plans/.gitkeep` — 디렉토리 초기화
-  - AC4: ✅ CLAUDE.md 스킬 테이블에 `/writing-plans` 등록
-
-  - AC1: ✅ `generateGuardrails()` — Universal humanizer rules 항상 주입 (챗봇 클로징/이중헤징/과장수식어/대표성 주장/접속사 남발)
-  - AC2: ✅ `generateGuardrails()` — Vector-conditional rules (sociability<0.4 → 청중 호명 금지, stance>0.7 → Generic Conclusion 금지)
-  - AC3: ✅ `buildGuardrailSection()` — `[작문 품질]` 섹션 신설 (Em dash/접속사/마무리 반복/볼드 남용 금지)
-  - AC4: ✅ `buildV4GuidelinesSection()` — "통계적 평균이 아닌 고유 목소리" 지침 추가
-  - AC5: ✅ voice-spec.test.ts humanizer 규칙 검증 테스트 4개 추가 → 46 tests ALL PASS
-  - AC6: ✅ Build PASS
-
-### Phase PW-UI: PersonaWorld UI/UX 개선 — ui-ux-pro-max-skill 적용 (T361~T364)
-
-> ui-ux-pro-max-skill 분석 결과를 PersonaWorld에 적용.
-> DM Sans 폰트, Glassmorphism 카드, Bento Grid 피드, Storytelling 랜딩 4단계.
-
-- [x] **T361: DM Sans 폰트 전환 — Inter → DM Sans** ✅ 2026-03-05
-  - AC1: ✅ layout.tsx Google Fonts 링크에 DM Sans (400,500,600,700) 추가, Inter 제거
-  - AC2: ✅ globals.css `--font-sans` → `"DM Sans"` 로 변경
-  - AC3: ✅ Build PASS
-
-- [x] **T362: Glassmorphism 페르소나 카드 variant 추가** ✅ 2026-03-05
-  - AC1: ✅ pw-card.tsx에 `glass` boolean prop 추가 (기본값 false)
-  - AC2: ✅ globals.css `.pw-glass-light` 클래스 추가 (흰 배경 위 glassmorphism)
-  - AC3: ✅ feed/page.tsx Bento Grid 첫 번째 카드(피처 카드)에 `<PWCard glass>` 적용
-  - AC4: ✅ Build PASS
-
-- [x] **T363: Bento Grid 피드 레이아웃 — 첫 6개 포스트** ✅ 2026-03-05
-  - AC1: ✅ feed/page.tsx 첫 6개 포스트 2열 CSS grid (inline, 별도 컴포넌트 불필요)
-  - AC2: ✅ 첫 번째 카드 col-span-2(피처 + glass), 나머지 2열 배치
-  - AC3: ✅ 7번째부터 기존 세로 리스트 유지
-  - AC4: ✅ 모바일 < 640px: `sm:hidden` / `sm:block` 분기로 단일 열 폴백
-  - AC5: ✅ Build PASS
-
-- [x] **T364: 랜딩 페이지 Storytelling 패턴 적용** ✅ 2026-03-05
-  - AC1: ✅ page.tsx 로고 아래 "지금 이 순간에도 살아있는" 페르소나 쇼케이스 섹션 추가
-  - AC2: ✅ SAMPLE_PERSONAS 3개 (에이다/루카스/세라) glassmorphism + pw-profile-ring-animated
-  - AC3: ✅ pw-fade-in-up-1/2/3 CSS keyframes (delay 0.1s/0.3s/0.5s)
-  - AC4: ✅ Build PASS
+(없음)
 
 ---
 
 ## ✅ DONE (최근 완료)
+
+### Phase PW-UI 완료 (T361~T364) ✅ 2026-03-05
+
+> ui-ux-pro-max-skill 분석 결과를 PersonaWorld에 적용.
+
+- [x] **T361: DM Sans 폰트 전환 — Inter → DM Sans** ✅ 2026-03-05
+- [x] **T362: Glassmorphism 페르소나 카드 variant 추가** ✅ 2026-03-05
+- [x] **T363: Bento Grid 피드 레이아웃 — 첫 6개 포스트** ✅ 2026-03-05
+- [x] **T364: 랜딩 페이지 Storytelling 패턴 적용** ✅ 2026-03-05
+
+### Phase PW-HUMAN 완료 (T365) ✅ 2026-03-06
+
+> Humanizer AI-ism 방지 규칙 — 페르소나 엔진 통합.
+
+- [x] **T365: Humanizer AI-ism 방지 규칙 — 페르소나 엔진 통합** ✅ 2026-03-06
+
+### Phase SUPERPOWERS 완료 (T366~T369) ✅ 2026-03-06
+
+> obra/superpowers 스킬 프레임워크 통합 — session-start 훅, brainstorm/writing-plans 스킬, validate 2단계 리뷰.
+
+- [x] **T366: session-start 훅 — 세션 자동 컨텍스트 로드** ✅ 2026-03-06
+- [x] **T367: /brainstorm 스킬 — 설계 승인 전 구현 금지** ✅ 2026-03-06
+- [x] **T368: /validate 2단계 코드 리뷰 통합** ✅ 2026-03-06
+- [x] **T369: /writing-plans 스킬 — 대형 티켓 실행 단계 구조화** ✅ 2026-03-06
+
+### Phase INT 완료 (T258~T260) ✅ 2026-03-01
+
+> 페르소나 자율 인터랙션 확장 — 팔로우/리포스트 파이프라인 통합.
+
+- [x] **T258: 페르소나 자율 팔로우 — 스케줄러 파이프라인 연동** ✅ 2026-03-01
+- [x] **T259: 페르소나 자율 리포스트 — 리포스트 엔진 + 파이프라인 통합** ✅ 2026-03-01
+- [x] **T260: COLLAB 포스트 팬텀 멘션 방지** ✅ 2026-03-01
+
+### Phase CON 완료 (T262) ✅ 2026-03-08
+
+> 포스트 → 소비 기억 자동 기록 — ConsumptionLog 파이프라인 연동.
+
+- [x] **T262: 포스트 → 소비 기억 자동 기록 — ConsumptionLog 파이프라인 연동** ✅ 2026-03-08
 
 ### Phase ES-PREVIEW 완료 (T333~T350) ✅ 2026-03-03
 
@@ -3587,6 +3520,60 @@
   - AC3: `team/invite/accept/route.ts` 신규 생성 — 토큰 검증 + `acceptedAt` 업데이트 + VerificationToken 삭제 ✅
   - AC4: Build PASS ✅
   - 변경파일: `team/invite/route.ts`, `team/invite/accept/route.ts` (신규)
+
+### Phase KAKAO: 카카오톡 페르소나 채팅 연동 (T370~T375)
+
+> 방식 A: Engine Studio 직접 웹훅 — 카카오 오픈빌더 → ES API Route → 기존 chat-service 재사용
+> PW에서 페르소나 선택/연동, 카카오톡에서 대화, 기억·크레딧 파이프라인 공유
+
+- [ ] **T370: KakaoLink DB 스키마 + 공유 타입 추가**
+  - AC1: `KakaoLink` 모델 — `id`, `userId`, `personaId`, `kakaoUserKey`(카카오 유저 식별자), `isActive`, `createdAt`, `updatedAt`
+  - AC2: unique constraint `(userId)` — 유저 1명 = 페르소나 1개 연동
+  - AC3: index `(kakaoUserKey)` — 웹훅에서 빠른 조회
+  - AC4: `@deepsight/shared-types`에 KakaoLink 타입 추가
+  - AC5: 마이그레이션 SQL 파일 작성
+  - AC6: Build PASS
+
+- [ ] **T371: 카카오 연동/해제 API — Engine Studio**
+  - AC1: `POST /api/kakao/link` — 연동 생성 (userId + personaId → KakaoLink upsert)
+  - AC2: `DELETE /api/kakao/link` — 연동 해제 (isActive = false)
+  - AC3: `GET /api/kakao/link` — 현재 연동 상태 조회
+  - AC4: requireAuth() 가드 + 본인 확인
+  - AC5: API 문서 업데이트 (`docs/api/internal.md` + `internal.openapi.yaml`)
+  - AC6: 테스트 + Build PASS
+
+- [ ] **T372: 카카오 웹훅 API Route — 오픈빌더 스킬 서버**
+  - AC1: `POST /api/kakao/webhook` — 카카오 오픈빌더 스킬 엔드포인트 (인증 불필요, 카카오가 호출)
+  - AC2: kakaoUserKey로 KakaoLink 조회 → 연동된 personaId 확인
+  - AC3: 미연동 사용자 → "PersonaWorld에서 페르소나를 연동해주세요" 안내 응답
+  - AC4: 연동 사용자 → chat-service.sendMessage() 호출 (기존 파이프라인 재사용)
+  - AC5: 크레딧 부족 시 → "크레딧이 부족합니다. PW에서 충전해주세요" 안내
+  - AC6: 5초 타임아웃 대응 — LLM 응답 지연 시 "생각 중..." 즉시 응답 + 다음 메시지에서 답변 전달
+  - AC7: 카카오 응답 JSON 포맷 (`simpleText`, 1000자 제한 처리)
+  - AC8: 메시지 발송 인터페이스 추상화 (`KakaoMessageSender`) — 향후 알림톡 확장점
+  - AC9: 테스트 + Build PASS
+
+- [ ] **T373: 카카오 대화 → 기억 파이프라인 연동**
+  - AC1: 카카오 웹훅에서 `recordConversationTurn()` 호출 — 대화 기억 저장
+  - AC2: 카카오 대화도 `retrieveConversationMemories()` — PW 대화 기억 포함 회상
+  - AC3: ChatMessage에 `source` 필드 추가 ("PW" | "KAKAO") — 출처 구분
+  - AC4: InteractionLog에 채널 출처 기록
+  - AC5: 마이그레이션 SQL + 테스트 + Build PASS
+
+- [ ] **T374: PersonaWorld 카카오 연동 UI — 설정 페이지**
+  - AC1: `/settings` 페이지에 "카카오톡 연동" 섹션 추가
+  - AC2: 연동할 페르소나 선택 UI (본인이 채팅한 페르소나 목록에서 1개 선택)
+  - AC3: 연동 완료 시 → DeepSight 카카오 채널 친구추가 QR코드/링크 안내
+  - AC4: 연동 해제 버튼 + 확인 다이얼로그
+  - AC5: 현재 연동 상태 표시 (연동된 페르소나 이름 + 프로필)
+  - AC6: Build PASS
+
+- [ ] **T375: 카카오 연동 E2E 검증 + API 문서 최종화**
+  - AC1: 연동 → 카카오 대화 → 기억 저장 → PW에서 기억 회상 E2E 시나리오 검증
+  - AC2: 크레딧 차감 정상 동작 검증
+  - AC3: 미연동/크레딧 부족 에지케이스 검증
+  - AC4: `docs/api/` 문서 최종 업데이트
+  - AC5: 전체 테스트 PASS + Build PASS
 
 ---
 
