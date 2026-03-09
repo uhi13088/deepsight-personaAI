@@ -9,7 +9,7 @@ https://engine.deepsight.ai/api/internal
 ```
 
 **인증**: 세션 기반 (`requireAuth()` — 내부 팀 전용)
-**최종 업데이트**: 2026-03-04
+**최종 업데이트**: 2026-03-09
 
 > **주의**: 이 API는 내부 운영 도구입니다. 외부에 노출하거나 B2B 고객에게 공개하지 마세요.
 
@@ -25,6 +25,8 @@ https://engine.deepsight.ai/api/internal
    - [GET/PUT/DELETE /personas/:id](#getputdelete-personasid)
    - [POST /personas/:id/test-generate](#post-personasidtest-generate)
    - [POST /personas/:id/lifecycle](#post-personasidlifecycle)
+   - [GET /personas/:id/autonomy](#get-personasidautonomy)
+   - [PATCH /personas/:id/autonomy](#patch-personasidautonomy)
 3. [Arena (AI 토론)](#3-arena-ai-토론)
    - [POST /arena/sessions](#post-arenasessions)
    - [POST /arena/sessions/:id/corrections](#post-arenasessionsidcorrections)
@@ -66,6 +68,12 @@ https://engine.deepsight.ai/api/internal
     - [GET/POST/PUT /persona-world-admin/news](#getpostput-persona-world-adminnews)
 17. [PersonaWorld 품질](#19-personaworld-품질)
     - [GET/POST /persona-world-admin/quality](#getpost-persona-world-adminquality)
+18. [Autonomy (자율 동작)](#20-autonomy-자율-동작)
+    - [GET /autonomy/corrections](#get-autonomycorrections)
+    - [PATCH /autonomy/corrections/:id/review](#patch-autonomycorrectionsidreview)
+    - [GET /autonomy/meta-cognition](#get-autonomymeta-cognition)
+    - [GET /autonomy/meta-cognition/:id](#get-autonomymeta-cognitionid)
+    - [GET /autonomy/memory-prune](#get-autonomymemory-prune)
 
 ---
 
@@ -528,6 +536,111 @@ Content-Type: application/json
     "id": "persona_xyz789",
     "previousStatus": "DRAFT",
     "newStatus": "REVIEW"
+  }
+}
+```
+
+---
+
+### GET /personas/:id/autonomy
+
+per-persona 자율 동작 정책(AutonomyPolicy)을 조회합니다.
+설정되지 않은 경우 기본값(모두 비활성)을 반환합니다.
+
+**요청**
+
+```http
+GET /api/internal/personas/persona_xyz789/autonomy
+```
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "personaId": "persona_xyz789",
+    "personaName": "유나",
+    "isCustom": false,
+    "policy": {
+      "autoCorrection": false,
+      "autoMemoryManagement": false,
+      "metaCognitionEnabled": false,
+      "correctionConfig": {
+        "maxAutoSeverity": "major",
+        "minConfidence": 0.9,
+        "dailyLimit": 3
+      },
+      "memoryConfig": {
+        "pruneConfidenceThreshold": 0.2,
+        "maxPerCategory": 100
+      }
+    }
+  }
+}
+```
+
+---
+
+### PATCH /personas/:id/autonomy
+
+자율 동작 정책을 업데이트합니다. 부분 업데이트를 지원합니다.
+
+**요청**
+
+```http
+PATCH /api/internal/personas/persona_xyz789/autonomy
+Content-Type: application/json
+```
+
+**Request Body** (모두 선택)
+
+| 필드                   | 타입      | 설명                     |
+| ---------------------- | --------- | ------------------------ |
+| `autoCorrection`       | `boolean` | 자율 교정 활성화         |
+| `autoMemoryManagement` | `boolean` | 자율 기억 관리 활성화    |
+| `metaCognitionEnabled` | `boolean` | 메타 인지 보고 활성화    |
+| `correctionConfig`     | `object`  | 자율 교정 세부 설정      |
+| `memoryConfig`         | `object`  | 자율 기억 관리 세부 설정 |
+
+**correctionConfig**
+
+| 필드              | 타입     | 범위        | 기본값 |
+| ----------------- | -------- | ----------- | ------ |
+| `maxAutoSeverity` | `string` | minor/major | major  |
+| `minConfidence`   | `number` | 0.7~1.0     | 0.9    |
+| `dailyLimit`      | `number` | 1~10 정수   | 3      |
+
+**memoryConfig**
+
+| 필드                       | 타입     | 범위         | 기본값 |
+| -------------------------- | -------- | ------------ | ------ |
+| `pruneConfidenceThreshold` | `number` | 0.0~0.5      | 0.2    |
+| `maxPerCategory`           | `number` | 10~1000 정수 | 100    |
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "personaId": "persona_xyz789",
+    "personaName": "유나",
+    "isCustom": true,
+    "policy": { "..." }
+  }
+}
+```
+
+**에러 (400)**
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "입력값이 유효하지 않습니다.",
+    "details": [{ "field": "correctionConfig.minConfidence", "message": "0.7~1.0 범위여야 합니다" }]
   }
 }
 ```
@@ -2648,3 +2761,100 @@ GET /api/internal/persona-world-admin/quality
 | `ARCHIVED`   | 보관됨               |
 | `DEPRECATED` | 폐기됨               |
 | `LEGACY`     | 구버전 유지          |
+
+---
+
+## 20. Autonomy (자율 동작)
+
+자율 교정 감사 로그, 메타 인지 보고서, 기억 관리 API.
+
+### GET /autonomy/corrections
+
+자율 교정 감사 로그 목록 조회.
+
+**쿼리 파라미터**
+
+| 파라미터    | 타입      | 설명                            |
+| ----------- | --------- | ------------------------------- |
+| `personaId` | `string`  | 페르소나 ID 필터                |
+| `reviewed`  | `boolean` | 리뷰 완료 여부 필터             |
+| `severity`  | `string`  | `minor` 또는 `major`            |
+| `limit`     | `number`  | 페이지 크기 (기본 50, 최대 100) |
+| `offset`    | `number`  | 페이지 오프셋                   |
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "logs": [...],
+    "total": 42,
+    "limit": 50,
+    "offset": 0
+  }
+}
+```
+
+---
+
+### PATCH /autonomy/corrections/:id/review
+
+감사 로그 리뷰 완료 마킹.
+
+**응답 (200 OK)**: 업데이트된 로그 객체
+
+**에러 (409)**: 이미 리뷰 완료된 로그
+
+---
+
+### GET /autonomy/meta-cognition
+
+메타 인지 보고서 목록 조회.
+
+**쿼리 파라미터**
+
+| 파라미터         | 타입     | 설명                                           |
+| ---------------- | -------- | ---------------------------------------------- |
+| `personaId`      | `string` | 페르소나 ID 필터                               |
+| `selfAssessment` | `string` | `HEALTHY\|DRIFTING\|NEEDS_ATTENTION\|CRITICAL` |
+| `since`          | `string` | 시작 날짜 (ISO 8601)                           |
+| `limit`          | `number` | 페이지 크기 (기본 50)                          |
+| `offset`         | `number` | 페이지 오프셋                                  |
+
+---
+
+### GET /autonomy/meta-cognition/:id
+
+개별 메타 인지 보고서 상세 조회.
+
+---
+
+### GET /autonomy/memory-prune
+
+페르소나 기억 상태 + 카테고리별 통계 조회.
+
+**쿼리 파라미터**
+
+| 파라미터    | 타입     | 필수 | 설명        |
+| ----------- | -------- | ---- | ----------- |
+| `personaId` | `string` | ✅   | 페르소나 ID |
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "personaId": "...",
+    "personaName": "유나",
+    "autoMemoryManagement": true,
+    "config": { "pruneConfidenceThreshold": 0.2, "maxPerCategory": 100 },
+    "stats": {
+      "totalMemories": 150,
+      "lowConfidenceCount": 5,
+      "byCategory": [{ "category": "BELIEF", "count": 40, "avgConfidence": 0.72 }]
+    }
+  }
+}
+```

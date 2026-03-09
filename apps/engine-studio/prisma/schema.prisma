@@ -200,6 +200,9 @@ model Persona {
   dimensionalityScore Decimal?        @db.Decimal(4, 3) // 0.000~1.000
   engineVersion       String?         @default("4.0")
 
+  // === v5.0 NEW: Autonomy Policy (JSON) ===
+  autonomyPolicy      Json?           // AutonomyPolicy type — per-persona 자율 동작 정책
+
   // === 타임스탬프 ===
   createdById     String
   createdBy       User            @relation("CreatedBy", fields: [createdById], references: [id])
@@ -242,6 +245,12 @@ model Persona {
 
   // 카카오톡 연동 (T370)
   kakaoLinks          KakaoLink[]
+
+  // v5.0 자율 교정 감사 로그 (T403)
+  autonomyCorrectionLogs AutonomyCorrectionLog[]
+
+  // v5.0 메타 인지 보고서 (T406)
+  metaCognitionReports MetaCognitionReport[]
 
   @@map("personas")
 }
@@ -2948,6 +2957,53 @@ enum SemanticMemoryCategory {
   RELATIONSHIP_MODEL // 특정 관계 패턴
   LEARNED_PATTERN    // 행동/반응 패턴
   SELF_NARRATIVE     // 자아 서사 (성장 방향)
+}
+
+// ============================================
+// Phase AU-B: 자율 교정 감사 로그 (T403)
+// ============================================
+
+/// 자율 적용된 교정의 감사 로그 — 관리자 사후 리뷰용
+model AutonomyCorrectionLog {
+  id                  String   @id @default(cuid())
+  personaId           String
+  persona             Persona  @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  sessionId           String
+  severity            String   // "minor" | "major"
+  confidence          Decimal  @db.Decimal(3, 2)
+  category            String   // CorrectionCategory
+  patchSummary        String   @db.Text
+  pisBeforeCorrection Decimal? @db.Decimal(3, 2)
+  reviewed            Boolean  @default(false)
+  reviewedBy          String?
+  reviewedAt          DateTime?
+  createdAt           DateTime @default(now())
+
+  @@index([personaId, createdAt])
+  @@index([reviewed])
+  @@map("autonomy_correction_logs")
+}
+
+// ============================================
+// Phase AU-C: 메타 인지 보고서 (T406)
+// ============================================
+
+/// 페르소나 메타 인지 보고서 — 드리프트 자각 + 1인칭 자기 보고
+model MetaCognitionReport {
+  id              String   @id @default(cuid())
+  personaId       String
+  persona         Persona  @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  pisSnapshot     Decimal  @db.Decimal(3, 2)
+  selfAssessment  String   // "HEALTHY" | "DRIFTING" | "NEEDS_ATTENTION" | "CRITICAL"
+  driftAwareness  String   @db.Text  // 드리프트 자각 텍스트
+  memoryHealth    String   @db.Text  // 기억 건강 상태
+  selfReport      String   @db.Text  // 1인칭 자기 보고
+  suggestion      String   @db.Text  // 개선 제안
+  createdAt       DateTime @default(now())
+
+  @@index([personaId, createdAt])
+  @@index([selfAssessment])
+  @@map("meta_cognition_reports")
 }
 
 // ============================================
