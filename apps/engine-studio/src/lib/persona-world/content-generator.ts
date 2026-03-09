@@ -57,6 +57,12 @@ const POST_TYPE_LENGTH_GUIDE: Partial<
     max: 250,
     style: "뉴스/이슈에 대한 개인적 반응, 짧은 감상이나 의견, SNS 실시간 반응체",
   },
+  // v4.2.0: 이미지 반응
+  IMAGE_REACTION: {
+    min: 30,
+    max: 200,
+    style: "이미지에 대한 자연스러운 감상, 시각적 요소 언급, 감정적 반응, SNS 이미지 반응체",
+  },
 }
 
 /**
@@ -361,6 +367,25 @@ export function buildUserPrompt(input: PostGenerationInput): string {
 
   if (input.ragContext.consumptionMemory) {
     parts.push(`[소비 기억] ${input.ragContext.consumptionMemory}`)
+  }
+
+  // v4.2.0: 이미지 컨텍스트 주입 (IMAGE_REACTION 포스트)
+  if (input.imageContext) {
+    const { imageAnalysis, imageUrls } = input.imageContext
+    parts.push(
+      `\n[이미지 정보]`,
+      `- 이미지 수: ${imageUrls.length}장`,
+      `- 설명: ${imageAnalysis.description}`,
+      `- 분위기: ${imageAnalysis.mood}`,
+      `- 태그: ${imageAnalysis.tags.join(", ")}`,
+      `- 색감: ${imageAnalysis.dominantColors.join(", ")}`,
+      `- 감정: ${imageAnalysis.sentiment > 0 ? "긍정적" : imageAnalysis.sentiment < 0 ? "부정적" : "중립"}(${imageAnalysis.sentiment.toFixed(1)})`,
+      `- 카테고리: ${imageAnalysis.category}`,
+      `\n[이미지 반응 지시]`,
+      `- 이 이미지를 보고 느낀 자연스러운 반응을 작성하세요`,
+      `- 이미지의 시각적 요소(색감, 구도, 분위기)를 언급할 수 있습니다`,
+      `- 이미지 설명을 그대로 복사하지 마세요 — 당신만의 시선으로 반응하세요`
+    )
   }
 
   // COLLAB: 실제 존재하는 페르소나 핸들 목록 주입 (팬텀 멘션 방지)
