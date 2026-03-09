@@ -11,7 +11,16 @@ import {
   PWProfileLevelBadge,
   PWSnsConnect,
 } from "@/components/persona-world"
-import { ArrowRight, ArrowLeft, Sparkles, AlertTriangle, Coins, Link2, Target } from "lucide-react"
+import {
+  ArrowRight,
+  ArrowLeft,
+  Sparkles,
+  AlertTriangle,
+  Coins,
+  Link2,
+  Target,
+  BarChart3,
+} from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useUserStore } from "@/lib/user-store"
 import { clientApi } from "@/lib/api"
@@ -23,6 +32,85 @@ import type {
   AdaptiveAnswerResponse,
 } from "@/lib/types"
 import { getProfileLevelByPhase, PHASE_CREDITS } from "@/lib/profile-level"
+import { getTraitDimension } from "@/lib/trait-colors"
+
+// ── 분석 결과 표시용 유틸 ─────────────────────────────────────
+
+interface TraitSummary {
+  key: string
+  label: string
+  value: number
+  color: string
+  low: string
+  high: string
+}
+
+function getTopTraits(vector: Record<string, number>, count = 5): TraitSummary[] {
+  return Object.entries(vector)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, count)
+    .map(([key, value]) => {
+      const dim = getTraitDimension(key)
+      return {
+        key,
+        label: dim?.label ?? key,
+        value,
+        color: dim?.color.primary ?? "#8B5CF6",
+        low: dim?.low ?? "",
+        high: dim?.high ?? "",
+      }
+    })
+}
+
+function TraitAnalysisCard({ traits, confidence }: { traits: TraitSummary[]; confidence: number }) {
+  const confidencePercent = Math.round(confidence * 100)
+  return (
+    <div className="mx-auto mt-6 w-full max-w-xs space-y-4">
+      {/* 프로필 정확도 */}
+      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+        <div className="mb-2 flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-purple-500" />
+          <span className="text-xs font-medium text-gray-600">분석 정확도</span>
+        </div>
+        <div className="mb-1 h-2 w-full overflow-hidden rounded-full bg-gray-200">
+          <div
+            className="pw-gradient h-full transition-all"
+            style={{ width: `${confidencePercent}%` }}
+          />
+        </div>
+        <p className="text-right text-sm font-bold text-purple-600">{confidencePercent}%</p>
+      </div>
+
+      {/* 주요 특성 */}
+      {traits.length > 0 && (
+        <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+          <p className="mb-3 text-xs font-medium text-gray-600">나의 주요 특성</p>
+          <div className="space-y-2.5">
+            {traits.map((trait) => (
+              <div key={trait.key}>
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-[11px] font-medium text-gray-700">{trait.label}</span>
+                  <span className="text-[10px] text-gray-400">
+                    {trait.value >= 0.6 ? trait.high : trait.value <= 0.4 ? trait.low : "균형"}
+                  </span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${trait.value * 100}%`,
+                      backgroundColor: trait.color,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ── Phase 설정 ──────────────────────────────────────────────
 
@@ -140,6 +228,10 @@ function PhaseOnboardingFlow() {
   const [showCredits, setShowCredits] = useState(false)
   const [earnedCredits, setEarnedCredits] = useState(0)
 
+  // 분석 결과 (마지막 Phase 제출 결과)
+  const [analysisVector, setAnalysisVector] = useState<Record<string, number> | null>(null)
+  const [analysisConfidence, setAnalysisConfidence] = useState(0)
+
   // SNS OAuth 콜백 결과 처리
   useEffect(() => {
     const connected = searchParams.get("sns_connected")
@@ -248,6 +340,12 @@ function PhaseOnboardingFlow() {
       const level = getProfileLevelByPhase(activePhase)
       completePhase(activePhase, result.creditsAwarded, level)
 
+      // 분석 결과 저장 (완료 화면에서 표시)
+      if (result.vectorUpdate) {
+        setAnalysisVector((prev) => ({ ...prev, ...result.vectorUpdate }))
+        setAnalysisConfidence(result.confidence)
+      }
+
       // 크레딧 피드백
       setEarnedCredits(result.creditsAwarded)
       setShowCredits(true)
@@ -281,11 +379,10 @@ function PhaseOnboardingFlow() {
     }
   }
 
-  // 온보딩 완료 → 피드 이동
+  // 온보딩 완료 → 결과 화면 표시
   const handleFinish = () => {
     completeOnboarding()
     setFlowStep("complete")
-    router.push("/feed")
   }
 
   // 이탈 시도
@@ -512,10 +609,19 @@ function PhaseOnboardingFlow() {
           <div className="w-full max-w-md text-center">
             <div className="mb-4 text-4xl">🎉</div>
             <h1 className="mb-2 text-2xl font-bold text-gray-900">온보딩 완료!</h1>
-            <p className="mb-4 text-sm text-gray-500">
+            <p className="mb-2 text-sm text-gray-500">
               총 {onboarding.creditsBalance}코인을 획득했어요
             </p>
             <PWProfileLevelBadge level={onboarding.profileLevel} />
+
+            {/* 분석 결과 */}
+            {analysisVector && Object.keys(analysisVector).length > 0 && (
+              <TraitAnalysisCard
+                traits={getTopTraits(analysisVector)}
+                confidence={analysisConfidence}
+              />
+            )}
+
             <PWButton onClick={() => router.push("/feed")} icon={ArrowRight} className="mt-6">
               PersonaWorld 시작하기
             </PWButton>
@@ -916,20 +1022,16 @@ function AdaptiveOnboardingFlow() {
             <p className="mb-4 text-sm text-gray-500">+{ADAPTIVE_CREDITS} 코인 획득!</p>
             <PWProfileLevelBadge level="ADVANCED" />
 
-            {/* 수렴 결과 요약 */}
+            {/* 분석 결과 */}
             {result && (
-              <div className="mx-auto mt-6 max-w-xs rounded-xl border border-gray-100 bg-gray-50 p-4">
-                <p className="mb-2 text-xs font-medium text-gray-600">프로필 정확도</p>
-                <div className="mb-3 h-2 w-full overflow-hidden rounded-full bg-gray-200">
-                  <div
-                    className="pw-gradient h-full transition-all"
-                    style={{ width: `${Math.round(result.confidence * 100)}%` }}
-                  />
-                </div>
-                <p className="text-lg font-bold text-purple-600">
-                  {Math.round(result.confidence * 100)}%
-                </p>
-              </div>
+              <TraitAnalysisCard
+                traits={getTopTraits({
+                  ...result.l1Vector,
+                  ...result.l2Vector,
+                  ...result.l3Vector,
+                })}
+                confidence={result.confidence}
+              />
             )}
 
             <PWButton onClick={handleFinish} icon={ArrowRight} className="mt-6">
