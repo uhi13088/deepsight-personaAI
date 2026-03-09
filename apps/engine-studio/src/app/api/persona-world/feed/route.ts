@@ -10,6 +10,10 @@ import type { GenreWeightTable, TuningProfile } from "@/lib/matching/tuning"
 import type { SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector } from "@/types"
 import { verifyInternalToken } from "@/lib/internal-auth"
 import { bulkGetMatchData, computeAndCache } from "@/lib/cache/persona-match-cache"
+import { findSimilarPersonas } from "@/lib/vector-search"
+
+/** 벡터 검색 후보 풀 크기 — SystemConfig에서 오버라이드 가능 (T384) */
+const DEFAULT_CANDIDATE_POOL_SIZE = 50
 
 /**
  * POST /api/persona-world/feed
@@ -128,24 +132,25 @@ export async function POST(request: NextRequest) {
         // 하이퍼파라미터 추출 (DB 프로필 → 정규화된 값)
         const hyperParams = extractHyperParameters(tuningProfile?.parameters ?? [])
 
-        // 후보 포스트 조회
-        const posts = await prisma.personaPost.findMany({
-          where: {
-            isHidden: false,
-            id: { notIn: excludePostIds },
-            persona: { status: { in: ["ACTIVE", "STANDARD"] } },
-          },
-          orderBy: [{ likeCount: "desc" }, { createdAt: "desc" }],
-          take: lim,
-          select: {
-            id: true,
-            personaId: true,
-            likeCount: true,
-          },
-        })
+        // candidatePoolSize: SystemConfig 오버라이드 가능
+        const tuningRaw = tuningProfile as Record<string, unknown> | null
+        const candidatePoolSize =
+          typeof tuningRaw?.candidatePoolSize === "number"
+            ? tuningRaw.candidatePoolSize
+            : DEFAULT_CANDIDATE_POOL_SIZE
 
-        // 유저 벡터 없으면 인기도 기반 폴백
+        // 유저 벡터 없으면 인기도 기반 폴백 (벡터 검색 불가)
         if (!pwUser || pwUser.depth == null) {
+          const posts = await prisma.personaPost.findMany({
+            where: {
+              isHidden: false,
+              id: { notIn: excludePostIds },
+              persona: { status: { in: ["ACTIVE", "STANDARD"] } },
+            },
+            orderBy: [{ likeCount: "desc" }, { createdAt: "desc" }],
+            take: lim,
+            select: { id: true, personaId: true, likeCount: true },
+          })
           return posts.map((p) => ({
             postId: p.id,
             personaId: p.personaId,
@@ -185,6 +190,43 @@ export async function POST(request: NextRequest) {
               neuroticism: Number(pwUser.neuroticism ?? 0.5),
             }
           : null
+
+        // T384: pgvector 벡터 검색으로 후보 페르소나 사전 필터링
+        // 벡터 컬럼이 있으면 ANN 검색, 없으면(마이그레이션 전) 전체 포스트 조회 폴백
+        let candidatePersonaIds: string[] | null = null
+        try {
+          const similar = await findSimilarPersonas(prisma, {
+            targetVector: userL1Vec,
+            layer: "SOCIAL",
+            topK: candidatePoolSize,
+          })
+          if (similar.length > 0) {
+            candidatePersonaIds = similar.map((s) => s.personaId)
+            console.log(
+              `[feed] vector-search: ${similar.length} candidates from pgvector (pool=${candidatePoolSize})`
+            )
+          }
+        } catch {
+          // pgvector 미설정 또는 벡터 컬럼 미존재 → 폴백 (전체 포스트 조회)
+          console.log("[feed] vector-search: pgvector not available, falling back to full scan")
+        }
+
+        // 후보 포스트 조회 — 벡터 검색 결과가 있으면 해당 페르소나만, 없으면 전체
+        const postWhere: Record<string, unknown> = {
+          isHidden: false,
+          id: { notIn: excludePostIds },
+          persona: { status: { in: ["ACTIVE", "STANDARD"] } },
+        }
+        if (candidatePersonaIds) {
+          postWhere.personaId = { in: candidatePersonaIds }
+        }
+
+        const posts = await prisma.personaPost.findMany({
+          where: postWhere,
+          orderBy: [{ likeCount: "desc" }, { createdAt: "desc" }],
+          take: lim,
+          select: { id: true, personaId: true, likeCount: true },
+        })
 
         // 페르소나 ID 추출
         const personaIds = [...new Set(posts.map((p) => p.personaId))]

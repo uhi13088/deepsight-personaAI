@@ -66,13 +66,14 @@
   - AC3: ✅ EXPLAIN ANALYZE 검증 쿼리 코멘트로 포함 (프로덕션 적용 후 실행)
   - AC4: ✅ `051_pgvector_indexes.sql` 마이그레이션 파일 추가
 
-- [ ] **T384: 피드 엔진 벡터 검색 통합**
-  - 배경: 현재 피드에서 전체 페르소나 로드 후 in-memory 매칭. 벡터 검색으로 후보 사전 필터링.
-  - AC1: `getCandidates()` 내 벡터 유사도 기반 사전 필터링 (Top-K 후보만 로드)
-  - AC2: 기존 3-tier 매칭은 유지 — 벡터 검색은 후보 축소 단계만 담당
-  - AC3: 후보 수 설정 가능 (`candidatePoolSize` 설정, 기본 50)
-  - AC4: 기존 피드 테스트 PASS + 벡터 검색 통합 테스트
-  - AC5: Build PASS
+- [x] **T384: 피드 엔진 벡터 검색 통합** ✅ 2026-03-09
+  - 변경: `api/persona-world/feed/route.ts`
+  - AC1: ✅ `getCandidates()` 내 `findSimilarPersonas()` L1 벡터 유사도 기반 사전 필터링
+  - AC2: ✅ 기존 3-tier 매칭 유지 — 벡터 검색은 후보 축소만 담당, pgvector 미설정 시 전체 스캔 폴백
+  - AC3: ✅ `candidatePoolSize` 설정 가능 (기본 50, TuningProfile에서 오버라이드)
+  - AC4: ✅ 기존 피드 테스트 22개 PASS + 벡터 검색 테스트 16개 PASS
+  - AC5: ✅ Build PASS
+  - 테스트: 132/132 PASS (4820/4820)
 
 ### Phase v4.1.1-C: 관리자 알림 — Slack/이메일 (T385~T388)
 
