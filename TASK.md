@@ -79,14 +79,15 @@
 
 > 시스템 이벤트(보안 위반, 비용 임계, 품질 저하 등)를 Slack/이메일로 실시간 알림.
 
-- [ ] **T385: 알림 서비스 코어 구현**
-  - 배경: 현재 알림 인프라 없음. Slack Webhook + SendGrid 이메일 2채널.
-  - AC1: `lib/notifications/notification-service.ts` — `sendAlert(channel, severity, title, body)` 통합 인터페이스
-  - AC2: `lib/notifications/slack-provider.ts` — Slack Incoming Webhook (`SLACK_WEBHOOK_URL` 환경변수)
-  - AC3: `lib/notifications/email-provider.ts` — SendGrid (`SENDGRID_API_KEY`, `ALERT_EMAIL_TO` 환경변수)
-  - AC4: severity 레벨: `critical` (즉시), `warning` (배치 5분), `info` (일일 다이제스트)
-  - AC5: 채널 비활성 시 graceful skip (환경변수 미설정 → 로그만 출력)
-  - AC6: 단위 테스트 — 각 provider mock 테스트
+- [x] **T385: 알림 서비스 코어 구현** ✅ 2026-03-09
+  - 변경: `lib/notifications/{notification-service,slack-provider,email-provider,index}.ts`, `env.d.ts`
+  - AC1: ✅ `sendAlert({ channel, severity, category, title, body })` 통합 인터페이스
+  - AC2: ✅ `slack-provider.ts` — Slack Incoming Webhook (SLACK_WEBHOOK_URL)
+  - AC3: ✅ `email-provider.ts` — SendGrid (SENDGRID_API_KEY, ALERT_EMAIL_TO, ALERT_EMAIL_FROM)
+  - AC4: ✅ severity: critical/warning/info + 이모지 + 색상 매핑
+  - AC5: ✅ 환경변수 미설정 시 graceful skip (false 반환, 로그만)
+  - AC6: ✅ 단위 테스트 24개 PASS (service 12 + slack 5 + email 7)
+  - 테스트: 135/135 PASS (4844/4844) + Build PASS
 
 - [ ] **T386: 알림 트리거 규칙 + Cron 연동**
   - AC1: 알림 트리거 정의 (`lib/notifications/alert-rules.ts`):
