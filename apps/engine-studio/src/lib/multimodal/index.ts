@@ -14,3 +14,13 @@ export {
 } from "./image-reaction-service"
 
 export { extractImageVector, blendVectors } from "./image-vector-extractor"
+
+export {
+  saveImageMemory,
+  searchImageMemories,
+  buildImageMemoryText,
+  buildImageMemorySubject,
+  type ImageMemoryInput,
+  type ImageMemoryRecord,
+  type ImageMemoryProvider,
+} from "./image-memory-service"

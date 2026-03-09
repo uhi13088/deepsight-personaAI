@@ -2929,6 +2929,11 @@ model SemanticMemory {
   /// 마지막 consolidation 시각
   consolidatedAt   DateTime @default(now())
 
+  /// v4.2.0: 이미지 기억 — 원본 이미지 URL
+  imageUrl         String?
+  /// v4.2.0: 이미지 기억 — Vision 분석 텍스트 설명
+  imageDescription String?  @db.Text
+
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
