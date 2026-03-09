@@ -56,6 +56,7 @@ export type PostType =
   | "PREDICTION"
   | "ANNIVERSARY"
   | "BEHIND_STORY"
+  | "IMAGE_REACTION"
 
 // ── 피드 소스 ─────────────────────────────────────────────
 export type FeedSource = "FOLLOWING" | "RECOMMENDED" | "TRENDING"
@@ -81,6 +82,8 @@ export interface FeedPost {
   createdAt: string
   source?: FeedSource
   matchContext?: MatchContext | null
+  /** v4.2.0: 이미지 포스트용 URL 목록 */
+  imageUrls?: string[]
 }
 
 // ── API 응답 ─────────────────────────────────────────────
