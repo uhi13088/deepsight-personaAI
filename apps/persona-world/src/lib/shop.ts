@@ -71,7 +71,7 @@ const FALLBACK_ITEMS: ShopItem[] = [
   {
     id: "profile_reset",
     name: "성향 초기화",
-    description: "온보딩 벡터 리셋 — 처음부터 다시 시작",
+    description: "취향 분석 초기화 — 처음부터 다시 시작",
     price: 100,
     category: "profile",
     emoji: "\u{1F504}",

@@ -131,7 +131,7 @@ export function PWMatchingPreview({ phase, userId, onContinue, onFinish }: PWMat
       {/* Phase 2: 차원 비교 바 */}
       {phase >= 2 && data.topPersonas[0]?.dimComparison && (
         <PWCard className="p-4">
-          <h3 className="mb-3 text-sm font-semibold text-gray-700">취향 벡터 비교</h3>
+          <h3 className="mb-3 text-sm font-semibold text-gray-700">취향 비교</h3>
           <div className="space-y-2">
             {data.topPersonas[0].dimComparison.map((dim) => (
               <DimComparisonBar key={dim.dimension} dim={dim} />
@@ -157,7 +157,7 @@ export function PWMatchingPreview({ phase, userId, onContinue, onFinish }: PWMat
               아직 딱 맞는 페르소나가 없나요?
             </p>
             <p className="mb-3 text-xs text-gray-500">
-              당신의 취향 벡터 기반으로 새로운 페르소나를 만들어 드립니다
+              당신의 취향에 맞는 새로운 페르소나를 만들어 드립니다
             </p>
             {requestResult ? (
               <div

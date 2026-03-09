@@ -1,21 +1,19 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
 
 /**
  * PersonaWorld Auth Middleware
  *
- * 1. 페이지 라우트: 세션 쿠키 없으면 로그인 페이지로 리다이렉트
+ * NextAuth v5 `auth()` 래퍼를 사용하여 세션을 검증합니다.
+ * 수동 쿠키 파싱 대신 NextAuth가 쿠키 청크, JWT 검증을 직접 처리.
+ *
+ * 1. 페이지 라우트: 세션 없으면 로그인 페이지로 리다이렉트
  * 2. API 프록시 라우트: 세션/인증 체크만 담당
  *    → 실제 프록시 + 헤더 주입은 route handler (api-proxy.ts)에서 처리
  */
-export async function middleware(request: NextRequest) {
+export default auth((request) => {
   const { pathname } = request.nextUrl
-
-  // NextAuth v5 JWT 세션 쿠키 확인
-  const sessionToken =
-    request.cookies.get("__Secure-authjs.session-token")?.value ||
-    request.cookies.get("authjs.session-token")?.value ||
-    request.cookies.get("__Secure-next-auth.session-token")?.value ||
-    request.cookies.get("next-auth.session-token")?.value
+  const isAuthenticated = !!request.auth
 
   // ── /api/public/*: 공개 API — 세션 불필요, 프록시 route handler가 처리 ──
   if (pathname.startsWith("/api/public/")) {
@@ -31,7 +29,7 @@ export async function middleware(request: NextRequest) {
 
   // ── /api/persona-world/*: 인증 필수, 프록시 route handler가 헤더 주입 처리 ──
   if (pathname.startsWith("/api/persona-world/")) {
-    if (!sessionToken) {
+    if (!isAuthenticated) {
       return NextResponse.json(
         { success: false, error: { code: "UNAUTHORIZED", message: "인증이 필요합니다." } },
         { status: 401 }
@@ -41,13 +39,13 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── 페이지 라우트: 세션 없으면 로그인 리다이렉트 ───────────
-  if (!sessionToken) {
+  if (!isAuthenticated) {
     const loginUrl = new URL("/", request.url)
     return NextResponse.redirect(loginUrl)
   }
 
   return NextResponse.next()
-}
+})
 
 export const config = {
   matcher: [
