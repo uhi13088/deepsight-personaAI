@@ -3323,8 +3323,8 @@ else:
 
 **문제 상황:**
 
-- 10분 영상 STT: 30초\~2분 소요
 - 이미지 캡셔닝: 5\~10초 소요
+- 음성 STT: 10\~30초 소요
 - 일반 HTTP 타임아웃: 30초
 
 **비동기 아키텍처:**
@@ -3371,9 +3371,9 @@ POST /v1/multimodal/analyze
 
 {
 
-"content_type": "video",
+"content_type": "image",
 
-"source_url": "[https://youtube.com/watch?v=](https://youtube.com/watch?v=)..."
+"source_url": "https://example.com/image.jpg"
 
 }
 
@@ -3451,7 +3451,7 @@ if (data.status \=== 'COMPLETED') {
 ### 4.5.3 통합 프로파일
 
 - 텍스트 \+ 이미지 \+ 음성 데이터를 종합하여 **멀티모달 유저 프로파일** 구축.
-- 각 모달리티에 가중치 부여 (기본: 텍스트 0.6, 이미지 0.3, 음성 0.1).
+- 각 모달리티에 가중치 부여 (기본: 텍스트 0.5, 이미지 0.3, 음성 0.2).
 
 ---
 

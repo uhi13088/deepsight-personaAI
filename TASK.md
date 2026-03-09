@@ -5,7 +5,7 @@
 
 ---
 
-## 🏷️ 현재 버전: v4.1.1-dev (Infrastructure)
+## 🏷️ 현재 버전: v4.2.0-dev (Multimodal)
 
 > **최종 갱신: 2026-03-09**
 
@@ -21,14 +21,14 @@
 
 ```
 현재 ──→ v4.1.1 Infrastructure ──→ v4.2.0 Multimodal ──→ v5.0 Autonomy
-              캐시·벡터DB·알림        이미지·영상 확장        자율 진화·메타 인지
+              캐시·벡터DB·알림        이미지·음성 확장         자율 진화·메타 인지
 ```
 
 > 상세 로드맵: `docs/design/persona-engine-v4-design-part3.md` §15
 
 ### v4.2.0 선행 완료 항목 (음성·관계)
 
-아래 항목은 v4.2.0 범위이나 이미 구현 완료되어 v4.2.0 진입 시 잔여 항목(이미지/영상)만 진행하면 됨:
+아래 항목은 v4.2.0 범위이나 이미 구현 완료되어 v4.2.0 진입 시 잔여 항목(이미지)만 진행하면 됨:
 
 - **음성 인터랙션**: TTS/STT Voice Pipeline, TTS 자체검증, 통화 테스트, TTS 튜닝 UI (T333~T350)
 - **관계 모델 확장**: 9단계+22유형 DB 필드 (T263), COOLING/DORMANT 단계 (T177)
@@ -2281,6 +2281,62 @@
   - AC3: Audio 재생 UI (재생/정지, 로딩 스피너)
   - AC4: 페르소나 이름 + 대표 문장으로 샘플 텍스트 자동 생성
   - AC5: Build PASS
+
+### Phase MM-A: 멀티모달 기반 인프라 — Vision LLM + 이미지 스토리지 (T389~T392)
+
+> v4.2.0 이미지·음성 멀티모달의 기반. Claude Vision API 통합 + 이미지 업로드 파이프라인 구축.
+
+- [x] **T389: LLM 클라이언트 Vision 확장 — 이미지 입력 지원** ✅ 2026-03-09
+  - 변경: `lib/llm-client.ts` (LLMImageInput, buildUserContent), `tests/unit/llm-client.test.ts`
+  - 테스트: 15/15 PASS + Build PASS
+
+- [x] **T390: 이미지 분석 서비스 — Claude Vision 기반 이미지 이해** ✅ 2026-03-09
+  - 변경: `lib/multimodal/image-analyzer.ts`, `lib/multimodal/index.ts`, `tests/unit/multimodal/image-analyzer.test.ts`
+  - 테스트: 8/8 PASS + Build PASS
+
+- [x] **T391: PersonaPost 이미지 필드 확장 — DB 스키마 + 타입** ✅ 2026-03-09
+  - 변경: `prisma/schema.prisma` (imageUrls, imageAnalysis, IMAGE_REACTION), `migrations/053_persona_post_images.sql`
+  - Build PASS
+
+- [x] **T392: 이미지 업로드 API — 유저 이미지 수신 + URL 반환** ✅ 2026-03-09
+  - 변경: `api/persona-world/images/upload/route.ts` (매직바이트 검증, 간이 해상도 파서)
+  - Build PASS
+
+### Phase MM-B: 이미지 포스트 생성 파이프라인 (T393~T396)
+
+> 페르소나가 이미지를 참조하는 포스트를 생성하고, 유저 이미지에 반응하는 파이프라인.
+
+- [x] **T393: 이미지 포스트 생성 — 텍스트+이미지 참조 포스트** ✅ 2026-03-09
+  - 변경: `types.ts` (ImagePostContext), `content-generator.ts` (IMAGE_REACTION 가이드 + 이미지 프롬프트), `post-pipeline.ts` (generateImagePost)
+  - 테스트: 51/51 PASS + Build PASS
+
+- [x] **T394: 유저 이미지 포스트 API — 피드에 이미지 포스트 등록** ✅ 2026-03-09
+  - 변경: `api/public/posts/route.ts`, `schema.prisma` (PostSource += USER_SUBMITTED), `migrations/053`
+  - Build PASS
+
+- [x] **T395: 페르소나 이미지 반응 — 유저 이미지 포스트에 자동 반응** ✅ 2026-03-09
+  - 변경: `comment-engine.ts` (이미지 컨텍스트 주입), `image-reaction-service.ts` (selectReactionCandidates, toImagePostContext)
+  - 테스트: 7개 추가 (15/15 PASS) + Build PASS
+
+- [x] **T396: 이미지 콘텐츠 벡터 추출 — 이미지 메타데이터 → L1 벡터** ✅ 2026-03-09
+  - 변경: `image-vector-extractor.ts` (extractImageVector, blendVectors), 9개 카테고리 프리셋
+  - 테스트: 13개 추가 (28/28 PASS) + Build PASS
+
+### Phase MM-C: PersonaWorld 이미지 UI (T397~T399)
+
+> 프런트엔드: 이미지 업로드, 이미지 포스트 표시, 이미지 갤러리.
+
+- [x] **T397: PersonaWorld 피드 — 이미지 포스트 렌더링** ✅ 2026-03-09
+  - 변경: `pw-image-grid.tsx` (PWImageGrid + ImageLightbox), `feed/page.tsx`, `types.ts`
+  - Build PASS
+
+- [x] **T398: PersonaWorld 피드 — 이미지 업로드 UI** ✅ 2026-03-09
+  - 변경: `pw-image-upload.tsx` (PWImageUpload — 드래그앤드롭, 미리보기, 에러 표시)
+  - Build PASS
+
+- [x] **T399: PersonaWorld 이미지 기억 — Memory Layer 확장** ✅ 2026-03-09
+  - 변경: `MemoryEntry` (imageUrl/imageDescription), `schema.prisma` + `054.sql`, `image-memory-service.ts`
+  - 테스트: 8개 추가 (36/36 PASS) + Build PASS
 
 ---
 

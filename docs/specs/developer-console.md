@@ -2162,7 +2162,7 @@ Authorization: Bearer sk_live_xxxxxxxxxxxxx
 
 ### 9.3.7 POST /v1/multimodal/analyze ← v2.1 추가 (Phase 2\)
 
-멀티모달 콘텐츠(영상, 이미지, 오디오)를 분석합니다.
+멀티모달 콘텐츠(이미지, 오디오)를 분석합니다.
 
 ⚠️ **비동기 API:** 이 엔드포인트는 처리 시간이 길어 **비동기 방식**으로 동작합니다.
 
@@ -2170,9 +2170,9 @@ Authorization: Bearer sk_live_xxxxxxxxxxxxx
 
 {
 
-"content_type": "video | image | audio",
+"content_type": "image | audio",
 
-"source_url": "[https://youtube.com/watch?v=](https://youtube.com/watch?v=)...",
+"source_url": "https://example.com/image.jpg",
 
 "analysis_options": {
 
@@ -2250,11 +2250,11 @@ Authorization: Bearer sk_live_xxxxxxxxxxxxx
 
 "result": {
 
-"transcript": "영상 내용 텍스트...",
+"description": "이미지 분석 텍스트...",
 
 "sentiment": {"positive": 0.7, "negative": 0.1, "neutral": 0.2},
 
-"summary": "영상 요약 내용..."
+"summary": "콘텐츠 요약 내용..."
 
 },
 

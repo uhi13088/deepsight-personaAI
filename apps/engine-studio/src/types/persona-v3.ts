@@ -422,4 +422,8 @@ export interface MemoryEntry {
   /** 최종 신뢰도 점수 (0.0~1.0) */
   trustScore: number
   createdAt: number
+  /** v4.2.0: 이미지 기억 — 원본 이미지 URL */
+  imageUrl?: string
+  /** v4.2.0: 이미지 기억 — Vision 분석 텍스트 설명 */
+  imageDescription?: string
 }

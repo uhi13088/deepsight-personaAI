@@ -55,6 +55,10 @@ export interface PostPipelineDataProvider {
     postSource?: PostSource
     locationTag?: string
     hashtags?: string[]
+    /** v4.2.0: 이미지 URL 목록 */
+    imageUrls?: string[]
+    /** v4.2.0: Vision 분석 결과 JSON */
+    imageAnalysis?: Record<string, unknown>
   }): Promise<{ id: string }>
 
   /** 최근 포스트 텍스트 조회 (RAG voiceAnchor용) */
@@ -553,4 +557,148 @@ export function stripPhantomMentions(
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+// ── v4.2.0: 이미지 포스트 생성 ────────────────────────────────
+
+import type { ImagePostContext } from "./types"
+
+export interface ImagePostInput {
+  persona: SchedulerPersona
+  imageContext: ImagePostContext
+  state: PersonaStateData
+  llmProvider: LLMProvider
+  dataProvider: PostPipelineDataProvider
+  securityOptions?: PostPipelineSecurityOptions
+}
+
+/**
+ * 이미지 반응 포스트 생성.
+ *
+ * 기존 executePostCreation 파이프라인을 재활용하되,
+ * postType을 IMAGE_REACTION으로 고정하고 이미지 컨텍스트를 주입.
+ *
+ * 파이프라인: 이미지 분석 결과 → LLM 반응 텍스트 생성 → 보안 게이트 → DB 저장
+ */
+export async function generateImagePost(
+  input: ImagePostInput
+): Promise<PostCreationResult & { imageUrls: string[] }> {
+  const { persona, imageContext, state, llmProvider, dataProvider, securityOptions } = input
+
+  // Step 1: RAG 컨텍스트 구축
+  const [recentTexts, consumptionMemory] = await Promise.all([
+    dataProvider.getRecentPostTexts(persona.id, 5),
+    dataProvider.getConsumptionContext(persona.id),
+  ])
+
+  let voiceAnchor: string
+  if (recentTexts.length > 0) {
+    voiceAnchor = `[최근 글 스타일]\n${recentTexts.slice(0, 3).join("\n---\n")}`
+  } else if (dataProvider.getVoiceProfile) {
+    const rawProfile = await dataProvider.getVoiceProfile(persona.id)
+    const profile = parseVoiceProfile(rawProfile)
+    voiceAnchor = profile ? buildVoiceAnchorFromProfile(profile) : ""
+  } else {
+    voiceAnchor = ""
+  }
+
+  const personaProfile: PersonaProfileSnapshot = {
+    name: persona.name,
+    role: persona.role,
+    expertise: persona.expertise,
+    description: persona.description,
+    region: persona.region,
+    speechPatterns: persona.speechPatterns,
+    quirks: persona.quirks,
+    postPrompt: persona.postPrompt,
+    commentPrompt: persona.commentPrompt,
+    voiceSpec: persona.voiceSpec,
+    factbook: persona.factbook,
+    fewShotEnabled: persona.fewShotEnabled,
+  }
+
+  const generationInput: PostGenerationInput = {
+    personaId: persona.id,
+    postType: "IMAGE_REACTION" as PersonaPostType,
+    trigger: "CONTENT_RELEASE",
+    topic: imageContext.imageAnalysis.tags[0] ?? "이미지 감상",
+    ragContext: {
+      voiceAnchor,
+      interestContinuity: `이미지 태그: ${imageContext.imageAnalysis.tags.join(", ")}`,
+      consumptionMemory,
+      emotionalState: describeEmotionalState(state),
+    },
+    personaState: state,
+    personaProfile,
+    l1Vector: persona.vectors.social,
+    imageContext,
+    hashtagRange: computeHashtagRange(
+      persona.vectors.temperament.extraversion,
+      persona.vectors.temperament.openness
+    ),
+  }
+
+  // Step 2: LLM 콘텐츠 생성
+  const result = await generatePostContent(generationInput, llmProvider)
+
+  // Step 3: Poignancy 계산
+  const volatility = persona.vectors.narrative.volatility
+  const poignancyScore = calculatePostPoignancy(state, volatility)
+
+  // Step 4: 해시태그 추출
+  const hashtags = extractHashtags(result.content)
+
+  // Step 5: 출처 결정
+  const postSource = determinePostSource({
+    isScheduled: false,
+    isArenaTest: false,
+    isFeedInspired: true,
+  })
+
+  // Step 6: DB 저장 (이미지 필드 포함)
+  const postMetadata: Record<string, unknown> = {
+    ...result.metadata,
+    imageAnalysis: imageContext.imageAnalysis,
+    trigger: "CONTENT_RELEASE",
+  }
+
+  const saved = await dataProvider.savePost({
+    personaId: persona.id,
+    type: "IMAGE_REACTION" as PersonaPostType,
+    content: result.content,
+    metadata: postMetadata,
+    poignancyScore,
+    postSource,
+    locationTag: persona.region ?? undefined,
+    hashtags,
+    imageUrls: imageContext.imageUrls,
+    imageAnalysis: imageContext.imageAnalysis as unknown as Record<string, unknown>,
+  })
+
+  // Step 7: 상태 갱신
+  await updatePersonaState(persona.id, { type: "post_created", tokensUsed: result.tokensUsed })
+
+  // Step 8: 활동 로그
+  await dataProvider.saveActivityLog({
+    personaId: persona.id,
+    activityType: "IMAGE_POST",
+    postId: saved.id,
+    metadata: {
+      imageCount: imageContext.imageUrls.length,
+      imageCategory: imageContext.imageAnalysis.category,
+      tokensUsed: result.tokensUsed,
+    },
+  })
+
+  return {
+    postId: saved.id,
+    content: result.content,
+    postType: "IMAGE_REACTION" as PersonaPostType,
+    tokensUsed: result.tokensUsed,
+    voiceCheck: null,
+    regenerated: false,
+    poignancyScore,
+    hashtags,
+    imageUrls: imageContext.imageUrls,
+  }
 }

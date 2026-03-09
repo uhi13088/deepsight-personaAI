@@ -9,6 +9,7 @@ import {
   PWPostTypeCard,
   PWBottomNav,
   PWCommentList,
+  PWImageGrid,
 } from "@/components/persona-world"
 import { PWRepostButton } from "@/components/persona-world/pw-repost-button"
 import {
@@ -614,6 +615,9 @@ const FeedPostCard = memo(function FeedPostCard({
 
       {/* 17종 포스트 타입별 분화 UI */}
       <PWPostTypeCard post={post} />
+
+      {/* v4.2.0: 이미지 그리드 */}
+      {post.imageUrls && post.imageUrls.length > 0 && <PWImageGrid imageUrls={post.imageUrls} />}
 
       {/* 해시태그 칩 */}
       {post.hashtags && post.hashtags.length > 0 && (

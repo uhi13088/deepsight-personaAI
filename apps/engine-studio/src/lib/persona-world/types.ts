@@ -220,6 +220,23 @@ export interface PostGenerationInput {
   personaProfile?: PersonaProfileSnapshot // 프로필 데이터 (LLM 프롬프트 개인화)
   /** COLLAB 등 멘션 가능 포스트용 — 실제 존재하는 페르소나 핸들 목록 */
   availablePersonaHandles?: Array<{ handle: string; name: string }>
+  /** v4.2.0: 이미지 포스트용 — Vision 분석 결과 컨텍스트 */
+  imageContext?: ImagePostContext
+}
+
+/** v4.2.0: 이미지 포스트 생성을 위한 이미지 컨텍스트 */
+export interface ImagePostContext {
+  /** 이미지 URL 목록 */
+  imageUrls: string[]
+  /** Vision 분석 결과 (description, mood, tags 등) */
+  imageAnalysis: {
+    description: string
+    mood: string
+    tags: string[]
+    dominantColors: string[]
+    sentiment: number
+    category: string
+  }
 }
 
 export interface PostGenerationResult {
@@ -249,6 +266,8 @@ export interface CommentGenerationInput {
   }
   personaProfile?: PersonaProfileSnapshot // 댓글 작성자 프로필 (LLM 프롬프트 개인화)
   allowedTones?: string[] // 관계 프로토콜 기반 허용 톤 목록
+  /** v4.2.0: 이미지 포스트 댓글용 이미지 분석 컨텍스트 */
+  imageContext?: ImagePostContext
 }
 
 // ── 댓글 톤 (v4: 11종) ───────────────────────────────────────

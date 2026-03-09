@@ -21,6 +21,20 @@ import type { Prisma } from "@/generated/prisma"
 
 // ── 타입 정의 ─────────────────────────────────────────────────
 
+/** v4.2.0: Vision 이미지 입력 */
+export interface LLMImageInput {
+  /** base64: 인코딩된 이미지 데이터, url: 외부 URL */
+  type: "base64" | "url"
+  /** base64 인코딩된 데이터 또는 이미지 URL */
+  data: string
+  /** MIME 타입 */
+  mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp"
+}
+
+/** 이미지 검증 제한 */
+const MAX_IMAGES_PER_REQUEST = 5
+const ALLOWED_IMAGE_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"])
+
 export interface LLMGenerateParams {
   systemPrompt: string
   userMessage: string
@@ -39,6 +53,11 @@ export interface LLMGenerateParams {
    * 비용 절감용: "claude-haiku-4-5-20251001" 지정 가능.
    */
   model?: string
+  /**
+   * v4.2.0: Vision 이미지 입력 (최대 5장).
+   * 지정 시 userMessage와 함께 멀티모달 content block으로 전송.
+   */
+  images?: LLMImageInput[]
 }
 
 export interface LLMGenerateResult {
@@ -194,6 +213,63 @@ export function buildSystemBlocks(
   return blocks
 }
 
+// ── v4.2.0: Vision 유저 메시지 빌드 ──────────────────────────
+
+/**
+ * 이미지가 있으면 멀티모달 content block 배열, 없으면 텍스트 문자열 반환.
+ * Anthropic API의 user message content 형식에 맞춤.
+ */
+export function buildUserContent(
+  userMessage: string,
+  images?: LLMImageInput[]
+): string | Anthropic.ContentBlockParam[] {
+  if (!images || images.length === 0) {
+    return userMessage
+  }
+
+  // 검증
+  if (images.length > MAX_IMAGES_PER_REQUEST) {
+    throw new Error(
+      `이미지는 최대 ${MAX_IMAGES_PER_REQUEST}장까지 지원합니다. (요청: ${images.length}장)`
+    )
+  }
+
+  for (const img of images) {
+    if (!ALLOWED_IMAGE_MEDIA_TYPES.has(img.mediaType)) {
+      throw new Error(`지원하지 않는 이미지 포맷: ${img.mediaType}. 허용: jpeg, png, gif, webp`)
+    }
+  }
+
+  const blocks: Anthropic.ContentBlockParam[] = []
+
+  // 이미지 블록 먼저 추가 (Claude Vision 권장 순서)
+  for (const img of images) {
+    if (img.type === "base64") {
+      blocks.push({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: img.mediaType,
+          data: img.data,
+        },
+      })
+    } else {
+      blocks.push({
+        type: "image",
+        source: {
+          type: "url",
+          url: img.data,
+        },
+      })
+    }
+  }
+
+  // 텍스트 블록
+  blocks.push({ type: "text", text: userMessage })
+
+  return blocks
+}
+
 // ── 안전 필터 연동 ───────────────────────────────────────────
 
 export class SafetyFilterBlockedError extends Error {
@@ -306,12 +382,15 @@ export async function generateText(params: LLMGenerateParams): Promise<LLMGenera
 
     const systemContent = buildSystemBlocks(params.systemPrompt, params.systemPromptPrefix)
 
+    // v4.2.0: Vision 이미지가 있으면 멀티모달 content block 구성
+    const userContent = buildUserContent(params.userMessage, params.images)
+
     const response = await client.messages.create({
       model,
       max_tokens: maxTokens,
       temperature,
       system: systemContent,
-      messages: [{ role: "user", content: params.userMessage }],
+      messages: [{ role: "user", content: userContent }],
     })
 
     const text = response.content

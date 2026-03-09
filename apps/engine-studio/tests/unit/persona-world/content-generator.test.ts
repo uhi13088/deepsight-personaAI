@@ -451,3 +451,85 @@ describe("buildSystemPrompt with fewShot", () => {
     expect(fewShotKey).toBeUndefined()
   })
 })
+
+// ═══ v4.2.0: IMAGE_REACTION 이미지 컨텍스트 ═══
+
+describe("buildUserPrompt — IMAGE_REACTION 이미지 컨텍스트", () => {
+  const imageContext = {
+    imageUrls: ["https://example.com/sunset.jpg"],
+    imageAnalysis: {
+      description: "따뜻한 석양이 비치는 해변 풍경이다.",
+      mood: "평화로운",
+      tags: ["해변", "석양", "바다"],
+      dominantColors: ["오렌지", "네이비 블루"],
+      sentiment: 0.8,
+      category: "풍경",
+    },
+  }
+
+  it("이미지 컨텍스트가 있으면 유저 프롬프트에 이미지 정보 섹션을 포함한다", () => {
+    const input = makeInput({
+      postType: "IMAGE_REACTION" as PersonaPostType,
+      imageContext,
+    })
+    const prompt = buildUserPrompt(input)
+
+    expect(prompt).toContain("[이미지 정보]")
+    expect(prompt).toContain("따뜻한 석양이 비치는 해변 풍경이다.")
+    expect(prompt).toContain("평화로운")
+    expect(prompt).toContain("해변, 석양, 바다")
+    expect(prompt).toContain("오렌지, 네이비 블루")
+    expect(prompt).toContain("풍경")
+  })
+
+  it("이미지 컨텍스트에 이미지 반응 지시가 포함된다", () => {
+    const input = makeInput({
+      postType: "IMAGE_REACTION" as PersonaPostType,
+      imageContext,
+    })
+    const prompt = buildUserPrompt(input)
+
+    expect(prompt).toContain("[이미지 반응 지시]")
+    expect(prompt).toContain("시각적 요소")
+  })
+
+  it("이미지 컨텍스트 없으면 이미지 섹션이 없다", () => {
+    const input = makeInput({ postType: "THOUGHT" as PersonaPostType })
+    const prompt = buildUserPrompt(input)
+
+    expect(prompt).not.toContain("[이미지 정보]")
+    expect(prompt).not.toContain("[이미지 반응 지시]")
+  })
+
+  it("IMAGE_REACTION 타입의 글 길이 가이드가 적용된다", () => {
+    const input = makeInput({
+      postType: "IMAGE_REACTION" as PersonaPostType,
+      imageContext,
+    })
+    const prompt = buildUserPrompt(input)
+
+    expect(prompt).toContain("30~200자")
+    expect(prompt).toContain("IMAGE_REACTION")
+  })
+
+  it("긍정 sentiment는 '긍정적'으로 표시된다", () => {
+    const input = makeInput({
+      postType: "IMAGE_REACTION" as PersonaPostType,
+      imageContext,
+    })
+    const prompt = buildUserPrompt(input)
+    expect(prompt).toContain("긍정적")
+  })
+
+  it("부정 sentiment는 '부정적'으로 표시된다", () => {
+    const input = makeInput({
+      postType: "IMAGE_REACTION" as PersonaPostType,
+      imageContext: {
+        ...imageContext,
+        imageAnalysis: { ...imageContext.imageAnalysis, sentiment: -0.5 },
+      },
+    })
+    const prompt = buildUserPrompt(input)
+    expect(prompt).toContain("부정적")
+  })
+})
