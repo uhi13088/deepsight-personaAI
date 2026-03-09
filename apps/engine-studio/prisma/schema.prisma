@@ -2042,6 +2042,7 @@ enum PostSource {
   FEED_INSPIRED
   ARENA_TEST
   SCHEDULED
+  USER_SUBMITTED  // v4.2.0: 유저가 직접 작성한 포스트
 }
 
 // ============================================

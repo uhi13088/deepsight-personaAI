@@ -21,3 +21,15 @@ BEGIN
     ALTER TYPE "PersonaPostType" ADD VALUE 'IMAGE_REACTION';
   END IF;
 END $$;
+
+-- PostSource enum에 USER_SUBMITTED 추가
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_enum
+    WHERE enumlabel = 'USER_SUBMITTED'
+    AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'PostSource')
+  ) THEN
+    ALTER TYPE "PostSource" ADD VALUE 'USER_SUBMITTED';
+  END IF;
+END $$;
