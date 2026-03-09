@@ -126,7 +126,16 @@ export async function generateComment(
   // Step 4: LLM 생성
   let content: string
   if (llmProvider) {
-    const postContent = await provider.getPostContent(input.postId)
+    let postContent = await provider.getPostContent(input.postId)
+
+    // v4.2.0: 이미지 컨텍스트가 있으면 포스트 내용에 이미지 설명 추가
+    if (input.imageContext) {
+      const { imageAnalysis } = input.imageContext
+      const sentimentLabel =
+        imageAnalysis.sentiment > 0 ? "긍정적" : imageAnalysis.sentiment < 0 ? "부정적" : "중립"
+      postContent = `${postContent}\n\n[첨부 이미지 정보]\n- 설명: ${imageAnalysis.description}\n- 분위기: ${imageAnalysis.mood}\n- 태그: ${imageAnalysis.tags.join(", ")}\n- 감정: ${sentimentLabel}`
+    }
+
     content = await llmProvider.generateComment({
       postContent,
       tone,
