@@ -37,65 +37,18 @@
 
 ## 📋 QUEUE (대기)
 
-### Phase v4.1.1-A: 벡터 캐시 — Redis (T376~T380)
-
-> 페르소나 매칭 엔진의 반복 벡터 연산을 Redis 캐시로 제거. 피드 레이턴시 35~55% 감소 목표.
-
-- [x] **T376: Upstash Redis 클라이언트 설정** ✅ 2026-03-09
-  - 변경: `apps/engine-studio/src/lib/redis.ts`, `apps/engine-studio/src/env.d.ts`, `apps/engine-studio/package.json`
-  - AC1: ✅ `@upstash/redis` 설치 + Redis 싱글턴 (globalForRedis, graceful null 반환)
-  - AC2: ✅ `env.d.ts` — `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` 타입 선언
-  - AC3: ✅ `pingRedis()` 헬스체크 유틸 (ok/message 반환, 미설정 시 graceful skip)
-  - AC4: ✅ Build PASS
-
-- [x] **T377: PrecomputedMatchData 캐시 서비스 구현** ✅ 2026-03-09
-  - 변경: `apps/engine-studio/src/lib/cache/persona-match-cache.ts`, `tests/unit/cache/persona-match-cache.test.ts`
-  - AC1: ✅ `PersonaMatchCache` — get/set/invalidate/bulkGet (pipeline 기반)
-  - AC2: ✅ 캐시 키 `persona:{id}:match`, TTL 7일, PrecomputedMatchData 타입
-  - AC3: ✅ `computeAndCache()` — DB 벡터 로드 → vFinal/crossAxis/paradox 계산 → 캐시 저장
-  - AC4: ✅ `getOrCompute()` cache-aside 패턴
-  - AC5: ✅ 단위 테스트 14개 PASS (get/set/invalidate/bulkGet/computeAndCache/getOrCompute)
-
-- [x] **T378: 캐시 무효화 — 페르소나 벡터 변경 훅** ✅ 2026-03-09
-  - 변경: 4개 라우트에 `invalidateMatchData(personaId)` 추가
-    - `api/internal/personas/[id]/route.ts` — PUT(벡터 업데이트) + DELETE(삭제)
-    - `api/cron/persona-evolution/route.ts` — saveNewNarrativeVersion
-    - `api/cron/v5-memory/route.ts` — updateL3Vector
-    - `api/internal/persona-world-admin/evolution/route.ts` — saveNewNarrativeVersion
-  - Build PASS
-  - 배경: 8개 이상의 페르소나 업데이트 라우트에서 벡터 변경 시 캐시 무효화 필요.
-  - AC1: `invalidatePersonaCache(personaId)` 호출을 다음 라우트에 추가:
-    - `PUT /api/internal/personas/[id]` (벡터 업데이트)
-    - `POST /api/internal/personas` (신규 생성)
-    - `POST /api/internal/personas/[id]/recalibrate` (재보정)
-    - `POST /api/internal/personas/[id]/self-correct` (자기교정)
-    - `POST /api/persona-world/onboarding` (온보딩 벡터 생성)
-    - `POST /api/persona-world/interaction` (관계 기반 벡터 변화)
-    - `POST /api/internal/arena/evaluate` (아레나 평가 후 벡터 조정)
-    - `POST /api/internal/personas/batch-recalibrate` (배치 재보정)
-  - AC2: 트랜잭션 내 벡터 변경 시 `afterCommit` 패턴으로 캐시 무효화 (롤백 시 캐시 남지 않도록)
-  - AC3: 통합 테스트 — 벡터 업데이트 후 캐시 미스 확인
-
-- [x] **T379: 피드 매칭 엔진 캐시 통합** ✅ 2026-03-09
-
-- [x] **T380: 캐시 모니터링 + 관리 API** ✅ 2026-03-09
-  - 변경: `api/internal/cache/{stats,invalidate-all,warm}/route.ts`
-  - AC1: ✅ `GET /api/internal/cache/stats` — Redis dbSize 조회
-  - AC2: ✅ `POST /api/internal/cache/invalidate-all` — flushdb
-  - AC3: ✅ `POST /api/internal/cache/warm` — 활성 페르소나 배치 워밍 (10개씩)
-  - AC5: ✅ Build PASS
-
 ### Phase v4.1.1-B: 메모리 인덱스 — pgvector (T381~T384)
 
 > PersonaLayerVector의 Float 컬럼 7+5+4개를 pgvector 벡터 컬럼으로 전환. 유사 페르소나 검색 O(N) → ANN 인덱스.
 
-- [ ] **T381: pgvector 확장 활성화 + 마이그레이션**
-  - 배경: Neon PostgreSQL에서 `CREATE EXTENSION vector` 지원. 현재 L1 7D, L2 5D, L3 4D를 Float 개별 컬럼으로 저장.
-  - AC1: Neon에서 `CREATE EXTENSION IF NOT EXISTS vector` 실행 확인
-  - AC2: 마이그레이션 SQL: `ALTER TABLE "PersonaLayerVector" ADD COLUMN l1_vec vector(7), l2_vec vector(5), l3_vec vector(4)`
-  - AC3: 기존 Float 컬럼 데이터 → 벡터 컬럼으로 복사하는 마이그레이션 SQL
-  - AC4: `prisma/migrations/` 폴더에 마이그레이션 파일 추가
-  - AC5: Prisma 스키마에 `Unsupported("vector(7)")` 타입 필드 추가 + `prisma generate` PASS
+- [x] **T381: pgvector 확장 활성화 + 마이그레이션** ✅ 2026-03-09
+  - 변경: `prisma/migrations/050_pgvector_columns.sql`, `prisma/schema.prisma`
+  - AC1: ✅ `CREATE EXTENSION IF NOT EXISTS vector` — 마이그레이션 SQL에 포함
+  - AC2: ✅ `ALTER TABLE "persona_layer_vectors" ADD COLUMN IF NOT EXISTS "l1Vec" vector(7), "l2Vec" vector(5), "l3Vec" vector(4)`
+  - AC3: ✅ 기존 dim1~dim7 → 벡터 컬럼 데이터 복사 SQL (layerType별 분기)
+  - AC4: ✅ `050_pgvector_columns.sql` 마이그레이션 파일 추가
+  - AC5: ✅ Prisma 스키마 `Unsupported("vector(N)")` 필드 추가 + prisma generate PASS
+  - 테스트: 131/131 PASS (4804/4804) + Build PASS
 
 - [ ] **T382: 벡터 검색 쿼리 레이어 구현**
   - AC1: `lib/vector-search.ts` — `findSimilarPersonas(targetVector, layer, topK, threshold)` 함수
@@ -2407,42 +2360,19 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-### Phase v4.1.1-A: 벡터 캐시 — Redis (T376~T380)
-
-- [x] **T376: Upstash Redis 클라이언트 설정** ✅ 2026-03-09
-  - 변경: `apps/engine-studio/src/lib/redis.ts`, `apps/engine-studio/src/env.d.ts`, `apps/engine-studio/package.json`
-  - AC1: ✅ `@upstash/redis` 설치 + Redis 싱글턴 (globalForRedis, graceful null 반환)
-  - AC2: ✅ `env.d.ts` — `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` 타입 선언
-  - AC3: ✅ `pingRedis()` 헬스체크 유틸 (ok/message 반환, 미설정 시 graceful skip)
-  - AC4: ✅ Build PASS
-
-- [x] **T377: PrecomputedMatchData 캐시 서비스 구현** ✅ 2026-03-09
-  - 변경: `apps/engine-studio/src/lib/cache/persona-match-cache.ts`, `tests/unit/cache/persona-match-cache.test.ts`
-  - AC1: ✅ `PersonaMatchCache` — get/set/invalidate/bulkGet (pipeline 기반)
-  - AC2: ✅ 캐시 키 `persona:{id}:match`, TTL 7일, PrecomputedMatchData 타입
-  - AC3: ✅ `computeAndCache()` — DB 벡터 로드 → vFinal/crossAxis/paradox 계산 → 캐시 저장
-  - AC4: ✅ `getOrCompute()` cache-aside 패턴
-  - AC5: ✅ 단위 테스트 14개 PASS (get/set/invalidate/bulkGet/computeAndCache/getOrCompute)
-
-- [x] **T378: 캐시 무효화 — 페르소나 벡터 변경 훅** ✅ 2026-03-09
-  - 변경: 4개 라우트에 `invalidateMatchData(personaId)` 추가
-    - `api/internal/personas/[id]/route.ts` — PUT(벡터 업데이트) + DELETE(삭제)
-    - `api/cron/persona-evolution/route.ts` — saveNewNarrativeVersion
-    - `api/cron/v5-memory/route.ts` — updateL3Vector
-    - `api/internal/persona-world-admin/evolution/route.ts` — saveNewNarrativeVersion
-  - Build PASS
-
-- [x] **T379: 피드 매칭 엔진 캐시 통합** ✅ 2026-03-09
-  - 변경: `api/persona-world/feed/route.ts`
-  - AC1: ✅ `bulkGetMatchData()`로 전체 페르소나 캐시 일괄 로드
-  - AC2: ✅ 캐시 히트 시 `calculateVFinal()` + DB 벡터 조회 스킵
-  - AC3: ✅ 캐시 미스 시 `computeAndCache()` → 자동 계산 + 캐시 저장
-  - AC4: ✅ `cacheHitRate` 로그 출력
-  - AC5: ✅ 기존 피드 테스트 22개 PASS + 캐시 테스트 14개 PASS + Build PASS
-
 ---
 
 ## ✅ DONE (최근 완료)
+
+### Phase v4.1.1-A: 벡터 캐시 — Redis 완료 (T376~T380) ✅ 2026-03-09
+
+> 페르소나 매칭 엔진의 반복 벡터 연산을 Redis 캐시로 제거. 피드 레이턴시 35~55% 감소 목표.
+
+- [x] **T376: Upstash Redis 클라이언트 설정** ✅ — `@upstash/redis` 싱글턴 + `pingRedis()` 헬스체크
+- [x] **T377: PrecomputedMatchData 캐시 서비스** ✅ — get/set/invalidate/bulkGet + computeAndCache + getOrCompute (14 tests)
+- [x] **T378: 캐시 무효화 훅** ✅ — 4개 벡터 변경 라우트에 `invalidateMatchData()` 추가
+- [x] **T379: 피드 매칭 엔진 캐시 통합** ✅ — bulkGetMatchData + cache-aside + cacheHitRate 로그
+- [x] **T380: 캐시 모니터링 + 관리 API** ✅ — stats/invalidate-all/warm 3개 API
 
 ### Phase PW-V4-DB 완료 (T263~T275) ✅ 2026-03-08
 

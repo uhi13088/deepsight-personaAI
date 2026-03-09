@@ -287,6 +287,12 @@ model PersonaLayerVector {
   dim6      Decimal?  @db.Decimal(4, 3)
   dim7      Decimal?  @db.Decimal(4, 3)
 
+  // pgvector 벡터 컬럼 (v4.1.1-B: T381)
+  // Unsupported 타입 — Prisma에서 직접 읽기/쓰기 불가, raw SQL로 접근
+  l1Vec     Unsupported("vector(7)")?  @map("l1Vec")
+  l2Vec     Unsupported("vector(5)")?  @map("l2Vec")
+  l3Vec     Unsupported("vector(4)")?  @map("l3Vec")
+
   createdAt DateTime  @default(now())
 
   @@unique([personaId, layerType, version])
