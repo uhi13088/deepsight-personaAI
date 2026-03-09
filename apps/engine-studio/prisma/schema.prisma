@@ -1187,6 +1187,10 @@ model PersonaPost {
   mediaItemId   String?
   mediaItem     MediaItem?   @relation(fields: [mediaItemId], references: [id])
 
+  // v4.2.0: 멀티모달 이미지 지원
+  imageUrls       String[]      @default([])  // 이미지 URL 목록 (최대 4장)
+  imageAnalysis   Json?                        // Vision 분석 결과 (ImageAnalysis JSON)
+
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -1313,6 +1317,8 @@ enum PersonaPostType {
   BEHIND_STORY
   // Phase NB: 뉴스 반응 타입
   NEWS_REACTION  // 외부 뉴스/이슈에 대한 페르소나 반응 포스트
+  // v4.2.0: 이미지 반응 타입
+  IMAGE_REACTION // 이미지 콘텐츠에 대한 페르소나 반응 포스트
 }
 
 enum ActivityTrigger {
