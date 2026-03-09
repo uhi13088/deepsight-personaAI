@@ -178,8 +178,8 @@ describe("executeInteractions", () => {
     expect(result.likes).toHaveLength(0)
     expect(result.comments).toHaveLength(0)
     expect(result.totalTokensUsed).toBe(0)
-    // 벡터 조회도 하지 않음
-    expect(dp.getPersonaVectors).not.toHaveBeenCalled()
+    // Phase RA: 벡터는 인터랙션 한도 산출을 위해 선조회되므로 1회 호출됨
+    expect(dp.getPersonaVectors).toHaveBeenCalledTimes(1)
   })
 
   // ── 자기 글 스킵 ──
