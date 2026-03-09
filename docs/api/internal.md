@@ -25,6 +25,8 @@ https://engine.deepsight.ai/api/internal
    - [GET/PUT/DELETE /personas/:id](#getputdelete-personasid)
    - [POST /personas/:id/test-generate](#post-personasidtest-generate)
    - [POST /personas/:id/lifecycle](#post-personasidlifecycle)
+   - [GET /personas/:id/autonomy](#get-personasidautonomy)
+   - [PATCH /personas/:id/autonomy](#patch-personasidautonomy)
 3. [Arena (AI 토론)](#3-arena-ai-토론)
    - [POST /arena/sessions](#post-arenasessions)
    - [POST /arena/sessions/:id/corrections](#post-arenasessionsidcorrections)
@@ -528,6 +530,111 @@ Content-Type: application/json
     "id": "persona_xyz789",
     "previousStatus": "DRAFT",
     "newStatus": "REVIEW"
+  }
+}
+```
+
+---
+
+### GET /personas/:id/autonomy
+
+per-persona 자율 동작 정책(AutonomyPolicy)을 조회합니다.
+설정되지 않은 경우 기본값(모두 비활성)을 반환합니다.
+
+**요청**
+
+```http
+GET /api/internal/personas/persona_xyz789/autonomy
+```
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "personaId": "persona_xyz789",
+    "personaName": "유나",
+    "isCustom": false,
+    "policy": {
+      "autoCorrection": false,
+      "autoMemoryManagement": false,
+      "metaCognitionEnabled": false,
+      "correctionConfig": {
+        "maxAutoSeverity": "major",
+        "minConfidence": 0.9,
+        "dailyLimit": 3
+      },
+      "memoryConfig": {
+        "pruneConfidenceThreshold": 0.2,
+        "maxPerCategory": 100
+      }
+    }
+  }
+}
+```
+
+---
+
+### PATCH /personas/:id/autonomy
+
+자율 동작 정책을 업데이트합니다. 부분 업데이트를 지원합니다.
+
+**요청**
+
+```http
+PATCH /api/internal/personas/persona_xyz789/autonomy
+Content-Type: application/json
+```
+
+**Request Body** (모두 선택)
+
+| 필드                   | 타입      | 설명                     |
+| ---------------------- | --------- | ------------------------ |
+| `autoCorrection`       | `boolean` | 자율 교정 활성화         |
+| `autoMemoryManagement` | `boolean` | 자율 기억 관리 활성화    |
+| `metaCognitionEnabled` | `boolean` | 메타 인지 보고 활성화    |
+| `correctionConfig`     | `object`  | 자율 교정 세부 설정      |
+| `memoryConfig`         | `object`  | 자율 기억 관리 세부 설정 |
+
+**correctionConfig**
+
+| 필드              | 타입     | 범위        | 기본값 |
+| ----------------- | -------- | ----------- | ------ |
+| `maxAutoSeverity` | `string` | minor/major | major  |
+| `minConfidence`   | `number` | 0.7~1.0     | 0.9    |
+| `dailyLimit`      | `number` | 1~10 정수   | 3      |
+
+**memoryConfig**
+
+| 필드                       | 타입     | 범위         | 기본값 |
+| -------------------------- | -------- | ------------ | ------ |
+| `pruneConfidenceThreshold` | `number` | 0.0~0.5      | 0.2    |
+| `maxPerCategory`           | `number` | 10~1000 정수 | 100    |
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "personaId": "persona_xyz789",
+    "personaName": "유나",
+    "isCustom": true,
+    "policy": { "..." }
+  }
+}
+```
+
+**에러 (400)**
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "입력값이 유효하지 않습니다.",
+    "details": [{ "field": "correctionConfig.minConfidence", "message": "0.7~1.0 범위여야 합니다" }]
   }
 }
 ```
