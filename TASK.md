@@ -15,7 +15,7 @@
 | ---------- | ------------------ | -------- | ---------- | ---------------------------------------------------------------------------------------------------------- |
 | v4.0.0     | Foundation         | **DONE** | 2026-03-08 | 보안 3계층, 기억(Poignancy/Factbook/망각), 자기교정(Arena/VoiceDrift), Social Module, 비용제어, 모더레이션 |
 | v4.1.0     | Optimization       | **DONE** | 2026-03-08 | 배치 댓글, Haiku 라우팅, A/B 품질 모니터, 아레나 자동 스케줄, 스케일 자동 트리거, 최적화 로그 뷰어         |
-| **v4.1.1** | **Infrastructure** | **NEXT** | -          | 벡터 캐시(Redis), 메모리 인덱스(pgvector), 관리자 알림(Slack/이메일)                                       |
+| **v4.1.1** | **Infrastructure** | **DONE** | 2026-03-09 | 벡터 캐시(Redis), 메모리 인덱스(pgvector), 관리자 알림(Slack/이메일)                                       |
 
 ### 다음 로드맵
 
@@ -36,85 +36,6 @@
 ---
 
 ## 📋 QUEUE (대기)
-
-### Phase v4.1.1-B: 메모리 인덱스 — pgvector (T381~T384)
-
-> PersonaLayerVector의 Float 컬럼 7+5+4개를 pgvector 벡터 컬럼으로 전환. 유사 페르소나 검색 O(N) → ANN 인덱스.
-
-- [x] **T381: pgvector 확장 활성화 + 마이그레이션** ✅ 2026-03-09
-  - 변경: `prisma/migrations/050_pgvector_columns.sql`, `prisma/schema.prisma`
-  - AC1: ✅ `CREATE EXTENSION IF NOT EXISTS vector` — 마이그레이션 SQL에 포함
-  - AC2: ✅ `ALTER TABLE "persona_layer_vectors" ADD COLUMN IF NOT EXISTS "l1Vec" vector(7), "l2Vec" vector(5), "l3Vec" vector(4)`
-  - AC3: ✅ 기존 dim1~dim7 → 벡터 컬럼 데이터 복사 SQL (layerType별 분기)
-  - AC4: ✅ `050_pgvector_columns.sql` 마이그레이션 파일 추가
-  - AC5: ✅ Prisma 스키마 `Unsupported("vector(N)")` 필드 추가 + prisma generate PASS
-  - 테스트: 131/131 PASS (4804/4804) + Build PASS
-
-- [x] **T382: 벡터 검색 쿼리 레이어 구현** ✅ 2026-03-09
-  - 변경: `src/lib/vector-search.ts`, `tests/unit/vector-search.test.ts`
-  - AC1: ✅ `findSimilarPersonas(prisma, { targetVector, layer, topK, threshold, excludePersonaIds })` 함수
-  - AC2: ✅ `<=>` cosine distance 연산자 + `ORDER BY distance ASC LIMIT $topK` (raw SQL)
-  - AC3: ✅ L1(SOCIAL 7D), L2(TEMPERAMENT 5D), L3(NARRATIVE 4D) 레이어별 검색
-  - AC4: ✅ distance 포함 + threshold 필터링 + excludePersonaIds 지원
-  - AC5: ✅ 단위 테스트 16개 PASS (차원 검증, 레이어별 검색, threshold, exclude, 빈 결과)
-  - 테스트: 132/132 PASS (4820/4820) + Build PASS
-
-- [x] **T383: 벡터 인덱스 생성 + 성능 검증** ✅ 2026-03-09
-  - 변경: `prisma/migrations/051_pgvector_indexes.sql`
-  - AC1: ✅ IVFFlat 인덱스 L1 `idx_plv_l1vec_cosine` (vector_cosine_ops, lists=10)
-  - AC2: ✅ L2 `idx_plv_l2vec_cosine`, L3 `idx_plv_l3vec_cosine` 인덱스 동일 생성
-  - AC3: ✅ EXPLAIN ANALYZE 검증 쿼리 코멘트로 포함 (프로덕션 적용 후 실행)
-  - AC4: ✅ `051_pgvector_indexes.sql` 마이그레이션 파일 추가
-
-- [x] **T384: 피드 엔진 벡터 검색 통합** ✅ 2026-03-09
-  - 변경: `api/persona-world/feed/route.ts`
-  - AC1: ✅ `getCandidates()` 내 `findSimilarPersonas()` L1 벡터 유사도 기반 사전 필터링
-  - AC2: ✅ 기존 3-tier 매칭 유지 — 벡터 검색은 후보 축소만 담당, pgvector 미설정 시 전체 스캔 폴백
-  - AC3: ✅ `candidatePoolSize` 설정 가능 (기본 50, TuningProfile에서 오버라이드)
-  - AC4: ✅ 기존 피드 테스트 22개 PASS + 벡터 검색 테스트 16개 PASS
-  - AC5: ✅ Build PASS
-  - 테스트: 132/132 PASS (4820/4820)
-
-### Phase v4.1.1-C: 관리자 알림 — Slack/이메일 (T385~T388)
-
-> 시스템 이벤트(보안 위반, 비용 임계, 품질 저하 등)를 Slack/이메일로 실시간 알림.
-
-- [x] **T385: 알림 서비스 코어 구현** ✅ 2026-03-09
-  - 변경: `lib/notifications/{notification-service,slack-provider,email-provider,index}.ts`, `env.d.ts`
-  - AC1: ✅ `sendAlert({ channel, severity, category, title, body })` 통합 인터페이스
-  - AC2: ✅ `slack-provider.ts` — Slack Incoming Webhook (SLACK_WEBHOOK_URL)
-  - AC3: ✅ `email-provider.ts` — SendGrid (SENDGRID_API_KEY, ALERT_EMAIL_TO, ALERT_EMAIL_FROM)
-  - AC4: ✅ severity: critical/warning/info + 이모지 + 색상 매핑
-  - AC5: ✅ 환경변수 미설정 시 graceful skip (false 반환, 로그만)
-  - AC6: ✅ 단위 테스트 24개 PASS (service 12 + slack 5 + email 7)
-  - 테스트: 135/135 PASS (4844/4844) + Build PASS
-
-- [x] **T386: 알림 트리거 규칙 + Cron 연동** ✅ 2026-03-09
-  - 변경: `lib/notifications/alert-rules.ts`, `api/internal/alerts/test/route.ts`, `prisma/schema.prisma`, `migrations/052_alert_logs.sql`
-  - AC1: ✅ 8개 트리거 규칙 (보안 2 + 비용 2 + 품질 2 + 시스템 2) + `evaluateAlertRules()` 함수
-  - AC2: ✅ Cron 라우트에서 `evaluateAlertRules(metrics)` 호출 가능 (규칙 엔진 준비)
-  - AC3: ✅ `POST /api/internal/alerts/test` — 테스트 알림 전송 + AlertLog 기록
-  - AC4: ✅ AlertLog 모델 (severity/category/channel/title/body/success/error/metadata) + 마이그레이션 SQL
-  - AC5: ✅ Build PASS
-  - 테스트: 136/136 PASS (4860/4860) — alert-rules 16개 테스트 포함
-
-- [x] **T387: 알림 채널 설정 UI** ✅ 2026-03-09
-  - 변경: `(dashboard)/global-config/alerts/page.tsx`, `api/internal/settings/alerts/route.ts`
-  - AC1: ✅ `/global-config/alerts` 설정 페이지
-  - AC2: ✅ Slack Webhook URL 설정 + 연결 테스트 버튼
-  - AC3: ✅ 이메일 수신자 목록 관리 (추가/삭제, Badge 클릭 삭제)
-  - AC4: ✅ 4개 카테고리 ON/OFF 토글 (보안/비용/품질/시스템)
-  - AC5: ✅ GET/POST `/api/internal/settings/alerts` — SystemConfig에 JSON 저장
-  - AC6: ✅ Build PASS
-
-- [x] **T388: 알림 히스토리 뷰어** ✅ 2026-03-09
-  - 변경: `(dashboard)/operations/monitoring/alerts/page.tsx`, `api/internal/alerts/history/route.ts`
-  - AC1: ✅ `/operations/monitoring/alerts` 히스토리 페이지
-  - AC2: ✅ AlertLog 목록 — 시간순, severity/category 필터
-  - AC3: ✅ 알림 상세 모달 (제목, 본문, 채널, 심각도, 발송 시각, 에러)
-  - AC4: ✅ 최근 24시간 알림 카운트 표시 (Header description)
-  - AC5: ✅ Build PASS
-  - 테스트: 136/136 PASS (4860/4860)
 
 ### Phase A: 핵심 페르소나 관리 (T45~T50)
 
@@ -2368,6 +2289,43 @@
 ---
 
 ## ✅ DONE (최근 완료)
+
+### Phase v4.1.1-C: 관리자 알림 — Slack/이메일 완료 (T385~T388) ✅ 2026-03-09
+
+> 시스템 이벤트(보안 위반, 비용 임계, 품질 저하 등)를 Slack/이메일로 실시간 알림.
+
+- [x] **T385: 알림 서비스 코어 구현** ✅ 2026-03-09
+  - 변경: `lib/notifications/{notification-service,slack-provider,email-provider,index}.ts`, `env.d.ts`
+  - 테스트: 135/135 PASS (4844/4844) + Build PASS
+
+- [x] **T386: 알림 트리거 규칙 + Cron 연동** ✅ 2026-03-09
+  - 변경: `lib/notifications/alert-rules.ts`, `api/internal/alerts/test/route.ts`, `prisma/schema.prisma`, `migrations/052_alert_logs.sql`
+  - 테스트: 136/136 PASS (4860/4860)
+
+- [x] **T387: 알림 채널 설정 UI** ✅ 2026-03-09
+  - 변경: `(dashboard)/global-config/alerts/page.tsx`, `api/internal/settings/alerts/route.ts`
+
+- [x] **T388: 알림 히스토리 뷰어** ✅ 2026-03-09
+  - 변경: `(dashboard)/operations/monitoring/alerts/page.tsx`, `api/internal/alerts/history/route.ts`
+  - 테스트: 136/136 PASS (4860/4860)
+
+### Phase v4.1.1-B: 메모리 인덱스 — pgvector 완료 (T381~T384) ✅ 2026-03-09
+
+> PersonaLayerVector의 Float 컬럼 7+5+4개를 pgvector 벡터 컬럼으로 전환. 유사 페르소나 검색 O(N) → ANN 인덱스.
+
+- [x] **T381: pgvector 확장 활성화 + 마이그레이션** ✅ 2026-03-09
+  - 변경: `prisma/migrations/050_pgvector_columns.sql`, `prisma/schema.prisma`
+
+- [x] **T382: 벡터 검색 쿼리 레이어 구현** ✅ 2026-03-09
+  - 변경: `src/lib/vector-search.ts`, `tests/unit/vector-search.test.ts`
+  - 테스트: 132/132 PASS (4820/4820) + Build PASS
+
+- [x] **T383: 벡터 인덱스 생성 + 성능 검증** ✅ 2026-03-09
+  - 변경: `prisma/migrations/051_pgvector_indexes.sql`
+
+- [x] **T384: 피드 엔진 벡터 검색 통합** ✅ 2026-03-09
+  - 변경: `api/persona-world/feed/route.ts`
+  - 테스트: 132/132 PASS (4820/4820)
 
 ### Phase v4.1.1-A: 벡터 캐시 — Redis 완료 (T376~T380) ✅ 2026-03-09
 
