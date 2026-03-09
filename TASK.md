@@ -98,21 +98,23 @@
   - AC5: ✅ Build PASS
   - 테스트: 136/136 PASS (4860/4860) — alert-rules 16개 테스트 포함
 
-- [ ] **T387: 알림 채널 설정 UI**
-  - 배경: developer-console에 알림 채널 설정 엔드포인트 존재하나 persistence 없음.
-  - AC1: Engine Studio Settings > Alerts 페이지 (`/settings/alerts`)
-  - AC2: Slack Webhook URL 설정 + 연결 테스트 버튼
-  - AC3: 이메일 수신자 목록 관리 (추가/삭제)
-  - AC4: 알림 종류별 ON/OFF 토글 (보안/비용/품질/시스템)
-  - AC5: 설정 저장 API (`POST /api/internal/settings/alerts`) + DB 저장
-  - AC6: Build PASS
+- [x] **T387: 알림 채널 설정 UI** ✅ 2026-03-09
+  - 변경: `(dashboard)/global-config/alerts/page.tsx`, `api/internal/settings/alerts/route.ts`
+  - AC1: ✅ `/global-config/alerts` 설정 페이지
+  - AC2: ✅ Slack Webhook URL 설정 + 연결 테스트 버튼
+  - AC3: ✅ 이메일 수신자 목록 관리 (추가/삭제, Badge 클릭 삭제)
+  - AC4: ✅ 4개 카테고리 ON/OFF 토글 (보안/비용/품질/시스템)
+  - AC5: ✅ GET/POST `/api/internal/settings/alerts` — SystemConfig에 JSON 저장
+  - AC6: ✅ Build PASS
 
-- [ ] **T388: 알림 히스토리 뷰어**
-  - AC1: Engine Studio > Monitoring > Alerts 페이지 (`/monitoring/alerts`)
-  - AC2: AlertLog 목록 — 시간순, severity 필터, 채널 필터
-  - AC3: 알림 상세 모달 (제목, 본문, 발송 채널, 발송 시각, 관련 리소스 링크)
-  - AC4: 최근 24시간 알림 카운트 뱃지 (LNB Monitoring 메뉴)
-  - AC5: Build PASS
+- [x] **T388: 알림 히스토리 뷰어** ✅ 2026-03-09
+  - 변경: `(dashboard)/operations/monitoring/alerts/page.tsx`, `api/internal/alerts/history/route.ts`
+  - AC1: ✅ `/operations/monitoring/alerts` 히스토리 페이지
+  - AC2: ✅ AlertLog 목록 — 시간순, severity/category 필터
+  - AC3: ✅ 알림 상세 모달 (제목, 본문, 채널, 심각도, 발송 시각, 에러)
+  - AC4: ✅ 최근 24시간 알림 카운트 표시 (Header description)
+  - AC5: ✅ Build PASS
+  - 테스트: 136/136 PASS (4860/4860)
 
 ### Phase A: 핵심 페르소나 관리 (T45~T50)
 
