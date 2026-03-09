@@ -2326,30 +2326,17 @@
 
 > 프런트엔드: 이미지 업로드, 이미지 포스트 표시, 이미지 갤러리.
 
-- [ ] **T397: PersonaWorld 피드 — 이미지 포스트 렌더링**
-  - 배경: 피드 카드에서 이미지를 표시할 수 있어야 함
-  - AC1: `PostCard` 컴포넌트에 `imageUrls` 존재 시 이미지 그리드 렌더링 (1장: 풀, 2장: 2열, 3+: 그리드)
-  - AC2: 이미지 클릭 시 라이트박스(확대 뷰) 오버레이
-  - AC3: 이미지 로딩 스켈레톤 + 에러 폴백 (깨진 이미지 아이콘)
-  - AC4: Next.js `<Image>` 컴포넌트 활용 (최적화 + lazy loading)
-  - AC5: Build PASS
+- [x] **T397: PersonaWorld 피드 — 이미지 포스트 렌더링** ✅ 2026-03-09
+  - 변경: `pw-image-grid.tsx` (PWImageGrid + ImageLightbox), `feed/page.tsx`, `types.ts`
+  - Build PASS
 
-- [ ] **T398: PersonaWorld 피드 — 이미지 업로드 UI**
-  - 배경: 유저가 이미지를 선택하고 피드에 올리는 UI
-  - AC1: 포스트 작성 영역에 이미지 첨부 버튼 (📎 / 🖼️ 아이콘)
-  - AC2: 드래그앤드롭 + 파일 선택 다이얼로그 (최대 4장)
-  - AC3: 선택된 이미지 미리보기 (썸네일) + 개별 삭제 버튼
-  - AC4: 업로드 진행률 표시 + 완료 시 URL 수신 → 포스트 데이터에 포함
-  - AC5: 포맷/크기 초과 시 유저 친화적 에러 메시지
-  - AC6: Build PASS
+- [x] **T398: PersonaWorld 피드 — 이미지 업로드 UI** ✅ 2026-03-09
+  - 변경: `pw-image-upload.tsx` (PWImageUpload — 드래그앤드롭, 미리보기, 에러 표시)
+  - Build PASS
 
-- [ ] **T399: PersonaWorld 이미지 기억 — Memory Layer 확장**
-  - 배경: 페르소나가 본 이미지를 기억하고 나중에 참조할 수 있어야 함
-  - AC1: `MemoryEntry` 타입에 `imageUrl?: string` + `imageDescription?: string` 필드 추가
-  - AC2: 이미지 반응 시 기억 저장 — URL + Vision 분석 텍스트를 기억 본문으로 저장
-  - AC3: RAG 검색 시 이미지 기억도 포함 (텍스트 설명 기반 검색)
-  - AC4: 기억 조회 UI에서 이미지 썸네일 표시
-  - AC5: Build PASS
+- [x] **T399: PersonaWorld 이미지 기억 — Memory Layer 확장** ✅ 2026-03-09
+  - 변경: `MemoryEntry` (imageUrl/imageDescription), `schema.prisma` + `054.sql`, `image-memory-service.ts`
+  - 테스트: 8개 추가 (36/36 PASS) + Build PASS
 
 ---
 
