@@ -200,6 +200,9 @@ model Persona {
   dimensionalityScore Decimal?        @db.Decimal(4, 3) // 0.000~1.000
   engineVersion       String?         @default("4.0")
 
+  // === v5.0 NEW: Autonomy Policy (JSON) ===
+  autonomyPolicy      Json?           // AutonomyPolicy type — per-persona 자율 동작 정책
+
   // === 타임스탬프 ===
   createdById     String
   createdBy       User            @relation("CreatedBy", fields: [createdById], references: [id])

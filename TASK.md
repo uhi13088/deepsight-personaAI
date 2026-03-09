@@ -50,13 +50,14 @@
 > v5.0 자율 동작의 기반: per-persona 정책 설정 + 킬 스위치.
 > 설계서: `docs/design/persona-engine-v5-design.md`
 
-- [ ] **T400: AutonomyPolicy 타입 정의 + Persona DB 필드 추가**
+- [x] **T400: AutonomyPolicy 타입 정의 + Persona DB 필드 추가** ✅ 2026-03-09
   - 배경: 자율 동작(교정/기억/메타인지)을 per-persona로 제어하는 정책 필요
-  - AC1: `AutonomyPolicy` 인터페이스 정의 — autoCorrection, autoMemoryManagement, metaCognitionEnabled + correctionConfig + memoryConfig
-  - AC2: `DEFAULT_AUTONOMY_POLICY` 상수 (모두 false, opt-in)
-  - AC3: Persona 모델에 `autonomyPolicy Json?` 필드 추가 + 마이그레이션 SQL
-  - AC4: `getAutonomyPolicy(persona)` 헬퍼 — null이면 기본값 반환
-  - AC5: 단위 테스트 PASS + Build PASS
+  - AC1: ✅ `AutonomyPolicy` 인터페이스 정의 — autoCorrection, autoMemoryManagement, metaCognitionEnabled + correctionConfig + memoryConfig
+  - AC2: ✅ `DEFAULT_AUTONOMY_POLICY` 상수 (모두 false, opt-in)
+  - AC3: ✅ Persona 모델에 `autonomyPolicy Json?` 필드 추가 + 마이그레이션 SQL (`055_autonomy_policy.sql`)
+  - AC4: ✅ `getAutonomyPolicy(persona)` 헬퍼 — null이면 기본값 반환 + `validateAutonomyPolicy()` 입력 검증
+  - AC5: ✅ 단위 테스트 31개 PASS (4940/4940) + Build PASS
+  - 변경: `lib/autonomy/autonomy-policy.ts`, `lib/autonomy/index.ts`, `prisma/schema.prisma`, `migrations/055_autonomy_policy.sql`
 
 - [ ] **T401: AutonomyPolicy 관리 API**
   - 배경: 관리자가 per-persona 자율 설정을 조회/수정할 수 있어야 함
@@ -152,6 +153,12 @@
 ---
 
 ## ✅ DONE (완료)
+
+### Phase AU-A: AutonomyPolicy 기반 설정 (T400~T401) — T400 완료
+
+- [x] **T400: AutonomyPolicy 타입 정의 + Persona DB 필드 추가** ✅ 2026-03-09
+  - 변경: `lib/autonomy/autonomy-policy.ts`, `lib/autonomy/index.ts`, `prisma/schema.prisma`, `migrations/055_autonomy_policy.sql`
+  - 테스트: 31개 추가 (4940/4940 PASS) + Build PASS
 
 ### Phase v4.1.1-C: 관리자 알림 — Slack/이메일 완료 (T385~T388) ✅ 2026-03-09
 
