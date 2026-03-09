@@ -50,12 +50,14 @@
   - AC5: ✅ Prisma 스키마 `Unsupported("vector(N)")` 필드 추가 + prisma generate PASS
   - 테스트: 131/131 PASS (4804/4804) + Build PASS
 
-- [ ] **T382: 벡터 검색 쿼리 레이어 구현**
-  - AC1: `lib/vector-search.ts` — `findSimilarPersonas(targetVector, layer, topK, threshold)` 함수
-  - AC2: L1 cosine distance 쿼리: `SELECT ... ORDER BY l1_vec <=> $1 LIMIT $2` (raw SQL via Prisma)
-  - AC3: L2, L3 레이어별 검색 지원
-  - AC4: 결과에 거리(distance) 포함 + threshold 필터링
-  - AC5: 단위 테스트 — 유사 벡터 검색 정확도 검증
+- [x] **T382: 벡터 검색 쿼리 레이어 구현** ✅ 2026-03-09
+  - 변경: `src/lib/vector-search.ts`, `tests/unit/vector-search.test.ts`
+  - AC1: ✅ `findSimilarPersonas(prisma, { targetVector, layer, topK, threshold, excludePersonaIds })` 함수
+  - AC2: ✅ `<=>` cosine distance 연산자 + `ORDER BY distance ASC LIMIT $topK` (raw SQL)
+  - AC3: ✅ L1(SOCIAL 7D), L2(TEMPERAMENT 5D), L3(NARRATIVE 4D) 레이어별 검색
+  - AC4: ✅ distance 포함 + threshold 필터링 + excludePersonaIds 지원
+  - AC5: ✅ 단위 테스트 16개 PASS (차원 검증, 레이어별 검색, threshold, exclude, 빈 결과)
+  - 테스트: 132/132 PASS (4820/4820) + Build PASS
 
 - [ ] **T383: 벡터 인덱스 생성 + 성능 검증**
   - AC1: IVFFlat 인덱스: `CREATE INDEX ON "PersonaLayerVector" USING ivfflat (l1_vec vector_cosine_ops) WITH (lists = 10)`
