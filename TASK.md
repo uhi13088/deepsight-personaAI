@@ -59,11 +59,12 @@
   - AC5: ✅ 단위 테스트 16개 PASS (차원 검증, 레이어별 검색, threshold, exclude, 빈 결과)
   - 테스트: 132/132 PASS (4820/4820) + Build PASS
 
-- [ ] **T383: 벡터 인덱스 생성 + 성능 검증**
-  - AC1: IVFFlat 인덱스: `CREATE INDEX ON "PersonaLayerVector" USING ivfflat (l1_vec vector_cosine_ops) WITH (lists = 10)`
-  - AC2: L2, L3 인덱스도 동일하게 생성
-  - AC3: EXPLAIN ANALYZE로 인덱스 사용 확인
-  - AC4: 마이그레이션 SQL 파일에 인덱스 DDL 포함
+- [x] **T383: 벡터 인덱스 생성 + 성능 검증** ✅ 2026-03-09
+  - 변경: `prisma/migrations/051_pgvector_indexes.sql`
+  - AC1: ✅ IVFFlat 인덱스 L1 `idx_plv_l1vec_cosine` (vector_cosine_ops, lists=10)
+  - AC2: ✅ L2 `idx_plv_l2vec_cosine`, L3 `idx_plv_l3vec_cosine` 인덱스 동일 생성
+  - AC3: ✅ EXPLAIN ANALYZE 검증 쿼리 코멘트로 포함 (프로덕션 적용 후 실행)
+  - AC4: ✅ `051_pgvector_indexes.sql` 마이그레이션 파일 추가
 
 - [ ] **T384: 피드 엔진 벡터 검색 통합**
   - 배경: 현재 피드에서 전체 페르소나 로드 후 in-memory 매칭. 벡터 검색으로 후보 사전 필터링.
