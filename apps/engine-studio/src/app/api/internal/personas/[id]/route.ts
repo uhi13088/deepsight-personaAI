@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAuth } from "@/lib/require-auth"
 import { prisma } from "@/lib/prisma"
+import { invalidateMatchData } from "@/lib/cache/persona-match-cache"
 import { calculateExtendedParadoxScore } from "@/lib/vector/paradox"
 import { calculateCrossAxisProfile } from "@/lib/vector/cross-axis"
 import type {
@@ -387,6 +388,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     })
 
+    // 벡터 변경 시 캐시 무효화
+    if (body.vectors) {
+      await invalidateMatchData(id)
+    }
+
     return NextResponse.json({ success: true, data: { id } } satisfies ApiResponse<{ id: string }>)
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error"
@@ -434,6 +440,9 @@ export async function DELETE(
       await tx.personaLayerVector.deleteMany({ where: { personaId: id } })
       await tx.persona.delete({ where: { id } })
     })
+
+    // 삭제 시 캐시 무효화
+    await invalidateMatchData(id)
 
     return NextResponse.json({ success: true, data: { id } } satisfies ApiResponse<{ id: string }>)
   } catch (error) {

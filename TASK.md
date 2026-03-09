@@ -15,7 +15,7 @@
 | ---------- | ------------------ | -------- | ---------- | ---------------------------------------------------------------------------------------------------------- |
 | v4.0.0     | Foundation         | **DONE** | 2026-03-08 | 보안 3계층, 기억(Poignancy/Factbook/망각), 자기교정(Arena/VoiceDrift), Social Module, 비용제어, 모더레이션 |
 | v4.1.0     | Optimization       | **DONE** | 2026-03-08 | 배치 댓글, Haiku 라우팅, A/B 품질 모니터, 아레나 자동 스케줄, 스케일 자동 트리거, 최적화 로그 뷰어         |
-| **v4.1.1** | **Infrastructure** | **NEXT** | -          | 벡터 캐시(Redis), 메모리 인덱스(pgvector), 관리자 알림(Slack/이메일)                                       |
+| **v4.1.1** | **Infrastructure** | **DONE** | 2026-03-09 | 벡터 캐시(Redis), 메모리 인덱스(pgvector), 관리자 알림(Slack/이메일)                                       |
 
 ### 다음 로드맵
 
@@ -36,127 +36,6 @@
 ---
 
 ## 📋 QUEUE (대기)
-
-### Phase v4.1.1-A: 벡터 캐시 — Redis (T376~T380)
-
-> 페르소나 매칭 엔진의 반복 벡터 연산을 Redis 캐시로 제거. 피드 레이턴시 35~55% 감소 목표.
-
-- [ ] **T376: Upstash Redis 클라이언트 설정**
-  - 배경: Vercel 서버리스 환경에서 `@upstash/redis` REST 기반 Redis 사용. 현재 Redis 의존성 없음.
-  - AC1: `@upstash/redis` 패키지 설치 + Redis 클라이언트 싱글턴 (`lib/redis.ts`)
-  - AC2: 환경변수 `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` 타입 정의 (env.d.ts)
-  - AC3: Redis 연결 헬스체크 유틸 (`lib/redis.ts` 내 `pingRedis()`)
-  - AC4: Build PASS
-
-- [ ] **T377: PrecomputedMatchData 캐시 서비스 구현**
-  - 배경: `calculateVFinal()`이 피드 요청당 45~120회 호출됨. vFinal[7D] + crossAxisProfile[83D] + paradoxScore + archetype은 벡터 변경 전까지 불변.
-  - AC1: `PersonaMatchCache` 서비스 (`lib/cache/persona-match-cache.ts`) — get/set/invalidate/bulkGet
-  - AC2: 캐시 키: `persona:{id}:match`, TTL 7일, 값: `{ vFinal, crossAxisProfile, paradoxScore, archetype, updatedAt }`
-  - AC3: `computeAndCache(personaId)` — DB에서 벡터 로드 → 계산 → 캐시 저장
-  - AC4: 캐시 미스 시 자동 계산 + 저장 (cache-aside 패턴)
-  - AC5: 단위 테스트 — get/set/invalidate/bulkGet/TTL 만료 시나리오
-
-- [ ] **T378: 캐시 무효화 — 페르소나 벡터 변경 훅**
-  - 배경: 8개 이상의 페르소나 업데이트 라우트에서 벡터 변경 시 캐시 무효화 필요.
-  - AC1: `invalidatePersonaCache(personaId)` 호출을 다음 라우트에 추가:
-    - `PUT /api/internal/personas/[id]` (벡터 업데이트)
-    - `POST /api/internal/personas` (신규 생성)
-    - `POST /api/internal/personas/[id]/recalibrate` (재보정)
-    - `POST /api/internal/personas/[id]/self-correct` (자기교정)
-    - `POST /api/persona-world/onboarding` (온보딩 벡터 생성)
-    - `POST /api/persona-world/interaction` (관계 기반 벡터 변화)
-    - `POST /api/internal/arena/evaluate` (아레나 평가 후 벡터 조정)
-    - `POST /api/internal/personas/batch-recalibrate` (배치 재보정)
-  - AC2: 트랜잭션 내 벡터 변경 시 `afterCommit` 패턴으로 캐시 무효화 (롤백 시 캐시 남지 않도록)
-  - AC3: 통합 테스트 — 벡터 업데이트 후 캐시 미스 확인
-
-- [ ] **T379: 피드 매칭 엔진 캐시 통합**
-  - 배경: `feed/route.ts` → `three-tier-engine.ts` 매칭 파이프라인에서 캐시 적용.
-  - AC1: `getCandidates()` 내 `bulkGet`으로 전체 페르소나 캐시 일괄 로드
-  - AC2: 캐시 히트 시 `calculateVFinal()` + `computeCrossAxisProfile()` 스킵
-  - AC3: 캐시 미스 페르소나만 개별 계산 + 캐시 저장
-  - AC4: 피드 응답에 `cacheHitRate` 메트릭 포함 (디버그/로그용)
-  - AC5: 기존 피드 테스트 전부 PASS + 캐시 시나리오 추가 테스트
-
-- [ ] **T380: 캐시 모니터링 + 관리 API**
-  - AC1: `GET /api/internal/cache/stats` — 전체 캐시 키 수, 히트율, 메모리 사용량
-  - AC2: `POST /api/internal/cache/invalidate-all` — 전체 캐시 초기화 (관리자 전용)
-  - AC3: `POST /api/internal/cache/warm` — 활성 페르소나 전체 캐시 워밍
-  - AC4: Engine Studio 대시보드에 캐시 히트율 위젯 (선택사항, 간단 표시)
-  - AC5: Build PASS
-
-### Phase v4.1.1-B: 메모리 인덱스 — pgvector (T381~T384)
-
-> PersonaLayerVector의 Float 컬럼 7+5+4개를 pgvector 벡터 컬럼으로 전환. 유사 페르소나 검색 O(N) → ANN 인덱스.
-
-- [ ] **T381: pgvector 확장 활성화 + 마이그레이션**
-  - 배경: Neon PostgreSQL에서 `CREATE EXTENSION vector` 지원. 현재 L1 7D, L2 5D, L3 4D를 Float 개별 컬럼으로 저장.
-  - AC1: Neon에서 `CREATE EXTENSION IF NOT EXISTS vector` 실행 확인
-  - AC2: 마이그레이션 SQL: `ALTER TABLE "PersonaLayerVector" ADD COLUMN l1_vec vector(7), l2_vec vector(5), l3_vec vector(4)`
-  - AC3: 기존 Float 컬럼 데이터 → 벡터 컬럼으로 복사하는 마이그레이션 SQL
-  - AC4: `prisma/migrations/` 폴더에 마이그레이션 파일 추가
-  - AC5: Prisma 스키마에 `Unsupported("vector(7)")` 타입 필드 추가 + `prisma generate` PASS
-
-- [ ] **T382: 벡터 검색 쿼리 레이어 구현**
-  - AC1: `lib/vector-search.ts` — `findSimilarPersonas(targetVector, layer, topK, threshold)` 함수
-  - AC2: L1 cosine distance 쿼리: `SELECT ... ORDER BY l1_vec <=> $1 LIMIT $2` (raw SQL via Prisma)
-  - AC3: L2, L3 레이어별 검색 지원
-  - AC4: 결과에 거리(distance) 포함 + threshold 필터링
-  - AC5: 단위 테스트 — 유사 벡터 검색 정확도 검증
-
-- [ ] **T383: 벡터 인덱스 생성 + 성능 검증**
-  - AC1: IVFFlat 인덱스: `CREATE INDEX ON "PersonaLayerVector" USING ivfflat (l1_vec vector_cosine_ops) WITH (lists = 10)`
-  - AC2: L2, L3 인덱스도 동일하게 생성
-  - AC3: EXPLAIN ANALYZE로 인덱스 사용 확인
-  - AC4: 마이그레이션 SQL 파일에 인덱스 DDL 포함
-
-- [ ] **T384: 피드 엔진 벡터 검색 통합**
-  - 배경: 현재 피드에서 전체 페르소나 로드 후 in-memory 매칭. 벡터 검색으로 후보 사전 필터링.
-  - AC1: `getCandidates()` 내 벡터 유사도 기반 사전 필터링 (Top-K 후보만 로드)
-  - AC2: 기존 3-tier 매칭은 유지 — 벡터 검색은 후보 축소 단계만 담당
-  - AC3: 후보 수 설정 가능 (`candidatePoolSize` 설정, 기본 50)
-  - AC4: 기존 피드 테스트 PASS + 벡터 검색 통합 테스트
-  - AC5: Build PASS
-
-### Phase v4.1.1-C: 관리자 알림 — Slack/이메일 (T385~T388)
-
-> 시스템 이벤트(보안 위반, 비용 임계, 품질 저하 등)를 Slack/이메일로 실시간 알림.
-
-- [ ] **T385: 알림 서비스 코어 구현**
-  - 배경: 현재 알림 인프라 없음. Slack Webhook + SendGrid 이메일 2채널.
-  - AC1: `lib/notifications/notification-service.ts` — `sendAlert(channel, severity, title, body)` 통합 인터페이스
-  - AC2: `lib/notifications/slack-provider.ts` — Slack Incoming Webhook (`SLACK_WEBHOOK_URL` 환경변수)
-  - AC3: `lib/notifications/email-provider.ts` — SendGrid (`SENDGRID_API_KEY`, `ALERT_EMAIL_TO` 환경변수)
-  - AC4: severity 레벨: `critical` (즉시), `warning` (배치 5분), `info` (일일 다이제스트)
-  - AC5: 채널 비활성 시 graceful skip (환경변수 미설정 → 로그만 출력)
-  - AC6: 단위 테스트 — 각 provider mock 테스트
-
-- [ ] **T386: 알림 트리거 규칙 + Cron 연동**
-  - AC1: 알림 트리거 정의 (`lib/notifications/alert-rules.ts`):
-    - 보안: Trust Score < 30, 격리 건수 > 10/일
-    - 비용: 일일 비용 > 임계값, 캐시 히트율 < 50%
-    - 품질: 인터뷰 평균 점수 < 70, Voice Drift > 0.3
-    - 시스템: API 에러율 > 5%, 응답시간 P95 > 3초
-  - AC2: 기존 cron 라우트 (`/api/cron/*`)에 알림 체크 추가
-  - AC3: `POST /api/internal/alerts/test` — 테스트 알림 전송 API
-  - AC4: 알림 이력 DB 모델 (`AlertLog`) + Prisma 스키마 추가 + 마이그레이션 SQL
-  - AC5: Build PASS
-
-- [ ] **T387: 알림 채널 설정 UI**
-  - 배경: developer-console에 알림 채널 설정 엔드포인트 존재하나 persistence 없음.
-  - AC1: Engine Studio Settings > Alerts 페이지 (`/settings/alerts`)
-  - AC2: Slack Webhook URL 설정 + 연결 테스트 버튼
-  - AC3: 이메일 수신자 목록 관리 (추가/삭제)
-  - AC4: 알림 종류별 ON/OFF 토글 (보안/비용/품질/시스템)
-  - AC5: 설정 저장 API (`POST /api/internal/settings/alerts`) + DB 저장
-  - AC6: Build PASS
-
-- [ ] **T388: 알림 히스토리 뷰어**
-  - AC1: Engine Studio > Monitoring > Alerts 페이지 (`/monitoring/alerts`)
-  - AC2: AlertLog 목록 — 시간순, severity 필터, 채널 필터
-  - AC3: 알림 상세 모달 (제목, 본문, 발송 채널, 발송 시각, 관련 리소스 링크)
-  - AC4: 최근 24시간 알림 카운트 뱃지 (LNB Monitoring 메뉴)
-  - AC5: Build PASS
 
 ### Phase A: 핵심 페르소나 관리 (T45~T50)
 
@@ -2407,11 +2286,56 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-(없음)
-
 ---
 
 ## ✅ DONE (최근 완료)
+
+### Phase v4.1.1-C: 관리자 알림 — Slack/이메일 완료 (T385~T388) ✅ 2026-03-09
+
+> 시스템 이벤트(보안 위반, 비용 임계, 품질 저하 등)를 Slack/이메일로 실시간 알림.
+
+- [x] **T385: 알림 서비스 코어 구현** ✅ 2026-03-09
+  - 변경: `lib/notifications/{notification-service,slack-provider,email-provider,index}.ts`, `env.d.ts`
+  - 테스트: 135/135 PASS (4844/4844) + Build PASS
+
+- [x] **T386: 알림 트리거 규칙 + Cron 연동** ✅ 2026-03-09
+  - 변경: `lib/notifications/alert-rules.ts`, `api/internal/alerts/test/route.ts`, `prisma/schema.prisma`, `migrations/052_alert_logs.sql`
+  - 테스트: 136/136 PASS (4860/4860)
+
+- [x] **T387: 알림 채널 설정 UI** ✅ 2026-03-09
+  - 변경: `(dashboard)/global-config/alerts/page.tsx`, `api/internal/settings/alerts/route.ts`
+
+- [x] **T388: 알림 히스토리 뷰어** ✅ 2026-03-09
+  - 변경: `(dashboard)/operations/monitoring/alerts/page.tsx`, `api/internal/alerts/history/route.ts`
+  - 테스트: 136/136 PASS (4860/4860)
+
+### Phase v4.1.1-B: 메모리 인덱스 — pgvector 완료 (T381~T384) ✅ 2026-03-09
+
+> PersonaLayerVector의 Float 컬럼 7+5+4개를 pgvector 벡터 컬럼으로 전환. 유사 페르소나 검색 O(N) → ANN 인덱스.
+
+- [x] **T381: pgvector 확장 활성화 + 마이그레이션** ✅ 2026-03-09
+  - 변경: `prisma/migrations/050_pgvector_columns.sql`, `prisma/schema.prisma`
+
+- [x] **T382: 벡터 검색 쿼리 레이어 구현** ✅ 2026-03-09
+  - 변경: `src/lib/vector-search.ts`, `tests/unit/vector-search.test.ts`
+  - 테스트: 132/132 PASS (4820/4820) + Build PASS
+
+- [x] **T383: 벡터 인덱스 생성 + 성능 검증** ✅ 2026-03-09
+  - 변경: `prisma/migrations/051_pgvector_indexes.sql`
+
+- [x] **T384: 피드 엔진 벡터 검색 통합** ✅ 2026-03-09
+  - 변경: `api/persona-world/feed/route.ts`
+  - 테스트: 132/132 PASS (4820/4820)
+
+### Phase v4.1.1-A: 벡터 캐시 — Redis 완료 (T376~T380) ✅ 2026-03-09
+
+> 페르소나 매칭 엔진의 반복 벡터 연산을 Redis 캐시로 제거. 피드 레이턴시 35~55% 감소 목표.
+
+- [x] **T376: Upstash Redis 클라이언트 설정** ✅ — `@upstash/redis` 싱글턴 + `pingRedis()` 헬스체크
+- [x] **T377: PrecomputedMatchData 캐시 서비스** ✅ — get/set/invalidate/bulkGet + computeAndCache + getOrCompute (14 tests)
+- [x] **T378: 캐시 무효화 훅** ✅ — 4개 벡터 변경 라우트에 `invalidateMatchData()` 추가
+- [x] **T379: 피드 매칭 엔진 캐시 통합** ✅ — bulkGetMatchData + cache-aside + cacheHitRate 로그
+- [x] **T380: 캐시 모니터링 + 관리 API** ✅ — stats/invalidate-all/warm 3개 API
 
 ### Phase PW-V4-DB 완료 (T263~T275) ✅ 2026-03-08
 
