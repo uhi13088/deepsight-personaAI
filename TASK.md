@@ -45,85 +45,6 @@
 
 ---
 
-### Phase AU-B: 자율 교정 (T402~T404)
-
-> 아레나 교정 자동 적용 + PIS 기반 자동 Arena 트리거 + 감사 로그.
-
-- [ ] **T402: correction-loop 자율 적용 분기**
-  - 배경: 현재 Minor만 자동 적용 → AutonomyPolicy에 따라 Major까지 자동 적용
-  - AC1: `getAutoApplyConfig(policy)` — policy 기반으로 maxSeverity, minConfidence, dailyLimit 동적 결정
-  - AC2: `executeCorrectionLoop`에서 policy 체크 → Major도 confidence ≥ 0.9이면 자동 적용
-  - AC3: Critical은 policy 무관하게 항상 관리자 승인 필요 (하드코딩)
-  - AC4: 기존 AUTO_APPLY_MAX_SEVERITY 상수는 policy=null 시 폴백으로 유지 (하위 호환)
-  - AC5: 기존 교정 테스트 깨지지 않음 + 자율 분기 테스트 추가
-  - AC6: Build PASS
-
-- [ ] **T403: AutonomyCorrectionLog 감사 로그**
-  - 배경: 자율 적용된 교정은 관리자가 사후 리뷰할 수 있어야 함
-  - AC1: `AutonomyCorrectionLog` DB 모델 — personaId, sessionId, severity, confidence, category, patchSummary, pisBeforeCorrection, reviewed
-  - AC2: 자율 적용 시 자동 로그 생성
-  - AC3: `GET /api/internal/autonomy/corrections` — 사후 리뷰용 목록 조회 (필터: personaId, reviewed, severity)
-  - AC4: `PATCH /api/internal/autonomy/corrections/[id]/review` — 리뷰 완료 마킹
-  - AC5: 과교정 감지 — 같은 카테고리 3회/24h 시 autoCorrection 자동 비활성화 + 관리자 알림
-  - AC6: Build PASS
-
-- [ ] **T404: PIS 기반 자동 Arena 트리거**
-  - 배경: PIS가 WARNING 이하로 떨어지면 관리자 개입 없이 Arena 세션 자동 스케줄
-  - AC1: quality-integration.ts Step 9 추가 — autoCorrection=true && PIS < 0.7 → Arena 세션 자동 생성
-  - AC2: arena-cost-control 예산 범위 내에서만 트리거 (예산 초과 시 스킵 + 관리자 알림)
-  - AC3: PIS < 0.6 (CRITICAL) 시 Arena 트리거 + Slack/이메일 관리자 알림
-  - AC4: 중복 트리거 방지 — 최근 24h 내 이미 Arena 실행했으면 스킵
-  - AC5: 단위 테스트 PASS + Build PASS
-
-### Phase AU-C: 메타 인지 (T405~T407)
-
-> 드리프트 자각 + 1인칭 자기 보고 + 관리자 알림 연동.
-
-- [ ] **T405: MetaCognitionReport 타입 + 서비스 코어**
-  - 배경: 페르소나가 자신의 드리프트를 자각하고 1인칭으로 보고
-  - AC1: `MetaCognitionReport` 인터페이스 — pisSnapshot, driftAwareness, memoryHealth, selfAssessment, suggestion
-  - AC2: `generateMetaCognitionReport(persona, pisResult, driftResult, memoryStats)` — LLM(Haiku) 호출로 자기 보고 생성
-  - AC3: VoiceSpec 참조하여 페르소나 고유 말투로 1인칭 서술
-  - AC4: selfAssessment 자동 판정: PIS+Drift 조합 → HEALTHY/DRIFTING/NEEDS_ATTENTION/CRITICAL
-  - AC5: 단위 테스트 PASS + Build PASS
-
-- [ ] **T406: MetaCognitionReport DB 저장 + 조회 API**
-  - 배경: 보고서를 DB에 저장하고 관리자가 조회할 수 있어야 함
-  - AC1: `MetaCognitionReport` DB 모델 + 마이그레이션 SQL
-  - AC2: quality-integration.ts Step 10 — metaCognitionEnabled=true인 페르소나만 보고서 생성 + 저장
-  - AC3: `GET /api/internal/autonomy/meta-cognition` — 보고서 목록 조회 (필터: personaId, selfAssessment, 기간)
-  - AC4: `GET /api/internal/autonomy/meta-cognition/[id]` — 개별 보고서 상세
-  - AC5: Build PASS
-
-- [ ] **T407: 메타 인지 관리자 알림 연동**
-  - 배경: selfAssessment가 NEEDS_ATTENTION 이상이면 관리자에게 자동 알림
-  - AC1: notification-service에 `META_COGNITION_ALERT` 이벤트 타입 추가
-  - AC2: alert-rules에 메타 인지 규칙 추가 — NEEDS_ATTENTION → Slack, CRITICAL → Slack + 이메일
-  - AC3: 알림 본문에 페르소나 이름 + selfAssessment + 핵심 드리프트 차원 + 자기 보고 요약 포함
-  - AC4: Build PASS
-
-### Phase AU-D: 자율 기억 관리 (T408~T409)
-
-> 기억 자동 prune + consolidation 연동.
-
-- [ ] **T408: memory-prune 서비스 코어**
-  - 배경: SemanticMemory의 낮은 품질 기억을 자동 정리
-  - AC1: `prunePersonaMemories(personaId, config)` — 3가지 규칙 적용 (low_confidence, duplicate, overflow)
-  - AC2: Low Confidence 규칙 — confidence < pruneConfidenceThreshold (기본 0.2)
-  - AC3: 중복 Subject 규칙 — 같은 subject 2개+ → 낮은 confidence 삭제
-  - AC4: Overflow 규칙 — 카테고리당 maxPerCategory 초과 → 낮은 confidence부터 삭제
-  - AC5: 안전 장치 — evidenceCount ≥ 3인 기억은 삭제 불가 + 1회 최대 10개
-  - AC6: `MemoryPruneResult` 반환 (prunedCount, 삭제된 기억 목록 + 사유)
-  - AC7: 단위 테스트 PASS + Build PASS
-
-- [ ] **T409: memory-consolidation 연동 + prune 자동 실행**
-  - 배경: 주간 기억 증류 직후 자동 prune 실행
-  - AC1: `memory-consolidation.ts`의 `consolidatePersonaMemories()` 끝에 prune 호출 추가
-  - AC2: `autoMemoryManagement=true`인 페르소나만 prune 실행
-  - AC3: prune 결과를 MemoryPruneResult로 반환 + 로그 기록
-  - AC4: `GET /api/internal/autonomy/memory-prune` — prune 이력 조회
-  - AC5: Build PASS
-
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
@@ -131,6 +52,50 @@
 ---
 
 ## ✅ DONE (완료)
+
+### Phase AU-D: 자율 기억 관리 (T408~T409) ✅ 2026-03-09
+
+- [x] **T408: memory-prune 서비스 코어** ✅ 2026-03-09
+  - 변경: `lib/autonomy/memory-prune.ts`
+  - 3가지 규칙 (low_confidence, duplicate, overflow) + 안전 장치 (evidenceCount ≥ 3 보호, 1회 최대 10개)
+  - 테스트: 7개 PASS
+
+- [x] **T409: memory-consolidation 연동 + prune 자동 실행** ✅ 2026-03-09
+  - 변경: `lib/autonomy/memory-prune-integration.ts`, `api/internal/autonomy/memory-prune/route.ts`
+  - autoMemoryManagement=true 페르소나만 실행 + prune 상태 조회 API
+
+### Phase AU-C: 메타 인지 (T405~T407) ✅ 2026-03-09
+
+- [x] **T405: MetaCognitionReport 타입 + 서비스 코어** ✅ 2026-03-09
+  - 변경: `lib/autonomy/meta-cognition.ts`
+  - LLM(Haiku) 기반 1인칭 자기 보고 + selfAssessment 자동 판정 + 폴백 기본값
+  - 테스트: 12개 PASS
+
+- [x] **T406: MetaCognitionReport DB 저장 + 조회 API** ✅ 2026-03-09
+  - 변경: `prisma/schema.prisma`, `migrations/057_meta_cognition_reports.sql`, `api/internal/autonomy/meta-cognition/`
+  - 목록 조회 (필터: personaId, selfAssessment, 기간) + 개별 상세
+
+- [x] **T407: 메타 인지 관리자 알림 연동** ✅ 2026-03-09
+  - 변경: `lib/autonomy/meta-cognition-alert.ts`
+  - NEEDS_ATTENTION → Slack, CRITICAL → Slack + 이메일
+
+### Phase AU-B: 자율 교정 (T402~T404) ✅ 2026-03-09
+
+- [x] **T402: correction-loop 자율 적용 분기** ✅ 2026-03-09
+  - 변경: `lib/autonomy/auto-correction.ts`
+  - getAutoApplyConfig + checkAutoApply + isAutoApplicable
+  - Critical 항상 관리자 승인, AUTO_APPLY_MAX_SEVERITY 폴백 유지
+  - 테스트: 13개 PASS
+
+- [x] **T403: AutonomyCorrectionLog 감사 로그** ✅ 2026-03-09
+  - 변경: `lib/autonomy/correction-log.ts`, `prisma/schema.prisma`, `migrations/056_autonomy_correction_logs.sql`, `api/internal/autonomy/corrections/`
+  - DB 모델 + 목록 조회 + 리뷰 마킹 + 과교정 감지 (같은 카테고리 3회/24h)
+  - 테스트: 6개 PASS
+
+- [x] **T404: PIS 기반 자동 Arena 트리거** ✅ 2026-03-09
+  - 변경: `lib/autonomy/auto-arena-trigger.ts`
+  - PIS < 0.7 WARNING, < 0.6 CRITICAL + 예산/중복 체크
+  - 테스트: 7개 PASS
 
 ### Phase AU-A: AutonomyPolicy 기반 설정 (T400~T401) ✅ 2026-03-09
 

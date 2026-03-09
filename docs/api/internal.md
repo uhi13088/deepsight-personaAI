@@ -9,7 +9,7 @@ https://engine.deepsight.ai/api/internal
 ```
 
 **인증**: 세션 기반 (`requireAuth()` — 내부 팀 전용)
-**최종 업데이트**: 2026-03-04
+**최종 업데이트**: 2026-03-09
 
 > **주의**: 이 API는 내부 운영 도구입니다. 외부에 노출하거나 B2B 고객에게 공개하지 마세요.
 
@@ -68,6 +68,12 @@ https://engine.deepsight.ai/api/internal
     - [GET/POST/PUT /persona-world-admin/news](#getpostput-persona-world-adminnews)
 17. [PersonaWorld 품질](#19-personaworld-품질)
     - [GET/POST /persona-world-admin/quality](#getpost-persona-world-adminquality)
+18. [Autonomy (자율 동작)](#20-autonomy-자율-동작)
+    - [GET /autonomy/corrections](#get-autonomycorrections)
+    - [PATCH /autonomy/corrections/:id/review](#patch-autonomycorrectionsidreview)
+    - [GET /autonomy/meta-cognition](#get-autonomymeta-cognition)
+    - [GET /autonomy/meta-cognition/:id](#get-autonomymeta-cognitionid)
+    - [GET /autonomy/memory-prune](#get-autonomymemory-prune)
 
 ---
 
@@ -2755,3 +2761,100 @@ GET /api/internal/persona-world-admin/quality
 | `ARCHIVED`   | 보관됨               |
 | `DEPRECATED` | 폐기됨               |
 | `LEGACY`     | 구버전 유지          |
+
+---
+
+## 20. Autonomy (자율 동작)
+
+자율 교정 감사 로그, 메타 인지 보고서, 기억 관리 API.
+
+### GET /autonomy/corrections
+
+자율 교정 감사 로그 목록 조회.
+
+**쿼리 파라미터**
+
+| 파라미터    | 타입      | 설명                            |
+| ----------- | --------- | ------------------------------- |
+| `personaId` | `string`  | 페르소나 ID 필터                |
+| `reviewed`  | `boolean` | 리뷰 완료 여부 필터             |
+| `severity`  | `string`  | `minor` 또는 `major`            |
+| `limit`     | `number`  | 페이지 크기 (기본 50, 최대 100) |
+| `offset`    | `number`  | 페이지 오프셋                   |
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "logs": [...],
+    "total": 42,
+    "limit": 50,
+    "offset": 0
+  }
+}
+```
+
+---
+
+### PATCH /autonomy/corrections/:id/review
+
+감사 로그 리뷰 완료 마킹.
+
+**응답 (200 OK)**: 업데이트된 로그 객체
+
+**에러 (409)**: 이미 리뷰 완료된 로그
+
+---
+
+### GET /autonomy/meta-cognition
+
+메타 인지 보고서 목록 조회.
+
+**쿼리 파라미터**
+
+| 파라미터         | 타입     | 설명                                           |
+| ---------------- | -------- | ---------------------------------------------- |
+| `personaId`      | `string` | 페르소나 ID 필터                               |
+| `selfAssessment` | `string` | `HEALTHY\|DRIFTING\|NEEDS_ATTENTION\|CRITICAL` |
+| `since`          | `string` | 시작 날짜 (ISO 8601)                           |
+| `limit`          | `number` | 페이지 크기 (기본 50)                          |
+| `offset`         | `number` | 페이지 오프셋                                  |
+
+---
+
+### GET /autonomy/meta-cognition/:id
+
+개별 메타 인지 보고서 상세 조회.
+
+---
+
+### GET /autonomy/memory-prune
+
+페르소나 기억 상태 + 카테고리별 통계 조회.
+
+**쿼리 파라미터**
+
+| 파라미터    | 타입     | 필수 | 설명        |
+| ----------- | -------- | ---- | ----------- |
+| `personaId` | `string` | ✅   | 페르소나 ID |
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "personaId": "...",
+    "personaName": "유나",
+    "autoMemoryManagement": true,
+    "config": { "pruneConfidenceThreshold": 0.2, "maxPerCategory": 100 },
+    "stats": {
+      "totalMemories": 150,
+      "lowConfidenceCount": 5,
+      "byCategory": [{ "category": "BELIEF", "count": 40, "avgConfidence": 0.72 }]
+    }
+  }
+}
+```

@@ -388,6 +388,89 @@ paths:
           $ref: "#/components/responses/NotFound"
 
   # -----------------------------------------------------------
+  # Autonomy (자율 동작)
+  # -----------------------------------------------------------
+
+  /autonomy/corrections:
+    get:
+      operationId: listAutonomyCorrections
+      tags: [Autonomy]
+      summary: 자율 교정 감사 로그 목록 조회
+      parameters:
+        - { name: personaId, in: query, schema: { type: string } }
+        - { name: reviewed, in: query, schema: { type: boolean } }
+        - { name: severity, in: query, schema: { type: string, enum: [minor, major] } }
+        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 100 } }
+        - { name: offset, in: query, schema: { type: integer, default: 0 } }
+      responses:
+        "200":
+          description: 감사 로그 목록
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /autonomy/corrections/{id}/review:
+    patch:
+      operationId: reviewAutonomyCorrection
+      tags: [Autonomy]
+      summary: 감사 로그 리뷰 완료 마킹
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: 리뷰 완료
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: 이미 리뷰 완료
+
+  /autonomy/meta-cognition:
+    get:
+      operationId: listMetaCognitionReports
+      tags: [Autonomy]
+      summary: 메타 인지 보고서 목록 조회
+      parameters:
+        - { name: personaId, in: query, schema: { type: string } }
+        - {
+            name: selfAssessment,
+            in: query,
+            schema: { type: string, enum: [HEALTHY, DRIFTING, NEEDS_ATTENTION, CRITICAL] },
+          }
+        - { name: since, in: query, schema: { type: string, format: date-time } }
+        - { name: limit, in: query, schema: { type: integer, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, default: 0 } }
+      responses:
+        "200":
+          description: 보고서 목록
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /autonomy/meta-cognition/{id}:
+    get:
+      operationId: getMetaCognitionReport
+      tags: [Autonomy]
+      summary: 개별 메타 인지 보고서 상세
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: 보고서 상세
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /autonomy/memory-prune:
+    get:
+      operationId: getMemoryPruneStats
+      tags: [Autonomy]
+      summary: 페르소나 기억 상태 + prune 통계
+      parameters:
+        - { name: personaId, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: 기억 상태 통계
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # -----------------------------------------------------------
   # Arena
   # -----------------------------------------------------------
 
