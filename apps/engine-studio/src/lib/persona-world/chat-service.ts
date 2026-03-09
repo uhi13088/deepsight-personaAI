@@ -145,6 +145,8 @@ export interface SendMessageInput {
   imageBase64?: string
   imageMediaType?: "image/jpeg" | "image/png" | "image/webp" | "image/gif"
   imageUrl?: string
+  /** 대화 출처 (기본: DIRECT, 카카오: KAKAO) */
+  source?: "DIRECT" | "KAKAO"
 }
 
 export interface SendMessageResult {
@@ -255,6 +257,7 @@ export async function sendMessage(
     previousMood,
     currentMood: state.mood,
     volatility,
+    source: input.source,
   })
 
   // 10. 페르소나 응답 poignancy 업데이트

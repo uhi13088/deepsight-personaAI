@@ -39,7 +39,7 @@ export interface ConversationMemoryProvider {
     personaResponse?: string
     responseLengthTokens?: number
     poignancyScore: number
-    source: "DIRECT"
+    source: "DIRECT" | "KAKAO"
   }): Promise<void>
 
   /** InteractionSession의 totalTurns 증가 */
@@ -75,6 +75,8 @@ export interface ConversationTurnInput {
   currentMood: number
   /** 페르소나 volatility (L3 narrative) */
   volatility: number
+  /** 대화 출처 (기본: DIRECT) */
+  source?: "DIRECT" | "KAKAO"
 }
 
 /** 대화 종료 시 입력 */
@@ -154,7 +156,7 @@ export async function recordConversationTurn(
     personaResponse: input.personaResponse,
     responseLengthTokens: input.responseLengthTokens,
     poignancyScore: poignancy,
-    source: "DIRECT",
+    source: input.source ?? "DIRECT",
   })
 
   // 세션 totalTurns 증가

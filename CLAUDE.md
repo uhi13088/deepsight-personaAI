@@ -1,5 +1,11 @@
 # DeepSight - CLAUDE.md
 
+## 현재 버전
+
+- **엔진 버전: v4.1.1-dev (Infrastructure)** — v4.0 Foundation + v4.1.0 Optimization 완료, 인프라 확장 단계
+- v4.0.0 (보안·기억·자기교정) → v4.1.0 (비용최적화·품질보호) → **v4.1.1 (캐시·벡터DB·알림)** → v4.2.0 (멀티모달) → v5.0 (자율진화)
+- 상세 로드맵: `docs/design/persona-engine-v4-design-part3.md` §15
+
 ## 목적
 
 - AI 페르소나 기반 콘텐츠 추천 B2B SaaS 플랫폼 (3-Layer 106D+ 벡터 매칭)

@@ -39,6 +39,33 @@
 - 새로운 사용 방법
 -->
 
+## [2026-03-08] T370: KakaoLink (카카오톡 페르소나 연동)
+
+### Added
+
+- `kakao_links` 테이블: 유저 1명 = 페르소나 1개 카카오톡 연동
+  - `id, userId(UNIQUE → persona_world_users), personaId → personas`
+  - `kakaoUserKey TEXT UNIQUE` — 카카오 오픈빌더 userRequest.user.id
+  - `isActive BOOLEAN DEFAULT true`
+  - `createdAt, updatedAt`
+  - INDEX: `kakaoUserKey` (웹훅에서 빠른 조회)
+- `PersonaWorldUser.kakaoLink KakaoLink?` relation 추가
+- `Persona.kakaoLinks KakaoLink[]` relation 추가
+- `@deepsight/shared-types`에 `KakaoLink` 인터페이스 추가
+
+### Migration
+
+`prisma/migrations/049_kakao_link.sql`
+
+### Claude에게
+
+- `userId`는 UNIQUE — 유저당 1개 페르소나만 연동 가능 (upsert로 변경 처리)
+- `kakaoUserKey`는 카카오 오픈빌더가 제공하는 유저 식별자 (봇 채널별 고유)
+- 웹훅 수신 시 `kakaoUserKey`로 조회 → 미연동이면 안내 메시지 반환
+- `isActive: false` = 연동 해제 상태 (데이터는 보존)
+
+---
+
 ## [2026-03-04] T392: ContentItem + PersonaCuratedContent + UserContentFeedback (B2B 콘텐츠 파이프라인)
 
 ### Added

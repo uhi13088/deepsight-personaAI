@@ -170,6 +170,20 @@ export const ERROR_CODES = {
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES]
 
 // ============================================
+// 카카오톡 연동 (T370)
+// ============================================
+
+export interface KakaoLink {
+  id: string
+  userId: string
+  personaId: string
+  kakaoUserKey: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+// ============================================
 // 사용자 & 조직
 // ============================================
 

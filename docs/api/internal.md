@@ -2536,6 +2536,90 @@ GET /api/internal/persona-world-admin/quality
 
 ---
 
+## 카카오톡 연동
+
+### GET /persona-world/kakao/link
+
+현재 카카오톡 연동 상태 조회.
+
+**인증**: `verifyInternalToken` + `verifyUserOwnership`
+
+**파라미터**:
+
+| 이름   | 위치  | 필수 | 설명       |
+| ------ | ----- | ---- | ---------- |
+| userId | query | O    | PW 유저 ID |
+
+**응답 200**:
+
+```json
+{
+  "success": true,
+  "data": {
+    "linked": true,
+    "link": {
+      "id": "clxxx",
+      "personaId": "clyyy",
+      "personaName": "페르소나 이름",
+      "personaImageUrl": "https://...",
+      "kakaoUserKey": "abc123",
+      "isActive": true,
+      "createdAt": "2026-03-08T..."
+    }
+  }
+}
+```
+
+### POST /persona-world/kakao/link
+
+카카오톡 연동 생성/변경 (유저당 1개만).
+
+**인증**: `verifyInternalToken` + `verifyUserOwnership`
+
+**요청 Body**:
+
+```json
+{
+  "userId": "clxxx",
+  "personaId": "clyyy",
+  "kakaoUserKey": "abc123"
+}
+```
+
+**응답 200**: 연동 정보
+**응답 409**: `KAKAO_KEY_TAKEN` — 해당 카카오 계정이 다른 유저에 이미 연동
+
+### DELETE /persona-world/kakao/link
+
+카카오톡 연동 해제 (isActive = false, 데이터 보존).
+
+**인증**: `verifyInternalToken` + `verifyUserOwnership`
+
+**파라미터**:
+
+| 이름   | 위치  | 필수 | 설명       |
+| ------ | ----- | ---- | ---------- |
+| userId | query | O    | PW 유저 ID |
+
+**응답 200**: `{ "success": true, "data": { "unlinked": true } }`
+**응답 404**: 활성 연동 없음
+
+### POST /kakao/webhook
+
+카카오 오픈빌더 스킬 서버 엔드포인트. **인증 불필요** (카카오가 직접 호출).
+
+**요청 Body**: 카카오 오픈빌더 스킬 JSON (userRequest.user.id, userRequest.utterance)
+
+**응답 200**: 카카오 스킬 응답 JSON (simpleText, 1000자 제한)
+
+**에지케이스**:
+
+- 미연동 유저 → "PersonaWorld에서 페르소나를 연동해주세요" 안내
+- 크레딧 부족 → "크레딧이 부족합니다" 안내
+- LLM 미설정 → "서비스 점검 중" 안내
+
+---
+
 ## 부록
 
 ### HTTP 상태 코드

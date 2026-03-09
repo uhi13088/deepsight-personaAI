@@ -1336,7 +1336,91 @@ paths:
         "500":
           description: 서버 내부 오류
 
-# ============================================================
+  # ============================================================
+  # ── 카카오톡 연동 ───────────────────────────────────────────
+
+  /persona-world/kakao/link:
+    get:
+      summary: 카카오톡 연동 상태 조회
+      tags: [카카오톡]
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: 연동 상태
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      linked: { type: boolean }
+                      link:
+                        type: object
+                        nullable: true
+                        properties:
+                          id: { type: string }
+                          personaId: { type: string }
+                          personaName: { type: string }
+                          personaImageUrl: { type: string, nullable: true }
+                          kakaoUserKey: { type: string }
+                          isActive: { type: boolean }
+                          createdAt: { type: string, format: date-time }
+    post:
+      summary: 카카오톡 연동 생성/변경
+      tags: [카카오톡]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, personaId, kakaoUserKey]
+              properties:
+                userId: { type: string }
+                personaId: { type: string }
+                kakaoUserKey: { type: string }
+      responses:
+        "200":
+          description: 연동 완료
+        "409":
+          description: 카카오 계정이 다른 유저에 이미 연동됨
+    delete:
+      summary: 카카오톡 연동 해제
+      tags: [카카오톡]
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: 연동 해제 완료
+        "404":
+          description: 활성 연동 없음
+
+  /kakao/webhook:
+    post:
+      summary: 카카오 오픈빌더 스킬 서버 (인증 불필요)
+      tags: [카카오톡]
+      description: 카카오 오픈빌더가 직접 호출하는 스킬 엔드포인트
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: 카카오 오픈빌더 스킬 JSON
+      responses:
+        "200":
+          description: 카카오 스킬 응답 (simpleText)
+
 # Components
 # ============================================================
 
