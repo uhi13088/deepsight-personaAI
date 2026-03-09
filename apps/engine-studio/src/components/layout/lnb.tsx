@@ -352,7 +352,7 @@ export function LNB() {
           )}
         >
           <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-          {!collapsed && <span>Engine Studio v4.0</span>}
+          {!collapsed && <span>Engine Studio v4.1.1</span>}
         </div>
 
         {mounted && (
