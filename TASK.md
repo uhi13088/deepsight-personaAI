@@ -41,12 +41,12 @@
 
 > 페르소나 매칭 엔진의 반복 벡터 연산을 Redis 캐시로 제거. 피드 레이턴시 35~55% 감소 목표.
 
-- [ ] **T376: Upstash Redis 클라이언트 설정**
-  - 배경: Vercel 서버리스 환경에서 `@upstash/redis` REST 기반 Redis 사용. 현재 Redis 의존성 없음.
-  - AC1: `@upstash/redis` 패키지 설치 + Redis 클라이언트 싱글턴 (`lib/redis.ts`)
-  - AC2: 환경변수 `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` 타입 정의 (env.d.ts)
-  - AC3: Redis 연결 헬스체크 유틸 (`lib/redis.ts` 내 `pingRedis()`)
-  - AC4: Build PASS
+- [x] **T376: Upstash Redis 클라이언트 설정** ✅ 2026-03-09
+  - 변경: `apps/engine-studio/src/lib/redis.ts`, `apps/engine-studio/src/env.d.ts`, `apps/engine-studio/package.json`
+  - AC1: ✅ `@upstash/redis` 설치 + Redis 싱글턴 (globalForRedis, graceful null 반환)
+  - AC2: ✅ `env.d.ts` — `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` 타입 선언
+  - AC3: ✅ `pingRedis()` 헬스체크 유틸 (ok/message 반환, 미설정 시 graceful skip)
+  - AC4: ✅ Build PASS
 
 - [ ] **T377: PrecomputedMatchData 캐시 서비스 구현**
   - 배경: `calculateVFinal()`이 피드 요청당 45~120회 호출됨. vFinal[7D] + crossAxisProfile[83D] + paradoxScore + archetype은 벡터 변경 전까지 불변.
@@ -2407,7 +2407,22 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-(없음)
+### Phase v4.1.1-A: 벡터 캐시 — Redis (T376~T380)
+
+- [x] **T376: Upstash Redis 클라이언트 설정** ✅ 2026-03-09
+  - 변경: `apps/engine-studio/src/lib/redis.ts`, `apps/engine-studio/src/env.d.ts`, `apps/engine-studio/package.json`
+  - AC1: ✅ `@upstash/redis` 설치 + Redis 싱글턴 (globalForRedis, graceful null 반환)
+  - AC2: ✅ `env.d.ts` — `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` 타입 선언
+  - AC3: ✅ `pingRedis()` 헬스체크 유틸 (ok/message 반환, 미설정 시 graceful skip)
+  - AC4: ✅ Build PASS
+
+- [ ] **T377: PrecomputedMatchData 캐시 서비스 구현**
+  - 배경: `calculateVFinal()`이 피드 요청당 45~120회 호출됨. vFinal[7D] + crossAxisProfile[83D] + paradoxScore + archetype은 벡터 변경 전까지 불변.
+  - AC1: `PersonaMatchCache` 서비스 (`lib/cache/persona-match-cache.ts`) — get/set/invalidate/bulkGet
+  - AC2: 캐시 키: `persona:{id}:match`, TTL 7일, 값: `{ vFinal, crossAxisProfile, paradoxScore, archetype, updatedAt }`
+  - AC3: `computeAndCache(personaId)` — DB에서 벡터 로드 → 계산 → 캐시 저장
+  - AC4: 캐시 미스 시 자동 계산 + 저장 (cache-aside 패턴)
+  - AC5: 단위 테스트 — get/set/invalidate/bulkGet/TTL 만료 시나리오
 
 ---
 
