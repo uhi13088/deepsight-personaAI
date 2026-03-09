@@ -9,6 +9,7 @@ import { applyGenreWeights, extractHyperParameters } from "@/lib/matching/tuning
 import type { GenreWeightTable, TuningProfile } from "@/lib/matching/tuning"
 import type { SocialPersonaVector, CoreTemperamentVector, NarrativeDriveVector } from "@/types"
 import { verifyInternalToken } from "@/lib/internal-auth"
+import { bulkGetMatchData, computeAndCache } from "@/lib/cache/persona-match-cache"
 
 /**
  * POST /api/persona-world/feed
@@ -185,46 +186,36 @@ export async function POST(request: NextRequest) {
             }
           : null
 
-        // 페르소나 벡터 + paradoxScore + favoriteGenres 병렬 조회
+        // 페르소나 ID 추출
         const personaIds = [...new Set(posts.map((p) => p.personaId))]
-        const [personaVectors, personas] = await Promise.all([
-          prisma.personaLayerVector.findMany({
-            where: { personaId: { in: personaIds } },
-            select: {
-              personaId: true,
-              layerType: true,
-              dim1: true,
-              dim2: true,
-              dim3: true,
-              dim4: true,
-              dim5: true,
-              dim6: true,
-              dim7: true,
-            },
-          }),
-          prisma.persona.findMany({
-            where: { id: { in: personaIds } },
-            select: { id: true, paradoxScore: true, favoriteGenres: true },
-          }),
-        ])
-        const paradoxMap = new Map(personas.map((p) => [p.id, Number(p.paradoxScore ?? 0)]))
-        const genreMap = new Map(personas.map((p) => [p.id, p.favoriteGenres[0] ?? null]))
 
-        // 페르소나별 벡터 맵 구축
-        const vectorMap = new Map<string, { l1?: number[]; l2?: number[]; l3?: number[] }>()
-        for (const v of personaVectors) {
-          if (!vectorMap.has(v.personaId)) {
-            vectorMap.set(v.personaId, {})
+        // T379: 캐시에서 매칭 데이터 일괄 로드
+        const { hits: cacheHits, misses: cacheMisses } = await bulkGetMatchData(personaIds)
+
+        // 캐시 미스 페르소나만 DB 조회 + 계산 + 캐시 저장
+        if (cacheMisses.length > 0) {
+          await Promise.all(cacheMisses.map((id) => computeAndCache(id)))
+          // 재조회 (computeAndCache가 캐시에 저장했으므로)
+          const { hits: newHits } = await bulkGetMatchData(cacheMisses)
+          for (const [id, data] of newHits) {
+            cacheHits.set(id, data)
           }
-          const dims = [v.dim1, v.dim2, v.dim3, v.dim4, v.dim5, v.dim6, v.dim7]
-            .filter((d) => d != null)
-            .map(Number)
-
-          const entry = vectorMap.get(v.personaId)!
-          if (v.layerType === "SOCIAL") entry.l1 = dims
-          else if (v.layerType === "TEMPERAMENT") entry.l2 = dims
-          else if (v.layerType === "NARRATIVE") entry.l3 = dims
         }
+
+        const cacheHitRate =
+          personaIds.length > 0
+            ? round((personaIds.length - cacheMisses.length) / personaIds.length)
+            : 0
+        console.log(
+          `[feed] cache: ${personaIds.length - cacheMisses.length}/${personaIds.length} hit (${cacheHitRate * 100}%)`
+        )
+
+        // favoriteGenres는 캐시에 없으므로 별도 조회
+        const personas = await prisma.persona.findMany({
+          where: { id: { in: personaIds } },
+          select: { id: true, favoriteGenres: true },
+        })
+        const genreMap = new Map(personas.map((p) => [p.id, p.favoriteGenres[0] ?? null]))
 
         // 유저 V_Final 계산 (L2 있으면 pressure 적용)
         const defaultL3: NarrativeDriveVector = {
@@ -236,9 +227,9 @@ export async function POST(request: NextRequest) {
         const userVFinal = userL2 ? calculateVFinal(userL1, userL2, defaultL3, 0.3) : null
 
         const candidates = posts.map((p) => {
-          const vecs = vectorMap.get(p.personaId)
-          if (!vecs?.l1 || vecs.l1.length < 7) {
-            // 벡터 없는 페르소나 → 인기도 폴백
+          const cached = cacheHits.get(p.personaId)
+          if (!cached) {
+            // 캐시 미스 (computeAndCache도 실패) → 인기도 폴백
             return {
               postId: p.id,
               personaId: p.personaId,
@@ -248,9 +239,11 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          const personaL1Vec = vecs.l1
+          // 캐시에서 L1 벡터 추출 (vFinal.l2Projected 기반이 아닌, 원본 필요 → crossAxisProfile 활용)
+          // vFinal.vector = 7D 최종 벡터 (L1 기준)
+          const personaL1Vec = cached.vFinal.vector
 
-          // 장르 가중치 적용: 페르소나의 대표 장르로 L1 벡터 조정
+          // 장르 가중치 적용
           const primaryGenre = genreMap.get(p.personaId)
           const weightedUserL1 =
             primaryGenre && genreWeights
@@ -261,10 +254,10 @@ export async function POST(request: NextRequest) {
               ? applyGenreWeights(personaL1Vec, primaryGenre, genreWeights)
               : personaL1Vec
 
-          // Basic: L1 코사인 유사도 70% + L2 유사도 30%
+          // Basic: L1(vFinal) 코사인 유사도 70% + L2 유사도 30%
           const l1Sim = Math.max(0, cosineSimilarity(weightedUserL1, weightedPersonaL1))
-          let l2Sim = 0.5 // L2 없으면 중립값
-          if (userL2 && vecs.l2 && vecs.l2.length >= 5) {
+          let l2Sim = 0.5
+          if (userL2 && cached.vFinal.l2Projected.length >= 5) {
             const userL2Vec = [
               userL2.openness,
               userL2.conscientiousness,
@@ -272,48 +265,24 @@ export async function POST(request: NextRequest) {
               userL2.agreeableness,
               userL2.neuroticism,
             ]
-            l2Sim = Math.max(0, cosineSimilarity(userL2Vec, vecs.l2))
+            l2Sim = Math.max(0, cosineSimilarity(userL2Vec, cached.vFinal.l2Projected.slice(0, 5)))
           }
           const basicScore = round(0.7 * l1Sim + 0.3 * l2Sim)
 
           // Exploration: L1 발산도 40% + L2 발산도 40% + 신선도 20%
           const l1Div = round(1 - l1Sim)
           const l2Div = round(1 - l2Sim)
-          const freshness = 0.8 // 피드 내 중복 체크는 distributeTiers에서 처리
-          // diversity_factor로 탐색 점수 부스트 (0.3 → 기본, 1.0 → 최대 탐색)
+          const freshness = 0.8
           const rawExploration = 0.4 * l1Div + 0.4 * l2Div + 0.2 * freshness
           const explorationScore = round(rawExploration * (1 + hyperParams.diversityFactor))
 
           // Advanced: V_Final 유사도 50% + L2 유사도 30% + 역설 호환 20%
-          let vFinalSim = l1Sim // V_Final 없으면 L1으로 대체
-          if (userVFinal && vecs.l2 && vecs.l2.length >= 5 && vecs.l3 && vecs.l3.length >= 4) {
-            const personaL1Obj: SocialPersonaVector = {
-              depth: personaL1Vec[0],
-              lens: personaL1Vec[1],
-              stance: personaL1Vec[2],
-              scope: personaL1Vec[3],
-              taste: personaL1Vec[4],
-              purpose: personaL1Vec[5],
-              sociability: personaL1Vec[6],
-            }
-            const personaL2Obj: CoreTemperamentVector = {
-              openness: vecs.l2[0],
-              conscientiousness: vecs.l2[1],
-              extraversion: vecs.l2[2],
-              agreeableness: vecs.l2[3],
-              neuroticism: vecs.l2[4],
-            }
-            const personaL3Obj: NarrativeDriveVector = {
-              lack: vecs.l3[0],
-              moralCompass: vecs.l3[1],
-              volatility: vecs.l3[2],
-              growthArc: vecs.l3[3],
-            }
-            const personaVFinal = calculateVFinal(personaL1Obj, personaL2Obj, personaL3Obj, 0.3)
-            vFinalSim = Math.max(0, cosineSimilarity(userVFinal.vector, personaVFinal.vector))
+          let vFinalSim = l1Sim
+          if (userVFinal) {
+            vFinalSim = Math.max(0, cosineSimilarity(userVFinal.vector, cached.vFinal.vector))
           }
-          const paradox: number = Number(paradoxMap.get(p.personaId as string) ?? 0)
-          const paradoxCompat = round(1 - Math.abs(0.5 - paradox)) // 유저 기본 역설 0.5
+          const paradox = cached.paradoxProfile.overall
+          const paradoxCompat = round(1 - Math.abs(0.5 - paradox))
           const advancedScore = round(0.5 * vFinalSim + 0.3 * l2Sim + 0.2 * paradoxCompat)
 
           return {

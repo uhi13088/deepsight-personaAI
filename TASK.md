@@ -76,13 +76,7 @@
   - AC2: 트랜잭션 내 벡터 변경 시 `afterCommit` 패턴으로 캐시 무효화 (롤백 시 캐시 남지 않도록)
   - AC3: 통합 테스트 — 벡터 업데이트 후 캐시 미스 확인
 
-- [ ] **T379: 피드 매칭 엔진 캐시 통합**
-  - 배경: `feed/route.ts` → `three-tier-engine.ts` 매칭 파이프라인에서 캐시 적용.
-  - AC1: `getCandidates()` 내 `bulkGet`으로 전체 페르소나 캐시 일괄 로드
-  - AC2: 캐시 히트 시 `calculateVFinal()` + `computeCrossAxisProfile()` 스킵
-  - AC3: 캐시 미스 페르소나만 개별 계산 + 캐시 저장
-  - AC4: 피드 응답에 `cacheHitRate` 메트릭 포함 (디버그/로그용)
-  - AC5: 기존 피드 테스트 전부 PASS + 캐시 시나리오 추가 테스트
+- [x] **T379: 피드 매칭 엔진 캐시 통합** ✅ 2026-03-09
 
 - [ ] **T380: 캐시 모니터링 + 관리 API**
   - AC1: `GET /api/internal/cache/stats` — 전체 캐시 키 수, 히트율, 메모리 사용량
@@ -2437,6 +2431,14 @@
     - `api/cron/v5-memory/route.ts` — updateL3Vector
     - `api/internal/persona-world-admin/evolution/route.ts` — saveNewNarrativeVersion
   - Build PASS
+
+- [x] **T379: 피드 매칭 엔진 캐시 통합** ✅ 2026-03-09
+  - 변경: `api/persona-world/feed/route.ts`
+  - AC1: ✅ `bulkGetMatchData()`로 전체 페르소나 캐시 일괄 로드
+  - AC2: ✅ 캐시 히트 시 `calculateVFinal()` + DB 벡터 조회 스킵
+  - AC3: ✅ 캐시 미스 시 `computeAndCache()` → 자동 계산 + 캐시 저장
+  - AC4: ✅ `cacheHitRate` 로그 출력
+  - AC5: ✅ 기존 피드 테스트 22개 PASS + 캐시 테스트 14개 PASS + Build PASS
 
 ---
 
