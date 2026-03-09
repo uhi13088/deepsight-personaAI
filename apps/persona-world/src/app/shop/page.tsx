@@ -40,10 +40,15 @@ export default function ShopPage() {
   const [tossReady, setTossReady] = useState(false)
 
   const [serverBalance, setServerBalance] = useState<number | null>(null)
-  const balance = serverBalance ?? onboarding.creditsBalance
+  // 서버 잔액과 로컬 잔액 중 큰 값을 사용
+  // (온보딩 크레딧은 로컬에만 존재, 결제 크레딧은 서버에만 존재할 수 있음)
+  const balance =
+    serverBalance !== null
+      ? Math.max(serverBalance, onboarding.creditsBalance)
+      : onboarding.creditsBalance
   const items = getShopItemsByCategory(activeTab)
 
-  // 서버에서 실제 잔액 fetch (Zustand 초기값 0 문제 해결)
+  // 서버에서 실제 잔액 fetch (결제 충전 반영)
   useEffect(() => {
     const userId = profile?.id
     if (!userId) return
