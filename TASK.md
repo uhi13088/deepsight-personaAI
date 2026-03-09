@@ -2306,37 +2306,21 @@
 
 > 페르소나가 이미지를 참조하는 포스트를 생성하고, 유저 이미지에 반응하는 파이프라인.
 
-- [ ] **T393: 이미지 포스트 생성 — 텍스트+이미지 참조 포스트**
-  - 배경: 페르소나가 이미지 URL을 참조하는 포스트를 생성할 수 있어야 함
-  - AC1: `content-generator.ts` 확장 — `generateImagePost(persona, imageUrl, analysis): Promise<PersonaPost>` 추가
-  - AC2: LLM 프롬프트에 이미지 분석 결과(`ImageAnalysis`) 주입 → 페르소나 캐릭터 기반 반응 텍스트 생성
-  - AC3: 생성된 포스트에 `imageUrls`, `imageAnalysis`, `type: IMAGE_REACTION` 저장
-  - AC4: 기존 포스트 생성 파이프라인(보안 게이트, 비용 추적, Poignancy 등) 재활용
-  - AC5: Build PASS
+- [x] **T393: 이미지 포스트 생성 — 텍스트+이미지 참조 포스트** ✅ 2026-03-09
+  - 변경: `types.ts` (ImagePostContext), `content-generator.ts` (IMAGE_REACTION 가이드 + 이미지 프롬프트), `post-pipeline.ts` (generateImagePost)
+  - 테스트: 51/51 PASS + Build PASS
 
-- [ ] **T394: 유저 이미지 포스트 API — 피드에 이미지 포스트 등록**
-  - 배경: 유저가 이미지+텍스트를 함께 올리는 피드 포스트 API 필요
-  - AC1: `POST /api/pw/feed/posts` 확장 — `imageUrls?: string[]` 파라미터 추가
-  - AC2: 이미지 URL 유효성 검증 (내부 업로드 URL만 허용, 외부 URL 차단)
-  - AC3: 이미지 포함 포스트 저장 시 `imageUrls` 필드에 저장
-  - AC4: 기존 텍스트 전용 포스트와 하위 호환 유지
-  - AC5: Build PASS
+- [x] **T394: 유저 이미지 포스트 API — 피드에 이미지 포스트 등록** ✅ 2026-03-09
+  - 변경: `api/public/posts/route.ts`, `schema.prisma` (PostSource += USER_SUBMITTED), `migrations/053`
+  - Build PASS
 
-- [ ] **T395: 페르소나 이미지 반응 — 유저 이미지 포스트에 자동 반응**
-  - 배경: 유저가 이미지를 올리면 페르소나가 Vision으로 이미지를 보고 댓글/반응 생성
-  - AC1: 유저 이미지 포스트 등록 시 → `image-analyzer`로 분석 → 관련 페르소나 선택
-  - AC2: 선택된 페르소나가 이미지 분석 결과 기반으로 댓글 생성 (comment-engine 확장)
-  - AC3: 댓글 프롬프트에 이미지 설명 + 감정 + 태그를 컨텍스트로 주입
-  - AC4: 매칭 점수 기반 반응 확률 (이미지 태그 ↔ 페르소나 관심사 벡터 매칭)
-  - AC5: Build PASS
+- [x] **T395: 페르소나 이미지 반응 — 유저 이미지 포스트에 자동 반응** ✅ 2026-03-09
+  - 변경: `comment-engine.ts` (이미지 컨텍스트 주입), `image-reaction-service.ts` (selectReactionCandidates, toImagePostContext)
+  - 테스트: 7개 추가 (15/15 PASS) + Build PASS
 
-- [ ] **T396: 이미지 콘텐츠 벡터 추출 — 이미지 메타데이터 → L1 벡터**
-  - 배경: 이미지 콘텐츠도 L1 벡터로 변환해야 페르소나-콘텐츠 매칭 가능
-  - AC1: `lib/multimodal/image-vector-extractor.ts` — 이미지 분석 결과에서 L1(7D) 벡터 추출
-  - AC2: 매핑 규칙: `mood/sentiment → Emotion`, `tags → Interest/Lifestyle`, `dominantColors → Aesthetic`
-  - AC3: 추출된 벡터를 콘텐츠 벡터 DB에 저장 (기존 텍스트 벡터와 동일 스키마)
-  - AC4: 혼합 콘텐츠(텍스트+이미지) 시 가중 평균: `텍스트 벡터 × 0.6 + 이미지 벡터 × 0.4`
-  - AC5: 단위 테스트 + Build PASS
+- [x] **T396: 이미지 콘텐츠 벡터 추출 — 이미지 메타데이터 → L1 벡터** ✅ 2026-03-09
+  - 변경: `image-vector-extractor.ts` (extractImageVector, blendVectors), 9개 카테고리 프리셋
+  - 테스트: 13개 추가 (28/28 PASS) + Build PASS
 
 ### Phase MM-C: PersonaWorld 이미지 UI (T397~T399)
 
