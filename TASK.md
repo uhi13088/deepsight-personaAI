@@ -48,13 +48,13 @@
   - AC3: ✅ `pingRedis()` 헬스체크 유틸 (ok/message 반환, 미설정 시 graceful skip)
   - AC4: ✅ Build PASS
 
-- [ ] **T377: PrecomputedMatchData 캐시 서비스 구현**
-  - 배경: `calculateVFinal()`이 피드 요청당 45~120회 호출됨. vFinal[7D] + crossAxisProfile[83D] + paradoxScore + archetype은 벡터 변경 전까지 불변.
-  - AC1: `PersonaMatchCache` 서비스 (`lib/cache/persona-match-cache.ts`) — get/set/invalidate/bulkGet
-  - AC2: 캐시 키: `persona:{id}:match`, TTL 7일, 값: `{ vFinal, crossAxisProfile, paradoxScore, archetype, updatedAt }`
-  - AC3: `computeAndCache(personaId)` — DB에서 벡터 로드 → 계산 → 캐시 저장
-  - AC4: 캐시 미스 시 자동 계산 + 저장 (cache-aside 패턴)
-  - AC5: 단위 테스트 — get/set/invalidate/bulkGet/TTL 만료 시나리오
+- [x] **T377: PrecomputedMatchData 캐시 서비스 구현** ✅ 2026-03-09
+  - 변경: `apps/engine-studio/src/lib/cache/persona-match-cache.ts`, `tests/unit/cache/persona-match-cache.test.ts`
+  - AC1: ✅ `PersonaMatchCache` — get/set/invalidate/bulkGet (pipeline 기반)
+  - AC2: ✅ 캐시 키 `persona:{id}:match`, TTL 7일, PrecomputedMatchData 타입
+  - AC3: ✅ `computeAndCache()` — DB 벡터 로드 → vFinal/crossAxis/paradox 계산 → 캐시 저장
+  - AC4: ✅ `getOrCompute()` cache-aside 패턴
+  - AC5: ✅ 단위 테스트 14개 PASS (get/set/invalidate/bulkGet/computeAndCache/getOrCompute)
 
 - [ ] **T378: 캐시 무효화 — 페르소나 벡터 변경 훅**
   - 배경: 8개 이상의 페르소나 업데이트 라우트에서 벡터 변경 시 캐시 무효화 필요.
@@ -2416,13 +2416,13 @@
   - AC3: ✅ `pingRedis()` 헬스체크 유틸 (ok/message 반환, 미설정 시 graceful skip)
   - AC4: ✅ Build PASS
 
-- [ ] **T377: PrecomputedMatchData 캐시 서비스 구현**
-  - 배경: `calculateVFinal()`이 피드 요청당 45~120회 호출됨. vFinal[7D] + crossAxisProfile[83D] + paradoxScore + archetype은 벡터 변경 전까지 불변.
-  - AC1: `PersonaMatchCache` 서비스 (`lib/cache/persona-match-cache.ts`) — get/set/invalidate/bulkGet
-  - AC2: 캐시 키: `persona:{id}:match`, TTL 7일, 값: `{ vFinal, crossAxisProfile, paradoxScore, archetype, updatedAt }`
-  - AC3: `computeAndCache(personaId)` — DB에서 벡터 로드 → 계산 → 캐시 저장
-  - AC4: 캐시 미스 시 자동 계산 + 저장 (cache-aside 패턴)
-  - AC5: 단위 테스트 — get/set/invalidate/bulkGet/TTL 만료 시나리오
+- [x] **T377: PrecomputedMatchData 캐시 서비스 구현** ✅ 2026-03-09
+  - 변경: `apps/engine-studio/src/lib/cache/persona-match-cache.ts`, `tests/unit/cache/persona-match-cache.test.ts`
+  - AC1: ✅ `PersonaMatchCache` — get/set/invalidate/bulkGet (pipeline 기반)
+  - AC2: ✅ 캐시 키 `persona:{id}:match`, TTL 7일, PrecomputedMatchData 타입
+  - AC3: ✅ `computeAndCache()` — DB 벡터 로드 → vFinal/crossAxis/paradox 계산 → 캐시 저장
+  - AC4: ✅ `getOrCompute()` cache-aside 패턴
+  - AC5: ✅ 단위 테스트 14개 PASS (get/set/invalidate/bulkGet/computeAndCache/getOrCompute)
 
 ---
 
