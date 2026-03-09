@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { Prisma } from "@/generated/prisma"
 import { prisma } from "@/lib/prisma"
+import { invalidateMatchData } from "@/lib/cache/persona-match-cache"
 import { runEvolutionBatch } from "@/lib/persona-world/evolution"
 import type { EvolutionRunnerDataProvider } from "@/lib/persona-world/evolution"
 import type { NarrativeDriveVector } from "@/types/persona-v3"
@@ -125,6 +126,7 @@ function createEvolutionDataProvider(): EvolutionRunnerDataProvider {
           dim4: newL3.growthArc,
         },
       })
+      await invalidateMatchData(personaId)
       return { version: newVersion }
     },
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { invalidateMatchData } from "@/lib/cache/persona-match-cache"
 import { consolidateAllPersonas } from "@/lib/persona-world/memory-consolidation"
 import type {
   ConsolidationProvider,
@@ -393,6 +394,7 @@ function createGrowthArcProvider(): GrowthArcProvider {
           dim4: vector.growthArc,
         },
       })
+      await invalidateMatchData(personaId)
       return { newVersion }
     },
   }

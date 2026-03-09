@@ -56,7 +56,13 @@
   - AC4: ✅ `getOrCompute()` cache-aside 패턴
   - AC5: ✅ 단위 테스트 14개 PASS (get/set/invalidate/bulkGet/computeAndCache/getOrCompute)
 
-- [ ] **T378: 캐시 무효화 — 페르소나 벡터 변경 훅**
+- [x] **T378: 캐시 무효화 — 페르소나 벡터 변경 훅** ✅ 2026-03-09
+  - 변경: 4개 라우트에 `invalidateMatchData(personaId)` 추가
+    - `api/internal/personas/[id]/route.ts` — PUT(벡터 업데이트) + DELETE(삭제)
+    - `api/cron/persona-evolution/route.ts` — saveNewNarrativeVersion
+    - `api/cron/v5-memory/route.ts` — updateL3Vector
+    - `api/internal/persona-world-admin/evolution/route.ts` — saveNewNarrativeVersion
+  - Build PASS
   - 배경: 8개 이상의 페르소나 업데이트 라우트에서 벡터 변경 시 캐시 무효화 필요.
   - AC1: `invalidatePersonaCache(personaId)` 호출을 다음 라우트에 추가:
     - `PUT /api/internal/personas/[id]` (벡터 업데이트)
@@ -2423,6 +2429,14 @@
   - AC3: ✅ `computeAndCache()` — DB 벡터 로드 → vFinal/crossAxis/paradox 계산 → 캐시 저장
   - AC4: ✅ `getOrCompute()` cache-aside 패턴
   - AC5: ✅ 단위 테스트 14개 PASS (get/set/invalidate/bulkGet/computeAndCache/getOrCompute)
+
+- [x] **T378: 캐시 무효화 — 페르소나 벡터 변경 훅** ✅ 2026-03-09
+  - 변경: 4개 라우트에 `invalidateMatchData(personaId)` 추가
+    - `api/internal/personas/[id]/route.ts` — PUT(벡터 업데이트) + DELETE(삭제)
+    - `api/cron/persona-evolution/route.ts` — saveNewNarrativeVersion
+    - `api/cron/v5-memory/route.ts` — updateL3Vector
+    - `api/internal/persona-world-admin/evolution/route.ts` — saveNewNarrativeVersion
+  - Build PASS
 
 ---
 
