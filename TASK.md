@@ -2286,40 +2286,21 @@
 
 > v4.2.0 이미지·음성 멀티모달의 기반. Claude Vision API 통합 + 이미지 업로드 파이프라인 구축.
 
-- [ ] **T389: LLM 클라이언트 Vision 확장 — 이미지 입력 지원**
-  - 배경: `llm-client.ts`의 `generateText()`가 텍스트 전용. Claude Vision API(이미지 content block) 미지원
-  - AC1: `LLMGenerateParams`에 `images?: { type: "base64" | "url"; data: string; mediaType: string }[]` 필드 추가
-  - AC2: `generateText()` 내부에서 images 존재 시 `messages`에 `image` content block 추가 (Anthropic SDK 형식)
-  - AC3: images 없으면 기존 동작 100% 유지 (하위 호환)
-  - AC4: 이미지 개수 제한 (최대 5장) + 지원 포맷 검증 (jpeg, png, gif, webp)
-  - AC5: 단위 테스트 — 이미지 파라미터 빌드 검증 + Build PASS
+- [x] **T389: LLM 클라이언트 Vision 확장 — 이미지 입력 지원** ✅ 2026-03-09
+  - 변경: `lib/llm-client.ts` (LLMImageInput, buildUserContent), `tests/unit/llm-client.test.ts`
+  - 테스트: 15/15 PASS + Build PASS
 
-- [ ] **T390: 이미지 분석 서비스 — Claude Vision 기반 이미지 이해**
-  - 배경: 유저가 피드에 올린 이미지를 페르소나가 "보고" 반응하려면 이미지 분석 필요
-  - AC1: `lib/multimodal/image-analyzer.ts` — `analyzeImage(imageUrl: string): Promise<ImageAnalysis>` 구현
-  - AC2: `ImageAnalysis` 타입 정의 — `{ description: string; mood: string; tags: string[]; dominantColors: string[]; sentiment: number }`
-  - AC3: Claude Vision 호출 시 구조화된 JSON 응답 요청 (프롬프트 엔지니어링)
-  - AC4: 분석 결과 캐싱 (동일 URL 재분석 방지) — 인메모리 LRU or DB
-  - AC5: 비용 라우팅 — 이미지 분석은 `callType: "mm:image_analysis"`로 추적
-  - AC6: 단위 테스트 + Build PASS
+- [x] **T390: 이미지 분석 서비스 — Claude Vision 기반 이미지 이해** ✅ 2026-03-09
+  - 변경: `lib/multimodal/image-analyzer.ts`, `lib/multimodal/index.ts`, `tests/unit/multimodal/image-analyzer.test.ts`
+  - 테스트: 8/8 PASS + Build PASS
 
-- [ ] **T391: PersonaPost 이미지 필드 확장 — DB 스키마 + 타입**
-  - 배경: `PersonaPost` 모델에 이미지 관련 필드 없음. 멀티모달 포스트 저장 불가
-  - AC1: `schema.prisma` PersonaPost에 `imageUrls String[] @default([])` 필드 추가
-  - AC2: `schema.prisma` PersonaPost에 `imageAnalysis Json?` 필드 추가 (Vision 분석 결과 저장)
-  - AC3: 마이그레이션 SQL `migrations/053_persona_post_images.sql` — `ALTER TABLE ADD COLUMN IF NOT EXISTS`
-  - AC4: `PersonaPostType` enum에 `IMAGE_REACTION` 추가 (이미지에 대한 페르소나 반응)
-  - AC5: `shared-types` 업데이트 — `PersonaPostType`에 `IMAGE_REACTION` 추가
-  - AC6: Build PASS
+- [x] **T391: PersonaPost 이미지 필드 확장 — DB 스키마 + 타입** ✅ 2026-03-09
+  - 변경: `prisma/schema.prisma` (imageUrls, imageAnalysis, IMAGE_REACTION), `migrations/053_persona_post_images.sql`
+  - Build PASS
 
-- [ ] **T392: 이미지 업로드 API — 유저 이미지 수신 + URL 반환**
-  - 배경: 유저가 피드에 이미지를 올리려면 업로드 엔드포인트 필요
-  - AC1: `POST /api/pw/images/upload` — multipart/form-data 이미지 수신
-  - AC2: 이미지 검증 — 파일 크기 (최대 10MB), 포맷 (jpeg/png/gif/webp), 해상도 (최대 4096x4096)
-  - AC3: 로컬 스토리지 구현 — `public/uploads/images/` + UUID 파일명 (Phase 1; S3는 추후)
-  - AC4: 응답: `{ success: true, data: { url: string, width: number, height: number } }`
-  - AC5: 보안: 파일 타입 검증 (매직 바이트), 파일명 새니타이징
-  - AC6: 단위 테스트 + Build PASS
+- [x] **T392: 이미지 업로드 API — 유저 이미지 수신 + URL 반환** ✅ 2026-03-09
+  - 변경: `api/persona-world/images/upload/route.ts` (매직바이트 검증, 간이 해상도 파서)
+  - Build PASS
 
 ### Phase MM-B: 이미지 포스트 생성 파이프라인 (T393~T396)
 
