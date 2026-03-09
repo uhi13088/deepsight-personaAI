@@ -506,7 +506,7 @@ export default function ProfilePage() {
           <PWCard className="mb-6">
             <h3 className="mb-4 flex items-center gap-2 font-semibold text-gray-900">
               <PWIcon icon={BarChart3} size="sm" gradient />
-              나의 3-Layer 취향 벡터
+              나의 취향 프로필
             </h3>
             <div className="space-y-3">
               {(
@@ -528,7 +528,7 @@ export default function ProfilePage() {
                     className="mb-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold text-white"
                     style={{ backgroundColor: LAYER_COLORS[layer].primary }}
                   >
-                    {layer} {LAYER_COLORS[layer].label}
+                    {LAYER_COLORS[layer].label}
                   </span>
                   <div className="space-y-1.5">
                     {dims.map((dim) => {
@@ -1035,7 +1035,7 @@ export default function ProfilePage() {
                 <div>
                   <div className="font-medium text-gray-900">취향 분석</div>
                   <div className="text-sm text-gray-500">
-                    {profile?.vector ? "다시 분석하기" : "나의 3-Layer 벡터 프로필"}
+                    {profile?.vector ? "다시 분석하기" : "나의 취향 프로필 만들기"}
                   </div>
                 </div>
               </div>

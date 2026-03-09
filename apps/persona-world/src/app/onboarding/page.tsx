@@ -646,7 +646,7 @@ function AdaptiveOnboardingFlow() {
   const checkMilestone = useCallback((answered: number, convergence: number) => {
     let text = ""
     if (answered === 10) {
-      text = "절반 가까이 왔어요! 벡터가 선명해지고 있어요"
+      text = "절반 가까이 왔어요! 취향이 선명해지고 있어요"
     } else if (answered === 20) {
       text = "거의 다 왔어요! 정밀한 프로필이 완성되고 있어요"
     } else if (convergence >= 70 && answered >= 15) {
