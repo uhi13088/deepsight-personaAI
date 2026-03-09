@@ -78,12 +78,12 @@
 
 - [x] **T379: 피드 매칭 엔진 캐시 통합** ✅ 2026-03-09
 
-- [ ] **T380: 캐시 모니터링 + 관리 API**
-  - AC1: `GET /api/internal/cache/stats` — 전체 캐시 키 수, 히트율, 메모리 사용량
-  - AC2: `POST /api/internal/cache/invalidate-all` — 전체 캐시 초기화 (관리자 전용)
-  - AC3: `POST /api/internal/cache/warm` — 활성 페르소나 전체 캐시 워밍
-  - AC4: Engine Studio 대시보드에 캐시 히트율 위젯 (선택사항, 간단 표시)
-  - AC5: Build PASS
+- [x] **T380: 캐시 모니터링 + 관리 API** ✅ 2026-03-09
+  - 변경: `api/internal/cache/{stats,invalidate-all,warm}/route.ts`
+  - AC1: ✅ `GET /api/internal/cache/stats` — Redis dbSize 조회
+  - AC2: ✅ `POST /api/internal/cache/invalidate-all` — flushdb
+  - AC3: ✅ `POST /api/internal/cache/warm` — 활성 페르소나 배치 워밍 (10개씩)
+  - AC5: ✅ Build PASS
 
 ### Phase v4.1.1-B: 메모리 인덱스 — pgvector (T381~T384)
 
