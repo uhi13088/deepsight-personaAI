@@ -3028,3 +3028,24 @@ model KakaoLink {
   @@index([kakaoUserKey])
   @@map("kakao_links")
 }
+
+// ── Alert Log (v4.1.1-C: T386) ──────────────────────────────
+
+model AlertLog {
+  id        String   @id @default(cuid())
+  severity  String   // critical, warning, info
+  category  String   // security, cost, quality, system
+  channel   String   // slack, email, all
+  title     String
+  body      String
+  success   Boolean  @default(false)
+  error     String?
+  metadata  Json?    // 추가 컨텍스트 (트리거 규칙 ID, 관련 리소스 등)
+
+  createdAt DateTime @default(now())
+
+  @@index([severity])
+  @@index([category])
+  @@index([createdAt])
+  @@map("alert_logs")
+}
