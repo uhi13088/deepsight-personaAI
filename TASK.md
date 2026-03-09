@@ -5,7 +5,7 @@
 
 ---
 
-## 🏷️ 현재 버전: v4.1.1-dev (Infrastructure)
+## 🏷️ 현재 버전: v4.2.0-dev (Multimodal)
 
 > **최종 갱신: 2026-03-09**
 
@@ -2280,6 +2280,110 @@
   - AC2: voice-pipeline의 synthesizeSpeech() 호출하는 내부 API 엔드포인트 추가
   - AC3: Audio 재생 UI (재생/정지, 로딩 스피너)
   - AC4: 페르소나 이름 + 대표 문장으로 샘플 텍스트 자동 생성
+  - AC5: Build PASS
+
+### Phase MM-A: 멀티모달 기반 인프라 — Vision LLM + 이미지 스토리지 (T389~T392)
+
+> v4.2.0 이미지·음성 멀티모달의 기반. Claude Vision API 통합 + 이미지 업로드 파이프라인 구축.
+
+- [ ] **T389: LLM 클라이언트 Vision 확장 — 이미지 입력 지원**
+  - 배경: `llm-client.ts`의 `generateText()`가 텍스트 전용. Claude Vision API(이미지 content block) 미지원
+  - AC1: `LLMGenerateParams`에 `images?: { type: "base64" | "url"; data: string; mediaType: string }[]` 필드 추가
+  - AC2: `generateText()` 내부에서 images 존재 시 `messages`에 `image` content block 추가 (Anthropic SDK 형식)
+  - AC3: images 없으면 기존 동작 100% 유지 (하위 호환)
+  - AC4: 이미지 개수 제한 (최대 5장) + 지원 포맷 검증 (jpeg, png, gif, webp)
+  - AC5: 단위 테스트 — 이미지 파라미터 빌드 검증 + Build PASS
+
+- [ ] **T390: 이미지 분석 서비스 — Claude Vision 기반 이미지 이해**
+  - 배경: 유저가 피드에 올린 이미지를 페르소나가 "보고" 반응하려면 이미지 분석 필요
+  - AC1: `lib/multimodal/image-analyzer.ts` — `analyzeImage(imageUrl: string): Promise<ImageAnalysis>` 구현
+  - AC2: `ImageAnalysis` 타입 정의 — `{ description: string; mood: string; tags: string[]; dominantColors: string[]; sentiment: number }`
+  - AC3: Claude Vision 호출 시 구조화된 JSON 응답 요청 (프롬프트 엔지니어링)
+  - AC4: 분석 결과 캐싱 (동일 URL 재분석 방지) — 인메모리 LRU or DB
+  - AC5: 비용 라우팅 — 이미지 분석은 `callType: "mm:image_analysis"`로 추적
+  - AC6: 단위 테스트 + Build PASS
+
+- [ ] **T391: PersonaPost 이미지 필드 확장 — DB 스키마 + 타입**
+  - 배경: `PersonaPost` 모델에 이미지 관련 필드 없음. 멀티모달 포스트 저장 불가
+  - AC1: `schema.prisma` PersonaPost에 `imageUrls String[] @default([])` 필드 추가
+  - AC2: `schema.prisma` PersonaPost에 `imageAnalysis Json?` 필드 추가 (Vision 분석 결과 저장)
+  - AC3: 마이그레이션 SQL `migrations/053_persona_post_images.sql` — `ALTER TABLE ADD COLUMN IF NOT EXISTS`
+  - AC4: `PersonaPostType` enum에 `IMAGE_REACTION` 추가 (이미지에 대한 페르소나 반응)
+  - AC5: `shared-types` 업데이트 — `PersonaPostType`에 `IMAGE_REACTION` 추가
+  - AC6: Build PASS
+
+- [ ] **T392: 이미지 업로드 API — 유저 이미지 수신 + URL 반환**
+  - 배경: 유저가 피드에 이미지를 올리려면 업로드 엔드포인트 필요
+  - AC1: `POST /api/pw/images/upload` — multipart/form-data 이미지 수신
+  - AC2: 이미지 검증 — 파일 크기 (최대 10MB), 포맷 (jpeg/png/gif/webp), 해상도 (최대 4096x4096)
+  - AC3: 로컬 스토리지 구현 — `public/uploads/images/` + UUID 파일명 (Phase 1; S3는 추후)
+  - AC4: 응답: `{ success: true, data: { url: string, width: number, height: number } }`
+  - AC5: 보안: 파일 타입 검증 (매직 바이트), 파일명 새니타이징
+  - AC6: 단위 테스트 + Build PASS
+
+### Phase MM-B: 이미지 포스트 생성 파이프라인 (T393~T396)
+
+> 페르소나가 이미지를 참조하는 포스트를 생성하고, 유저 이미지에 반응하는 파이프라인.
+
+- [ ] **T393: 이미지 포스트 생성 — 텍스트+이미지 참조 포스트**
+  - 배경: 페르소나가 이미지 URL을 참조하는 포스트를 생성할 수 있어야 함
+  - AC1: `content-generator.ts` 확장 — `generateImagePost(persona, imageUrl, analysis): Promise<PersonaPost>` 추가
+  - AC2: LLM 프롬프트에 이미지 분석 결과(`ImageAnalysis`) 주입 → 페르소나 캐릭터 기반 반응 텍스트 생성
+  - AC3: 생성된 포스트에 `imageUrls`, `imageAnalysis`, `type: IMAGE_REACTION` 저장
+  - AC4: 기존 포스트 생성 파이프라인(보안 게이트, 비용 추적, Poignancy 등) 재활용
+  - AC5: Build PASS
+
+- [ ] **T394: 유저 이미지 포스트 API — 피드에 이미지 포스트 등록**
+  - 배경: 유저가 이미지+텍스트를 함께 올리는 피드 포스트 API 필요
+  - AC1: `POST /api/pw/feed/posts` 확장 — `imageUrls?: string[]` 파라미터 추가
+  - AC2: 이미지 URL 유효성 검증 (내부 업로드 URL만 허용, 외부 URL 차단)
+  - AC3: 이미지 포함 포스트 저장 시 `imageUrls` 필드에 저장
+  - AC4: 기존 텍스트 전용 포스트와 하위 호환 유지
+  - AC5: Build PASS
+
+- [ ] **T395: 페르소나 이미지 반응 — 유저 이미지 포스트에 자동 반응**
+  - 배경: 유저가 이미지를 올리면 페르소나가 Vision으로 이미지를 보고 댓글/반응 생성
+  - AC1: 유저 이미지 포스트 등록 시 → `image-analyzer`로 분석 → 관련 페르소나 선택
+  - AC2: 선택된 페르소나가 이미지 분석 결과 기반으로 댓글 생성 (comment-engine 확장)
+  - AC3: 댓글 프롬프트에 이미지 설명 + 감정 + 태그를 컨텍스트로 주입
+  - AC4: 매칭 점수 기반 반응 확률 (이미지 태그 ↔ 페르소나 관심사 벡터 매칭)
+  - AC5: Build PASS
+
+- [ ] **T396: 이미지 콘텐츠 벡터 추출 — 이미지 메타데이터 → L1 벡터**
+  - 배경: 이미지 콘텐츠도 L1 벡터로 변환해야 페르소나-콘텐츠 매칭 가능
+  - AC1: `lib/multimodal/image-vector-extractor.ts` — 이미지 분석 결과에서 L1(7D) 벡터 추출
+  - AC2: 매핑 규칙: `mood/sentiment → Emotion`, `tags → Interest/Lifestyle`, `dominantColors → Aesthetic`
+  - AC3: 추출된 벡터를 콘텐츠 벡터 DB에 저장 (기존 텍스트 벡터와 동일 스키마)
+  - AC4: 혼합 콘텐츠(텍스트+이미지) 시 가중 평균: `텍스트 벡터 × 0.6 + 이미지 벡터 × 0.4`
+  - AC5: 단위 테스트 + Build PASS
+
+### Phase MM-C: PersonaWorld 이미지 UI (T397~T399)
+
+> 프런트엔드: 이미지 업로드, 이미지 포스트 표시, 이미지 갤러리.
+
+- [ ] **T397: PersonaWorld 피드 — 이미지 포스트 렌더링**
+  - 배경: 피드 카드에서 이미지를 표시할 수 있어야 함
+  - AC1: `PostCard` 컴포넌트에 `imageUrls` 존재 시 이미지 그리드 렌더링 (1장: 풀, 2장: 2열, 3+: 그리드)
+  - AC2: 이미지 클릭 시 라이트박스(확대 뷰) 오버레이
+  - AC3: 이미지 로딩 스켈레톤 + 에러 폴백 (깨진 이미지 아이콘)
+  - AC4: Next.js `<Image>` 컴포넌트 활용 (최적화 + lazy loading)
+  - AC5: Build PASS
+
+- [ ] **T398: PersonaWorld 피드 — 이미지 업로드 UI**
+  - 배경: 유저가 이미지를 선택하고 피드에 올리는 UI
+  - AC1: 포스트 작성 영역에 이미지 첨부 버튼 (📎 / 🖼️ 아이콘)
+  - AC2: 드래그앤드롭 + 파일 선택 다이얼로그 (최대 4장)
+  - AC3: 선택된 이미지 미리보기 (썸네일) + 개별 삭제 버튼
+  - AC4: 업로드 진행률 표시 + 완료 시 URL 수신 → 포스트 데이터에 포함
+  - AC5: 포맷/크기 초과 시 유저 친화적 에러 메시지
+  - AC6: Build PASS
+
+- [ ] **T399: PersonaWorld 이미지 기억 — Memory Layer 확장**
+  - 배경: 페르소나가 본 이미지를 기억하고 나중에 참조할 수 있어야 함
+  - AC1: `MemoryEntry` 타입에 `imageUrl?: string` + `imageDescription?: string` 필드 추가
+  - AC2: 이미지 반응 시 기억 저장 — URL + Vision 분석 텍스트를 기억 본문으로 저장
+  - AC3: RAG 검색 시 이미지 기억도 포함 (텍스트 설명 기반 검색)
+  - AC4: 기억 조회 UI에서 이미지 썸네일 표시
   - AC5: Build PASS
 
 ---
