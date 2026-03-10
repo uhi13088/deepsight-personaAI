@@ -136,7 +136,7 @@ const GENERATION_PIPELINE = [
     title: "벡터 다양성 주입",
     description:
       "아키타입 프리셋에 무작위 변이를 주입하여 같은 아키타입에서도 개성 있는 페르소나를 만듭니다.",
-    detail: "L1 7D + L2 5D + L3 4D = 16D 기본 벡터",
+    detail: "3-Layer Orthogonal Vector System (106D+)",
     color: "from-blue-500 to-purple-500",
   },
   {

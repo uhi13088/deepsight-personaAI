@@ -42,7 +42,7 @@ export interface AdaptiveSession {
 
 // ── 불확실도 프로필 ──────────────────────────────────────────
 
-/** 전체 차원 불확실도 프로필 (16D) */
+/** 전체 정량 차원 불확실도 프로필 */
 export interface UncertaintyProfile {
   l1: Record<SocialDimension, DimensionUncertainty>
   l2: Record<TemperamentDimension, DimensionUncertainty>

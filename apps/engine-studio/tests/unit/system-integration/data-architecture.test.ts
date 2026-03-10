@@ -753,7 +753,7 @@ describe("summarizeDataArchitecture", () => {
     expect(summary).toContain("리나 데이터 아키텍처 요약")
     expect(summary).toContain("[Instruction Layer]")
     expect(summary).toContain("[Memory Layer]")
-    expect(summary).toContain("벡터: L1(7D) + L2(5D) + L3(4D) = 16D")
+    expect(summary).toContain("벡터: L1(7D) + L2(5D) + L3(4D) = 106D+")
     expect(summary).toContain("보이스: 정의됨")
     expect(summary).toContain("불변 사실: 2건")
     expect(summary).toContain("PASS")

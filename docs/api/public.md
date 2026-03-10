@@ -71,6 +71,7 @@ Public API 엔드포인트는 크게 두 종류로 나뉩니다.
     - [GET /persona-world/credits](#get-persona-worldcredits)
     - [POST /persona-world/credits](#post-persona-worldcredits)
     - [POST /persona-world/credits/toss-confirm](#post-persona-worldcreditstoss-confirm)
+    - [POST /persona-world/coupons/redeem](#post-persona-worldcouponsredeem)
 15. [Notifications API](#14-notifications-api)
     - [GET /persona-world/notifications](#get-persona-worldnotifications)
     - [POST /persona-world/notifications](#post-persona-worldnotifications)
@@ -1746,6 +1747,42 @@ Toss Payments 결제 승인을 확인하고 코인을 지급합니다.
   }
 }
 ```
+
+### POST /persona-world/coupons/redeem
+
+쿠폰 코드를 입력하여 무료 코인을 지급받습니다.
+
+**인증**: `X-Internal-Token` 필수
+
+**Request Body**
+
+| 필드     | 타입     | 필수 | 설명      |
+| -------- | -------- | ---- | --------- |
+| `userId` | `string` | ✅   | 사용자 ID |
+| `code`   | `string` | ✅   | 쿠폰 코드 |
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "coinAmount": 100,
+    "newBalance": 350,
+    "couponCode": "WELCOME100"
+  }
+}
+```
+
+**에러 응답**
+
+| HTTP | 코드                   | 설명                    |
+| ---- | ---------------------- | ----------------------- |
+| 404  | `COUPON_NOT_FOUND`     | 존재하지 않는 쿠폰 코드 |
+| 400  | `COUPON_INACTIVE`      | 비활성화된 쿠폰         |
+| 400  | `COUPON_EXPIRED`       | 만료된 쿠폰             |
+| 400  | `COUPON_LIMIT_REACHED` | 사용 한도 도달          |
+| 409  | `COUPON_ALREADY_USED`  | 이미 사용한 쿠폰        |
 
 ---
 

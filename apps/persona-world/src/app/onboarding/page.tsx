@@ -11,16 +11,7 @@ import {
   PWProfileLevelBadge,
   PWSnsConnect,
 } from "@/components/persona-world"
-import {
-  ArrowRight,
-  ArrowLeft,
-  Sparkles,
-  AlertTriangle,
-  Coins,
-  Link2,
-  Target,
-  BarChart3,
-} from "lucide-react"
+import { ArrowRight, ArrowLeft, Sparkles, AlertTriangle, Coins, Link2, Target } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useUserStore } from "@/lib/user-store"
 import { clientApi } from "@/lib/api"
@@ -36,78 +27,161 @@ import { getTraitDimension } from "@/lib/trait-colors"
 
 // ── 분석 결과 표시용 유틸 ─────────────────────────────────────
 
-interface TraitSummary {
-  key: string
-  label: string
-  value: number
-  color: string
-  low: string
-  high: string
+// 레이어별 사용자 친화적 설명 매핑
+const LAYER_FRIENDLY = {
+  L1: {
+    icon: "🎭",
+    title: "콘텐츠 스타일",
+    subtitle: "당신이 콘텐츠를 즐기는 방식",
+    color: "from-blue-50 to-blue-100",
+    border: "border-blue-200",
+  },
+  L2: {
+    icon: "💫",
+    title: "성격 기질",
+    subtitle: "당신의 타고난 성향",
+    color: "from-amber-50 to-amber-100",
+    border: "border-amber-200",
+  },
+  L3: {
+    icon: "🌊",
+    title: "내면의 이야기",
+    subtitle: "당신을 움직이는 동력",
+    color: "from-purple-50 to-purple-100",
+    border: "border-purple-200",
+  },
+} as const
+
+// 각 차원의 값을 자연어 설명으로 변환
+function describeTraitValue(key: string, value: number): string {
+  const dim = getTraitDimension(key)
+  if (!dim) return ""
+  if (value >= 0.7) return dim.high
+  if (value <= 0.3) return dim.low
+  return "균형잡힌"
 }
 
-function getTopTraits(vector: Record<string, number>, count = 5): TraitSummary[] {
-  return Object.entries(vector)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, count)
-    .map(([key, value]) => {
-      const dim = getTraitDimension(key)
-      return {
-        key,
-        label: dim?.label ?? key,
-        value,
-        color: dim?.color.primary ?? "#8B5CF6",
-        low: dim?.low ?? "",
-        high: dim?.high ?? "",
-      }
-    })
+// 레이어별 대표 특성 키워드 추출
+function getLayerKeywords(data: Record<string, number>, keys: string[]): string[] {
+  return keys
+    .filter((k) => k in data)
+    .sort((a, b) => Math.abs(data[b] - 0.5) - Math.abs(data[a] - 0.5))
+    .slice(0, 3)
+    .map((k) => describeTraitValue(k, data[k]))
+    .filter(Boolean)
 }
 
-function TraitAnalysisCard({ traits, confidence }: { traits: TraitSummary[]; confidence: number }) {
+// 레이어별 요약 문장 생성
+function getLayerSummary(layer: "L1" | "L2" | "L3", data: Record<string, number>): string {
+  const entries = Object.entries(data).sort(([, a], [, b]) => Math.abs(b - 0.5) - Math.abs(a - 0.5))
+  if (entries.length === 0) return ""
+
+  const [topKey, topVal] = entries[0]
+  const dim = getTraitDimension(topKey)
+  if (!dim) return ""
+
+  const trait = topVal >= 0.6 ? dim.high : topVal <= 0.4 ? dim.low : "균형잡힌"
+
+  if (layer === "L1") {
+    return `${trait} 시각으로 콘텐츠를 바라보는 편이에요`
+  }
+  if (layer === "L2") {
+    return `기질적으로 ${trait} 성향이 돋보여요`
+  }
+  return `내면에서 ${trait} 에너지가 강하게 느껴져요`
+}
+
+const L1_KEYS = ["depth", "lens", "stance", "scope", "taste", "purpose", "sociability"]
+const L2_KEYS = ["openness", "conscientiousness", "extraversion", "agreeableness", "neuroticism"]
+const L3_KEYS = ["lack", "moralCompass", "volatility", "growthArc"]
+
+interface LayerVector {
+  social: Record<string, number>
+  temperament: Record<string, number>
+  narrative: Record<string, number>
+}
+
+function ProfileSummaryCard({
+  vector,
+  confidence,
+}: {
+  vector: LayerVector | Record<string, number>
+  confidence: number
+}) {
+  // flat vector (adaptive) vs structured vector (phase) 둘 다 지원
+  let l1Data: Record<string, number>
+  let l2Data: Record<string, number>
+  let l3Data: Record<string, number>
+
+  if ("social" in vector) {
+    l1Data = vector.social
+    l2Data = vector.temperament
+    l3Data = vector.narrative
+  } else {
+    l1Data = Object.fromEntries(Object.entries(vector).filter(([k]) => L1_KEYS.includes(k)))
+    l2Data = Object.fromEntries(Object.entries(vector).filter(([k]) => L2_KEYS.includes(k)))
+    l3Data = Object.fromEntries(Object.entries(vector).filter(([k]) => L3_KEYS.includes(k)))
+  }
+
+  const layers = [
+    { key: "L1" as const, data: l1Data, dimKeys: L1_KEYS },
+    { key: "L2" as const, data: l2Data, dimKeys: L2_KEYS },
+    { key: "L3" as const, data: l3Data, dimKeys: L3_KEYS },
+  ]
+
   const confidencePercent = Math.round(confidence * 100)
+
   return (
-    <div className="mx-auto mt-6 w-full max-w-xs space-y-4">
-      {/* 프로필 정확도 */}
-      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-        <div className="mb-2 flex items-center gap-2">
-          <BarChart3 className="h-4 w-4 text-purple-500" />
-          <span className="text-xs font-medium text-gray-600">분석 정확도</span>
+    <div className="mx-auto mt-6 w-full max-w-sm space-y-3">
+      {layers.map(({ key, data, dimKeys }) => {
+        const info = LAYER_FRIENDLY[key]
+        const keywords = getLayerKeywords(data, dimKeys)
+        const summary = getLayerSummary(key, data)
+
+        if (Object.keys(data).length === 0) return null
+
+        return (
+          <div
+            key={key}
+            className={`rounded-xl border ${info.border} bg-gradient-to-r ${info.color} p-4`}
+          >
+            <div className="mb-2 flex items-center gap-2">
+              <span className="text-lg">{info.icon}</span>
+              <div>
+                <p className="text-sm font-semibold text-gray-800">{info.title}</p>
+                <p className="text-[11px] text-gray-500">{info.subtitle}</p>
+              </div>
+            </div>
+            {keywords.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {keywords.map((kw) => (
+                  <span
+                    key={kw}
+                    className="rounded-full bg-white/70 px-2.5 py-0.5 text-xs font-medium text-gray-700"
+                  >
+                    {kw}
+                  </span>
+                ))}
+              </div>
+            )}
+            {summary && <p className="text-xs text-gray-600">{summary}</p>}
+          </div>
+        )
+      })}
+
+      {/* 프로필 완성도 */}
+      <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-xs text-gray-500">프로필 완성도</span>
+          <span className="text-xs font-bold text-purple-600">{confidencePercent}%</span>
         </div>
-        <div className="mb-1 h-2 w-full overflow-hidden rounded-full bg-gray-200">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
           <div
             className="pw-gradient h-full transition-all"
             style={{ width: `${confidencePercent}%` }}
           />
         </div>
-        <p className="text-right text-sm font-bold text-purple-600">{confidencePercent}%</p>
       </div>
-
-      {/* 주요 특성 */}
-      {traits.length > 0 && (
-        <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-          <p className="mb-3 text-xs font-medium text-gray-600">나의 주요 특성</p>
-          <div className="space-y-2.5">
-            {traits.map((trait) => (
-              <div key={trait.key}>
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-[11px] font-medium text-gray-700">{trait.label}</span>
-                  <span className="text-[10px] text-gray-400">
-                    {trait.value >= 0.6 ? trait.high : trait.value <= 0.4 ? trait.low : "균형"}
-                  </span>
-                </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${trait.value * 100}%`,
-                      backgroundColor: trait.color,
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -616,10 +690,7 @@ function PhaseOnboardingFlow() {
 
             {/* 분석 결과 */}
             {analysisVector && Object.keys(analysisVector).length > 0 && (
-              <TraitAnalysisCard
-                traits={getTopTraits(analysisVector)}
-                confidence={analysisConfidence}
-              />
+              <ProfileSummaryCard vector={analysisVector} confidence={analysisConfidence} />
             )}
 
             <PWButton onClick={() => router.push("/feed")} icon={ArrowRight} className="mt-6">
@@ -1024,12 +1095,12 @@ function AdaptiveOnboardingFlow() {
 
             {/* 분석 결과 */}
             {result && (
-              <TraitAnalysisCard
-                traits={getTopTraits({
-                  ...result.l1Vector,
-                  ...result.l2Vector,
-                  ...result.l3Vector,
-                })}
+              <ProfileSummaryCard
+                vector={{
+                  social: result.l1Vector,
+                  temperament: result.l2Vector,
+                  narrative: result.l3Vector,
+                }}
                 confidence={result.confidence}
               />
             )}

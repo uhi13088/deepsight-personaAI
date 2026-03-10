@@ -738,7 +738,7 @@ export function summarizeDataArchitecture(
     ``,
     `[Instruction Layer]`,
     `  정의 버전: v${instruction.definitionVersion}`,
-    `  벡터: L1(7D) + L2(5D) + L3(4D) = 16D`,
+    `  벡터: L1(7D) + L2(5D) + L3(4D) = 106D+`,
     `  보이스: ${instruction.voiceProfile ? "정의됨" : "미정의"}`,
     `  불변 사실: ${instruction.immutableFacts.length}건`,
     `  무결성: ${instrIntegrity.valid ? "PASS" : `FAIL (${instrIntegrity.issues.length}건)`}`,

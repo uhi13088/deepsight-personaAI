@@ -53,6 +53,28 @@
 
 ## ✅ DONE (완료)
 
+### Phase COUPON: 쿠폰/프로모션 코드 시스템 (T410~T414) ✅ 2026-03-10
+
+- [x] **T410: DB 모델 + 마이그레이션 + 쿠폰 서비스 코어** ✅ 2026-03-10
+  - 변경: `schema.prisma`, `058_coupon_system.sql`, `coupon-service.ts`
+  - 테스트: 22개 PASS
+
+- [x] **T411: 관리자 쿠폰 CRUD API** ✅ 2026-03-10
+  - 변경: `api/internal/persona-world-admin/coupons/route.ts`
+  - GET/POST/PUT/DELETE + Prisma DI provider
+
+- [x] **T412: 사용자 쿠폰 적용 API** ✅ 2026-03-10
+  - 변경: `api/persona-world/coupons/redeem/route.ts`
+  - addCredits() 연동, 에러 매핑
+
+- [x] **T413: Engine Studio 쿠폰 관리 UI** ✅ 2026-03-10
+  - 변경: `persona-world-admin/coupons/page.tsx`, `lnb.tsx`
+  - 필터/검색/생성 폼/코드 복사/활성화 토글
+
+- [x] **T414: Persona World 쿠폰 입력 UI + API 문서** ✅ 2026-03-10
+  - 변경: `shop/page.tsx`, `api.ts`, `docs/api/internal.md`, `docs/api/public.md`
+  - 쿠폰 코드 입력 → 코인 지급 → 잔액 갱신
+
 ### Phase AU-D: 자율 기억 관리 (T408~T409) ✅ 2026-03-09
 
 - [x] **T408: memory-prune 서비스 코어** ✅ 2026-03-09

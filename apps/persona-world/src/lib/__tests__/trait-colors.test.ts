@@ -11,7 +11,7 @@ import {
   mapLayerToTraits,
 } from "../trait-colors"
 
-describe("trait-colors: 3-Layer 16D 색상 매핑", () => {
+describe("trait-colors: 3-Layer 벡터 색상 매핑", () => {
   // ── 차원 수 검증 ──────────────────────────────────────
   it("L1 = 7D (Social Persona)", () => {
     expect(L1_DIMENSIONS).toHaveLength(7)
