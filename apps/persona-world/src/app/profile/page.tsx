@@ -17,16 +17,11 @@ import {
   BarChart3,
   Heart,
   Bookmark,
-  Link2,
   Users,
   Loader2,
   Flame,
   Coins,
   Check,
-  X,
-  Shield,
-  RefreshCw,
-  Brain,
   Repeat2,
   MessageCircle,
 } from "lucide-react"
@@ -37,35 +32,29 @@ import { clientApi } from "@/lib/api"
 import type { FeedPost } from "@/lib/types"
 import { L1_DIMENSIONS, L2_DIMENSIONS, L3_DIMENSIONS, LAYER_COLORS } from "@/lib/trait-colors"
 import { PROFILE_LEVELS } from "@/lib/profile-level"
-import { SNS_PROVIDER_CONFIG } from "@/lib/role-config"
 import { isBadgeItem, isFrameItem, getShopItemById } from "@/lib/shop"
-import type { PersonaDetail, SnsProvider } from "@/lib/types"
+import type { PersonaDetail } from "@/lib/types"
 
 export default function ProfilePage() {
   const {
     profile,
     onboarding,
     dailyQuestion,
-    snsConnections,
     followedPersonas,
     likedPosts,
     bookmarkedPosts,
     repostedPosts,
     answerDailyQuestion,
-    connectSns,
-    disconnectSns,
-    setSnsAnalyzing,
     purchasedItems,
     restoreActivity,
   } = useUserStore()
 
   const [followedPersonaDetails, setFollowedPersonaDetails] = useState<PersonaDetail[]>([])
   const [loadingFollowed, setLoadingFollowed] = useState(false)
-  const [showSnsConnect, setShowSnsConnect] = useState(false)
   const [dailyAnswered, setDailyAnswered] = useState(false)
 
   // 활동 탭
-  type ActivityTab = "likes" | "bookmarks" | "reposts"
+  type ActivityTab = "following" | "likes" | "bookmarks" | "reposts"
   const [activeActivityTab, setActiveActivityTab] = useState<ActivityTab | null>(null)
   const [activityPosts, setActivityPosts] = useState<FeedPost[]>([])
   const [activityLoading, setActivityLoading] = useState(false)
@@ -73,6 +62,7 @@ export default function ProfilePage() {
   const fetchActivityPosts = useCallback(
     async (tab: ActivityTab) => {
       if (!profile?.id) return
+      if (tab === "following") return // 팔로잉은 별도 데이터 사용
       setActivityLoading(true)
       try {
         const data = await clientApi.getUserActivity(profile.id, tab, 20)
@@ -105,52 +95,6 @@ export default function ProfilePage() {
     }
   }, [profile?.id, restoreActivity])
 
-  const [consentProvider, setConsentProvider] = useState<SnsProvider | null>(null)
-  const [reanalyzing, setReanalyzing] = useState(false)
-  const [reanalysisResult, setReanalysisResult] = useState<{
-    llmSummary?: string
-    llmTraits?: string[]
-    creditUsed: number
-    isFirstFree: boolean
-  } | null>(null)
-
-  // SNS OAuth 콜백 결과 처리
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const connected = params.get("sns_connected")
-    const snsError = params.get("sns_error")
-    if (connected) {
-      const config = SNS_PROVIDER_CONFIG[connected]
-      if (config) {
-        connectSns(connected as SnsProvider, `${connected}_oauth`)
-        const summary = params.get("sns_summary")
-        if (summary) {
-          toast.success(`${config.label} 연동 완료! AI 분석이 적용되었습니다`)
-          setReanalysisResult({
-            llmSummary: decodeURIComponent(summary),
-            creditUsed: 0,
-            isFirstFree: true,
-          })
-        } else {
-          toast.success(`${config.label} 연동 및 분석이 완료되었습니다!`)
-        }
-      }
-      // URL 정리
-      const url = new URL(window.location.href)
-      url.searchParams.delete("sns_connected")
-      url.searchParams.delete("level")
-      url.searchParams.delete("sns_summary")
-      window.history.replaceState({}, "", url.pathname)
-    }
-    if (snsError) {
-      toast.error(`SNS 연동 실패: ${decodeURIComponent(snsError)}`)
-      const url = new URL(window.location.href)
-      url.searchParams.delete("sns_error")
-      window.history.replaceState({}, "", url.pathname)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   // 오늘 이미 답변했는지 확인
   const today = new Date().toISOString().slice(0, 10)
   const alreadyAnsweredToday = dailyQuestion.lastAnsweredDate === today
@@ -182,124 +126,6 @@ export default function ProfilePage() {
     setDailyAnswered(true)
     toast.success("10 코인 획득! 매칭 정밀도가 향상됩니다")
   }, [answerDailyQuestion])
-
-  // OAuth 지원 플랫폼 (서버 환경변수 설정 필요)
-  const OAUTH_PLATFORMS = new Set(["youtube", "spotify", "instagram", "twitter"])
-  // 데이터 업로드 플랫폼
-  const UPLOAD_PLATFORMS = new Set(["netflix"])
-
-  const handleSnsConnect = useCallback(
-    async (provider: SnsProvider) => {
-      setConsentProvider(null)
-      const userId = profile?.id
-      if (!userId) {
-        toast.error("로그인이 필요합니다")
-        return
-      }
-
-      // 미지원 플랫폼 (threads, naver_blog, youtube_music)
-      if (!OAUTH_PLATFORMS.has(provider) && !UPLOAD_PLATFORMS.has(provider)) {
-        toast.info(`${SNS_PROVIDER_CONFIG[provider].label}은(는) 준비 중입니다.`)
-        return
-      }
-
-      // 업로드 방식 (Netflix)
-      if (UPLOAD_PLATFORMS.has(provider)) {
-        const input = document.createElement("input")
-        input.type = "file"
-        input.accept = ".csv,.json"
-        input.onchange = async (e) => {
-          const file = (e.target as HTMLInputElement).files?.[0]
-          if (!file) return
-          setSnsAnalyzing(provider, true)
-          connectSns(provider, file.name)
-          toast.info(`${SNS_PROVIDER_CONFIG[provider].label} 데이터 분석 중...`)
-          try {
-            const text = await file.text()
-            let parsedData: Record<string, unknown>
-            if (file.name.endsWith(".json")) {
-              parsedData = JSON.parse(text)
-            } else {
-              const lines = text.split("\n")
-              const headers = lines[0]?.split(",").map((h) => h.trim()) ?? []
-              const rows = lines.slice(1).map((line) => {
-                const values = line.split(",").map((v) => v.trim())
-                const row: Record<string, string> = {}
-                headers.forEach((h, i) => {
-                  row[h] = values[i] ?? ""
-                })
-                return row
-              })
-              parsedData = { viewingHistory: rows }
-            }
-            await clientApi.uploadSnsData(userId, provider, parsedData)
-            setSnsAnalyzing(provider, false)
-            toast.success(`${SNS_PROVIDER_CONFIG[provider].label} 분석이 완료되었습니다`)
-          } catch (err) {
-            setSnsAnalyzing(provider, false)
-            disconnectSns(provider)
-            toast.error(err instanceof Error ? err.message : "데이터 업로드에 실패했습니다")
-          }
-        }
-        input.click()
-        return
-      }
-
-      // OAuth 방식 (YouTube, Spotify, Instagram, Twitter)
-      try {
-        const result = await clientApi.startSnsAuth(userId, provider, undefined, "/profile")
-        if (result.method === "oauth" && result.authUrl) {
-          window.location.href = result.authUrl
-        } else {
-          toast.info(`${SNS_PROVIDER_CONFIG[provider].label} OAuth 설정이 필요합니다`)
-        }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "SNS 연동에 실패했습니다"
-        // 환경변수 미설정은 에러가 아닌 안내 메시지로 표시
-        if (msg.includes("환경변수") || msg.includes("누락") || msg.includes("config")) {
-          toast.info(msg)
-        } else {
-          toast.error(msg)
-        }
-      }
-    },
-    [profile?.id, connectSns, disconnectSns, setSnsAnalyzing]
-  )
-
-  // SNS 재분석 (Claude Sonnet)
-  const handleReanalyze = useCallback(async () => {
-    const userId = profile?.id
-    if (!userId) return
-
-    setReanalyzing(true)
-    setReanalysisResult(null)
-    try {
-      const result = await clientApi.reanalyzeSns(userId)
-      setReanalysisResult({
-        llmSummary: result.llmSummary,
-        llmTraits: result.llmTraits,
-        creditUsed: result.creditUsed,
-        isFirstFree: result.isFirstFree,
-      })
-      if (result.isFirstFree) {
-        toast.success("AI 심층 분석이 완료되었습니다! (무료)")
-      } else {
-        toast.success(`AI 심층 분석 완료 (${result.creditUsed} 코인 사용)`)
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "재분석에 실패했습니다")
-    } finally {
-      setReanalyzing(false)
-    }
-  }, [profile?.id])
-
-  const handleSnsDisconnect = useCallback(
-    (provider: SnsProvider) => {
-      disconnectSns(provider)
-      toast.info(`${SNS_PROVIDER_CONFIG[provider].label} 연동이 해제되었습니다`)
-    },
-    [disconnectSns]
-  )
 
   const levelConfig = PROFILE_LEVELS[onboarding.profileLevel]
   const confidence = profile?.vectorConfidence
@@ -560,11 +386,15 @@ export default function ProfilePage() {
 
         {/* Stats */}
         <div className="mb-4 grid grid-cols-4 gap-3">
-          <PWCard className="text-center">
-            <Users className="mx-auto mb-2 h-5 w-5 text-purple-400" />
-            <div className="text-xl font-bold text-gray-900">{followedPersonas.length}</div>
-            <div className="text-[10px] text-gray-500">팔로잉</div>
-          </PWCard>
+          <button onClick={() => handleActivityTabClick("following")} className="text-left">
+            <PWCard
+              className={`text-center transition-all ${activeActivityTab === "following" ? "ring-2 ring-purple-400" : ""}`}
+            >
+              <Users className={`mx-auto mb-2 h-5 w-5 text-purple-400`} />
+              <div className="text-xl font-bold text-gray-900">{followedPersonas.length}</div>
+              <div className="text-[10px] text-gray-500">팔로잉</div>
+            </PWCard>
+          </button>
           <button onClick={() => handleActivityTabClick("likes")} className="text-left">
             <PWCard
               className={`text-center transition-all ${activeActivityTab === "likes" ? "ring-2 ring-pink-400" : ""}`}
@@ -591,19 +421,22 @@ export default function ProfilePage() {
             <PWCard
               className={`text-center transition-all ${activeActivityTab === "reposts" ? "ring-2 ring-blue-400" : ""}`}
             >
-              <Repeat2
-                className={`mx-auto mb-2 h-5 w-5 ${activeActivityTab === "reposts" ? "text-blue-400" : "text-blue-400"}`}
-              />
+              <Repeat2 className={`mx-auto mb-2 h-5 w-5 text-blue-400`} />
               <div className="text-xl font-bold text-gray-900">{repostedPosts.length}</div>
               <div className="text-[10px] text-gray-500">리포스트</div>
             </PWCard>
           </button>
         </div>
 
-        {/* 활동 포스트 목록 */}
+        {/* 활동 컨텐츠 목록 */}
         {activeActivityTab && (
           <PWCard className="mb-6">
             <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-900">
+              {activeActivityTab === "following" && (
+                <>
+                  <Users className="h-4 w-4 text-purple-400" /> 팔로잉 중인 페르소나
+                </>
+              )}
               {activeActivityTab === "likes" && (
                 <>
                   <Heart className="h-4 w-4 fill-pink-400 text-pink-400" /> 좋아요한 글
@@ -621,428 +454,88 @@ export default function ProfilePage() {
               )}
             </h3>
 
-            {activityLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-purple-500" />
-              </div>
-            ) : activityPosts.length > 0 ? (
-              <div className="space-y-3">
-                {activityPosts.map((post) => (
-                  <Link
-                    key={post.id}
-                    href={`/persona/${post.persona.id}`}
-                    className="flex gap-3 rounded-lg p-2 transition-colors hover:bg-gray-50"
-                  >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-pink-400 text-sm">
-                      {post.persona.name.charAt(0)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-900">
-                          {post.persona.name}
-                        </span>
-                        <span className="text-[10px] text-gray-400">@{post.persona.handle}</span>
-                      </div>
-                      <p className="mt-0.5 line-clamp-2 text-xs text-gray-600">{post.content}</p>
-                      <div className="mt-1 flex items-center gap-3 text-[10px] text-gray-400">
-                        <span className="flex items-center gap-0.5">
-                          <Heart className="h-3 w-3" /> {post.likeCount}
-                        </span>
-                        <span className="flex items-center gap-0.5">
-                          <MessageCircle className="h-3 w-3" /> {post.commentCount}
-                        </span>
-                        <span className="flex items-center gap-0.5">
-                          <Repeat2 className="h-3 w-3" /> {post.repostCount}
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <p className="py-6 text-center text-sm text-gray-400">
-                {activeActivityTab === "likes" && "아직 좋아요한 글이 없습니다"}
-                {activeActivityTab === "bookmarks" && "아직 저장한 글이 없습니다"}
-                {activeActivityTab === "reposts" && "아직 리포스트한 글이 없습니다"}
-              </p>
-            )}
-          </PWCard>
-        )}
-
-        {/* 팔로우한 페르소나 */}
-        {followedPersonas.length > 0 && (
-          <PWCard className="mb-6">
-            <h3 className="mb-4 flex items-center gap-2 font-semibold text-gray-900">
-              <PWIcon icon={Users} size="sm" gradient />
-              팔로우 중인 페르소나
-            </h3>
-            {loadingFollowed ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="h-6 w-6 animate-spin text-purple-500" />
-              </div>
-            ) : followedPersonaDetails.length > 0 ? (
-              <div className="space-y-3">
-                {followedPersonaDetails.slice(0, 5).map((persona) => (
-                  <Link
-                    key={persona.id}
-                    href={`/persona/${persona.id}`}
-                    className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-gray-50"
-                  >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-pink-400 text-lg">
-                      {persona.name.charAt(0)}
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900">{persona.name}</div>
-                      <div className="text-sm text-gray-500">{persona.handle}</div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-gray-400" />
-                  </Link>
-                ))}
-                {followedPersonaDetails.length > 5 && (
-                  <Link
-                    href="/explore"
-                    className="block text-center text-sm text-purple-500 hover:underline"
-                  >
-                    +{followedPersonaDetails.length - 5}명 더 보기
-                  </Link>
+            {/* 팔로잉 — 1줄 리스트 */}
+            {activeActivityTab === "following" && (
+              <>
+                {loadingFollowed ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-purple-500" />
+                  </div>
+                ) : followedPersonaDetails.length > 0 ? (
+                  <div className="space-y-2">
+                    {followedPersonaDetails.map((persona) => (
+                      <Link
+                        key={persona.id}
+                        href={`/persona/${persona.id}`}
+                        className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-gray-50"
+                      >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-pink-400 text-lg">
+                          {persona.name.charAt(0)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-gray-900">{persona.name}</div>
+                          <div className="text-xs text-gray-500">@{persona.handle}</div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-gray-400" />
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="py-6 text-center text-sm text-gray-400">
+                    아직 팔로우한 페르소나가 없습니다
+                  </p>
                 )}
-              </div>
-            ) : (
-              <p className="py-4 text-center text-sm text-gray-500">
-                팔로우 정보를 불러올 수 없습니다
-              </p>
+              </>
+            )}
+
+            {/* 좋아요/저장/리포스트 — 2열 카드 */}
+            {activeActivityTab !== "following" && (
+              <>
+                {activityLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-purple-500" />
+                  </div>
+                ) : activityPosts.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    {activityPosts.map((post) => (
+                      <Link
+                        key={post.id}
+                        href={`/persona/${post.persona.id}`}
+                        className="rounded-xl border border-gray-100 bg-white p-3 transition-all hover:border-gray-200 hover:shadow-sm"
+                      >
+                        <div className="mb-2 flex items-center gap-2">
+                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-pink-400 text-xs text-white">
+                            {post.persona.name.charAt(0)}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="truncate text-xs font-medium text-gray-900">
+                              {post.persona.name}
+                            </div>
+                          </div>
+                        </div>
+                        <p className="line-clamp-3 text-xs text-gray-600">{post.content}</p>
+                        <div className="mt-2 flex items-center gap-3 text-[10px] text-gray-400">
+                          <span className="flex items-center gap-0.5">
+                            <Heart className="h-3 w-3" /> {post.likeCount}
+                          </span>
+                          <span className="flex items-center gap-0.5">
+                            <MessageCircle className="h-3 w-3" /> {post.commentCount}
+                          </span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="py-6 text-center text-sm text-gray-400">
+                    {activeActivityTab === "likes" && "아직 좋아요한 글이 없습니다"}
+                    {activeActivityTab === "bookmarks" && "아직 저장한 글이 없습니다"}
+                    {activeActivityTab === "reposts" && "아직 리포스트한 글이 없습니다"}
+                  </p>
+                )}
+              </>
             )}
           </PWCard>
         )}
-
-        {/* ── AC3: SNS 연동 UI ──────────────────────────────── */}
-        <PWCard className="mb-6">
-          <button
-            onClick={() => setShowSnsConnect(!showSnsConnect)}
-            className="flex w-full items-center justify-between"
-          >
-            <h3 className="flex items-center gap-2 font-semibold text-gray-900">
-              <PWIcon icon={Link2} size="sm" gradient />
-              SNS 연동
-              {snsConnections.length > 0 && (
-                <span className="rounded-full bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-600">
-                  {snsConnections.length}개 연동
-                </span>
-              )}
-            </h3>
-            <ChevronRight
-              className={`h-5 w-5 text-gray-400 transition-transform ${showSnsConnect ? "rotate-90" : ""}`}
-            />
-          </button>
-
-          {showSnsConnect && (
-            <div className="mt-4 space-y-2">
-              <p className="mb-3 text-sm text-gray-500">
-                SNS 활동을 분석해서 매칭 정밀도를 더 높일 수 있어요
-              </p>
-              {(Object.keys(SNS_PROVIDER_CONFIG) as SnsProvider[]).map((provider) => {
-                const config = SNS_PROVIDER_CONFIG[provider]
-                const connection = snsConnections.find((c) => c.provider === provider)
-                const isConnected = connection?.connected ?? false
-                const isAnalyzing = connection?.analyzing ?? false
-                const isSupported = OAUTH_PLATFORMS.has(provider) || UPLOAD_PLATFORMS.has(provider)
-
-                return (
-                  <div
-                    key={provider}
-                    className={`flex items-center justify-between rounded-lg border p-3 ${
-                      isConnected
-                        ? "border-green-200 bg-green-50/50"
-                        : !isSupported
-                          ? "border-gray-100 bg-gray-50/50"
-                          : "border-gray-100 bg-white"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`flex h-9 w-9 items-center justify-center rounded-lg text-lg ${config.color} ${!isSupported && !isConnected ? "opacity-50" : ""}`}
-                      >
-                        {config.emoji}
-                      </span>
-                      <div>
-                        <div
-                          className={`text-sm font-medium ${!isSupported && !isConnected ? "text-gray-400" : "text-gray-900"}`}
-                        >
-                          {config.label}
-                          {!isSupported && !isConnected && (
-                            <span className="ml-1.5 text-[10px] text-gray-400">준비 중</span>
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {isAnalyzing
-                            ? "분석 중..."
-                            : isConnected
-                              ? `연동됨 · ${config.description}`
-                              : config.description}
-                        </div>
-                      </div>
-                    </div>
-                    {isAnalyzing ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-purple-500" />
-                    ) : isConnected ? (
-                      <button
-                        onClick={() => handleSnsDisconnect(provider)}
-                        className="rounded-full px-3 py-1 text-xs text-red-500 transition-colors hover:bg-red-50"
-                      >
-                        해제
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() =>
-                          isSupported
-                            ? setConsentProvider(provider)
-                            : toast.info(`${config.label}은(는) 준비 중입니다.`)
-                        }
-                        className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                          isSupported
-                            ? "bg-purple-100 text-purple-700 hover:bg-purple-200"
-                            : "bg-gray-100 text-gray-400"
-                        }`}
-                      >
-                        연동하기
-                      </button>
-                    )}
-                  </div>
-                )
-              })}
-              {/* SNS AI 재분석 버튼 */}
-              {snsConnections.some((c) => c.connected) && (
-                <div className="mt-3 rounded-lg border border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Brain className="h-4 w-4 text-purple-500" />
-                      <span className="text-sm font-medium text-gray-900">AI 심층 분석</span>
-                    </div>
-                    <PWButton
-                      size="sm"
-                      variant="outline"
-                      onClick={handleReanalyze}
-                      disabled={reanalyzing}
-                      className="!border-purple-300 !text-purple-700 hover:!bg-purple-100"
-                    >
-                      {reanalyzing ? (
-                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                      ) : (
-                        <RefreshCw className="mr-1 h-3 w-3" />
-                      )}
-                      {reanalyzing ? "분석 중..." : "재분석"}
-                    </PWButton>
-                  </div>
-                  <p className="mt-1.5 text-xs text-gray-500">
-                    Claude Sonnet이 SNS 데이터를 심층 분석합니다 · 최초 1회 무료, 이후 5 코인
-                  </p>
-                </div>
-              )}
-
-              {/* 재분석 결과 표시 */}
-              {reanalysisResult?.llmSummary && (
-                <div className="mt-3 rounded-lg border border-green-200 bg-green-50/50 p-3">
-                  <div className="mb-1.5 flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-green-600" />
-                    <span className="text-xs font-medium text-green-700">AI 분석 결과</span>
-                    {reanalysisResult.isFirstFree && (
-                      <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] text-green-600">
-                        무료
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-700">{reanalysisResult.llmSummary}</p>
-                  {reanalysisResult.llmTraits && reanalysisResult.llmTraits.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {reanalysisResult.llmTraits.map((trait) => (
-                        <span
-                          key={trait}
-                          className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-medium text-purple-700"
-                        >
-                          {trait}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <p className="pt-2 text-center text-xs text-gray-400">
-                연동할수록 정밀도가 높아져요 — 1개: +2~3% | 2개+: +4~5% (교차검증)
-              </p>
-            </div>
-          )}
-        </PWCard>
-
-        {/* SNS 동의 모달 */}
-        {consentProvider && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4">
-            <div className="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="flex items-center gap-2 font-semibold text-gray-900">
-                  {UPLOAD_PLATFORMS.has(consentProvider) ? (
-                    <>
-                      <span>{SNS_PROVIDER_CONFIG[consentProvider].emoji}</span>
-                      {SNS_PROVIDER_CONFIG[consentProvider].label} 파일 업로드
-                    </>
-                  ) : (
-                    <>
-                      <Shield className="h-5 w-5 text-purple-500" />
-                      데이터 분석 동의
-                    </>
-                  )}
-                </h3>
-                <button
-                  onClick={() => setConsentProvider(null)}
-                  className="rounded-full p-1 hover:bg-gray-100"
-                >
-                  <X className="h-5 w-5 text-gray-400" />
-                </button>
-              </div>
-
-              {UPLOAD_PLATFORMS.has(consentProvider) ? (
-                /* ── 업로드 플랫폼 (Netflix) ── */
-                <>
-                  <p className="mb-3 text-sm text-gray-600">
-                    시청 기록 파일을 업로드하면 AI가 콘텐츠 취향을 분석합니다.
-                  </p>
-
-                  <div className="mb-4 rounded-lg bg-gray-50 p-3">
-                    <p className="mb-2 text-xs font-semibold text-gray-700">
-                      📥 파일 받는 방법 (Netflix 기준)
-                    </p>
-                    <ol className="space-y-1.5 text-xs text-gray-600">
-                      <li className="flex gap-2">
-                        <span className="shrink-0 font-bold text-purple-500">1.</span>
-                        <span>netflix.com 로그인 → 우측 상단 프로필 아이콘 클릭</span>
-                      </li>
-                      <li className="flex gap-2">
-                        <span className="shrink-0 font-bold text-purple-500">2.</span>
-                        <span>계정 → 보안 및 개인 정보 → 내 정보 다운로드</span>
-                      </li>
-                      <li className="flex gap-2">
-                        <span className="shrink-0 font-bold text-purple-500">3.</span>
-                        <span>"시청 활동" 항목 요청 후 이메일로 받기</span>
-                      </li>
-                      <li className="flex gap-2">
-                        <span className="shrink-0 font-bold text-purple-500">4.</span>
-                        <span>
-                          받은 파일 중{" "}
-                          <code className="rounded bg-gray-200 px-1 font-mono text-[10px]">
-                            NetflixViewingHistory.csv
-                          </code>{" "}
-                          업로드
-                        </span>
-                      </li>
-                    </ol>
-                  </div>
-
-                  <div className="mb-4 space-y-1.5">
-                    <p className="text-xs font-medium text-gray-600">분석 항목:</p>
-                    {["시청한 영화/드라마 목록", "장르별 선호 패턴", "시청 완료율 패턴"].map(
-                      (item) => (
-                        <div key={item} className="flex items-center gap-2 text-xs text-green-600">
-                          <Check className="h-3 w-3" />
-                          {item}
-                        </div>
-                      )
-                    )}
-                  </div>
-
-                  <p className="mb-6 text-xs text-gray-400">
-                    원본 파일은 분석 후 즉시 삭제됩니다. 개인 식별 정보는 수집하지 않습니다.
-                  </p>
-
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setConsentProvider(null)}
-                      className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
-                    >
-                      취소
-                    </button>
-                    <button
-                      onClick={() => handleSnsConnect(consentProvider)}
-                      className="flex-1 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
-                    >
-                      CSV 파일 선택하기
-                    </button>
-                  </div>
-                </>
-              ) : (
-                /* ── OAuth 플랫폼 ── */
-                <>
-                  <p className="mb-4 text-sm font-medium text-gray-700">
-                    {SNS_PROVIDER_CONFIG[consentProvider].label} 데이터 분석 동의
-                  </p>
-
-                  <div className="mb-4 space-y-2">
-                    <p className="text-xs font-medium text-gray-600">다음 데이터를 분석합니다:</p>
-                    {[
-                      "공개 포스트/콘텐츠 (최근 200개)",
-                      "좋아요/관심 표시 기록",
-                      "장르/카테고리 선호 패턴",
-                    ].map((item) => (
-                      <div key={item} className="flex items-center gap-2 text-xs text-green-600">
-                        <Check className="h-3 w-3" />
-                        {item}
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mb-4 space-y-2">
-                    <p className="text-xs font-medium text-gray-600">다음은 수집하지 않습니다:</p>
-                    {["비공개 메시지 (DM)", "개인 식별 정보", "결제 정보"].map((item) => (
-                      <div key={item} className="flex items-center gap-2 text-xs text-red-500">
-                        <X className="h-3 w-3" />
-                        {item}
-                      </div>
-                    ))}
-                  </div>
-
-                  <p className="mb-6 text-xs text-gray-500">
-                    분석된 결과는 매칭 정밀도 향상에만 사용되며, 원본 데이터는 분석 후 즉시
-                    삭제됩니다. 동의는 언제든 철회할 수 있습니다.
-                  </p>
-
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setConsentProvider(null)}
-                      className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
-                    >
-                      취소
-                    </button>
-                    <button
-                      onClick={() => handleSnsConnect(consentProvider)}
-                      className="flex-1 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
-                    >
-                      동의하고 연동하기
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Menu */}
-        <div className="space-y-2">
-          <Link href="/onboarding">
-            <PWCard className="flex items-center justify-between !p-4 transition-colors hover:bg-gray-50">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100">
-                  <BarChart3 className="h-5 w-5 text-purple-500" />
-                </div>
-                <div>
-                  <div className="font-medium text-gray-900">취향 분석</div>
-                  <div className="text-sm text-gray-500">
-                    {profile?.vector ? "다시 분석하기" : "나의 취향 프로필 만들기"}
-                  </div>
-                </div>
-              </div>
-              <ChevronRight className="h-5 w-5 text-gray-400" />
-            </PWCard>
-          </Link>
-        </div>
       </main>
 
       <PWBottomNav />
