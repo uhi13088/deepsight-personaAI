@@ -49,6 +49,40 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
+### Phase COUPON: 쿠폰/프로모션 코드 시스템 (T410~T414)
+
+> 계획서: `docs/plans/2026-03-10-coupon-system.md`
+> 목표: 관리자가 무료 코인 지급 쿠폰을 생성·관리하고, 사용자가 코드 입력으로 코인을 받는 시스템
+
+- [ ] **T410: DB 모델 + 마이그레이션 + 쿠폰 서비스 코어**
+  - Coupon, CouponRedemption, CouponType 모델 (schema.prisma)
+  - 058_coupon_system.sql 마이그레이션
+  - coupon-service.ts (DI 패턴: createCoupon, validateCoupon, redeemCoupon, getCoupons 등)
+  - coupon-service.test.ts 단위 테스트
+  - AC: `pnpm test -- coupon-service` PASS
+
+- [ ] **T411: 관리자 쿠폰 CRUD API**
+  - GET/POST/PUT/DELETE `/api/internal/persona-world-admin/coupons`
+  - requireAuth() 가드
+  - AC: 쿠폰 생성/조회/수정/비활성화 API 동작
+
+- [ ] **T412: 사용자 쿠폰 적용 API**
+  - POST `/api/persona-world/coupons/redeem` (Internal token 인증)
+  - 검증: 코드 유효성, 만료, 한도, 중복 사용
+  - addCredits() 연동하여 EARN 트랜잭션 생성
+  - AC: 정상 적용 + 에러 케이스 응답
+
+- [ ] **T413: Engine Studio 쿠폰 관리 UI**
+  - 쿠폰 목록 테이블 + 생성 폼 + 인라인 편집
+  - LNB에 "쿠폰 관리" 메뉴 추가
+  - AC: 쿠폰 CRUD UI 동작
+
+- [ ] **T414: Persona World 쿠폰 입력 UI + API 문서**
+  - 샵 페이지에 쿠폰 코드 입력 섹션
+  - api.ts에 redeemCoupon() 함수
+  - docs/api/ 문서 최신화
+  - AC: 쿠폰 입력 → 코인 지급 → 잔액 반영
+
 ---
 
 ## ✅ DONE (완료)
