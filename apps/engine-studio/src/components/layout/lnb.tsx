@@ -129,6 +129,7 @@ const navSections: NavSection[] = [
       { label: "Evolution", href: "/persona-world-admin/evolution" },
       { label: "News Reactions", href: "/persona-world-admin/news" },
       { label: "Shop Management", href: "/persona-world-admin/shop" },
+      { label: "Coupons", href: "/persona-world-admin/coupons" },
     ],
   },
   {
