@@ -3117,3 +3117,48 @@ model AlertLog {
   @@index([createdAt])
   @@map("alert_logs")
 }
+
+// ============================================
+// 쿠폰/프로모션 코드 시스템 (v4.2.0 — T410)
+// ============================================
+
+model Coupon {
+  id              String             @id @default(cuid())
+  code            String             @unique               // 대소문자 무관, 유니크
+  type            CouponType         @default(MANUAL)      // MANUAL | WELCOME | REFERRAL
+  coinAmount      Int                @map("coin_amount")   // 지급 코인 수
+  description     String?                                   // 관리자 메모
+  maxRedemptions  Int                @default(1) @map("max_redemptions") // 총 사용 가능 횟수
+  usedCount       Int                @default(0) @map("used_count")     // 현재 사용 횟수
+  isActive        Boolean            @default(true) @map("is_active")
+  expiresAt       DateTime?          @map("expires_at")    // 만료일 (null = 무기한)
+  createdBy       String?            @map("created_by")    // 생성 관리자 ID
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  redemptions     CouponRedemption[]
+
+  @@index([code])
+  @@index([type])
+  @@map("coupons")
+}
+
+model CouponRedemption {
+  id              String   @id @default(cuid())
+  couponId        String   @map("coupon_id")
+  coupon          Coupon   @relation(fields: [couponId], references: [id])
+  userId          String   @map("user_id")       // PersonaWorldUser ID
+  coinAmount      Int      @map("coin_amount")   // 실제 지급된 코인 수
+  transactionId   String?  @map("transaction_id") // CoinTransaction 참조
+  redeemedAt      DateTime @default(now()) @map("redeemed_at")
+
+  @@unique([couponId, userId])  // 1인 1회 사용 제한
+  @@index([userId])
+  @@map("coupon_redemptions")
+}
+
+enum CouponType {
+  MANUAL    // 관리자 수동 생성
+  WELCOME   // 신규가입 자동 발급
+  REFERRAL  // 추천인 보상
+}
