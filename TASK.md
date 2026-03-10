@@ -45,6 +45,34 @@
 
 ---
 
+### Phase NICKNAME: 활동명 시스템 (T420~T424)
+
+> 계획서: `docs/plans/2026-03-10-nickname-system.md`
+
+- [ ] **T420: DB 스키마 + 마이그레이션 + 프로필 수정 API**
+  - AC: PersonaWorldUser에 nickname 컬럼 추가 + 마이그레이션 SQL + PATCH API
+  - AC: register API 응답에 nickname 포함
+  - AC: engine-studio 빌드 성공
+
+- [ ] **T421: 온보딩 활동명 입력 스텝**
+  - AC: 온보딩 시작 시 활동명 입력 UI (2~20자)
+  - AC: 입력값이 cold-start/adaptive API를 통해 DB에 저장
+  - AC: persona-world 빌드 성공
+
+- [ ] **T422: 설정 페이지 활동명 변경**
+  - AC: 설정 > 계정 탭에서 활동명 수정 가능
+  - AC: 변경 시 DB 반영 + 로컬 스토어 동기화
+  - AC: persona-world 빌드 성공
+
+- [ ] **T423: 댓글 시스템 활동명 적용**
+  - AC: 댓글에 nickname 우선 표시 (nickname → name → "익명")
+  - AC: engine-studio 빌드 성공
+
+- [ ] **T424: 채팅/통화 활동명 적용**
+  - AC: 채팅 시 페르소나가 유저를 활동명으로 호칭
+  - AC: 통화 시 페르소나가 유저를 활동명으로 호칭
+  - AC: pnpm validate 전체 PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
