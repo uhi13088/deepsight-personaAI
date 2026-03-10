@@ -8,7 +8,7 @@
 
 import type { ShopItemFromAPI } from "./api"
 
-export type ShopCategory = "persona" | "profile"
+export type ShopCategory = "persona" | "profile" | "arena"
 
 export interface ShopItem {
   id: string
@@ -133,6 +133,74 @@ const FALLBACK_ITEMS: ShopItem[] = [
     emoji: "\u{1F48E}",
     repeatable: false,
   },
+  // ── 아레나 ─────────────────────────────────────
+  {
+    id: "arena_room_1v1",
+    name: "1:1 토론방",
+    description: "페르소나 2명이 토론하는 방 (기본 5라운드)",
+    price: 50,
+    category: "arena",
+    emoji: "\u{1F3DF}\uFE0F",
+    repeatable: true,
+    tag: "NEW",
+  },
+  {
+    id: "arena_room_panel",
+    name: "패널 토론방",
+    description: "페르소나 3~5명이 토론하는 방 (기본 5라운드)",
+    price: 120,
+    category: "arena",
+    emoji: "\u{1F3DF}\uFE0F",
+    repeatable: true,
+    tag: "NEW",
+  },
+  {
+    id: "arena_room_large",
+    name: "대형 토론방",
+    description: "페르소나 6~8명이 토론하는 방 (기본 5라운드)",
+    price: 280,
+    category: "arena",
+    emoji: "\u{1F3DF}\uFE0F",
+    repeatable: true,
+  },
+  {
+    id: "arena_invite_normal",
+    name: "일반 초대권",
+    description: "페르소나 1명을 토론방에 초대합니다",
+    price: 15,
+    category: "arena",
+    emoji: "\u{1F3AB}",
+    repeatable: true,
+  },
+  {
+    id: "arena_invite_premium",
+    name: "프리미엄 초대권",
+    description: "인기 페르소나를 토론방에 초대합니다",
+    price: 40,
+    category: "arena",
+    emoji: "\u{1F3AB}",
+    repeatable: true,
+    tag: "HOT",
+  },
+  {
+    id: "arena_round_addon",
+    name: "라운드 추가 +3",
+    description: "토론 라운드를 3회 추가합니다 (인원 비례 과금)",
+    price: 25,
+    priceLabel: "25~80 코인",
+    category: "arena",
+    emoji: "\u{2699}\uFE0F",
+    repeatable: true,
+  },
+  {
+    id: "arena_replay_save",
+    name: "토론 리플레이 저장",
+    description: "토론 내용을 저장하여 나중에 다시 볼 수 있습니다",
+    price: 15,
+    category: "arena",
+    emoji: "\u{1F4BE}",
+    repeatable: true,
+  },
 ]
 
 // ── API 데이터 → ShopItem 변환 ──────────────────────────────────
@@ -208,7 +276,14 @@ export function isFrameItem(itemId: string): boolean {
 }
 
 /** 카테고리 라벨 */
+/** 아레나 아이템 ID인지 확인 */
+export function isArenaItem(itemId: string): boolean {
+  return itemId.startsWith("arena_")
+}
+
+/** 카테고리 라벨 */
 export const SHOP_CATEGORY_LABELS: Record<ShopCategory, string> = {
   persona: "페르소나",
   profile: "프로필 꾸미기",
+  arena: "아레나",
 }

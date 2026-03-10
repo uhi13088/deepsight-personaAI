@@ -16,6 +16,7 @@ export type TriggerType =
   | "BOT_PATTERN_DETECTED"
   | "FACTBOOK_VIOLATION"
   | "SCHEDULED_CHECK"
+  | "USER_ARENA"
 
 export interface ArenaTrigger {
   type: TriggerType
@@ -71,6 +72,7 @@ const TRIGGER_CONDITIONS: Record<TriggerType, Omit<TriggerCondition, "type">> = 
   BOT_PATTERN_DETECTED: { priority: "HIGH", maxDelayHours: 1 },
   FACTBOOK_VIOLATION: { priority: "MEDIUM", maxDelayHours: 24 },
   SCHEDULED_CHECK: { priority: "LOW", maxDelayHours: 168 }, // 1주
+  USER_ARENA: { priority: "LOW", maxDelayHours: 24 }, // 유저 토론 데이터 — 낮은 우선순위
 }
 
 // ── 트리거 생성 ───────────────────────────────────────────────

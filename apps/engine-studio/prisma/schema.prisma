@@ -3163,3 +3163,83 @@ enum CouponType {
   WELCOME   // 신규가입 자동 발급
   REFERRAL  // 추천인 보상
 }
+
+// ============================================
+// PW 아레나 — 유저 토론 시스템 (T425~T439)
+// ============================================
+
+enum PWArenaRoomType {
+  ROOM_1V1   // 1:1 토론방 (2인)
+  ROOM_PANEL // 패널 토론방 (3~5인)
+  ROOM_LARGE // 대형 토론방 (6~8인)
+}
+
+enum PWArenaStatus {
+  WAITING     // 생성됨, 토론 시작 대기
+  IN_PROGRESS // 토론 진행 중
+  COMPLETED   // 토론 완료
+  CANCELLED   // 취소됨
+}
+
+/// PW 유저가 생성한 토론 세션
+model PWArenaSession {
+  id              String          @id @default(cuid())
+  userId          String          @map("user_id")           // PersonaWorldUser ID (세션 소유자)
+  roomType        PWArenaRoomType @map("room_type")
+  topic           String          @db.Text
+  participantIds  Json            @map("participant_ids")    // string[] — 참여 페르소나 ID 목록
+  currentRound    Int             @default(0) @map("current_round")
+  maxRounds       Int             @map("max_rounds")
+  status          PWArenaStatus   @default(WAITING)
+  replaySaved     Boolean         @default(false) @map("replay_saved")
+  totalCoinsSpent Int             @default(0) @map("total_coins_spent")
+
+  // 엔진 품질 파이프라인 연동
+  qualitySynced   Boolean         @default(false) @map("quality_synced") // 엔진에 전송 완료 여부
+
+  createdAt       DateTime        @default(now()) @map("created_at")
+  completedAt     DateTime?       @map("completed_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  turns           PWArenaTurn[]
+  votes           PWArenaVote[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("pw_arena_sessions")
+}
+
+/// PW 아레나 토론 턴 (페르소나 발언)
+model PWArenaTurn {
+  id          String         @id @default(cuid())
+  sessionId   String         @map("session_id")
+  session     PWArenaSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  roundNumber Int            @map("round_number")   // 1-based
+  speakerId   String         @map("speaker_id")     // 페르소나 ID
+  content     String         @db.Text
+  tokensUsed  Int            @default(0) @map("tokens_used")
+
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  @@unique([sessionId, roundNumber, speakerId])
+  @@index([sessionId])
+  @@map("pw_arena_turns")
+}
+
+/// PW 아레나 유저 투표
+model PWArenaVote {
+  id          String         @id @default(cuid())
+  sessionId   String         @map("session_id")
+  session     PWArenaSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId      String         @map("user_id")        // 투표한 PW 유저 ID
+  personaId   String         @map("persona_id")     // 투표 대상 페르소나
+  roundNumber Int?           @map("round_number")   // null이면 전체 투표
+
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  @@unique([sessionId, userId, roundNumber])
+  @@index([sessionId])
+  @@map("pw_arena_votes")
+}
