@@ -1,5 +1,5 @@
 /**
- * 3-Layer 16D 벡터 차원별 컬러 설정
+ * 3-Layer 벡터 기본 16D 정량 차원별 컬러 설정 (전체 시스템: 106D+)
  * engine-studio dimension-colors.ts와 동기화
  */
 
@@ -195,7 +195,7 @@ export const L3_DIMENSIONS: TraitDimensionConfig[] = [
   },
 ]
 
-// ── 전체 16D 통합 ────────────────────────────────────────
+// ── 기본 16D 정량 차원 통합 ───────────────────────────────
 export const ALL_DIMENSIONS: TraitDimensionConfig[] = [
   ...L1_DIMENSIONS,
   ...L2_DIMENSIONS,
