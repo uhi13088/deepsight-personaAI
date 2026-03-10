@@ -68,7 +68,12 @@ https://engine.deepsight.ai/api/internal
     - [GET/POST/PUT /persona-world-admin/news](#getpostput-persona-world-adminnews)
 17. [PersonaWorld 품질](#19-personaworld-품질)
     - [GET/POST /persona-world-admin/quality](#getpost-persona-world-adminquality)
-18. [Autonomy (자율 동작)](#20-autonomy-자율-동작)
+18. [PersonaWorld 쿠폰 관리](#21-personaworld-쿠폰-관리)
+    - [GET /persona-world-admin/coupons](#get-persona-world-admincoupons)
+    - [POST /persona-world-admin/coupons](#post-persona-world-admincoupons)
+    - [PUT /persona-world-admin/coupons](#put-persona-world-admincoupons)
+    - [DELETE /persona-world-admin/coupons](#delete-persona-world-admincoupons)
+19. [Autonomy (자율 동작)](#20-autonomy-자율-동작)
     - [GET /autonomy/corrections](#get-autonomycorrections)
     - [PATCH /autonomy/corrections/:id/review](#patch-autonomycorrectionsidreview)
     - [GET /autonomy/meta-cognition](#get-autonomymeta-cognition)
@@ -2857,4 +2862,103 @@ GET /api/internal/persona-world-admin/quality
     }
   }
 }
+```
+
+---
+
+## 21. PersonaWorld 쿠폰 관리
+
+### GET /persona-world-admin/coupons
+
+쿠폰 목록 조회.
+
+**쿼리 파라미터**
+
+| 필드       | 타입     | 필수 | 설명                            |
+| ---------- | -------- | ---- | ------------------------------- |
+| `type`     | `string` |      | MANUAL / WELCOME / REFERRAL     |
+| `isActive` | `string` |      | "true" / "false"                |
+| `search`   | `string` |      | 코드/설명 검색                  |
+| `limit`    | `number` |      | 페이지 크기 (기본 50, 최대 100) |
+| `offset`   | `number` |      | 오프셋 (기본 0)                 |
+
+**응답 (200 OK)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "coupons": [
+      {
+        "id": "...",
+        "code": "WELCOME100",
+        "type": "MANUAL",
+        "coinAmount": 100,
+        "description": "신규가입 프로모션",
+        "maxRedemptions": 1000,
+        "usedCount": 42,
+        "isActive": true,
+        "expiresAt": "2026-12-31T00:00:00.000Z",
+        "createdBy": "admin-id",
+        "createdAt": "2026-03-10T00:00:00.000Z"
+      }
+    ],
+    "total": 1
+  }
+}
+```
+
+### POST /persona-world-admin/coupons
+
+쿠폰 생성.
+
+**요청 Body**
+
+| 필드             | 타입      | 필수 | 설명                                   |
+| ---------------- | --------- | ---- | -------------------------------------- |
+| `code`           | `string`  | △    | 쿠폰 코드 (autoGenerate=false 시 필수) |
+| `autoGenerate`   | `boolean` |      | true면 자동 코드 생성                  |
+| `prefix`         | `string`  |      | 자동 생성 시 접두사                    |
+| `type`           | `string`  |      | MANUAL / WELCOME / REFERRAL            |
+| `coinAmount`     | `number`  | ✅   | 지급 코인 수 (1 이상)                  |
+| `description`    | `string`  |      | 관리자 메모                            |
+| `maxRedemptions` | `number`  |      | 최대 사용 횟수 (기본 1)                |
+| `expiresAt`      | `string`  |      | 만료일 ISO 8601 (null = 무기한)        |
+
+**응답 (201 Created)**
+
+```json
+{
+  "success": true,
+  "data": { "id": "...", "code": "EVENT-ABCD1234", "coinAmount": 500, "...": "..." }
+}
+```
+
+### PUT /persona-world-admin/coupons
+
+쿠폰 수정.
+
+**요청 Body**
+
+| 필드             | 타입      | 필수 | 설명               |
+| ---------------- | --------- | ---- | ------------------ |
+| `id`             | `string`  | ✅   | 쿠폰 ID            |
+| `coinAmount`     | `number`  |      | 지급 코인 수       |
+| `description`    | `string`  |      | 설명               |
+| `maxRedemptions` | `number`  |      | 최대 사용 횟수     |
+| `isActive`       | `boolean` |      | 활성/비활성        |
+| `expiresAt`      | `string`  |      | 만료일 (null 가능) |
+
+### DELETE /persona-world-admin/coupons
+
+쿠폰 비활성화 (soft delete).
+
+**쿼리 파라미터**
+
+| 필드 | 타입     | 필수 | 설명    |
+| ---- | -------- | ---- | ------- |
+| `id` | `string` | ✅   | 쿠폰 ID |
+
+```
+
 ```

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import Script from "next/script"
 import { toast } from "sonner"
-import { ArrowLeft, Coins, Check, Lock, Zap } from "lucide-react"
+import { ArrowLeft, Coins, Check, Lock, Zap, Ticket } from "lucide-react"
 import { PWLogoWithText, PWCard, PWButton, PWBottomNav } from "@/components/persona-world"
 import { useUserStore } from "@/lib/user-store"
 import { clientApi } from "@/lib/api"
@@ -39,6 +39,8 @@ export default function ShopPage() {
   const [coinLoading, setCoinLoading] = useState<string | null>(null)
   const [tossReady, setTossReady] = useState(false)
 
+  const [couponCode, setCouponCode] = useState("")
+  const [couponLoading, setCouponLoading] = useState(false)
   const [serverBalance, setServerBalance] = useState<number | null>(null)
   // 서버 잔액과 로컬 잔액 중 큰 값을 사용
   // (온보딩 크레딧은 로컬에만 존재, 결제 크레딧은 서버에만 존재할 수 있음)
@@ -57,6 +59,32 @@ export default function ShopPage() {
       .then((data) => setServerBalance(data.balance))
       .catch(() => {})
   }, [profile?.id])
+  const handleCouponRedeem = async () => {
+    const userId = profile?.id
+    if (!userId) {
+      toast.error("로그인이 필요합니다")
+      return
+    }
+    const code = couponCode.trim()
+    if (!code) {
+      toast.error("쿠폰 코드를 입력해주세요")
+      return
+    }
+
+    setCouponLoading(true)
+    try {
+      const result = await clientApi.redeemCoupon(userId, code)
+      setServerBalance(result.newBalance)
+      setCouponCode("")
+      toast.success(`${result.coinAmount} 코인이 지급되었습니다!`)
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "쿠폰 적용 실패"
+      toast.error(msg)
+    } finally {
+      setCouponLoading(false)
+    }
+  }
+
   const handleCoinPurchase = async (packageId: string) => {
     const userId = profile?.id
     if (!userId) {
@@ -213,6 +241,38 @@ export default function ShopPage() {
                 )}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* 쿠폰 코드 입력 */}
+        <div className="mb-6">
+          <h2 className="mb-3 flex items-center gap-2 font-semibold text-gray-900">
+            <Ticket className="h-5 w-5 text-purple-500" />
+            쿠폰 코드
+          </h2>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={couponCode}
+              onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleCouponRedeem()
+              }}
+              placeholder="쿠폰 코드를 입력하세요"
+              disabled={couponLoading}
+              className="flex-1 rounded-xl border-2 border-gray-200 bg-white px-4 py-2.5 text-sm font-medium uppercase placeholder:normal-case placeholder:text-gray-400 focus:border-purple-400 focus:outline-none disabled:opacity-50"
+            />
+            <button
+              onClick={() => void handleCouponRedeem()}
+              disabled={couponLoading || !couponCode.trim()}
+              className="rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 px-5 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:shadow-lg disabled:opacity-50"
+            >
+              {couponLoading ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              ) : (
+                "적용"
+              )}
+            </button>
           </div>
         </div>
 

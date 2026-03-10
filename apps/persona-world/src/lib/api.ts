@@ -670,6 +670,34 @@ export const clientApi = {
     return json.data!
   },
 
+  // ── 쿠폰 코드 적용 ────────────────────────────────────────
+  async redeemCoupon(userId: string, code: string) {
+    const res = await fetch(`/api/persona-world/coupons/redeem`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, code }),
+    })
+
+    const json: ApiResponse<{
+      coinAmount: number
+      newBalance: number
+      couponCode: string
+    }> = await res.json()
+
+    if (!json.success) {
+      const errorMessages: Record<string, string> = {
+        COUPON_NOT_FOUND: "존재하지 않는 쿠폰 코드입니다",
+        COUPON_INACTIVE: "비활성화된 쿠폰입니다",
+        COUPON_EXPIRED: "만료된 쿠폰입니다",
+        COUPON_LIMIT_REACHED: "쿠폰 사용 한도에 도달했습니다",
+        COUPON_ALREADY_USED: "이미 사용한 쿠폰입니다",
+      }
+      const code = json.error?.code ?? ""
+      throw new Error(errorMessages[code] ?? json.error?.message ?? "쿠폰 적용 실패")
+    }
+    return json.data!
+  },
+
   // ── SNS 재분석 실행 ──────────────────────────────────────
   async reanalyzeSns(userId: string) {
     const res = await fetch(`/api/persona-world/onboarding/sns/reanalyze`, {
