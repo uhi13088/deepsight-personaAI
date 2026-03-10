@@ -223,13 +223,13 @@ export default function NotificationSettingsPage() {
               </div>
               <button
                 onClick={() => handleToggleAll(!allEnabled)}
-                className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${
+                className={`inline-flex h-7 w-12 shrink-0 items-center rounded-full border-2 border-transparent transition-colors ${
                   allEnabled ? "bg-purple-500" : "bg-gray-300"
                 }`}
               >
                 <span
-                  className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                    allEnabled ? "translate-x-6" : "translate-x-1"
+                  className={`block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                    allEnabled ? "translate-x-6" : "translate-x-0"
                   }`}
                 />
               </button>
@@ -248,13 +248,13 @@ export default function NotificationSettingsPage() {
                   </div>
                   <button
                     onClick={() => handleToggle(type.key, !prefs[type.key])}
-                    className={`relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors ${
+                    className={`inline-flex h-6 w-10 shrink-0 items-center rounded-full border-2 border-transparent transition-colors ${
                       prefs[type.key] ? "bg-purple-500" : "bg-gray-300"
                     }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-                        prefs[type.key] ? "translate-x-5" : "translate-x-1"
+                      className={`block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                        prefs[type.key] ? "translate-x-5" : "translate-x-0"
                       }`}
                     />
                   </button>
@@ -279,13 +279,13 @@ export default function NotificationSettingsPage() {
                   </div>
                   <button
                     onClick={() => handleQuietToggle(!quietEnabled)}
-                    className={`relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors ${
+                    className={`inline-flex h-6 w-10 shrink-0 items-center rounded-full border-2 border-transparent transition-colors ${
                       quietEnabled ? "bg-indigo-500" : "bg-gray-300"
                     }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-                        quietEnabled ? "translate-x-5" : "translate-x-1"
+                      className={`block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                        quietEnabled ? "translate-x-5" : "translate-x-0"
                       }`}
                     />
                   </button>

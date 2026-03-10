@@ -290,7 +290,7 @@ export default function SettingsPage() {
                 <div>
                   <div className="text-sm font-medium">취향 분석</div>
                   <div className="text-xs text-gray-500">
-                    {profile?.vector ? "다시 분석하기" : "나의 취향 프로필 만들기"}
+                    {profile?.vector ? "다시 분석하기" : "취향 온보딩 시작하기"}
                   </div>
                 </div>
                 <ChevronRight className="h-5 w-5 text-gray-500" />
