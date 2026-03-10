@@ -528,24 +528,27 @@ export const clientApi = {
   async requestPersonaGeneration(
     userId: string,
     userVector: Record<string, unknown>,
-    topSimilarity: number
+    topSimilarity: number,
+    useCredits?: boolean
   ) {
     const res = await fetch(`/api/public/persona-requests`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, userVector, topSimilarity }),
+      body: JSON.stringify({ userId, userVector, topSimilarity, useCredits }),
     })
     if (!res.ok) {
       const json = await res.json().catch(() => null)
-      throw new Error(
-        (json as { error?: { message?: string } })?.error?.message ?? "페르소나 생성 요청 실패"
-      )
+      const parsed = json as { error?: { code?: string; message?: string } } | null
+      const err = new Error(parsed?.error?.message ?? "페르소나 생성 요청 실패")
+      ;(err as Error & { code?: string }).code = parsed?.error?.code
+      throw err
     }
 
     const json: ApiResponse<{
       id: string
       status: string
       scheduledDate: string
+      creditSpent: number
       message: string
     }> = await res.json()
     if (!json.success) throw new Error(json.error?.message || "Unknown error")

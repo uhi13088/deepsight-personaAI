@@ -2314,6 +2314,7 @@ model PersonaGenerationRequest {
 
   userVector          Json                      // 요청 시점의 사용자 벡터 (ThreeLayerVector)
   topSimilarity       Decimal                   @db.Decimal(5, 2) // 요청 시점 최고 유사도 (%)
+  creditSpent         Int                       @default(0) // 크레딧 사용량 (0=무료, 300=유료)
   status              PersonaRequestStatus      @default(PENDING)
   scheduledDate       DateTime                  // 생성 예정일
 

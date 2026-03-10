@@ -39,6 +39,26 @@
 - 새로운 사용 방법
 -->
 
+## [2026-03-10] T414: 크레딧 기반 페르소나 재요청
+
+### Added
+
+- persona_generation_requests.creditSpent: 크레딧 사용량 (INT, DEFAULT 0). 무료=0, 유료=300
+
+### Migration
+
+```sql
+-- 059_persona_request_credit.sql
+ALTER TABLE "persona_generation_requests"
+  ADD COLUMN IF NOT EXISTS "creditSpent" INTEGER NOT NULL DEFAULT 0;
+```
+
+### Claude에게
+
+- PersonaGenerationRequest 조회 시 creditSpent 필드 포함됨
+- POST /persona-requests 에 useCredits 파라미터 추가 (70%+ 유사도 시 true 필수)
+- 70% 미만 = 무료 (creditSpent=0), 70% 이상 = 300 크레딧 차감
+
 ## [2026-03-08] T370: KakaoLink (카카오톡 페르소나 연동)
 
 ### Added

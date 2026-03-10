@@ -823,7 +823,9 @@ paths:
       summary: 페르소나 생성 요청
       description: |
         새 페르소나 생성을 요청합니다.
-        - 유사도 70% 이상이면 요청 거부 (SIMILARITY_TOO_HIGH)
+        - 유사도 70% 미만: 무료 요청
+        - 유사도 70% 이상 + useCredits=true: 크레딧 300 차감 후 요청
+        - 유사도 70% 이상 + useCredits 미지정: 거부 (SIMILARITY_TOO_HIGH)
         - 이미 진행 중인 요청이 있으면 중복 거부 (DUPLICATE_REQUEST)
         - 인큐베이터 dailyLimit에 따라 자동 스케줄링
       requestBody:
@@ -841,6 +843,12 @@ paths:
                 $ref: "#/components/schemas/PersonaRequestCreateResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "402":
+          description: 크레딧 부족
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "409":
           description: 중복 요청
           content:
@@ -2287,6 +2295,9 @@ components:
           enum: [PENDING, SCHEDULED, GENERATING, COMPLETED, FAILED]
         topSimilarity:
           type: number
+        creditSpent:
+          type: integer
+          description: 크레딧 사용량 (0=무료, 300=유료)
         scheduledDate:
           type: string
           format: date-time
@@ -2337,7 +2348,10 @@ components:
           description: 사용자 성향 벡터 데이터
         topSimilarity:
           type: number
-          description: 기존 페르소나와의 최대 유사도 (0-100). 70 이상이면 거부됨.
+          description: 기존 페르소나와의 최대 유사도 (0-100)
+        useCredits:
+          type: boolean
+          description: 크레딧 사용 여부. 유사도 70% 이상일 때 true 필수 (비용 300)
 
     PersonaRequestCreateResponse:
       type: object
@@ -2356,6 +2370,9 @@ components:
             scheduledDate:
               type: string
               format: date-time
+            creditSpent:
+              type: integer
+              description: 실제 차감된 크레딧 (0 또는 300)
             message:
               type: string
 

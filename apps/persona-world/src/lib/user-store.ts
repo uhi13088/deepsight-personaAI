@@ -138,7 +138,7 @@ interface UserState {
 
   // 페르소나 생성 요청
   personaRequests: PersonaRequest[]
-  requestPersona: (topSimilarity: number) => Promise<PersonaRequest | null>
+  requestPersona: (topSimilarity: number, useCredits?: boolean) => Promise<PersonaRequest | null>
   fetchPersonaRequests: () => Promise<void>
   hasActiveRequest: () => boolean
 
@@ -530,7 +530,7 @@ export const useUserStore = create<UserState>()(
 
       // 페르소나 생성 요청
       personaRequests: [],
-      requestPersona: async (topSimilarity) => {
+      requestPersona: async (topSimilarity, useCredits) => {
         const state = get()
         const userId = state.profile?.id
         const userVector = state.profile?.vector
@@ -540,7 +540,8 @@ export const useUserStore = create<UserState>()(
           const result = await clientApi.requestPersonaGeneration(
             userId,
             userVector as unknown as Record<string, unknown>,
-            topSimilarity
+            topSimilarity,
+            useCredits
           )
           const newRequest: PersonaRequest = {
             id: result.id,
@@ -549,13 +550,24 @@ export const useUserStore = create<UserState>()(
             scheduledDate: result.scheduledDate,
             topSimilarity,
           }
-          set((s) => ({
-            personaRequests: [newRequest, ...s.personaRequests],
-          }))
+          // 크레딧 차감 시 로컬 잔액 동기화
+          if (result.creditSpent > 0) {
+            set((s) => ({
+              personaRequests: [newRequest, ...s.personaRequests],
+              onboarding: {
+                ...s.onboarding,
+                creditsBalance: Math.max(0, s.onboarding.creditsBalance - result.creditSpent),
+              },
+            }))
+          } else {
+            set((s) => ({
+              personaRequests: [newRequest, ...s.personaRequests],
+            }))
+          }
           return newRequest
         } catch (err) {
           console.warn("[user-store] Persona request failed:", err)
-          return null
+          throw err
         }
       },
 
