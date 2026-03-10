@@ -7,7 +7,7 @@
 
 ## 🏷️ 현재 버전: v4.2.0-dev (Multimodal)
 
-> **최종 갱신: 2026-03-09**
+> **최종 갱신: 2026-03-10**
 
 ### 버전 히스토리
 
@@ -45,13 +45,67 @@
 
 ---
 
+### Phase NICKNAME: 활동명 시스템 (T420~T424)
+
+> 계획서: `docs/plans/2026-03-10-nickname-system.md`
+
+- [ ] **T420: DB 스키마 + 마이그레이션 + 프로필 수정 API**
+  - AC: PersonaWorldUser에 nickname 컬럼 추가 + 마이그레이션 SQL + PATCH API
+  - AC: register API 응답에 nickname 포함
+  - AC: engine-studio 빌드 성공
+
+- [ ] **T421: 온보딩 활동명 입력 스텝**
+  - AC: 온보딩 시작 시 활동명 입력 UI (2~20자)
+  - AC: 입력값이 cold-start/adaptive API를 통해 DB에 저장
+  - AC: persona-world 빌드 성공
+
+- [ ] **T422: 설정 페이지 활동명 변경**
+  - AC: 설정 > 계정 탭에서 활동명 수정 가능
+  - AC: 변경 시 DB 반영 + 로컬 스토어 동기화
+  - AC: persona-world 빌드 성공
+
+- [ ] **T423: 댓글 시스템 활동명 적용**
+  - AC: 댓글에 nickname 우선 표시 (nickname → name → "익명")
+  - AC: engine-studio 빌드 성공
+
+- [ ] **T424: 채팅/통화 활동명 적용**
+  - AC: 채팅 시 페르소나가 유저를 활동명으로 호칭
+  - AC: 통화 시 페르소나가 유저를 활동명으로 호칭
+  - AC: pnpm validate 전체 PASS
+
 ---
 
 ## 🔄 IN_PROGRESS (진행중)
 
 ---
 
+> **최종 갱신: 2026-03-10**
+
 ## ✅ DONE (완료)
+
+### Phase EXPLORE: 탐색 페이지 개선 + 매칭 버그 수정 (T415~T419) ✅ 2026-03-10
+
+- [x] **T415: 트렌딩 해시태그 최대 10개 제한** ✅ 2026-03-10
+  - 변경: `api/public/search/route.ts` (SQL LIMIT 20→10), `explore/page.tsx` (slice 12→10)
+  - 최근 1주일 기준 정렬 유지
+
+- [x] **T416: 페르소나 클러스터 섹션 제거** ✅ 2026-03-10
+  - 변경: `explore/page.tsx` (UI 제거), `api/persona-world/explore/route.ts`, `api/public/explore/route.ts`
+  - 하위호환: API 응답에 `clusters: []` 유지
+
+- [x] **T417: 활성 토론 3일 제한 + 자동 종료 조건** ✅ 2026-03-10
+  - 변경: 양쪽 explore API route — `createdAt >= 3일전`, `commentCount < 50`, `likeCount < 100`
+  - 조건 충족 시 목록에서 자동 제외
+
+- [x] **T418: 신규 페르소나 섹션 제거** ✅ 2026-03-10
+  - 변경: `explore/page.tsx` (UI 제거), 양쪽 explore API route (쿼리 제거)
+  - 하위호환: API 응답에 `newPersonas: []` 유지
+
+- [x] **T419: 온보딩 완료 후 페르소나 매칭 버그 수정** ✅ 2026-03-10
+  - 근본 원인 3가지: ① PersonaWorldUser.update → upsert (레코드 미존재 대응)
+  - ② completedOnboarding 판정: `profileQuality !== "BASIC"` → 벡터 존재 여부도 체크
+  - ③ cold-start + adaptive 양쪽 동일 수정
+  - 변경: `onboarding/cold-start/route.ts`, `onboarding/adaptive/start/route.ts`, `auth/register/route.ts`
 
 ### Phase COUPON: 쿠폰/프로모션 코드 시스템 (T410~T414) ✅ 2026-03-10
 

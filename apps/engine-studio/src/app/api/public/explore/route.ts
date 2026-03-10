@@ -4,66 +4,23 @@ import { prisma } from "@/lib/prisma"
 /**
  * GET /api/public/explore
  *
- * Explore 페이지 종합 API — 4개 섹션 데이터를 한 번에 반환
- *
- * Query Parameters:
- * - search: 검색어 (optional)
- * - role: 역할 필터 (optional, comma-separated: REVIEWER,CURATOR)
+ * Explore 페이지 종합 API — 핫 토픽 + 활성 토론 반환
  *
  * Returns:
- * - clusters: 역할별 페르소나 그룹
  * - hotTopics: 핫 토픽 (활성 포스트 기반)
- * - activeDebates: 활성 토론/VS_BATTLE 포스트
- * - newPersonas: 신규 페르소나 하이라이트
+ * - activeDebates: 활성 토론/VS_BATTLE 포스트 (3일 이내, 자동 종료 조건 적용)
  */
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = request.nextUrl
-    const search = searchParams.get("search") || ""
-    const roleFilter = searchParams.get("role")
-    const roles = roleFilter ? roleFilter.split(",").filter(Boolean) : []
-
     const activeStatuses = ["ACTIVE", "STANDARD"] as const
 
-    // ── 공통 필터 ───────────────────────────────────────────
-    const personaWhere: Record<string, unknown> = {
-      status: { in: [...activeStatuses] },
-    }
-    if (search) {
-      personaWhere.OR = [
-        { name: { contains: search, mode: "insensitive" } },
-        { tagline: { contains: search, mode: "insensitive" } },
-        { expertise: { hasSome: [search] } },
-      ]
-    }
-    if (roles.length > 0) {
-      personaWhere.role = { in: roles }
-    }
-
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
 
-    // 4개 독립 쿼리를 병렬 실행
-    const [personasForClusters, hotPosts, activeDebates, newPersonas] = await Promise.all([
-      // 1. 역할별 클러스터
-      prisma.persona.findMany({
-        where: personaWhere,
-        select: {
-          id: true,
-          name: true,
-          handle: true,
-          tagline: true,
-          role: true,
-          expertise: true,
-          profileImageUrl: true,
-          warmth: true,
-          archetypeId: true,
-          _count: { select: { followers: true, posts: true } },
-        },
-        orderBy: { followers: { _count: "desc" } },
-        take: 50,
-      }),
-      // 2. 핫 토픽
+    // 2개 독립 쿼리를 병렬 실행
+    const [hotPosts, activeDebates] = await Promise.all([
+      // 1. 핫 토픽
       prisma.personaPost.groupBy({
         by: ["type"],
         where: {
@@ -76,11 +33,14 @@ export async function GET(request: NextRequest) {
         orderBy: { _count: { id: "desc" } },
         take: 8,
       }),
-      // 3. 활성 토론
+      // 2. 활성 토론 (3일 이내 + 자동 종료 조건: 댓글 50 미만 & 좋아요 100 미만)
       prisma.personaPost.findMany({
         where: {
           type: { in: ["DEBATE", "VS_BATTLE"] },
           isHidden: false,
+          createdAt: { gte: threeDaysAgo },
+          commentCount: { lt: 50 },
+          likeCount: { lt: 100 },
           persona: { status: { in: [...activeStatuses] } },
         },
         orderBy: [{ commentCount: "desc" }, { likeCount: "desc" }],
@@ -104,66 +64,7 @@ export async function GET(request: NextRequest) {
           },
         },
       }),
-      // 4. 신규 페르소나
-      prisma.persona.findMany({
-        where: { status: { in: [...activeStatuses] } },
-        orderBy: { createdAt: "desc" },
-        take: 6,
-        select: {
-          id: true,
-          name: true,
-          handle: true,
-          tagline: true,
-          role: true,
-          expertise: true,
-          profileImageUrl: true,
-          warmth: true,
-          archetypeId: true,
-          createdAt: true,
-          _count: { select: { followers: true, posts: true } },
-        },
-      }),
     ])
-
-    // 역할별로 그룹핑
-    const clusterMap = new Map<
-      string,
-      Array<{
-        id: string
-        name: string
-        handle: string
-        tagline: string | null
-        role: string
-        profileImageUrl: string | null
-        warmth: number | null
-        archetypeId: string | null
-        followerCount: number
-        postCount: number
-      }>
-    >()
-
-    for (const p of personasForClusters) {
-      const role = p.role
-      if (!clusterMap.has(role)) clusterMap.set(role, [])
-      clusterMap.get(role)!.push({
-        id: p.id,
-        name: p.name,
-        handle: p.handle ?? "",
-        tagline: p.tagline,
-        role: p.role,
-        profileImageUrl: p.profileImageUrl,
-        warmth: p.warmth != null ? Number(p.warmth) : null,
-        archetypeId: p.archetypeId,
-        followerCount: p._count.followers,
-        postCount: p._count.posts,
-      })
-    }
-
-    const clusters = Array.from(clusterMap.entries()).map(([role, personas]) => ({
-      role,
-      count: personas.length,
-      personas: personas.slice(0, 6),
-    }))
 
     const hotTopics = hotPosts.map((g) => ({
       type: g.type,
@@ -176,7 +77,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        clusters,
+        clusters: [],
         hotTopics,
         activeDebates: activeDebates.map((d) => ({
           id: d.id,
@@ -194,20 +95,7 @@ export async function GET(request: NextRequest) {
             profileImageUrl: d.persona.profileImageUrl,
           },
         })),
-        newPersonas: newPersonas.map((p) => ({
-          id: p.id,
-          name: p.name,
-          handle: p.handle ?? "",
-          tagline: p.tagline,
-          role: p.role,
-          expertise: p.expertise ?? [],
-          profileImageUrl: p.profileImageUrl,
-          warmth: p.warmth != null ? Number(p.warmth) : null,
-          archetypeId: p.archetypeId,
-          followerCount: p._count.followers,
-          postCount: p._count.posts,
-          createdAt: p.createdAt.toISOString(),
-        })),
+        newPersonas: [],
       },
     })
   } catch (error) {

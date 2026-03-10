@@ -51,16 +51,19 @@ function PersonaTraitChips({
   vector,
 }: {
   vector: {
-    social: Record<string, number>
-    temperament: Record<string, number>
-    narrative: Record<string, number>
+    social: Record<string, number> | { [k: string]: number }
+    temperament: Record<string, number> | { [k: string]: number }
+    narrative: Record<string, number> | { [k: string]: number }
   }
 }) {
   // 모든 레이어에서 극단적인(0.5에서 먼) 상위 4개 차원을 추출해 자연어 칩으로 표시
+  const social = vector.social as Record<string, number>
+  const temperament = vector.temperament as Record<string, number>
+  const narrative = vector.narrative as Record<string, number>
   const allDims: Array<{ key: string; value: number }> = [
-    ...Object.entries(vector.social).map(([k, v]) => ({ key: k, value: v })),
-    ...Object.entries(vector.temperament).map(([k, v]) => ({ key: k, value: v })),
-    ...Object.entries(vector.narrative).map(([k, v]) => ({ key: k, value: v })),
+    ...Object.entries(social).map(([k, v]) => ({ key: k, value: v })),
+    ...Object.entries(temperament).map(([k, v]) => ({ key: k, value: v })),
+    ...Object.entries(narrative).map(([k, v]) => ({ key: k, value: v })),
   ]
 
   const top = allDims.sort((a, b) => Math.abs(b.value - 0.5) - Math.abs(a.value - 0.5)).slice(0, 4)
@@ -500,7 +503,15 @@ export default function PersonaDetailPage() {
           {/* 성향 키워드 */}
           {persona.vector && (
             <div className="mb-4 flex flex-wrap gap-1.5">
-              <PersonaTraitChips vector={persona.vector} />
+              <PersonaTraitChips
+                vector={
+                  persona.vector as unknown as {
+                    social: Record<string, number>
+                    temperament: Record<string, number>
+                    narrative: Record<string, number>
+                  }
+                }
+              />
             </div>
           )}
 

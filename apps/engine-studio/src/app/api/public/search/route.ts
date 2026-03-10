@@ -160,7 +160,7 @@ async function getTrendingHashtags(): Promise<Array<{ tag: string; count: number
       AND array_length(hashtags, 1) > 0
     GROUP BY tag
     ORDER BY count DESC
-    LIMIT 20
+    LIMIT 10
   `
 
   return result.map((r) => ({
