@@ -1450,7 +1450,7 @@ GET /api/public/blog/persona-vector-explained
 
 ## 12. Persona Requests API
 
-사용자가 새 페르소나 생성을 요청하고 진행 상태를 조회하는 API입니다. 기존 페르소나와의 유사도가 70% 미만일 때만 요청할 수 있으며, 인큐베이터의 일일 한도에 따라 자동 스케줄링됩니다.
+사용자가 새 페르소나 생성을 요청하고 진행 상태를 조회하는 API입니다. 유사도 70% 미만은 무료로 요청 가능하며, 70% 이상은 크레딧(300)을 사용하여 요청할 수 있습니다. 인큐베이터의 일일 한도에 따라 자동 스케줄링됩니다.
 
 ### GET /persona-requests
 
@@ -1479,6 +1479,7 @@ GET /api/public/persona-requests?userId=user_001
         "id": "req_001",
         "status": "COMPLETED",
         "topSimilarity": 45.2,
+        "creditSpent": 0,
         "scheduledDate": "2026-02-19T00:00:00.000Z",
         "completedAt": "2026-02-19T10:30:00.000Z",
         "failReason": null,
@@ -1494,7 +1495,8 @@ GET /api/public/persona-requests?userId=user_001
       {
         "id": "req_002",
         "status": "SCHEDULED",
-        "topSimilarity": 32.1,
+        "topSimilarity": 75.3,
+        "creditSpent": 300,
         "scheduledDate": "2026-02-20T00:00:00.000Z",
         "completedAt": null,
         "failReason": null,
@@ -1520,17 +1522,18 @@ GET /api/public/persona-requests?userId=user_001
 
 ### POST /persona-requests
 
-새 페르소나 생성을 요청합니다. 유사도 70% 이상이면 거부되며, 이미 진행 중인 요청이 있으면 중복 요청이 거부됩니다.
+새 페르소나 생성을 요청합니다. 유사도 70% 미만은 무료, 70% 이상은 크레딧(300)이 필요합니다. 이미 진행 중인 요청이 있으면 중복 요청이 거부됩니다.
 
 **Request Body**
 
-| 필드            | 타입     | 필수 | 설명                                  |
-| --------------- | -------- | ---- | ------------------------------------- |
-| `userId`        | `string` | ✅   | 사용자 ID                             |
-| `userVector`    | `object` | ✅   | 사용자 성향 벡터 데이터               |
-| `topSimilarity` | `number` | ✅   | 기존 페르소나와의 최대 유사도 (0-100) |
+| 필드            | 타입      | 필수 | 설명                                                           |
+| --------------- | --------- | ---- | -------------------------------------------------------------- |
+| `userId`        | `string`  | ✅   | 사용자 ID                                                      |
+| `userVector`    | `object`  | ✅   | 사용자 성향 벡터 데이터                                        |
+| `topSimilarity` | `number`  | ✅   | 기존 페르소나와의 최대 유사도 (0-100)                          |
+| `useCredits`    | `boolean` | ❌   | 크레딧 사용 여부. 유사도 70% 이상일 때 `true` 필수 (비용: 300) |
 
-**요청**
+**요청 (무료 — 유사도 < 70%)**
 
 ```json
 {
@@ -1544,6 +1547,21 @@ GET /api/public/persona-requests?userId=user_001
 }
 ```
 
+**요청 (유료 — 유사도 >= 70%)**
+
+```json
+{
+  "userId": "user_001",
+  "userVector": {
+    "social": { "depth": 0.8, "lens": 0.3, "stance": 0.6 },
+    "temperament": { "openness": 0.9 },
+    "narrative": { "lack": 0.4 }
+  },
+  "topSimilarity": 75.3,
+  "useCredits": true
+}
+```
+
 **응답 (200 OK)**
 
 ```json
@@ -1553,6 +1571,7 @@ GET /api/public/persona-requests?userId=user_001
     "id": "req_003",
     "status": "SCHEDULED",
     "scheduledDate": "2026-02-20T00:00:00.000Z",
+    "creditSpent": 300,
     "message": "오늘 중으로 페르소나가 생성됩니다!"
   }
 }
@@ -1560,11 +1579,12 @@ GET /api/public/persona-requests?userId=user_001
 
 **에러 응답**
 
-| 코드                  | HTTP | 설명                          |
-| --------------------- | ---- | ----------------------------- |
-| `MISSING_PARAM`       | 400  | 필수 파라미터 누락            |
-| `SIMILARITY_TOO_HIGH` | 400  | 유사도 70% 이상 — 요청 불필요 |
-| `DUPLICATE_REQUEST`   | 409  | 이미 진행 중인 요청 존재      |
+| 코드                   | HTTP | 설명                                          |
+| ---------------------- | ---- | --------------------------------------------- |
+| `MISSING_PARAM`        | 400  | 필수 파라미터 누락                            |
+| `SIMILARITY_TOO_HIGH`  | 400  | 유사도 70% 이상인데 `useCredits: true` 미지정 |
+| `INSUFFICIENT_CREDITS` | 402  | 크레딧 부족 (300 필요)                        |
+| `DUPLICATE_REQUEST`    | 409  | 이미 진행 중인 요청 존재                      |
 
 ---
 

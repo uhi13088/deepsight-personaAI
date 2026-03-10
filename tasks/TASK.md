@@ -1350,6 +1350,46 @@
   - 전체 4692 테스트 PASS
   - Build PASS (engine-studio)
 
+## 🔄 IN_PROGRESS (진행중)
+
+### T414: 크레딧 기반 페르소나 재요청 (70%+ 유저)
+
+> 매칭률 70% 이상 유저가 크레딧을 사용해 더 높은 매칭률의 페르소나를 요청할 수 있는 기능.
+> 70% 미만은 기존대로 무료, 70% 이상은 크레딧 300 차감.
+
+- [ ] **T414-1: Backend — persona-requests API 수정**
+  - `topSimilarity >= 70` 시 `SIMILARITY_TOO_HIGH` 거부 → 크레딧 차감 후 허용
+  - 요청 body에 `useCredits: boolean` 옵션 추가
+  - `useCredits=true && topSimilarity >= 70` → credit-service.spendCredits(300) → 요청 생성
+  - `useCredits=false && topSimilarity >= 70` → 기존대로 거부
+  - `topSimilarity < 70` → 기존대로 무료 (useCredits 무시)
+  - PersonaGenerationRequest에 `creditSpent` 필드 기록
+  - 파일: `apps/engine-studio/src/app/api/public/persona-requests/route.ts`
+
+- [ ] **T414-2: Frontend — clientApi + user-store 수정**
+  - `requestPersonaGeneration`에 `useCredits` 파라미터 추가
+  - `requestPersona(topSimilarity, useCredits)` 시그니처 변경
+  - 크레딧 부족 시 에러 핸들링 (INSUFFICIENT_BALANCE)
+  - 성공 시 `creditsBalance` 로컬 차감
+  - 파일: `apps/persona-world/src/lib/api.ts`, `apps/persona-world/src/lib/user-store.ts`
+
+- [ ] **T414-3: Frontend — PWMatchingPreview UI 업데이트**
+  - 70%+ 유저: "더 맞는 페르소나를 찾고 싶다면" 카드 + 크레딧 300 비용 표시 + 요청 버튼
+  - 크레딧 부족 시 "크레딧이 부족합니다" 안내 + 충전 유도
+  - 70% 미만: 기존 무료 요청 UI 유지
+  - 파일: `apps/persona-world/src/components/persona-world/pw-matching-preview.tsx`
+
+- [ ] **T414-4: 테스트 + API 문서 + 전체 검증**
+  - 단위 테스트: 70%+ 크레딧 요청 성공/실패, 잔액 부족, 70% 미만 무료 유지
+  - `docs/api/public.md` + `public.openapi.yaml` 최신화
+  - typecheck + build + test PASS
+
+- **AC**:
+  - 70% 미만 → 무료 요청 (기존 동작 유지)
+  - 70% 이상 + 크레딧 300 이상 → 크레딧 차감 후 요청 성공
+  - 70% 이상 + 크레딧 부족 → 402 에러 + UI 안내
+  - 중복 요청 방지 기존 로직 유지
+
 ## BLOCKED
 
 (없음)

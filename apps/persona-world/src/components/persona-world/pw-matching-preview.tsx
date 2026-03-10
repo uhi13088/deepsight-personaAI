@@ -5,7 +5,7 @@ import { PWCard, PWButton, PWProfileRing, PWSpinner } from "@/components/persona
 import { clientApi } from "@/lib/api"
 import { useUserStore } from "@/lib/user-store"
 import type { MatchingPreviewResponse, MatchingPreviewPersona } from "@/lib/types"
-import { ArrowRight, Play, Trophy, Star, Medal, Sparkles, Heart } from "lucide-react"
+import { ArrowRight, Play, Trophy, Star, Medal, Sparkles, Heart, Coins } from "lucide-react"
 
 interface PWMatchingPreviewProps {
   phase: number
@@ -25,6 +25,7 @@ export function PWMatchingPreview({ phase, userId, onContinue, onFinish }: PWMat
   } | null>(null)
   const requestPersona = useUserStore((s) => s.requestPersona)
   const hasActiveRequest = useUserStore((s) => s.hasActiveRequest)
+  const creditsBalance = useUserStore((s) => s.onboarding.creditsBalance)
 
   useEffect(() => {
     let cancelled = false
@@ -69,12 +70,15 @@ export function PWMatchingPreview({ phase, userId, onContinue, onFinish }: PWMat
 
   const isLastPhase = phase === 3
   const topSimilarity = data.topPersonas[0]?.similarity ?? 0
-  const showRequestButton = topSimilarity < 70
+  const isFreeRequest = topSimilarity < 70
+  const isPaidRequest = topSimilarity >= 70
+  const CREDIT_COST = 300
+  const hasEnoughCredits = creditsBalance >= CREDIT_COST
 
-  async function handleRequestPersona() {
+  async function handleRequestPersona(useCredits?: boolean) {
     setRequesting(true)
     try {
-      const result = await requestPersona(topSimilarity)
+      const result = await requestPersona(topSimilarity, useCredits)
       if (result) {
         setRequestResult({
           success: true,
@@ -89,11 +93,19 @@ export function PWMatchingPreview({ phase, userId, onContinue, onFinish }: PWMat
           message: "요청에 실패했습니다. 다시 시도해주세요.",
         })
       }
-    } catch {
-      setRequestResult({
-        success: false,
-        message: "요청에 실패했습니다. 다시 시도해주세요.",
-      })
+    } catch (err) {
+      const code = (err as Error & { code?: string }).code
+      if (code === "INSUFFICIENT_CREDITS") {
+        setRequestResult({
+          success: false,
+          message: `크레딧이 부족합니다. ${CREDIT_COST} 크레딧이 필요합니다.`,
+        })
+      } else {
+        setRequestResult({
+          success: false,
+          message: "요청에 실패했습니다. 다시 시도해주세요.",
+        })
+      }
     } finally {
       setRequesting(false)
     }
@@ -161,8 +173,8 @@ export function PWMatchingPreview({ phase, userId, onContinue, onFinish }: PWMat
         </PWCard>
       )}
 
-      {/* 페르소나 요청 (유사도 < 70%) */}
-      {showRequestButton && (
+      {/* 페르소나 요청 — 무료 (유사도 < 70%) */}
+      {isFreeRequest && (
         <PWCard className="border-dashed border-purple-200 bg-purple-50/50 p-4">
           <div className="text-center">
             <Sparkles className="mx-auto mb-2 h-6 w-6 text-purple-500" />
@@ -170,7 +182,7 @@ export function PWMatchingPreview({ phase, userId, onContinue, onFinish }: PWMat
               아직 딱 맞는 페르소나가 없나요?
             </p>
             <p className="mb-3 text-xs text-gray-500">
-              당신의 취향에 맞는 새로운 페르소나를 만들어 드립니다
+              당신의 취향에 맞는 새로운 페르소나를 무료로 만들어 드립니다
             </p>
             {requestResult ? (
               <div
@@ -182,7 +194,7 @@ export function PWMatchingPreview({ phase, userId, onContinue, onFinish }: PWMat
               </div>
             ) : (
               <PWButton
-                onClick={handleRequestPersona}
+                onClick={() => handleRequestPersona()}
                 disabled={requesting || hasActiveRequest()}
                 icon={Sparkles}
                 className="w-full"
@@ -191,7 +203,64 @@ export function PWMatchingPreview({ phase, userId, onContinue, onFinish }: PWMat
                   ? "요청 중..."
                   : hasActiveRequest()
                     ? "이미 요청이 진행 중입니다"
-                    : "페르소나 요청하기"}
+                    : "무료 페르소나 요청하기"}
+              </PWButton>
+            )}
+          </div>
+        </PWCard>
+      )}
+
+      {/* 페르소나 요청 — 크레딧 (유사도 >= 70%) */}
+      {isPaidRequest && (
+        <PWCard className="border-dashed border-amber-200 bg-amber-50/50 p-4">
+          <div className="text-center">
+            <Coins className="mx-auto mb-2 h-6 w-6 text-amber-500" />
+            <p className="mb-1 text-sm font-semibold text-gray-800">
+              더 맞는 페르소나를 찾고 싶다면
+            </p>
+            <p className="mb-3 text-xs text-gray-500">
+              크레딧을 사용해 당신에게 더 잘 맞는 페르소나를 요청할 수 있어요
+            </p>
+            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1">
+              <Coins className="h-3.5 w-3.5 text-amber-600" />
+              <span className="text-xs font-semibold text-amber-700">{CREDIT_COST} 크레딧</span>
+              <span className="text-xs text-amber-500">
+                (보유: {creditsBalance.toLocaleString()})
+              </span>
+            </div>
+            {requestResult ? (
+              <div
+                className={`rounded-lg p-3 text-sm ${
+                  requestResult.success ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"
+                }`}
+              >
+                {requestResult.message}
+              </div>
+            ) : !hasEnoughCredits ? (
+              <div className="space-y-2">
+                <p className="text-xs text-red-500">
+                  크레딧이 부족합니다 ({CREDIT_COST - creditsBalance} 크레딧 더 필요)
+                </p>
+                <PWButton
+                  onClick={() => window.location.assign("/shop")}
+                  icon={Coins}
+                  className="w-full"
+                >
+                  크레딧 충전하기
+                </PWButton>
+              </div>
+            ) : (
+              <PWButton
+                onClick={() => handleRequestPersona(true)}
+                disabled={requesting || hasActiveRequest()}
+                icon={Sparkles}
+                className="w-full"
+              >
+                {requesting
+                  ? "요청 중..."
+                  : hasActiveRequest()
+                    ? "이미 요청이 진행 중입니다"
+                    : `${CREDIT_COST} 크레딧으로 페르소나 요청하기`}
               </PWButton>
             )}
           </div>
