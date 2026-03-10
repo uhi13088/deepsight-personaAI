@@ -30,6 +30,7 @@ import {
 import { formatTimeAgo } from "@/lib/format"
 import { PWCard, PWProfileRing } from "@/components/persona-world"
 import type { PersonaFullDetail, TasteItem } from "@/lib/types"
+import { getTraitDimension } from "@/lib/trait-colors"
 
 // ── contentType 아이콘/라벨 ──────────────────────────────
 
@@ -42,6 +43,51 @@ const CONTENT_TYPE_EMOJI: Record<string, string> = {
   ARTICLE: "📰",
   PODCAST: "🎙️",
   OTHER: "✨",
+}
+
+// ── 페르소나 성향 칩 ──────────────────────────────────────
+
+function PersonaTraitChips({
+  vector,
+}: {
+  vector: {
+    social: Record<string, number>
+    temperament: Record<string, number>
+    narrative: Record<string, number>
+  }
+}) {
+  // 모든 레이어에서 극단적인(0.5에서 먼) 상위 4개 차원을 추출해 자연어 칩으로 표시
+  const allDims: Array<{ key: string; value: number }> = [
+    ...Object.entries(vector.social).map(([k, v]) => ({ key: k, value: v })),
+    ...Object.entries(vector.temperament).map(([k, v]) => ({ key: k, value: v })),
+    ...Object.entries(vector.narrative).map(([k, v]) => ({ key: k, value: v })),
+  ]
+
+  const top = allDims.sort((a, b) => Math.abs(b.value - 0.5) - Math.abs(a.value - 0.5)).slice(0, 4)
+
+  const chips = top
+    .map(({ key, value }) => {
+      const dim = getTraitDimension(key)
+      if (!dim) return null
+      const label = value >= 0.6 ? dim.high : value <= 0.4 ? dim.low : null
+      return label
+    })
+    .filter(Boolean) as string[]
+
+  if (chips.length === 0) return null
+
+  return (
+    <>
+      {chips.map((chip) => (
+        <span
+          key={chip}
+          className="rounded-full bg-violet-50 px-2.5 py-0.5 text-xs font-medium text-violet-600"
+        >
+          {chip}
+        </span>
+      ))}
+    </>
+  )
 }
 
 // ── 취향 카드 ─────────────────────────────────────────────
@@ -451,7 +497,14 @@ export default function PersonaDetailPage() {
             </div>
           )}
 
-          {/* 통계 (AC4: 관계 미니맵) */}
+          {/* 성향 키워드 */}
+          {persona.vector && (
+            <div className="mb-4 flex flex-wrap gap-1.5">
+              <PersonaTraitChips vector={persona.vector} />
+            </div>
+          )}
+
+          {/* 통계 */}
           <div className="flex gap-6 border-t border-gray-100 pt-4">
             <div className="text-center">
               <p className="text-lg font-bold text-gray-900">{persona.postCount}</p>
@@ -465,14 +518,6 @@ export default function PersonaDetailPage() {
               <p className="text-lg font-bold text-gray-900">{persona.followingCount}</p>
               <p className="text-xs text-gray-500">팔로잉</p>
             </div>
-            {persona.warmth != null && (
-              <div className="text-center">
-                <p className="text-lg font-bold text-gray-900">
-                  {Math.round(persona.warmth * 100)}%
-                </p>
-                <p className="text-xs text-gray-500">따뜻함</p>
-              </div>
-            )}
           </div>
         </PWCard>
 

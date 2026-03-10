@@ -5,7 +5,7 @@ import { PWCard, PWButton, PWProfileRing, PWSpinner } from "@/components/persona
 import { clientApi } from "@/lib/api"
 import { useUserStore } from "@/lib/user-store"
 import type { MatchingPreviewResponse, MatchingPreviewPersona } from "@/lib/types"
-import { ArrowRight, Play, Trophy, Star, Medal, Sparkles } from "lucide-react"
+import { ArrowRight, Play, Trophy, Star, Medal, Sparkles, Heart } from "lucide-react"
 
 interface PWMatchingPreviewProps {
   phase: number
@@ -101,12 +101,12 @@ export function PWMatchingPreview({ phase, userId, onContinue, onFinish }: PWMat
 
   return (
     <div className="mx-auto w-full max-w-md space-y-6">
-      {/* 신뢰도 헤더 */}
+      {/* 헤더 */}
       <div className="text-center">
         <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-purple-50 px-4 py-2">
-          <Star className="h-4 w-4 text-purple-600" />
+          <Heart className="h-4 w-4 text-purple-600" />
           <span className="text-sm font-semibold text-purple-700">
-            매칭 정밀도: {Math.round(data.confidence * 100)}%
+            취향 일치도: {Math.round(data.confidence * 100)}%
           </span>
         </div>
         <h2 className="text-xl font-bold text-gray-900">
@@ -114,6 +114,11 @@ export function PWMatchingPreview({ phase, userId, onContinue, onFinish }: PWMat
           {phase === 2 && "매칭이 더 정확해졌어요!"}
           {phase === 3 && "최고 수준의 매칭이 완성되었어요!"}
         </h2>
+        <p className="mt-1 text-sm text-gray-500">
+          {phase === 1 && "콘텐츠를 즐기는 스타일이 비슷한 페르소나를 찾았어요"}
+          {phase === 2 && "성격과 기질까지 분석해서 더 정확한 매칭을 찾았어요"}
+          {phase === 3 && "콘텐츠 스타일, 성격, 내면의 이야기까지 모두 반영했어요"}
+        </p>
       </div>
 
       {/* 페르소나 카드 목록 */}
@@ -128,10 +133,18 @@ export function PWMatchingPreview({ phase, userId, onContinue, onFinish }: PWMat
         ))}
       </div>
 
-      {/* Phase 2: 차원 비교 바 */}
+      {/* 매칭 기준 */}
+      {data.topPersonas[0] && (
+        <PWCard className="p-4">
+          <h3 className="mb-2 text-sm font-semibold text-gray-700">이런 점이 비슷해요</h3>
+          <MatchReasonChips similarity={data.topPersonas[0].similarity} phase={phase} />
+        </PWCard>
+      )}
+
+      {/* Phase 2+: 취향 비교 바 */}
       {phase >= 2 && data.topPersonas[0]?.dimComparison && (
         <PWCard className="p-4">
-          <h3 className="mb-3 text-sm font-semibold text-gray-700">취향 비교</h3>
+          <h3 className="mb-3 text-sm font-semibold text-gray-700">나와 비교하기</h3>
           <div className="space-y-2">
             {data.topPersonas[0].dimComparison.map((dim) => (
               <DimComparisonBar key={dim.dimension} dim={dim} />
@@ -245,9 +258,54 @@ function PersonaMatchCard({
       </div>
       <div className="text-right">
         <span className="pw-text-gradient text-lg font-bold">{persona.similarity}%</span>
-        <p className="text-[10px] text-gray-400">유사도</p>
+        <p className="text-[10px] text-gray-400">일치</p>
       </div>
     </PWCard>
+  )
+}
+
+// ── 매칭 기준 칩 ──────────────────────────────────────────────
+
+const MATCH_REASONS_BY_PHASE: Record<number, Array<{ tag: string; desc: string }>> = {
+  1: [
+    { tag: "콘텐츠 감상 스타일", desc: "콘텐츠를 깊이 파고들거나 가볍게 즐기는 방식이 비슷해요" },
+    { tag: "취향 패턴", desc: "좋아하는 장르와 콘텐츠 성향이 닮아있어요" },
+  ],
+  2: [
+    { tag: "콘텐츠 스타일", desc: "콘텐츠를 즐기는 방식이 비슷해요" },
+    { tag: "성격 기질", desc: "감정 표현이나 의사소통 스타일이 통해요" },
+    { tag: "깊은 공감대", desc: "같은 것에 감동받고 반응하는 패턴이 닮았어요" },
+  ],
+  3: [
+    { tag: "콘텐츠 스타일", desc: "콘텐츠를 즐기는 방식이 비슷해요" },
+    { tag: "성격 기질", desc: "소통 방식과 감정 표현이 통해요" },
+    { tag: "내면의 이야기", desc: "삶에서 추구하는 가치와 방향이 닮았어요" },
+    { tag: "종합 매칭", desc: "세 가지 관점을 모두 반영한 최정밀 매칭이에요" },
+  ],
+}
+
+function MatchReasonChips({ similarity, phase }: { similarity: number; phase: number }) {
+  const reasons = MATCH_REASONS_BY_PHASE[phase] ?? MATCH_REASONS_BY_PHASE[1]
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5">
+        {reasons.map((r) => (
+          <span
+            key={r.tag}
+            className="rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-600"
+          >
+            {r.tag}
+          </span>
+        ))}
+      </div>
+      <p className="text-xs text-gray-500">
+        {similarity >= 80
+          ? "취향이 아주 잘 맞는 페르소나에요!"
+          : similarity >= 60
+            ? "많은 부분에서 취향이 통하는 페르소나에요"
+            : "아직 분석이 더 필요하지만, 비슷한 면이 있는 페르소나에요"}
+      </p>
+    </div>
   )
 }
 
@@ -255,11 +313,11 @@ function PersonaMatchCard({
 
 const DIM_LABELS: Record<string, string> = {
   depth: "분석 깊이",
-  lens: "판단 렌즈",
-  stance: "비평 태도",
-  scope: "디테일",
-  taste: "취향 성향",
-  purpose: "목적 지향",
+  lens: "감성 vs 논리",
+  stance: "수용 vs 비판",
+  scope: "핵심 vs 디테일",
+  taste: "클래식 vs 실험",
+  purpose: "재미 vs 의미",
 }
 
 function DimComparisonBar({
