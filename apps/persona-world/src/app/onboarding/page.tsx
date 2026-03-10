@@ -113,10 +113,11 @@ function ProfileSummaryCard({
   let l2Data: Record<string, number>
   let l3Data: Record<string, number>
 
-  if ("social" in vector) {
-    l1Data = vector.social
-    l2Data = vector.temperament
-    l3Data = vector.narrative
+  if ("social" in vector && typeof vector.social === "object") {
+    const structured = vector as LayerVector
+    l1Data = structured.social
+    l2Data = structured.temperament
+    l3Data = structured.narrative
   } else {
     l1Data = Object.fromEntries(Object.entries(vector).filter(([k]) => L1_KEYS.includes(k)))
     l2Data = Object.fromEntries(Object.entries(vector).filter(([k]) => L2_KEYS.includes(k)))

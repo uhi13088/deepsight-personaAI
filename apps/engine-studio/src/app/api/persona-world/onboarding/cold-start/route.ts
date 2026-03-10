@@ -116,33 +116,34 @@ export async function POST(request: NextRequest) {
           },
         })
 
-        // 프로필 레벨 + L1 벡터 + L2(OCEAN) 업데이트
-        await prisma.personaWorldUser.update({
+        // 프로필 레벨 + L1 벡터 + L2(OCEAN) 업데이트 (upsert로 레코드 미존재 대응)
+        const vectorData = {
+          profileQuality: result.profileLevel,
+          ...(result.l1Vector
+            ? {
+                depth: result.l1Vector.depth,
+                lens: result.l1Vector.lens,
+                stance: result.l1Vector.stance,
+                scope: result.l1Vector.scope,
+                taste: result.l1Vector.taste,
+                purpose: result.l1Vector.purpose,
+              }
+            : {}),
+          ...(result.l2Vector
+            ? {
+                openness: result.l2Vector.openness,
+                conscientiousness: result.l2Vector.conscientiousness,
+                extraversion: result.l2Vector.extraversion,
+                agreeableness: result.l2Vector.agreeableness,
+                neuroticism: result.l2Vector.neuroticism,
+                hasOceanProfile: true,
+              }
+            : {}),
+        }
+        await prisma.personaWorldUser.upsert({
           where: { id: uid },
-          data: {
-            profileQuality: result.profileLevel,
-            // L1 벡터를 user 레코드에 저장 (매칭 프리뷰에서 사용)
-            ...(result.l1Vector
-              ? {
-                  depth: result.l1Vector.depth,
-                  lens: result.l1Vector.lens,
-                  stance: result.l1Vector.stance,
-                  scope: result.l1Vector.scope,
-                  taste: result.l1Vector.taste,
-                  purpose: result.l1Vector.purpose,
-                }
-              : {}),
-            ...(result.l2Vector
-              ? {
-                  openness: result.l2Vector.openness,
-                  conscientiousness: result.l2Vector.conscientiousness,
-                  extraversion: result.l2Vector.extraversion,
-                  agreeableness: result.l2Vector.agreeableness,
-                  neuroticism: result.l2Vector.neuroticism,
-                  hasOceanProfile: true,
-                }
-              : {}),
-          },
+          update: vectorData,
+          create: { id: uid, email: `${uid}@onboarding.local`, ...vectorData },
         })
       },
     }

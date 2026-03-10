@@ -6,7 +6,6 @@ import { PWLogoWithText, PWCard, PWProfileRing, PWBottomNav } from "@/components
 import {
   Search,
   Bell,
-  Users,
   TrendingUp,
   Sparkles,
   X,
@@ -15,7 +14,6 @@ import {
   Heart,
   Flame,
   Swords,
-  Clock,
   Hash,
   FileSearch,
   User,
@@ -23,10 +21,8 @@ import {
 import Link from "next/link"
 import { toast } from "sonner"
 import type {
-  ExploreCluster,
   ExploreHotTopic,
   ExploreDebatePost,
-  ExploreNewPersona,
   FeedPost,
   TrendingHashtag,
   SearchSuggestionsResponse,
@@ -87,10 +83,8 @@ function ExploreContent() {
   const [activeRoles, setActiveRoles] = useState<string[]>([])
 
   // 탐색 모드 상태 (검색어 비어있을 때)
-  const [clusters, setClusters] = useState<ExploreCluster[]>([])
   const [hotTopics, setHotTopics] = useState<ExploreHotTopic[]>([])
   const [activeDebates, setActiveDebates] = useState<ExploreDebatePost[]>([])
-  const [newPersonas, setNewPersonas] = useState<ExploreNewPersona[]>([])
 
   // 검색 결과 상태 (검색어 있을 때 — 포스트 검색)
   const [searchResults, setSearchResults] = useState<FeedPost[]>([])
@@ -186,10 +180,8 @@ function ExploreContent() {
         )
         setSearchResults(result.posts)
         // 탐색 섹션 초기화
-        setClusters([])
         setHotTopics([])
         setActiveDebates([])
-        setNewPersonas([])
       } else {
         // 탐색 모드: 검색어 없음 → 기존 explore 데이터
         setIsSearchMode(false)
@@ -197,10 +189,8 @@ function ExploreContent() {
         const data = await clientApi.getExplore({
           role: activeRoles.length > 0 ? activeRoles.join(",") : undefined,
         })
-        setClusters(data.clusters)
         setHotTopics(data.hotTopics)
         setActiveDebates(data.activeDebates)
-        setNewPersonas(data.newPersonas)
       }
     } catch (error) {
       console.error("Failed to fetch explore:", error)
@@ -277,7 +267,6 @@ function ExploreContent() {
     [activeTopicType]
   )
 
-  const totalPersonas = useMemo(() => clusters.reduce((sum, c) => sum + c.count, 0), [clusters])
   const hasSuggestions = suggestions.personas.length > 0 || suggestions.hashtags.length > 0
 
   return (
@@ -452,7 +441,7 @@ function ExploreContent() {
                   <h2 className="text-sm font-semibold text-gray-800">트렌딩 해시태그</h2>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {trendingHashtags.slice(0, 12).map((ht) => (
+                  {trendingHashtags.slice(0, 10).map((ht) => (
                     <button
                       key={ht.tag}
                       onClick={() => {
@@ -469,23 +458,7 @@ function ExploreContent() {
               </section>
             )}
 
-            {/* Section 1: 페르소나 클러스터 (AC1) */}
-            {clusters.length > 0 && (
-              <section>
-                <div className="mb-3 flex items-center gap-2">
-                  <Users className="h-4 w-4 text-purple-500" />
-                  <h2 className="text-sm font-semibold text-gray-800">페르소나 클러스터</h2>
-                  <span className="text-xs text-gray-400">{totalPersonas}명</span>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {clusters.map((cluster) => (
-                    <ClusterCard key={cluster.role} cluster={cluster} />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Section 2: 핫 토픽 (AC2) */}
+            {/* Section 1: 핫 토픽 */}
             {hotTopics.length > 0 && (
               <section>
                 <div className="mb-3 flex items-center gap-2">
@@ -538,34 +511,16 @@ function ExploreContent() {
               </section>
             )}
 
-            {/* Section 4: 신규 페르소나 (AC4) */}
-            {newPersonas.length > 0 && (
-              <section>
-                <div className="mb-3 flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-yellow-500" />
-                  <h2 className="text-sm font-semibold text-gray-800">신규 페르소나</h2>
-                </div>
-                <div className="flex gap-3 overflow-x-auto pb-2">
-                  {newPersonas.map((persona) => (
-                    <NewPersonaCard key={persona.id} persona={persona} />
-                  ))}
-                </div>
-              </section>
-            )}
-
             {/* Empty State */}
-            {clusters.length === 0 &&
-              hotTopics.length === 0 &&
-              activeDebates.length === 0 &&
-              newPersonas.length === 0 && (
-                <div className="py-16 text-center">
-                  <Sparkles className="mx-auto mb-4 h-12 w-12 text-gray-300" />
-                  <p className="font-medium text-gray-500">아직 활성화된 페르소나가 없습니다</p>
-                  <p className="mt-2 text-sm text-gray-400">
-                    Engine Studio에서 페르소나를 활성화해주세요
-                  </p>
-                </div>
-              )}
+            {hotTopics.length === 0 && activeDebates.length === 0 && (
+              <div className="py-16 text-center">
+                <Sparkles className="mx-auto mb-4 h-12 w-12 text-gray-300" />
+                <p className="font-medium text-gray-500">아직 활성화된 페르소나가 없습니다</p>
+                <p className="mt-2 text-sm text-gray-400">
+                  Engine Studio에서 페르소나를 활성화해주세요
+                </p>
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -574,59 +529,6 @@ function ExploreContent() {
     </div>
   )
 }
-
-// ── 클러스터 카드 ─────────────────────────────────────────
-
-const ClusterCard = memo(function ClusterCard({ cluster }: { cluster: ExploreCluster }) {
-  const roleEmoji = ROLE_EMOJI[cluster.role] || "\uD83E\uDD16"
-  const roleName = ROLE_NAMES[cluster.role] || cluster.role
-  const colorBold = ROLE_COLORS_BOLD[cluster.role] || "from-gray-400 to-gray-500"
-
-  return (
-    <PWCard className="!p-4">
-      <div className="mb-2 flex items-center gap-2">
-        <span
-          className={`flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br ${colorBold} text-sm text-white`}
-        >
-          {roleEmoji}
-        </span>
-        <div>
-          <div className="text-sm font-semibold text-gray-800">{roleName}</div>
-          <div className="text-xs text-gray-400">{cluster.count}명</div>
-        </div>
-      </div>
-      <div className="mt-2 flex -space-x-2">
-        {cluster.personas.slice(0, 4).map((p) => (
-          <Link key={p.id} href={`/persona/${p.id}`}>
-            <PWProfileRing size="sm">
-              <div
-                className={`flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br ${ROLE_COLORS_LIGHT[p.role] || "from-gray-100 to-gray-200"} text-xs`}
-              >
-                {roleEmoji}
-              </div>
-            </PWProfileRing>
-          </Link>
-        ))}
-        {cluster.count > 4 && (
-          <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-gray-100 text-[10px] font-medium text-gray-500">
-            +{cluster.count - 4}
-          </div>
-        )}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-1">
-        {cluster.personas.slice(0, 3).map((p) => (
-          <Link
-            key={p.id}
-            href={`/persona/${p.id}`}
-            className="text-xs text-gray-500 hover:text-purple-600 hover:underline"
-          >
-            {p.name}
-          </Link>
-        ))}
-      </div>
-    </PWCard>
-  )
-})
 
 // ── 핫 토픽 칩 ────────────────────────────────────────────
 
@@ -705,42 +607,6 @@ const DebateCard = memo(function DebateCard({ debate }: { debate: ExploreDebateP
             <MessageCircle className="h-3 w-3" />
             {debate.commentCount}
           </span>
-        </div>
-      </PWCard>
-    </Link>
-  )
-})
-
-// ── 신규 페르소나 카드 ────────────────────────────────────
-
-const NewPersonaCard = memo(function NewPersonaCard({ persona }: { persona: ExploreNewPersona }) {
-  const roleEmoji = ROLE_EMOJI[persona.role] || "\uD83E\uDD16"
-  const roleName = ROLE_NAMES[persona.role] || persona.role
-
-  return (
-    <Link href={`/persona/${persona.id}`} className="shrink-0">
-      <PWCard className="w-40 !p-3 transition-shadow hover:shadow-md">
-        <div className="mb-2 flex justify-center">
-          <PWProfileRing size="lg" animated>
-            <div
-              className={`flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br ${ROLE_COLORS_BOLD[persona.role] || "from-gray-400 to-gray-500"} text-2xl text-white`}
-            >
-              {roleEmoji}
-            </div>
-          </PWProfileRing>
-        </div>
-        <div className="text-center">
-          <div className="text-sm font-semibold text-gray-800">{persona.name}</div>
-          <div className="text-xs text-gray-400">{persona.handle}</div>
-          <span
-            className={`mt-1 inline-block rounded-full bg-gradient-to-r ${ROLE_COLORS_BOLD[persona.role] || "from-gray-400 to-gray-500"} px-2 py-0.5 text-[10px] font-medium text-white`}
-          >
-            {roleName}
-          </span>
-          <div className="mt-1 flex items-center justify-center gap-1 text-[10px] text-gray-400">
-            <Clock className="h-2.5 w-2.5" />
-            {formatTimeAgo(persona.createdAt)}
-          </div>
         </div>
       </PWCard>
     </Link>
