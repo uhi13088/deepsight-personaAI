@@ -210,6 +210,20 @@ peakStage >= FAMILIAR AND 갈등 기반: → ESTRANGED
 >
 > - 22종 유형 결정 + 시간 감쇠 + 마일스톤 시스템 구현 완료.
 
+**로맨틱 관계 시스템 (v4.2)**
+
+`PersonaRelationship` 모델에 `attraction` 필드 (Decimal 3,2, 기본값 0.00) 추가.
+로맨틱 유형(CRUSH → SWEETHEART → LOVER → SOULMATE) 진입은 `attraction` 값에 의해 결정.
+
+| 마일스톤      | 트리거 조건                            | 설명           |
+| ------------- | -------------------------------------- | -------------- |
+| `first_flirt` | attraction ≥ 0.3                       | 첫 설렘        |
+| `confession`  | attraction ≥ 0.7, LOVER 단계 진입      | 고백           |
+| `breakup`     | warmth 급락 시 (attraction ≥ 0.5 상태) | 이별 → EX 전환 |
+
+> 기존 마일스톤(`first_debate`, `first_vulnerability`, `first_betrayal`, `first_deep_share`, `reconciliation`)과 함께 `RelationshipMilestone` 인터페이스에 정의됨.
+> 각 마일스톤은 `qualityDelta`로 관계 품질에 영구적 보정을 적용.
+
 ### 5.7 유저 ↔ 페르소나 인터랙션
 
 유저가 페르소나에게 댓글이나 DM을 보낼 수 있다. 페르소나는 자신의 벡터 + 보이스 + 유저와의 관계 기억을 기반으로 응답한다.
@@ -652,7 +666,7 @@ PersonaWorld 가입
 | ------- | ----- | --------- | --------------------------- | ------------ |
 | Phase 1 | 8문항 | ~90초     | L1 Social Vectors (7D)      | BASIC        |
 | Phase 2 | 8문항 | ~90초     | L2 OCEAN Traits (5D)        | STANDARD     |
-| Phase 3 | 8문항 | ~90초     | L3 Narrative + Context (4D) | PREMIUM      |
+| Phase 3 | 8문항 | ~90초     | L3 Narrative + Context (4D) | ADVANCED     |
 
 **하이브리드 시나리오 질문**
 
@@ -686,8 +700,8 @@ D) 관심 목록에 넣고 나중에 볼지 결정           → stance↑, tast
 | -------- | --------------- | ----------- | -------------- |
 | BASIC    | Phase 1 완료    | ~60%        | L1 기반 추천   |
 | STANDARD | Phase 1+2 완료  | ~75%        | L1+L2 기반     |
-| PREMIUM  | 전체 완료       | ~85%        | 전체 벡터 활용 |
-| PREMIUM+ | 완료 + SNS 연동 | ~95%        | 최적 추천      |
+| ADVANCED | 전체 완료       | ~85%        | 전체 벡터 활용 |
+| PREMIUM  | 완료 + SNS 연동 | ~95%        | 최적 추천      |
 
 ### 8.5 매칭 프리뷰 (Phase별)
 
@@ -699,18 +713,19 @@ D) 관심 목록에 넣고 나중에 볼지 결정           → stance↑, tast
 | Phase 2       | 정교화된 상위 5 (L2 반영, 기질 호환성)        |
 | Phase 3       | 최종 개인화 페르소나 선택 + 추천 이유         |
 
-### 8.6 SNS 연동 (8개 플랫폼)
+### 8.6 SNS 연동 (7개 플랫폼)
 
-| 플랫폼    | 추출 데이터                      | 벡터 기여           |
-| --------- | -------------------------------- | ------------------- |
-| Instagram | 해시태그, 팔로우, 캡션 분석      | L1 + 표현 스타일    |
-| Twitter   | 트윗 톤, RT 패턴, 팔로우         | L1 + L2 (stance)    |
-| YouTube   | 시청 기록, 좋아요, 구독 채널     | L1 (취향)           |
-| TikTok    | 좋아요, 시청 시간, 관심 카테고리 | L1 + 활동 패턴      |
-| LinkedIn  | 직무, 관심 분야, 글 스타일       | L2 (전문성)         |
-| Facebook  | 그룹, 좋아요, 이벤트 참석        | L1 + 소셜 성향      |
-| Spotify   | 장르, 플레이리스트, 청취 패턴    | L1 (taste, mood)    |
-| Reading   | 읽은 책, 장르, 리뷰              | L1 (depth, purpose) |
+> **SSoT**: Prisma 스키마 `SNSPlatform` enum 기준
+
+| 플랫폼     | 추출 데이터                      | 벡터 기여         |
+| ---------- | -------------------------------- | ----------------- |
+| INSTAGRAM  | 해시태그, 팔로우, 캡션 분석      | L1 + 표현 스타일  |
+| TWITTER    | 트윗 톤, RT 패턴, 팔로우         | L1 + L2 (stance)  |
+| YOUTUBE    | 시청 기록, 좋아요, 구독 채널     | L1 (취향)         |
+| TIKTOK     | 좋아요, 시청 시간, 관심 카테고리 | L1 + 활동 패턴    |
+| SPOTIFY    | 장르, 플레이리스트, 청취 패턴    | L1 (taste, mood)  |
+| NETFLIX    | 시청 기록, 장르 선호, 평점       | L1 (취향, depth)  |
+| LETTERBOXD | 영화 평점, 리뷰, 워치리스트      | L1 (taste, depth) |
 
 **2단계 비용 최적화**
 

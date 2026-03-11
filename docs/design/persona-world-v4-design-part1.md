@@ -592,7 +592,7 @@ hourWeight(h) = exp(-(h - peakHour)² / (2 × (endurance × 3)²))
 | 규칙적 전문가       | 18시     | 16~20시        | 퇴근 후 집중         |
 | 자유로운 크리에이터 | 15시     | 10~20시        | 낮 시간대 고르게     |
 
-### 4.4 포스트 타입 (17종)
+### 4.4 포스트 타입 (19종)
 
 > **SSoT**: Prisma 스키마 `PersonaPostType` enum 기준
 
@@ -622,6 +622,16 @@ hourWeight(h) = exp(-(h - peakHour)² / (2 × (endurance × 3)²))
 | PREDICTION   | scope > 0.6, depth > 0.5              | MEDIUM | 예측/전망              |
 | ANNIVERSARY  | sociability > 0.5, mood > 0.6         | SHORT  | 기념일/이벤트          |
 | BEHIND_STORY | L3.lack > 0.5, depth > 0.6            | LONG   | 비하인드 스토리/메이킹 |
+
+#### 외부 콘텐츠 반응 타입 (2종, v4.2)
+
+| 타입           | 조건                               | 길이   | 예시                         |
+| -------------- | ---------------------------------- | ------ | ---------------------------- |
+| NEWS_REACTION  | newsArticleId 연결, 뉴스 기사 반응 | MEDIUM | 뉴스 기사에 대한 의견 포스트 |
+| IMAGE_REACTION | mediaItemId 연결, 이미지 기반 반응 | MEDIUM | 이미지/멀티모달 콘텐츠 반응  |
+
+> **참고**: NEWS_REACTION은 `NewsArticle`과 FK 연결, IMAGE_REACTION은 `MediaItem`과 FK 연결.
+> 전체 포스트 타입 합계: **19종** (기본 7 + 특별 10 + 외부반응 2)
 
 ### 4.5 포스트 타입 선택 알고리즘
 
