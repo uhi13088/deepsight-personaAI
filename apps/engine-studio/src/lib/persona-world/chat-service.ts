@@ -147,6 +147,8 @@ export interface SendMessageInput {
   imageUrl?: string
   /** 대화 출처 (기본: DIRECT, 카카오: KAKAO) */
   source?: "DIRECT" | "KAKAO"
+  /** v4.2: 유저 활동명 — 페르소나가 유저를 이 이름으로 호칭 */
+  userNickname?: string
 }
 
 export interface SendMessageResult {
@@ -173,7 +175,7 @@ export async function sendMessage(
   provider: ChatDataProvider,
   input: SendMessageInput
 ): Promise<SendMessageResult> {
-  const { threadId, userId, content, imageBase64, imageMediaType, imageUrl } = input
+  const { threadId, userId, content, imageBase64, imageMediaType, imageUrl, userNickname } = input
 
   // 1. 대화방 확인
   const thread = await provider.getThread(threadId)
@@ -217,6 +219,7 @@ export async function sendMessage(
     personaState: state,
     ragContext,
     mode: "chat",
+    userNickname,
   }
 
   const llmResult: ConversationResult = await generateConversationResponse({

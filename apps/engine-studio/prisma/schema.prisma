@@ -1348,6 +1348,7 @@ model PersonaWorldUser {
   id              String          @id @default(cuid())
   email           String          @unique
   name            String?
+  nickname        String?         // v4.2: 활동명 (2~20자, NULL이면 name → "익명" 폴백)
   profileImageUrl String?
 
   // === 7D 벡터 (유저의 취향, L1) ===

@@ -11,7 +11,16 @@ import {
   PWProfileLevelBadge,
   PWSnsConnect,
 } from "@/components/persona-world"
-import { ArrowRight, ArrowLeft, Sparkles, AlertTriangle, Coins, Link2, Target } from "lucide-react"
+import {
+  ArrowRight,
+  ArrowLeft,
+  Sparkles,
+  AlertTriangle,
+  Coins,
+  Link2,
+  Target,
+  User,
+} from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useUserStore } from "@/lib/user-store"
 import { clientApi } from "@/lib/api"
@@ -234,7 +243,7 @@ const ADAPTIVE_CREDITS = 450 // Phase 1+2+3 합산 (100+150+200)
 
 // ── 온보딩 플로우 상태 ──────────────────────────────────────
 
-type FlowStep = "intro" | "questions" | "preview" | "complete"
+type FlowStep = "intro" | "nickname" | "questions" | "preview" | "complete"
 type OnboardingMode = "adaptive" | "phase"
 
 export default function OnboardingPage() {
@@ -285,6 +294,11 @@ function PhaseOnboardingFlow() {
   const [flowStep, setFlowStep] = useState<FlowStep>("intro")
   const [activePhase, setActivePhase] = useState<1 | 2 | 3>(1)
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0)
+
+  // 활동명
+  const [nicknameInput, setNicknameInput] = useState("")
+  const [nicknameError, setNicknameError] = useState<string | null>(null)
+  const [nicknameSaved, setNicknameSaved] = useState(false)
 
   // 질문 데이터
   const [questions, setQuestions] = useState<OnboardingQuestion[]>([])
@@ -348,6 +362,25 @@ function PhaseOnboardingFlow() {
 
   // Phase 시작
   const handleStartPhase = async () => {
+    // Phase 1에서 아직 활동명을 설정하지 않았다면 nickname 스텝으로
+    if (activePhase === 1 && !nicknameSaved && !profile?.nickname) {
+      setFlowStep("nickname")
+      return
+    }
+    startPhase(activePhase)
+    setFlowStep("questions")
+    await loadQuestions(activePhase)
+  }
+
+  // 활동명 확인 후 질문으로 진행
+  const handleNicknameConfirm = async () => {
+    const trimmed = nicknameInput.trim()
+    if (trimmed.length < 2 || trimmed.length > 20) {
+      setNicknameError("활동명은 2~20자여야 합니다")
+      return
+    }
+    setNicknameError(null)
+    setNicknameSaved(true)
     startPhase(activePhase)
     setFlowStep("questions")
     await loadQuestions(activePhase)
@@ -407,8 +440,13 @@ function PhaseOnboardingFlow() {
         })
       )
 
-      // API 제출
-      const result = await clientApi.submitOnboardingAnswers(userId, activePhase, answerPayload)
+      // API 제출 (Phase 1일 때 nickname 전달)
+      const result = await clientApi.submitOnboardingAnswers(
+        userId,
+        activePhase,
+        answerPayload,
+        activePhase === 1 && nicknameInput.trim() ? nicknameInput.trim() : undefined
+      )
 
       // 스토어 업데이트
       savePhaseAnswers(activePhase, answerPayload)
@@ -596,6 +634,59 @@ function PhaseOnboardingFlow() {
                 </p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── NICKNAME ── */}
+        {flowStep === "nickname" && (
+          <div className="w-full max-w-md text-center">
+            <div className="mb-4 inline-flex rounded-full bg-purple-100 p-3">
+              <User className="h-8 w-8 text-purple-600" />
+            </div>
+            <h1 className="mb-2 text-2xl font-bold text-gray-900">활동명을 정해주세요</h1>
+            <p className="mb-6 text-sm text-gray-500">
+              PersonaWorld에서 사용할 이름이에요. 다른 페르소나가 이 이름으로 불러줄 거예요.
+            </p>
+            <div className="mx-auto max-w-xs space-y-3">
+              <input
+                type="text"
+                value={nicknameInput}
+                onChange={(e) => {
+                  setNicknameInput(e.target.value)
+                  setNicknameError(null)
+                }}
+                placeholder="2~20자"
+                maxLength={20}
+                className={`w-full rounded-xl border px-4 py-3 text-center text-lg font-medium outline-none transition-colors ${
+                  nicknameError
+                    ? "border-red-300 bg-red-50 focus:border-red-400"
+                    : "border-gray-200 bg-gray-50 focus:border-purple-400 focus:bg-white"
+                }`}
+              />
+              {nicknameError && <p className="text-xs text-red-500">{nicknameError}</p>}
+              <p className="text-xs text-gray-400">
+                {nicknameInput.trim().length}/20자 · 나중에 설정에서 변경할 수 있어요
+              </p>
+              <PWButton
+                onClick={handleNicknameConfirm}
+                icon={ArrowRight}
+                disabled={nicknameInput.trim().length < 2}
+                className={nicknameInput.trim().length < 2 ? "opacity-50" : ""}
+              >
+                시작하기
+              </PWButton>
+              <button
+                onClick={async () => {
+                  setNicknameSaved(true)
+                  startPhase(activePhase)
+                  setFlowStep("questions")
+                  await loadQuestions(activePhase)
+                }}
+                className="text-xs text-gray-400 underline hover:text-gray-600"
+              >
+                나중에 설정할게요
+              </button>
+            </div>
           </div>
         )}
 
@@ -787,11 +878,15 @@ function PhaseIntro({ info, onStart }: { info: (typeof PHASE_INFO)[number]; onSt
 
 // ── 적응형 온보딩 플로우 ────────────────────────────────────
 
-type AdaptiveStep = "intro" | "questions" | "complete"
+type AdaptiveStep = "intro" | "nickname" | "questions" | "complete"
 
 function AdaptiveOnboardingFlow() {
   const router = useRouter()
   const { profile, setProfile, completeOnboarding, completePhase } = useUserStore()
+
+  // 활동명
+  const [nicknameInput, setNicknameInput] = useState("")
+  const [nicknameError, setNicknameError] = useState<string | null>(null)
 
   // 플로우 상태
   const [step, setStep] = useState<AdaptiveStep>("intro")
@@ -837,8 +932,28 @@ function AdaptiveOnboardingFlow() {
     }
   }, [])
 
+  // 인트로에서 시작 → 닉네임 스텝으로
+  const handleGoToNickname = () => {
+    if (!profile?.nickname) {
+      setStep("nickname")
+    } else {
+      handleStartAdaptive()
+    }
+  }
+
+  // 닉네임 확인 → 적응형 시작
+  const handleNicknameConfirmAdaptive = () => {
+    const trimmed = nicknameInput.trim()
+    if (trimmed.length < 2 || trimmed.length > 20) {
+      setNicknameError("활동명은 2~20자여야 합니다")
+      return
+    }
+    setNicknameError(null)
+    handleStartAdaptive(trimmed)
+  }
+
   // 적응형 온보딩 시작
-  const handleStart = async () => {
+  const handleStartAdaptive = async (nickname?: string) => {
     setLoading(true)
     setError(null)
     try {
@@ -847,7 +962,7 @@ function AdaptiveOnboardingFlow() {
         userId = crypto.randomUUID()
         setProfile({
           id: userId,
-          nickname: "관찰자",
+          nickname: nickname ?? "관찰자",
           vector: null,
           vectorConfidence: null,
           completedOnboarding: false,
@@ -855,7 +970,7 @@ function AdaptiveOnboardingFlow() {
         })
       }
 
-      const data = await clientApi.startAdaptiveOnboarding(userId)
+      const data = await clientApi.startAdaptiveOnboarding(userId, nickname)
       setSessionId(data.sessionId)
       setCurrentQuestion(data.firstQuestion)
       setProgress({
@@ -1002,7 +1117,12 @@ function AdaptiveOnboardingFlow() {
               </div>
             )}
 
-            <PWButton onClick={handleStart} icon={ArrowRight} className="px-8" disabled={loading}>
+            <PWButton
+              onClick={handleGoToNickname}
+              icon={ArrowRight}
+              className="px-8"
+              disabled={loading}
+            >
               {loading ? "준비 중..." : "시작하기"}
             </PWButton>
 
@@ -1015,6 +1135,54 @@ function AdaptiveOnboardingFlow() {
                 단계별로 나누어 진행하고 싶다면
               </button>
             </p>
+          </div>
+        )}
+
+        {/* ── NICKNAME (적응형) ── */}
+        {step === "nickname" && (
+          <div className="w-full max-w-md text-center">
+            <div className="mb-4 inline-flex rounded-full bg-purple-100 p-3">
+              <User className="h-8 w-8 text-purple-600" />
+            </div>
+            <h1 className="mb-2 text-2xl font-bold text-gray-900">활동명을 정해주세요</h1>
+            <p className="mb-6 text-sm text-gray-500">
+              PersonaWorld에서 사용할 이름이에요. 다른 페르소나가 이 이름으로 불러줄 거예요.
+            </p>
+            <div className="mx-auto max-w-xs space-y-3">
+              <input
+                type="text"
+                value={nicknameInput}
+                onChange={(e) => {
+                  setNicknameInput(e.target.value)
+                  setNicknameError(null)
+                }}
+                placeholder="2~20자"
+                maxLength={20}
+                className={`w-full rounded-xl border px-4 py-3 text-center text-lg font-medium outline-none transition-colors ${
+                  nicknameError
+                    ? "border-red-300 bg-red-50 focus:border-red-400"
+                    : "border-gray-200 bg-gray-50 focus:border-purple-400 focus:bg-white"
+                }`}
+              />
+              {nicknameError && <p className="text-xs text-red-500">{nicknameError}</p>}
+              <p className="text-xs text-gray-400">
+                {nicknameInput.trim().length}/20자 · 나중에 설정에서 변경할 수 있어요
+              </p>
+              <PWButton
+                onClick={handleNicknameConfirmAdaptive}
+                icon={ArrowRight}
+                disabled={nicknameInput.trim().length < 2 || loading}
+                className={nicknameInput.trim().length < 2 ? "opacity-50" : ""}
+              >
+                {loading ? "준비 중..." : "시작하기"}
+              </PWButton>
+              <button
+                onClick={() => handleStartAdaptive()}
+                className="text-xs text-gray-400 underline hover:text-gray-600"
+              >
+                나중에 설정할게요
+              </button>
+            </div>
           </div>
         )}
 

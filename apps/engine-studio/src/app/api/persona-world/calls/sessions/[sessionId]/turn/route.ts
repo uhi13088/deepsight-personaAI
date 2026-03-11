@@ -423,6 +423,12 @@ export async function POST(
 
     const audioBuffer = Buffer.from(body.audioBase64, "base64")
 
+    // 유저 활동명 조회
+    const pwUser = await prisma.personaWorldUser.findUnique({
+      where: { id: body.userId },
+      select: { nickname: true },
+    })
+
     const dp = buildCallProvider()
     const result = await processCallTurn(dp, {
       reservationId: body.reservationId,
@@ -434,6 +440,7 @@ export async function POST(
       conversationHistory: body.conversationHistory ?? [],
       turnNumber: body.turnNumber ?? 0,
       elapsedSec: body.elapsedSec ?? 0,
+      userNickname: pwUser?.nickname ?? undefined,
     })
 
     return NextResponse.json({

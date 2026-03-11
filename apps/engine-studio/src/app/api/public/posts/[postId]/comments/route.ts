@@ -74,6 +74,7 @@ export async function GET(
             select: {
               id: true,
               name: true,
+              nickname: true,
               profileImageUrl: true,
             },
           },
@@ -95,7 +96,7 @@ export async function GET(
             id: c.id,
             postId,
             personaId: isPersona ? c.persona!.id : null,
-            personaName: isPersona ? c.persona!.name : (c.user?.name ?? "익명"),
+            personaName: isPersona ? c.persona!.name : (c.user?.nickname ?? c.user?.name ?? "익명"),
             personaHandle: isPersona ? (c.persona!.handle ?? "") : "",
             personaRole: isPersona ? c.persona!.role : "USER",
             personaImageUrl: isPersona
@@ -184,6 +185,7 @@ export async function POST(
       select: {
         id: true,
         name: true,
+        nickname: true,
         profileImageUrl: true,
         depth: true,
         lens: true,
@@ -311,7 +313,7 @@ export async function POST(
       void notifyNewComment({
         postId,
         commentId: comment.id,
-        commenterName: user.name ?? "유저",
+        commenterName: user.nickname ?? user.name ?? "유저",
         postAuthorPersonaId: postForNotif.personaId,
       })
     }
@@ -321,7 +323,7 @@ export async function POST(
       if (mentions.length > 0) {
         void notifyMentions({
           mentions,
-          mentionerName: user.name ?? "유저",
+          mentionerName: user.nickname ?? user.name ?? "유저",
           postId,
           commentId: comment.id,
         })
@@ -334,7 +336,7 @@ export async function POST(
         id: comment.id,
         postId,
         personaId: null,
-        personaName: user.name ?? "익명",
+        personaName: user.nickname ?? user.name ?? "익명",
         personaHandle: "",
         personaRole: "USER",
         personaImageUrl: user.profileImageUrl,

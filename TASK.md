@@ -45,131 +45,40 @@
 
 ---
 
-### Phase NICKNAME: 활동명 시스템 (T420~T424)
-
-> 계획서: `docs/plans/2026-03-10-nickname-system.md`
-
-- [ ] **T420: DB 스키마 + 마이그레이션 + 프로필 수정 API**
-  - AC: PersonaWorldUser에 nickname 컬럼 추가 + 마이그레이션 SQL + PATCH API
-  - AC: register API 응답에 nickname 포함
-  - AC: engine-studio 빌드 성공
-
-- [ ] **T421: 온보딩 활동명 입력 스텝**
-  - AC: 온보딩 시작 시 활동명 입력 UI (2~20자)
-  - AC: 입력값이 cold-start/adaptive API를 통해 DB에 저장
-  - AC: persona-world 빌드 성공
-
-- [ ] **T422: 설정 페이지 활동명 변경**
-  - AC: 설정 > 계정 탭에서 활동명 수정 가능
-  - AC: 변경 시 DB 반영 + 로컬 스토어 동기화
-  - AC: persona-world 빌드 성공
-
-- [ ] **T423: 댓글 시스템 활동명 적용**
-  - AC: 댓글에 nickname 우선 표시 (nickname → name → "익명")
-  - AC: engine-studio 빌드 성공
-
-- [ ] **T424: 채팅/통화 활동명 적용**
-  - AC: 채팅 시 페르소나가 유저를 활동명으로 호칭
-  - AC: 통화 시 페르소나가 유저를 활동명으로 호칭
-  - AC: pnpm validate 전체 PASS
-
----
-
-### Phase PW-ARENA: PersonaWorld 아레나 시스템 (T425~T439)
-
-> 계획서: `docs/plans/2026-03-10-pw-arena-system.md`
-> 구조: A+C 하이브리드 — 유저 토론 → 엔진 내부 심판 → 페르소나 품질 업그레이드
-> 마진: 전 상품 65%+ (블렌딩 67~68%)
-
-#### Phase 1: DB + 타입 + 상점
-
-- [ ] **T425: shared-types PW 아레나 타입 정의**
-  - AC: PWArenaSession, PWArenaTurn, PWArenaVote, ArenaRoomType 타입 추가
-  - AC: `@deepsight/shared-types` 타입체크 PASS
-
-- [ ] **T426: DB 스키마 + 마이그레이션**
-  - AC: PWArenaSession, PWArenaTurn, PWArenaVote Prisma 모델 추가
-  - AC: 마이그레이션 SQL 파일 존재
-  - AC: `prisma validate` 성공
-
-- [ ] **T427: 아레나 상점 아이템 시드**
-  - AC: ShopCategory에 "arena" 추가
-  - AC: 아레나 아이템 폴백 데이터 + INSERT SQL 존재
-  - AC: 타입체크 PASS
-
-#### Phase 2: 엔진 서비스
-
-- [ ] **T428: PW 아레나 타입 + 설정 상수**
-  - AC: RoomConfig, RoundConfig, 가격/제한 상수 정의
-  - AC: 타입체크 PASS
-
-- [ ] **T429: PW 아레나 LLM 호출**
-  - AC: 페르소나 프로필 로드 → 토론 발언 생성
-  - AC: 턴별 토큰 제한 동작
-  - AC: 유닛 테스트 PASS
-
-- [ ] **T430: PW 아레나 세션 서비스**
-  - AC: 세션 생성 (코인 검증 → 차감 → DB 저장)
-  - AC: 턴 실행, 세션 완료 처리
-  - AC: 유닛 테스트 PASS
-
-- [ ] **T431: 품질 평가 필터 + 엔진 브릿지**
-  - AC: TriggerType에 USER_ARENA 추가
-  - AC: 필터링 조건 (최소 3라운드, 최소 토큰, 주제 복잡도)
-  - AC: 토론 완료 → 엔진 심판 파이프라인 전송 확인
-  - AC: 유닛 테스트 PASS
-
-#### Phase 3: API 라우트
-
-- [ ] **T432: 세션 목록/생성 API**
-  - AC: GET/POST /api/persona-world/arena 동작
-  - AC: requireAuth 가드 + ApiResponse 패턴
-  - AC: 코인 잔액 확인 → 차감 → 세션 생성
-
-- [ ] **T433: 세션 상세/턴 실행 API**
-  - AC: GET/PATCH /api/persona-world/arena/[sessionId] 동작
-  - AC: POST /api/persona-world/arena/[sessionId]/turns 동작
-  - AC: 세션 소유자 검증
-
-- [ ] **T434: API 문서 업데이트**
-  - AC: internal.md + internal.openapi.yaml에 아레나 API 기재
-  - AC: 모든 엔드포인트 문서화
-
-#### Phase 4: PW 프론트엔드
-
-- [ ] **T435: 아레나 공통 컴포넌트**
-  - AC: arena-room-card, arena-chat, arena-participant-list, arena-round-indicator, arena-vote-panel
-  - AC: persona-world 빌드 성공
-
-- [ ] **T436: 아레나 메인 페이지**
-  - AC: /arena 라우트에 진행 중 토론 목록 + 내 토론 + 생성 버튼
-  - AC: persona-world 빌드 성공
-
-- [ ] **T437: 토론방 생성 플로우**
-  - AC: 방 유형 선택 → 페르소나 초대 → 주제 입력 → 코인 확인 → 생성
-  - AC: 인원 비례 라운드 추가 가격 동적 표시
-  - AC: persona-world 빌드 성공
-
-- [ ] **T438: 토론 관전/참여 + 리플레이**
-  - AC: 실시간 토론 뷰 (라운드별 발언 + 유저 투표)
-  - AC: 리플레이 페이지
-  - AC: persona-world 빌드 성공
-
-#### Phase 5: 통합 검증
-
-- [ ] **T439: 통합 테스트 + pnpm validate**
-  - AC: PW 아레나 → 엔진 품질 파이프라인 E2E 테스트
-  - AC: `pnpm validate` 전체 PASS
-
----
-
 ## 🔄 IN_PROGRESS (진행중)
 
 ---
 
-> **최종 갱신: 2026-03-10**
+> **최종 갱신: 2026-03-11**
 
 ## ✅ DONE (완료)
+
+### Phase NICKNAME: 활동명 시스템 (T420~T424) ✅ 2026-03-11
+
+- [x] **T420: DB 스키마 + 마이그레이션 + 프로필 수정 API** ✅ 2026-03-11
+  - 변경: `schema.prisma` (nickname 컬럼), `062_nickname.sql`, `users/profile/route.ts` (PATCH), `register/route.ts` (응답에 nickname 추가)
+
+- [x] **T421: 온보딩 활동명 입력 스텝** ✅ 2026-03-11
+  - 변경: `onboarding/page.tsx` (nickname 스텝 추가), `cold-start/route.ts`, `adaptive/start/route.ts`, `api.ts` (nickname 전달)
+
+- [x] **T422: 설정 페이지 활동명 변경** ✅ 2026-03-11
+  - 변경: `settings/page.tsx` (인라인 수정 UI), `api.ts` (updateNickname 추가)
+
+- [x] **T423: 댓글 시스템 활동명 적용** ✅ 2026-03-11
+  - 변경: `posts/[postId]/comments/route.ts` — user select에 nickname 추가, 표시 우선순위: nickname → name → "익명"
+
+- [x] **T424: 채팅/통화 활동명 적용** ✅ 2026-03-11
+  - 변경: `conversation-engine.ts` (ConversationContext.userNickname, suffix에 유저 활동명 주입), `chat-service.ts`, `call-service.ts`, 각 route handler
+  - 테스트: 5014/5014 PASS, engine-studio + persona-world 빌드 PASS
+
+### Phase PW-ARENA: PersonaWorld 아레나 시스템 (T425~T439) ✅ 2026-03-11
+
+- [x] **T425~T439: PW 아레나 전체** ✅ 2026-03-11
+  - shared-types 아레나 타입, DB 스키마/마이그레이션, 상점 아이템
+  - 엔진 서비스 (LLM, 세션, 품질 필터, 브릿지)
+  - API 라우트 (세션 CRUD, 턴 실행)
+  - PW 프론트엔드 (아레나 페이지, 생성 플로우, 리플레이)
+  - API 문서 업데이트, pnpm validate PASS
 
 ### Phase EXPLORE: 탐색 페이지 개선 + 매칭 버그 수정 (T415~T419) ✅ 2026-03-10
 

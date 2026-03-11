@@ -56,7 +56,7 @@ const TX_TYPE_LABELS: Record<string, { label: string; color: string }> = {
 }
 
 export default function SettingsPage() {
-  const { profile, onboarding, reset } = useUserStore()
+  const { profile, onboarding, reset, setProfile } = useUserStore()
   const userId = profile?.id
   const balance = onboarding.creditsBalance
 
@@ -64,6 +64,11 @@ export default function SettingsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [txLoading, setTxLoading] = useState(false)
   const [serverBalance, setServerBalance] = useState<number | null>(null)
+
+  // 활동명 수정
+  const [editingNickname, setEditingNickname] = useState(false)
+  const [nicknameInput, setNicknameInput] = useState(profile?.nickname ?? "")
+  const [nicknameSaving, setNicknameSaving] = useState(false)
 
   // 카카오 연동
   const [kakaoLink, setKakaoLink] = useState<KakaoLinkState>({
@@ -151,6 +156,28 @@ export default function SettingsPage() {
       loadChattedPersonas()
     }
   }, [activeTab, loadTransactions, loadKakaoLink, loadChattedPersonas])
+
+  const handleNicknameSave = async () => {
+    const trimmed = nicknameInput.trim()
+    if (trimmed.length < 2 || trimmed.length > 20) {
+      toast.error("활동명은 2~20자여야 합니다")
+      return
+    }
+    if (!userId) return
+    setNicknameSaving(true)
+    try {
+      await clientApi.updateNickname(userId, trimmed)
+      if (profile) {
+        setProfile({ ...profile, nickname: trimmed })
+      }
+      setEditingNickname(false)
+      toast.success("활동명이 변경되었습니다")
+    } catch {
+      toast.error("활동명 변경에 실패했습니다")
+    } finally {
+      setNicknameSaving(false)
+    }
+  }
 
   const handleLogout = async () => {
     reset()
@@ -275,7 +302,49 @@ export default function SettingsPage() {
                   <User className="h-7 w-7 text-white" />
                 </div>
                 <div className="flex-1">
-                  <div className="font-semibold text-gray-900">{profile?.nickname || "관찰자"}</div>
+                  {editingNickname ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={nicknameInput}
+                        onChange={(e) => setNicknameInput(e.target.value)}
+                        maxLength={20}
+                        className="w-full rounded-lg border border-purple-300 bg-white px-2.5 py-1.5 text-sm font-semibold outline-none focus:border-purple-500"
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleNicknameSave}
+                        disabled={nicknameSaving}
+                        className="shrink-0 rounded-lg bg-purple-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-purple-600 disabled:opacity-50"
+                      >
+                        {nicknameSaving ? "..." : "저장"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingNickname(false)
+                          setNicknameInput(profile?.nickname ?? "")
+                        }}
+                        className="shrink-0 text-xs text-gray-400 hover:text-gray-600"
+                      >
+                        취소
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900">
+                        {profile?.nickname || "관찰자"}
+                      </span>
+                      <button
+                        onClick={() => {
+                          setNicknameInput(profile?.nickname ?? "")
+                          setEditingNickname(true)
+                        }}
+                        className="text-xs text-purple-400 hover:text-purple-600"
+                      >
+                        수정
+                      </button>
+                    </div>
+                  )}
                   {profile?.email && <div className="text-sm text-gray-400">{profile.email}</div>}
                   <div className="mt-1 text-xs text-gray-500">
                     {profile?.completedOnboarding ? "온보딩 완료" : "온보딩 미완료"}
