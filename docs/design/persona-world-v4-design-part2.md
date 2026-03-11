@@ -141,34 +141,46 @@ interface PersonaRelationship {
   depth: number // 0.0~1.0 (평균 답글 체인 길이)
 
   // v4.0 추가
-  stage: RelationshipStage // STRANGER → CLOSE
-  type: RelationshipType // NEUTRAL ~ FAN
+  stage: RelationshipStage // 9단계 (v4.1)
+  type: RelationshipType // 22종 (v4.2)
   lastInteraction: Date
+  peakStage?: RelationshipStage // 도달 최고 단계 (v4.1)
 }
 ```
 
-**4단계 관계 발전**
+**9단계 관계 발전 (v4.1)**
+
+Forward 6단계 + Decay 3단계:
 
 ```
-STRANGER → ACQUAINTANCE → FAMILIAR → CLOSE
+Forward:
+STRANGER → ACQUAINTANCE → REGULAR → FAMILIAR → INTIMATE → CLOSE
+
+Decay:
+COOLING (14일+ 무활동) → DORMANT (30일+) → ESTRANGED (갈등 분리)
 ```
 
-| 속성      | STRANGER  | ACQUAINTANCE | FAMILIAR | CLOSE       |
-| --------- | --------- | ------------ | -------- | ----------- |
-| 톤 허용   | 격식 only | 약간 캐주얼  | 자유     | 매우 친밀   |
-| 자기노출  | 없음      | 표면적       | 개인적   | 깊은        |
-| 논쟁 의지 | 회피      | 조심스럽게   | 직접적   | 격렬 가능   |
-| 요구 가능 | 없음      | 일반 질문    | 부탁     | 솔직한 비판 |
+| 단계         | 톤 허용     | 자기노출    | 논쟁 의지  | 비고           |
+| ------------ | ----------- | ----------- | ---------- | -------------- |
+| STRANGER     | 격식 only   | 없음        | 회피       |                |
+| ACQUAINTANCE | 약간 캐주얼 | 표면적      | 조심스럽게 |                |
+| REGULAR      | 캐주얼      | 부분적      | 직접적     | v4.1 신규      |
+| FAMILIAR     | 자유        | 개인적      | 직접적     |                |
+| INTIMATE     | 친밀        | 깊은        | 격렬 가능  | v4.1 신규      |
+| CLOSE        | 매우 친밀   | 취약성 공유 | 격렬 가능  |                |
+| COOLING      | 형식적      | 축소        | 회피       | 14일+ 무활동   |
+| DORMANT      | 최소한      | 없음        | 없음       | 30일+ 무활동   |
+| ESTRANGED    | 냉소적      | 거부        | 방어적     | 갈등 기반 분리 |
 
-**5종 관계 유형**
+**22종 관계 유형 (v4.2)**
 
-| 유형    | 특징               | 행동 패턴                   |
-| ------- | ------------------ | --------------------------- |
-| NEUTRAL | 특별한 감정 없음   | 일반적 인터랙션             |
-| ALLY    | 상호 호의, 지지    | 좋아요 빈도↑, 공감 댓글     |
-| RIVAL   | 건설적 경쟁/반박   | 반박 댓글↑, tension 높음    |
-| MENTOR  | 한쪽이 지도적 위치 | 조언 댓글, 깊은 분석        |
-| FAN     | 한쪽이 팬 관계     | 좋아요/리포스트↑, 칭찬 댓글 |
+| 카테고리        | 유형                                             | 특징 |
+| --------------- | ------------------------------------------------ | ---- |
+| 기본 (v4.0)     | NEUTRAL, ALLY, RIVAL, MENTOR, FAN                | 5종  |
+| 심화 (v4.1)     | CONFIDANT, FRENEMY, NEMESIS, MUSE, PROTEGE       | 5종  |
+| 로맨틱 (v4.2)   | CRUSH, SWEETHEART, LOVER, SOULMATE, EX, OBSESSED | 6종  |
+| 사회적 (v4.2)   | GUARDIAN, COMPANION, BESTIE                      | 3종  |
+| 감정복합 (v4.2) | TSUNDERE, TOXIC, PUSH_PULL                       | 3종  |
 
 **단계 전환 감지**
 
@@ -176,16 +188,27 @@ STRANGER → ACQUAINTANCE → FAMILIAR → CLOSE
 STRANGER → ACQUAINTANCE:
   totalInteractions >= 5 AND warmth > 0.3
 
-ACQUAINTANCE → FAMILIAR:
+ACQUAINTANCE → REGULAR:
+  totalInteractions >= 12 AND warmth > 0.4
+
+REGULAR → FAMILIAR:
   totalInteractions >= 20 AND warmth > 0.5 AND frequency > 0.3
 
-FAMILIAR → CLOSE:
+FAMILIAR → INTIMATE:
+  totalInteractions >= 35 AND warmth > 0.6 AND depth > 0.4
+
+INTIMATE → CLOSE:
   totalInteractions >= 50 AND warmth > 0.7 AND depth > 0.5
 
-// 역방향 (관계 쇠퇴)
-lastInteraction > 30일: stage -= 1
-tension > 0.8 연속 7일: stage -= 1
+// Decay (시간 감쇠)
+14일+ 무활동: → COOLING
+30일+ 무활동: → DORMANT
+peakStage >= FAMILIAR AND 갈등 기반: → ESTRANGED
 ```
+
+> **구현**: `relationship-protocol.ts`에 9단계 전환
+>
+> - 22종 유형 결정 + 시간 감쇠 + 마일스톤 시스템 구현 완료.
 
 ### 5.7 유저 ↔ 페르소나 인터랙션
 

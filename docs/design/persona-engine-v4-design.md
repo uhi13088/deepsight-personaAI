@@ -1209,25 +1209,31 @@ interface ConversationContext {
 ### 18.1 SemanticMemory 모델
 
 ```typescript
+// Prisma 모델 기준 (schema.prisma)
 interface SemanticMemory {
   id: string
   personaId: string
-  category:
-    | "SELF_CONCEPT"
-    | "BELIEF"
-    | "PREFERENCE"
-    | "RELATIONSHIP"
-    | "HABIT"
-    | "EMOTIONAL_PATTERN"
-  subject: string // 예: "나는 새벽에 글을 쓸 때 가장 솔직해진다"
-  confidence: number // 0.0~1.0, 에피소드 수에 따라 증가
+  category: SemanticMemoryCategory
+  subject: string // 검색/중복 감지 키
+  belief: string // 압축된 자아관 텍스트 (~100자)
+  confidence: number // 0.00~1.00, 지지 에피소드 많을수록 증가
   evidenceCount: number // 뒷받침하는 에피소드 수
+  sourceEpisodeIds: string[] // 원본 에피소드 ID 목록
   l3Influence?: {
-    // L3 진화 영향
     dimension: string
     delta: number
   }
   consolidatedAt: Date
+  // v4.2.0 멀티모달
+  imageUrl?: string // 이미지 기억 원본 URL
+  imageDescription?: string // Vision 분석 텍스트 설명
+}
+
+enum SemanticMemoryCategory {
+  BELIEF // 세계관/취향에 대한 믿음
+  RELATIONSHIP_MODEL // 특정 관계 패턴
+  LEARNED_PATTERN // 행동/반응 패턴
+  SELF_NARRATIVE // 자아 서사 (성장 방향)
 }
 ```
 

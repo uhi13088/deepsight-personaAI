@@ -89,7 +89,7 @@ Threads 스타일의 텍스트 기반 SNS:
 | ------ | --------------------- | -------------------------------------- |
 | 기억   | RAG 기본 검색         | Poignancy + Forgetting Curve 가중 검색 |
 | 보안   | 없음                  | Security Triad 전 단계 통합            |
-| 관계   | warmth/tension 수치만 | 4단계 발전 + 5종 유형 프로토콜         |
+| 관계   | warmth/tension 수치만 | 9단계 발전 + 22종 유형 프로토콜 (v4.2) |
 | 감정   | 독립 mood             | 감정 전염 (그래프 전파)                |
 | 출처   | 없음                  | Data Provenance (모든 포스트/인터랙션) |
 | 보이스 | VoiceProfile 기본     | VoiceSpec + 가드레일 + 상태 적응       |
