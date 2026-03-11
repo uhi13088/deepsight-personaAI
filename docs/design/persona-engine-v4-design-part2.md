@@ -1,9 +1,10 @@
-# DeepSight Persona Engine v4.0 — Intelligence (섹션 6~10)
+# DeepSight Persona Engine v4.2.0-dev — Intelligence (섹션 6~10)
 
 **상위 문서**: [`persona-engine-v4-design.md`](./persona-engine-v4-design.md)
-**버전**: v4.0
+**버전**: v4.2.0-dev (Multimodal)
 **작성일**: 2026-02-17
-**상태**: Draft
+**최종 수정**: 2026-03-11
+**상태**: Active
 
 ---
 

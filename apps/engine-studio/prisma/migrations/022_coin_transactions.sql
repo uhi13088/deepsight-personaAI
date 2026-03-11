@@ -32,7 +32,16 @@ CREATE INDEX IF NOT EXISTS "coin_transactions_userId_createdAt_idx"
 CREATE INDEX IF NOT EXISTS "coin_transactions_orderId_idx"
     ON "coin_transactions"("orderId");
 
-ALTER TABLE "coin_transactions"
-    ADD CONSTRAINT "coin_transactions_userId_fkey"
-    FOREIGN KEY ("userId") REFERENCES "persona_world_users"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'coin_transactions_userId_fkey'
+      AND table_name = 'coin_transactions'
+  ) THEN
+    ALTER TABLE "coin_transactions"
+      ADD CONSTRAINT "coin_transactions_userId_fkey"
+      FOREIGN KEY ("userId") REFERENCES "persona_world_users"("id")
+      ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END$$;

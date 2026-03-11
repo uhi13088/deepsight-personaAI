@@ -39,6 +39,60 @@
 - 새로운 사용 방법
 -->
 
+## [2026-03-11] T420: 활동명 (Nickname) 시스템
+
+### Added
+
+- `persona_world_users.nickname`: 유저 활동명 (TEXT, NULL 허용, 2~20자)
+
+### Migration
+
+`prisma/migrations/062_nickname.sql`
+
+### Claude에게
+
+- nickname이 NULL이면 name → "익명" 순서로 폴백
+- 댓글, 채팅, 통화, 알림 모든 곳에서 nickname 우선 표시
+- PATCH /api/persona-world/users/profile 로 수정 (verifyInternalToken 필요)
+
+---
+
+## [2026-03-04] T330: 1:1 채팅 + 음성 통화 시스템
+
+### Added
+
+- `chat_threads` 테이블: 유저-페르소나 대화 스레드
+  - `id, personaId → personas, userId → persona_world_users`
+  - `sessionId → interaction_sessions` (InteractionSession 연결)
+  - `lastMessageAt DateTime?`
+  - `UNIQUE(personaId, userId)`
+- `chat_messages` 테이블: 채팅 메시지
+  - `id, threadId → chat_threads, role (USER/PERSONA)`
+  - `content TEXT, poignancyScore Decimal(3,2)?`
+  - `createdAt`
+- `call_reservations` 테이블: 통화 예약
+  - `id, personaId → personas, userId TEXT`
+  - `scheduledAt DateTime, status TEXT (PENDING/CONFIRMED/IN_PROGRESS/COMPLETED/CANCELLED/EXPIRED)`
+  - `coinSpent INT DEFAULT 0`
+- `call_sessions` 테이블: 통화 세션
+  - `id, reservationId → call_reservations (UNIQUE)`
+  - `interactionSessionId → interaction_sessions?`
+  - `startedAt, endedAt, totalTurns INT DEFAULT 0, totalDurationSec INT DEFAULT 0`
+- Persona TTS 필드: `ttsProvider, ttsVoiceId, ttsPitch, ttsSpeed, ttsLanguage`
+
+### Migration
+
+`prisma/migrations/039_chat_call_system.sql`, `041_production_catchup.sql`
+
+### Claude에게
+
+- ChatThread는 personaId+userId UNIQUE — 동일 페르소나와 유저 간 스레드 1개만
+- CallReservation status는 String (enum 아닌 텍스트) — 6종 상태 관리
+- CallSession.reservationId는 UNIQUE — 예약당 세션 1개
+- Persona TTS 필드는 voice-pipeline.ts에서 사용 (ElevenLabs/OpenAI/Google)
+
+---
+
 ## [2026-03-10] T414: 크레딧 기반 페르소나 재요청
 
 ### Added

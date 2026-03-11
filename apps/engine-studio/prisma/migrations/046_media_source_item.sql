@@ -65,12 +65,21 @@ CREATE TABLE "media_items" (
 
 -- PersonaPost에 mediaItemId 컬럼 추가
 ALTER TABLE "persona_posts"
-  ADD COLUMN "mediaItemId" TEXT;
+  ADD COLUMN IF NOT EXISTS "mediaItemId" TEXT;
 
-ALTER TABLE "persona_posts"
-  ADD CONSTRAINT "persona_posts_mediaItemId_fkey"
-    FOREIGN KEY ("mediaItemId") REFERENCES "media_items"("id")
-    ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'persona_posts_mediaItemId_fkey'
+      AND table_name = 'persona_posts'
+  ) THEN
+    ALTER TABLE "persona_posts"
+      ADD CONSTRAINT "persona_posts_mediaItemId_fkey"
+      FOREIGN KEY ("mediaItemId") REFERENCES "media_items"("id")
+      ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END$$;
 
 -- 인덱스
 CREATE UNIQUE INDEX "media_items_sourceId_originalId_key"

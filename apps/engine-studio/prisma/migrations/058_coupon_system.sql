@@ -48,8 +48,17 @@ CREATE INDEX IF NOT EXISTS "coupons_code_idx" ON "coupons"("code");
 CREATE INDEX IF NOT EXISTS "coupons_type_idx" ON "coupons"("type");
 CREATE INDEX IF NOT EXISTS "coupon_redemptions_user_id_idx" ON "coupon_redemptions"("user_id");
 
--- FK
-ALTER TABLE "coupon_redemptions"
-  ADD CONSTRAINT "coupon_redemptions_coupon_id_fkey"
-  FOREIGN KEY ("coupon_id") REFERENCES "coupons"("id")
-  ON DELETE RESTRICT ON UPDATE CASCADE;
+-- FK (멱등성 보장)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'coupon_redemptions_coupon_id_fkey'
+      AND table_name = 'coupon_redemptions'
+  ) THEN
+    ALTER TABLE "coupon_redemptions"
+      ADD CONSTRAINT "coupon_redemptions_coupon_id_fkey"
+      FOREIGN KEY ("coupon_id") REFERENCES "coupons"("id")
+      ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END$$;

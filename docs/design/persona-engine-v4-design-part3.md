@@ -1,7 +1,8 @@
-# DeepSight Persona Engine v4.0 — 설계서 Part 3: Operations
+# DeepSight Persona Engine v4.2.0-dev — 설계서 Part 3: Operations
 
-**버전**: v4.0
+**버전**: v4.2.0-dev (Multimodal)
 **작성일**: 2026-03-04
+**최종 수정**: 2026-03-11
 **상태**: Active
 **설계서 참조**: [`persona-engine-v4-design.md`](./persona-engine-v4-design.md)
 **Part 1 (§1~§5)**: [`persona-engine-v4-design-part1.md`](./persona-engine-v4-design-part1.md)
