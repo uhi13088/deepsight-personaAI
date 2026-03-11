@@ -23,10 +23,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { userId, level, answers } = body as {
+    const { userId, level, answers, nickname } = body as {
       userId: string
       level: "QUICK" | "STANDARD" | "DEEP"
       answers: OnboardingAnswer[]
+      nickname?: string
     }
 
     if (!userId || !level || !answers?.length) {
@@ -140,10 +141,12 @@ export async function POST(request: NextRequest) {
               }
             : {}),
         }
+        // nickname이 전달되면 함께 저장
+        const nicknameData = nickname?.trim() ? { nickname: nickname.trim() } : {}
         await prisma.personaWorldUser.upsert({
           where: { id: uid },
-          update: vectorData,
-          create: { id: uid, email: `${uid}@onboarding.local`, ...vectorData },
+          update: { ...vectorData, ...nicknameData },
+          create: { id: uid, email: `${uid}@onboarding.local`, ...vectorData, ...nicknameData },
         })
       },
     }

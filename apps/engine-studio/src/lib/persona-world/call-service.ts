@@ -172,7 +172,8 @@ export interface StartCallResult {
  */
 export async function startCall(
   dp: CallDataProvider,
-  reservationId: string
+  reservationId: string,
+  userNickname?: string
 ): Promise<StartCallResult> {
   // 1. 예약 확인
   const reservation = await dp.getReservation(reservationId)
@@ -224,6 +225,7 @@ export async function startCall(
       personaState: currentState,
       ragContext,
       mode: "call",
+      userNickname,
     },
     history: [],
     userMessage: "안녕하세요, 전화 받아주셔서 감사해요!",
@@ -269,6 +271,7 @@ export async function processCallTurn(
     conversationHistory: ConversationMessage[]
     turnNumber: number
     elapsedSec: number
+    userNickname?: string
   }
 ): Promise<CallTurnResult> {
   // 1. 시간/턴 제한 확인
@@ -309,6 +312,7 @@ export async function processCallTurn(
       ragContext,
       mode: "call",
       userLanguage: sttResult.language,
+      userNickname: params.userNickname,
     },
     history: params.conversationHistory,
     userMessage,

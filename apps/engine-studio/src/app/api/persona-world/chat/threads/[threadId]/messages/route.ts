@@ -469,6 +469,12 @@ export async function POST(
       )
     }
 
+    // 유저 활동명 조회
+    const pwUser = await prisma.personaWorldUser.findUnique({
+      where: { id: userId },
+      select: { nickname: true },
+    })
+
     const provider = buildChatProvider()
     const result = await sendMessage(provider, {
       threadId,
@@ -477,6 +483,7 @@ export async function POST(
       imageBase64,
       imageMediaType,
       imageUrl,
+      userNickname: pwUser?.nickname ?? undefined,
     })
 
     return NextResponse.json({

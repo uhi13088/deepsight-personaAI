@@ -403,8 +403,22 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // 예약에서 userId → 활동명 조회
+    const reservation = await prisma.callReservation.findUnique({
+      where: { id: body.reservationId },
+      select: { userId: true },
+    })
+    let userNickname: string | undefined
+    if (reservation) {
+      const pwUser = await prisma.personaWorldUser.findUnique({
+        where: { id: reservation.userId },
+        select: { nickname: true },
+      })
+      userNickname = pwUser?.nickname ?? undefined
+    }
+
     const dp = buildCallProvider()
-    const result = await startCall(dp, body.reservationId)
+    const result = await startCall(dp, body.reservationId, userNickname)
 
     return NextResponse.json({
       success: true,

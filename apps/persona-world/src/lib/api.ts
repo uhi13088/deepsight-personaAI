@@ -137,7 +137,12 @@ export const clientApi = {
   },
 
   // ── 온보딩: 답변 제출 (Cold Start 벡터 생성) ─────────────
-  async submitOnboardingAnswers(userId: string, phase: number, answers: OnboardingAnswer[]) {
+  async submitOnboardingAnswers(
+    userId: string,
+    phase: number,
+    answers: OnboardingAnswer[],
+    nickname?: string
+  ) {
     // phase → level 매핑
     const levelMap: Record<number, "QUICK" | "STANDARD" | "DEEP"> = {
       1: "QUICK",
@@ -150,7 +155,7 @@ export const clientApi = {
     const res = await fetch(`/api/persona-world/onboarding/cold-start`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, level, answers }),
+      body: JSON.stringify({ userId, level, answers, ...(nickname ? { nickname } : {}) }),
     })
     if (!res.ok) throw new Error("Failed to submit onboarding answers")
 
@@ -177,11 +182,11 @@ export const clientApi = {
   },
 
   // ── 적응형 온보딩 ─────────────────────────────────────────
-  async startAdaptiveOnboarding(userId: string) {
+  async startAdaptiveOnboarding(userId: string, nickname?: string) {
     const res = await fetch(`/api/persona-world/onboarding/adaptive/start`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId, ...(nickname ? { nickname } : {}) }),
     })
     if (!res.ok) throw new Error("Failed to start adaptive onboarding")
     const json: ApiResponse<AdaptiveStartResponse> = await res.json()
@@ -208,6 +213,19 @@ export const clientApi = {
     if (!res.ok) throw new Error("Failed to fetch matching preview")
 
     const json: ApiResponse<MatchingPreviewResponse> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── 프로필 수정 ─────────────────────────────────────────
+  async updateNickname(userId: string, nickname: string) {
+    const res = await fetch(`/api/persona-world/users/profile`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, nickname }),
+    })
+    if (!res.ok) throw new Error("Failed to update nickname")
+    const json: ApiResponse<{ id: string; nickname: string }> = await res.json()
     if (!json.success) throw new Error(json.error?.message || "Unknown error")
     return json.data!
   },
@@ -1054,6 +1072,157 @@ export const clientApi = {
     }
     return json.data!
   },
+
+  // ── 아레나 ──────────────────────────────────────────────────
+  async getArenaSessions(userId: string, options?: { limit?: number; offset?: number }) {
+    const params = new URLSearchParams({ userId })
+    if (options?.limit) params.set("limit", String(options.limit))
+    if (options?.offset) params.set("offset", String(options.offset))
+
+    const res = await fetch(`/api/persona-world/arena?${params}`)
+    if (!res.ok) throw new Error("Failed to fetch arena sessions")
+
+    const json = (await res.json()) as {
+      success: boolean
+      data?: ArenaSessionListItem[]
+      meta?: Record<string, unknown>
+    }
+    if (!json.success) throw new Error("Failed to fetch arena sessions")
+    return { data: json.data ?? [], meta: json.meta }
+  },
+
+  async getActiveArenaSessions() {
+    const res = await fetch("/api/persona-world/arena")
+    if (!res.ok) throw new Error("Failed to fetch active arena sessions")
+
+    const json = (await res.json()) as {
+      success: boolean
+      data?: ArenaSessionListItem[]
+      meta?: Record<string, unknown>
+    }
+    if (!json.success) throw new Error("Failed to fetch active arena sessions")
+    return { data: json.data ?? [], meta: json.meta }
+  },
+
+  async createArenaSession(params: ArenaCreateParams) {
+    const res = await fetch("/api/persona-world/arena", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    })
+
+    const json = await res.json()
+    if (!json.success) {
+      throw new Error(json.error?.message || "Failed to create arena session")
+    }
+    return json.data as { session: ArenaSessionListItem; costBreakdown: ArenaCostBreakdown }
+  },
+
+  async getArenaSession(sessionId: string) {
+    const res = await fetch(`/api/persona-world/arena/${sessionId}`)
+    if (!res.ok) throw new Error("Failed to fetch arena session")
+
+    const json: ApiResponse<ArenaSessionDetail> = await res.json()
+    if (!json.success) throw new Error("Failed to fetch arena session")
+    return json.data!
+  },
+
+  async executeArenaRound(sessionId: string, userId: string) {
+    const res = await fetch(`/api/persona-world/arena/${sessionId}/turns`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    })
+
+    const json = await res.json()
+    if (!json.success) {
+      throw new Error(json.error?.message || "Failed to execute arena round")
+    }
+    return json.data as ArenaRoundResult
+  },
+
+  async updateArenaSession(sessionId: string, userId: string, action: "complete" | "cancel") {
+    const res = await fetch(`/api/persona-world/arena/${sessionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, action }),
+    })
+
+    const json = await res.json()
+    if (!json.success) {
+      throw new Error(json.error?.message || "Failed to update arena session")
+    }
+    return json.data
+  },
+}
+
+// ── 아레나 타입 ────────────────────────────────────────────
+
+export interface ArenaSessionListItem {
+  id: string
+  userId: string
+  roomType: string
+  topic: string
+  participantIds: string[]
+  currentRound: number
+  maxRounds: number
+  status: string
+  replaySaved: boolean
+  totalCoinsSpent: number
+  turnCount: number
+  voteCount: number
+  createdAt: string
+  completedAt: string | null
+}
+
+export interface ArenaSessionDetail extends ArenaSessionListItem {
+  turns: Array<{
+    id: string
+    roundNumber: number
+    speakerId: string
+    content: string
+    tokensUsed: number
+    createdAt: string
+  }>
+  votes: Array<{
+    id: string
+    userId: string
+    personaId: string
+    roundNumber: number | null
+    createdAt: string
+  }>
+}
+
+export interface ArenaCreateParams {
+  userId: string
+  roomType: string
+  topic: string
+  participantIds: string[]
+  inviteTickets?: { normal: number; premium: number }
+  extraRoundSets?: number
+  saveReplay?: boolean
+}
+
+export interface ArenaCostBreakdown {
+  roomPrice: number
+  inviteNormalPrice: number
+  invitePremiumPrice: number
+  roundAddonPrice: number
+  replayPrice: number
+  totalPrice: number
+}
+
+export interface ArenaRoundResult {
+  roundNumber: number
+  isLastRound: boolean
+  turns: Array<{
+    id: string
+    roundNumber: number
+    speakerId: string
+    content: string
+    tokensUsed: number
+    createdAt: string
+  }>
 }
 
 /** 카카오톡 연동 데이터 */

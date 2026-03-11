@@ -24,13 +24,22 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { userId } = body as { userId: string }
+    const { userId, nickname } = body as { userId: string; nickname?: string }
 
     if (!userId) {
       return NextResponse.json(
         { success: false, error: { code: "INVALID_REQUEST", message: "userId 필요" } },
         { status: 400 }
       )
+    }
+
+    // nickname이 전달되면 먼저 저장
+    if (nickname?.trim()) {
+      await prisma.personaWorldUser.upsert({
+        where: { id: userId },
+        update: { nickname: nickname.trim() },
+        create: { id: userId, email: `${userId}@onboarding.local`, nickname: nickname.trim() },
+      })
     }
 
     const provider = buildAdaptiveProvider()

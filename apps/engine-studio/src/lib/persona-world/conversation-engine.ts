@@ -30,6 +30,8 @@ export interface ConversationContext {
   userLanguage?: string
   /** v5.0: 압축된 자아관 (SemanticMemory) — confidence 높은 순 TOP-10 */
   semanticMemories?: SemanticMemoryItem[]
+  /** v4.2: 유저 활동명 — 페르소나가 유저를 이 이름으로 호칭 */
+  userNickname?: string
 }
 
 /** Conversation Engine에 주입되는 SemanticMemory 요약 */
@@ -214,9 +216,17 @@ export function buildConversationSystemSuffix(
   state: PersonaStateData,
   ragContext: string,
   mode: ConversationMode,
-  userLanguage?: string
+  userLanguage?: string,
+  userNickname?: string
 ): string {
   const lines: string[] = []
+
+  // ── 유저 활동명 ──
+  if (userNickname) {
+    lines.push("## 유저 정보")
+    lines.push(`활동명: ${userNickname}`)
+    lines.push("- 유저를 활동명으로 불러주세요. 자연스럽게 이름을 섞어 사용하세요.")
+  }
 
   // ── 현재 감정 상태 ──
   lines.push("## 현재 상태")
@@ -346,12 +356,26 @@ export async function generateConversationResponse(
   input: ConversationInput
 ): Promise<ConversationResult> {
   const { context, history, userMessage, imageBase64, imageMediaType } = input
-  const { persona, personaId, personaState, ragContext, mode, userLanguage, semanticMemories } =
-    context
+  const {
+    persona,
+    personaId,
+    personaState,
+    ragContext,
+    mode,
+    userLanguage,
+    semanticMemories,
+    userNickname,
+  } = context
 
   // 시스템 프롬프트 빌드 (v5.0: SemanticMemory 주입)
   const prefix = buildConversationSystemPrefix(persona, semanticMemories)
-  const suffix = buildConversationSystemSuffix(personaState, ragContext, mode, userLanguage)
+  const suffix = buildConversationSystemSuffix(
+    personaState,
+    ragContext,
+    mode,
+    userLanguage,
+    userNickname
+  )
 
   // Anthropic 메시지 빌드
   const messages = buildAnthropicMessages(history, userMessage, imageBase64, imageMediaType)

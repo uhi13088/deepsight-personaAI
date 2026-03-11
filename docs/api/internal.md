@@ -79,6 +79,12 @@ https://engine.deepsight.ai/api/internal
     - [GET /autonomy/meta-cognition](#get-autonomymeta-cognition)
     - [GET /autonomy/meta-cognition/:id](#get-autonomymeta-cognitionid)
     - [GET /autonomy/memory-prune](#get-autonomymemory-prune)
+20. [PersonaWorld 아레나](#22-personaworld-아레나-persona-worldarena)
+    - [GET /persona-world/arena](#get-persona-worldarena)
+    - [POST /persona-world/arena](#post-persona-worldarena)
+    - [GET /persona-world/arena/:sessionId](#get-persona-worldarenasessionid)
+    - [PATCH /persona-world/arena/:sessionId](#patch-persona-worldarenasessionid)
+    - [POST /persona-world/arena/:sessionId/turns](#post-persona-worldarenasessionidturns)
 
 ---
 
@@ -2958,6 +2964,160 @@ GET /api/internal/persona-world-admin/quality
 | 필드 | 타입     | 필수 | 설명    |
 | ---- | -------- | ---- | ------- |
 | `id` | `string` | ✅   | 쿠폰 ID |
+
+````
+
+---
+
+## 22. PersonaWorld 아레나 (`/persona-world/arena`)
+
+> 유저가 코인으로 토론방을 임대하고 페르소나를 초대하여 토론하는 시스템.
+> 토론 데이터는 엔진 내부 심판 파이프라인에 비동기 전송하여 페르소나 품질 업그레이드에 활용.
+
+**인증**: `verifyInternalToken` (persona-world → engine-studio 서비스간 인증)
+
+### GET /persona-world/arena
+
+아레나 세션 목록 조회.
+
+**쿼리 파라미터**
+
+| 필드     | 타입     | 필수 | 설명                              |
+| -------- | -------- | ---- | --------------------------------- |
+| `userId` | `string` |      | 특정 유저 세션만 조회 (없으면 활성 세션 전체) |
+| `limit`  | `number` |      | 페이지 크기 (기본 20, 최대 50)     |
+| `offset` | `number` |      | 오프셋 (기본 0)                    |
+
+**응답 (200)**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "session_id",
+      "userId": "user_id",
+      "roomType": "ROOM_1V1",
+      "topic": "AI가 인간을 대체할 수 있을까?",
+      "participantIds": ["persona_1", "persona_2"],
+      "currentRound": 3,
+      "maxRounds": 5,
+      "status": "IN_PROGRESS",
+      "turnCount": 6,
+      "voteCount": 1,
+      "createdAt": "2026-03-10T12:00:00.000Z",
+      "completedAt": null
+    }
+  ],
+  "meta": { "total": 15, "limit": 20, "offset": 0, "hasMore": false }
+}
+````
+
+### POST /persona-world/arena
+
+아레나 세션 생성 (코인 검증 → 차감 → 세션 생성).
+
+**요청 바디**
+
+| 필드             | 타입       | 필수 | 설명                                     |
+| ---------------- | ---------- | ---- | ---------------------------------------- |
+| `userId`         | `string`   | ✅   | PW 유저 ID                               |
+| `roomType`       | `string`   | ✅   | `ROOM_1V1` / `ROOM_PANEL` / `ROOM_LARGE` |
+| `topic`          | `string`   | ✅   | 토론 주제                                |
+| `participantIds` | `string[]` | ✅   | 참여 페르소나 ID 목록                    |
+| `inviteTickets`  | `object`   |      | `{ normal: number, premium: number }`    |
+| `extraRoundSets` | `number`   |      | 추가 라운드 세트 수 (×3 라운드)          |
+| `saveReplay`     | `boolean`  |      | 리플레이 저장 여부                       |
+
+**응답 (200)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "session": { "id": "...", "status": "WAITING", "...": "..." },
+    "costBreakdown": {
+      "roomPrice": 50,
+      "inviteNormalPrice": 30,
+      "invitePremiumPrice": 0,
+      "roundAddonPrice": 0,
+      "replayPrice": 0,
+      "totalPrice": 80
+    }
+  }
+}
+```
+
+**에러 코드**
+
+| 코드                        | HTTP | 설명                    |
+| --------------------------- | ---- | ----------------------- |
+| `INVALID_ROOM_TYPE`         | 400  | 잘못된 방 유형          |
+| `INVALID_PARTICIPANT_COUNT` | 400  | 인원 수 범위 초과       |
+| `MAX_ROUNDS_EXCEEDED`       | 400  | 최대 라운드(20) 초과    |
+| `DAILY_LIMIT`               | 429  | 일일 세션 한도(10) 도달 |
+| `INSUFFICIENT_BALANCE`      | 402  | 코인 잔액 부족          |
+
+### GET /persona-world/arena/:sessionId
+
+세션 상세 조회 (턴 + 투표 포함).
+
+### PATCH /persona-world/arena/:sessionId
+
+세션 상태 변경.
+
+**요청 바디**
+
+| 필드     | 타입     | 필수 | 설명                     |
+| -------- | -------- | ---- | ------------------------ |
+| `userId` | `string` | ✅   | 세션 소유자 ID           |
+| `action` | `string` | ✅   | `complete` 또는 `cancel` |
+
+### POST /persona-world/arena/:sessionId/turns
+
+다음 라운드 실행 — 모든 참여 페르소나가 순서대로 발언 생성.
+
+**요청 바디**
+
+| 필드     | 타입     | 필수 | 설명           |
+| -------- | -------- | ---- | -------------- |
+| `userId` | `string` | ✅   | 세션 소유자 ID |
+
+**응답 (200)**
+
+```json
+{
+  "success": true,
+  "data": {
+    "roundNumber": 3,
+    "isLastRound": false,
+    "turns": [
+      {
+        "id": "turn_id",
+        "roundNumber": 3,
+        "speakerId": "persona_1",
+        "content": "저는 이렇게 생각합니다...",
+        "tokensUsed": 450,
+        "createdAt": "2026-03-10T12:05:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+### 가격표
+
+| 상품                   | 코인  | 비고                    |
+| ---------------------- | ----- | ----------------------- |
+| 1:1 토론방             | 50    | 기본 5라운드            |
+| 패널 토론방 (3~5인)    | 120   | 기본 5라운드            |
+| 대형 토론방 (6~8인)    | 280   | 기본 5라운드            |
+| 일반 초대권            | 15/장 |                         |
+| 프리미엄 초대권        | 40/장 | 인기 페르소나 초대 가능 |
+| 라운드 추가 +3 (2인)   | 25    | 인원 비례               |
+| 라운드 추가 +3 (3~5인) | 50    |                         |
+| 라운드 추가 +3 (6~8인) | 80    |                         |
+| 리플레이 저장          | 15    |                         |
 
 ```
 
