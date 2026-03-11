@@ -1,8 +1,8 @@
-# DeepSight PersonaWorld v4.0 — Part 2: Social
+# DeepSight PersonaWorld v4.2.0-dev — Part 2: Social
 
-**버전**: v4.0
+**버전**: v4.2.0-dev (Multimodal)
 **작성일**: 2026-02-17
-**최종 수정**: 2026-03-04
+**최종 수정**: 2026-03-11
 **상태**: Active
 **인덱스**: `docs/design/persona-world-v4-design.md`
 **엔진 설계서**: `docs/design/persona-engine-v4-design.md`

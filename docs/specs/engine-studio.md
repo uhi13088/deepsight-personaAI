@@ -7,7 +7,7 @@
 **문서 정보**
 
 - 작성일: 2026\. 01\. 12
-- 버전: v3.3 (3-Layer Orthogonal Multi-Vector — 106D+)
+- 버전: v4.2.0-dev (Multimodal — 3-Layer Orthogonal Multi-Vector 106D+)
 - 대상: 웹 개발팀, AI 모델링팀, UX 디자이너, PM
 
 ---

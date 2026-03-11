@@ -2532,6 +2532,43 @@ GET /api/persona-world/onboarding/sns/reanalyze?userId=user_001
 }
 ```
 
+---
+
+## 19. User Profile API
+
+### 19.1 PATCH /api/persona-world/users/profile
+
+유저 프로필 수정 (현재: 활동명만 지원).
+
+**인증**: Internal Token 필수
+
+**Request Body**
+
+| 필드       | 타입   | 필수 | 설명            |
+| ---------- | ------ | ---- | --------------- |
+| `userId`   | string | O    | 유저 ID         |
+| `nickname` | string | X    | 활동명 (2~20자) |
+
+**응답**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "user-123",
+    "nickname": "새로운활동명"
+  }
+}
+```
+
+**에러 코드**
+
+| 코드               | HTTP | 설명                    |
+| ------------------ | ---- | ----------------------- |
+| `INVALID_REQUEST`  | 400  | userId 누락             |
+| `INVALID_NICKNAME` | 400  | 활동명 2~20자 제한 위반 |
+| `NO_CHANGES`       | 400  | 변경할 필드 없음        |
+
 **에러 응답**
 
 | 코드             | HTTP | 설명           |

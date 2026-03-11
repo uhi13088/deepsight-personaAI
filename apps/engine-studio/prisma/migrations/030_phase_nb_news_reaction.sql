@@ -34,8 +34,20 @@ CREATE TABLE IF NOT EXISTS "news_articles" (
 CREATE UNIQUE INDEX IF NOT EXISTS "news_articles_url_key" ON "news_articles"("url");
 CREATE INDEX IF NOT EXISTS "news_articles_publishedAt_idx" ON "news_articles"("publishedAt");
 
--- 4. PersonaPost에 newsArticleId FK 추가
+-- 4. PersonaPost에 newsArticleId 컬럼 추가
 ALTER TABLE "persona_posts"
-    ADD COLUMN IF NOT EXISTS "newsArticleId" TEXT,
-    ADD CONSTRAINT "persona_posts_newsArticleId_fkey"
-        FOREIGN KEY ("newsArticleId") REFERENCES "news_articles"("id") ON DELETE SET NULL;
+    ADD COLUMN IF NOT EXISTS "newsArticleId" TEXT;
+
+-- 4-1. FK 추가 (멱등성 보장)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'persona_posts_newsArticleId_fkey'
+      AND table_name = 'persona_posts'
+  ) THEN
+    ALTER TABLE "persona_posts"
+      ADD CONSTRAINT "persona_posts_newsArticleId_fkey"
+      FOREIGN KEY ("newsArticleId") REFERENCES "news_articles"("id") ON DELETE SET NULL;
+  END IF;
+END$$;

@@ -61,10 +61,19 @@ CREATE TABLE IF NOT EXISTS "user_trust_scores" (
 
 CREATE UNIQUE INDEX IF NOT EXISTS "user_trust_scores_userId_key" ON "user_trust_scores"("userId");
 
-ALTER TABLE "user_trust_scores"
-  ADD CONSTRAINT "user_trust_scores_userId_fkey"
-  FOREIGN KEY ("userId") REFERENCES "persona_world_users"("id")
-  ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'user_trust_scores_userId_fkey'
+      AND table_name = 'user_trust_scores'
+  ) THEN
+    ALTER TABLE "user_trust_scores"
+      ADD CONSTRAINT "user_trust_scores_userId_fkey"
+      FOREIGN KEY ("userId") REFERENCES "persona_world_users"("id")
+      ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END$$;
 
 -- T268: PWQuarantineEntry
 CREATE TABLE IF NOT EXISTS "pw_quarantine_entries" (
@@ -88,10 +97,19 @@ CREATE INDEX IF NOT EXISTS "pw_quarantine_entries_status_idx" ON "pw_quarantine_
 CREATE INDEX IF NOT EXISTS "pw_quarantine_entries_personaId_idx" ON "pw_quarantine_entries"("personaId");
 CREATE INDEX IF NOT EXISTS "pw_quarantine_entries_expiresAt_idx" ON "pw_quarantine_entries"("expiresAt");
 
-ALTER TABLE "pw_quarantine_entries"
-  ADD CONSTRAINT "pw_quarantine_entries_personaId_fkey"
-  FOREIGN KEY ("personaId") REFERENCES "personas"("id")
-  ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'pw_quarantine_entries_personaId_fkey'
+      AND table_name = 'pw_quarantine_entries'
+  ) THEN
+    ALTER TABLE "pw_quarantine_entries"
+      ADD CONSTRAINT "pw_quarantine_entries_personaId_fkey"
+      FOREIGN KEY ("personaId") REFERENCES "personas"("id")
+      ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END$$;
 
 -- T269: ModerationLog
 CREATE TABLE IF NOT EXISTS "moderation_logs" (

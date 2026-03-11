@@ -23,7 +23,16 @@ CREATE TABLE IF NOT EXISTS "pw_notification_preferences" (
 CREATE UNIQUE INDEX IF NOT EXISTS "pw_notification_preferences_userId_key"
     ON "pw_notification_preferences"("userId");
 
-ALTER TABLE "pw_notification_preferences"
-    ADD CONSTRAINT "pw_notification_preferences_userId_fkey"
-    FOREIGN KEY ("userId") REFERENCES "persona_world_users"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'pw_notification_preferences_userId_fkey'
+      AND table_name = 'pw_notification_preferences'
+  ) THEN
+    ALTER TABLE "pw_notification_preferences"
+      ADD CONSTRAINT "pw_notification_preferences_userId_fkey"
+      FOREIGN KEY ("userId") REFERENCES "persona_world_users"("id")
+      ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END$$;

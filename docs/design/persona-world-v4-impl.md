@@ -1,8 +1,8 @@
-# DeepSight PersonaWorld v4.0 — 구현 계획서
+# DeepSight PersonaWorld v4.2.0-dev — 구현 계획서
 
-**버전**: v4.0
+**버전**: v4.2.0-dev (Multimodal)
 **작성일**: 2026-02-16
-**최종 수정**: 2026-03-04
+**최종 수정**: 2026-03-11
 **상태**: Active
 **설계서 참조**:
 
@@ -1530,36 +1530,36 @@ isVoiceConfigured(): { stt: boolean, tts: boolean }
 
 | #   | 태스크                                                            | 상태 |
 | --- | ----------------------------------------------------------------- | ---- |
-| 31  | PW 특화 Gate Guard 규칙 (조작 시도, 정보 추출, 레이트 리밋, 스팸) | TODO |
-| 32  | 유저 신뢰도 관리 (Trust Score CRUD, Inspection Level)             | TODO |
-| 33  | PW Kill Switch 확장 (8종 토글, 4종 자동 트리거)                   | TODO |
-| 34  | Quarantine 시스템 (격리 CRUD, 만료 처리, 심각도별 정책)           | TODO |
-| 35  | 자율 활동 무결성 검증 (PersonaState, 팩트북, 패턴 검사)           | TODO |
-| 36  | Auto-Interview PW 확장 (20문항, PW 맥락화, 적응적 스케줄링)       | TODO |
-| 37  | PIS 계산 (3요소 가중합, 등급 판정, 자동 조치)                     | TODO |
-| 38  | 품질 로깅 (PostQualityLog, CommentQualityLog, InteractionPattern) | TODO |
-| 39  | Arena 피드백 루프 (PW→Arena 트리거, 교정 추적)                    | TODO |
+| 31  | PW 특화 Gate Guard 규칙 (조작 시도, 정보 추출, 레이트 리밋, 스팸) | DONE |
+| 32  | 유저 신뢰도 관리 (Trust Score CRUD, Inspection Level)             | DONE |
+| 33  | PW Kill Switch 확장 (8종 토글, 4종 자동 트리거)                   | DONE |
+| 34  | Quarantine 시스템 (격리 CRUD, 만료 처리, 심각도별 정책)           | DONE |
+| 35  | 자율 활동 무결성 검증 (PersonaState, 팩트북, 패턴 검사)           | DONE |
+| 36  | Auto-Interview PW 확장 (20문항, PW 맥락화, 적응적 스케줄링)       | DONE |
+| 37  | PIS 계산 (3요소 가중합, 등급 판정, 자동 조치)                     | DONE |
+| 38  | 품질 로깅 (PostQualityLog, CommentQualityLog, InteractionPattern) | DONE |
+| 39  | Arena 피드백 루프 (PW→Arena 트리거, 교정 추적)                    | DONE |
 
 ### Phase 7: 모더레이션 & 운영
 
 | #   | 태스크                                                       | 상태 |
 | --- | ------------------------------------------------------------ | ---- |
-| 40  | 자동 모더레이션 파이프라인 (3단계: 규칙→Sentinel→비동기)     | TODO |
-| 41  | 관리자 대시보드 서비스 (Activity/Quality/Cost/Security 집계) | TODO |
-| 42  | 관리자 대시보드 API (6 엔드포인트)                           | TODO |
-| 43  | 콘텐츠/페르소나/시스템 관리 액션                             | TODO |
-| 44  | 신고 처리 시스템 (6종 카테고리, 자동 분류, 관리자 리뷰)      | TODO |
-| 45  | 운영 스케줄 작업 (8종 예약 작업)                             | TODO |
-| 46  | 운영 KPI 트래커 (서비스 건전성 8종, UX 6종)                  | TODO |
+| 40  | 자동 모더레이션 파이프라인 (3단계: 규칙→Sentinel→비동기)     | DONE |
+| 41  | 관리자 대시보드 서비스 (Activity/Quality/Cost/Security 집계) | DONE |
+| 42  | 관리자 대시보드 API (6 엔드포인트)                           | DONE |
+| 43  | 콘텐츠/페르소나/시스템 관리 액션                             | DONE |
+| 44  | 신고 처리 시스템 (6종 카테고리, 자동 분류, 관리자 리뷰)      | DONE |
+| 45  | 운영 스케줄 작업 (8종 예약 작업)                             | DONE |
+| 46  | 운영 KPI 트래커 (서비스 건전성 8종, UX 6종)                  | DONE |
 
 ### Phase 8: 비용 모니터링 & 제어
 
 | #   | 태스크                                                     | 상태 |
 | --- | ---------------------------------------------------------- | ---- |
-| 47  | 비용 추적 확장 (활동 유형별 LLM 사용 로깅, 일간/월간 집계) | TODO |
-| 48  | 예산 알림 체계 (4단계 일일/월간, 자동 조치)                | TODO |
-| 49  | 비용 모드 (QUALITY/BALANCE/COST_PRIORITY)                  | TODO |
-| 50  | 비용 최적화 실행 (적응적 스케줄링, 배치 처리, 캐시 최적화) | TODO |
+| 47  | 비용 추적 확장 (활동 유형별 LLM 사용 로깅, 일간/월간 집계) | DONE |
+| 48  | 예산 알림 체계 (4단계 일일/월간, 자동 조치)                | DONE |
+| 49  | 비용 모드 (QUALITY/BALANCE/COST_PRIORITY)                  | DONE |
+| 50  | 비용 최적화 실행 (적응적 스케줄링, 배치 처리, 캐시 최적화) | DONE |
 
 ### Phase 9: 채팅 + 통화 시스템 (T330~T367)
 

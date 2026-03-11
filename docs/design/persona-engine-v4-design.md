@@ -1,8 +1,8 @@
 # DeepSight Persona Engine v4.0 — 설계서
 
-**버전**: v4.0
+**버전**: v4.2.0-dev (Multimodal)
 **작성일**: 2026-02-16
-**최종 수정**: 2026-03-04
+**최종 수정**: 2026-03-11
 **상태**: Active
 
 ---
@@ -25,6 +25,10 @@
 14. [LLM 모델 전략](#14-llm-모델-전략)
 15. [로드맵 (v4.1 ~ v6.0)](#15-로드맵)
 16. [TTS Voice Engine + 음성 자체검증](#16-tts-voice-engine--음성-자체검증)
+17. [Conversation Engine (1:1 채팅 + 음성 통화)](#17-conversation-engine)
+18. [Semantic Memory Architecture (v5.0)](#18-semantic-memory-architecture)
+19. [ContentItem B2B 파이프라인](#19-contentitem-b2b-파이프라인)
+20. [적응형 온보딩 (Adaptive Onboarding)](#20-적응형-온보딩)
 
 ---
 
@@ -1109,6 +1113,214 @@ resetTTSValidationMetrics(): void                  // 메트릭 초기화
 - 운영 대시보드에서 실시간 모니터링 가능
 - `failuresByCode` 분포로 검증 계층별 문제 식별
 - `failuresByProvider` 분포로 프로바이더 안정성 비교
+
+---
+
+## 17. Conversation Engine (1:1 채팅 + 음성 통화)
+
+유저와 페르소나 간 실시간 대화를 처리하는 엔진. 채팅(텍스트)과 통화(음성) 두 모드를 지원하며, 기억 파이프라인과 완전 통합된다.
+
+### 17.1 아키텍처
+
+```
+┌──────────────────────────────────────────────┐
+│          Conversation Engine                  │
+│                                               │
+│  System Prompt = Static Prefix + Dynamic Suffix│
+│  ┌──────────────┐ ┌──────────────────────────┐│
+│  │ Static Prefix│ │ Dynamic Suffix           ││
+│  │ - 이름/역할  │ │ - PersonaState           ││
+│  │ - 배경/성격  │ │ - RAG Context            ││
+│  │ - VoiceSpec  │ │ - Mode Rules (chat/call) ││
+│  │ - Factbook   │ │ - SemanticMemory TOP-10  ││
+│  │ - PostPrompt │ │ - 유저 정보 (nickname)   ││
+│  └──────────────┘ └──────────────────────────┘│
+│                                               │
+│  Mode: CHAT (500 tokens) / CALL (200 tokens)  │
+└──────────────────────────────────────────────┘
+```
+
+### 17.2 ConversationContext
+
+```typescript
+interface ConversationContext {
+  personaProfile: PersonaProfileSnapshot
+  personaState: PersonaState | null
+  ragContext: string
+  mode: "chat" | "call"
+  userNickname?: string // v4.2: 유저 활동명
+  semanticMemories?: SemanticMemory[] // v5.0: 자아관 기억
+}
+```
+
+### 17.3 채팅 서비스 (Chat Service)
+
+- **ChatDataProvider** DI 패턴: DB 조회/저장을 추상화
+- `createThread(personaId, userId)` → ChatThread + InteractionSession 생성
+- `sendMessage(input)` → RAG 검색 → LLM 생성 → 기억 기록 → 응답 반환
+- **비용**: 10 코인/턴
+- **토큰 예산**: System ~2,000 + RAG ~300 + History ~200 = ~2,500 tok
+
+### 17.4 통화 서비스 (Call Service)
+
+- **CallDataProvider** DI 패턴: 예약/세션/기억 관리 추상화
+- `createReservation(personaId, userId, scheduledAt)` → 예약 생성 (200 코인)
+- `startCall(reservationId)` → CallSession 생성 + TTS 인사 생성
+- `processCallTurn(input)` → STT → LLM → TTS 파이프라인
+- `endCall(sessionId)` → 기억 최종화 (Factbook 갱신)
+- **토큰 예산**: System ~1,500 + RAG ~200 + History ~100 = ~1,800 tok
+
+### 17.5 기억 파이프라인 통합
+
+```
+턴 처리 → recordConversationTurn (Poignancy 계산)
+       → adjustStateForConversation (mood/energy 변화)
+종료 시 → finalizeConversation (Factbook mutableContext 갱신)
+       → RAG 인덱싱 (다음 대화에서 검색 가능)
+```
+
+- `retrieveConversationMemories`: RAG 가중 검색으로 관련 기억 로드
+- `recordConversationTurn`: Poignancy Score 계산 → InteractionLog 저장
+- `adjustStateForConversation`: 대화 내용에 따라 mood/energy 조정
+- `finalizeConversation`: 대화 요약 → Factbook.mutableContext 업데이트
+
+### 17.6 음성 파이프라인 (Call 모드)
+
+```
+유저 음성 → Whisper STT (다국어)
+         → LLM 생성 (200 tokens, 간결 모드)
+         → TTS 합성 (ElevenLabs/OpenAI/Google)
+         → 4-Layer 검증 (§16.3)
+         → 음성 응답 반환
+```
+
+- STT: OpenAI Whisper API (다국어 자동 감지)
+- TTS: §16에서 정의한 Voice Engine 10D + 프로바이더 Fallback 활용
+- 캐시: LRU 인메모리 캐시 (SHA-256 키, 최대 5,000 entries)
+
+---
+
+## 18. Semantic Memory Architecture (v5.0)
+
+> 상세 설계서: `docs/design/persona-engine-v5-design.md`
+
+에피소드 기억을 의미적으로 압축하여 자아관을 유지하고, L3 벡터를 점진적으로 진화시키는 3계층 기억 시스템.
+
+### 18.1 SemanticMemory 모델
+
+```typescript
+interface SemanticMemory {
+  id: string
+  personaId: string
+  category:
+    | "SELF_CONCEPT"
+    | "BELIEF"
+    | "PREFERENCE"
+    | "RELATIONSHIP"
+    | "HABIT"
+    | "EMOTIONAL_PATTERN"
+  subject: string // 예: "나는 새벽에 글을 쓸 때 가장 솔직해진다"
+  confidence: number // 0.0~1.0, 에피소드 수에 따라 증가
+  evidenceCount: number // 뒷받침하는 에피소드 수
+  l3Influence?: {
+    // L3 진화 영향
+    dimension: string
+    delta: number
+  }
+  consolidatedAt: Date
+}
+```
+
+### 18.2 3단계 파이프라인
+
+```
+주간 배치 (cron/v5-memory)
+  ① Memory Consolidation: 에피소드 → LLM(Haiku) → SemanticMemory upsert
+  ② Growth Arc Updater: l3Influence 누적 → L3 벡터 미세 조정
+  ③ Identity Drift Detector: 출력 vs ImmutableCore → driftScore 계산
+```
+
+### 18.3 L3 진화 경계
+
+| 차원         | 단일 consolidation 최대 | 생애 최대 |
+| ------------ | ----------------------- | --------- |
+| lack         | ±0.001                  | ±0.10     |
+| moralCompass | ±0.001                  | ±0.10     |
+| volatility   | ±0.002                  | ±0.20     |
+| growthArc    | ±0.005                  | ±0.40     |
+
+### 18.4 Conversation Engine 통합
+
+- `buildConversationSystemPrefix()`: SemanticMemory TOP-10을 "내면에 쌓인 자아관" 섹션으로 주입
+- 토큰 효율: 에피소드 대비 10배 이상 (10항목 ≈ 400 토큰)
+
+---
+
+## 19. ContentItem B2B 파이프라인
+
+외부 고객(B2B)이 콘텐츠를 등록하면 페르소나가 큐레이션하고, 유저에게 매칭 기반으로 추천하는 파이프라인.
+
+### 19.1 데이터 모델
+
+```
+ContentItem ─── 콘텐츠 메타데이터 + L1 7D + L3 4D 벡터
+     │
+     ├── PersonaCuratedContent ─── 페르소나×콘텐츠 큐레이션 (PENDING/APPROVED/REJECTED)
+     │
+     └── UserContentFeedback ─── 유저 피드백 (LIKE/SKIP/SAVE/CONSUME)
+```
+
+### 19.2 벡터화
+
+```typescript
+vectorizeContent(item: { title, description?, genres, tags }): ContentVectorResult
+// Claude Sonnet → "이 콘텐츠에 끌릴 사람의 취향 프로필" → L1 7D + L3 4D
+```
+
+### 19.3 자동 큐레이션
+
+- ConsumptionLog에서 `rating >= 0.7`인 콘텐츠 → PersonaCuratedContent 자동 생성 (PENDING)
+- 관리자 승인 → APPROVED → 추천 대상에 포함
+- Cron: 매일 새벽 3시 `cron/content-auto-curation`
+
+### 19.4 B2B 추천 API
+
+```
+POST /api/v1/recommendations
+  → verifyApiKey → tenantId
+  → 유저 벡터 조회
+  → matchAll() → 상위 5 페르소나
+  → PersonaCuratedContent (APPROVED) + ContentItem 조회
+  → rankContents(userVector, contents) → finalScore = matchScore × curationScore
+  → 중복 제거 → 상위 limit개 반환
+```
+
+---
+
+## 20. 적응형 온보딩 (Adaptive Onboarding)
+
+기존 고정 24문항 → 적응형 20~28문항 가변 시스템. CAT(Computerized Adaptive Testing) 기법 적용.
+
+### 20.1 핵심 알고리즘
+
+```
+세션 시작 → 16D 불확실도 프로필 초기화 (L1 7D + L2 5D + L3 4D)
+  → 질문 선택: 가장 불확실한 차원의 질문 우선 (정보 획득량 최대화)
+  → 답변 → 벡터 점진 업데이트 + 불확실도 감소
+  → 종료 판정: 평균 불확실도 < 0.15 또는 최대 28문항
+```
+
+### 20.2 질문 풀
+
+- 기존 24문항 + 추가 21문항 = **총 45문항**
+- 카테고리: core(기본) / deepening(심화) / cross_layer(교차) / verification(검증)
+- `isAdaptive`, `informationGain`, `minPriorAnswers` 메타데이터
+
+### 20.3 Phase 기반과 공존
+
+- 기본 모드: Adaptive (적응형)
+- `?mode=phase`: 기존 3-Phase 24문항 방식 선택 가능
+- 기존 cold-start API 하위 호환 유지
 
 ---
 
