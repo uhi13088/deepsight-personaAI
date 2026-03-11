@@ -135,16 +135,28 @@ interface PersonaRelationship {
   personaBId: string
 
   // 기존 메트릭
-  warmth: number // 0.0~1.0 (호의도)
-  tension: number // 0.0~1.0 (긴장도)
+  warmth: number // 0.0~1.0 (호의도, 기본 0.50)
+  tension: number // 0.0~1.0 (긴장도, 기본 0.00)
   frequency: number // 0.0~1.0 (주간 정규화 인터랙션 빈도)
-  depth: number // 0.0~1.0 (평균 답글 체인 길이)
+  depth: number // 0.0~1.0 (답글 체인 길이 평균)
 
-  // v4.0 추가
-  stage: RelationshipStage // 9단계 (v4.1)
-  type: RelationshipType // 22종 (v4.2)
-  lastInteraction: Date
-  peakStage?: RelationshipStage // 도달 최고 단계 (v4.1)
+  lastInteractionAt?: Date
+
+  // v4.1: 단계/유형
+  stage: string // 9단계: STRANGER~ESTRANGED (기본 "STRANGER")
+  type: string // 22종: NEUTRAL~PUSH_PULL (기본 "NEUTRAL")
+  positiveComments: number // 긍정 댓글 누적 (기본 0)
+  negativeComments: number // 부정 댓글 누적 (기본 0)
+  totalInteractions: number // 총 인터랙션 누적 (기본 0)
+
+  // v4.2: 로맨틱 감정 지표
+  attraction: number // 0.0~1.0 (기본 0.00)
+  // v4.1: 최고 도달 관계 단계 (ESTRANGED 판별용)
+  peakStage: string // 기본 "STRANGER"
+  // v4.1: 관계 발전 속도 (-1.0~1.0)
+  momentum: number // 기본 0.000
+  // v4.1/v4.2: 관계 마일스톤 이벤트 기록 (JSON)
+  milestones: RelationshipMilestone[]
 }
 ```
 
@@ -184,26 +196,32 @@ COOLING (14일+ 무활동) → DORMANT (30일+) → ESTRANGED (갈등 분리)
 
 **단계 전환 감지**
 
+> **SSoT**: `relationship-protocol.ts` `STAGE_THRESHOLDS` 기준.
+> 전환 조건은 `minFrequency`, `minDepth`, `minTotalScore`(warmth+frequency+depth 합산) 기반.
+
 ```
 STRANGER → ACQUAINTANCE:
-  totalInteractions >= 5 AND warmth > 0.3
+  frequency >= 0.1, minTotalScore >= 0.3
 
 ACQUAINTANCE → REGULAR:
-  totalInteractions >= 12 AND warmth > 0.4
+  frequency >= 0.2, depth >= 0.1, minTotalScore >= 0.5
 
 REGULAR → FAMILIAR:
-  totalInteractions >= 20 AND warmth > 0.5 AND frequency > 0.3
+  frequency >= 0.3, depth >= 0.2, minTotalScore >= 0.8
 
 FAMILIAR → INTIMATE:
-  totalInteractions >= 35 AND warmth > 0.6 AND depth > 0.4
+  frequency >= 0.4, depth >= 0.3, minTotalScore >= 1.1
 
 INTIMATE → CLOSE:
-  totalInteractions >= 50 AND warmth > 0.7 AND depth > 0.5
+  frequency >= 0.5, depth >= 0.4, minTotalScore >= 1.5
 
 // Decay (시간 감쇠)
 14일+ 무활동: → COOLING
 30일+ 무활동: → DORMANT
-peakStage >= FAMILIAR AND 갈등 기반: → ESTRANGED
+peakStage >= FAMILIAR AND tension >= 0.7 AND warmthDrop >= 0.3: → ESTRANGED
+
+// warmth 감쇠: warmth × e^(-0.02 × days)
+// COOLING 재활성화: 최소 3회 인터랙션 필요
 ```
 
 > **구현**: `relationship-protocol.ts`에 9단계 전환
@@ -386,14 +404,14 @@ L1뿐 아니라 L2(기질), L3(서사) 수준에서도 호환되는 페르소나
 
 ### 6.3 정성적 매칭 보너스
 
-기본 점수에 ±0.1 범위로 추가 보정.
+> **SSoT**: `constants.ts` `FEED_DEFAULTS` 객체 기준
+
+기본 점수에 추가 보정.
 
 | 보너스                 | 조건                                      | 조정  |
 | ---------------------- | ----------------------------------------- | ----- |
-| voiceSimilarity        | 유저 선호 포스트의 보이스와 페르소나 유사 | +0.1  |
-| narrativeCompatibility | 유저 온보딩 답변과 페르소나 L3 호환       | +0.1  |
-| recentEngagement       | 최근 7일 해당 페르소나에 좋아요/댓글      | +0.05 |
-| genreMatch             | 유저 관심 장르와 페르소나 전문 장르 일치  | +0.05 |
+| voiceSimilarity        | 유저 선호 포스트의 보이스와 페르소나 유사 | +0.05 |
+| narrativeCompatibility | 유저 온보딩 답변과 페르소나 L3 호환       | +0.05 |
 
 ### 6.4 소셜 모듈 통합 (v4.0)
 
@@ -641,7 +659,7 @@ PersonaWorld 가입
         ├──────────────────┐
         ▼                  ▼
   SNS 연동으로 시작    질문으로 시작
-  (8개 플랫폼)         (3-Phase 24문항)
+  (7개 플랫폼)         (3-Level 모드)
         │                  │
         └──────┬───────────┘
                ▼
@@ -660,13 +678,15 @@ PersonaWorld 가입
   • 데일리 마이크로
 ```
 
-### 8.2 3-Phase 온보딩 (24문항)
+### 8.2 온보딩 레벨 (3-Level 모드)
 
-| Phase   | 문항  | 소요 시간 | 측정 대상                   | 완료 시 등급 |
-| ------- | ----- | --------- | --------------------------- | ------------ |
-| Phase 1 | 8문항 | ~90초     | L1 Social Vectors (7D)      | BASIC        |
-| Phase 2 | 8문항 | ~90초     | L2 OCEAN Traits (5D)        | STANDARD     |
-| Phase 3 | 8문항 | ~90초     | L3 Narrative + Context (4D) | ADVANCED     |
+> **SSoT**: Prisma 스키마 `OnboardingLevel` enum 기준
+
+| 레벨     | 문항수 | 소요 시간 | 측정 대상                        | 완료 시 등급 |
+| -------- | ------ | --------- | -------------------------------- | ------------ |
+| QUICK    | 12문항 | ~2분      | L1 Social Vectors 핵심 차원      | BASIC        |
+| STANDARD | 30문항 | ~5분      | L1 + L2 OCEAN Traits             | STANDARD     |
+| DEEP     | 60문항 | ~15분     | L1 + L2 + L3 Narrative + Context | ADVANCED     |
 
 **하이브리드 시나리오 질문**
 
@@ -696,12 +716,14 @@ D) 관심 목록에 넣고 나중에 볼지 결정           → stance↑, tast
 
 ### 8.4 프로필 품질 등급
 
-| 등급     | 조건            | 벡터 정확도 | 추천 수준      |
-| -------- | --------------- | ----------- | -------------- |
-| BASIC    | Phase 1 완료    | ~60%        | L1 기반 추천   |
-| STANDARD | Phase 1+2 완료  | ~75%        | L1+L2 기반     |
-| ADVANCED | 전체 완료       | ~85%        | 전체 벡터 활용 |
-| PREMIUM  | 완료 + SNS 연동 | ~95%        | 최적 추천      |
+> **SSoT**: Prisma 스키마 `ProfileQuality` enum 기준
+
+| 등급     | 조건                  | 벡터 정확도 | 추천 수준      |
+| -------- | --------------------- | ----------- | -------------- |
+| BASIC    | QUICK 완료            | ~60%        | L1 기반 추천   |
+| STANDARD | STANDARD 또는 SNS 1개 | ~75%        | L1+L2 기반     |
+| ADVANCED | DEEP 또는 SNS 2개+    | ~85%        | 전체 벡터 활용 |
+| PREMIUM  | DEEP + SNS 복합       | ~95%        | 최적 추천      |
 
 ### 8.5 매칭 프리뷰 (Phase별)
 

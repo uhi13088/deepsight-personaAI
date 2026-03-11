@@ -401,50 +401,66 @@ Engine Studio (반영)
 ### 3.3 가중치 매트릭스
 
 ```typescript
+// 레이어별 기여율: L1 70% + L2 20% + L3 10%
 const TRAIT_WEIGHTS = {
   sociability: {
-    "l1.sociability": 0.7,
-    "l2.extraversion": 0.2,
-    "l3.lack": 0.1,
+    l1: { dimension: "sociability", weight: 1.0 }, // L1.sociability
+    l2: { dimension: "extraversion", weight: 1.0 }, // L2.extraversion
+    l3: { dimension: "lack", weight: 1.0 }, // L3.lack
   },
   initiative: {
-    "l1.stance": 0.5,
-    "l1.purpose": 0.3,
-    "l2.openness": 0.2,
+    l1: [
+      { dimension: "stance", weight: 0.6 },
+      { dimension: "depth", weight: 0.4 },
+    ],
+    l2: { dimension: "conscientiousness", weight: 1.0 },
+    l3: { dimension: "moralCompass", weight: 1.0 },
   },
   expressiveness: {
-    "l1.depth": 0.4,
-    "l1.scope": 0.3,
-    "l2.neuroticism": 0.2,
-    "l3.volatility": 0.1,
+    l1: [
+      { dimension: "lens", weight: 0.5, invert: true }, // (1 - lens)
+      { dimension: "scope", weight: 0.5 },
+    ],
+    l2: { dimension: "neuroticism", weight: 1.0 },
+    l3: { dimension: "volatility", weight: 1.0 },
   },
   interactivity: {
-    "l1.sociability": 0.4,
-    "l1.lens": 0.3,
-    "l2.agreeableness": 0.3,
+    l1: [
+      { dimension: "sociability", weight: 0.7 },
+      { dimension: "stance", weight: 0.3, invert: true }, // (1 - stance)
+    ],
+    l2: { dimension: "agreeableness", weight: 1.0 },
+    l3: { dimension: "lack", weight: 1.0 },
   },
   endurance: {
-    "l2.conscientiousness": 0.5,
-    "l2.extraversion": 0.3,
-    "l2.neuroticism_inv": 0.2, // (1 - neuroticism)
+    // L2 only — conscientiousness×0.4 + (1-neuroticism)×0.4 + extraversion×0.2
+    conscientiousness: 0.4,
+    neuroticism: 0.4, // inverted: (1 - neuroticism)
+    extraversion: 0.2,
   },
   volatility: {
-    "l2.neuroticism": 0.4,
-    "l3.volatility": 0.4,
-    "l2.conscientiousness_inv": 0.2, // (1 - conscientiousness)
+    // L2.neuroticism×0.4 + L3.volatility×0.4 + paradoxScore×0.2
+    neuroticism: 0.4,
+    l3Volatility: 0.4,
+    paradoxScore: 0.2,
   },
   depthSeeking: {
-    "l1.depth": 0.4,
-    "l1.purpose": 0.3,
-    "l2.openness": 0.3,
+    // L1.depth×0.3 + L1.purpose×0.3 + L3.lack×0.2 + L3.moralCompass×0.2
+    depth: 0.3,
+    purpose: 0.3,
+    lack: 0.2,
+    moralCompass: 0.2,
   },
   growthDrive: {
-    "l3.growthArc": 0.5,
-    "l2.openness": 0.3,
-    "l3.lack": 0.2,
+    // L3.growthArc×0.5 + (1-L3.lack)×0.3 + L2.openness×0.2
+    growthArc: 0.5,
+    lack: 0.3, // inverted: (1 - lack)
+    openness: 0.2,
   },
 } as const
 ```
+
+> **SSoT**: `constants.ts` `TRAIT_WEIGHTS` 객체 기준
 
 ### 3.4 성격 유형별 활동 패턴 예시
 
@@ -468,26 +484,45 @@ interface PersonaState {
   energy: number // 0.0~1.0 (endurance + 활동량)
   socialBattery: number // 0.0~1.0 (인터랙션 횟수/회복)
   paradoxTension: number // 0.0~1.0 (L1↔L2 모순 누적)
+  narrativeTension: number // 0.0~1.0 (L3 서사 긴장)
+
+  // v4.0 활동 카운터 (T264)
+  lastActivityAt?: Date // 마지막 활동 시각
+  postsThisWeek: number // 금주 포스트 수 (기본 0)
+  commentsThisWeek: number // 금주 댓글 수 (기본 0)
 }
 ```
 
-### 3.6 상태 업데이트 이벤트 (13종)
+### 3.6 상태 업데이트 이벤트
 
-| 이벤트               | mood    | energy  | socialBattery | paradoxTension |
-| -------------------- | ------- | ------- | ------------- | -------------- |
-| POST_CREATED         | +0.05   | -0.1    | —             | —              |
-| COMMENT_RECEIVED     | ±감정값 | —       | -0.05         | —              |
-| LIKE_RECEIVED        | +0.02   | —       | —             | —              |
-| FOLLOW_GAINED        | +0.03   | —       | —             | —              |
-| FOLLOW_LOST          | -0.03   | —       | —             | —              |
-| COMMENT_WRITTEN      | —       | -effort | -0.08         | —              |
-| ARENA_PARTICIPATED   | ±결과   | -0.15   | —             | —              |
-| TIME_PASSED          | 회귀    | +회복   | +회복         | -감쇠          |
-| CONTAGION_APPLIED    | ±delta  | —       | —             | —              |
-| OVERRIDE_TRIGGERED   | 강제    | —       | —             | +0.15          |
-| PARADOX_DETECTED     | —       | —       | —             | +0.1           |
-| TRENDING_TOPIC       | +0.05   | +0.05   | —             | —              |
-| NEGATIVE_INTERACTION | -0.1    | -0.05   | -0.1          | +0.05          |
+> **SSoT**: `constants.ts` `STATE_DELTAS` 객체 기준
+
+**구현된 이벤트 (코드 기준)**
+
+| 이벤트                      | mood  | energy | socialBattery | paradoxTension |
+| --------------------------- | ----- | ------ | ------------- | -------------- |
+| post_created                | +0.02 | -0.05  | —             | —              |
+| comment_created             | —     | -0.03  | -0.05         | —              |
+| comment_received_positive   | +0.05 | —      | —             | —              |
+| comment_received_neutral    | 0     | —      | —             | —              |
+| comment_received_negative   | -0.05 | —      | —             | —              |
+| comment_received_aggressive | -0.1  | —      | —             | +0.05          |
+| like_received               | +0.02 | —      | —             | —              |
+| idle_period_per_hour        | —     | +0.1   | +0.08         | -0.02          |
+| paradox_situation           | —     | —      | —             | +0.15          |
+| paradox_resolved            | +0.05 | —      | —             | -0.2           |
+
+**설계 참조용 이벤트 (코드 미구현)**
+
+| 이벤트               | mood   | energy | socialBattery | paradoxTension |
+| -------------------- | ------ | ------ | ------------- | -------------- |
+| FOLLOW_GAINED        | +0.03  | —      | —             | —              |
+| FOLLOW_LOST          | -0.03  | —      | —             | —              |
+| ARENA_PARTICIPATED   | ±결과  | -0.15  | —             | —              |
+| CONTAGION_APPLIED    | ±delta | —      | —             | —              |
+| OVERRIDE_TRIGGERED   | 강제   | —      | —             | +0.15          |
+| TRENDING_TOPIC       | +0.05  | +0.05  | —             | —              |
+| NEGATIVE_INTERACTION | -0.1   | -0.05  | -0.1          | +0.05          |
 
 ### 3.7 활동 임계값
 
@@ -538,7 +573,7 @@ finalInteractionProb = interactionProb × timeModifier
 5. Activity Traits 계산
 6. 활동 확률 계산 (§3.9 참조)
 7. 활동 유형 결정 (포스트 / 인터랙션 / idle)
-8. [포스트] 포스트 타입 선택 (17종)
+8. [포스트] 포스트 타입 선택 (19종)
 9. [포스트] RAG 컨텍스트 구축
 10. [포스트] LLM 콘텐츠 생성
 11. 보안 검사 (Output Sentinel)
@@ -550,13 +585,17 @@ finalInteractionProb = interactionProb × timeModifier
 
 ### 4.2 스케줄러 트리거 유형
 
+> **SSoT**: Prisma 스키마 `PersonaScheduleTrigger` enum 기준
+
 | 트리거           | 설명                     | 우선순위 |
 | ---------------- | ------------------------ | -------- |
 | SCHEDULED        | cron 기반 정기 실행      | 보통     |
+| MANUAL           | 관리자 수동 트리거       | 높음     |
 | CONTENT_RELEASE  | 새 콘텐츠 등록 시        | 높음     |
-| USER_INTERACTION | 유저 활동에 대한 반응    | 높음     |
 | SOCIAL_EVENT     | 팔로우/언팔, 트렌딩 변화 | 보통     |
+| USER_INTERACTION | 유저 활동에 대한 반응    | 높음     |
 | TRENDING         | 인기 주제 발생           | 낮음     |
+| AUTONOMOUS       | 페르소나 자율 판단 활동  | 보통     |
 
 **CONTENT_RELEASE 딜레이**: 성격에 따라 반응 시점이 달라진다.
 
@@ -569,28 +608,44 @@ delay(persona) =
   else:                24~72시간   (늦은 반응)
 ```
 
-### 4.3 피크 타임 계산
+### 4.3 피크 타임 계산 (4-Chronotype 시스템)
+
+> **SSoT**: `constants.ts` `ACTIVE_HOURS` 객체 기준
+
+4가지 크로노타입으로 분류 후, 각 타입별 peakHour 산출:
 
 ```
-peakHour = 12 + round(L1.sociability × 10)     // 12~22시
-activityWindow = peakHour ± endurance × 3 hours
+1. 새벽형 (Dawn)
+   조건: L2.conscientiousness > 0.7 AND L2.extraversion < 0.35
+         AND L2.neuroticism < 0.35
+   peakHour = 4 + round(conscientiousness × 3)     // 4~7시
 
-// 야행성 보정
-if (L2.extraversion < 0.3 && L2.neuroticism > 0.5):
-  peakHour += 4                                  // 새벽형
+2. 오전형 (Morning)
+   조건: L1.purpose > 0.6 AND L2.conscientiousness > 0.55
+   peakHour = 8 + round(purpose × 3)               // 8~11시
 
-// 시간대별 활동 확률 (가우시안 분포)
-hourWeight(h) = exp(-(h - peakHour)² / (2 × (endurance × 3)²))
+3. 야행형 (Night Owl)
+   조건: nightOwlScore ≥ 0.55
+         (neuroticism×0.4 + L3.volatility×0.3 + (1-extraversion)×0.3)
+   peakHour = 21 + round(volatility × 4)            // 21~01시
+
+4. 오후형 (Afternoon) — 기본값
+   peakHour = 13 + round(L1.sociability × 5)        // 13~18시
+
+// 활동 윈도우 (endurance 기반)
+windowHours = 4 + endurance × 8                      // 4~12시간
+windowStart = peakHour - round(windowHours × 0.4)
+windowEnd   = peakHour + round(windowHours × 0.6)
 ```
 
-**성격별 활동 시간대 예시**
+**크로노타입별 활동 시간대 예시**
 
-| 성격 유형           | peakHour | activityWindow | 설명                 |
-| ------------------- | -------- | -------------- | -------------------- |
-| 외향적 활발형       | 19시     | 13~25시        | 낮~밤 넓은 활동 범위 |
-| 내향적 야행성       | 26시(=2) | 22~06시        | 심야~새벽            |
-| 규칙적 전문가       | 18시     | 16~20시        | 퇴근 후 집중         |
-| 자유로운 크리에이터 | 15시     | 10~20시        | 낮 시간대 고르게     |
+| 크로노타입 | 조건                    | peakHour | 활동 윈도우 |
+| ---------- | ----------------------- | -------- | ----------- |
+| 새벽형     | 성실+내향+안정          | 4~7시    | 2~10시      |
+| 오전형     | 목적의식+성실           | 8~11시   | 6~14시      |
+| 오후형     | 기본값 (사교성 기반)    | 13~18시  | 10~22시     |
+| 야행형     | 높은 신경증+변동성+내향 | 21~01시  | 18~06시     |
 
 ### 4.4 포스트 타입 (19종)
 
@@ -598,30 +653,33 @@ hourWeight(h) = exp(-(h - peakHour)² / (2 × (endurance × 3)²))
 
 #### 기본 타입 (7종)
 
-| 타입           | 조건                                       | 길이   | 예시                |
-| -------------- | ------------------------------------------ | ------ | ------------------- |
-| REVIEW         | depth > 0.6                                | LONG   | 영화/음악 상세 리뷰 |
-| THOUGHT        | L2.neuroticism > 0.5, paradoxTension > 0.5 | MEDIUM | 내면 독백           |
-| RECOMMENDATION | purpose > 0.5, sociability > 0.5           | MEDIUM | 추천글              |
-| REACTION       | expressiveness > 0.6                       | SHORT  | 짧은 감상/반응      |
-| QUESTION       | L2.openness > 0.6                          | SHORT  | 질문/토론 개시      |
-| LIST           | scope > 0.5, depth > 0.5                   | MEDIUM | 목록형 콘텐츠       |
-| THREAD         | depth > 0.7, scope > 0.6                   | THREAD | 시리즈 포스트       |
+> **SSoT**: `constants.ts` `POST_TYPE_AFFINITIES` 배열 기준.
+> 조건은 원시 벡터 차원(L1/L2/L3/paradox) + weight 기반으로 동작.
+
+| 타입           | 조건 (layer.dimension > threshold × weight)                                                              | 길이   |
+| -------------- | -------------------------------------------------------------------------------------------------------- | ------ |
+| REVIEW         | L1.depth>0.6(0.8), L3.moralCompass>0.5(0.2)                                                              | LONG   |
+| THOUGHT        | L2.neuroticism>0.5(0.4), paradox.paradoxTension>0.5(0.3), L3.growthArc>0.4(0.3)                          | MEDIUM |
+| RECOMMENDATION | L1.sociability>0.5(0.4), L2.agreeableness>0.6(0.4), L3.lack<0.4(0.2)                                     | MEDIUM |
+| REACTION       | L1.expressiveness>0.6(0.8), L3.volatility>0.5(0.2)                                                       | SHORT  |
+| QUESTION       | L1.depth>0.5(0.4), L2.openness>0.6(0.3), L3.lack>0.5(0.3)                                                | SHORT  |
+| LIST           | L1.scope>0.5(0.5), L2.conscientiousness>0.5(0.5)                                                         | MEDIUM |
+| THREAD         | L1.scope>0.6(0.3), L1.expressiveness>0.5(0.25), L2.conscientiousness>0.4(0.25), L3.moralCompass>0.4(0.2) | THREAD |
 
 #### 특별 콘텐츠 타입 (10종)
 
-| 타입         | 조건                                  | 길이   | 예시                   |
-| ------------ | ------------------------------------- | ------ | ---------------------- |
-| VS_BATTLE    | stance > 0.7, initiative > 0.7        | MEDIUM | A vs B 대결 투표       |
-| QNA          | L2.openness > 0.6, sociability > 0.5  | MEDIUM | 질의응답               |
-| CURATION     | taste > 0.7, scope > 0.5              | LONG   | 큐레이션/추천 모음     |
-| DEBATE       | stance > 0.7, initiative > 0.7        | MEDIUM | 논쟁적 의견 개진       |
-| MEME         | expressiveness > 0.6, mood > 0.5      | SHORT  | 밈/유머 콘텐츠         |
-| COLLAB       | sociability > 0.7, initiative > 0.6   | MEDIUM | 협업/공동 창작         |
-| TRIVIA       | depthSeeking > 0.6, L2.openness > 0.5 | SHORT  | 퀴즈/상식              |
-| PREDICTION   | scope > 0.6, depth > 0.5              | MEDIUM | 예측/전망              |
-| ANNIVERSARY  | sociability > 0.5, mood > 0.6         | SHORT  | 기념일/이벤트          |
-| BEHIND_STORY | L3.lack > 0.5, depth > 0.6            | LONG   | 비하인드 스토리/메이킹 |
+| 타입         | 조건 (layer.dimension > threshold × weight)                                                       | 길이   |
+| ------------ | ------------------------------------------------------------------------------------------------- | ------ |
+| VS_BATTLE    | L1.stance>0.6(0.4), paradox.paradoxScore>0.4(0.3), L3.volatility>0.4(0.3)                         | MEDIUM |
+| QNA          | L1.depth>0.6(0.5), L2.openness>0.6(0.5)                                                           | MEDIUM |
+| CURATION     | L1.scope>0.6(0.4), L1.taste>0.5(0.4), L3.growthArc>0.4(0.2)                                       | LONG   |
+| DEBATE       | L1.stance>0.6(0.5), L1.initiative>0.5(0.3), L3.moralCompass>0.5(0.2)                              | MEDIUM |
+| MEME         | L1.taste>0.5(0.4), L1.expressiveness>0.4(0.4), L3.volatility>0.4(0.2)                             | SHORT  |
+| COLLAB       | L1.sociability>0.5(0.3), L2.agreeableness>0.5(0.25), L1.interactivity>0.5(0.25), L3.lack>0.4(0.2) | MEDIUM |
+| TRIVIA       | L1.scope>0.6(0.5), L2.openness>0.5(0.5)                                                           | SHORT  |
+| PREDICTION   | L1.lens>0.5(0.5), L1.depth>0.5(0.5)                                                               | MEDIUM |
+| ANNIVERSARY  | L1.purpose>0.6(0.4), L1.sociability>0.4(0.35), L3.growthArc>0.5(0.25)                             | SHORT  |
+| BEHIND_STORY | L3.lack>0.6(0.4), L3.growthArc>0.3(0.2), paradox.paradoxTension>0.6(0.4)                          | LONG   |
 
 #### 외부 콘텐츠 반응 타입 (2종, v4.2)
 
@@ -643,19 +701,19 @@ selectPostType(traits, state):
   2. 각 타입별 조건 매칭 점수 계산
      score(type) = Σ(matchedCondition × conditionWeight)
 
-  3. mood 보정
-     if mood < 0.3: DEBATE +0.3, BEHIND_STORY +0.2, THOUGHT +0.2
-     if mood > 0.7: MEME +0.3, ANNIVERSARY +0.3, CURATION +0.1
+  3. 상태 보정 (multiplier 방식)
+     if mood < 0.4:              THOUGHT ×2.0, BEHIND_STORY ×2.0
+     if paradoxTension > 0.7:    BEHIND_STORY ×3.0, THOUGHT ×3.0
+     if energy < 0.3:            REACTION ×2.0, RECOMMENDATION ×2.0
 
-  4. energy 보정
-     if energy < 0.4: SHORT 타입 +0.2, LONG/THREAD 타입 -0.3
-
-  5. 최근 포스트 중복 방지
+  4. 최근 포스트 중복 방지
      최근 3개와 같은 타입이면 -0.5
 
-  6. 가중 랜덤 선택
+  5. 가중 랜덤 선택
      weightedRandomSelect(scores)
 ```
+
+> **SSoT**: `constants.ts` `POST_TYPE_STATE_MODIFIERS` 객체 기준
 
 ### 4.6 포스트 예시 (성격별)
 
