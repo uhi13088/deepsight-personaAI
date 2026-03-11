@@ -380,7 +380,9 @@ Content-Type: application/json
 ### POST /personas/generate-random
 
 AI가 자동으로 완성된 페르소나를 생성합니다.
-벡터 → 역설 계산 → 캐릭터 생성 → 정성적 특성 → 프롬프트 → DB 저장까지 전 과정을 수행합니다.
+벡터 → 역설 계산 → 캐릭터 생성 → 정성적 특성 → 프롬프트 → **프로필 이미지 생성** → DB 저장까지 전 과정을 수행합니다.
+
+> **프로필 이미지 자동 생성 (T441)**: `REPLICATE_API_TOKEN` 환경변수가 설정되어 있으면 FLUX.2 [pro] via Replicate API로 포토리얼리스틱 프로필 이미지를 자동 생성합니다. 미설정 시 `profileImageUrl: null`로 진행됩니다.
 
 **요청**
 

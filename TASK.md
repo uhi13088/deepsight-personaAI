@@ -47,11 +47,30 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
+_v4.2.0 이미지 생성 티켓은 아래 DONE 섹션으로 이동_
+
 ---
 
 > **최종 갱신: 2026-03-11**
 
 ## ✅ DONE (완료)
+
+### Phase PROFILE-IMAGE: 페르소나 프로필 이미지 자동생성 (T440~T444) ✅ 2026-03-11
+
+- [x] **T440: Replicate 클라이언트 + 프롬프트 빌더** ✅ 2026-03-11
+  - 변경: `replicate` npm 추가, `lib/image-generation/replicate-client.ts` (싱글턴), `lib/image-generation/prompt-builder.ts` (demographics→프롬프트)
+
+- [x] **T441: 프로필 이미지 생성기 (FLUX.2 [pro])** ✅ 2026-03-11
+  - 변경: `lib/image-generation/profile-image-generator.ts` — FLUX.2 호출 → 로컬 저장, graceful degradation
+
+- [x] **T442: 파이프라인 통합** ✅ 2026-03-11
+  - 변경: `pipeline.ts` — auto/manual 양쪽에 이미지 생성 Stage 삽입
+
+- [x] **T443: 테스트** ✅ 2026-03-11
+  - 변경: `tests/unit/image-generation/` — prompt-builder 15개 + profile-image-generator 7개 = 22 tests PASS
+
+- [x] **T444: 문서 업데이트** ✅ 2026-03-11
+  - 변경: `docs/api/internal.md` — generate-random 엔드포인트에 이미지 생성 설명 추가
 
 ### Phase NICKNAME: 활동명 시스템 (T420~T424) ✅ 2026-03-11
 
