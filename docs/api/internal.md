@@ -103,6 +103,51 @@ https://engine.deepsight.ai/api/internal
     - [GET /cron/persona-evolution](#get-cronpersona-evolution)
     - [GET /cron/content-auto-curation](#get-croncontent-auto-curation)
     - [GET /cron/media-fetch](#get-cronmedia-fetch)
+24. [알림 (Alerts)](#26-알림-alerts)
+    - [GET /alerts/history](#get-alertshistory)
+    - [POST /alerts/test](#post-alertstest)
+    - [GET/POST /settings/alerts](#getpost-settingsalerts)
+25. [콘텐츠 큐레이션](#27-콘텐츠-큐레이션)
+    - [GET /curation/pending](#get-curationpending)
+    - [POST /curation/manual](#post-curationmanual)
+    - [PATCH /curation/:id/approve](#patch-curationidapprove)
+    - [PATCH /curation/:id/reject](#patch-curationidreject)
+26. [페르소나 확장](#28-페르소나-확장)
+    - [POST /personas/:id/duplicate](#post-personasidduplicate)
+    - [GET /personas/:id/memories](#get-personasidmemories)
+    - [POST /personas/:id/upgrade](#post-personasidupgrade)
+27. [안전 설정 (Safety)](#29-안전-설정-safety)
+    - [GET/PUT /safety-config](#getput-safety-config)
+    - [GET /security/connectivity](#get-securityconnectivity)
+28. [시스템 통합](#30-시스템-통합)
+    - [GET/POST /system-integration/deploy](#getpost-system-integrationdeploy)
+    - [GET/POST /system-integration/versions](#getpost-system-integrationversions)
+29. [팀 확장](#31-팀-확장)
+    - [GET/POST /team/audit](#getpost-teamaudit)
+    - [GET /team/roles](#get-teamroles)
+30. [사용자 인사이트 확장](#32-사용자-인사이트-확장)
+    - [GET/POST /user-insight/archetype](#getpost-user-insightarchetype)
+    - [POST /user-insight/cold-start/summarize](#post-user-insightcold-startsummarize)
+    - [GET/POST /user-insight/psychometric](#getpost-user-insightpsychometric)
+31. [아레나 확장](#33-아레나-확장)
+    - [POST /arena/sessions/:id/run](#post-arenasessionsidrun)
+    - [POST /arena/sessions/:id/judge](#post-arenasessionsidjudge)
+    - [POST /arena/sessions/:id/corrections/generate](#post-arenasessionsidcorrectionsgenerate)
+    - [GET /arena/sessions/:id/turns](#get-arenasessionsidturns)
+32. [운영 확장](#34-운영-확장)
+    - [GET/POST /operations/backup](#getpost-operationsbackup)
+    - [GET /operations/llm-costs](#get-operationsllm-costs)
+    - [GET /notifications](#get-notifications)
+33. [PW Admin 확장](#35-pw-admin-확장)
+    - [GET/POST/PUT /persona-world-admin/media](#getpostput-persona-world-adminmedia)
+    - [GET/PUT /persona-world-admin/operations/budget](#getput-persona-world-adminoperationsbudget)
+    - [GET /persona-world-admin/operations/optimization](#get-persona-world-adminoperationsoptimization)
+    - [GET/POST/PUT /persona-world-admin/shop](#getpostput-persona-world-adminshop)
+34. [글로벌 설정 확장](#36-글로벌-설정-확장)
+    - [GET/POST /global-config/endpoints](#getpost-global-configendpoints)
+35. [인큐베이터 확장](#37-인큐베이터-확장)
+    - [GET/PUT/DELETE /incubator/golden-samples/:id](#getputdelete-incubatorgolden-samplesid)
+    - [GET /incubator/golden-samples/metrics](#get-incubatorgolden-samplesmetrics)
 
 ---
 
@@ -3344,3 +3389,470 @@ PersonaCuratedContent(PENDING)로 자동 생성합니다.
 
 TMDB, KOPIS, 알라딘, Last.fm에서 트렌딩 미디어를
 수집합니다. 3회 연속 실패 시 소스 자동 비활성화.
+
+---
+
+## 26. 알림 (Alerts)
+
+### GET /alerts/history
+
+알림 히스토리를 커서 기반 페이지네이션으로 조회합니다.
+
+**Query Params**: `severity`, `category`, `limit`, `cursor`
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "alerts": [],
+    "nextCursor": "...",
+    "hasMore": false,
+    "recentCount": 42
+  }
+}
+```
+
+### POST /alerts/test
+
+테스트 알림을 Slack/Email 채널로 전송합니다.
+
+**요청 Body**
+
+```json
+{
+  "channel": "slack",
+  "severity": "warning"
+}
+```
+
+### GET /settings/alerts
+
+알림 설정 조회 (Slack/Email 채널, 카테고리 활성화).
+
+### POST /settings/alerts
+
+알림 설정 저장.
+
+**요청 Body**
+
+```json
+{
+  "slack": { "enabled": true, "webhookUrl": "..." },
+  "email": { "enabled": true, "recipients": ["a@b.com"] },
+  "categories": {
+    "security": true,
+    "cost": true,
+    "quality": true,
+    "system": true
+  }
+}
+```
+
+---
+
+## 27. 콘텐츠 큐레이션
+
+### GET /curation/pending
+
+PENDING 상태 큐레이션 목록을 페이지네이션으로 조회합니다.
+
+**Query Params**: `personaId`, `page`, `limit`
+
+### POST /curation/manual
+
+수동 큐레이션을 APPROVED 상태로 직접 생성합니다.
+
+**요청 Body**
+
+```json
+{
+  "personaId": "...",
+  "contentItemId": "...",
+  "curationScore": 0.85,
+  "curationReason": "...",
+  "highlights": ["..."]
+}
+```
+
+### PATCH /curation/:id/approve
+
+큐레이션 상태를 APPROVED로 변경합니다.
+
+### PATCH /curation/:id/reject
+
+큐레이션 상태를 REJECTED로 변경합니다.
+
+---
+
+## 28. 페르소나 확장
+
+### POST /personas/:id/duplicate
+
+페르소나를 DRAFT 상태로 복제합니다 (벡터 포함).
+
+**요청 Body**
+
+```json
+{ "newName": "복제된 페르소나" }
+```
+
+**응답 201**
+
+```json
+{
+  "success": true,
+  "data": { "id": "...", "name": "복제된 페르소나" }
+}
+```
+
+### GET /personas/:id/memories
+
+페르소나 기억 통합 조회 (활동/소비/대화/관계 탭별).
+
+**Query Params**: `tab` (`activity|consumption|interaction|
+relationship`), `limit`
+
+### POST /personas/:id/upgrade
+
+오래된 엔진 버전 페르소나를 v4.0으로 업그레이드합니다
+(voiceSpec/factbook/triggerMap 자동 생성).
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "...",
+    "engineVersion": "4.0",
+    "upgraded": true
+  }
+}
+```
+
+---
+
+## 29. 안전 설정 (Safety)
+
+### GET /safety-config
+
+시스템 안전 설정 조회 (긴급 동결, 기능 토글, 자동 트리거).
+
+### PUT /safety-config
+
+안전 설정 변경.
+
+**요청 Body**
+
+```json
+{
+  "action": "freeze",
+  "reason": "긴급 보안 이슈",
+  "updatedBy": "admin"
+}
+```
+
+action: `freeze` | `unfreeze` | `enableFeature` |
+`disableFeature`
+
+### GET /security/connectivity
+
+Social Module 관계 그래프 분석 (노드 메트릭, 이상 탐지).
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "stats": { "nodeCount": 45, "edgeCount": 120 },
+    "nodes": [],
+    "anomalies": []
+  }
+}
+```
+
+---
+
+## 30. 시스템 통합
+
+### GET /system-integration/deploy
+
+배포 워크플로우, 환경 설정, 카나리 릴리스, 롤백 트리거
+조회.
+
+### POST /system-integration/deploy
+
+배포 액션 (워크플로우 생성, 스테이지 진행, 카나리 생성/
+진행, 메트릭 업데이트, 롤백 시뮬레이션).
+
+**action**: `create_workflow` | `advance_stage` |
+`create_canary` | `advance_canary` |
+`update_canary_metrics` | `simulate_rollback_trigger`
+
+### GET /system-integration/versions
+
+알고리즘 버전 목록 조회 (시드 데이터 자동 생성 포함).
+
+### POST /system-integration/versions
+
+알고리즘 버전 관리.
+
+**action**: `bump` | `diff` | `set_testing` | `activate` |
+`deprecate` | `rollback`
+
+---
+
+## 31. 팀 확장
+
+### GET /team/audit
+
+감사 로그 조회 (필터링, 페이지네이션, 요약 통계).
+
+**Query Params**: `actor`, `action`, `targetType`,
+`keyword`, `limit`, `offset`
+
+### POST /team/audit
+
+감사 로그 기록.
+
+**요청 Body**
+
+```json
+{
+  "actorId": "...",
+  "actorName": "admin",
+  "action": "UPDATE_PERSONA",
+  "targetType": "persona",
+  "targetId": "...",
+  "details": {}
+}
+```
+
+### GET /team/roles
+
+역할 정의, 권한 매트릭스, 역할별 멤버 수 조회.
+
+---
+
+## 32. 사용자 인사이트 확장
+
+### GET /user-insight/archetype
+
+사용자 아키타입 전체 목록 조회.
+
+### POST /user-insight/archetype
+
+커스텀 아키타입 추가 또는 삭제.
+
+**action**: `add_custom` | `remove`
+
+### POST /user-insight/cold-start/summarize
+
+Cold Start 벡터 결과를 AI(Claude)로 자연어 프로필 요약
+생성.
+
+**요청 Body**
+
+```json
+{
+  "l1": { "depth": 0.7, "lens": 0.4 },
+  "l2": { "openness": 0.8 },
+  "confidence": { "depth": 0.9, "lens": 0.6 }
+}
+```
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "summary": "...",
+    "structured": {
+      "typeName": "탐구적 감성가",
+      "oneLiner": "...",
+      "traits": [],
+      "examples": [],
+      "exploring": []
+    }
+  }
+}
+```
+
+### GET /user-insight/psychometric
+
+심리측정 설정 조회 (OCEAN-L1 매핑, 반전 임계치).
+
+### POST /user-insight/psychometric
+
+심리측정 분석 수행.
+
+**action**: `predict_l1` | `detect_reversals` |
+`extract_latent_traits`
+
+---
+
+## 33. 아레나 확장
+
+### POST /arena/sessions/:id/run
+
+PENDING 아레나 세션 전체 실행 (LLM 턴 루프 → 판정 →
+COMPLETED 처리).
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "sessionId": "...",
+    "status": "COMPLETED",
+    "totalTurns": 10,
+    "totalTokens": 4500,
+    "overallScore": 0.82
+  }
+}
+```
+
+### POST /arena/sessions/:id/judge
+
+아레나 판정 실행 (룰 기반 또는 LLM).
+
+**요청 Body**
+
+```json
+{
+  "method": "RULE_BASED",
+  "precision": "STANDARD"
+}
+```
+
+### POST /arena/sessions/:id/corrections/generate
+
+판정 이슈에서 교정 요청 일괄 자동 생성 (minor=자동적용,
+major/critical=검토대기).
+
+### GET /arena/sessions/:id/turns
+
+아레나 턴 목록 조회.
+
+---
+
+## 34. 운영 확장
+
+### GET /operations/backup
+
+백업 정책, 백업 기록, DR 계획, DR 훈련 목록 조회.
+
+### POST /operations/backup
+
+DR 훈련 스케줄/시작/완료 처리.
+
+**action**: `schedule_drill` | `start_drill` |
+`complete_drill`
+
+### GET /operations/llm-costs
+
+LLM 비용 요약, 일별 비용, callType별 통계, 최근 호출
+목록.
+
+**Query Params**: `days` (기본 30), `limit` (기본 50)
+
+### GET /notifications
+
+시스템 상태 기반 알림 자동 생성 (인시던트, 긴급동결,
+에러, 일시중지 페르소나, 미처리 신고).
+
+---
+
+## 35. PW Admin 확장
+
+### GET /persona-world-admin/media
+
+미디어 소스 목록, 프리셋, 최근 미디어 아이템 조회.
+
+### POST /persona-world-admin/media
+
+미디어 소스 추가/수동 수집/프리셋 일괄 등록.
+
+**action**: `add_source` | `fetch_source` | `add_presets`
+
+### PUT /persona-world-admin/media
+
+미디어 소스 활성화/비활성화 토글.
+
+### GET /persona-world-admin/operations/budget
+
+BudgetConfig 싱글톤 조회 (일일/월간 예산, 비용 모드).
+
+### PUT /persona-world-admin/operations/budget
+
+BudgetConfig 업데이트 (upsert).
+
+**요청 Body**
+
+```json
+{
+  "dailyBudget": 50.0,
+  "monthlyBudget": 1000.0,
+  "costMode": "BALANCE"
+}
+```
+
+costMode: `QUALITY` | `BALANCE` | `COST_PRIORITY`
+
+### GET /persona-world-admin/operations/optimization
+
+최적화 대시보드 — 현재 상태, A/B 보고서, Haiku 라우팅
+통계.
+
+**Query Params**: `days` (기본 7), `limit` (기본 50)
+
+### GET /persona-world-admin/shop
+
+PW 상점 아이템 전체 목록 조회.
+
+### POST /persona-world-admin/shop
+
+상점 아이템 추가.
+
+### PUT /persona-world-admin/shop
+
+상점 아이템 일괄 수정.
+
+---
+
+## 36. 글로벌 설정 확장
+
+### GET /global-config/endpoints
+
+API 엔드포인트 관리자 상태 조회 (목록, 버전, 헬스체크).
+
+### POST /global-config/endpoints
+
+API 엔드포인트 등록, 헬스체크 실행, Rate Limit 업데이트.
+
+**action**: `register` | `healthCheck` | `updateRateLimit`
+
+---
+
+## 37. 인큐베이터 확장
+
+### GET /incubator/golden-samples/:id
+
+골든 샘플 단일 상세 조회.
+
+### PUT /incubator/golden-samples/:id
+
+골든 샘플 수정 (내용 변경 시 version 자동 증가).
+
+### DELETE /incubator/golden-samples/:id
+
+골든 샘플 소프트 삭제 (isActive = false).
+
+### GET /incubator/golden-samples/metrics
+
+골든 샘플 풀 현황, 차원 커버리지, 확장 필요성 메트릭.

@@ -9,7 +9,7 @@ https://api.deepsight.ai
 ```
 
 **버전**: v1
-**최종 업데이트**: 2026-02-20
+**최종 업데이트**: 2026-03-11
 
 ---
 
@@ -48,19 +48,19 @@ DeepSight External API는 AI 페르소나 기반 콘텐츠 추천을 위한 REST
 
 ### 핵심 개념
 
-| 개념                   | 설명                                                                                          |
-| ---------------------- | --------------------------------------------------------------------------------------------- |
-| **페르소나 (Persona)** | 독립적인 성향·관점·취향을 가진 AI 캐릭터. 콘텐츠 추천의 기준점                                |
-| **3-Layer 벡터**       | 페르소나와 유저의 성향을 수치화한 106D+ 벡터 (L1 Social 7D · L2 Temperament 5D · L3 Depth 4D) |
-| **매칭 티어**          | `basic` / `advanced` / `exploration` — 사용하는 벡터 레이어 수에 따라 정확도 상이             |
-| **유저 벡터**          | 온보딩 응답으로 생성된 유저 성향 프로필 (매칭에 활용)                                         |
+| 개념                   | 설명                                                                                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------------------- |
+| **페르소나 (Persona)** | 독립적인 성향·관점·취향을 가진 AI 캐릭터. 콘텐츠 추천의 기준점                                          |
+| **3-Layer 벡터**       | 페르소나와 유저의 성향을 수치화한 106D+ 벡터 (L1 Social 7D · L2 Temperament 5D · L3 Narrative Drive 4D) |
+| **매칭 티어**          | `basic` / `advanced` / `exploration` — 사용하는 벡터 레이어 수에 따라 정확도 상이                       |
+| **유저 벡터**          | 온보딩 응답으로 생성된 유저 성향 프로필 (매칭에 활용)                                                   |
 
 ### 3-Layer 벡터 구조
 
 ```
 L1 Social (7D)         — depth, lens, stance, scope, taste, purpose, sociability
 L2 Temperament (5D)    — openness, conscientiousness, extraversion, agreeableness, neuroticism
-L3 Depth (4D)          — lack, moralCompass, volatility, growthArc
+L3 Narrative Drive (4D) — lack, moralCompass, volatility, growthArc
 ```
 
 각 차원 값은 `0.0 ~ 1.0` 범위입니다.
@@ -199,6 +199,10 @@ curl -X POST https://api.deepsight.ai/v1/match \
 ---
 
 ## 6. Matching API
+
+> **⚠️ 미구현**: match, batch-match, filter 엔드포인트는
+> 설계 완료 상태이며 아직 구현되지 않았습니다. 현재는
+> §11 Recommendations API를 사용하세요.
 
 사용자에게 가장 적합한 페르소나를 찾아 콘텐츠를 추천합니다.
 
@@ -466,11 +470,11 @@ Authorization: Bearer {API_KEY}
 
 **페르소나 벡터 구조**
 
-| 필드         | 설명                                                     |
-| ------------ | -------------------------------------------------------- |
-| `vectors.l1` | L1 Social 벡터 (7차원, 항상 포함)                        |
-| `vectors.l2` | L2 Temperament 벡터 (5차원, OCEAN 프로파일 보유 시 포함) |
-| `vectors.l3` | L3 Depth 벡터 (4차원, 심층 프로파일 보유 시 포함)        |
+| 필드         | 설명                                                        |
+| ------------ | ----------------------------------------------------------- |
+| `vectors.l1` | L1 Social 벡터 (7차원, 항상 포함)                           |
+| `vectors.l2` | L2 Temperament 벡터 (5차원, OCEAN 프로파일 보유 시 포함)    |
+| `vectors.l3` | L3 Narrative Drive 벡터 (4차원, 심층 프로파일 보유 시 포함) |
 
 ---
 
@@ -723,6 +727,9 @@ emotional-pragmatist, dangerous-mentor, volatile-intellectual, growing-cynic
 
 ## 8. Feedback API
 
+> **⚠️ 미구현**: Feedback API는 설계 완료 상태이며
+> 아직 구현되지 않았습니다.
+
 매칭 결과에 대한 사용자 피드백을 수집합니다. 피드백은 페르소나 진화 알고리즘의 학습 데이터로 활용됩니다.
 
 ---
@@ -793,6 +800,9 @@ Content-Type: application/json
 ---
 
 ## 9. Users API
+
+> **⚠️ 미구현**: Users API (profile, onboarding, consent)는
+> 설계 완료 상태이며 아직 구현되지 않았습니다.
 
 사용자 프로필·온보딩·동의(Consent) 관련 API입니다.
 
