@@ -1390,6 +1390,53 @@
   - 70% 이상 + 크레딧 부족 → 402 에러 + UI 안내
   - 중복 요청 방지 기존 로직 유지
 
+---
+
+### Phase VFINAL: V_Final 동적 블렌딩 + 10-Level 월드 표현 강도
+
+> 계획서: `docs/plans/2026-03-11-vfinal-dynamic-blending.md`
+> PersonaWorld 전체 페르소나의 V_Final을 PersonaState 기반 동적 Pressure로 계산.
+> 관리자가 Engine Studio에서 월드 표현 강도(1~10)를 설정하여 허용 범위 제어.
+
+- [ ] **T415: VFinalConfig DB 모델 + 10-Level 상수 + 설정 API**
+  - schema.prisma: VFinalConfig 싱글턴 모델 (expressionLevel Int @default(5))
+  - 마이그레이션 SQL 작성
+  - vfinal-config.ts: 10-Level 상수 테이블 + getWorldVFinalConfig()
+  - GET/PUT /api/admin/settings/vfinal API
+  - SystemSafetyConfig.featureToggles에 vFinalEnabled 추가
+
+- [ ] **T416: computePressure() 코어 함수**
+  - pressure.ts: computePressure(state, triggerEffects?, worldConfig?) → P_final
+  - P_raw = paradoxTension×0.5 + moodExtreme×0.2 + narrativeTension×0.15 + triggerBoost×0.15
+  - worldConfig.maxPressure로 clamp
+  - 단위 테스트: 경계값, 각 요소 기여도, Level별 clamp
+
+- [ ] **T417: TriggerMap → Pressure 부스트 연결**
+  - scheduler.ts: applyTriggerMapToTraits() 확장 → pressureBoost 반환
+  - triggerMultiplier[level] 적용
+  - pressure.ts: triggerEffectsToPressure() 추가
+
+- [ ] **T418: 전체 파이프라인 V_Final 연결**
+  - three-tier-engine.ts: PersonaState → computePressure → calculateVFinal에 P 주입
+  - scheduler.ts: V_Final 기반 ActivityTraits
+  - comment-tone.ts: commenterVectors를 V_Final로 교체
+  - like-engine.ts / follow-engine.ts: V_Final 기반 재계산
+  - vFinalEnabled=false → L1 fallback
+
+- [ ] **T419: 통합 테스트 + 전체 검증**
+  - Level 1/5/10 시나리오 테스트
+  - Kill Switch (vFinalEnabled=false) fallback 테스트
+  - pnpm validate PASS
+  - API 문서 최신화 (internal.md)
+
+- **AC**:
+  - 관리자가 Engine Studio에서 표현 강도 1~10 설정 가능
+  - 설정된 레벨 범위 내에서 V_Final 동적 계산
+  - 매칭/포스트/댓글/좋아요/팔로우 전체 파이프라인 적용
+  - vFinalEnabled=false 시 전체 L1 fallback
+  - PIS 기존 자율 검증 시스템과 호환
+  - pnpm validate PASS
+
 ## BLOCKED
 
 (없음)

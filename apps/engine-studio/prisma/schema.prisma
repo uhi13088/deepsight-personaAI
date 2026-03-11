@@ -2666,6 +2666,20 @@ model BudgetConfig {
 }
 
 // ============================================
+// v4.2 V_Final 동적 블렌딩 설정 (T415)
+// ============================================
+
+model VFinalConfig {
+  id              String   @id @default("singleton")           // 싱글톤 레코드
+  expressionLevel Int      @default(5)                         // 1~10 월드 표현 강도
+  vFinalEnabled   Boolean  @default(true)                      // V_Final 활성화 여부 (Kill Switch)
+  updatedAt       DateTime @updatedAt
+  updatedBy       String?
+
+  @@map("vfinal_configs")
+}
+
+// ============================================
 // v4.0 1:1 채팅 시스템 (T330)
 // ============================================
 

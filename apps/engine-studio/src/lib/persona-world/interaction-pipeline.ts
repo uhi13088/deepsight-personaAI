@@ -40,6 +40,9 @@ import { isFeatureEnabled, type PWKillSwitchConfig } from "./security/pw-kill-sw
 import type { ImmutableFact } from "@/types"
 import { runModerationPipeline } from "./moderation/auto-moderator"
 import { computeActivityTraits, computeInteractionLimits } from "./activity-mapper"
+import { computePressure } from "./pressure"
+import { getWorldVFinalConfig } from "./vfinal-config"
+import { calculateVFinal, vFinalToVector } from "@/lib/vector/v-final"
 
 // ── 타입 정의 ────────────────────────────────────────────────
 
@@ -164,7 +167,8 @@ export async function executeInteractions(
   state: PersonaStateData,
   dataProvider: InteractionPipelineDataProvider,
   commentLLMProvider?: CommentLLMProvider,
-  securityOptions?: InteractionSecurityOptions
+  securityOptions?: InteractionSecurityOptions,
+  pressureBoost: number = 0
 ): Promise<InteractionExecutionResult> {
   const likes: InteractionExecutionResult["likes"] = []
   const comments: InteractionExecutionResult["comments"] = []
@@ -186,9 +190,27 @@ export async function executeInteractions(
 
   // Phase RA: 벡터 선계산 → 트레이트 → 인터랙션 한도 동적 산출
   const personaVectors = await dataProvider.getPersonaVectors(persona.id)
-  const traits = computeActivityTraits(personaVectors, persona.paradoxScore)
+
+  // T418: V_Final 동적 블렌딩 — vFinalEnabled일 때 동적 pressure 기반 벡터 사용
+  const worldConfig = await getWorldVFinalConfig()
+  let effectiveVectors = personaVectors
+  if (worldConfig.vFinalEnabled) {
+    const pressureResult = computePressure(state, pressureBoost, worldConfig.levelConfig)
+    const vFinalResult = calculateVFinal(
+      personaVectors.social,
+      personaVectors.temperament,
+      personaVectors.narrative,
+      pressureResult.pressure
+    )
+    effectiveVectors = {
+      ...personaVectors,
+      social: vFinalToVector(vFinalResult),
+    }
+  }
+
+  const traits = computeActivityTraits(effectiveVectors, persona.paradoxScore)
   const limits = computeInteractionLimits(traits)
-  const l2Result = classifyL2Pattern(personaVectors.temperament)
+  const l2Result = classifyL2Pattern(effectiveVectors.temperament)
   const l2Pattern = l2Result.pattern // L2ConflictPattern 문자열
 
   // Step 1: 최근 피드 포스트 조회 (트레이트 기반 동적 한도)
@@ -384,7 +406,7 @@ export async function executeInteractions(
 
     const commentDataProvider: CommentDataProvider = {
       getPostContent: async () => post.content,
-      getPersonaVectors: async () => personaVectors, // 캐시된 벡터 재사용
+      getPersonaVectors: async () => effectiveVectors, // V_Final 적용된 벡터
       getParadoxScore: async () => persona.paradoxScore,
       saveCommentLog: async () => {},
     }
@@ -399,7 +421,7 @@ export async function executeInteractions(
 
     const commentResult: CommentResult = await generateComment(
       commentInput,
-      personaVectors, // 캐시된 벡터 재사용
+      effectiveVectors, // V_Final 적용된 벡터
       commentDataProvider,
       commentLLMProvider
     )

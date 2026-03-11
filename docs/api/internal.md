@@ -148,6 +148,9 @@ https://engine.deepsight.ai/api/internal
 35. [인큐베이터 확장](#37-인큐베이터-확장)
     - [GET/PUT/DELETE /incubator/golden-samples/:id](#getputdelete-incubatorgolden-samplesid)
     - [GET /incubator/golden-samples/metrics](#get-incubatorgolden-samplesmetrics)
+36. [V_Final 표현 강도 설정](#38-v_final-표현-강도-설정)
+    - [GET /settings/vfinal](#get-settingsvfinal)
+    - [PUT /settings/vfinal](#put-settingsvfinal)
 
 ---
 
@@ -3856,3 +3859,61 @@ API 엔드포인트 등록, 헬스체크 실행, Rate Limit 업데이트.
 ### GET /incubator/golden-samples/metrics
 
 골든 샘플 풀 현황, 차원 커버리지, 확장 필요성 메트릭.
+
+---
+
+## 38. V_Final 표현 강도 설정
+
+PersonaWorld V_Final 동적 블렌딩의 월드 표현 강도 (1~10 레벨)를 관리합니다.
+
+### GET /settings/vfinal
+
+현재 V_Final 설정 조회.
+
+**응답:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "expressionLevel": 5,
+    "vFinalEnabled": true,
+    "levelConfig": {
+      "level": 5,
+      "maxPressure": 0.5,
+      "driftLimit": 0.25,
+      "triggerMultiplier": 1.0
+    }
+  }
+}
+```
+
+### PUT /settings/vfinal
+
+V_Final 표현 강도 업데이트.
+
+**요청:**
+
+```json
+{
+  "expressionLevel": 7,
+  "vFinalEnabled": true,
+  "updatedBy": "admin@deepsight.ai"
+}
+```
+
+| 필드            | 타입    | 필수 | 설명                                                      |
+| --------------- | ------- | ---- | --------------------------------------------------------- |
+| expressionLevel | number  | O    | 1~10 레벨 (maxPressure/driftLimit/triggerMultiplier 결정) |
+| vFinalEnabled   | boolean | O    | false시 전체 V_Final 비활성 (L1 fallback)                 |
+| updatedBy       | string  | O    | 변경자 식별                                               |
+
+**응답:** GET과 동일 형식.
+
+**10-Level 설정 테이블:**
+
+| Lv  | maxPressure | driftLimit | triggerMultiplier |
+| --- | ----------- | ---------- | ----------------- |
+| 1   | 0.10        | 0.05       | 0.2               |
+| 5   | 0.50        | 0.25       | 1.0               |
+| 10  | 1.00        | 0.75       | 2.0               |

@@ -24,6 +24,7 @@ import type {
 } from "./types"
 import { evaluateRules } from "@/lib/trigger/rule-dsl"
 import type { TriggerRuleDSL, RuleContext, RuleEffect } from "@/lib/trigger/rule-dsl"
+import { triggerEffectsToPressure } from "./pressure"
 
 /**
  * 최소한의 페르소나 데이터 (스케줄러용).
@@ -174,6 +175,7 @@ export async function getActivePersonas(
     isInActiveHours: boolean
     todayPostCount: number
     lastPostAt: Date | null
+    pressureBoost: number
   }>
 > {
   const personas = await provider.getActiveStatusPersonas()
@@ -184,6 +186,7 @@ export async function getActivePersonas(
     isInActiveHours: boolean
     todayPostCount: number
     lastPostAt: Date | null
+    pressureBoost: number
   }> = []
 
   console.log(`[Scheduler] 활성 페르소나 ${personas.length}명 평가 (hour=${currentHour})`)
@@ -222,8 +225,9 @@ export async function getActivePersonas(
       continue
     }
 
-    // 6. triggerMap 효과 적용 (벡터 임시 보정)
-    const effectiveTraits = applyTriggerMapToTraits(persona, state, traits)
+    // 6. triggerMap 효과 적용 (벡터 임시 보정) + pressure 부스트 추출
+    const triggerResult = applyTriggerMapToTraits(persona, state, traits)
+    const effectiveTraits = triggerResult.traits
 
     // 7. 일일 포스트 수 + 마지막 포스팅 시간 조회 (하드 리밋용)
     const [todayPostCount, lastPostAt] = await Promise.all([
@@ -238,6 +242,7 @@ export async function getActivePersonas(
       isInActiveHours,
       todayPostCount,
       lastPostAt,
+      pressureBoost: triggerResult.pressureBoost,
     })
   }
 
@@ -373,27 +378,34 @@ export function decideActivity(
 
 // ── 헬퍼: TriggerMap 효과 → ActivityTraits 보정 ──────────────
 
+interface TriggerMapResult {
+  traits: ActivityTraitsV3
+  pressureBoost: number
+}
+
 /**
  * triggerMap 규칙을 평가하여 ActivityTraits를 임시 보정.
  *
  * 벡터 차원에 boost/suppress/override 효과를 적용한 수정 벡터로
  * 새로운 ActivityTraits를 계산한다. 원본 벡터는 변경하지 않음.
+ * pressureBoost도 함께 반환 (T417: TriggerMap → Pressure 연결).
  */
 function applyTriggerMapToTraits(
   persona: SchedulerPersona,
   state: PersonaStateData,
-  baseTraits: ActivityTraitsV3
-): ActivityTraitsV3 {
-  if (!persona.triggerMap) return baseTraits
+  baseTraits: ActivityTraitsV3,
+  triggerMultiplier: number = 1.0
+): TriggerMapResult {
+  if (!persona.triggerMap) return { traits: baseTraits, pressureBoost: 0 }
 
   let rules: TriggerRuleDSL[]
   try {
     rules = Array.isArray(persona.triggerMap) ? (persona.triggerMap as TriggerRuleDSL[]) : []
   } catch {
-    return baseTraits
+    return { traits: baseTraits, pressureBoost: 0 }
   }
 
-  if (rules.length === 0) return baseTraits
+  if (rules.length === 0) return { traits: baseTraits, pressureBoost: 0 }
 
   const { social: l1, temperament: l2, narrative: l3 } = persona.vectors
   const ctx: RuleContext = {
@@ -428,7 +440,7 @@ function applyTriggerMapToTraits(
   }
 
   const evalResult = evaluateRules(rules, ctx)
-  if (evalResult.appliedEffects.length === 0) return baseTraits
+  if (evalResult.appliedEffects.length === 0) return { traits: baseTraits, pressureBoost: 0 }
 
   // 효과를 벡터 복사본에 적용
   const v: ThreeLayerVector = {
@@ -442,7 +454,9 @@ function applyTriggerMapToTraits(
   }
 
   // 수정된 벡터로 새로운 ActivityTraits 계산
-  return computeActivityTraits(v, persona.paradoxScore)
+  const traits = computeActivityTraits(v, persona.paradoxScore)
+  const pressureBoost = triggerEffectsToPressure(evalResult.appliedEffects, triggerMultiplier)
+  return { traits, pressureBoost }
 }
 
 function applyEffectToVector(v: ThreeLayerVector, effect: RuleEffect): void {
