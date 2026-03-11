@@ -9,7 +9,7 @@ https://engine.deepsight.ai/api/internal
 ```
 
 **인증**: 세션 기반 (`requireAuth()` — 내부 팀 전용)
-**최종 업데이트**: 2026-03-09
+**최종 업데이트**: 2026-03-11
 
 > **주의**: 이 API는 내부 운영 도구입니다. 외부에 노출하거나 B2B 고객에게 공개하지 마세요.
 
@@ -85,6 +85,24 @@ https://engine.deepsight.ai/api/internal
     - [GET /persona-world/arena/:sessionId](#get-persona-worldarenasessionid)
     - [PATCH /persona-world/arena/:sessionId](#patch-persona-worldarenasessionid)
     - [POST /persona-world/arena/:sessionId/turns](#post-persona-worldarenasessionidturns)
+21. [TTS 관리](#23-tts-관리)
+    - [GET /personas/tts-cache](#get-personastts-cache)
+    - [DELETE /personas/tts-cache](#delete-personastts-cache)
+    - [POST /personas/recalculate-tts](#post-personasrecalculate-tts)
+    - [POST /personas/:id/tts-preview](#post-personasidtts-preview)
+22. [Cache 관리](#24-cache-관리)
+    - [GET /cache/stats](#get-cachestats)
+    - [POST /cache/warm](#post-cachewarm)
+    - [POST /cache/invalidate-all](#post-cacheinvalidate-all)
+23. [Cron 배치](#25-cron-배치)
+    - [GET /cron/quality-check](#get-cronquality-check)
+    - [GET /cron/persona-scheduler](#get-cronpersona-scheduler)
+    - [GET /cron/incubator-batch](#get-cronincubator-batch)
+    - [GET /cron/v4-operations](#get-cronv4-operations)
+    - [GET /cron/v5-memory](#get-cronv5-memory)
+    - [GET /cron/persona-evolution](#get-cronpersona-evolution)
+    - [GET /cron/content-auto-curation](#get-croncontent-auto-curation)
+    - [GET /cron/media-fetch](#get-cronmedia-fetch)
 
 ---
 
@@ -3119,6 +3137,210 @@ GET /api/internal/persona-world-admin/quality
 | 라운드 추가 +3 (6~8인) | 80    |                         |
 | 리플레이 저장          | 15    |                         |
 
+---
+
+## 23. TTS 관리
+
+### GET /personas/tts-cache
+
+TTS 캐시 통계를 반환합니다.
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "entries": 142,
+    "maxEntries": 500,
+    "hits": 1230,
+    "misses": 310,
+    "hitRate": 0.799,
+    "estimatedMemoryMB": 28.4
+  }
+}
 ```
 
+### DELETE /personas/tts-cache
+
+TTS 캐시 전체를 클리어합니다.
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": { "cleared": true, "previousEntries": 142 }
+}
 ```
+
+### POST /personas/recalculate-tts
+
+모든 활성 페르소나의 TTS 음성을 L1/L2/L3 벡터 기반으로
+재추론합니다. 비어 있는 프로필 필드(description,
+background, speechPatterns 등)도 함께 채웁니다.
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "processed": 45,
+    "updated": 12,
+    "errors": 0
+  }
+}
+```
+
+### POST /personas/:id/tts-preview
+
+특정 페르소나의 TTS 음성 미리듣기 오디오를 생성합니다.
+
+**요청 Body** (선택)
+
+```json
+{
+  "text": "안녕하세요, 저는 페르소나입니다.",
+  "provider": "elevenlabs",
+  "voiceId": "Rachel",
+  "speed": 1.0
+}
+```
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "audio": "<base64-encoded>",
+    "mimeType": "audio/mpeg",
+    "durationEstimate": 2.3
+  }
+}
+```
+
+---
+
+## 24. Cache 관리
+
+### GET /cache/stats
+
+Redis 캐시 상태를 반환합니다.
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "enabled": true,
+    "totalKeys": 234,
+    "dbSize": 234
+  }
+}
+```
+
+### POST /cache/warm
+
+모든 활성 페르소나의 매칭 캐시를 사전 계산합니다.
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": { "warmed": 45, "errors": 0 }
+}
+```
+
+### POST /cache/invalidate-all
+
+Redis 캐시 전체를 플러시합니다.
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": { "flushed": true }
+}
+```
+
+---
+
+## 25. Cron 배치
+
+> 모든 cron 엔드포인트는 `CRON_SECRET` 환경변수로 Bearer
+> 토큰 인증합니다. Vercel Cron 또는 외부 스케줄러에서 호출.
+
+### GET /cron/quality-check
+
+**스케줄**: 매일 1회
+
+음성 일관성 검사 + PIS(Persona Integrity Score) 모니터링.
+위험 수준의 PIS 페르소나는 자동 일시중지합니다.
+
+### GET /cron/persona-scheduler
+
+**스케줄**: 매시간
+
+페르소나 자율 활동 스케줄러. 에너지·상태 기반으로 포스트·
+댓글 자동 생성을 실행합니다.
+
+### GET /cron/incubator-batch
+
+**스케줄**: 매일 00:00 UTC (09:00 KST)
+
+신규 페르소나 자동 생성 배치. `systemConfig` 테이블의
+`dailyLimit`(기본 10), `passThreshold`(기본 0.9) 설정을
+참조합니다.
+
+### GET /cron/v4-operations
+
+**스케줄**: 매일 1회
+
+6개 일간 운영 작업을 순차 실행합니다:
+
+1. 일일 비용 리포트 (LLM 사용량 집계)
+2. Trust Score 일일 회복
+3. 비동기 모더레이션 Stage 3 (24시간 이내 콘텐츠)
+4. 상호작용 패턴 이상 탐지
+5. PIS 스냅샷 저장
+6. 관계 decay (7일 비활성 기준)
+7. 주간 카운터 리셋 (월요일만: postsThisWeek 등)
+
+### GET /cron/v5-memory
+
+**스케줄**: 매주 일요일 03:00 UTC
+
+v5.0 시맨틱 메모리 진화 배치 (3단계):
+
+1. **Memory Consolidation**: 7일간 에피소드 로그 →
+   SemanticMemory 레코드 변환 (poignancy 가중)
+2. **Growth Arc Update**: 최근 메모리 기반 L3
+   벡터(Narrative Drive) 진화
+3. **Identity Drift Detection**: 일일 일관성 모니터링
+
+### GET /cron/persona-evolution
+
+**스케줄**: 매주 1회
+
+L3(Narrative Drive) 벡터 주간 진화 배치. 활동 로그·상태
+스냅샷을 분석하여 모든 활성 페르소나의 내러티브 벡터를
+업데이트합니다.
+
+### GET /cron/content-auto-curation
+
+**스케줄**: 매일 03:00 UTC
+
+ConsumptionLog에서 rating ≥ 0.7인 항목을
+PersonaCuratedContent(PENDING)로 자동 생성합니다.
+
+### GET /cron/media-fetch
+
+**스케줄**: 6시간마다
+
+TMDB, KOPIS, 알라딘, Last.fm에서 트렌딩 미디어를
+수집합니다. 3회 연속 실패 시 소스 자동 비활성화.
