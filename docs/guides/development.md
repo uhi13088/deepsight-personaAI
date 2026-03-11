@@ -18,25 +18,28 @@
 
 ## 필수 참조 문서
 
-| 문서                           | 경로                                    | 핵심 용도                 |
-| ------------------------------ | --------------------------------------- | ------------------------- |
-| **엔진 v3 설계서**             | `docs/design/persona-engine-v3.md`      | 3-Layer 106D+ 아키텍처    |
-| **엔진 v3 구현계획서**         | `docs/design/persona-engine-v3-impl.md` | Phase 0~9, 타입/함수 명세 |
-| **PersonaWorld v3 설계서**     | `docs/design/persona-world-v3.md`       | 자율 SNS 아키텍처         |
-| **PersonaWorld v3 구현계획서** | `docs/design/persona-world-v3-impl.md`  | PW-Phase 0~5, 43 태스크   |
-| **기능정의서 - 엔진스튜디오**  | `docs/specs/engine-studio.md`           | 페르소나 설정, 벡터 매칭  |
-| **기능정의서 - 개발자콘솔**    | `docs/specs/developer-console.md`       | API 관리, 대시보드 기능   |
-| **기능정의서 - 페르소나월드**  | `docs/specs/persona-world.md`           | AI SNS, 자율 활동 시스템  |
-| **UI가이드 - 디자인시스템**    | `docs/specs/persona-world-ui.md`        | 컴포넌트, 컬러, 모션      |
+| 문서                           | 경로                                      | 핵심 용도                       |
+| ------------------------------ | ----------------------------------------- | ------------------------------- |
+| **엔진 v4 설계서**             | `docs/design/persona-engine-v4-design.md` | 3-Layer 106D+ 아키텍처 (v4.2.0) |
+| **엔진 v4 구현계획서**         | `docs/design/persona-engine-v4-impl.md`   | Phase 0~9, 타입/함수 명세       |
+| **PersonaWorld v4 설계서**     | `docs/design/persona-world-v4-design.md`  | 자율 SNS 아키텍처 (v4.2.0)      |
+| **PersonaWorld v4 구현계획서** | `docs/design/persona-world-v4-impl.md`    | PW-Phase 0~8, 태스크            |
+| **기능정의서 - 엔진스튜디오**  | `docs/specs/engine-studio.md`             | 페르소나 설정, 벡터 매칭        |
+| **기능정의서 - 개발자콘솔**    | `docs/specs/developer-console.md`         | API 관리, 대시보드 기능         |
+| **기능정의서 - 페르소나월드**  | `docs/specs/persona-world.md`             | AI SNS, 채팅, 음성통화, 아레나  |
+| **UI가이드 - 디자인시스템**    | `docs/specs/persona-world-ui.md`          | 컴포넌트, 컬러, 모션            |
+| **API 문서 - External**        | `docs/api/external-v1.md`                 | B2B 외부 API v1                 |
+| **API 문서 - Internal**        | `docs/api/internal.md`                    | 내부 관리자 API                 |
+| **API 문서 - Public**          | `docs/api/public.md`                      | PersonaWorld 공개 API           |
 
 ### 문서 참조 규칙
 
 ```
-페르소나 기능 개발 → 엔진스튜디오 기능정의서 + 페르소나시스템 설계서
-PersonaWorld 기능 개발 → 페르소나월드 기능정의서
+페르소나 기능 개발 → 엔진스튜디오 기능정의서 + 엔진 v4 설계서
+PersonaWorld 기능 개발 → 페르소나월드 기능정의서 + PW v4 설계서
 PersonaWorld UI 개발 → 페르소나월드 디자인시스템 가이드
-API/대시보드 개발 → 개발자콘솔 기능정의서
-벡터 매칭 로직 → 페르소나시스템 설계서
+API/대시보드 개발 → 개발자콘솔 기능정의서 + API 문서 (docs/api/)
+벡터 매칭 로직 → 엔진 v4 설계서 + @deepsight/vector-core
 UI/UX 개발 → 기능정의서 + 디자인시스템 가이드
 수익/과금 기능 → 마케팅 가이드
 ```
@@ -94,16 +97,25 @@ Infrastructure:
 ## 프로젝트 구조
 
 ```
-deepsight/
+deepsight-personaAI/
 ├── apps/
-│   ├── engine-studio/           # AI 페르소나 관리
-│   └── developer-console/       # API 및 대시보드
-├── docs/                        # 기획 문서
-├── CLAUDE.md                    # 프로젝트 규칙 (간결)
-├── TASK.md                      # 작업 큐
+│   ├── engine-studio/           # AI 페르소나 관리 (메인 백엔드 + PW API)
+│   ├── developer-console/       # API 관리 대시보드 (B2B)
+│   ├── persona-world/           # PersonaWorld 프론트엔드 (AI SNS)
+│   └── landing/                 # 랜딩 페이지
+├── packages/
+│   ├── shared-types/            # 공통 타입 (@deepsight/shared-types)
+│   ├── vector-core/             # 벡터 계산 (@deepsight/vector-core)
+│   ├── ui/                      # 공통 UI 컴포넌트 (@deepsight/ui)
+│   ├── auth/                    # 인증 팩토리 (@deepsight/auth)
+│   ├── config/                  # 공통 설정 (@deepsight/config)
+│   └── sdk/                     # 외부 JS SDK (@deepsight/sdk)
+├── docs/                        # 설계서 · API 문서 · 스펙
+├── skills/                      # Claude Code 스킬
+├── hooks/                       # Claude Code 보안 훅
+├── tasks/                       # TASK.md · lessons.md
+├── CLAUDE.md                    # 프로젝트 규칙
 └── .claude/                     # Claude Code 설정
-    ├── settings.json
-    └── commands/
 ```
 
 ### apps/engine-studio 구조
@@ -114,22 +126,27 @@ src/
 │   ├── (auth)/               # 인증 라우트 그룹
 │   ├── (dashboard)/          # 대시보드 라우트 그룹
 │   └── api/                  # API Routes
-│       └── persona-world/    # PersonaWorld API
+│       ├── internal/         # 내부 관리자 API
+│       ├── external/v1/      # B2B 외부 API
+│       ├── persona-world/    # PersonaWorld 공개 API
+│       └── cron/             # Cron 배치 엔드포인트
 ├── components/               # 컴포넌트
-│   ├── ui/                   # shadcn/ui 기본
-│   ├── persona-world/        # PersonaWorld 디자인시스템 컴포넌트
-│   │   ├── pw-logo.tsx       # PW 로고
-│   │   ├── pw-button.tsx     # 그라데이션 버튼
-│   │   ├── pw-card.tsx       # 호버 카드
-│   │   ├── pw-profile-ring.tsx # 프로필 링
-│   │   └── ...
+│   ├── ui/                   # shadcn/ui (→ @deepsight/ui)
 │   ├── common/               # 공통 컴포넌트
 │   └── features/             # 기능별 컴포넌트
-├── lib/                      # 라이브러리
+├── lib/                      # 핵심 라이브러리
+│   ├── persona-world/        # PW 백엔드 로직
+│   │   ├── conversation/     # 1:1 채팅 엔진 (DI 패턴)
+│   │   ├── voice-pipeline.ts # 음성 통화 TTS 파이프라인
+│   │   ├── memory/           # v5 시맨틱 메모리
+│   │   ├── moderation/       # 3단계 자동 모더레이션
+│   │   └── security/         # Gate Guard · Trust Score
 │   ├── feed/                 # 피드 알고리즘
 │   ├── scheduler/            # 자율 활동 스케줄러
-│   ├── onboarding/           # 유저 온보딩
-│   └── persona-generation/   # 페르소나 자동 생성
+│   ├── onboarding/           # 적응형 온보딩 (CAT)
+│   ├── persona-generation/   # 페르소나 자동 생성 (인큐베이터)
+│   ├── content/              # ContentItem B2B 파이프라인
+│   └── arena/                # AI 토론 아레나
 ├── hooks/                    # 커스텀 훅
 ├── stores/                   # Zustand 스토어
 ├── types/                    # 타입 정의
@@ -187,9 +204,12 @@ src/
 ## 데이터베이스 스키마
 
 > Prisma 스키마가 모든 타입 정의의 기준입니다.
+> **SSoT**: `apps/engine-studio/prisma/schema.prisma`
+> **변경 이력**: `docs/CHANGELOG_SCHEMA.md`
+> **마이그레이션**: `apps/engine-studio/prisma/migrations/`
 
 ```prisma
-// prisma/schema.prisma
+// apps/engine-studio/prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"

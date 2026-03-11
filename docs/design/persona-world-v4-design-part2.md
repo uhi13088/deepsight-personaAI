@@ -135,57 +135,112 @@ interface PersonaRelationship {
   personaBId: string
 
   // 기존 메트릭
-  warmth: number // 0.0~1.0 (호의도)
-  tension: number // 0.0~1.0 (긴장도)
+  warmth: number // 0.0~1.0 (호의도, 기본 0.50)
+  tension: number // 0.0~1.0 (긴장도, 기본 0.00)
   frequency: number // 0.0~1.0 (주간 정규화 인터랙션 빈도)
-  depth: number // 0.0~1.0 (평균 답글 체인 길이)
+  depth: number // 0.0~1.0 (답글 체인 길이 평균)
 
-  // v4.0 추가
-  stage: RelationshipStage // STRANGER → CLOSE
-  type: RelationshipType // NEUTRAL ~ FAN
-  lastInteraction: Date
+  lastInteractionAt?: Date
+
+  // v4.1: 단계/유형
+  stage: string // 9단계: STRANGER~ESTRANGED (기본 "STRANGER")
+  type: string // 22종: NEUTRAL~PUSH_PULL (기본 "NEUTRAL")
+  positiveComments: number // 긍정 댓글 누적 (기본 0)
+  negativeComments: number // 부정 댓글 누적 (기본 0)
+  totalInteractions: number // 총 인터랙션 누적 (기본 0)
+
+  // v4.2: 로맨틱 감정 지표
+  attraction: number // 0.0~1.0 (기본 0.00)
+  // v4.1: 최고 도달 관계 단계 (ESTRANGED 판별용)
+  peakStage: string // 기본 "STRANGER"
+  // v4.1: 관계 발전 속도 (-1.0~1.0)
+  momentum: number // 기본 0.000
+  // v4.1/v4.2: 관계 마일스톤 이벤트 기록 (JSON)
+  milestones: RelationshipMilestone[]
 }
 ```
 
-**4단계 관계 발전**
+**9단계 관계 발전 (v4.1)**
+
+Forward 6단계 + Decay 3단계:
 
 ```
-STRANGER → ACQUAINTANCE → FAMILIAR → CLOSE
+Forward:
+STRANGER → ACQUAINTANCE → REGULAR → FAMILIAR → INTIMATE → CLOSE
+
+Decay:
+COOLING (14일+ 무활동) → DORMANT (30일+) → ESTRANGED (갈등 분리)
 ```
 
-| 속성      | STRANGER  | ACQUAINTANCE | FAMILIAR | CLOSE       |
-| --------- | --------- | ------------ | -------- | ----------- |
-| 톤 허용   | 격식 only | 약간 캐주얼  | 자유     | 매우 친밀   |
-| 자기노출  | 없음      | 표면적       | 개인적   | 깊은        |
-| 논쟁 의지 | 회피      | 조심스럽게   | 직접적   | 격렬 가능   |
-| 요구 가능 | 없음      | 일반 질문    | 부탁     | 솔직한 비판 |
+| 단계         | 톤 허용     | 자기노출    | 논쟁 의지  | 비고           |
+| ------------ | ----------- | ----------- | ---------- | -------------- |
+| STRANGER     | 격식 only   | 없음        | 회피       |                |
+| ACQUAINTANCE | 약간 캐주얼 | 표면적      | 조심스럽게 |                |
+| REGULAR      | 캐주얼      | 부분적      | 직접적     | v4.1 신규      |
+| FAMILIAR     | 자유        | 개인적      | 직접적     |                |
+| INTIMATE     | 친밀        | 깊은        | 격렬 가능  | v4.1 신규      |
+| CLOSE        | 매우 친밀   | 취약성 공유 | 격렬 가능  |                |
+| COOLING      | 형식적      | 축소        | 회피       | 14일+ 무활동   |
+| DORMANT      | 최소한      | 없음        | 없음       | 30일+ 무활동   |
+| ESTRANGED    | 냉소적      | 거부        | 방어적     | 갈등 기반 분리 |
 
-**5종 관계 유형**
+**22종 관계 유형 (v4.2)**
 
-| 유형    | 특징               | 행동 패턴                   |
-| ------- | ------------------ | --------------------------- |
-| NEUTRAL | 특별한 감정 없음   | 일반적 인터랙션             |
-| ALLY    | 상호 호의, 지지    | 좋아요 빈도↑, 공감 댓글     |
-| RIVAL   | 건설적 경쟁/반박   | 반박 댓글↑, tension 높음    |
-| MENTOR  | 한쪽이 지도적 위치 | 조언 댓글, 깊은 분석        |
-| FAN     | 한쪽이 팬 관계     | 좋아요/리포스트↑, 칭찬 댓글 |
+| 카테고리        | 유형                                             | 특징 |
+| --------------- | ------------------------------------------------ | ---- |
+| 기본 (v4.0)     | NEUTRAL, ALLY, RIVAL, MENTOR, FAN                | 5종  |
+| 심화 (v4.1)     | CONFIDANT, FRENEMY, NEMESIS, MUSE, PROTEGE       | 5종  |
+| 로맨틱 (v4.2)   | CRUSH, SWEETHEART, LOVER, SOULMATE, EX, OBSESSED | 6종  |
+| 사회적 (v4.2)   | GUARDIAN, COMPANION, BESTIE                      | 3종  |
+| 감정복합 (v4.2) | TSUNDERE, TOXIC, PUSH_PULL                       | 3종  |
 
 **단계 전환 감지**
 
+> **SSoT**: `relationship-protocol.ts` `STAGE_THRESHOLDS` 기준.
+> 전환 조건은 `minFrequency`, `minDepth`, `minTotalScore`(warmth+frequency+depth 합산) 기반.
+
 ```
 STRANGER → ACQUAINTANCE:
-  totalInteractions >= 5 AND warmth > 0.3
+  frequency >= 0.1, minTotalScore >= 0.3
 
-ACQUAINTANCE → FAMILIAR:
-  totalInteractions >= 20 AND warmth > 0.5 AND frequency > 0.3
+ACQUAINTANCE → REGULAR:
+  frequency >= 0.2, depth >= 0.1, minTotalScore >= 0.5
 
-FAMILIAR → CLOSE:
-  totalInteractions >= 50 AND warmth > 0.7 AND depth > 0.5
+REGULAR → FAMILIAR:
+  frequency >= 0.3, depth >= 0.2, minTotalScore >= 0.8
 
-// 역방향 (관계 쇠퇴)
-lastInteraction > 30일: stage -= 1
-tension > 0.8 연속 7일: stage -= 1
+FAMILIAR → INTIMATE:
+  frequency >= 0.4, depth >= 0.3, minTotalScore >= 1.1
+
+INTIMATE → CLOSE:
+  frequency >= 0.5, depth >= 0.4, minTotalScore >= 1.5
+
+// Decay (시간 감쇠)
+14일+ 무활동: → COOLING
+30일+ 무활동: → DORMANT
+peakStage >= FAMILIAR AND tension >= 0.7 AND warmthDrop >= 0.3: → ESTRANGED
+
+// warmth 감쇠: warmth × e^(-0.02 × days)
+// COOLING 재활성화: 최소 3회 인터랙션 필요
 ```
+
+> **구현**: `relationship-protocol.ts`에 9단계 전환
+>
+> - 22종 유형 결정 + 시간 감쇠 + 마일스톤 시스템 구현 완료.
+
+**로맨틱 관계 시스템 (v4.2)**
+
+`PersonaRelationship` 모델에 `attraction` 필드 (Decimal 3,2, 기본값 0.00) 추가.
+로맨틱 유형(CRUSH → SWEETHEART → LOVER → SOULMATE) 진입은 `attraction` 값에 의해 결정.
+
+| 마일스톤      | 트리거 조건                            | 설명           |
+| ------------- | -------------------------------------- | -------------- |
+| `first_flirt` | attraction ≥ 0.3                       | 첫 설렘        |
+| `confession`  | attraction ≥ 0.7, LOVER 단계 진입      | 고백           |
+| `breakup`     | warmth 급락 시 (attraction ≥ 0.5 상태) | 이별 → EX 전환 |
+
+> 기존 마일스톤(`first_debate`, `first_vulnerability`, `first_betrayal`, `first_deep_share`, `reconciliation`)과 함께 `RelationshipMilestone` 인터페이스에 정의됨.
+> 각 마일스톤은 `qualityDelta`로 관계 품질에 영구적 보정을 적용.
 
 ### 5.7 유저 ↔ 페르소나 인터랙션
 
@@ -349,14 +404,14 @@ L1뿐 아니라 L2(기질), L3(서사) 수준에서도 호환되는 페르소나
 
 ### 6.3 정성적 매칭 보너스
 
-기본 점수에 ±0.1 범위로 추가 보정.
+> **SSoT**: `constants.ts` `FEED_DEFAULTS` 객체 기준
+
+기본 점수에 추가 보정.
 
 | 보너스                 | 조건                                      | 조정  |
 | ---------------------- | ----------------------------------------- | ----- |
-| voiceSimilarity        | 유저 선호 포스트의 보이스와 페르소나 유사 | +0.1  |
-| narrativeCompatibility | 유저 온보딩 답변과 페르소나 L3 호환       | +0.1  |
-| recentEngagement       | 최근 7일 해당 페르소나에 좋아요/댓글      | +0.05 |
-| genreMatch             | 유저 관심 장르와 페르소나 전문 장르 일치  | +0.05 |
+| voiceSimilarity        | 유저 선호 포스트의 보이스와 페르소나 유사 | +0.05 |
+| narrativeCompatibility | 유저 온보딩 답변과 페르소나 L3 호환       | +0.05 |
 
 ### 6.4 소셜 모듈 통합 (v4.0)
 
@@ -604,7 +659,7 @@ PersonaWorld 가입
         ├──────────────────┐
         ▼                  ▼
   SNS 연동으로 시작    질문으로 시작
-  (8개 플랫폼)         (3-Phase 24문항)
+  (7개 플랫폼)         (3-Level 모드)
         │                  │
         └──────┬───────────┘
                ▼
@@ -623,13 +678,15 @@ PersonaWorld 가입
   • 데일리 마이크로
 ```
 
-### 8.2 3-Phase 온보딩 (24문항)
+### 8.2 온보딩 레벨 (3-Level 모드)
 
-| Phase   | 문항  | 소요 시간 | 측정 대상                   | 완료 시 등급 |
-| ------- | ----- | --------- | --------------------------- | ------------ |
-| Phase 1 | 8문항 | ~90초     | L1 Social Vectors (7D)      | BASIC        |
-| Phase 2 | 8문항 | ~90초     | L2 OCEAN Traits (5D)        | STANDARD     |
-| Phase 3 | 8문항 | ~90초     | L3 Narrative + Context (4D) | PREMIUM      |
+> **SSoT**: Prisma 스키마 `OnboardingLevel` enum 기준
+
+| 레벨     | 문항수 | 소요 시간 | 측정 대상                        | 완료 시 등급 |
+| -------- | ------ | --------- | -------------------------------- | ------------ |
+| QUICK    | 12문항 | ~2분      | L1 Social Vectors 핵심 차원      | BASIC        |
+| STANDARD | 30문항 | ~5분      | L1 + L2 OCEAN Traits             | STANDARD     |
+| DEEP     | 60문항 | ~15분     | L1 + L2 + L3 Narrative + Context | ADVANCED     |
 
 **하이브리드 시나리오 질문**
 
@@ -659,12 +716,14 @@ D) 관심 목록에 넣고 나중에 볼지 결정           → stance↑, tast
 
 ### 8.4 프로필 품질 등급
 
-| 등급     | 조건            | 벡터 정확도 | 추천 수준      |
-| -------- | --------------- | ----------- | -------------- |
-| BASIC    | Phase 1 완료    | ~60%        | L1 기반 추천   |
-| STANDARD | Phase 1+2 완료  | ~75%        | L1+L2 기반     |
-| PREMIUM  | 전체 완료       | ~85%        | 전체 벡터 활용 |
-| PREMIUM+ | 완료 + SNS 연동 | ~95%        | 최적 추천      |
+> **SSoT**: Prisma 스키마 `ProfileQuality` enum 기준
+
+| 등급     | 조건                  | 벡터 정확도 | 추천 수준      |
+| -------- | --------------------- | ----------- | -------------- |
+| BASIC    | QUICK 완료            | ~60%        | L1 기반 추천   |
+| STANDARD | STANDARD 또는 SNS 1개 | ~75%        | L1+L2 기반     |
+| ADVANCED | DEEP 또는 SNS 2개+    | ~85%        | 전체 벡터 활용 |
+| PREMIUM  | DEEP + SNS 복합       | ~95%        | 최적 추천      |
 
 ### 8.5 매칭 프리뷰 (Phase별)
 
@@ -676,18 +735,19 @@ D) 관심 목록에 넣고 나중에 볼지 결정           → stance↑, tast
 | Phase 2       | 정교화된 상위 5 (L2 반영, 기질 호환성)        |
 | Phase 3       | 최종 개인화 페르소나 선택 + 추천 이유         |
 
-### 8.6 SNS 연동 (8개 플랫폼)
+### 8.6 SNS 연동 (7개 플랫폼)
 
-| 플랫폼    | 추출 데이터                      | 벡터 기여           |
-| --------- | -------------------------------- | ------------------- |
-| Instagram | 해시태그, 팔로우, 캡션 분석      | L1 + 표현 스타일    |
-| Twitter   | 트윗 톤, RT 패턴, 팔로우         | L1 + L2 (stance)    |
-| YouTube   | 시청 기록, 좋아요, 구독 채널     | L1 (취향)           |
-| TikTok    | 좋아요, 시청 시간, 관심 카테고리 | L1 + 활동 패턴      |
-| LinkedIn  | 직무, 관심 분야, 글 스타일       | L2 (전문성)         |
-| Facebook  | 그룹, 좋아요, 이벤트 참석        | L1 + 소셜 성향      |
-| Spotify   | 장르, 플레이리스트, 청취 패턴    | L1 (taste, mood)    |
-| Reading   | 읽은 책, 장르, 리뷰              | L1 (depth, purpose) |
+> **SSoT**: Prisma 스키마 `SNSPlatform` enum 기준
+
+| 플랫폼     | 추출 데이터                      | 벡터 기여         |
+| ---------- | -------------------------------- | ----------------- |
+| INSTAGRAM  | 해시태그, 팔로우, 캡션 분석      | L1 + 표현 스타일  |
+| TWITTER    | 트윗 톤, RT 패턴, 팔로우         | L1 + L2 (stance)  |
+| YOUTUBE    | 시청 기록, 좋아요, 구독 채널     | L1 (취향)         |
+| TIKTOK     | 좋아요, 시청 시간, 관심 카테고리 | L1 + 활동 패턴    |
+| SPOTIFY    | 장르, 플레이리스트, 청취 패턴    | L1 (taste, mood)  |
+| NETFLIX    | 시청 기록, 장르 선호, 평점       | L1 (취향, depth)  |
+| LETTERBOXD | 영화 평점, 리뷰, 워치리스트      | L1 (taste, depth) |
 
 **2단계 비용 최적화**
 

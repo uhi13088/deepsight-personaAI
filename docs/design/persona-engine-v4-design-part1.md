@@ -511,6 +511,13 @@ SystemSafetyConfig (전역)          ← Kill Switch, feature toggles
 | volatility   | 안정(0) ↔ 불안정(1) | 불안정하면 취향 변동, 예측 불가 반응 빈도 증가     |
 | growthArc    | 정체(0) ↔ 성장(1)   | 성장형이면 시간에 따라 취향·관점이 점진적으로 변화 |
 
+> **구현 참고**: L3 기본값은 축 시맨틱에 따라 **0.0**이
+> 중립 (충족/유연/안정/정체). `engine-studio/constants/
+v3/dimensions.ts: DEFAULT_L3_VECTOR = {0.0, 0.0, 0.0,
+0.0}`. `@deepsight/vector-core`의 `L3_BASE`는 0.5를
+> 사용하므로 주의 — 페르소나 생성 시 engine-studio 상수를
+> 기준으로 할 것.
+
 ### 3.2 교차 메커니즘
 
 **V_Final 계산**
@@ -531,6 +538,12 @@ V_Final = (1-P) · V_L1 + P · (α · Proj_L2→L1 + β · Proj_L3→L1)
 
 **P = 0 (평상시)**: V_Final = V_L1 그대로. 표면적 행동만 반영.
 **P = 1 (극한 압박)**: V_Final = α·L2투영 + β·L3투영. 기질과 서사가 행동을 완전히 지배.
+
+> **구현 상태 (v4.2.0)**: Projection 행렬은
+> `projection-coefficients.ts`에 Sparse 1:1 매핑으로
+> 구현됨 (full 5×7/4×7 행렬이 아닌 주요 차원만 매핑).
+> Pressure Coefficient 기반 V_Final 블렌딩은 미구현 —
+> 현재 L1 벡터만 직접 사용. 향후 v5.0에서 구현 예정.
 
 **투영 행렬 예시 — L2→L1 (5×7)**
 
@@ -665,6 +678,12 @@ Character Bible
 ```
 
 ### 4.1 트리거 맵 (Trigger Map)
+
+> **구현 상태 (v4.2.0)**: TriggerMap DSL은 설계 완료
+> 상태이며, 페르소나 생성 시 `triggerMap` JSON 필드에
+> 저장됨. 그러나 런타임 DSL 평가 엔진은 미구현 —
+> 현재 triggerMap은 아레나 판정·StyleBook 참조용으로만
+> 사용됨. v5.0에서 실시간 평가 엔진 구현 예정.
 
 특정 조건에서 벡터·상태를 변화시키는 규칙 시스템. 페르소나의 "반응 패턴"을 선언적으로 정의한다.
 

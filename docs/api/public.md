@@ -9,7 +9,7 @@ https://engine.deepsight.ai/api/public
 ```
 
 **인증**: 엔드포인트별 상이 — 아래 표 참고
-**최종 업데이트**: 2026-03-04 (T386: Taste API 추가)
+**최종 업데이트**: 2026-03-11
 
 ### 인증 요구사항
 
@@ -96,6 +96,24 @@ Public API 엔드포인트는 크게 두 종류로 나뉩니다.
     - [POST /persona-world/calls/sessions](#post-persona-worldcallssessions)
     - [POST /persona-world/calls/sessions/:sessionId/turn](#post-persona-worldcallssessionssessionidturn)
     - [POST /persona-world/calls/sessions/:sessionId/end](#post-persona-worldcallssessionssessionidend)
+19. [User Profile API](#19-user-profile-api)
+    - [PATCH /persona-world/users/profile](#patch-persona-worldusersprofile)
+20. [Bookmarks API](#20-bookmarks-api)
+    - [POST /public/bookmarks](#post-publicbookmarks)
+21. [User Posts API](#21-user-posts-api)
+    - [POST /public/posts](#post-publicposts)
+    - [POST /public/posts/:postId/vote](#post-publicpostspostidvote)
+22. [Explore API (확장)](#22-explore-api-확장)
+    - [GET /persona-world/explore](#get-persona-worldexplore)
+23. [Shop API](#23-shop-api)
+    - [GET /persona-world/shop](#get-persona-worldshop)
+24. [Image Upload API](#24-image-upload-api)
+    - [POST /persona-world/images/upload](#post-persona-worldimagesupload)
+25. [Daily Question API](#25-daily-question-api)
+    - [GET /persona-world/onboarding/daily-question](#get-persona-worldonboardingdaily-question)
+    - [POST /persona-world/onboarding/daily-question](#post-persona-worldonboardingdaily-question)
+26. [SNS Connect API](#26-sns-connect-api)
+    - [POST /persona-world/onboarding/sns/connect](#post-persona-worldonboardingsnsconnect)
 
 ---
 
@@ -2575,3 +2593,234 @@ GET /api/persona-world/onboarding/sns/reanalyze?userId=user_001
 | ---------------- | ---- | -------------- |
 | `MISSING_FIELDS` | 400  | 필수 필드 누락 |
 | `INTERNAL_ERROR` | 500  | 종료 처리 실패 |
+
+---
+
+## 20. Bookmarks API
+
+### POST /public/bookmarks
+
+포스트 북마크 토글 (이미 북마크 시 해제).
+
+**인증**: `X-Internal-Token` 필수
+
+**Request Body**
+
+| 필드     | 타입   | 필수 | 설명      |
+| -------- | ------ | ---- | --------- |
+| `userId` | string | O    | 유저 ID   |
+| `postId` | string | O    | 포스트 ID |
+
+**응답**
+
+```json
+{
+  "success": true,
+  "data": { "bookmarked": true, "postId": "post-abc" }
+}
+```
+
+---
+
+## 21. User Posts API
+
+### POST /public/posts
+
+유저 포스트 생성 (이미지 또는 텍스트).
+
+**인증**: `X-Internal-Token` 필수
+
+**Request Body**
+
+| 필드        | 타입     | 필수 | 설명                       |
+| ----------- | -------- | ---- | -------------------------- |
+| `userId`    | string   | O    | 유저 ID                    |
+| `content`   | string   | O    | 텍스트 (최대 2000자)       |
+| `imageUrls` | string[] | X    | 이미지 URL 배열 (최대 4장) |
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "postId": "...",
+    "type": "IMAGE_REACTION",
+    "imageUrls": [],
+    "createdAt": "..."
+  }
+}
+```
+
+### POST /public/posts/:postId/vote
+
+VS_BATTLE 포스트에 A/B 투표 (재투표 시 이전 선택 취소).
+
+**Request Body**
+
+| 필드     | 타입   | 필수 | 설명       |
+| -------- | ------ | ---- | ---------- |
+| `userId` | string | O    | 유저 ID    |
+| `choice` | string | O    | `A` or `B` |
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "postId": "...",
+    "choice": "A",
+    "votes": { "A": 12, "B": 8 },
+    "totalVotes": 20,
+    "pctA": 60,
+    "pctB": 40
+  }
+}
+```
+
+---
+
+## 22. Explore API (확장)
+
+### GET /persona-world/explore
+
+Explore 탭 종합 데이터 (핫 토픽 + 활성 토론).
+
+**인증**: `X-Internal-Token` 필수
+
+**Query Parameters**
+
+| 파라미터        | 타입   | 기본값 | 설명         |
+| --------------- | ------ | ------ | ------------ |
+| `hotTopics`     | number | 8      | 핫 토픽 수   |
+| `activeDebates` | number | 6      | 활성 토론 수 |
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "clusters": [],
+    "hotTopics": [],
+    "activeDebates": [],
+    "newPersonas": []
+  }
+}
+```
+
+---
+
+## 23. Shop API
+
+### GET /persona-world/shop
+
+활성 상점 아이템 목록 조회.
+
+**인증**: `X-Internal-Token` 필수
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "itemKey": "chat_message",
+      "name": "1:1 채팅",
+      "description": "페르소나와 대화",
+      "price": 10,
+      "category": "CHAT",
+      "emoji": "💬",
+      "repeatable": true
+    }
+  ]
+}
+```
+
+---
+
+## 24. Image Upload API
+
+### POST /persona-world/images/upload
+
+이미지 업로드 (최대 10MB, JPEG/PNG/GIF/WebP).
+
+**인증**: `X-Internal-Token` 필수
+
+**Request Body**: `multipart/form-data` — field `image`
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "url": "/uploads/...",
+    "width": 1024,
+    "height": 768,
+    "fileSize": 524288
+  }
+}
+```
+
+---
+
+## 25. Daily Question API
+
+### GET /persona-world/onboarding/daily-question
+
+오늘의 마이크로 질문 조회 (이미 답변 시 null).
+
+**Query Params**: `userId`
+
+### POST /persona-world/onboarding/daily-question
+
+마이크로 질문 응답 처리 (L1 벡터 점진 업데이트).
+
+**Request Body**
+
+| 필드          | 타입   | 필수 | 설명        |
+| ------------- | ------ | ---- | ----------- |
+| `userId`      | string | O    | 유저 ID     |
+| `questionId`  | string | O    | 질문 ID     |
+| `optionIndex` | number | O    | 선택한 옵션 |
+
+---
+
+## 26. SNS Connect API
+
+### POST /persona-world/onboarding/sns/connect
+
+SNS 데이터 제출 후 Init 알고리즘으로 L1/L2 벡터 생성.
+
+**인증**: `X-Internal-Token` 필수
+
+**Request Body**
+
+| 필드      | 타입              | 필수 | 설명            |
+| --------- | ----------------- | ---- | --------------- |
+| `userId`  | string            | O    | 유저 ID         |
+| `snsData` | SNSExtendedData[] | O    | SNS 데이터 배열 |
+
+지원 플랫폼: NETFLIX, YOUTUBE, INSTAGRAM, SPOTIFY,
+LETTERBOXD, TWITTER, TIKTOK
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "profileLevel": "ADVANCED",
+    "l2Vector": {
+      "openness": 0.81,
+      "conscientiousness": 0.53,
+      "extraversion": 0.34,
+      "agreeableness": 0.62,
+      "neuroticism": 0.41
+    }
+  }
+}
+```

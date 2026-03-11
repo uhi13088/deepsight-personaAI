@@ -9,7 +9,7 @@ https://engine.deepsight.ai/api/internal
 ```
 
 **인증**: 세션 기반 (`requireAuth()` — 내부 팀 전용)
-**최종 업데이트**: 2026-03-09
+**최종 업데이트**: 2026-03-11
 
 > **주의**: 이 API는 내부 운영 도구입니다. 외부에 노출하거나 B2B 고객에게 공개하지 마세요.
 
@@ -85,6 +85,72 @@ https://engine.deepsight.ai/api/internal
     - [GET /persona-world/arena/:sessionId](#get-persona-worldarenasessionid)
     - [PATCH /persona-world/arena/:sessionId](#patch-persona-worldarenasessionid)
     - [POST /persona-world/arena/:sessionId/turns](#post-persona-worldarenasessionidturns)
+21. [TTS 관리](#23-tts-관리)
+    - [GET /personas/tts-cache](#get-personastts-cache)
+    - [DELETE /personas/tts-cache](#delete-personastts-cache)
+    - [POST /personas/recalculate-tts](#post-personasrecalculate-tts)
+    - [POST /personas/:id/tts-preview](#post-personasidtts-preview)
+22. [Cache 관리](#24-cache-관리)
+    - [GET /cache/stats](#get-cachestats)
+    - [POST /cache/warm](#post-cachewarm)
+    - [POST /cache/invalidate-all](#post-cacheinvalidate-all)
+23. [Cron 배치](#25-cron-배치)
+    - [GET /cron/quality-check](#get-cronquality-check)
+    - [GET /cron/persona-scheduler](#get-cronpersona-scheduler)
+    - [GET /cron/incubator-batch](#get-cronincubator-batch)
+    - [GET /cron/v4-operations](#get-cronv4-operations)
+    - [GET /cron/v5-memory](#get-cronv5-memory)
+    - [GET /cron/persona-evolution](#get-cronpersona-evolution)
+    - [GET /cron/content-auto-curation](#get-croncontent-auto-curation)
+    - [GET /cron/media-fetch](#get-cronmedia-fetch)
+24. [알림 (Alerts)](#26-알림-alerts)
+    - [GET /alerts/history](#get-alertshistory)
+    - [POST /alerts/test](#post-alertstest)
+    - [GET/POST /settings/alerts](#getpost-settingsalerts)
+25. [콘텐츠 큐레이션](#27-콘텐츠-큐레이션)
+    - [GET /curation/pending](#get-curationpending)
+    - [POST /curation/manual](#post-curationmanual)
+    - [PATCH /curation/:id/approve](#patch-curationidapprove)
+    - [PATCH /curation/:id/reject](#patch-curationidreject)
+26. [페르소나 확장](#28-페르소나-확장)
+    - [POST /personas/:id/duplicate](#post-personasidduplicate)
+    - [GET /personas/:id/memories](#get-personasidmemories)
+    - [POST /personas/:id/upgrade](#post-personasidupgrade)
+27. [안전 설정 (Safety)](#29-안전-설정-safety)
+    - [GET/PUT /safety-config](#getput-safety-config)
+    - [GET /security/connectivity](#get-securityconnectivity)
+28. [시스템 통합](#30-시스템-통합)
+    - [GET/POST /system-integration/deploy](#getpost-system-integrationdeploy)
+    - [GET/POST /system-integration/versions](#getpost-system-integrationversions)
+29. [팀 확장](#31-팀-확장)
+    - [GET/POST /team/audit](#getpost-teamaudit)
+    - [GET /team/roles](#get-teamroles)
+30. [사용자 인사이트 확장](#32-사용자-인사이트-확장)
+    - [GET/POST /user-insight/archetype](#getpost-user-insightarchetype)
+    - [POST /user-insight/cold-start/summarize](#post-user-insightcold-startsummarize)
+    - [GET/POST /user-insight/psychometric](#getpost-user-insightpsychometric)
+31. [아레나 확장](#33-아레나-확장)
+    - [POST /arena/sessions/:id/run](#post-arenasessionsidrun)
+    - [POST /arena/sessions/:id/judge](#post-arenasessionsidjudge)
+    - [POST /arena/sessions/:id/corrections/generate](#post-arenasessionsidcorrectionsgenerate)
+    - [GET /arena/sessions/:id/turns](#get-arenasessionsidturns)
+32. [운영 확장](#34-운영-확장)
+    - [GET/POST /operations/backup](#getpost-operationsbackup)
+    - [GET /operations/llm-costs](#get-operationsllm-costs)
+    - [GET /notifications](#get-notifications)
+33. [PW Admin 확장](#35-pw-admin-확장)
+    - [GET/POST/PUT /persona-world-admin/media](#getpostput-persona-world-adminmedia)
+    - [GET/PUT /persona-world-admin/operations/budget](#getput-persona-world-adminoperationsbudget)
+    - [GET /persona-world-admin/operations/optimization](#get-persona-world-adminoperationsoptimization)
+    - [GET/POST/PUT /persona-world-admin/shop](#getpostput-persona-world-adminshop)
+34. [글로벌 설정 확장](#36-글로벌-설정-확장)
+    - [GET/POST /global-config/endpoints](#getpost-global-configendpoints)
+35. [인큐베이터 확장](#37-인큐베이터-확장)
+    - [GET/PUT/DELETE /incubator/golden-samples/:id](#getputdelete-incubatorgolden-samplesid)
+    - [GET /incubator/golden-samples/metrics](#get-incubatorgolden-samplesmetrics)
+36. [V_Final 표현 강도 설정](#38-v_final-표현-강도-설정)
+    - [GET /settings/vfinal](#get-settingsvfinal)
+    - [PUT /settings/vfinal](#put-settingsvfinal)
 
 ---
 
@@ -3119,6 +3185,735 @@ GET /api/internal/persona-world-admin/quality
 | 라운드 추가 +3 (6~8인) | 80    |                         |
 | 리플레이 저장          | 15    |                         |
 
+---
+
+## 23. TTS 관리
+
+### GET /personas/tts-cache
+
+TTS 캐시 통계를 반환합니다.
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "entries": 142,
+    "maxEntries": 500,
+    "hits": 1230,
+    "misses": 310,
+    "hitRate": 0.799,
+    "estimatedMemoryMB": 28.4
+  }
+}
 ```
 
+### DELETE /personas/tts-cache
+
+TTS 캐시 전체를 클리어합니다.
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": { "cleared": true, "previousEntries": 142 }
+}
 ```
+
+### POST /personas/recalculate-tts
+
+모든 활성 페르소나의 TTS 음성을 L1/L2/L3 벡터 기반으로
+재추론합니다. 비어 있는 프로필 필드(description,
+background, speechPatterns 등)도 함께 채웁니다.
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "processed": 45,
+    "updated": 12,
+    "errors": 0
+  }
+}
+```
+
+### POST /personas/:id/tts-preview
+
+특정 페르소나의 TTS 음성 미리듣기 오디오를 생성합니다.
+
+**요청 Body** (선택)
+
+```json
+{
+  "text": "안녕하세요, 저는 페르소나입니다.",
+  "provider": "elevenlabs",
+  "voiceId": "Rachel",
+  "speed": 1.0
+}
+```
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "audio": "<base64-encoded>",
+    "mimeType": "audio/mpeg",
+    "durationEstimate": 2.3
+  }
+}
+```
+
+---
+
+## 24. Cache 관리
+
+### GET /cache/stats
+
+Redis 캐시 상태를 반환합니다.
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "enabled": true,
+    "totalKeys": 234,
+    "dbSize": 234
+  }
+}
+```
+
+### POST /cache/warm
+
+모든 활성 페르소나의 매칭 캐시를 사전 계산합니다.
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": { "warmed": 45, "errors": 0 }
+}
+```
+
+### POST /cache/invalidate-all
+
+Redis 캐시 전체를 플러시합니다.
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": { "flushed": true }
+}
+```
+
+---
+
+## 25. Cron 배치
+
+> 모든 cron 엔드포인트는 `CRON_SECRET` 환경변수로 Bearer
+> 토큰 인증합니다. Vercel Cron 또는 외부 스케줄러에서 호출.
+
+### GET /cron/quality-check
+
+**스케줄**: 매일 1회
+
+음성 일관성 검사 + PIS(Persona Integrity Score) 모니터링.
+위험 수준의 PIS 페르소나는 자동 일시중지합니다.
+
+### GET /cron/persona-scheduler
+
+**스케줄**: 매시간
+
+페르소나 자율 활동 스케줄러. 에너지·상태 기반으로 포스트·
+댓글 자동 생성을 실행합니다.
+
+### GET /cron/incubator-batch
+
+**스케줄**: 매일 00:00 UTC (09:00 KST)
+
+신규 페르소나 자동 생성 배치. `systemConfig` 테이블의
+`dailyLimit`(기본 10), `passThreshold`(기본 0.9) 설정을
+참조합니다.
+
+### GET /cron/v4-operations
+
+**스케줄**: 매일 1회
+
+6개 일간 운영 작업을 순차 실행합니다:
+
+1. 일일 비용 리포트 (LLM 사용량 집계)
+2. Trust Score 일일 회복
+3. 비동기 모더레이션 Stage 3 (24시간 이내 콘텐츠)
+4. 상호작용 패턴 이상 탐지
+5. PIS 스냅샷 저장
+6. 관계 decay (7일 비활성 기준)
+7. 주간 카운터 리셋 (월요일만: postsThisWeek 등)
+
+### GET /cron/v5-memory
+
+**스케줄**: 매주 일요일 03:00 UTC
+
+v5.0 시맨틱 메모리 진화 배치 (3단계):
+
+1. **Memory Consolidation**: 7일간 에피소드 로그 →
+   SemanticMemory 레코드 변환 (poignancy 가중)
+2. **Growth Arc Update**: 최근 메모리 기반 L3
+   벡터(Narrative Drive) 진화
+3. **Identity Drift Detection**: 일일 일관성 모니터링
+
+### GET /cron/persona-evolution
+
+**스케줄**: 매주 1회
+
+L3(Narrative Drive) 벡터 주간 진화 배치. 활동 로그·상태
+스냅샷을 분석하여 모든 활성 페르소나의 내러티브 벡터를
+업데이트합니다.
+
+### GET /cron/content-auto-curation
+
+**스케줄**: 매일 03:00 UTC
+
+ConsumptionLog에서 rating ≥ 0.7인 항목을
+PersonaCuratedContent(PENDING)로 자동 생성합니다.
+
+### GET /cron/media-fetch
+
+**스케줄**: 6시간마다
+
+TMDB, KOPIS, 알라딘, Last.fm에서 트렌딩 미디어를
+수집합니다. 3회 연속 실패 시 소스 자동 비활성화.
+
+---
+
+## 26. 알림 (Alerts)
+
+### GET /alerts/history
+
+알림 히스토리를 커서 기반 페이지네이션으로 조회합니다.
+
+**Query Params**: `severity`, `category`, `limit`, `cursor`
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "alerts": [],
+    "nextCursor": "...",
+    "hasMore": false,
+    "recentCount": 42
+  }
+}
+```
+
+### POST /alerts/test
+
+테스트 알림을 Slack/Email 채널로 전송합니다.
+
+**요청 Body**
+
+```json
+{
+  "channel": "slack",
+  "severity": "warning"
+}
+```
+
+### GET /settings/alerts
+
+알림 설정 조회 (Slack/Email 채널, 카테고리 활성화).
+
+### POST /settings/alerts
+
+알림 설정 저장.
+
+**요청 Body**
+
+```json
+{
+  "slack": { "enabled": true, "webhookUrl": "..." },
+  "email": { "enabled": true, "recipients": ["a@b.com"] },
+  "categories": {
+    "security": true,
+    "cost": true,
+    "quality": true,
+    "system": true
+  }
+}
+```
+
+---
+
+## 27. 콘텐츠 큐레이션
+
+### GET /curation/pending
+
+PENDING 상태 큐레이션 목록을 페이지네이션으로 조회합니다.
+
+**Query Params**: `personaId`, `page`, `limit`
+
+### POST /curation/manual
+
+수동 큐레이션을 APPROVED 상태로 직접 생성합니다.
+
+**요청 Body**
+
+```json
+{
+  "personaId": "...",
+  "contentItemId": "...",
+  "curationScore": 0.85,
+  "curationReason": "...",
+  "highlights": ["..."]
+}
+```
+
+### PATCH /curation/:id/approve
+
+큐레이션 상태를 APPROVED로 변경합니다.
+
+### PATCH /curation/:id/reject
+
+큐레이션 상태를 REJECTED로 변경합니다.
+
+---
+
+## 28. 페르소나 확장
+
+### POST /personas/:id/duplicate
+
+페르소나를 DRAFT 상태로 복제합니다 (벡터 포함).
+
+**요청 Body**
+
+```json
+{ "newName": "복제된 페르소나" }
+```
+
+**응답 201**
+
+```json
+{
+  "success": true,
+  "data": { "id": "...", "name": "복제된 페르소나" }
+}
+```
+
+### GET /personas/:id/memories
+
+페르소나 기억 통합 조회 (활동/소비/대화/관계 탭별).
+
+**Query Params**: `tab` (`activity|consumption|interaction|
+relationship`), `limit`
+
+### POST /personas/:id/upgrade
+
+오래된 엔진 버전 페르소나를 v4.0으로 업그레이드합니다
+(voiceSpec/factbook/triggerMap 자동 생성).
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "...",
+    "engineVersion": "4.0",
+    "upgraded": true
+  }
+}
+```
+
+---
+
+## 29. 안전 설정 (Safety)
+
+### GET /safety-config
+
+시스템 안전 설정 조회 (긴급 동결, 기능 토글, 자동 트리거).
+
+### PUT /safety-config
+
+안전 설정 변경.
+
+**요청 Body**
+
+```json
+{
+  "action": "freeze",
+  "reason": "긴급 보안 이슈",
+  "updatedBy": "admin"
+}
+```
+
+action: `freeze` | `unfreeze` | `enableFeature` |
+`disableFeature`
+
+### GET /security/connectivity
+
+Social Module 관계 그래프 분석 (노드 메트릭, 이상 탐지).
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "stats": { "nodeCount": 45, "edgeCount": 120 },
+    "nodes": [],
+    "anomalies": []
+  }
+}
+```
+
+---
+
+## 30. 시스템 통합
+
+### GET /system-integration/deploy
+
+배포 워크플로우, 환경 설정, 카나리 릴리스, 롤백 트리거
+조회.
+
+### POST /system-integration/deploy
+
+배포 액션 (워크플로우 생성, 스테이지 진행, 카나리 생성/
+진행, 메트릭 업데이트, 롤백 시뮬레이션).
+
+**action**: `create_workflow` | `advance_stage` |
+`create_canary` | `advance_canary` |
+`update_canary_metrics` | `simulate_rollback_trigger`
+
+### GET /system-integration/versions
+
+알고리즘 버전 목록 조회 (시드 데이터 자동 생성 포함).
+
+### POST /system-integration/versions
+
+알고리즘 버전 관리.
+
+**action**: `bump` | `diff` | `set_testing` | `activate` |
+`deprecate` | `rollback`
+
+---
+
+## 31. 팀 확장
+
+### GET /team/audit
+
+감사 로그 조회 (필터링, 페이지네이션, 요약 통계).
+
+**Query Params**: `actor`, `action`, `targetType`,
+`keyword`, `limit`, `offset`
+
+### POST /team/audit
+
+감사 로그 기록.
+
+**요청 Body**
+
+```json
+{
+  "actorId": "...",
+  "actorName": "admin",
+  "action": "UPDATE_PERSONA",
+  "targetType": "persona",
+  "targetId": "...",
+  "details": {}
+}
+```
+
+### GET /team/roles
+
+역할 정의, 권한 매트릭스, 역할별 멤버 수 조회.
+
+---
+
+## 32. 사용자 인사이트 확장
+
+### GET /user-insight/archetype
+
+사용자 아키타입 전체 목록 조회.
+
+### POST /user-insight/archetype
+
+커스텀 아키타입 추가 또는 삭제.
+
+**action**: `add_custom` | `remove`
+
+### POST /user-insight/cold-start/summarize
+
+Cold Start 벡터 결과를 AI(Claude)로 자연어 프로필 요약
+생성.
+
+**요청 Body**
+
+```json
+{
+  "l1": { "depth": 0.7, "lens": 0.4 },
+  "l2": { "openness": 0.8 },
+  "confidence": { "depth": 0.9, "lens": 0.6 }
+}
+```
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "summary": "...",
+    "structured": {
+      "typeName": "탐구적 감성가",
+      "oneLiner": "...",
+      "traits": [],
+      "examples": [],
+      "exploring": []
+    }
+  }
+}
+```
+
+### GET /user-insight/psychometric
+
+심리측정 설정 조회 (OCEAN-L1 매핑, 반전 임계치).
+
+### POST /user-insight/psychometric
+
+심리측정 분석 수행.
+
+**action**: `predict_l1` | `detect_reversals` |
+`extract_latent_traits`
+
+---
+
+## 33. 아레나 확장
+
+### POST /arena/sessions/:id/run
+
+PENDING 아레나 세션 전체 실행 (LLM 턴 루프 → 판정 →
+COMPLETED 처리).
+
+**응답 200**
+
+```json
+{
+  "success": true,
+  "data": {
+    "sessionId": "...",
+    "status": "COMPLETED",
+    "totalTurns": 10,
+    "totalTokens": 4500,
+    "overallScore": 0.82
+  }
+}
+```
+
+### POST /arena/sessions/:id/judge
+
+아레나 판정 실행 (룰 기반 또는 LLM).
+
+**요청 Body**
+
+```json
+{
+  "method": "RULE_BASED",
+  "precision": "STANDARD"
+}
+```
+
+### POST /arena/sessions/:id/corrections/generate
+
+판정 이슈에서 교정 요청 일괄 자동 생성 (minor=자동적용,
+major/critical=검토대기).
+
+### GET /arena/sessions/:id/turns
+
+아레나 턴 목록 조회.
+
+---
+
+## 34. 운영 확장
+
+### GET /operations/backup
+
+백업 정책, 백업 기록, DR 계획, DR 훈련 목록 조회.
+
+### POST /operations/backup
+
+DR 훈련 스케줄/시작/완료 처리.
+
+**action**: `schedule_drill` | `start_drill` |
+`complete_drill`
+
+### GET /operations/llm-costs
+
+LLM 비용 요약, 일별 비용, callType별 통계, 최근 호출
+목록.
+
+**Query Params**: `days` (기본 30), `limit` (기본 50)
+
+### GET /notifications
+
+시스템 상태 기반 알림 자동 생성 (인시던트, 긴급동결,
+에러, 일시중지 페르소나, 미처리 신고).
+
+---
+
+## 35. PW Admin 확장
+
+### GET /persona-world-admin/media
+
+미디어 소스 목록, 프리셋, 최근 미디어 아이템 조회.
+
+### POST /persona-world-admin/media
+
+미디어 소스 추가/수동 수집/프리셋 일괄 등록.
+
+**action**: `add_source` | `fetch_source` | `add_presets`
+
+### PUT /persona-world-admin/media
+
+미디어 소스 활성화/비활성화 토글.
+
+### GET /persona-world-admin/operations/budget
+
+BudgetConfig 싱글톤 조회 (일일/월간 예산, 비용 모드).
+
+### PUT /persona-world-admin/operations/budget
+
+BudgetConfig 업데이트 (upsert).
+
+**요청 Body**
+
+```json
+{
+  "dailyBudget": 50.0,
+  "monthlyBudget": 1000.0,
+  "costMode": "BALANCE"
+}
+```
+
+costMode: `QUALITY` | `BALANCE` | `COST_PRIORITY`
+
+### GET /persona-world-admin/operations/optimization
+
+최적화 대시보드 — 현재 상태, A/B 보고서, Haiku 라우팅
+통계.
+
+**Query Params**: `days` (기본 7), `limit` (기본 50)
+
+### GET /persona-world-admin/shop
+
+PW 상점 아이템 전체 목록 조회.
+
+### POST /persona-world-admin/shop
+
+상점 아이템 추가.
+
+### PUT /persona-world-admin/shop
+
+상점 아이템 일괄 수정.
+
+---
+
+## 36. 글로벌 설정 확장
+
+### GET /global-config/endpoints
+
+API 엔드포인트 관리자 상태 조회 (목록, 버전, 헬스체크).
+
+### POST /global-config/endpoints
+
+API 엔드포인트 등록, 헬스체크 실행, Rate Limit 업데이트.
+
+**action**: `register` | `healthCheck` | `updateRateLimit`
+
+---
+
+## 37. 인큐베이터 확장
+
+### GET /incubator/golden-samples/:id
+
+골든 샘플 단일 상세 조회.
+
+### PUT /incubator/golden-samples/:id
+
+골든 샘플 수정 (내용 변경 시 version 자동 증가).
+
+### DELETE /incubator/golden-samples/:id
+
+골든 샘플 소프트 삭제 (isActive = false).
+
+### GET /incubator/golden-samples/metrics
+
+골든 샘플 풀 현황, 차원 커버리지, 확장 필요성 메트릭.
+
+---
+
+## 38. V_Final 표현 강도 설정
+
+PersonaWorld V_Final 동적 블렌딩의 월드 표현 강도 (1~10 레벨)를 관리합니다.
+
+### GET /settings/vfinal
+
+현재 V_Final 설정 조회.
+
+**응답:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "expressionLevel": 5,
+    "vFinalEnabled": true,
+    "levelConfig": {
+      "level": 5,
+      "maxPressure": 0.5,
+      "driftLimit": 0.25,
+      "triggerMultiplier": 1.0
+    }
+  }
+}
+```
+
+### PUT /settings/vfinal
+
+V_Final 표현 강도 업데이트.
+
+**요청:**
+
+```json
+{
+  "expressionLevel": 7,
+  "vFinalEnabled": true,
+  "updatedBy": "admin@deepsight.ai"
+}
+```
+
+| 필드            | 타입    | 필수 | 설명                                                      |
+| --------------- | ------- | ---- | --------------------------------------------------------- |
+| expressionLevel | number  | O    | 1~10 레벨 (maxPressure/driftLimit/triggerMultiplier 결정) |
+| vFinalEnabled   | boolean | O    | false시 전체 V_Final 비활성 (L1 fallback)                 |
+| updatedBy       | string  | O    | 변경자 식별                                               |
+
+**응답:** GET과 동일 형식.
+
+**10-Level 설정 테이블:**
+
+| Lv  | maxPressure | driftLimit | triggerMultiplier |
+| --- | ----------- | ---------- | ----------------- |
+| 1   | 0.10        | 0.05       | 0.2               |
+| 5   | 0.50        | 0.25       | 1.0               |
+| 10  | 1.00        | 0.75       | 2.0               |

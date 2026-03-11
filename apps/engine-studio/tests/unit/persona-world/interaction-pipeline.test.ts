@@ -81,6 +81,46 @@ vi.mock("@/lib/persona-world/interactions/repost-engine", () => ({
   computeRepostProbability: vi.fn(() => 0.5),
 }))
 
+vi.mock("@/lib/persona-world/vfinal-config", () => ({
+  getWorldVFinalConfig: vi.fn().mockResolvedValue({
+    expressionLevel: 5,
+    vFinalEnabled: false, // 테스트에서는 기본 비활성 (기존 동작 유지)
+    levelConfig: { level: 5, maxPressure: 0.5, driftLimit: 0.25, triggerMultiplier: 1.0 },
+  }),
+}))
+
+vi.mock("@/lib/persona-world/pressure", () => ({
+  computePressure: vi.fn(() => ({
+    pressure: 0.1,
+    rawPressure: 0.1,
+    contributions: {
+      paradoxTension: 0.05,
+      moodExtreme: 0.02,
+      narrativeTension: 0.02,
+      triggerBoost: 0.01,
+    },
+  })),
+}))
+
+vi.mock("@/lib/vector/v-final", () => ({
+  calculateVFinal: vi.fn(() => ({
+    vector: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+    pressure: 0.1,
+    layerContributions: { l1Weight: 0.9, l2Weight: 0.06, l3Weight: 0.04 },
+    l2Projected: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+    l3Projected: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+  })),
+  vFinalToVector: vi.fn(() => ({
+    depth: 0.5,
+    lens: 0.5,
+    stance: 0.5,
+    scope: 0.5,
+    taste: 0.5,
+    purpose: 0.5,
+    sociability: 0.5,
+  })),
+}))
+
 // ── 헬퍼 ────────────────────────────────────────────────────
 
 const defaultVectors = {

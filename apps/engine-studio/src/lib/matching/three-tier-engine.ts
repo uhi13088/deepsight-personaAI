@@ -108,6 +108,8 @@ export interface PersonaCandidate {
   crossAxisProfile: CrossAxisProfile
   paradoxProfile: ParadoxProfile
   archetype?: string
+  /** 동적 Pressure (V_Final 블렌딩용, T418). 미지정 시 기본값 사용. */
+  pressure?: number
 }
 
 export interface UserProfile {
@@ -401,7 +403,7 @@ export function matchPersona(
   tier: MatchingTier,
   options?: EnrichmentOptions
 ): MatchResult {
-  const personaVFinal = calculateVFinal(persona.l1, persona.l2, persona.l3)
+  const personaVFinal = calculateVFinal(persona.l1, persona.l2, persona.l3, persona.pressure)
 
   let result: { score: number; breakdown: MatchBreakdown }
 
@@ -521,7 +523,7 @@ export function matchAll(
     }
 
     // Pre-compute: 페르소나 VFinal (Basic/Advanced에서 공유, 1회만 계산)
-    const personaVFinal = calculateVFinal(persona.l1, persona.l2, persona.l3)
+    const personaVFinal = calculateVFinal(persona.l1, persona.l2, persona.l3, persona.pressure)
 
     // 페르소나 VFinal에도 장르 가중치 적용
     const personaVFinalVector =
