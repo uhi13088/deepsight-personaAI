@@ -1487,6 +1487,44 @@
   - 같은 대화 내 자기 모순 최소화 (자기 발화 일관성)
   - 기존 페르소나도 앵커 보정 가능
 
+---
+
+### Phase LIFE-ANCHOR-RETRO: 기존 페르소나 생활 앵커 일괄 보정
+
+> **배경**: T420-T421은 신규 페르소나에만 적용됨. 기존 31개+ 페르소나는 Factbook에
+> 생활 앵커가 없음. Engine Studio에서 관리자가 일괄 또는 개별로 앵커를 생성할 수 있는
+> API + UI가 필요.
+
+- [ ] **T424: 생활 앵커 일괄 생성 API**
+  - `POST /api/internal/personas/bulk-generate-anchors`
+    - body: `{ personaIds?: string[] }` — 생략 시 앵커 없는 전체 페르소나 대상
+    - 각 페르소나의 profile(name, role, expertise, nationality, region, gender, birthDate) +
+      layerVectors(TEMPERAMENT L2) + 기존 Factbook 조회
+    - T420에서 구현한 `generateLifeAnchors()` 호출
+    - 생성된 앵커를 Factbook `mutableContext`에 merge (중복 category는 skip)
+    - 결과: `{ processed: number, succeeded: number, failed: number, results: [...] }`
+  - `GET /api/internal/personas/anchor-status`
+    - 각 페르소나별 앵커 보유 여부 + 카테고리 목록 반환
+    - 앵커 없는 페르소나 수 집계
+  - 요금 제어: 페르소나당 LLM 1회 호출 — 처리 전 예상 비용 계산 후 응답에 포함
+
+- [ ] **T425: Engine Studio 생활 앵커 관리 UI**
+  - `apps/engine-studio/src/app/(dashboard)/persona-studio/personas/page.tsx` 또는
+    별도 `(dashboard)/tools/anchor-manager/page.tsx`
+  - 앵커 현황 카드: "앵커 미생성 페르소나 N개" + 예상 비용 표시
+  - **[일괄 생성] 버튼**: 앵커 없는 페르소나 전체 대상 → 확인 모달(예상 비용) → API 호출
+  - **진행 상태**: 처리 중 스피너 + 완료 시 결과 요약 (성공 N, 실패 N)
+  - 개별 페르소나 행: 앵커 보유 상태 배지 (✅ 보유 / ⚠️ 미생성) + 개별 [재생성] 버튼
+  - 사이드바 메뉴: System Integration 또는 Persona Studio 하위에 추가
+
+- **AC**:
+  - [일괄 생성] 버튼 클릭 → 앵커 없는 페르소나 전체에 생활 앵커 생성
+  - 기존 앵커 있는 페르소나는 skip (중복 생성 방지)
+  - 개별 페르소나 [재생성]으로 앵커 업데이트 가능
+  - 처리 결과(성공/실패) UI에 표시
+  - T420 `generateLifeAnchors()` 재사용 (코드 중복 없음)
+  - pnpm validate PASS
+
 ## BLOCKED
 
 (없음)
