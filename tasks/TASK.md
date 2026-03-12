@@ -1437,6 +1437,56 @@
   - PIS 기존 자율 검증 시스템과 호환
   - pnpm validate PASS
 
+---
+
+### Phase LIFE-ANCHOR: 페르소나 생활 앵커 — 대화 허구 붕괴 방지
+
+> **배경**: 현재 대화 엔진은 Factbook에 없는 구체적 사실(카페명, 영화명, 블로그 URL 등)을
+> LLM이 즉흥적으로 만들어냄. 사용자가 구체적 내용을 되물으면 "기억이 안 난다"를
+> 반복하며 대화가 붕괴됨. 해결책: 페르소나 생성 시 실제 생활 데이터를 Factbook에
+> 미리 생성·저장하고, 대화 엔진은 Factbook 데이터만 구체적으로 언급하도록 강제.
+
+- [ ] **T420: 생활 앵커 생성기 (Life Anchor Generator)**
+  - `apps/engine-studio/src/lib/persona-generation/life-anchor-generator.ts` 신규
+  - 입력: demographics(nationality, region, role, expertise, interests) + personality vectors
+  - 출력: LifeAnchor[] — 아래 카테고리별 구체적 사실들
+    - `place`: 자주 가는 장소 1~2곳 (실제 존재 가능한 이름)
+    - `social`: 주요 지인 1~2명 (이름 + 관계 + 직업)
+    - `media_recent`: 최근 소비한 미디어 2~3개 (제목 + 한줄 감상)
+    - `creative_work`: 본인 창작물/프로젝트 (제목 + 플랫폼/URL)
+    - `routine`: 주간 루틴 1~2가지
+  - LLM 호출로 demographics/성격 기반 현실적 앵커 생성
+  - 생성된 앵커는 Factbook `mutableContext`에 category별로 저장
+  - 단위 테스트: 카테고리별 앵커 존재 여부, 국적/지역 일관성
+
+- [ ] **T421: 페르소나 생성 파이프라인에 생활 앵커 통합**
+  - `pipeline.ts` auto/manual 파이프라인 양쪽에 Stage 추가
+  - `convertBackstoryToFactbook()` 이후 `generateLifeAnchors()` 호출
+  - 생성된 LifeAnchor[] → Factbook `mutableContext`에 병합
+  - FAL/Replicate 이미지 생성과 동일하게 실패 시 null 처리 (파이프라인 중단 없음)
+  - 기존 페르소나 보정: 앵커 없는 페르소나 대상 보정 스크립트 or 수동 트리거 API
+
+- [ ] **T422: 대화 엔진 Factbook 우선 원칙 적용**
+  - `conversation-engine.ts` — `buildConversationSystemPrefix()` Factbook 섹션에 규칙 추가:
+    - "Factbook에 없는 구체적 사실(장소명, 인물명, 작품명, URL)은 즉흥적으로 만들지 말 것"
+    - "모르거나 Factbook에 없는 정보는 자연스럽게 모호하게 처리할 것"
+    - "같은 대화 내에서 한 말과 모순되지 않을 것"
+    - "사용자 불만 시 길게 자기분석/반성하지 말고 짧게 인정하거나 넘어갈 것"
+  - 단위 테스트: Factbook 있음/없음 케이스별 시스템 프롬프트 내용 검증
+
+- [ ] **T423: 테스트 + 검증**
+  - T420 생활 앵커 생성기 단위 테스트
+  - T421 파이프라인 통합 테스트 (mock LLM)
+  - T422 프롬프트 내용 단위 테스트
+  - pnpm validate PASS
+
+- **AC**:
+  - 새로 생성되는 페르소나는 Factbook에 place/social/media/creative/routine 앵커 보유
+  - 대화에서 카페명, 영화명, 블로그 URL 등 구체적 사실을 Factbook 기반으로 말함
+  - Factbook에 없는 사실은 즉흥 생성 대신 자연스럽게 모호화
+  - 같은 대화 내 자기 모순 최소화 (자기 발화 일관성)
+  - 기존 페르소나도 앵커 보정 가능
+
 ## BLOCKED
 
 (없음)
