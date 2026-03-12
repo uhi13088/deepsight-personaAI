@@ -31,6 +31,15 @@ vi.mock("@/lib/persona-world/conversation-memory", () => ({
   adjustStateForConversation: vi.fn().mockImplementation((state: PersonaStateData) => state),
 }))
 
+vi.mock("@/lib/persona-world/intimacy-engine", () => ({
+  updateIntimacyAfterChat: vi.fn().mockResolvedValue({
+    newScore: 0.003,
+    newLevel: 1,
+    previousLevel: 1,
+    levelUp: false,
+  }),
+}))
+
 vi.mock("@/lib/persona-world/voice-pipeline", () => ({
   speechToText: vi.fn().mockResolvedValue({ text: "안녕하세요", language: "ko" }),
   textToSpeech: vi
@@ -136,6 +145,24 @@ function createMockProvider(overrides?: Partial<CallDataProvider>): CallDataProv
     findByOrderId: vi.fn().mockResolvedValue(null),
     updateTransaction: vi.fn().mockResolvedValue(null),
     getTransactions: vi.fn().mockResolvedValue([]),
+
+    // Intimacy
+    getIntimacyByUserAndPersona: vi.fn().mockResolvedValue({
+      threadId: "thread-1",
+      intimacyLevel: 1,
+      sharedMilestones: null,
+      intimacyScore: 0,
+      lastIntimacyAt: null,
+    }),
+    getThreadIntimacy: vi.fn().mockResolvedValue({
+      intimacyScore: 0,
+      intimacyLevel: 1,
+      lastIntimacyAt: null,
+      sharedMilestones: null,
+      personaId: "persona-1",
+      userId: "user-1",
+    }),
+    updateThreadIntimacy: vi.fn().mockResolvedValue(undefined),
 
     ...overrides,
   }

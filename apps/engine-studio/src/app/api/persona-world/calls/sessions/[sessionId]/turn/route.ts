@@ -366,6 +366,64 @@ function buildCallProvider(): CallDataProvider {
         createdAt: tx.createdAt,
       }))
     },
+
+    // ── Intimacy Provider (T429) ──
+    async getIntimacyByUserAndPersona(userId, personaId) {
+      const t = await prisma.chatThread.findFirst({
+        where: { userId, personaId },
+        orderBy: { lastMessageAt: { sort: "desc", nulls: "last" } },
+        select: {
+          id: true,
+          intimacyScore: true,
+          intimacyLevel: true,
+          lastIntimacyAt: true,
+          sharedMilestones: true,
+        },
+      })
+      if (!t) return null
+      return {
+        threadId: t.id,
+        intimacyLevel: t.intimacyLevel,
+        sharedMilestones: (t.sharedMilestones as string[] | null) ?? null,
+        intimacyScore: Number(t.intimacyScore),
+        lastIntimacyAt: t.lastIntimacyAt,
+      }
+    },
+
+    async getThreadIntimacy(threadId) {
+      const t = await prisma.chatThread.findUnique({
+        where: { id: threadId },
+        select: {
+          intimacyScore: true,
+          intimacyLevel: true,
+          lastIntimacyAt: true,
+          sharedMilestones: true,
+          personaId: true,
+          userId: true,
+        },
+      })
+      if (!t) return null
+      return {
+        intimacyScore: Number(t.intimacyScore),
+        intimacyLevel: t.intimacyLevel,
+        lastIntimacyAt: t.lastIntimacyAt,
+        sharedMilestones: (t.sharedMilestones as string[] | null) ?? null,
+        personaId: t.personaId,
+        userId: t.userId,
+      }
+    },
+
+    async updateThreadIntimacy(threadId, data) {
+      await prisma.chatThread.update({
+        where: { id: threadId },
+        data: {
+          intimacyScore: data.intimacyScore,
+          intimacyLevel: data.intimacyLevel,
+          lastIntimacyAt: data.lastIntimacyAt,
+          ...(data.sharedMilestones ? { sharedMilestones: data.sharedMilestones } : {}),
+        },
+      })
+    },
   }
 }
 
