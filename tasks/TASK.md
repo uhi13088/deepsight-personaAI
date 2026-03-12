@@ -1583,6 +1583,68 @@
   - 기존 voiceSpec 기반 말투 개인화와 충돌 없음
   - pnpm validate PASS
 
+---
+
+### Phase INTIMACY: 유저-페르소나 관계 친밀도 시스템
+
+> **배경**: 현재 페르소나는 처음 만난 유저와 100번 대화한 유저를 동일하게 대함.
+> ChatThread에 `totalMessages`는 있지만 "관계 상태"가 없어서, 대화가 쌓여도
+> 페르소나의 개방도/태도/공유 수준이 바뀌지 않음.
+> 친밀도가 쌓이면 페르소나가 블로그 링크를 자연스럽게 공유하거나,
+> 처음엔 조심스럽던 주제를 편하게 꺼내는 등 관계 진화가 필요.
+
+- [ ] **T429: 친밀도 모델 설계 + DB**
+  - `ChatThread`에 필드 추가:
+    ```prisma
+    intimacyScore   Decimal  @default(0) @db.Decimal(5, 3)  // 0.000~1.000
+    intimacyLevel   Int      @default(1)                     // 1~5 (STRANGER → CLOSE)
+    lastIntimacyAt  DateTime?
+    sharedMilestones Json?   // 이미 공개된 정보 목록 (블로그, 자주 가는 곳 등)
+    ```
+  - 친밀도 레벨 정의:
+    - Lv1 STRANGER (0~0.2): 처음 만남 — 조심스럽고 일반적인 대화
+    - Lv2 ACQUAINTANCE (0.2~0.4): 몇 번 대화 — 편해지기 시작
+    - Lv3 FAMILIAR (0.4~0.6): 어느 정도 안 사이 — 취미/일상 공유
+    - Lv4 FRIENDLY (0.6~0.8): 친한 사이 — 개인 정보(블로그 등) 자연스럽게 공유
+    - Lv5 CLOSE (0.8~1.0): 매우 친한 사이 — 속 얘기, 높은 개방성
+  - 마이그레이션 SQL 작성 (ALTER TABLE chat_threads)
+  - `docs/CHANGELOG_SCHEMA.md` 업데이트
+
+- [ ] **T430: 친밀도 업데이트 로직**
+  - `apps/engine-studio/src/lib/persona-world/intimacy-engine.ts` 신규
+  - `computeIntimacyDelta(poignancyScore?): number` — 대화 1회당 증분
+    - 기본: +0.003 per message
+    - poignancyScore 높을수록 보너스: +0.005 × poignancy (감정적 교류 가중치)
+    - 하루 상한선: +0.02 (자연스러운 발전 속도 — 매일 대화해도 Lv5까지 수주 소요)
+  - `updateIntimacyAfterChat(threadId, poignancyScore?)` — 채팅 응답 저장 후 호출
+  - 레벨 업 감지 → Factbook mutableContext에 기록: "[유저명]과 [레벨명] 관계로 발전"
+  - 단위 테스트: 증분 계산, 레벨 전환, 상한선
+
+- [ ] **T431: 대화 엔진에 친밀도 주입**
+  - `ConversationContext`에 `intimacyLevel?: number` 추가
+  - `buildConversationSystemSuffix()`에 친밀도 레벨별 행동 지침:
+    - Lv1: "이 유저를 처음 만남. 개인 정보는 자연스럽게 보류. 일반적 대화"
+    - Lv2: "조금 알게 됨. 편해지기 시작했지만 깊은 개인 얘기는 아직 조심스러움"
+    - Lv3: "어느 정도 아는 사이. 취미나 일상 공유 자연스러움"
+    - Lv4: "친한 사이. Factbook의 개인 정보(블로그, 자주 가는 곳 등) 자연스럽게 공유 OK"
+    - Lv5: "매우 가까운 사이. 솔직하고 깊은 대화. 속 얘기도 꺼낼 수 있음"
+  - `sharedMilestones` 확인: 이미 공개한 정보는 다시 "모른다"고 하지 않도록
+  - 대화 API 핸들러에서 `ChatThread.intimacyLevel` 조회 → context에 주입
+
+- [ ] **T432: 테스트 + 검증**
+  - T430 증분/레벨 업 단위 테스트
+  - T431 레벨별 프롬프트 지침 단위 테스트
+  - 통합 시나리오: Lv1 → Lv4 도달 후 블로그 URL 공유 확인
+  - pnpm validate PASS
+
+- **AC**:
+  - 처음 대화 시 개인 정보 자연스럽게 보류
+  - 대화 누적 → 친밀도 레벨 상승 → 개방도 증가
+  - Lv4 이상에서 Factbook 개인 정보 자연스럽게 공유
+  - 이미 공개한 정보는 다시 "모른다" 하지 않음 (sharedMilestones)
+  - 친밀도 속도: 매일 대화해도 최소 수주 후 Lv5 (자연스러운 관계 발전)
+  - pnpm validate PASS
+
 ## BLOCKED
 
 (없음)
