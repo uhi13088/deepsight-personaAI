@@ -1525,6 +1525,64 @@
   - T420 `generateLifeAnchors()` 재사용 (코드 중복 없음)
   - pnpm validate PASS
 
+---
+
+### Phase VECTOR-BEHAVIOR: 벡터 기반 상황별 행동 패턴
+
+> **배경**: 현재 대화 엔진(conversation-engine.ts)에 L1/L2 벡터가 전달되지 않음.
+> VoiceStyleParams(formality, humor 등)만 전달되어 말투는 개인화되지만,
+> "상대방이 화낼 때", "거절당할 때" 같은 감정적 상황에서의 반응 패턴은
+> LLM 기본값(사과 + 대화 종료)으로 fallback됨.
+> 예: sociability=0.82 + stance=0.90(냉소적)인 Farida가 "싫어 안봐"를 들었을 때
+> "시간 필요하면 연락 기다릴게" → 벡터와 정반대. 오히려 "에이~ 왜그래"가 맞음.
+
+- [ ] **T426: PersonaProfileSnapshot에 L1/L2 벡터 추가**
+  - `types.ts` → `PersonaProfileSnapshot`에 선택적 필드 추가:
+    ```ts
+    l1Vector?: {
+      sociability: number   // 0~1: 외향 (관계 유지 의지)
+      stance: number        // 0~1: 비관적/냉소적 (수동적 복종 거부)
+      purpose: number       // 0~1: 의미추구
+      depth: number         // 0~1: 직관적 ↔ 분석적
+    }
+    l2Vector?: {
+      extraversion: number
+      agreeableness: number
+      neuroticism: number
+      openness: number
+    }
+    ```
+  - 대화 API 핸들러(conversation route)에서 persona 조회 시 layerVectors 포함 → snapshot에 주입
+  - 기존 호환성 유지 (모든 필드 optional)
+
+- [ ] **T427: 대화 엔진 — 벡터 기반 상황별 행동 지침 생성**
+  - `buildConversationSystemPrefix()`에 L1/L2 벡터 → 상황별 행동 패턴 변환 로직 추가
+  - **거절/충돌 상황** (사용자가 화내거나 대화를 끊으려 할 때):
+    - `sociability > 0.7` → "상대방이 화내거나 거절해도 관계를 유지하려는 적극성. 조용히 물러서지 않음"
+    - `sociability < 0.3` → "상대방이 거절하면 담담하게 받아들임"
+    - `stance > 0.7` (냉소적) → "지나치게 사과하거나 자기비난하지 않음. 오히려 상황을 냉소적으로 봄"
+    - `agreeableness < 0.35` → "동의보다 자기 관점 유지. 쉽게 굴복하지 않음"
+  - **사과/인정 패턴**:
+    - `neuroticism > 0.6` → "실수에 민감하게 반응하지만 길게 자기분석하지는 않음"
+    - `assertiveness > 0.7` (VoiceStyleParams) → "실수를 인정하되 과도한 사과 없이 빠르게 넘어감"
+  - **AI 종료 패턴 방지**:
+    - "대화를 마무리 짓는 '...기다릴게', '시간이 필요하면 연락해' 식의 AI 종료 패턴을 사용하지 말 것"
+    - "대화의 끝은 당신의 성격 벡터가 결정. 당신이 먼저 대화를 끝내지 않음"
+  - 단위 테스트: sociability/stance/agreeableness 조합별 생성된 지침 내용 검증
+
+- [ ] **T428: 테스트 + 검증**
+  - T426 PersonaProfileSnapshot 타입 변경 영향 범위 확인
+  - T427 프롬프트 변환 단위 테스트
+  - 대화 API 통합 테스트 (mock 페르소나 + 거절 시나리오)
+  - pnpm validate PASS
+
+- **AC**:
+  - sociability=0.82 + stance=0.90인 페르소나는 "싫어 안봐"에 "에이 왜그래~" 류로 반응
+  - "시간 필요하면 연락 기다릴게" 류의 AI 종료 패턴 제거
+  - 벡터별 상황 반응이 일관되게 적용됨 (낮은 sociability 페르소나는 다르게 반응)
+  - 기존 voiceSpec 기반 말투 개인화와 충돌 없음
+  - pnpm validate PASS
+
 ## BLOCKED
 
 (없음)
