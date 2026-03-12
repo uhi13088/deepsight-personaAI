@@ -9,7 +9,7 @@ import crypto from "crypto"
 import {
   isImageGenerationConfigured,
   generateImageWithFlux,
-} from "@/lib/image-generation/replicate-client"
+} from "@/lib/image-generation/image-client"
 import {
   buildProfileImagePrompt,
   buildQualityEnhancement,
@@ -99,7 +99,9 @@ export async function generateProfileImage(
   input: GenerateProfileImageInput
 ): Promise<GenerateProfileImageResult | null> {
   if (!isImageGenerationConfigured()) {
-    console.log("[ImageGen] Skipping — REPLICATE_API_TOKEN not configured")
+    console.log(
+      "[ImageGen] Skipping — no image generation API configured (FAL_KEY / REPLICATE_API_TOKEN)"
+    )
     return null
   }
 

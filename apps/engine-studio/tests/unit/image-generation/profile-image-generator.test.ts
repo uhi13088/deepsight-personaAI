@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 
 // ── Mocks ─────────────────────────────────────────────────────
 
-vi.mock("@/lib/image-generation/replicate-client", () => ({
+vi.mock("@/lib/image-generation/image-client", () => ({
   isImageGenerationConfigured: vi.fn(),
   generateImageWithFlux: vi.fn(),
 }))
@@ -23,7 +23,7 @@ import { generateProfileImage } from "@/lib/image-generation/profile-image-gener
 import {
   isImageGenerationConfigured,
   generateImageWithFlux,
-} from "@/lib/image-generation/replicate-client"
+} from "@/lib/image-generation/image-client"
 import { writeFile, mkdir } from "fs/promises"
 
 const mockedIsConfigured = vi.mocked(isImageGenerationConfigured)
@@ -48,7 +48,7 @@ describe("generateProfileImage", () => {
     vi.clearAllMocks()
   })
 
-  it("should return null when Replicate is not configured", async () => {
+  it("should return null when no provider is configured", async () => {
     mockedIsConfigured.mockReturnValue(false)
 
     const result = await generateProfileImage(DEFAULT_INPUT)
@@ -59,8 +59,9 @@ describe("generateProfileImage", () => {
   it("should generate image and save locally when configured", async () => {
     mockedIsConfigured.mockReturnValue(true)
     mockedGenerateImage.mockResolvedValue({
-      imageUrl: "https://replicate.delivery/example/image.webp",
-      model: "black-forest-labs/flux-1.1-pro",
+      imageUrl: "https://fal.media/files/example/image.webp",
+      provider: "fal",
+      model: "fal-ai/flux-pro/v1.1",
     })
 
     const result = await generateProfileImage(DEFAULT_INPUT)
@@ -69,7 +70,7 @@ describe("generateProfileImage", () => {
     expect(result?.profileImageUrl).toMatch(
       /^\/uploads\/images\/\d{4}\/\d{2}\/\d{2}\/[\w-]+\.webp$/
     )
-    expect(result?.model).toBe("black-forest-labs/flux-1.1-pro")
+    expect(result?.model).toBe("fal-ai/flux-pro/v1.1")
     expect(mkdir).toHaveBeenCalled()
     expect(writeFile).toHaveBeenCalled()
   })
@@ -85,8 +86,9 @@ describe("generateProfileImage", () => {
   it("should return null on download failure", async () => {
     mockedIsConfigured.mockReturnValue(true)
     mockedGenerateImage.mockResolvedValue({
-      imageUrl: "https://replicate.delivery/example/image.webp",
-      model: "black-forest-labs/flux-1.1-pro",
+      imageUrl: "https://fal.media/files/example/image.webp",
+      provider: "fal",
+      model: "fal-ai/flux-pro/v1.1",
     })
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: false,
@@ -109,8 +111,9 @@ describe("generateProfileImage", () => {
   it("should pass correct prompt input to FLUX", async () => {
     mockedIsConfigured.mockReturnValue(true)
     mockedGenerateImage.mockResolvedValue({
-      imageUrl: "https://replicate.delivery/example/image.webp",
-      model: "black-forest-labs/flux-1.1-pro",
+      imageUrl: "https://fal.media/files/example/image.webp",
+      provider: "fal",
+      model: "fal-ai/flux-pro/v1.1",
     })
 
     await generateProfileImage(DEFAULT_INPUT)
@@ -127,8 +130,9 @@ describe("generateProfileImage", () => {
   it("should include quality enhancement in prompt", async () => {
     mockedIsConfigured.mockReturnValue(true)
     mockedGenerateImage.mockResolvedValue({
-      imageUrl: "https://replicate.delivery/example/image.webp",
-      model: "black-forest-labs/flux-1.1-pro",
+      imageUrl: "https://fal.media/files/example/image.webp",
+      provider: "fal",
+      model: "fal-ai/flux-pro/v1.1",
     })
 
     await generateProfileImage(DEFAULT_INPUT)

@@ -32,6 +32,7 @@
     "@deepsight/shared-types": "workspace:^",
     "@deepsight/ui": "workspace:^",
     "@deepsight/vector-core": "workspace:^",
+    "@fal-ai/client": "^1.9.4",
     "@prisma/client": "5.22.0",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
