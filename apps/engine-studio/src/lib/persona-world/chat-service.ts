@@ -19,6 +19,8 @@ import {
 import type { ConversationMemoryProvider } from "./conversation-memory"
 import { spendCredits, getBalance } from "./credit-service"
 import type { CreditDataProvider } from "./credit-service"
+import { updateIntimacyAfterChat } from "./intimacy-engine"
+import type { IntimacyDataProvider } from "./intimacy-engine"
 import type { PersonaProfileSnapshot, PersonaStateData } from "./types"
 
 // ── 상수 ────────────────────────────────────────────────────
@@ -31,7 +33,8 @@ const DEFAULT_PAGE_SIZE = 30
 
 // ── DI 인터페이스 ───────────────────────────────────────────
 
-export interface ChatDataProvider extends ConversationMemoryProvider, CreditDataProvider {
+export interface ChatDataProvider
+  extends ConversationMemoryProvider, CreditDataProvider, IntimacyDataProvider {
   /** 대화방 생성 */
   createThread(params: {
     personaId: string
@@ -61,6 +64,10 @@ export interface ChatDataProvider extends ConversationMemoryProvider, CreditData
     sessionId: string | null
     totalMessages: number
     isActive: boolean
+    intimacyScore: number
+    intimacyLevel: number
+    lastIntimacyAt: Date | null
+    sharedMilestones: string[] | null
   } | null>
 
   /** 메시지 저장 */
@@ -212,7 +219,7 @@ export async function sendMessage(
     content: m.content,
   }))
 
-  // 6. Conversation Engine 호출
+  // 6. Conversation Engine 호출 (친밀도 주입 T431)
   const conversationContext: ConversationContext = {
     persona: profile,
     personaId: thread.personaId,
@@ -220,6 +227,8 @@ export async function sendMessage(
     ragContext,
     mode: "chat",
     userNickname,
+    intimacyLevel: thread.intimacyLevel,
+    sharedMilestones: thread.sharedMilestones ?? undefined,
   }
 
   const llmResult: ConversationResult = await generateConversationResponse({
@@ -263,8 +272,8 @@ export async function sendMessage(
     source: input.source,
   })
 
-  // 10. 페르소나 응답 poignancy 업데이트
-  // (이미 saveMessage로 저장했으므로 poignancy만 업데이트)
+  // 10. 친밀도 업데이트 (T430)
+  await updateIntimacyAfterChat(provider, threadId, poignancy)
 
   // 11. 대화방 메타데이터 업데이트
   await provider.updateThread(threadId, {

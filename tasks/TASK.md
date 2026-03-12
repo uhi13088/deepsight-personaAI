@@ -1593,7 +1593,7 @@
 > 친밀도가 쌓이면 페르소나가 블로그 링크를 자연스럽게 공유하거나,
 > 처음엔 조심스럽던 주제를 편하게 꺼내는 등 관계 진화가 필요.
 
-- [ ] **T429: 친밀도 모델 설계 + DB**
+- [x] **T429: 친밀도 모델 설계 + DB**
   - `ChatThread`에 필드 추가:
     ```prisma
     intimacyScore   Decimal  @default(0) @db.Decimal(5, 3)  // 0.000~1.000
@@ -1610,7 +1610,7 @@
   - 마이그레이션 SQL 작성 (ALTER TABLE chat_threads)
   - `docs/CHANGELOG_SCHEMA.md` 업데이트
 
-- [ ] **T430: 친밀도 업데이트 로직**
+- [x] **T430: 친밀도 업데이트 로직**
   - `apps/engine-studio/src/lib/persona-world/intimacy-engine.ts` 신규
   - `computeIntimacyDelta(poignancyScore?): number` — 대화 1회당 증분
     - 기본: +0.003 per message
@@ -1620,7 +1620,7 @@
   - 레벨 업 감지 → Factbook mutableContext에 기록: "[유저명]과 [레벨명] 관계로 발전"
   - 단위 테스트: 증분 계산, 레벨 전환, 상한선
 
-- [ ] **T431: 대화 엔진에 친밀도 주입**
+- [x] **T431: 대화 엔진에 친밀도 주입**
   - `ConversationContext`에 `intimacyLevel?: number` 추가
   - `buildConversationSystemSuffix()`에 친밀도 레벨별 행동 지침:
     - Lv1: "이 유저를 처음 만남. 개인 정보는 자연스럽게 보류. 일반적 대화"
@@ -1631,7 +1631,7 @@
   - `sharedMilestones` 확인: 이미 공개한 정보는 다시 "모른다"고 하지 않도록
   - 대화 API 핸들러에서 `ChatThread.intimacyLevel` 조회 → context에 주입
 
-- [ ] **T432: 테스트 + 검증**
+- [x] **T432: 테스트 + 검증**
   - T430 증분/레벨 업 단위 테스트
   - T431 레벨별 프롬프트 지침 단위 테스트
   - 통합 시나리오: Lv1 → Lv4 도달 후 블로그 URL 공유 확인

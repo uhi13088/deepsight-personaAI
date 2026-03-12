@@ -25,6 +25,15 @@ vi.mock("@/lib/persona-world/conversation-memory", () => ({
   adjustStateForConversation: vi.fn().mockImplementation((state: PersonaStateData) => state),
 }))
 
+vi.mock("@/lib/persona-world/intimacy-engine", () => ({
+  updateIntimacyAfterChat: vi.fn().mockResolvedValue({
+    newScore: 0.003,
+    newLevel: 1,
+    previousLevel: 1,
+    levelUp: false,
+  }),
+}))
+
 // ── Mock Profile ─────────────────────────────────────────────
 
 const MOCK_PROFILE: PersonaProfileSnapshot = {
@@ -59,6 +68,10 @@ function createMockProvider(overrides?: Partial<ChatDataProvider>): ChatDataProv
       sessionId: "session-1",
       totalMessages: 0,
       isActive: true,
+      intimacyScore: 0,
+      intimacyLevel: 1,
+      lastIntimacyAt: null,
+      sharedMilestones: null,
     }),
     saveMessage: vi
       .fn()
@@ -74,6 +87,15 @@ function createMockProvider(overrides?: Partial<ChatDataProvider>): ChatDataProv
     incrementSessionTurns: vi.fn().mockResolvedValue(undefined),
     getFactbook: vi.fn().mockResolvedValue(null),
     saveFactbook: vi.fn().mockResolvedValue(undefined),
+    getThreadIntimacy: vi.fn().mockResolvedValue({
+      intimacyScore: 0,
+      intimacyLevel: 1,
+      lastIntimacyAt: null,
+      sharedMilestones: null,
+      personaId: "persona-1",
+      userId: "user-1",
+    }),
+    updateThreadIntimacy: vi.fn().mockResolvedValue(undefined),
     getPersonaState: vi.fn().mockResolvedValue(MOCK_STATE),
     savePersonaState: vi.fn().mockResolvedValue(undefined),
     getLatestTransaction: vi
@@ -188,6 +210,10 @@ describe("sendMessage", () => {
         sessionId: "session-1",
         totalMessages: 0,
         isActive: true,
+        intimacyScore: 0,
+        intimacyLevel: 1,
+        lastIntimacyAt: null,
+        sharedMilestones: null,
       }),
     })
 
@@ -203,6 +229,10 @@ describe("sendMessage", () => {
         sessionId: "session-1",
         totalMessages: 0,
         isActive: false,
+        intimacyScore: 0,
+        intimacyLevel: 1,
+        lastIntimacyAt: null,
+        sharedMilestones: null,
       }),
     })
 
@@ -278,6 +308,10 @@ describe("getMessages", () => {
         sessionId: "session-1",
         totalMessages: 10,
         isActive: true,
+        intimacyScore: 0,
+        intimacyLevel: 1,
+        lastIntimacyAt: null,
+        sharedMilestones: null,
       }),
     })
 

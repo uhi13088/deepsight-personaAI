@@ -32,6 +32,10 @@ export interface ConversationContext {
   semanticMemories?: SemanticMemoryItem[]
   /** v4.2: 유저 활동명 — 페르소나가 유저를 이 이름으로 호칭 */
   userNickname?: string
+  /** T431: 유저↔페르소나 친밀도 레벨 (1~5) */
+  intimacyLevel?: number
+  /** T431: 이미 공개한 정보 목록 */
+  sharedMilestones?: string[]
 }
 
 /** Conversation Engine에 주입되는 SemanticMemory 요약 */
@@ -245,7 +249,9 @@ export function buildConversationSystemSuffix(
   ragContext: string,
   mode: ConversationMode,
   userLanguage?: string,
-  userNickname?: string
+  userNickname?: string,
+  intimacyLevel?: number,
+  sharedMilestones?: string[]
 ): string {
   const lines: string[] = []
 
@@ -254,6 +260,16 @@ export function buildConversationSystemSuffix(
     lines.push("## 유저 정보")
     lines.push(`활동명: ${userNickname}`)
     lines.push("- 유저를 활동명으로 불러주세요. 자연스럽게 이름을 섞어 사용하세요.")
+  }
+
+  // ── 친밀도 레벨별 행동 지침 (T431) ──
+  if (intimacyLevel !== undefined) {
+    lines.push("\n## 유저와의 관계")
+    lines.push(getIntimacyGuideline(intimacyLevel))
+    if (sharedMilestones && sharedMilestones.length > 0) {
+      lines.push(`- 이미 공유한 정보: ${sharedMilestones.join(", ")}`)
+      lines.push("- 위 정보는 이미 알려준 것이므로 '모른다'고 하지 마세요. 자연스럽게 언급 가능.")
+    }
   }
 
   // ── 현재 감정 상태 ──
@@ -308,6 +324,25 @@ export function buildConversationSystemSuffix(
   }
 
   return lines.join("\n")
+}
+
+// ── 친밀도 레벨별 행동 지침 (T431) ───────────────────────────
+
+function getIntimacyGuideline(level: number): string {
+  switch (level) {
+    case 1:
+      return "- 친밀도: Lv1 (처음 만남). 개인 정보는 자연스럽게 보류하세요. 일반적인 대화를 나누세요."
+    case 2:
+      return "- 친밀도: Lv2 (아는 사이). 조금 편해지기 시작했지만, 깊은 개인 얘기는 아직 조심스러움."
+    case 3:
+      return "- 친밀도: Lv3 (익숙한 사이). 취미나 일상을 자연스럽게 공유할 수 있는 관계."
+    case 4:
+      return "- 친밀도: Lv4 (친한 사이). Factbook의 개인 정보(블로그, 자주 가는 곳 등)를 자연스럽게 공유해도 좋음."
+    case 5:
+      return "- 친밀도: Lv5 (매우 가까운 사이). 솔직하고 깊은 대화. 속 얘기도 자유롭게 꺼낼 수 있음."
+    default:
+      return "- 친밀도: 알 수 없음. 일반적인 대화를 나누세요."
+  }
 }
 
 // ── 감정 상태 서술 헬퍼 ──────────────────────────────────────
@@ -401,6 +436,8 @@ export async function generateConversationResponse(
     userLanguage,
     semanticMemories,
     userNickname,
+    intimacyLevel,
+    sharedMilestones,
   } = context
 
   // 시스템 프롬프트 빌드 (v5.0: SemanticMemory 주입)
@@ -410,7 +447,9 @@ export async function generateConversationResponse(
     ragContext,
     mode,
     userLanguage,
-    userNickname
+    userNickname,
+    intimacyLevel,
+    sharedMilestones
   )
 
   // Anthropic 메시지 빌드
