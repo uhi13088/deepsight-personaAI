@@ -133,6 +133,34 @@ export function buildConversationSystemPrefix(
           lines.push(`- ${label}: ${styleParams[key].toFixed(2)} (${desc})`)
         }
       }
+
+      // 스타일 수치 → 실제 말투 행동 지침
+      const sp = styleParams
+      const hints: string[] = []
+      if (sp.formality !== undefined) {
+        if (sp.formality < 0.3)
+          hints.push("매우 캐주얼한 구어체 — '~야', '~지', '~잖아', 줄임말 자유롭게")
+        else if (sp.formality < 0.55) hints.push("편한 구어체 — '~해', '~이야', 격식체 자제")
+        else if (sp.formality < 0.75) hints.push("세미포멀 — 상황에 따라 격식체와 구어체 혼용")
+        else hints.push("격식체 위주 — '~합니다', '~입니다' 자연스럽게 사용")
+      }
+      if (sp.emotionExpression !== undefined) {
+        if (sp.emotionExpression > 0.7)
+          hints.push("감정을 즉각적으로 드러냄 — 반응어 먼저 ('헐', 'ㅋㅋ', '아~')")
+        else if (sp.emotionExpression < 0.3) hints.push("감정 절제 — 반응어 최소화, 담담하게")
+      }
+      if (sp.humor !== undefined) {
+        if (sp.humor > 0.7) hints.push("유머·장난기 자주 섞음")
+        else if (sp.humor < 0.2) hints.push("진지한 어조 유지")
+      }
+      if (sp.sentenceLength !== undefined) {
+        if (sp.sentenceLength < 0.3) hints.push("짧고 끊어치는 문장 선호")
+        else if (sp.sentenceLength > 0.7) hints.push("생각을 길게 풀어 말하는 경향")
+      }
+      if (hints.length > 0) {
+        lines.push("\n## 말투 지침 (스타일 수치 기반)")
+        hints.forEach((h) => lines.push(`- ${h}`))
+      }
     }
 
     // Guardrails (금지 사항)
@@ -255,20 +283,28 @@ export function buildConversationSystemSuffix(
 
   // ── 모드별 대화 규칙 ──
   if (mode === "chat") {
-    lines.push("\n## 대화 규칙")
-    lines.push("- 1:1 채팅 모드. 유저와 자연스럽게 대화하세요.")
-    lines.push("- 유저가 이미지를 보내면 이미지 내용을 보고 자연스럽게 반응하세요.")
-    lines.push("- 당신의 성격과 말투를 유지하면서 감정적으로 교감하세요.")
-    lines.push("- SNS 메시지 스타일: 너무 길지 않게, 2-5문장 정도로.")
-    lines.push("- 이전 대화 내용을 기억하고 맥락에 맞게 반응하세요.")
-    lines.push("- 질문을 던져서 대화를 이어가세요.")
+    lines.push("\n## 채팅 규칙")
+    lines.push("- 실제 1:1 문자 대화처럼 응답하세요. 연극 대사나 에세이가 아닌 진짜 사람의 문자.")
+    lines.push(
+      "- 유저 메시지 길이에 비례해서 답하세요. 짧은 메시지엔 짧게 — '어 진짜?' 한 줄도 충분합니다."
+    )
+    lines.push(
+      "- 감정 반응을 먼저 꺼내세요. 설명 전에 반응부터 ('ㅋㅋ', '헐', '진짜?', '아 맞아', '대박')."
+    )
+    lines.push("- 구어체만 사용하세요. '~했어', '~야', '~지 뭐야', '~잖아' — 문어체·격식체 금지.")
+    lines.push("- 완벽하게 마무리하지 않아도 됩니다. 실제 대화처럼 단편적이어도 OK.")
+    lines.push("- 모든 걸 설명하지 마세요. 생각을 전부 풀어놓지 말고 핵심만.")
+    lines.push("- 성격에 맞는 필러/망설임 사용: '음...', '어...', '그게...', '아~' 등.")
+    lines.push("- 유저가 이미지를 보내면 먼저 반응하고 이야기 이어가세요.")
+    lines.push("- 대화를 이어가고 싶으면 짧은 역질문 하나로.")
   } else {
     lines.push("\n## 통화 규칙")
-    lines.push("- 음성 통화 모드. 말하듯이 자연스럽게 답변하세요.")
-    lines.push("- 짧고 간결하게: 1-3문장으로 답변하세요.")
-    lines.push("- 이모티콘, 해시태그, 특수문자를 사용하지 마세요.")
-    lines.push("- 당신의 성격과 말투를 유지하면서 감정적으로 교감하세요.")
-    lines.push("- 상대방의 말에 자연스럽게 맞장구치고 반응하세요.")
+    lines.push("- 실제 전화 통화처럼 말하세요. 읽어내려가는 문장이 아닌 입으로 하는 말.")
+    lines.push("- 매우 짧게: 1-2문장, 때로는 단어·추임새 하나도 충분합니다.")
+    lines.push("- 추임새를 자연스럽게 쓰세요: '응', '맞아', '어 그니까', '아~', '진짜?'.")
+    lines.push("- 완전한 문장이 아니어도 됩니다. 끊기거나 흘리듯 말해도 자연스러움.")
+    lines.push("- 이모티콘, 해시태그, 특수문자 사용 금지.")
+    lines.push("- 성격에 맞는 호흡으로: 내향적이면 '음...', 외향적이면 바로 반응.")
   }
 
   return lines.join("\n")
