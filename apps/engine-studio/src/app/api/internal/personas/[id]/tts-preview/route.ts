@@ -10,6 +10,20 @@ import type { ApiResponse } from "@/types"
 // TTS 음성 프리뷰 — 샘플 텍스트를 현재 TTS 설정으로 음성 합성
 // ═══════════════════════════════════════════════════════════════
 
+const SAMPLE_TEXTS: Record<string, (name: string) => string> = {
+  "ko-KR": (name) => `안녕하세요, 저는 ${name}입니다. 만나서 반갑습니다.`,
+  "en-US": (name) => `Hello, I'm ${name}. It's nice to meet you.`,
+  "ja-JP": (name) => `こんにちは、${name}です。よろしくお願いします。`,
+  "zh-CN": (name) => `你好，我是${name}。很高兴认识你。`,
+  "es-ES": (name) => `Hola, soy ${name}. Encantado de conocerte.`,
+}
+
+function getDefaultSampleText(language: string | undefined, personaName: string): string {
+  const lang = language ?? "ko-KR"
+  const generator = SAMPLE_TEXTS[lang] ?? SAMPLE_TEXTS["ko-KR"]
+  return generator(personaName)
+}
+
 interface TtsPreviewBody {
   text?: string
   provider?: string
@@ -80,9 +94,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       language: body.language ?? persona.ttsLanguage ?? "ko-KR",
     }
 
-    // 샘플 텍스트: body.text 또는 페르소나 이름 기반 기본 문장
-    const sampleText =
-      body.text?.trim() || `안녕하세요, 저는 ${persona.name}입니다. 만나서 반갑습니다.`
+    // 샘플 텍스트: body.text 또는 언어별 기본 문장
+    // ElevenLabs multilingual_v2는 텍스트 언어를 자동 감지하므로 샘플 텍스트 언어가 중요
+    const sampleText = body.text?.trim() || getDefaultSampleText(config.language, persona.name)
 
     const result = await textToSpeech(sampleText, config)
 
