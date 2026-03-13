@@ -23,10 +23,6 @@ interface CouponData {
 }
 
 interface CreateForm {
-  code: string
-  autoGenerate: boolean
-  prefix: string
-  type: CouponData["type"]
   coinAmount: number
   description: string
   maxRedemptions: number
@@ -34,10 +30,6 @@ interface CreateForm {
 }
 
 const INITIAL_FORM: CreateForm = {
-  code: "",
-  autoGenerate: false,
-  prefix: "",
-  type: "MANUAL",
   coinAmount: 100,
   description: "",
   maxRedemptions: 1,
@@ -96,17 +88,12 @@ export default function CouponManagementPage() {
     setError(null)
     try {
       const body: Record<string, unknown> = {
-        type: form.type,
+        type: "MANUAL",
+        autoGenerate: true,
         coinAmount: form.coinAmount,
         description: form.description || undefined,
         maxRedemptions: form.maxRedemptions,
         expiresAt: form.expiresAt || null,
-      }
-      if (form.autoGenerate) {
-        body.autoGenerate = true
-        if (form.prefix) body.prefix = form.prefix
-      } else {
-        body.code = form.code
       }
 
       const res = await fetch("/api/internal/persona-world-admin/coupons", {
@@ -208,64 +195,17 @@ export default function CouponManagementPage() {
       {showCreate && (
         <div className="bg-muted/50 border-border space-y-3 rounded border p-4">
           <h3 className="text-sm font-semibold">쿠폰 생성</h3>
+          <p className="text-muted-foreground text-xs">쿠폰 코드는 자동으로 생성됩니다.</p>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-muted-foreground text-xs">코드 생성 방식</label>
-              <div className="mt-1 flex gap-3">
-                <label className="flex items-center gap-1 text-sm">
-                  <input
-                    type="radio"
-                    checked={!form.autoGenerate}
-                    onChange={() => setForm({ ...form, autoGenerate: false })}
-                  />
-                  수동 입력
-                </label>
-                <label className="flex items-center gap-1 text-sm">
-                  <input
-                    type="radio"
-                    checked={form.autoGenerate}
-                    onChange={() => setForm({ ...form, autoGenerate: true })}
-                  />
-                  자동 생성
-                </label>
-              </div>
-            </div>
-            <div>
-              {form.autoGenerate ? (
-                <>
-                  <label className="text-muted-foreground text-xs">접두사 (선택)</label>
-                  <input
-                    type="text"
-                    value={form.prefix}
-                    onChange={(e) => setForm({ ...form, prefix: e.target.value })}
-                    placeholder="예: EVENT"
-                    className="border-border bg-background mt-1 w-full rounded border px-2 py-1 text-sm"
-                  />
-                </>
-              ) : (
-                <>
-                  <label className="text-muted-foreground text-xs">쿠폰 코드</label>
-                  <input
-                    type="text"
-                    value={form.code}
-                    onChange={(e) => setForm({ ...form, code: e.target.value })}
-                    placeholder="예: WELCOME100"
-                    className="border-border bg-background mt-1 w-full rounded border px-2 py-1 text-sm uppercase"
-                  />
-                </>
-              )}
-            </div>
-            <div>
-              <label className="text-muted-foreground text-xs">타입</label>
-              <select
-                value={form.type}
-                onChange={(e) => setForm({ ...form, type: e.target.value as CouponData["type"] })}
+              <label className="text-muted-foreground text-xs">쿠폰 이름</label>
+              <input
+                type="text"
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="예: 신규가입 환영 쿠폰"
                 className="border-border bg-background mt-1 w-full rounded border px-2 py-1 text-sm"
-              >
-                <option value="MANUAL">MANUAL</option>
-                <option value="WELCOME">WELCOME</option>
-                <option value="REFERRAL">REFERRAL</option>
-              </select>
+              />
             </div>
             <div>
               <label className="text-muted-foreground text-xs">지급 코인</label>
@@ -293,16 +233,6 @@ export default function CouponManagementPage() {
                 type="datetime-local"
                 value={form.expiresAt}
                 onChange={(e) => setForm({ ...form, expiresAt: e.target.value })}
-                className="border-border bg-background mt-1 w-full rounded border px-2 py-1 text-sm"
-              />
-            </div>
-            <div className="col-span-2">
-              <label className="text-muted-foreground text-xs">설명 (선택)</label>
-              <input
-                type="text"
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="관리자 메모"
                 className="border-border bg-background mt-1 w-full rounded border px-2 py-1 text-sm"
               />
             </div>
