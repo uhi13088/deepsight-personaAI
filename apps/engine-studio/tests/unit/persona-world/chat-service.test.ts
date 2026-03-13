@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { createThread, sendMessage, getMessages } from "@/lib/persona-world/chat-service"
+import {
+  createThread,
+  sendMessage,
+  getMessages,
+  endChatThread,
+  extractHighlights,
+  SESSION_TIMEOUT_MS,
+} from "@/lib/persona-world/chat-service"
 import type { ChatDataProvider, SendMessageInput } from "@/lib/persona-world/chat-service"
 import type { PersonaProfileSnapshot, PersonaStateData } from "@/lib/persona-world/types"
 
@@ -23,6 +30,18 @@ vi.mock("@/lib/persona-world/conversation-memory", () => ({
   retrieveConversationMemories: vi.fn().mockResolvedValue(""),
   recordConversationTurn: vi.fn().mockResolvedValue({ poignancy: 0.3 }),
   adjustStateForConversation: vi.fn().mockImplementation((state: PersonaStateData) => state),
+  classifyUserSentiment: vi.fn().mockReturnValue("neutral"),
+  detectTextLanguage: vi.fn().mockReturnValue(undefined),
+  finalizeConversation: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock("@/lib/persona-world/intimacy-engine", () => ({
+  updateIntimacyAfterChat: vi.fn().mockResolvedValue({
+    newScore: 0.003,
+    newLevel: 1,
+    previousLevel: 1,
+    levelUp: false,
+  }),
 }))
 
 // ── Mock Profile ─────────────────────────────────────────────
@@ -59,6 +78,11 @@ function createMockProvider(overrides?: Partial<ChatDataProvider>): ChatDataProv
       sessionId: "session-1",
       totalMessages: 0,
       isActive: true,
+      lastMessageAt: new Date(),
+      intimacyScore: 0,
+      intimacyLevel: 1,
+      lastIntimacyAt: null,
+      sharedMilestones: null,
     }),
     saveMessage: vi
       .fn()
@@ -74,6 +98,15 @@ function createMockProvider(overrides?: Partial<ChatDataProvider>): ChatDataProv
     incrementSessionTurns: vi.fn().mockResolvedValue(undefined),
     getFactbook: vi.fn().mockResolvedValue(null),
     saveFactbook: vi.fn().mockResolvedValue(undefined),
+    getThreadIntimacy: vi.fn().mockResolvedValue({
+      intimacyScore: 0,
+      intimacyLevel: 1,
+      lastIntimacyAt: null,
+      sharedMilestones: null,
+      personaId: "persona-1",
+      userId: "user-1",
+    }),
+    updateThreadIntimacy: vi.fn().mockResolvedValue(undefined),
     getPersonaState: vi.fn().mockResolvedValue(MOCK_STATE),
     savePersonaState: vi.fn().mockResolvedValue(undefined),
     getLatestTransaction: vi
@@ -117,6 +150,12 @@ function createMockProvider(overrides?: Partial<ChatDataProvider>): ChatDataProv
     findByOrderId: vi.fn().mockResolvedValue(null),
     updateTransaction: vi.fn().mockResolvedValue(null),
     getTransactions: vi.fn().mockResolvedValue([]),
+    getTopPoignancyLogs: vi
+      .fn()
+      .mockResolvedValue([
+        { userMessage: "좋아하는 영화?", personaResponse: "인셉션이요!", poignancyScore: 0.8 },
+      ]),
+    endInteractionSession: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   }
 }
@@ -188,13 +227,18 @@ describe("sendMessage", () => {
         sessionId: "session-1",
         totalMessages: 0,
         isActive: true,
+        lastMessageAt: new Date(),
+        intimacyScore: 0,
+        intimacyLevel: 1,
+        lastIntimacyAt: null,
+        sharedMilestones: null,
       }),
     })
 
     await expect(sendMessage(provider, baseInput)).rejects.toThrow("UNAUTHORIZED")
   })
 
-  it("비활성 대화방이면 THREAD_INACTIVE 에러를 던진다", async () => {
+  it("T434: 비활성 대화방이면 자동 재활성화 후 정상 처리한다", async () => {
     provider = createMockProvider({
       getThread: vi.fn().mockResolvedValue({
         id: "thread-1",
@@ -203,10 +247,22 @@ describe("sendMessage", () => {
         sessionId: "session-1",
         totalMessages: 0,
         isActive: false,
+        lastMessageAt: new Date(),
+        intimacyScore: 0,
+        intimacyLevel: 1,
+        lastIntimacyAt: null,
+        sharedMilestones: null,
       }),
     })
 
-    await expect(sendMessage(provider, baseInput)).rejects.toThrow("THREAD_INACTIVE")
+    const result = await sendMessage(provider, baseInput)
+    expect(result.personaResponse).toBe("안녕하세요! 반가워요.")
+    // 재활성화 시 새 세션 생성 + isActive 업데이트
+    expect(provider.createInteractionSession).toHaveBeenCalled()
+    expect(provider.updateThread).toHaveBeenCalledWith(
+      "thread-1",
+      expect.objectContaining({ isActive: true, sessionId: "session-1" })
+    )
   })
 
   it("페르소나가 없으면 PERSONA_NOT_FOUND 에러를 던진다", async () => {
@@ -278,6 +334,11 @@ describe("getMessages", () => {
         sessionId: "session-1",
         totalMessages: 10,
         isActive: true,
+        lastMessageAt: new Date(),
+        intimacyScore: 0,
+        intimacyLevel: 1,
+        lastIntimacyAt: null,
+        sharedMilestones: null,
       }),
     })
 
@@ -309,5 +370,180 @@ describe("getMessages", () => {
     const result = await getMessages(provider, "thread-1", "user-1")
     expect(result.messages).toHaveLength(1)
     expect(result.messages[0].content).toBe("hello")
+  })
+})
+
+// ── T433: 세션 타임아웃 자동 finalize ─────────────────────
+
+describe("sendMessage — session timeout (T433)", () => {
+  const baseInput: SendMessageInput = {
+    threadId: "thread-1",
+    userId: "user-1",
+    content: "안녕하세요!",
+  }
+
+  it("T433: 30분 비활동 후 메시지 → 이전 세션 finalize + 새 세션 시작", async () => {
+    const oldTime = new Date(Date.now() - SESSION_TIMEOUT_MS - 60000) // 31분 전
+    const provider = createMockProvider({
+      getThread: vi.fn().mockResolvedValue({
+        id: "thread-1",
+        personaId: "persona-1",
+        userId: "user-1",
+        sessionId: "session-old",
+        totalMessages: 10,
+        isActive: true,
+        lastMessageAt: oldTime,
+        intimacyScore: 0,
+        intimacyLevel: 1,
+        lastIntimacyAt: null,
+        sharedMilestones: null,
+      }),
+    })
+
+    await sendMessage(provider, baseInput)
+
+    // 이전 세션 종료
+    expect(provider.endInteractionSession).toHaveBeenCalledWith("session-old", expect.any(Date))
+    // 새 세션 생성
+    expect(provider.createInteractionSession).toHaveBeenCalled()
+    // 스레드 세션 교체
+    expect(provider.updateThread).toHaveBeenCalledWith(
+      "thread-1",
+      expect.objectContaining({ sessionId: "session-1" })
+    )
+  })
+
+  it("T433: 30분 미만 활동 → 세션 유지 (finalize 미호출)", async () => {
+    const recentTime = new Date(Date.now() - 10 * 60 * 1000) // 10분 전
+    const provider = createMockProvider({
+      getThread: vi.fn().mockResolvedValue({
+        id: "thread-1",
+        personaId: "persona-1",
+        userId: "user-1",
+        sessionId: "session-1",
+        totalMessages: 5,
+        isActive: true,
+        lastMessageAt: recentTime,
+        intimacyScore: 0,
+        intimacyLevel: 1,
+        lastIntimacyAt: null,
+        sharedMilestones: null,
+      }),
+    })
+
+    await sendMessage(provider, baseInput)
+
+    expect(provider.endInteractionSession).not.toHaveBeenCalled()
+  })
+
+  it("T433: SESSION_TIMEOUT_MS = 30분", () => {
+    expect(SESSION_TIMEOUT_MS).toBe(30 * 60 * 1000)
+  })
+})
+
+// ── T433: extractHighlights ─────────────────────────────
+
+describe("extractHighlights (T433)", () => {
+  it("sessionId가 null이면 빈 배열 반환", async () => {
+    const provider = createMockProvider()
+    const result = await extractHighlights(provider, null)
+    expect(result).toEqual([])
+  })
+
+  it("poignancy 상위 로그에서 highlights 추출", async () => {
+    const provider = createMockProvider()
+    const result = await extractHighlights(provider, "session-1")
+    expect(result).toHaveLength(1)
+    expect(result[0]).toContain("좋아하는 영화?")
+    expect(result[0]).toContain("인셉션이요!")
+  })
+})
+
+// ── T435: endChatThread ────────────────────────────────
+
+describe("endChatThread (T435)", () => {
+  it("정상적으로 스레드를 종료한다", async () => {
+    const provider = createMockProvider()
+    const result = await endChatThread(provider, {
+      threadId: "thread-1",
+      userId: "user-1",
+    })
+
+    expect(result.totalTurns).toBe(0)
+    expect(result.highlights).toHaveLength(1)
+    // isActive=false, endedAt 설정
+    expect(provider.updateThread).toHaveBeenCalledWith(
+      "thread-1",
+      expect.objectContaining({ isActive: false, endedAt: expect.any(Date) })
+    )
+    // 세션 종료
+    expect(provider.endInteractionSession).toHaveBeenCalledWith("session-1", expect.any(Date))
+  })
+
+  it("사용자 제공 highlights 사용", async () => {
+    const provider = createMockProvider()
+    const result = await endChatThread(provider, {
+      threadId: "thread-1",
+      userId: "user-1",
+      highlights: ["좋은 대화였어요", "영화 추천 받았음"],
+    })
+
+    expect(result.highlights).toEqual(["좋은 대화였어요", "영화 추천 받았음"])
+    // 자동 추출 미호출
+    expect(provider.getTopPoignancyLogs).not.toHaveBeenCalled()
+  })
+
+  it("대화방이 없으면 THREAD_NOT_FOUND 에러", async () => {
+    const provider = createMockProvider({
+      getThread: vi.fn().mockResolvedValue(null),
+    })
+
+    await expect(endChatThread(provider, { threadId: "x", userId: "user-1" })).rejects.toThrow(
+      "THREAD_NOT_FOUND"
+    )
+  })
+
+  it("다른 유저의 스레드면 UNAUTHORIZED 에러", async () => {
+    const provider = createMockProvider({
+      getThread: vi.fn().mockResolvedValue({
+        id: "thread-1",
+        personaId: "persona-1",
+        userId: "other-user",
+        sessionId: "session-1",
+        totalMessages: 5,
+        isActive: true,
+        lastMessageAt: new Date(),
+        intimacyScore: 0,
+        intimacyLevel: 1,
+        lastIntimacyAt: null,
+        sharedMilestones: null,
+      }),
+    })
+
+    await expect(
+      endChatThread(provider, { threadId: "thread-1", userId: "user-1" })
+    ).rejects.toThrow("UNAUTHORIZED")
+  })
+
+  it("이미 종료된 스레드면 THREAD_ALREADY_ENDED 에러", async () => {
+    const provider = createMockProvider({
+      getThread: vi.fn().mockResolvedValue({
+        id: "thread-1",
+        personaId: "persona-1",
+        userId: "user-1",
+        sessionId: "session-1",
+        totalMessages: 5,
+        isActive: false,
+        lastMessageAt: new Date(),
+        intimacyScore: 0,
+        intimacyLevel: 1,
+        lastIntimacyAt: null,
+        sharedMilestones: null,
+      }),
+    })
+
+    await expect(
+      endChatThread(provider, { threadId: "thread-1", userId: "user-1" })
+    ).rejects.toThrow("THREAD_ALREADY_ENDED")
   })
 })

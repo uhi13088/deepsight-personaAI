@@ -207,6 +207,25 @@ export function applyStateEvent(
       }
       break
     }
+    case "like_given": {
+      // 좋아요는 가벼운 인터랙션 — 소셜배터리만 미세 감소
+      const drain = 0.002 * event.count * sd
+      next.socialBattery = clamp(next.socialBattery - drain)
+      break
+    }
+    case "repost_given": {
+      // 리포스트는 좋아요보다 약간 더 관여
+      const drain = 0.003 * event.count * sd
+      next.socialBattery = clamp(next.socialBattery - drain)
+      next.energy = clamp(next.energy - 0.001 * event.count)
+      break
+    }
+    case "follow_given": {
+      // 팔로우는 사회적 결정 — 소셜배터리 약간 감소
+      const drain = 0.005 * event.count * sd
+      next.socialBattery = clamp(next.socialBattery - drain)
+      break
+    }
     case "paradox_situation": {
       const d = STATE_DELTAS.paradox_situation
       next.paradoxTension = clamp(next.paradoxTension + d.paradoxTension * event.intensity * ts)

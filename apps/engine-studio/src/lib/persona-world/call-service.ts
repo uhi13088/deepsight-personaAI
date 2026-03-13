@@ -12,6 +12,7 @@ import {
   recordConversationTurn,
   finalizeConversation,
   adjustStateForConversation,
+  classifyUserSentiment,
 } from "./conversation-memory"
 import type {
   ConversationMemoryProvider,
@@ -20,6 +21,7 @@ import type {
 } from "./conversation-memory"
 import { spendCredits, getBalance } from "./credit-service"
 import type { CreditDataProvider } from "./credit-service"
+import { updateIntimacyAfterChat } from "./intimacy-engine"
 import { speechToText, textToSpeech, buildTTSConfig, sttLanguageToBcp47 } from "./voice-pipeline"
 import type { TTSResult } from "./voice-pipeline"
 import type { PersonaProfileSnapshot, PersonaStateData } from "./types"
@@ -117,6 +119,39 @@ export interface CallDataProvider extends ConversationMemoryProvider, CreditData
     ttsSpeed: number | null
     ttsLanguage: string | null
   }>
+
+  /** 유저↔페르소나의 ChatThread 친밀도 조회 (통화에서도 친밀도 반영) */
+  getIntimacyByUserAndPersona(
+    userId: string,
+    personaId: string
+  ): Promise<{
+    threadId: string
+    intimacyLevel: number
+    sharedMilestones: string[] | null
+    intimacyScore: number
+    lastIntimacyAt: Date | null
+  } | null>
+
+  /** ChatThread 친밀도 업데이트 (IntimacyDataProvider 호환) */
+  getThreadIntimacy(threadId: string): Promise<{
+    intimacyScore: number
+    intimacyLevel: number
+    lastIntimacyAt: Date | null
+    sharedMilestones: string[] | null
+    personaId: string
+    userId: string
+  } | null>
+
+  /** ChatThread 친밀도 업데이트 */
+  updateThreadIntimacy(
+    threadId: string,
+    data: {
+      intimacyScore: number
+      intimacyLevel: number
+      lastIntimacyAt: Date
+      sharedMilestones?: string[]
+    }
+  ): Promise<void>
 }
 
 // ── 서비스 함수: 예약 생성 ───────────────────────────────────
@@ -217,7 +252,13 @@ export async function startCall(
     reservation.userId
   )
 
-  // 7. 인사 생성 (LLM)
+  // 7. 친밀도 조회 (ChatThread 기반)
+  const intimacyData = await dp.getIntimacyByUserAndPersona(
+    reservation.userId,
+    reservation.personaId
+  )
+
+  // 8. 인사 생성 (LLM)
   const input: ConversationInput = {
     context: {
       persona: profile,
@@ -226,6 +267,8 @@ export async function startCall(
       ragContext,
       mode: "call",
       userNickname,
+      intimacyLevel: intimacyData?.intimacyLevel,
+      sharedMilestones: intimacyData?.sharedMilestones ?? undefined,
     },
     history: [],
     userMessage: "안녕하세요, 전화 받아주셔서 감사해요!",
@@ -303,7 +346,10 @@ export async function processCallTurn(
     userMessage = `${sttResult.text}\n\n[시스템: 통화 시간이 거의 끝나갑니다. 자연스럽게 마무리 인사를 해주세요.]`
   }
 
-  // 6. LLM 응답 생성 (유저 언어로 응답하도록 지시)
+  // 6. 친밀도 조회 (ChatThread 기반)
+  const intimacyData = await dp.getIntimacyByUserAndPersona(params.userId, params.personaId)
+
+  // 7. LLM 응답 생성 (유저 언어로 응답하도록 지시)
   const input: ConversationInput = {
     context: {
       persona: profile,
@@ -313,6 +359,8 @@ export async function processCallTurn(
       mode: "call",
       userLanguage: sttResult.language,
       userNickname: params.userNickname,
+      intimacyLevel: intimacyData?.intimacyLevel,
+      sharedMilestones: intimacyData?.sharedMilestones ?? undefined,
     },
     history: params.conversationHistory,
     userMessage,
@@ -337,11 +385,25 @@ export async function processCallTurn(
     previousMood: currentState.mood,
     currentMood: currentState.mood, // 미세 변화는 adjustState에서 처리
     volatility,
+    source: "CALL",
   }
-  await recordConversationTurn(dp, turnInput)
+  const { poignancy } = await recordConversationTurn(dp, turnInput)
 
-  // 9. 상태 조정
-  const updatedState = adjustStateForConversation(currentState, "neutral")
+  // 9. 친밀도 업데이트 (ChatThread 기반, T447: 페르소나 상태 반영)
+  if (intimacyData) {
+    await updateIntimacyAfterChat(dp, intimacyData.threadId, poignancy, {
+      personaMood: currentState.mood,
+      paradoxTension: currentState.paradoxTension,
+    })
+  }
+
+  // 10. 상태 조정 (유저 발화 감정 분류 반영, T446: 친밀도 비례 영향력)
+  const userSentiment = classifyUserSentiment(sttResult.text)
+  const updatedState = adjustStateForConversation(
+    currentState,
+    userSentiment,
+    intimacyData?.intimacyLevel
+  )
   await dp.savePersonaState(params.personaId, updatedState)
 
   // 10. CallSession 턴 수 업데이트

@@ -4,6 +4,7 @@ import {
   recordConversationTurn,
   finalizeConversation,
   adjustStateForConversation,
+  INTIMACY_MOOD_DELTA,
 } from "@/lib/persona-world/conversation-memory"
 import type {
   ConversationMemoryProvider,
@@ -237,5 +238,46 @@ describe("adjustStateForConversation", () => {
   it("neutral 감정이면 mood가 변하지 않는다", () => {
     const result = adjustStateForConversation(baseState, "neutral")
     expect(result.mood).toBe(baseState.mood)
+  })
+
+  // T446: 친밀도 비례 mood 영향력 테스트
+  it("T446: Lv1(기본) positive → mood +0.02", () => {
+    const result = adjustStateForConversation(baseState, "positive", 1)
+    expect(result.mood).toBeCloseTo(0.52)
+  })
+
+  it("T446: Lv3(FAMILIAR) positive → mood +0.03", () => {
+    const result = adjustStateForConversation(baseState, "positive", 3)
+    expect(result.mood).toBeCloseTo(0.53)
+  })
+
+  it("T446: Lv5(CLOSE) positive → mood +0.05", () => {
+    const result = adjustStateForConversation(baseState, "positive", 5)
+    expect(result.mood).toBeCloseTo(0.55)
+  })
+
+  it("T446: Lv5(CLOSE) negative → mood -0.05", () => {
+    const result = adjustStateForConversation(baseState, "negative", 5)
+    expect(result.mood).toBeCloseTo(0.45)
+  })
+
+  it("T446: Lv5 대비 Lv1 영향력 = 2.5배", () => {
+    const lv1 = adjustStateForConversation(baseState, "positive", 1)
+    const lv5 = adjustStateForConversation(baseState, "positive", 5)
+    const lv1Delta = lv1.mood - baseState.mood
+    const lv5Delta = lv5.mood - baseState.mood
+    expect(lv5Delta / lv1Delta).toBeCloseTo(2.5)
+  })
+
+  it("T446: intimacyLevel 미제공 시 Lv1 기본값 사용", () => {
+    const withoutLevel = adjustStateForConversation(baseState, "positive")
+    const withLv1 = adjustStateForConversation(baseState, "positive", 1)
+    expect(withoutLevel.mood).toBe(withLv1.mood)
+  })
+
+  it("T446: INTIMACY_MOOD_DELTA 상수가 5개 레벨 정의", () => {
+    expect(Object.keys(INTIMACY_MOOD_DELTA)).toHaveLength(5)
+    expect(INTIMACY_MOOD_DELTA[1]).toBe(0.02)
+    expect(INTIMACY_MOOD_DELTA[5]).toBe(0.05)
   })
 })

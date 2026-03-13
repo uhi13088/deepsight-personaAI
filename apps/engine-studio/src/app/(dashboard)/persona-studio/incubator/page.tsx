@@ -42,12 +42,39 @@ export default function IncubatorPage() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // localStorage에서 auto-run 설정 복원
+  // DB enabled 상태 + localStorage에서 auto-run 설정 복원
   useEffect(() => {
+    // DB의 enabled 플래그를 기준으로 초기화 (Cron과 동기화)
+    fetch("/api/internal/incubator/dashboard", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "get_settings" }),
+    })
+      .then((r) => r.json())
+      .then((d: { success: boolean; data?: { enabled?: boolean } }) => {
+        if (d.success && d.data) {
+          const dbEnabled = d.data.enabled !== false
+          setAutoRun(dbEnabled)
+          try {
+            localStorage.setItem(AUTO_RUN_KEY, String(dbEnabled))
+          } catch {
+            /* ignore */
+          }
+        }
+      })
+      .catch(() => {
+        // fallback: localStorage
+        try {
+          const saved = localStorage.getItem(AUTO_RUN_KEY)
+          const savedInterval = localStorage.getItem(AUTO_INTERVAL_KEY)
+          if (saved === "true") setAutoRun(true)
+          if (savedInterval) setAutoInterval(Number(savedInterval))
+        } catch {
+          /* ignore */
+        }
+      })
     try {
-      const saved = localStorage.getItem(AUTO_RUN_KEY)
       const savedInterval = localStorage.getItem(AUTO_INTERVAL_KEY)
-      if (saved === "true") setAutoRun(true)
       if (savedInterval) setAutoInterval(Number(savedInterval))
     } catch {
       /* ignore */
@@ -175,6 +202,12 @@ export default function IncubatorPage() {
     } catch {
       /* ignore */
     }
+    // DB의 enabled 플래그도 동기화 → Vercel Cron이 수동 모드를 존중하도록
+    void fetch("/api/internal/incubator/dashboard", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "save_settings", settings: { enabled: next } }),
+    })
   }
 
   if (loading) {

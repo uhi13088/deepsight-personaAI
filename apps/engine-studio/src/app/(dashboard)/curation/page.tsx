@@ -70,13 +70,13 @@ function CurationCard({
   const score = Math.round(item.curationScore * 100)
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="border-border bg-card rounded-lg border p-4 shadow-sm">
       {/* 콘텐츠 정보 */}
       <div className="flex items-start gap-3">
         <span className="text-2xl">{emoji}</span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate font-semibold text-gray-900">{item.contentItem.title}</h3>
+            <h3 className="text-foreground truncate font-semibold">{item.contentItem.title}</h3>
             <Badge variant="outline" className="shrink-0 text-xs">
               {item.contentItem.contentType}
             </Badge>
@@ -87,18 +87,24 @@ function CurationCard({
             )}
           </div>
           {item.contentItem.description && (
-            <p className="mt-1 line-clamp-2 text-sm text-gray-500">
+            <p className="text-muted-foreground mt-1 line-clamp-2 text-sm">
               {item.contentItem.description}
             </p>
           )}
           <div className="mt-1 flex flex-wrap gap-1">
             {item.contentItem.genres.map((g) => (
-              <span key={g} className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
+              <span
+                key={g}
+                className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-xs"
+              >
                 {g}
               </span>
             ))}
             {item.contentItem.tags.slice(0, 3).map((t) => (
-              <span key={t} className="rounded bg-violet-50 px-1.5 py-0.5 text-xs text-violet-600">
+              <span
+                key={t}
+                className="rounded bg-violet-100 px-1.5 py-0.5 text-xs text-violet-700 dark:bg-violet-900/30 dark:text-violet-400"
+              >
                 {t}
               </span>
             ))}
@@ -108,17 +114,17 @@ function CurationCard({
 
       {/* 큐레이션 메타 */}
       <div className="mt-3 flex items-center justify-between">
-        <div className="flex items-center gap-3 text-sm text-gray-600">
-          <span className="font-medium text-violet-600">
+        <div className="text-muted-foreground flex items-center gap-3 text-sm">
+          <span className="font-medium text-violet-600 dark:text-violet-400">
             @{item.persona.handle ?? item.persona.name}
           </span>
-          <span className="text-gray-400">·</span>
+          <span className="text-muted-foreground/50">·</span>
           <span>
             점수: <strong>{score}%</strong>
           </span>
           {item.curationReason && (
             <>
-              <span className="text-gray-400">·</span>
+              <span className="text-muted-foreground/50">·</span>
               <span className="line-clamp-1 max-w-[200px] italic">"{item.curationReason}"</span>
             </>
           )}
@@ -203,27 +209,27 @@ function ManualCurationForm({ onCreated }: { onCreated: () => void }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-3 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4"
+      className="border-border bg-muted space-y-3 rounded-lg border border-dashed p-4"
     >
-      <h3 className="font-medium text-gray-700">수동 큐레이션 생성 (APPROVED 직접 저장)</h3>
+      <h3 className="text-foreground font-medium">수동 큐레이션 생성 (APPROVED 직접 저장)</h3>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="grid grid-cols-2 gap-3">
         <input
-          className="rounded border px-3 py-2 text-sm"
+          className="border-border bg-background text-foreground rounded border px-3 py-2 text-sm"
           placeholder="페르소나 ID"
           value={form.personaId}
           onChange={(e) => setForm((f) => ({ ...f, personaId: e.target.value }))}
           required
         />
         <input
-          className="rounded border px-3 py-2 text-sm"
+          className="border-border bg-background text-foreground rounded border px-3 py-2 text-sm"
           placeholder="ContentItem ID"
           value={form.contentItemId}
           onChange={(e) => setForm((f) => ({ ...f, contentItemId: e.target.value }))}
           required
         />
         <input
-          className="rounded border px-3 py-2 text-sm"
+          className="border-border bg-background text-foreground rounded border px-3 py-2 text-sm"
           placeholder="점수 (0~1)"
           type="number"
           min="0"
@@ -233,7 +239,7 @@ function ManualCurationForm({ onCreated }: { onCreated: () => void }) {
           onChange={(e) => setForm((f) => ({ ...f, curationScore: e.target.value }))}
         />
         <input
-          className="rounded border px-3 py-2 text-sm"
+          className="border-border bg-background text-foreground rounded border px-3 py-2 text-sm"
           placeholder="큐레이션 이유 (선택)"
           value={form.curationReason}
           onChange={(e) => setForm((f) => ({ ...f, curationReason: e.target.value }))}
@@ -310,29 +316,14 @@ export default function CurationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
       <Header title="큐레이션 관리" description="PENDING 큐레이션 검토 및 B2B 추천 승인" />
-      <main className="mx-auto max-w-5xl px-6 py-8">
-        {/* 헤더 */}
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">큐레이션 관리</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              PENDING {pagination.total}건 | 승인하면 B2B 추천 API에 즉시 반영됩니다
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => fetchPending(pagination.page)}>
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-            <ManualCurationForm onCreated={() => fetchPending(1)} />
-          </div>
-        </div>
 
-        {/* 필터 */}
-        <div className="mb-4 flex gap-2">
+      <div className="space-y-4 p-6">
+        {/* 툴바 */}
+        <div className="flex items-center gap-2">
           <input
-            className="w-64 rounded border px-3 py-2 text-sm"
+            className="border-border bg-background text-foreground w-64 rounded border px-3 py-2 text-sm"
             placeholder="페르소나 ID로 필터"
             value={personaIdFilter}
             onChange={(e) => setPersonaIdFilter(e.target.value)}
@@ -342,23 +333,26 @@ export default function CurationPage() {
             적용
           </Button>
           {personaIdFilter && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setPersonaIdFilter("")
-              }}
-            >
+            <Button variant="ghost" size="sm" onClick={() => setPersonaIdFilter("")}>
               초기화
             </Button>
           )}
+          <div className="ml-auto flex items-center gap-2">
+            {pagination.total > 0 && (
+              <span className="text-muted-foreground text-xs">PENDING {pagination.total}건</span>
+            )}
+            <Button variant="outline" size="sm" onClick={() => fetchPending(pagination.page)}>
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <ManualCurationForm onCreated={() => fetchPending(1)} />
+          </div>
         </div>
 
         {/* 목록 */}
         {loading ? (
-          <div className="py-12 text-center text-gray-400">불러오는 중...</div>
+          <div className="text-muted-foreground py-12 text-center">불러오는 중...</div>
         ) : items.length === 0 ? (
-          <div className="py-12 text-center text-gray-400">
+          <div className="text-muted-foreground py-12 text-center">
             <p className="text-lg">PENDING 큐레이션이 없습니다</p>
             <p className="mt-1 text-sm">자동 큐레이션 cron이 실행되면 여기에 표시됩니다</p>
           </div>
@@ -378,7 +372,7 @@ export default function CurationPage() {
 
         {/* 페이지네이션 */}
         {pagination.totalPages > 1 && (
-          <div className="mt-6 flex items-center justify-center gap-3">
+          <div className="flex items-center justify-center gap-3">
             <Button
               variant="outline"
               size="sm"
@@ -387,7 +381,7 @@ export default function CurationPage() {
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-sm text-gray-600">
+            <span className="text-muted-foreground text-sm">
               {pagination.page} / {pagination.totalPages}
             </span>
             <Button
@@ -400,7 +394,7 @@ export default function CurationPage() {
             </Button>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </>
   )
 }

@@ -81,6 +81,19 @@ vi.mock("@/lib/persona-world/interactions/repost-engine", () => ({
   computeRepostProbability: vi.fn(() => 0.5),
 }))
 
+vi.mock("@/lib/persona-world/poignancy", () => ({
+  calculateInteractionPoignancy: vi.fn(() => 0.15),
+}))
+
+vi.mock("@/lib/persona-world/quality-monitor", () => ({
+  checkVoiceConsistency: vi.fn().mockResolvedValue({
+    status: "ok",
+    similarity: 0.9,
+    currentFeatures: {},
+    averageFeatures: {},
+  }),
+}))
+
 vi.mock("@/lib/persona-world/vfinal-config", () => ({
   getWorldVFinalConfig: vi.fn().mockResolvedValue({
     expressionLevel: 5,

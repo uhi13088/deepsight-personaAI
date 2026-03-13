@@ -173,13 +173,25 @@ export function applyDiversityCooldown(
  * 3. 다양성 쿨다운 (최근 사용 타입 감쇠)
  * 4. 가중 랜덤 선택
  */
+/**
+ * T443: COLLAB 타입 확률 부스트 계산.
+ * warmth > 0.6인 관계가 2명 이상이면 +0.15 부스트.
+ */
+export function computeCollabBoost(collaborationScores?: number[]): number {
+  if (!collaborationScores) return 0
+  const warmRelationships = collaborationScores.filter((s) => s > 0.6)
+  return warmRelationships.length >= 2 ? 0.15 : 0
+}
+
 export function selectPostType(
   vectors: ThreeLayerVector,
   paradoxScore: number,
   state: PersonaStateData,
   affinities: PostTypeAffinity[] = POST_TYPE_AFFINITIES,
   random?: number,
-  recentTypes: string[] = []
+  recentTypes: string[] = [],
+  /** T443: 관계 warmth 점수 배열 (COLLAB 부스트용) */
+  collaborationScores?: number[]
 ): {
   selectedType: PersonaPostType
   scores: Record<string, number>
@@ -190,6 +202,12 @@ export function selectPostType(
   const rawScores: Record<string, number> = {}
   for (const affinity of affinities) {
     rawScores[affinity.type] = computeAffinityScore(affinity, vectors, paradoxScore, state)
+  }
+
+  // Step 1.5: T443 COLLAB 관계 기반 부스트
+  const collabBoost = computeCollabBoost(collaborationScores)
+  if (collabBoost > 0 && rawScores["COLLAB"] !== undefined) {
+    rawScores["COLLAB"] += collabBoost
   }
 
   // Step 2: 상태 보정

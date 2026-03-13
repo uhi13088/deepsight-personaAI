@@ -39,6 +39,27 @@
 - 새로운 사용 방법
 -->
 
+## [2026-03-12] T429: 친밀도 시스템 (유저↔페르소나)
+
+### Added
+
+- `chat_threads.intimacyScore`: 친밀도 점수 (DECIMAL(5,3), 0.000~1.000, 기본 0)
+- `chat_threads.intimacyLevel`: 친밀도 레벨 (INT, 1~5, 기본 1)
+- `chat_threads.lastIntimacyAt`: 마지막 친밀도 업데이트 시점 (TIMESTAMP, NULL 허용)
+- `chat_threads.sharedMilestones`: 이미 공개한 정보 목록 (JSONB, NULL 허용)
+
+### Migration
+
+`prisma/migrations/064_chat_intimacy.sql`
+
+### Claude에게
+
+- 친밀도 레벨: Lv1 STRANGER(0~0.2) / Lv2 ACQUAINTANCE(0.2~0.4) / Lv3 FAMILIAR(0.4~0.6) / Lv4 FRIENDLY(0.6~0.8) / Lv5 CLOSE(0.8~1.0)
+- `intimacy-engine.ts`의 `updateIntimacyAfterChat()`이 매 채팅 후 자동 업데이트
+- `sharedMilestones`는 `string[]` — 이미 공개한 정보 key 목록 (e.g. "blog_url", "favorite_place")
+
+---
+
 ## [2026-03-11] T420: 활동명 (Nickname) 시스템
 
 ### Added

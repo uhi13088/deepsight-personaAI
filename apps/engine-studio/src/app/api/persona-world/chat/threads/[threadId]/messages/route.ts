@@ -51,6 +51,11 @@ function buildChatProvider(): ChatDataProvider {
         sessionId: t.sessionId,
         totalMessages: t.totalMessages,
         isActive: t.isActive,
+        lastMessageAt: t.lastMessageAt,
+        intimacyScore: Number(t.intimacyScore),
+        intimacyLevel: t.intimacyLevel,
+        lastIntimacyAt: t.lastIntimacyAt,
+        sharedMilestones: (t.sharedMilestones as string[] | null) ?? null,
       }
     },
 
@@ -260,6 +265,68 @@ function buildChatProvider(): ChatDataProvider {
       const config = p.paradoxConfig as Record<string, unknown>
       const narrativeVector = config.narrativeVector as Record<string, number> | undefined
       return narrativeVector?.volatility ?? 0.3
+    },
+
+    // ── T433: Session finalize helpers ──
+    async getTopPoignancyLogs(sessionId, limit) {
+      const logs = await prisma.interactionLog.findMany({
+        where: { sessionId },
+        orderBy: { poignancyScore: "desc" },
+        take: limit,
+        select: {
+          userMessage: true,
+          personaResponse: true,
+          poignancyScore: true,
+        },
+      })
+      return logs.map((log) => ({
+        userMessage: log.userMessage ?? "",
+        personaResponse: log.personaResponse ?? "",
+        poignancyScore: Number(log.poignancyScore ?? 0),
+      }))
+    },
+
+    async endInteractionSession(sessionId, endedAt) {
+      await prisma.interactionSession.update({
+        where: { id: sessionId },
+        data: { endedAt },
+      })
+    },
+
+    // ── Intimacy Provider (T429) ──
+    async getThreadIntimacy(threadId) {
+      const t = await prisma.chatThread.findUnique({
+        where: { id: threadId },
+        select: {
+          intimacyScore: true,
+          intimacyLevel: true,
+          lastIntimacyAt: true,
+          sharedMilestones: true,
+          personaId: true,
+          userId: true,
+        },
+      })
+      if (!t) return null
+      return {
+        intimacyScore: Number(t.intimacyScore),
+        intimacyLevel: t.intimacyLevel,
+        lastIntimacyAt: t.lastIntimacyAt,
+        sharedMilestones: (t.sharedMilestones as string[] | null) ?? null,
+        personaId: t.personaId,
+        userId: t.userId,
+      }
+    },
+
+    async updateThreadIntimacy(threadId, data) {
+      await prisma.chatThread.update({
+        where: { id: threadId },
+        data: {
+          intimacyScore: data.intimacyScore,
+          intimacyLevel: data.intimacyLevel,
+          lastIntimacyAt: data.lastIntimacyAt,
+          ...(data.sharedMilestones ? { sharedMilestones: data.sharedMilestones } : {}),
+        },
+      })
     },
 
     // ── Credit Provider ──

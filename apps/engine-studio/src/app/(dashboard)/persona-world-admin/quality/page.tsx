@@ -109,6 +109,8 @@ export default function QualityMonitorPage() {
                 <th className="px-4 py-2 text-left font-medium">마지막 체크</th>
                 <th className="px-4 py-2 text-left font-medium">Voice</th>
                 <th className="px-4 py-2 text-left font-medium">PIS</th>
+                <th className="px-4 py-2 text-left font-medium">관계 건강</th>
+                <th className="px-4 py-2 text-left font-medium">친밀도</th>
               </tr>
             </thead>
             <tbody>
@@ -116,6 +118,12 @@ export default function QualityMonitorPage() {
                 const meta = r.metadata as {
                   voiceCheck?: { similarity: number; status: string }
                   qualityGate?: { score: number; status: string }
+                  relationshipHealth?: {
+                    warmthTrend: "RISING" | "STABLE" | "DECLINING"
+                    activeRelationships: number
+                    destructivePatterns: number
+                    intimacy: { avgLevel: number; recentLevelUps: number }
+                  }
                 } | null
                 return (
                   <tr key={r.personaId} className="border-b">
@@ -153,6 +161,51 @@ export default function QualityMonitorPage() {
                           }
                         >
                           {meta.qualityGate.score.toFixed(3)}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      {meta?.relationshipHealth ? (
+                        <span className="flex items-center gap-1">
+                          <span
+                            className={
+                              meta.relationshipHealth.warmthTrend === "RISING"
+                                ? "text-green-600"
+                                : meta.relationshipHealth.warmthTrend === "DECLINING"
+                                  ? "text-red-600"
+                                  : "text-amber-600"
+                            }
+                          >
+                            {meta.relationshipHealth.warmthTrend === "RISING"
+                              ? "↑"
+                              : meta.relationshipHealth.warmthTrend === "DECLINING"
+                                ? "↓"
+                                : "→"}
+                          </span>
+                          <span className="text-muted-foreground text-xs">
+                            {meta.relationshipHealth.activeRelationships}관계
+                          </span>
+                          {meta.relationshipHealth.destructivePatterns > 0 && (
+                            <Badge variant="destructive" className="ml-1 text-[10px]">
+                              경고 {meta.relationshipHealth.destructivePatterns}
+                            </Badge>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      {meta?.relationshipHealth?.intimacy ? (
+                        <span className="text-xs">
+                          Lv{meta.relationshipHealth.intimacy.avgLevel.toFixed(1)}
+                          {meta.relationshipHealth.intimacy.recentLevelUps > 0 && (
+                            <span className="ml-1 text-green-600">
+                              +{meta.relationshipHealth.intimacy.recentLevelUps}
+                            </span>
+                          )}
                         </span>
                       ) : (
                         <span className="text-muted-foreground">—</span>

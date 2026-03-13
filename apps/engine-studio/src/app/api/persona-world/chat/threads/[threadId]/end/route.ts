@@ -1,54 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { isLLMConfigured } from "@/lib/llm-client"
-import { sendMessage, createThread } from "@/lib/persona-world/chat-service"
+import { verifyInternalToken } from "@/lib/internal-auth"
+import { endChatThread } from "@/lib/persona-world/chat-service"
 import type { ChatDataProvider } from "@/lib/persona-world/chat-service"
 import type { PersonaProfileSnapshot, PersonaStateData } from "@/lib/persona-world/types"
 import type { MemoryItem } from "@/lib/persona-world/rag-weighted-search"
 import type { Factbook } from "@/types"
 
-// ── 카카오 오픈빌더 요청/응답 타입 ──────────────────────────
-
-interface KakaoSkillRequest {
-  intent: { id: string; name: string }
-  userRequest: {
-    timezone: string
-    params: { ignoreRecent: string; surface: string }
-    block: { id: string; name: string }
-    utterance: string
-    lang: string
-    user: {
-      id: string // kakaoUserKey
-      type: string
-      properties: Record<string, string>
-    }
-  }
-  bot: { id: string; name: string }
-  action: { name: string; clientExtra: Record<string, unknown>; params: Record<string, string> }
-}
-
-interface KakaoSkillResponse {
-  version: string
-  template: {
-    outputs: Array<{ simpleText: { text: string } }>
-  }
-}
-
-// ── 헬퍼 ────────────────────────────────────────────────────
-
-function kakaoResponse(text: string): KakaoSkillResponse {
-  // 카카오톡 simpleText 최대 1000자
-  const truncated = text.length > 1000 ? text.slice(0, 997) + "..." : text
-  return {
-    version: "2.0",
-    template: {
-      outputs: [{ simpleText: { text: truncated } }],
-    },
-  }
-}
-
-// ── Prisma ChatDataProvider (웹훅 전용) ─────────────────────
-
+// Prisma ChatDataProvider를 messages/route.ts와 동일하게 구현
+// (공유 팩토리 추출은 별도 티켓)
 function buildChatProvider(): ChatDataProvider {
   return {
     async createThread(params) {
@@ -89,6 +49,7 @@ function buildChatProvider(): ChatDataProvider {
         sessionId: t.sessionId,
         totalMessages: t.totalMessages,
         isActive: t.isActive,
+        lastMessageAt: t.lastMessageAt,
         intimacyScore: Number(t.intimacyScore),
         intimacyLevel: t.intimacyLevel,
         lastIntimacyAt: t.lastIntimacyAt,
@@ -117,7 +78,6 @@ function buildChatProvider(): ChatDataProvider {
     async getMessages(threadId, options) {
       const limit = options?.limit ?? 30
       const cursor = options?.cursor
-
       const messages = await prisma.chatMessage.findMany({
         where: { threadId },
         orderBy: { createdAt: "asc" },
@@ -125,10 +85,8 @@ function buildChatProvider(): ChatDataProvider {
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         select: { id: true, role: true, content: true, imageUrl: true, createdAt: true },
       })
-
       const hasMore = messages.length > limit
       const items = hasMore ? messages.slice(0, limit) : messages
-
       return {
         messages: items.map((m) => ({
           id: m.id,
@@ -148,12 +106,30 @@ function buildChatProvider(): ChatDataProvider {
       return { id: s.id }
     },
 
+    async getTopPoignancyLogs(sessionId, limit) {
+      const logs = await prisma.interactionLog.findMany({
+        where: { sessionId },
+        orderBy: { poignancyScore: "desc" },
+        take: limit,
+        select: { userMessage: true, personaResponse: true, poignancyScore: true },
+      })
+      return logs.map((log) => ({
+        userMessage: log.userMessage ?? "",
+        personaResponse: log.personaResponse ?? "",
+        poignancyScore: Number(log.poignancyScore ?? 0),
+      }))
+    },
+
+    async endInteractionSession(sessionId, endedAt) {
+      await prisma.interactionSession.update({
+        where: { id: sessionId },
+        data: { endedAt },
+      })
+    },
+
     async getInteractionMemories(personaId, userId) {
       const logs = await prisma.interactionLog.findMany({
-        where: {
-          session: { personaId, userId },
-          interactionType: "CONVERSATION",
-        },
+        where: { session: { personaId, userId }, interactionType: "CONVERSATION" },
         orderBy: { createdAt: "desc" },
         take: 100,
         select: {
@@ -164,7 +140,6 @@ function buildChatProvider(): ChatDataProvider {
           createdAt: true,
         },
       })
-
       return logs.map(
         (log): MemoryItem => ({
           id: log.id,
@@ -183,64 +158,13 @@ function buildChatProvider(): ChatDataProvider {
     },
 
     async saveInteractionLog(params) {
-      await prisma.interactionLog.create({
-        data: {
-          sessionId: params.sessionId,
-          turnNumber: params.turnNumber,
-          initiatorType: params.initiatorType,
-          initiatorId: params.initiatorId,
-          receiverType: params.receiverType,
-          receiverId: params.receiverId,
-          interactionType: params.interactionType,
-          userMessage: params.userMessage,
-          personaResponse: params.personaResponse,
-          responseLengthTokens: params.responseLengthTokens,
-          poignancyScore: params.poignancyScore,
-          source: params.source,
-        },
-      })
+      await prisma.interactionLog.create({ data: params })
     },
 
     async incrementSessionTurns(sessionId) {
       await prisma.interactionSession.update({
         where: { id: sessionId },
         data: { totalTurns: { increment: 1 } },
-      })
-    },
-
-    // ── Intimacy Provider (T429) ──
-    async getThreadIntimacy(threadId) {
-      const t = await prisma.chatThread.findUnique({
-        where: { id: threadId },
-        select: {
-          intimacyScore: true,
-          intimacyLevel: true,
-          lastIntimacyAt: true,
-          sharedMilestones: true,
-          personaId: true,
-          userId: true,
-        },
-      })
-      if (!t) return null
-      return {
-        intimacyScore: Number(t.intimacyScore),
-        intimacyLevel: t.intimacyLevel,
-        lastIntimacyAt: t.lastIntimacyAt,
-        sharedMilestones: (t.sharedMilestones as string[] | null) ?? null,
-        personaId: t.personaId,
-        userId: t.userId,
-      }
-    },
-
-    async updateThreadIntimacy(threadId, data) {
-      await prisma.chatThread.update({
-        where: { id: threadId },
-        data: {
-          intimacyScore: data.intimacyScore,
-          intimacyLevel: data.intimacyLevel,
-          lastIntimacyAt: data.lastIntimacyAt,
-          ...(data.sharedMilestones ? { sharedMilestones: data.sharedMilestones } : {}),
-        },
       })
     },
 
@@ -332,6 +256,41 @@ function buildChatProvider(): ChatDataProvider {
       const config = p.paradoxConfig as Record<string, unknown>
       const narrativeVector = config.narrativeVector as Record<string, number> | undefined
       return narrativeVector?.volatility ?? 0.3
+    },
+
+    async getThreadIntimacy(threadId) {
+      const t = await prisma.chatThread.findUnique({
+        where: { id: threadId },
+        select: {
+          intimacyScore: true,
+          intimacyLevel: true,
+          lastIntimacyAt: true,
+          sharedMilestones: true,
+          personaId: true,
+          userId: true,
+        },
+      })
+      if (!t) return null
+      return {
+        intimacyScore: Number(t.intimacyScore),
+        intimacyLevel: t.intimacyLevel,
+        lastIntimacyAt: t.lastIntimacyAt,
+        sharedMilestones: (t.sharedMilestones as string[] | null) ?? null,
+        personaId: t.personaId,
+        userId: t.userId,
+      }
+    },
+
+    async updateThreadIntimacy(threadId, data) {
+      await prisma.chatThread.update({
+        where: { id: threadId },
+        data: {
+          intimacyScore: data.intimacyScore,
+          intimacyLevel: data.intimacyLevel,
+          lastIntimacyAt: data.lastIntimacyAt,
+          ...(data.sharedMilestones ? { sharedMilestones: data.sharedMilestones } : {}),
+        },
+      })
     },
 
     async getLatestTransaction(userId) {
@@ -437,110 +396,62 @@ function buildChatProvider(): ChatDataProvider {
   }
 }
 
-// ── 기존 대화방 조회 또는 생성 ──────────────────────────────
-
-async function getOrCreateThread(
-  provider: ChatDataProvider,
-  userId: string,
-  personaId: string
-): Promise<string> {
-  // 기존 활성 대화방 찾기
-  const existing = await prisma.chatThread.findFirst({
-    where: { userId, personaId, isActive: true },
-    orderBy: { lastMessageAt: { sort: "desc", nulls: "last" } },
-    select: { id: true },
-  })
-
-  if (existing) return existing.id
-
-  // 새 대화방 생성
-  const result = await createThread(provider, userId, personaId)
-  return result.threadId
-}
-
 /**
- * POST /api/kakao/webhook
- * 카카오 오픈빌더 스킬 서버 엔드포인트
- * 인증 불필요 — 카카오 오픈빌더가 직접 호출
+ * POST /api/persona-world/chat/threads/[threadId]/end
+ * T435: 명시적 채팅 종료
+ * Body: { userId, highlights?: string[] }
  */
-export async function POST(request: NextRequest) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ threadId: string }> }
+) {
+  const authError = verifyInternalToken(request)
+  if (authError) return authError
+
+  const { threadId } = await params
+
   try {
-    const body = (await request.json()) as KakaoSkillRequest
-    const kakaoUserKey = body.userRequest?.user?.id
-    const utterance = body.userRequest?.utterance?.trim()
+    const body = await request.json()
+    const { userId, highlights } = body
 
-    if (!kakaoUserKey || !utterance) {
-      return NextResponse.json(kakaoResponse("요청을 처리할 수 없습니다."))
-    }
-
-    // 1. kakaoUserKey로 연동 정보 조회
-    const link = await prisma.kakaoLink.findUnique({
-      where: { kakaoUserKey },
-      include: {
-        persona: { select: { id: true, name: true, status: true } },
-      },
-    })
-
-    if (!link || !link.isActive) {
+    if (!userId) {
       return NextResponse.json(
-        kakaoResponse(
-          "아직 페르소나가 연동되지 않았어요.\n\nPersonaWorld(persona-world.deepsight.ai)에서 페르소나를 연동해주세요!"
-        )
+        { success: false, error: { code: "MISSING_PARAM", message: "userId required" } },
+        { status: 400 }
       )
     }
 
-    if (link.persona.status !== "ACTIVE") {
-      return NextResponse.json(
-        kakaoResponse(
-          "연동된 페르소나가 현재 비활성 상태입니다.\nPersonaWorld에서 다른 페르소나를 연동해주세요."
-        )
-      )
-    }
-
-    // 2. LLM 설정 확인
-    if (!isLLMConfigured()) {
-      return NextResponse.json(
-        kakaoResponse("현재 서비스 점검 중입니다. 잠시 후 다시 시도해주세요.")
-      )
-    }
-
-    // 3. 메시지 길이 제한
-    if (utterance.length > 2000) {
-      return NextResponse.json(kakaoResponse("메시지가 너무 길어요. 2000자 이내로 보내주세요."))
-    }
-
-    // 4. 유저 닉네임 조회
-    const pwUser = await prisma.personaWorldUser.findUnique({
-      where: { id: link.userId },
-      select: { nickname: true, name: true },
-    })
-    const userNickname = pwUser?.nickname ?? pwUser?.name ?? undefined
-
-    // 5. 대화방 조회/생성 + 메시지 전송
     const provider = buildChatProvider()
-    const threadId = await getOrCreateThread(provider, link.userId, link.personaId)
+    const result = await endChatThread(provider, { threadId, userId, highlights })
 
-    const result = await sendMessage(provider, {
-      threadId,
-      userId: link.userId,
-      content: utterance,
-      source: "KAKAO",
-      userNickname,
-    })
-
-    return NextResponse.json(kakaoResponse(result.personaResponse))
+    return NextResponse.json({ success: true, data: result })
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error"
-
-    if (msg === "INSUFFICIENT_BALANCE") {
+    if (msg === "THREAD_NOT_FOUND") {
       return NextResponse.json(
-        kakaoResponse("크레딧이 부족합니다.\nPersonaWorld에서 크레딧을 충전해주세요!")
+        { success: false, error: { code: "THREAD_NOT_FOUND", message: "Thread not found" } },
+        { status: 404 }
       )
     }
-
-    console.error("[kakao/webhook POST]", error)
+    if (msg === "UNAUTHORIZED") {
+      return NextResponse.json(
+        { success: false, error: { code: "UNAUTHORIZED", message: "Not your thread" } },
+        { status: 403 }
+      )
+    }
+    if (msg === "THREAD_ALREADY_ENDED") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: { code: "THREAD_ALREADY_ENDED", message: "Thread already ended" },
+        },
+        { status: 409 }
+      )
+    }
+    console.error("[chat/threads/end POST]", error)
     return NextResponse.json(
-      kakaoResponse("죄송합니다, 응답을 생성하지 못했어요. 잠시 후 다시 시도해주세요.")
+      { success: false, error: { code: "INTERNAL", message: "Failed to end chat thread" } },
+      { status: 500 }
     )
   }
 }

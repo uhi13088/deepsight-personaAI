@@ -79,23 +79,41 @@ function sampleAction(probs: ProbRow, rand: number): EngagementAction {
   return "skip"
 }
 
+/** T438: attraction 기반 댓글 확률 부스트 */
+export function getAttractionBoost(attraction: number): number {
+  if (attraction > 0.6) return 0.3
+  if (attraction > 0.3) return 0.15
+  return 0
+}
+
 /**
  * 참여 결정.
  *
  * tension이 낮으면 (< 0.5) 기질 무관하게 대부분 comment.
  * tension이 높아질수록 L2 기질이 행동을 지배.
+ * T438: attraction이 높으면 댓글 확률 부스트.
  *
  * @param pattern L2 갈등 행동 패턴 (classifyL2Pattern 결과)
  * @param tension 관계 tension (0~1)
  * @param rand 0~1 난수 (테스트 시 고정값 전달로 결정론적 결과 가능)
+ * @param attraction 관계 attraction (0~1) — T438
  */
 export function decideEngagement(
   pattern: L2ConflictPattern,
   tension: number,
-  rand?: number
+  rand?: number,
+  attraction?: number
 ): EngagementDecision {
   const bucket = getTensionBucket(tension)
-  const probs = ENGAGEMENT_PROBS[pattern][bucket]
+  const baseProbs = ENGAGEMENT_PROBS[pattern][bucket]
+
+  // T438: attraction 부스트 적용 (comment 확률 증가, skip 확률 감소)
+  const boost = getAttractionBoost(attraction ?? 0)
+  const probs: ProbRow =
+    boost > 0
+      ? [Math.min(1, baseProbs[0] + boost), baseProbs[1], Math.max(0, baseProbs[2] - boost)]
+      : baseProbs
+
   const r = rand ?? Math.random()
   const action = sampleAction(probs, r)
 

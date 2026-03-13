@@ -543,6 +543,16 @@ export type {
   ConversationResult,
 } from "./conversation-engine"
 
+// Intimacy Engine (T429~T432)
+export {
+  computeIntimacyDelta,
+  scoreToLevel,
+  applyDailyCap,
+  updateIntimacyAfterChat,
+  INTIMACY_LEVELS,
+} from "./intimacy-engine"
+export type { IntimacyDataProvider, UpdateIntimacyResult } from "./intimacy-engine"
+
 // Voice Pipeline (T337 — STT + TTS)
 export {
   speechToText,

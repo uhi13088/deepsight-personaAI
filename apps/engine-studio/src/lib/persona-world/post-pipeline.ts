@@ -81,10 +81,12 @@ export interface PostPipelineDataProvider {
   /** DB에서 페르소나 voiceProfile JSON 조회 (콜드스타트 fallback용) */
   getVoiceProfile?(personaId: string): Promise<unknown | null>
 
-  /** 활성 페르소나 핸들 목록 조회 (COLLAB 멘션용, 팬텀 멘션 방지) */
+  /** 활성 페르소나 핸들 목록 조회 (COLLAB 멘션용, 팬텀 멘션 방지, T441: 관계 기반 랭킹) */
   getActivePersonaHandles?(
     excludePersonaId: string
-  ): Promise<Array<{ handle: string; name: string }>>
+  ): Promise<
+    Array<{ handle: string; name: string; collabScore?: number; relationshipHint?: string }>
+  >
 
   /** 소비 기록 저장 (포스트 → ConsumptionLog 자동 추출) */
   recordConsumption?(personaId: string, record: ConsumptionRecord): Promise<{ id: string }>

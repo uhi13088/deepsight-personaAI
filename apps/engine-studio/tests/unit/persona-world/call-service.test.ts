@@ -29,6 +29,16 @@ vi.mock("@/lib/persona-world/conversation-memory", () => ({
   recordConversationTurn: vi.fn().mockResolvedValue({ poignancy: 0.3 }),
   finalizeConversation: vi.fn().mockResolvedValue(undefined),
   adjustStateForConversation: vi.fn().mockImplementation((state: PersonaStateData) => state),
+  classifyUserSentiment: vi.fn().mockReturnValue("neutral"),
+}))
+
+vi.mock("@/lib/persona-world/intimacy-engine", () => ({
+  updateIntimacyAfterChat: vi.fn().mockResolvedValue({
+    newScore: 0.003,
+    newLevel: 1,
+    previousLevel: 1,
+    levelUp: false,
+  }),
 }))
 
 vi.mock("@/lib/persona-world/voice-pipeline", () => ({
@@ -136,6 +146,24 @@ function createMockProvider(overrides?: Partial<CallDataProvider>): CallDataProv
     findByOrderId: vi.fn().mockResolvedValue(null),
     updateTransaction: vi.fn().mockResolvedValue(null),
     getTransactions: vi.fn().mockResolvedValue([]),
+
+    // Intimacy
+    getIntimacyByUserAndPersona: vi.fn().mockResolvedValue({
+      threadId: "thread-1",
+      intimacyLevel: 1,
+      sharedMilestones: null,
+      intimacyScore: 0,
+      lastIntimacyAt: null,
+    }),
+    getThreadIntimacy: vi.fn().mockResolvedValue({
+      intimacyScore: 0,
+      intimacyLevel: 1,
+      lastIntimacyAt: null,
+      sharedMilestones: null,
+      personaId: "persona-1",
+      userId: "user-1",
+    }),
+    updateThreadIntimacy: vi.fn().mockResolvedValue(undefined),
 
     ...overrides,
   }

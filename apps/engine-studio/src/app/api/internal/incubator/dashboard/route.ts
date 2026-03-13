@@ -267,6 +267,7 @@ export async function GET() {
 // ── POST: 수동 배치 트리거 + 설정 변경 ──────────────────────
 
 interface IncubatorSettings {
+  enabled: boolean
   generationCostKRW: number
   testCostKRW: number
   monthlyBudgetKRW: number
@@ -325,6 +326,7 @@ export async function POST(request: NextRequest) {
 
       const configMap = Object.fromEntries(rows.map((r) => [r.key, r.value]))
       const settings: IncubatorSettings = {
+        enabled: configMap.enabled !== false && configMap.enabled !== "false",
         generationCostKRW: (configMap.generationCostKRW as number) ?? 5,
         testCostKRW: (configMap.testCostKRW as number) ?? 2,
         monthlyBudgetKRW: (configMap.monthlyBudgetKRW as number) ?? 10000,

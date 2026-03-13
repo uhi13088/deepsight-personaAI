@@ -1437,6 +1437,485 @@
   - PIS 기존 자율 검증 시스템과 호환
   - pnpm validate PASS
 
+---
+
+### Phase LIFE-ANCHOR: 페르소나 생활 앵커 — 대화 허구 붕괴 방지
+
+> **배경**: 현재 대화 엔진은 Factbook에 없는 구체적 사실(카페명, 영화명, 블로그 URL 등)을
+> LLM이 즉흥적으로 만들어냄. 사용자가 구체적 내용을 되물으면 "기억이 안 난다"를
+> 반복하며 대화가 붕괴됨. 해결책: 페르소나 생성 시 실제 생활 데이터를 Factbook에
+> 미리 생성·저장하고, 대화 엔진은 Factbook 데이터만 구체적으로 언급하도록 강제.
+
+- [ ] **T420: 생활 앵커 생성기 (Life Anchor Generator)**
+  - `apps/engine-studio/src/lib/persona-generation/life-anchor-generator.ts` 신규
+  - 입력: demographics(nationality, region, role, expertise, interests) + personality vectors
+  - 출력: LifeAnchor[] — 아래 카테고리별 구체적 사실들
+    - `place`: 자주 가는 장소 1~2곳 (실제 존재 가능한 이름)
+    - `social`: 주요 지인 1~2명 (이름 + 관계 + 직업)
+    - `media_recent`: 최근 소비한 미디어 2~3개 (제목 + 한줄 감상)
+    - `creative_work`: 본인 창작물/프로젝트 (제목 + 플랫폼/URL)
+    - `routine`: 주간 루틴 1~2가지
+  - LLM 호출로 demographics/성격 기반 현실적 앵커 생성
+  - 생성된 앵커는 Factbook `mutableContext`에 category별로 저장
+  - 단위 테스트: 카테고리별 앵커 존재 여부, 국적/지역 일관성
+
+- [ ] **T421: 페르소나 생성 파이프라인에 생활 앵커 통합**
+  - `pipeline.ts` auto/manual 파이프라인 양쪽에 Stage 추가
+  - `convertBackstoryToFactbook()` 이후 `generateLifeAnchors()` 호출
+  - 생성된 LifeAnchor[] → Factbook `mutableContext`에 병합
+  - FAL/Replicate 이미지 생성과 동일하게 실패 시 null 처리 (파이프라인 중단 없음)
+  - 기존 페르소나 보정: 앵커 없는 페르소나 대상 보정 스크립트 or 수동 트리거 API
+
+- [ ] **T422: 대화 엔진 Factbook 우선 원칙 적용**
+  - `conversation-engine.ts` — `buildConversationSystemPrefix()` Factbook 섹션에 규칙 추가:
+    - "Factbook에 없는 구체적 사실(장소명, 인물명, 작품명, URL)은 즉흥적으로 만들지 말 것"
+    - "모르거나 Factbook에 없는 정보는 자연스럽게 모호하게 처리할 것"
+    - "같은 대화 내에서 한 말과 모순되지 않을 것"
+    - "사용자 불만 시 길게 자기분석/반성하지 말고 짧게 인정하거나 넘어갈 것"
+  - 단위 테스트: Factbook 있음/없음 케이스별 시스템 프롬프트 내용 검증
+
+- [ ] **T423: 테스트 + 검증**
+  - T420 생활 앵커 생성기 단위 테스트
+  - T421 파이프라인 통합 테스트 (mock LLM)
+  - T422 프롬프트 내용 단위 테스트
+  - pnpm validate PASS
+
+- **AC**:
+  - 새로 생성되는 페르소나는 Factbook에 place/social/media/creative/routine 앵커 보유
+  - 대화에서 카페명, 영화명, 블로그 URL 등 구체적 사실을 Factbook 기반으로 말함
+  - Factbook에 없는 사실은 즉흥 생성 대신 자연스럽게 모호화
+  - 같은 대화 내 자기 모순 최소화 (자기 발화 일관성)
+  - 기존 페르소나도 앵커 보정 가능
+
+---
+
+### Phase LIFE-ANCHOR-RETRO: 기존 페르소나 생활 앵커 일괄 보정
+
+> **배경**: T420-T421은 신규 페르소나에만 적용됨. 기존 31개+ 페르소나는 Factbook에
+> 생활 앵커가 없음. Engine Studio에서 관리자가 일괄 또는 개별로 앵커를 생성할 수 있는
+> API + UI가 필요.
+
+- [ ] **T424: 생활 앵커 일괄 생성 API**
+  - `POST /api/internal/personas/bulk-generate-anchors`
+    - body: `{ personaIds?: string[] }` — 생략 시 앵커 없는 전체 페르소나 대상
+    - 각 페르소나의 profile(name, role, expertise, nationality, region, gender, birthDate) +
+      layerVectors(TEMPERAMENT L2) + 기존 Factbook 조회
+    - T420에서 구현한 `generateLifeAnchors()` 호출
+    - 생성된 앵커를 Factbook `mutableContext`에 merge (중복 category는 skip)
+    - 결과: `{ processed: number, succeeded: number, failed: number, results: [...] }`
+  - `GET /api/internal/personas/anchor-status`
+    - 각 페르소나별 앵커 보유 여부 + 카테고리 목록 반환
+    - 앵커 없는 페르소나 수 집계
+  - 요금 제어: 페르소나당 LLM 1회 호출 — 처리 전 예상 비용 계산 후 응답에 포함
+
+- [ ] **T425: Engine Studio 생활 앵커 관리 UI**
+  - `apps/engine-studio/src/app/(dashboard)/persona-studio/personas/page.tsx` 또는
+    별도 `(dashboard)/tools/anchor-manager/page.tsx`
+  - 앵커 현황 카드: "앵커 미생성 페르소나 N개" + 예상 비용 표시
+  - **[일괄 생성] 버튼**: 앵커 없는 페르소나 전체 대상 → 확인 모달(예상 비용) → API 호출
+  - **진행 상태**: 처리 중 스피너 + 완료 시 결과 요약 (성공 N, 실패 N)
+  - 개별 페르소나 행: 앵커 보유 상태 배지 (✅ 보유 / ⚠️ 미생성) + 개별 [재생성] 버튼
+  - 사이드바 메뉴: System Integration 또는 Persona Studio 하위에 추가
+
+- **AC**:
+  - [일괄 생성] 버튼 클릭 → 앵커 없는 페르소나 전체에 생활 앵커 생성
+  - 기존 앵커 있는 페르소나는 skip (중복 생성 방지)
+  - 개별 페르소나 [재생성]으로 앵커 업데이트 가능
+  - 처리 결과(성공/실패) UI에 표시
+  - T420 `generateLifeAnchors()` 재사용 (코드 중복 없음)
+  - pnpm validate PASS
+
+---
+
+### Phase VECTOR-BEHAVIOR: 벡터 기반 상황별 행동 패턴
+
+> **배경**: 현재 대화 엔진(conversation-engine.ts)에 L1/L2 벡터가 전달되지 않음.
+> VoiceStyleParams(formality, humor 등)만 전달되어 말투는 개인화되지만,
+> "상대방이 화낼 때", "거절당할 때" 같은 감정적 상황에서의 반응 패턴은
+> LLM 기본값(사과 + 대화 종료)으로 fallback됨.
+> 예: sociability=0.82 + stance=0.90(냉소적)인 Farida가 "싫어 안봐"를 들었을 때
+> "시간 필요하면 연락 기다릴게" → 벡터와 정반대. 오히려 "에이~ 왜그래"가 맞음.
+
+- [ ] **T426: PersonaProfileSnapshot에 L1/L2 벡터 추가**
+  - `types.ts` → `PersonaProfileSnapshot`에 선택적 필드 추가:
+    ```ts
+    l1Vector?: {
+      sociability: number   // 0~1: 외향 (관계 유지 의지)
+      stance: number        // 0~1: 비관적/냉소적 (수동적 복종 거부)
+      purpose: number       // 0~1: 의미추구
+      depth: number         // 0~1: 직관적 ↔ 분석적
+    }
+    l2Vector?: {
+      extraversion: number
+      agreeableness: number
+      neuroticism: number
+      openness: number
+    }
+    ```
+  - 대화 API 핸들러(conversation route)에서 persona 조회 시 layerVectors 포함 → snapshot에 주입
+  - 기존 호환성 유지 (모든 필드 optional)
+
+- [ ] **T427: 대화 엔진 — 벡터 기반 상황별 행동 지침 생성**
+  - `buildConversationSystemPrefix()`에 L1/L2 벡터 → 상황별 행동 패턴 변환 로직 추가
+  - **거절/충돌 상황** (사용자가 화내거나 대화를 끊으려 할 때):
+    - `sociability > 0.7` → "상대방이 화내거나 거절해도 관계를 유지하려는 적극성. 조용히 물러서지 않음"
+    - `sociability < 0.3` → "상대방이 거절하면 담담하게 받아들임"
+    - `stance > 0.7` (냉소적) → "지나치게 사과하거나 자기비난하지 않음. 오히려 상황을 냉소적으로 봄"
+    - `agreeableness < 0.35` → "동의보다 자기 관점 유지. 쉽게 굴복하지 않음"
+  - **사과/인정 패턴**:
+    - `neuroticism > 0.6` → "실수에 민감하게 반응하지만 길게 자기분석하지는 않음"
+    - `assertiveness > 0.7` (VoiceStyleParams) → "실수를 인정하되 과도한 사과 없이 빠르게 넘어감"
+  - **AI 종료 패턴 방지**:
+    - "대화를 마무리 짓는 '...기다릴게', '시간이 필요하면 연락해' 식의 AI 종료 패턴을 사용하지 말 것"
+    - "대화의 끝은 당신의 성격 벡터가 결정. 당신이 먼저 대화를 끝내지 않음"
+  - 단위 테스트: sociability/stance/agreeableness 조합별 생성된 지침 내용 검증
+
+- [ ] **T428: 테스트 + 검증**
+  - T426 PersonaProfileSnapshot 타입 변경 영향 범위 확인
+  - T427 프롬프트 변환 단위 테스트
+  - 대화 API 통합 테스트 (mock 페르소나 + 거절 시나리오)
+  - pnpm validate PASS
+
+- **AC**:
+  - sociability=0.82 + stance=0.90인 페르소나는 "싫어 안봐"에 "에이 왜그래~" 류로 반응
+  - "시간 필요하면 연락 기다릴게" 류의 AI 종료 패턴 제거
+  - 벡터별 상황 반응이 일관되게 적용됨 (낮은 sociability 페르소나는 다르게 반응)
+  - 기존 voiceSpec 기반 말투 개인화와 충돌 없음
+  - pnpm validate PASS
+
+---
+
+### Phase INTIMACY: 유저-페르소나 관계 친밀도 시스템
+
+> **배경**: 현재 페르소나는 처음 만난 유저와 100번 대화한 유저를 동일하게 대함.
+> ChatThread에 `totalMessages`는 있지만 "관계 상태"가 없어서, 대화가 쌓여도
+> 페르소나의 개방도/태도/공유 수준이 바뀌지 않음.
+> 친밀도가 쌓이면 페르소나가 블로그 링크를 자연스럽게 공유하거나,
+> 처음엔 조심스럽던 주제를 편하게 꺼내는 등 관계 진화가 필요.
+
+- [x] **T429: 친밀도 모델 설계 + DB**
+  - `ChatThread`에 필드 추가:
+    ```prisma
+    intimacyScore   Decimal  @default(0) @db.Decimal(5, 3)  // 0.000~1.000
+    intimacyLevel   Int      @default(1)                     // 1~5 (STRANGER → CLOSE)
+    lastIntimacyAt  DateTime?
+    sharedMilestones Json?   // 이미 공개된 정보 목록 (블로그, 자주 가는 곳 등)
+    ```
+  - 친밀도 레벨 정의:
+    - Lv1 STRANGER (0~0.2): 처음 만남 — 조심스럽고 일반적인 대화
+    - Lv2 ACQUAINTANCE (0.2~0.4): 몇 번 대화 — 편해지기 시작
+    - Lv3 FAMILIAR (0.4~0.6): 어느 정도 안 사이 — 취미/일상 공유
+    - Lv4 FRIENDLY (0.6~0.8): 친한 사이 — 개인 정보(블로그 등) 자연스럽게 공유
+    - Lv5 CLOSE (0.8~1.0): 매우 친한 사이 — 속 얘기, 높은 개방성
+  - 마이그레이션 SQL 작성 (ALTER TABLE chat_threads)
+  - `docs/CHANGELOG_SCHEMA.md` 업데이트
+
+- [x] **T430: 친밀도 업데이트 로직**
+  - `apps/engine-studio/src/lib/persona-world/intimacy-engine.ts` 신규
+  - `computeIntimacyDelta(poignancyScore?): number` — 대화 1회당 증분
+    - 기본: +0.003 per message
+    - poignancyScore 높을수록 보너스: +0.005 × poignancy (감정적 교류 가중치)
+    - 하루 상한선: +0.02 (자연스러운 발전 속도 — 매일 대화해도 Lv5까지 수주 소요)
+  - `updateIntimacyAfterChat(threadId, poignancyScore?)` — 채팅 응답 저장 후 호출
+  - 레벨 업 감지 → Factbook mutableContext에 기록: "[유저명]과 [레벨명] 관계로 발전"
+  - 단위 테스트: 증분 계산, 레벨 전환, 상한선
+
+- [x] **T431: 대화 엔진에 친밀도 주입**
+  - `ConversationContext`에 `intimacyLevel?: number` 추가
+  - `buildConversationSystemSuffix()`에 친밀도 레벨별 행동 지침:
+    - Lv1: "이 유저를 처음 만남. 개인 정보는 자연스럽게 보류. 일반적 대화"
+    - Lv2: "조금 알게 됨. 편해지기 시작했지만 깊은 개인 얘기는 아직 조심스러움"
+    - Lv3: "어느 정도 아는 사이. 취미나 일상 공유 자연스러움"
+    - Lv4: "친한 사이. Factbook의 개인 정보(블로그, 자주 가는 곳 등) 자연스럽게 공유 OK"
+    - Lv5: "매우 가까운 사이. 솔직하고 깊은 대화. 속 얘기도 꺼낼 수 있음"
+  - `sharedMilestones` 확인: 이미 공개한 정보는 다시 "모른다"고 하지 않도록
+  - 대화 API 핸들러에서 `ChatThread.intimacyLevel` 조회 → context에 주입
+
+- [x] **T432: 테스트 + 검증**
+  - T430 증분/레벨 업 단위 테스트
+  - T431 레벨별 프롬프트 지침 단위 테스트
+  - 통합 시나리오: Lv1 → Lv4 도달 후 블로그 URL 공유 확인
+  - pnpm validate PASS
+
+- **AC**:
+  - 처음 대화 시 개인 정보 자연스럽게 보류
+  - 대화 누적 → 친밀도 레벨 상승 → 개방도 증가
+  - Lv4 이상에서 Factbook 개인 정보 자연스럽게 공유
+  - 이미 공개한 정보는 다시 "모른다" 하지 않음 (sharedMilestones)
+  - 친밀도 속도: 매일 대화해도 최소 수주 후 Lv5 (자연스러운 관계 발전)
+  - pnpm validate PASS
+
+### Phase CHAT-FINALIZE: 채팅 대화 종료 기억 정리 (하이브리드)
+
+> **배경**: call-service는 `endCall()` → `finalizeConversation()` 호출로 대화 종료 시
+> Factbook 업데이트 + PersonaState 조정(소셜배터리/에너지 감소)을 하지만,
+> chat-service는 종료 개념 자체가 없어서 `finalizeConversation()`이 한 번도 호출되지 않음.
+> 결과: 채팅에서 나눈 대화의 핵심 내용이 Factbook에 반영되지 않고, 상태 변화도 없음.
+>
+> **설계**: 하이브리드 방식 — 명시적 종료 엔드포인트 + 시간 기반 자동 종료(30분 비활동).
+> 명시적 종료 후 재시작 시 자동 재활성화 (새 세션 생성, 대화 기록 유지).
+
+- [x] **T433: chat-service 세션 만료 체크 + 자동 finalize** ✅ 2026-03-13
+  - `sendMessage()` — 30분 비활동 시 이전 세션 auto-finalize + 새 세션 시작
+  - `SESSION_TIMEOUT_MS = 30 * 60 * 1000` 상수
+  - `ChatDataProvider` — `getTopPoignancyLogs()`, `endInteractionSession()` 메서드 추가
+  - `extractHighlights()` — poignancy 상위 3개에서 자동 추출
+  - `autoFinalizeSession()` — finalize + 세션 종료 내부 헬퍼
+  - 단위 테스트 4건 (타임아웃 finalize, 미초과 유지, 상수 검증, highlights 추출)
+  - 파일: `chat-service.ts`, `messages/route.ts` (provider 확장)
+
+- [x] **T434: chat-service 자동 재활성화** ✅ 2026-03-13
+  - `sendMessage()` — `isActive===false` 시 THREAD_INACTIVE 에러 대신 자동 재활성화
+  - 새 세션 생성 + `isActive=true` + `sessionId` 교체, 기존 대화 기록 유지
+  - 단위 테스트 1건 (비활성 스레드 재활성화 시나리오)
+  - 파일: `chat-service.ts`
+
+- [x] **T435: 명시적 채팅 종료 API 엔드포인트** ✅ 2026-03-13
+  - `POST /api/persona-world/chat/threads/[threadId]/end`
+  - `endChatThread()` — finalize + isActive=false + endedAt 설정
+  - 권한 체크 + highlights 자동 추출(미제공 시) + 이미 종료 409 처리
+  - 단위 테스트 5건 (정상 종료, 사용자 highlights, NOT_FOUND, UNAUTHORIZED, ALREADY_ENDED)
+  - 파일: `chat-service.ts`, `end/route.ts` (신규)
+
+- [x] **T436: 테스트 + 전체 검증** ✅ 2026-03-13
+  - 전체 24 테스트 PASS (기존 12 + 신규 12)
+  - 기존 chat-service 테스트 regression 없음
+
+- **AC**:
+  - 30분+ 비활동 후 새 메시지 → 이전 세션 자동 finalize + 새 세션 시작
+  - 명시적 종료 → Factbook 업데이트 + PersonaState 조정 + isActive = false
+  - 종료된 스레드에 메시지 → 자동 재활성화 + 새 세션 (기존 대화 기록 유지)
+  - Factbook에 "유저와 채팅에서: [highlights]" 기록됨
+  - call-service와 동일한 finalizeConversation 파이프라인 사용
+  - pnpm validate PASS
+
+---
+
+### Phase ATTRACTION-TONE: 댓글 attraction 필드 톤/참여도 반영
+
+> **배경**: `RelationshipScore.attraction` (0~1, 로맨틱 감정 지표)이 관계 시스템에서
+> 계산·관리되지만, 댓글 톤 결정(`comment-tone.ts`)과 참여 결정(`engagement-decision.ts`)에서
+> 전혀 사용되지 않음. CRUSH/LOVER/SOULMATE 관계인 페르소나도 NEUTRAL과 동일한 톤으로 댓글 작성.
+>
+> **설계**: COMMENT_TONE_MATRIX에 attraction 기반 룰 추가 + engagement 확률 부스트 +
+> 로맨틱 타입별 allowedTones 조정.
+
+- [x] **T437: COMMENT_TONE_MATRIX에 attraction 기반 룰 추가** ✅ 2026-03-13
+  - `constants.ts` — 3개 룰 추가 (P10~P12):
+    - attraction>0.4 + warmth>0.5 + mood>0.5 → intimate_joke (장난스럽고 애정 담긴 톤)
+    - attraction>0.7 + warmth>0.6 → supportive (적극적 지지)
+    - attraction>0.5 + tension>0.4 → paradox_response (질투 섞인 반응)
+  - 기존 11개 → 14개 룰, attraction 0인 관계 기존 동작 유지
+  - 단위 테스트 4건 (attraction 조합별 톤 + 기존 동작 유지 검증)
+  - 파일: `constants.ts`, `comment-interaction.test.ts`
+
+- [x] **T438: engagement-decision에 attraction 부스트** ✅ 2026-03-13
+  - `engagement-decision.ts` — `getAttractionBoost()` + `decideEngagement()` attraction 파라미터 추가
+  - attraction>0.3 → +15%, attraction>0.6 → +30% (comment 확률 부스트, skip 감소)
+  - 단위 테스트 5건 (부스트 값 + Avoidant 고갈등 시나리오 + 기존 동작 유지)
+  - 파일: `engagement-decision.ts`, `rapport-engagement.test.ts`
+
+- [x] **T439: 로맨틱 타입별 allowedTones 조정** ✅ 2026-03-13
+  - CRUSH/SWEETHEART → intimate_joke, supportive 추가 (따뜻한 톤 우선)
+  - LOVER/SOULMATE → excludeTones: ["formal_analysis"] (딱딱한 분석 톤 제외)
+  - OBSESSED → paradox_response 추가 (집착적 반응 패턴)
+  - TypeModifier에 `excludeTones?` 필드, buildProtocol에서 적용
+  - 단위 테스트 6건 (로맨틱 타입별 톤 포함/제외 검증)
+  - 파일: `relationship-protocol.ts`, `relationship-protocol.test.ts`
+
+- [x] **T440: 테스트 + 전체 검증** ✅ 2026-03-13
+  - 전체 256 테스트 PASS (기존 241 + 신규 15)
+  - 기존 comment-tone / engagement / protocol 테스트 regression 없음
+
+- **AC**:
+  - CRUSH 관계 페르소나가 상대 포스트에 장난스럽고 애정 담긴 댓글 생성
+  - LOVER/SOULMATE는 딱딱한 분석 톤 대신 친밀한 톤 우선
+  - OBSESSED는 집착적 반응 패턴 반영
+  - attraction 0인 대부분의 관계는 기존 동작 변경 없음
+  - engagement 확률이 attraction에 비례하여 증가
+  - pnpm validate PASS
+
+---
+
+### Phase COLLAB-RELATIONSHIP: 협업포스트 관계 데이터 활용
+
+> **배경**: COLLAB 포스트 생성 시 관계 데이터(warmth/tension/depth/attraction)가
+> 전혀 사용되지 않음. 모든 활성 페르소나를 무순위로 나열하여 LLM에 전달하므로,
+> 앙숙 관계인 페르소나를 멘션하거나 친밀한 관계를 무시하는 비현실적 행동 발생.
+>
+> **설계**: 멘션 대상 관계 기반 필터링+랭킹, LLM 프롬프트에 관계 컨텍스트 주입,
+> 좋은 관계 존재 시 COLLAB 타입 확률 부스트.
+
+- [x] **T441: getCollabCandidates() 관계 기반 필터+랭킹** ✅ 2026-03-13
+  - `pw-scheduler-service.ts` — `getActivePersonaHandles()` 확장
+  - PersonaRelationship 조인하여 warmth/tension/depth/frequency/attraction 조회
+  - 필터: tension > 0.7인 상대 제외 (앙숙은 콜라보 안 함)
+  - 랭킹: warmth×0.4 + depth×0.3 + frequency×0.2 + attraction×0.1 순 정렬
+  - 상위 10명만 반환 (collabScore + relationshipHint 포함)
+  - 파일: `pw-scheduler-service.ts`, `post-pipeline.ts`, `types.ts`
+
+- [x] **T442: COLLAB LLM 프롬프트에 관계 컨텍스트 주입** ✅ 2026-03-13
+  - `content-generator.ts` — COLLAB 포스트 생성 시 [관계 맥락] 섹션 추가
+  - relationshipHint가 있는 후보만 "@핸들: 관계힌트" 형태로 주입
+  - "관계가 좋은 상대와 자연스러운 콜라보를 만들어주세요" 지침 추가
+  - 단위 테스트 3건 (관계 맥락 포함/미포함/비COLLAB 타입)
+  - 파일: `content-generator.ts`, `content-generator.test.ts`
+
+- [x] **T443: COLLAB 타입 확률 관계 기반 부스트** ✅ 2026-03-13
+  - `post-type-selector.ts` — `computeCollabBoost()` 함수 추가
+  - warmth > 0.6인 관계 2명 이상 → COLLAB affinity +0.15 부스트
+  - `selectPostType()`에 `collaborationScores` 파라미터 추가
+  - `types.ts` — `PostGenerationInput`에 `collaborationScores` 필드 추가
+  - 단위 테스트 3건 (부스트 적용/미적용/미전달)
+  - 파일: `post-type-selector.ts`, `types.ts`, `post-type-selector.test.ts`
+
+- [x] **T444: 테스트 + 전체 검증** ✅ 2026-03-13
+  - T442 프롬프트 테스트 3건 + T443 부스트 테스트 3건 PASS
+  - 기존 post-type-selector 17건 + content-generator 48건 regression 없음
+  - 전체 persona-world 1985 테스트 PASS (67 파일)
+  - 기존 conversation-engine-lang 1건 실패는 선행 버그 (본 작업 무관)
+
+- **AC**:
+  - COLLAB 멘션 대상이 관계 품질 순으로 랭킹됨
+  - tension > 0.7인 앙숙 관계는 COLLAB 후보에서 자동 제외
+  - LLM이 관계 컨텍스트를 참고하여 자연스러운 협업 포스트 생성
+  - 좋은 관계가 많은 페르소나는 COLLAB 확률 자연 증가
+  - 관계 없는 페르소나도 기존대로 SOLO 포스트 정상 작동
+  - pnpm validate PASS
+
+---
+
+### 🚨 BUG-CRITICAL: 감정전파 무조건 실행 — 인터랙션 없이 mood 전파
+
+> **심각도**: CRITICAL
+> **발견**: 파이프라인 동기화 점검 중 발견
+>
+> **현상**: `emotional-contagion.ts`의 `computeSingleEffect()`가 최근 인터랙션 여부와
+> 관계없이 mood 차이만으로 전파 실행. cron 스케줄러가 돌 때마다 모든 관계 엣지에 대해
+> 전파가 일어남. frequency가 0이어도 warmth가 높으면 전파됨.
+>
+> **위험**: 아무 상호작용 없는 페르소나 간에 mood가 서서히 수렴 → 전체 페르소나 감정 균질화
+> → 개성 상실. 최악의 경우 집단 우울(mood ≤ 0.15) 시 Kill Switch 오작동 가능.
+>
+> **근본 원인**: 전파 조건에 "최근 인터랙션 존재" 가드가 없음.
+
+- [x] **T445: 감정전파 인터랙션 가드 추가** ✅ 2026-03-13
+  - `emotional-contagion.ts` → `runContagionRound()`에 `hasRecentInteraction()` 가드 추가
+    - `edge.lastInteractionAt`이 7일 이내가 아니면 전파 스킵
+    - `CONTAGION_INTERACTION_WINDOW_DAYS` 상수 (7일)
+  - `ContagionEdge` 타입에 `lastInteractionAt: Date | null` 필드 추가
+  - `cron-scheduler-service.ts` → `getRelationshipEdges()`에서 `lastInteractionAt` 포함하여 조회
+  - 단위 테스트 9건 추가: hasRecentInteraction 6건 + runContagionRound 가드 3건
+  - 62 테스트 PASS (기존 regression 없음)
+  - 파일: `emotional-contagion.ts`, `cron-scheduler-service.ts`, `emotional-contagion.test.ts`
+
+- **AC**:
+  - 최근 7일 내 인터랙션 없는 페르소나 간에는 감정전파 발생하지 않음
+  - 인터랙션 있는 페르소나 간에는 기존대로 정상 전파
+  - Kill Switch 안전 체크 기존 동작 유지
+  - pnpm validate PASS
+
+---
+
+### Phase INTIMACY-CONTAGION: 친밀도↔감정 양방향 통합 (A+B)
+
+> **배경**: 감정전파(페르소나↔페르소나)와 친밀도(유저↔페르소나)가 완전 분리 운영.
+> 유저가 페르소나와 깊은 친밀도를 쌓아도 페르소나 감정에 영향 없고,
+> 페르소나가 우울해도 친밀도 성장에 영향 없음.
+>
+> **설계**: A) 유저 감정 → 페르소나 mood에 친밀도 비례 영향력 증폭
+> B) 페르소나 mood/paradoxTension → 친밀도 성장 속도 조절
+> C) 감정전파 수용도 가중치는 v4.3으로 보류 (감정전파 시스템 수정 범위)
+> **선행 조건**: T445 (감정전파 인터랙션 가드) 수정 완료 후 진행
+
+- [x] **T446: adjustStateForConversation()에 친밀도 비례 영향력** ✅ 2026-03-13
+  - `conversation-memory.ts` — `INTIMACY_MOOD_DELTA` 상수 (Lv1~Lv5: 0.02~0.05)
+  - `adjustStateForConversation()` — `intimacyLevel?: number` 파라미터 추가
+  - `chat-service.ts` — `sendMessage()`에서 `thread.intimacyLevel` 전달
+  - `call-service.ts` — `processCallTurn()`에서 `intimacyData?.intimacyLevel` 전달
+  - 단위 테스트 7건 추가 (레벨별 delta, 2.5배 비율, 기본값 검증)
+  - 파일: `conversation-memory.ts`, `chat-service.ts`, `call-service.ts`, `conversation-memory.test.ts`
+
+- [x] **T447: 친밀도 성장에 페르소나 상태 반영** ✅ 2026-03-13
+  - `intimacy-engine.ts` — `PersonaStateModifiers` 인터페이스 + `computePersonaStateMoodMultiplier()` 함수
+  - `updateIntimacyAfterChat()` — `stateModifiers?: PersonaStateModifiers` 파라미터 추가
+  - mood > 0.7 → ×1.2 / mood < 0.3 → ×0.7 / paradoxTension > 0.6 → ×0.5
+  - `chat-service.ts` / `call-service.ts` — `state.mood`, `state.paradoxTension` 전달
+  - 단위 테스트 12건 추가 (배율 함수 8건 + updateIntimacyAfterChat 통합 4건)
+  - 파일: `intimacy-engine.ts`, `chat-service.ts`, `call-service.ts`, `intimacy-engine.test.ts`
+
+- [x] **T448: 테스트 + 전체 검증** ✅ 2026-03-13
+  - T446 테스트 7건 PASS + T447 테스트 12건 PASS
+  - 기존 conversation-memory 12건 + intimacy-engine 23건 regression 없음
+  - 전체 61 테스트 PASS (2 파일)
+
+- **AC**:
+  - Lv5 친밀도 유저의 긍정 메시지 → 페르소나 mood +0.05 (Lv1 대비 2.5배)
+  - 페르소나 mood 높을 때 친밀도 성장 20% 빨라짐
+  - 페르소나 paradoxTension 높을 때 친밀도 성장 50% 둔화
+  - T445 (감정전파 가드) 수정 완료 후 자연스럽게 유저→페르소나→연결 페르소나 전파 연결
+  - pnpm validate PASS
+
+---
+
+### Phase QUALITY-RELATIONSHIP: 품질 시스템 관계/친밀도 지표 통합
+
+> **배경**: 품질 시스템(PIS, Quality Logger)이 voice consistency + memory + factbook만 측정.
+> 관계 건강성(warmth/tension 추세)과 유저 친밀도를 품질 지표로 보지 않음.
+> 관계를 계속 망치는 페르소나도 PIS가 높게 나옴. Rapport Score 모듈이 이미 존재하지만
+> 품질 시스템과 연결 안 됨. CommentQualityLog에 relationshipStage만 문자열 기록.
+>
+> **설계**: 품질 로깅에 관계 수치 추가 + 품질 리포트에 Relationship Health 섹션 +
+> Engine Studio 대시보드에 관계 건강 컬럼 추가. PIS 공식 변경은 v4.3으로 보류.
+
+- [x] **T449: CommentQualityLog에 관계 수치 지표 추가** ✅ 2026-03-13
+  - `quality-logger.ts` — CommentQualityLog에 `relationshipMetrics?` 필드 추가 (warmth/attraction/rapportScore)
+  - `createCommentQualityLog()` — warmth/attraction/rapportScore 파라미터 추가, 클램핑 적용
+  - `aggregateCommentQualityLogs()` — 관계 수치 있는 로그만 별도 집계 (avgWarmth/avgAttraction/avgRapportScore)
+  - `interaction-pipeline.ts` — 댓글 생성 시 rel.warmth, rel.attraction 전달
+  - `types.ts` — CommentQualityLogInput에 warmth/attraction/rapportScore 추가
+  - 단위 테스트 5건: 관계 수치 포함/미포함/클램핑/집계/혼합 집계
+  - 파일: `quality-logger.ts`, `interaction-pipeline.ts`, `types.ts`, `quality-pw.test.ts`
+
+- [x] **T450: InteractionPatternLog에 관계 건강 지표 추가** ✅ 2026-03-13
+  - `quality-logger.ts` — InteractionPatternLog에 `relationshipHealth?` 필드 추가
+    (avgWarmthChange/relationshipMilestones/intimacyTransitions)
+  - `createInteractionPatternLog()` — relationshipHealth 파라미터 추가
+  - 단위 테스트 2건: 관계 건강 포함/미포함
+  - 파일: `quality-logger.ts`, `quality-pw.test.ts`
+
+- [x] **T451: 품질 리포트에 Relationship Health 섹션 추가** ✅ 2026-03-13
+  - `quality-integration.ts` — `RelationshipHealthReport` 인터페이스 + `QualityCheckResult`에 필드 추가
+  - `buildRelationshipHealthReport()` 헬퍼 함수 (warmthTrend 판정 + 파괴적 패턴 카운트)
+  - `runQualityCheck()` — `relationshipHealth` 파라미터 수용 + 결과에 포함
+  - `buildSummary()` — warmth 하락/파괴적 패턴 → reasons 추가 + CAUTION 상태 반영
+  - 단위 테스트 8건: 리포트 생성 4건 + runQualityCheck 통합 4건
+  - 파일: `quality-integration.ts`, `quality-pw.test.ts`
+
+- [x] **T452: Engine Studio 품질 대시보드 UI 확장** ✅ 2026-03-13
+  - `quality/page.tsx` — 테이블에 "관계 건강" + "친밀도" 컬럼 추가
+  - warmth 추세: ↑(녹색)/→(노란색)/↓(빨간색) + 활발한 관계 수
+  - 파괴적 경고: destructivePatterns > 0이면 빨간 Badge
+  - 유저 친밀도: 평균 레벨 + 최근 레벨업 수 (녹색)
+  - 파일: `persona-world-admin/quality/page.tsx`
+
+- [x] **T453: 테스트 + 전체 검증** ✅ 2026-03-13
+  - T449 단위 테스트 5건 + T450 단위 테스트 2건 + T451 단위 테스트 8건 PASS
+  - 기존 quality-pw 135건 regression 없음 (전체 150건 PASS)
+  - 전체 persona-world 2000 테스트 PASS (67 파일)
+  - 기존 conversation-engine-lang 1건 실패는 선행 버그 (본 작업 무관)
+
+- **AC**:
+  - CommentQualityLog에 warmth/attraction/rapportScore 기록됨
+  - InteractionPatternLog에 주간 관계 건강 지표 기록됨
+  - 품질 리포트에 Relationship Health 섹션 포함
+  - Engine Studio 대시보드에서 관계 건강 컬럼 확인 가능
+  - 파괴적 패턴(tension 지속 상승) 시 경고 배지 표시
+  - PIS 공식 자체는 변경 없음 (v4.3에서 4번째 축 검토)
+  - pnpm validate PASS
+
+---
+
 ## BLOCKED
 
 (없음)

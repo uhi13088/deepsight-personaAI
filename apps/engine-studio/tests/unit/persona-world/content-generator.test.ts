@@ -201,6 +201,52 @@ describe("buildUserPrompt — COLLAB phantom mention prevention", () => {
   })
 })
 
+// ═══ buildUserPrompt — COLLAB 관계 맥락 (T442) ═══
+
+describe("buildUserPrompt — COLLAB relationship context (T442)", () => {
+  it("relationshipHint가 있는 핸들이 있으면 [관계 맥락] 섹션 포함", () => {
+    const input = makeInput({
+      postType: "COLLAB" as PersonaPostType,
+      availablePersonaHandles: [
+        { handle: "영화광_민수", name: "민수", relationshipHint: "가까운 사이" },
+        { handle: "테크_리뷰어", name: "지수", relationshipHint: "자주 교류" },
+        { handle: "일반인", name: "철수" },
+      ],
+    })
+    const prompt = buildUserPrompt(input)
+
+    expect(prompt).toContain("[관계 맥락]")
+    expect(prompt).toContain("@영화광_민수: 가까운 사이")
+    expect(prompt).toContain("@테크_리뷰어: 자주 교류")
+    expect(prompt).toContain("관계가 좋은 상대와 자연스러운 콜라보")
+  })
+
+  it("relationshipHint가 없으면 [관계 맥락] 섹션 미포함", () => {
+    const input = makeInput({
+      postType: "COLLAB" as PersonaPostType,
+      availablePersonaHandles: [
+        { handle: "영화광_민수", name: "민수" },
+        { handle: "테크_리뷰어", name: "지수" },
+      ],
+    })
+    const prompt = buildUserPrompt(input)
+
+    expect(prompt).not.toContain("[관계 맥락]")
+  })
+
+  it("COLLAB 아닌 타입에서는 관계 맥락 미포함", () => {
+    const input = makeInput({
+      postType: "REVIEW" as PersonaPostType,
+      availablePersonaHandles: [
+        { handle: "test", name: "테스트", relationshipHint: "가까운 사이" },
+      ],
+    })
+    const prompt = buildUserPrompt(input)
+
+    expect(prompt).not.toContain("[관계 맥락]")
+  })
+})
+
 // ═══ generatePostContent ═══
 
 describe("generatePostContent", () => {

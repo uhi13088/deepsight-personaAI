@@ -40,6 +40,7 @@ import {
   analyzePISChange,
   detectQualityIssues,
   selectQualityCheckTargets,
+  buildRelationshipHealthReport,
 } from "@/lib/persona-world/quality/quality-integration"
 
 // ═══ Auto-Interview ═══
@@ -1839,5 +1840,333 @@ describe("PIS Engine — measurePISBatch", () => {
     expect(result.summary.gradeDistribution).toBeDefined()
     const totalInDist = Object.values(result.summary.gradeDistribution).reduce((s, n) => s + n, 0)
     expect(totalInDist).toBe(2)
+  })
+})
+
+// ═══ T449: CommentQualityLog 관계 수치 ═══
+
+describe("CommentQualityLog — 관계 수치 (T449)", () => {
+  it("warmth/attraction 전달 시 relationshipMetrics 포함", () => {
+    const log = createCommentQualityLog({
+      commentId: "c-rel",
+      personaId: "p1",
+      targetPostId: "post-1",
+      selectedTone: "empathetic",
+      toneMatchScore: 0.9,
+      relationshipStage: "FAMILIAR",
+      moodAtGeneration: 0.7,
+      contextRelevance: 0.8,
+      memoryReference: true,
+      naturalness: 0.85,
+      warmth: 0.6,
+      attraction: 0.3,
+      rapportScore: 0.7,
+    })
+
+    expect(log.relationshipMetrics).toBeDefined()
+    expect(log.relationshipMetrics!.warmth).toBeCloseTo(0.6)
+    expect(log.relationshipMetrics!.attraction).toBeCloseTo(0.3)
+    expect(log.relationshipMetrics!.rapportScore).toBeCloseTo(0.7)
+  })
+
+  it("관계 수치 미전달 시 relationshipMetrics 없음", () => {
+    const log = createCommentQualityLog({
+      commentId: "c-no-rel",
+      personaId: "p1",
+      targetPostId: "post-1",
+      selectedTone: "empathetic",
+      toneMatchScore: 0.9,
+      relationshipStage: "STRANGER",
+      moodAtGeneration: 0.5,
+      contextRelevance: 0.7,
+      memoryReference: false,
+      naturalness: 0.7,
+    })
+
+    expect(log.relationshipMetrics).toBeUndefined()
+  })
+
+  it("관계 수치 클램핑 (0~1)", () => {
+    const log = createCommentQualityLog({
+      commentId: "c-clamp-rel",
+      personaId: "p1",
+      targetPostId: "post-1",
+      selectedTone: "empathetic",
+      toneMatchScore: 0.9,
+      relationshipStage: "CLOSE",
+      moodAtGeneration: 0.7,
+      contextRelevance: 0.8,
+      memoryReference: false,
+      naturalness: 0.7,
+      warmth: 1.5,
+      attraction: -0.3,
+    })
+
+    expect(log.relationshipMetrics!.warmth).toBe(1)
+    expect(log.relationshipMetrics!.attraction).toBe(0)
+  })
+
+  it("aggregateCommentQualityLogs — 관계 수치 평균 집계", () => {
+    const logs = [
+      createCommentQualityLog({
+        commentId: "c1",
+        personaId: "p1",
+        targetPostId: "post-1",
+        selectedTone: "empathetic",
+        toneMatchScore: 0.8,
+        relationshipStage: "FAMILIAR",
+        moodAtGeneration: 0.7,
+        contextRelevance: 0.9,
+        memoryReference: true,
+        naturalness: 0.85,
+        warmth: 0.6,
+        attraction: 0.4,
+        rapportScore: 0.7,
+      }),
+      createCommentQualityLog({
+        commentId: "c2",
+        personaId: "p1",
+        targetPostId: "post-2",
+        selectedTone: "deep_analysis",
+        toneMatchScore: 0.7,
+        relationshipStage: "CLOSE",
+        moodAtGeneration: 0.5,
+        contextRelevance: 0.6,
+        memoryReference: false,
+        naturalness: 0.7,
+        warmth: 0.8,
+        attraction: 0.2,
+        rapportScore: 0.5,
+      }),
+    ]
+
+    const stats = aggregateCommentQualityLogs(logs)
+    expect(stats.avgWarmth).toBeCloseTo(0.7, 1)
+    expect(stats.avgAttraction).toBeCloseTo(0.3, 1)
+    expect(stats.avgRapportScore).toBeCloseTo(0.6, 1)
+  })
+
+  it("aggregateCommentQualityLogs — 관계 수치 없는 로그 혼합 시 있는 것만 집계", () => {
+    const logs = [
+      createCommentQualityLog({
+        commentId: "c1",
+        personaId: "p1",
+        targetPostId: "post-1",
+        selectedTone: "empathetic",
+        toneMatchScore: 0.8,
+        relationshipStage: "FAMILIAR",
+        moodAtGeneration: 0.7,
+        contextRelevance: 0.9,
+        memoryReference: true,
+        naturalness: 0.85,
+        warmth: 0.6,
+        attraction: 0.4,
+        rapportScore: 0.7,
+      }),
+      createCommentQualityLog({
+        commentId: "c2",
+        personaId: "p1",
+        targetPostId: "post-2",
+        selectedTone: "deep_analysis",
+        toneMatchScore: 0.7,
+        relationshipStage: "STRANGER",
+        moodAtGeneration: 0.5,
+        contextRelevance: 0.6,
+        memoryReference: false,
+        naturalness: 0.7,
+        // 관계 수치 없음
+      }),
+    ]
+
+    const stats = aggregateCommentQualityLogs(logs)
+    // 1개만 관계 수치 있으므로 그 값 그대로
+    expect(stats.avgWarmth).toBeCloseTo(0.6, 1)
+    expect(stats.avgAttraction).toBeCloseTo(0.4, 1)
+  })
+})
+
+// ═══ T450: InteractionPatternLog 관계 건강 지표 ═══
+
+describe("InteractionPatternLog — 관계 건강 (T450)", () => {
+  const baseStats = {
+    postsCreated: 5,
+    commentsWritten: 10,
+    likesGiven: 20,
+    followsInitiated: 2,
+    repostsShared: 3,
+  }
+  const basePatterns = {
+    activeHours: [9, 14, 20],
+    avgIntervalMinutes: 30,
+    targetDiversity: 0.7,
+    topicDiversity: 0.6,
+    energyCorrelation: 0.8,
+  }
+
+  it("relationshipHealth 전달 시 포함됨", () => {
+    const log = createInteractionPatternLog({
+      personaId: "p1",
+      period: "WEEKLY",
+      stats: baseStats,
+      patterns: basePatterns,
+      energy: 0.7,
+      relationshipHealth: {
+        avgWarmthChange: 0.05,
+        relationshipMilestones: 2,
+        intimacyTransitions: 1,
+      },
+    })
+
+    expect(log.relationshipHealth).toBeDefined()
+    expect(log.relationshipHealth!.avgWarmthChange).toBe(0.05)
+    expect(log.relationshipHealth!.relationshipMilestones).toBe(2)
+    expect(log.relationshipHealth!.intimacyTransitions).toBe(1)
+  })
+
+  it("relationshipHealth 미전달 시 없음", () => {
+    const log = createInteractionPatternLog({
+      personaId: "p1",
+      period: "DAILY",
+      stats: baseStats,
+      patterns: basePatterns,
+      energy: 0.7,
+    })
+
+    expect(log.relationshipHealth).toBeUndefined()
+  })
+})
+
+// ═══ T451: buildRelationshipHealthReport ═══
+
+describe("buildRelationshipHealthReport (T451)", () => {
+  it("평균 warmth 변화 > 0.02 → RISING", () => {
+    const report = buildRelationshipHealthReport({
+      warmthChanges: [0.05, 0.03, 0.04],
+      activeRelationships: 5,
+      tensionRisingCount: 0,
+      avgIntimacyLevel: 2.5,
+      recentLevelUps: 1,
+    })
+
+    expect(report.warmthTrend).toBe("RISING")
+    expect(report.activeRelationships).toBe(5)
+    expect(report.destructivePatterns).toBe(0)
+    expect(report.intimacy.avgLevel).toBe(2.5)
+    expect(report.intimacy.recentLevelUps).toBe(1)
+  })
+
+  it("평균 warmth 변화 < -0.02 → DECLINING", () => {
+    const report = buildRelationshipHealthReport({
+      warmthChanges: [-0.05, -0.03, -0.04],
+      activeRelationships: 3,
+      tensionRisingCount: 2,
+      avgIntimacyLevel: 1.5,
+      recentLevelUps: 0,
+    })
+
+    expect(report.warmthTrend).toBe("DECLINING")
+    expect(report.destructivePatterns).toBe(2)
+  })
+
+  it("평균 warmth 변화 -0.02~0.02 → STABLE", () => {
+    const report = buildRelationshipHealthReport({
+      warmthChanges: [0.01, -0.01, 0.005],
+      activeRelationships: 4,
+      tensionRisingCount: 0,
+      avgIntimacyLevel: 3.0,
+      recentLevelUps: 0,
+    })
+
+    expect(report.warmthTrend).toBe("STABLE")
+  })
+
+  it("warmthChanges 빈 배열 → STABLE", () => {
+    const report = buildRelationshipHealthReport({
+      warmthChanges: [],
+      activeRelationships: 0,
+      tensionRisingCount: 0,
+      avgIntimacyLevel: 1.0,
+      recentLevelUps: 0,
+    })
+
+    expect(report.warmthTrend).toBe("STABLE")
+  })
+})
+
+// ═══ T451: runQualityCheck + relationshipHealth ═══
+
+describe("runQualityCheck — relationshipHealth (T451)", () => {
+  const goodCR2 = { recentMemoryAccuracy: 0.9, mediumTermAccuracy: 0.85, coreMemoryRetention: 0.9 }
+  const goodSC2 = { factbookCompliance: 0.95, voiceSpecAdherence: 0.9, vectorBehaviorAlign: 0.85 }
+  const goodCS2 = { weeklyDrift: 0.05, toneVariance: 0.05, growthArcAlignment: 0.9 }
+
+  it("relationshipHealth 전달 시 결과에 포함", () => {
+    const result = runQualityCheck({
+      personaId: "p1",
+      contextRecall: goodCR2,
+      settingConsistency: goodSC2,
+      characterStability: goodCS2,
+      sampleSize: 50,
+      relationshipHealth: {
+        warmthTrend: "RISING",
+        activeRelationships: 5,
+        destructivePatterns: 0,
+        intimacy: { avgLevel: 3.0, recentLevelUps: 2 },
+      },
+    })
+
+    expect(result.relationshipHealth).not.toBeNull()
+    expect(result.relationshipHealth!.warmthTrend).toBe("RISING")
+    expect(result.summary.status).toBe("HEALTHY")
+  })
+
+  it("warmthTrend DECLINING → summary에 관계 하락 이유 포함", () => {
+    const result = runQualityCheck({
+      personaId: "p1",
+      contextRecall: goodCR2,
+      settingConsistency: goodSC2,
+      characterStability: goodCS2,
+      sampleSize: 50,
+      relationshipHealth: {
+        warmthTrend: "DECLINING",
+        activeRelationships: 3,
+        destructivePatterns: 0,
+        intimacy: { avgLevel: 2.0, recentLevelUps: 0 },
+      },
+    })
+
+    expect(result.summary.reasons.some((r) => r.includes("warmth 추세 하락"))).toBe(true)
+    expect(result.summary.status).toBe("CAUTION")
+  })
+
+  it("destructivePatterns > 0 → summary에 파괴적 패턴 경고 포함", () => {
+    const result = runQualityCheck({
+      personaId: "p1",
+      contextRecall: goodCR2,
+      settingConsistency: goodSC2,
+      characterStability: goodCS2,
+      sampleSize: 50,
+      relationshipHealth: {
+        warmthTrend: "STABLE",
+        activeRelationships: 4,
+        destructivePatterns: 2,
+        intimacy: { avgLevel: 2.5, recentLevelUps: 0 },
+      },
+    })
+
+    expect(result.summary.reasons.some((r) => r.includes("파괴적 관계 패턴"))).toBe(true)
+    expect(result.summary.status).toBe("CAUTION")
+  })
+
+  it("relationshipHealth 미전달 시 null", () => {
+    const result = runQualityCheck({
+      personaId: "p1",
+      contextRecall: goodCR2,
+      settingConsistency: goodSC2,
+      characterStability: goodCS2,
+      sampleSize: 50,
+    })
+
+    expect(result.relationshipHealth).toBeNull()
   })
 })

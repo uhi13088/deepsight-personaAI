@@ -59,6 +59,9 @@ export type StateUpdateEvent =
       sentiment: "positive" | "neutral" | "negative" | "aggressive"
     }
   | { type: "like_received" }
+  | { type: "like_given"; count: number }
+  | { type: "repost_given"; count: number }
+  | { type: "follow_given"; count: number }
   | { type: "idle_period"; hours: number }
   | { type: "paradox_situation"; intensity: number }
   | { type: "paradox_resolved" }
@@ -218,8 +221,15 @@ export interface PostGenerationInput {
   l1Vector?: SocialPersonaVector // L1 소셜 벡터 (few-shot 생성용)
   hashtagRange?: { min: number; max: number } // 해시태그 수 범위 (temperament 벡터 기반)
   personaProfile?: PersonaProfileSnapshot // 프로필 데이터 (LLM 프롬프트 개인화)
-  /** COLLAB 등 멘션 가능 포스트용 — 실제 존재하는 페르소나 핸들 목록 */
-  availablePersonaHandles?: Array<{ handle: string; name: string }>
+  /** COLLAB 등 멘션 가능 포스트용 — 실제 존재하는 페르소나 핸들 목록 (T441: 관계 랭킹 포함) */
+  availablePersonaHandles?: Array<{
+    handle: string
+    name: string
+    collabScore?: number
+    relationshipHint?: string
+  }>
+  /** T443: COLLAB 타입 확률 부스트 (warmth>0.6 관계 수 기반) */
+  collaborationScores?: number[]
   /** v4.2.0: 이미지 포스트용 — Vision 분석 결과 컨텍스트 */
   imageContext?: ImagePostContext
 }
@@ -454,6 +464,10 @@ export interface CommentQualityLogInput {
   memoryReference: boolean
   naturalness: number
   overallScore: number
+  /** T449: 관계 수치 (선택) */
+  warmth?: number
+  attraction?: number
+  rapportScore?: number
 }
 
 export type AnomalyType = "BOT_PATTERN" | "ENERGY_MISMATCH" | "SUDDEN_BURST" | "PROLONGED_SILENCE"

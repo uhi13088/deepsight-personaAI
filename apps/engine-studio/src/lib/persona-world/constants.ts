@@ -378,7 +378,35 @@ export const COMMENT_TONE_MATRIX: CommentToneRule[] = [
     weight: 0.8,
   },
   {
-    // P10: lack 높음 + mood 낮음 → 과잉 동의
+    // P10: attraction 중간 + warmth 높음 + mood 높음 → 장난스럽고 애정 담긴 톤 (T437)
+    conditions: [
+      { source: "relationship", dimension: "attraction", operator: ">", threshold: 0.4 },
+      { source: "relationship", dimension: "warmth", operator: ">", threshold: 0.5 },
+      { source: "state", dimension: "mood", operator: ">", threshold: 0.5 },
+    ],
+    tone: "intimate_joke",
+    weight: 0.95,
+  },
+  {
+    // P11: attraction 높음 + warmth 높음 → 적극적 지지/응원 톤 (T437)
+    conditions: [
+      { source: "relationship", dimension: "attraction", operator: ">", threshold: 0.7 },
+      { source: "relationship", dimension: "warmth", operator: ">", threshold: 0.6 },
+    ],
+    tone: "supportive",
+    weight: 1.0,
+  },
+  {
+    // P12: attraction 중간 + tension 높음 → 질투 섞인 반응 (T437)
+    conditions: [
+      { source: "relationship", dimension: "attraction", operator: ">", threshold: 0.5 },
+      { source: "relationship", dimension: "tension", operator: ">", threshold: 0.4 },
+    ],
+    tone: "paradox_response",
+    weight: 0.9,
+  },
+  {
+    // P13: lack 높음 + mood 낮음 → 과잉 동의
     conditions: [
       { source: "commenter", dimension: "lack", operator: ">", threshold: 0.6 },
       { source: "state", dimension: "mood", operator: "<", threshold: 0.3 },
@@ -387,7 +415,7 @@ export const COMMENT_TONE_MATRIX: CommentToneRule[] = [
     weight: 0.7,
   },
   {
-    // P11: 기본 fallback → 지지
+    // P14: 기본 fallback → 지지
     conditions: [],
     tone: "supportive",
     weight: 0.3,

@@ -326,6 +326,8 @@ interface TypeModifier {
   debateWillingnessDelta: number
   selfDisclosureDelta: number
   extraTones: string[]
+  /** T439: 이 타입에서 제외할 톤 (LOVER/SOULMATE → formal_analysis 제외) */
+  excludeTones?: string[]
 }
 
 const TYPE_MODIFIERS: Record<RelationshipType, TypeModifier> = {
@@ -396,24 +398,29 @@ const TYPE_MODIFIERS: Record<RelationshipType, TypeModifier> = {
     interactionBoostDelta: 0.3, // 적극적 상호작용 시도
     debateWillingnessDelta: -0.2, // 갈등 회피 (싫은 모습 보이기 싫음)
     selfDisclosureDelta: 0.05, // 조심스러운 자기 노출
-    extraTones: ["supportive", "light_reaction", "empathetic"],
+    // T439: intimate_joke, supportive 가중치 상향 — 따뜻한 톤 우선
+    extraTones: ["intimate_joke", "supportive", "light_reaction", "empathetic"],
   },
   SWEETHEART: {
     interactionBoostDelta: 0.35, // 자주 대화하고 싶음
     debateWillingnessDelta: -0.1, // 갈등 약간 회피
     selfDisclosureDelta: 0.15, // 서서히 마음 열기
-    extraTones: ["light_reaction", "intimate_joke", "empathetic"],
+    // T439: intimate_joke, supportive 가중치 상향
+    extraTones: ["intimate_joke", "light_reaction", "empathetic", "supportive"],
   },
   LOVER: {
     interactionBoostDelta: 0.5, // 가장 높은 상호작용 욕구
     debateWillingnessDelta: 0, // 편안한 의견 교환
     selfDisclosureDelta: 0.35, // 깊은 자기 노출
+    // T439: formal_analysis 제외 — 딱딱한 분석 톤 부적합
     extraTones: ["intimate_joke", "empathetic", "paradox_response", "supportive"],
+    excludeTones: ["formal_analysis"],
   },
   SOULMATE: {
     interactionBoostDelta: 0.5, // 최고의 유대
     debateWillingnessDelta: 0.1, // 진솔한 의견 교환 가능
     selfDisclosureDelta: 0.4, // 완전한 자기 노출
+    // T439: formal_analysis 제외 — 친밀한 사이에서 부자연스러움
     extraTones: [
       "intimate_joke",
       "empathetic",
@@ -421,6 +428,7 @@ const TYPE_MODIFIERS: Record<RelationshipType, TypeModifier> = {
       "deep_analysis",
       "unique_perspective",
     ],
+    excludeTones: ["formal_analysis"],
   },
   EX: {
     interactionBoostDelta: -0.2, // 상호작용 기피
@@ -432,7 +440,8 @@ const TYPE_MODIFIERS: Record<RelationshipType, TypeModifier> = {
     interactionBoostDelta: 0.6, // 과도한 관심, 멈출 수 없음
     debateWillingnessDelta: -0.1, // 상대 비위 맞추려 함
     selfDisclosureDelta: 0, // 일방적 관심
-    extraTones: ["supportive", "empathetic", "light_reaction"],
+    // T439: paradox_response 가중치 상향 — 집착적 반응 패턴
+    extraTones: ["supportive", "empathetic", "light_reaction", "paradox_response"],
   },
   // ── v4.2 사회적 3종 ──
   GUARDIAN: {
@@ -887,8 +896,13 @@ export function buildProtocol(stage: RelationshipStage, type: RelationshipType):
   const base = STAGE_PROTOCOLS[stage]
   const modifier = TYPE_MODIFIERS[type]
 
-  // 톤 병합 (중복 제거)
+  // 톤 병합 (중복 제거) + T439: excludeTones 적용
   const toneSet = new Set([...base.allowedTones, ...modifier.extraTones])
+  if (modifier.excludeTones) {
+    for (const tone of modifier.excludeTones) {
+      toneSet.delete(tone)
+    }
+  }
 
   return {
     interactionBoost: clamp(base.interactionBoost + modifier.interactionBoostDelta, 0, 2),

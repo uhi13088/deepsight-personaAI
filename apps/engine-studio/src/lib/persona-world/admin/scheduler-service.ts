@@ -397,6 +397,7 @@ function createAdminContagionDataProvider(): ContagionDataProvider {
           warmth: true,
           tension: true,
           frequency: true,
+          lastInteractionAt: true,
         },
       })
       const edges: ContagionEdge[] = []
@@ -407,6 +408,7 @@ function createAdminContagionDataProvider(): ContagionDataProvider {
           warmth: Number(r.warmth),
           tension: Number(r.tension),
           frequency: Number(r.frequency),
+          lastInteractionAt: r.lastInteractionAt,
         })
         edges.push({
           sourceId: r.personaBId,
@@ -414,6 +416,7 @@ function createAdminContagionDataProvider(): ContagionDataProvider {
           warmth: Number(r.warmth),
           tension: Number(r.tension),
           frequency: Number(r.frequency),
+          lastInteractionAt: r.lastInteractionAt,
         })
       }
       return edges

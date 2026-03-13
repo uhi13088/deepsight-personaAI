@@ -43,6 +43,21 @@ import type { VoiceStyleParams } from "../types"
 
 // ── 통합 결과 타입 ──────────────────────────────────────────
 
+/** T451: 관계 건강 지표 */
+export interface RelationshipHealthReport {
+  /** 평균 warmth 추세 */
+  warmthTrend: "RISING" | "STABLE" | "DECLINING"
+  /** 활발한 관계 수 */
+  activeRelationships: number
+  /** 파괴적 패턴 감지 (tension 지속 상승 관계 수) */
+  destructivePatterns: number
+  /** 유저 친밀도 현황 */
+  intimacy: {
+    avgLevel: number
+    recentLevelUps: number
+  }
+}
+
 export interface QualityCheckResult {
   personaId: string
   interview: PWInterviewResult | null
@@ -55,6 +70,8 @@ export interface QualityCheckResult {
   diversityConstraint: DiversityConstraintResult | null
   /** T183: VoiceStyle 자동 보정 결과 (STABLE이 아닐 때 자동 생성) */
   driftCorrection: DriftCorrectionResult | null
+  /** T451: 관계 건강 리포트 */
+  relationshipHealth: RelationshipHealthReport | null
   summary: QualitySummary
 }
 
@@ -90,6 +107,8 @@ export function runQualityCheck(params: {
   voiceStyleBaseline?: VoiceStyleParams
   voiceStyleCurrent?: VoiceStyleParams
   recentContents?: string[]
+  /** T451: 관계 건강 데이터 (외부에서 수집하여 전달) */
+  relationshipHealth?: RelationshipHealthReport
 }): QualityCheckResult {
   const {
     personaId,
@@ -106,6 +125,7 @@ export function runQualityCheck(params: {
     voiceStyleBaseline,
     voiceStyleCurrent,
     recentContents,
+    relationshipHealth,
   } = params
 
   // Step 1: PIS 계산
@@ -161,7 +181,8 @@ export function runQualityCheck(params: {
     triggers,
     drift,
     diversity,
-    driftCorrection
+    driftCorrection,
+    relationshipHealth ?? null
   )
 
   return {
@@ -174,6 +195,7 @@ export function runQualityCheck(params: {
     diversity,
     diversityConstraint,
     driftCorrection,
+    relationshipHealth: relationshipHealth ?? null,
     summary,
   }
 }
@@ -268,7 +290,8 @@ function buildSummary(
   triggers: ArenaTrigger[],
   drift: DriftResult | null = null,
   diversity: DiversityResult | null = null,
-  driftCorrection: DriftCorrectionResult | null = null
+  driftCorrection: DriftCorrectionResult | null = null,
+  relationshipHealth: RelationshipHealthReport | null = null
 ): QualitySummary {
   const reasons: string[] = []
 
@@ -318,6 +341,18 @@ function buildSummary(
     }
   }
 
+  // T451: 관계 건강 지표
+  if (relationshipHealth) {
+    if (relationshipHealth.warmthTrend === "DECLINING") {
+      reasons.push(`관계 warmth 추세 하락`)
+    }
+    if (relationshipHealth.destructivePatterns > 0) {
+      reasons.push(
+        `파괴적 관계 패턴 ${relationshipHealth.destructivePatterns}건 (tension 지속 상승)`
+      )
+    }
+  }
+
   // 트리거 기반
   if (triggers.some((t) => t.priority === "CRITICAL")) {
     reasons.push(
@@ -344,7 +379,10 @@ function buildSummary(
     (interview && interview.verdict === "warning") ||
     logIssues.length > 0 ||
     (drift && drift.severity === "WARNING") ||
-    (diversity && diversity.severity === "WARNING")
+    (diversity && diversity.severity === "WARNING") ||
+    (relationshipHealth &&
+      (relationshipHealth.warmthTrend === "DECLINING" ||
+        relationshipHealth.destructivePatterns > 0))
   ) {
     status = "CAUTION"
   } else {
@@ -352,6 +390,40 @@ function buildSummary(
   }
 
   return { status, reasons }
+}
+
+/**
+ * T451: 관계 건강 리포트 생성 헬퍼.
+ *
+ * warmthChanges: 각 관계의 주간 warmth 변화값 배열
+ * tensionRising: tension이 지속 상승 중인 관계 수
+ */
+export function buildRelationshipHealthReport(params: {
+  warmthChanges: number[]
+  activeRelationships: number
+  tensionRisingCount: number
+  avgIntimacyLevel: number
+  recentLevelUps: number
+}): RelationshipHealthReport {
+  const avgChange =
+    params.warmthChanges.length > 0
+      ? params.warmthChanges.reduce((s, v) => s + v, 0) / params.warmthChanges.length
+      : 0
+
+  let warmthTrend: RelationshipHealthReport["warmthTrend"]
+  if (avgChange > 0.02) warmthTrend = "RISING"
+  else if (avgChange < -0.02) warmthTrend = "DECLINING"
+  else warmthTrend = "STABLE"
+
+  return {
+    warmthTrend,
+    activeRelationships: params.activeRelationships,
+    destructivePatterns: params.tensionRisingCount,
+    intimacy: {
+      avgLevel: round(params.avgIntimacyLevel),
+      recentLevelUps: params.recentLevelUps,
+    },
+  }
 }
 
 function round(v: number): number {

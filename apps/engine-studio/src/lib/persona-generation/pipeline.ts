@@ -56,6 +56,7 @@ import {
   type PostFrequency as PrismaPostFrequency,
 } from "@/generated/prisma"
 import { ARCHETYPES } from "@/lib/persona-generation/archetypes"
+import { generateProfileImage } from "@/lib/image-generation/profile-image-generator"
 
 // ── TTS 음성 검증 (T365) ─────────────────────────────────────
 //
@@ -543,6 +544,21 @@ async function executeAutoPipeline(options?: AutoPipelineInput): Promise<Generat
     triggerRules,
   })
 
+  // Stage 5.7: 프로필 이미지 자동 생성 (T441 — FLUX.2 [pro] via Replicate)
+  const profileImageResult = await generateProfileImage({
+    gender: demographics.gender,
+    nationality: demographics.nationality,
+    birthDate: structured.birthDate,
+    role,
+    expertise: character.expertise,
+    personality: {
+      extraversion: l2.extraversion,
+      agreeableness: l2.agreeableness,
+      openness: l2.openness,
+      neuroticism: l2.neuroticism,
+    },
+  })
+
   // Stage 6: Paradox Score
   const crossAxisProfile = calculateCrossAxisProfile(l1, l2, l3)
   const paradoxProfile = calculateExtendedParadoxScore(l1, l2, l3, crossAxisProfile)
@@ -554,6 +570,7 @@ async function executeAutoPipeline(options?: AutoPipelineInput): Promise<Generat
     tagline: character.description,
     role,
     expertise: character.expertise,
+    profileImageUrl: profileImageResult?.profileImageUrl,
     description: character.description,
     warmth,
     background: character.background,
@@ -664,6 +681,25 @@ async function executeManualPipeline(input: ManualPipelineInput): Promise<Genera
     triggerRules,
   })
 
+  // 프로필 이미지: 외부 미제공 시 자동 생성 (T441)
+  let profileImageUrl = input.profileImageUrl ?? null
+  if (!profileImageUrl) {
+    const imageResult = await generateProfileImage({
+      gender: demographics.gender,
+      nationality: demographics.nationality,
+      birthDate: structured.birthDate,
+      role: input.role,
+      expertise: input.expertise,
+      personality: {
+        extraversion: l2.extraversion,
+        agreeableness: l2.agreeableness,
+        openness: l2.openness,
+        neuroticism: l2.neuroticism,
+      },
+    })
+    profileImageUrl = imageResult?.profileImageUrl ?? null
+  }
+
   // Paradox Score
   const crossAxisProfile = calculateCrossAxisProfile(l1, l2, l3)
   const paradoxProfile = calculateExtendedParadoxScore(l1, l2, l3, crossAxisProfile)
@@ -675,7 +711,7 @@ async function executeManualPipeline(input: ManualPipelineInput): Promise<Genera
     tagline: input.description,
     role: input.role,
     expertise: input.expertise,
-    profileImageUrl: input.profileImageUrl,
+    profileImageUrl,
     description: input.description,
     warmth,
     background: null,

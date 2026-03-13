@@ -15,10 +15,15 @@ import {
   retrieveConversationMemories,
   recordConversationTurn,
   adjustStateForConversation,
+  classifyUserSentiment,
+  detectTextLanguage,
+  finalizeConversation,
 } from "./conversation-memory"
 import type { ConversationMemoryProvider } from "./conversation-memory"
 import { spendCredits, getBalance } from "./credit-service"
 import type { CreditDataProvider } from "./credit-service"
+import { updateIntimacyAfterChat } from "./intimacy-engine"
+import type { IntimacyDataProvider } from "./intimacy-engine"
 import type { PersonaProfileSnapshot, PersonaStateData } from "./types"
 
 // ── 상수 ────────────────────────────────────────────────────
@@ -29,9 +34,13 @@ const CHAT_COST_PER_TURN = 10
 /** 페이지네이션 기본값 */
 const DEFAULT_PAGE_SIZE = 30
 
+/** T433: 세션 타임아웃 (30분) */
+export const SESSION_TIMEOUT_MS = 30 * 60 * 1000
+
 // ── DI 인터페이스 ───────────────────────────────────────────
 
-export interface ChatDataProvider extends ConversationMemoryProvider, CreditDataProvider {
+export interface ChatDataProvider
+  extends ConversationMemoryProvider, CreditDataProvider, IntimacyDataProvider {
   /** 대화방 생성 */
   createThread(params: {
     personaId: string
@@ -61,6 +70,11 @@ export interface ChatDataProvider extends ConversationMemoryProvider, CreditData
     sessionId: string | null
     totalMessages: number
     isActive: boolean
+    lastMessageAt: Date | null
+    intimacyScore: number
+    intimacyLevel: number
+    lastIntimacyAt: Date | null
+    sharedMilestones: string[] | null
   } | null>
 
   /** 메시지 저장 */
@@ -88,10 +102,16 @@ export interface ChatDataProvider extends ConversationMemoryProvider, CreditData
     nextCursor: string | null
   }>
 
-  /** 대화방 업데이트 (lastMessageAt, totalMessages) */
+  /** 대화방 업데이트 */
   updateThread(
     threadId: string,
-    data: { lastMessageAt?: Date; totalMessages?: number }
+    data: {
+      lastMessageAt?: Date
+      totalMessages?: number
+      sessionId?: string
+      isActive?: boolean
+      endedAt?: Date
+    }
   ): Promise<void>
 
   /** InteractionSession 생성 */
@@ -102,6 +122,15 @@ export interface ChatDataProvider extends ConversationMemoryProvider, CreditData
 
   /** L3 volatility 조회 (poignancy 계산용) */
   getPersonaVolatility(personaId: string): Promise<number>
+
+  /** T433: 세션의 poignancy 상위 로그 조회 (highlights 자동 추출) */
+  getTopPoignancyLogs(
+    sessionId: string,
+    limit: number
+  ): Promise<Array<{ userMessage: string; personaResponse: string; poignancyScore: number }>>
+
+  /** T433: InteractionSession 종료 처리 */
+  endInteractionSession(sessionId: string, endedAt: Date): Promise<void>
 }
 
 // ── 서비스 함수: 대화방 생성 ───────────────────────────────
@@ -181,7 +210,41 @@ export async function sendMessage(
   const thread = await provider.getThread(threadId)
   if (!thread) throw new Error("THREAD_NOT_FOUND")
   if (thread.userId !== userId) throw new Error("UNAUTHORIZED")
-  if (!thread.isActive) throw new Error("THREAD_INACTIVE")
+
+  // T434: 비활성 스레드 → 자동 재활성화 (새 세션 생성, 대화 기록 유지)
+  if (!thread.isActive) {
+    const newSession = await provider.createInteractionSession({
+      personaId: thread.personaId,
+      userId,
+    })
+    await provider.updateThread(threadId, {
+      isActive: true,
+      sessionId: newSession.id,
+    })
+    thread.sessionId = newSession.id
+    thread.isActive = true
+  }
+
+  // T433: 30분 비활동 시 이전 세션 finalize + 새 세션 시작
+  const now = new Date()
+  if (thread.lastMessageAt && thread.sessionId) {
+    const elapsed = now.getTime() - thread.lastMessageAt.getTime()
+    if (elapsed > SESSION_TIMEOUT_MS) {
+      await autoFinalizeSession(
+        provider,
+        thread.sessionId,
+        thread.personaId,
+        userId,
+        thread.totalMessages
+      )
+      const newSession = await provider.createInteractionSession({
+        personaId: thread.personaId,
+        userId,
+      })
+      await provider.updateThread(threadId, { sessionId: newSession.id })
+      thread.sessionId = newSession.id
+    }
+  }
 
   // 2. 코인 차감 (잔액 부족 시 INSUFFICIENT_BALANCE 에러)
   await spendCredits(provider, userId, CHAT_COST_PER_TURN, "persona_chat")
@@ -212,7 +275,8 @@ export async function sendMessage(
     content: m.content,
   }))
 
-  // 6. Conversation Engine 호출
+  // 6. Conversation Engine 호출 (친밀도 주입 T431)
+  const userLanguage = detectTextLanguage(content)
   const conversationContext: ConversationContext = {
     persona: profile,
     personaId: thread.personaId,
@@ -220,6 +284,9 @@ export async function sendMessage(
     ragContext,
     mode: "chat",
     userNickname,
+    intimacyLevel: thread.intimacyLevel,
+    sharedMilestones: thread.sharedMilestones ?? undefined,
+    userLanguage,
   }
 
   const llmResult: ConversationResult = await generateConversationResponse({
@@ -263,8 +330,11 @@ export async function sendMessage(
     source: input.source,
   })
 
-  // 10. 페르소나 응답 poignancy 업데이트
-  // (이미 saveMessage로 저장했으므로 poignancy만 업데이트)
+  // 10. 친밀도 업데이트 (T430, T447: 페르소나 상태 반영)
+  await updateIntimacyAfterChat(provider, threadId, poignancy, {
+    personaMood: state.mood,
+    paradoxTension: state.paradoxTension,
+  })
 
   // 11. 대화방 메타데이터 업데이트
   await provider.updateThread(threadId, {
@@ -272,9 +342,9 @@ export async function sendMessage(
     totalMessages: thread.totalMessages + 2, // user + persona
   })
 
-  // 12. PersonaState 미세 조정 (간단한 감정 분류)
+  // 12. PersonaState 미세 조정 (간단한 감정 분류, T446: 친밀도 비례 영향력)
   const sentiment = classifyUserSentiment(content)
-  const updatedState = adjustStateForConversation(state, sentiment)
+  const updatedState = adjustStateForConversation(state, sentiment, thread.intimacyLevel)
   await provider.savePersonaState(thread.personaId, updatedState)
 
   // 13. 잔액 조회
@@ -338,13 +408,91 @@ export async function getMessages(
   })
 }
 
-// ── 유틸: 간단한 감정 분류 ──────────────────────────────────
+// ── 서비스 함수: 채팅 종료 (T435) ───────────────────────────
 
-function classifyUserSentiment(text: string): "positive" | "neutral" | "negative" {
-  const positivePatterns = /좋|감사|행복|기쁘|사랑|최고|대박|귀엽|멋|ㅋㅋ|ㅎㅎ|😊|😍|❤️|👍/
-  const negativePatterns = /싫|슬프|힘들|짜증|화나|우울|ㅠㅠ|ㅜㅜ|😢|😭|💔|별로|최악/
-
-  if (positivePatterns.test(text)) return "positive"
-  if (negativePatterns.test(text)) return "negative"
-  return "neutral"
+export interface EndChatThreadInput {
+  threadId: string
+  userId: string
+  highlights?: string[]
 }
+
+export interface EndChatThreadResult {
+  totalTurns: number
+  highlights: string[]
+}
+
+/**
+ * T435: 명시적 채팅 종료.
+ * finalize → isActive=false → endedAt 설정.
+ */
+export async function endChatThread(
+  provider: ChatDataProvider,
+  input: EndChatThreadInput
+): Promise<EndChatThreadResult> {
+  const { threadId, userId } = input
+
+  const thread = await provider.getThread(threadId)
+  if (!thread) throw new Error("THREAD_NOT_FOUND")
+  if (thread.userId !== userId) throw new Error("UNAUTHORIZED")
+  if (!thread.isActive) throw new Error("THREAD_ALREADY_ENDED")
+
+  // highlights: 제공되면 사용, 없으면 자동 추출
+  const highlights = input.highlights ?? (await extractHighlights(provider, thread.sessionId))
+
+  // finalize
+  if (thread.sessionId) {
+    await finalizeConversation(provider, {
+      personaId: thread.personaId,
+      userId,
+      highlights,
+      mode: "chat",
+      totalTurns: thread.totalMessages,
+    })
+    await provider.endInteractionSession(thread.sessionId, new Date())
+  }
+
+  // 스레드 비활성화
+  await provider.updateThread(threadId, {
+    isActive: false,
+    endedAt: new Date(),
+  })
+
+  return { totalTurns: thread.totalMessages, highlights }
+}
+
+// ── 내부 헬퍼 ────────────────────────────────────────────────
+
+/**
+ * T433: 세션 자동 finalize (30분 타임아웃 시).
+ */
+async function autoFinalizeSession(
+  provider: ChatDataProvider,
+  sessionId: string,
+  personaId: string,
+  userId: string,
+  totalMessages: number
+): Promise<void> {
+  const highlights = await extractHighlights(provider, sessionId)
+  await finalizeConversation(provider, {
+    personaId,
+    userId,
+    highlights,
+    mode: "chat",
+    totalTurns: totalMessages,
+  })
+  await provider.endInteractionSession(sessionId, new Date())
+}
+
+/**
+ * T433: poignancy 상위 3개에서 highlights 자동 추출.
+ */
+export async function extractHighlights(
+  provider: ChatDataProvider,
+  sessionId: string | null
+): Promise<string[]> {
+  if (!sessionId) return []
+  const logs = await provider.getTopPoignancyLogs(sessionId, 3)
+  return logs.map((log) => `${log.userMessage.slice(0, 50)} → ${log.personaResponse.slice(0, 80)}`)
+}
+
+// classifyUserSentiment → conversation-memory.ts로 이동 (공용 함수)
