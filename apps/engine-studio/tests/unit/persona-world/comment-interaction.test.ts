@@ -444,3 +444,40 @@ describe("respondToUser", () => {
     expect(result.response).toBeTruthy()
   })
 })
+
+// ═══ T437: attraction 기반 톤 매트릭스 테스트 ═══
+
+describe("decideCommentTone — attraction rules (T437)", () => {
+  it("attraction 높음 + warmth 높음 + mood 높음 → intimate_joke", () => {
+    const vectors = makeVectors()
+    const state = makeState({ mood: 0.7 })
+    const rel = makeRelationship({ attraction: 0.5, warmth: 0.6 })
+    const result = decideCommentTone(vectors, state, rel, 0.1)
+    expect(result.tone).toBe("intimate_joke")
+  })
+
+  it("attraction 매우 높음 + warmth 높음 → supportive (devoted_support)", () => {
+    const vectors = makeVectors()
+    const state = makeState({ mood: 0.4 }) // mood 낮아서 intimate_joke 조건 미충족
+    const rel = makeRelationship({ attraction: 0.8, warmth: 0.7 })
+    const result = decideCommentTone(vectors, state, rel, 0.1)
+    expect(result.tone).toBe("supportive")
+  })
+
+  it("attraction 중간 + tension 높음 → paradox_response (jealous_edge)", () => {
+    const vectors = makeVectors()
+    const state = makeState()
+    const rel = makeRelationship({ attraction: 0.6, tension: 0.5 })
+    const result = decideCommentTone(vectors, state, rel, 0.1)
+    expect(result.tone).toBe("paradox_response")
+  })
+
+  it("attraction 0인 관계 → 기존 동작 유지 (attraction 룰 무매치)", () => {
+    const vectors = makeVectors()
+    const state = makeState()
+    const rel = makeRelationship({ attraction: 0, warmth: 0.5 })
+    const result = decideCommentTone(vectors, state, rel, 0.1)
+    // attraction 기반 룰이 매치하지 않으므로 기존 톤 중 하나
+    expect(["supportive", "light_reaction", "empathetic", "formal_analysis"]).toContain(result.tone)
+  })
+})

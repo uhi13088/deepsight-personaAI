@@ -1700,38 +1700,32 @@
 > **설계**: COMMENT_TONE_MATRIX에 attraction 기반 룰 추가 + engagement 확률 부스트 +
 > 로맨틱 타입별 allowedTones 조정.
 
-- [ ] **T437: COMMENT_TONE_MATRIX에 attraction 기반 룰 추가**
-  - `constants.ts` — 3개 룰 추가:
-    - `flirty_comment`: attraction > 0.4 + warmth > 0.5 + mood > 0.5 → 장난스럽고 애정 담긴 톤
-    - `devoted_support`: attraction > 0.7 + warmth > 0.6 → 적극적 지지/응원 톤
-    - `jealous_edge`: attraction > 0.5 + tension > 0.4 → 질투 섞인 반응 (OBSESSED/TSUNDERE)
-  - 기존 11개 룰과 priority 충돌 없도록 배치
-  - attraction 0인 관계는 기존 동작 그대로 유지
-  - 단위 테스트: attraction 조합별 톤 선택 검증
-  - 파일: `apps/engine-studio/src/lib/persona-world/constants.ts`
+- [x] **T437: COMMENT_TONE_MATRIX에 attraction 기반 룰 추가** ✅ 2026-03-13
+  - `constants.ts` — 3개 룰 추가 (P10~P12):
+    - attraction>0.4 + warmth>0.5 + mood>0.5 → intimate_joke (장난스럽고 애정 담긴 톤)
+    - attraction>0.7 + warmth>0.6 → supportive (적극적 지지)
+    - attraction>0.5 + tension>0.4 → paradox_response (질투 섞인 반응)
+  - 기존 11개 → 14개 룰, attraction 0인 관계 기존 동작 유지
+  - 단위 테스트 4건 (attraction 조합별 톤 + 기존 동작 유지 검증)
+  - 파일: `constants.ts`, `comment-interaction.test.ts`
 
-- [ ] **T438: engagement-decision에 attraction 부스트**
-  - `engagement-decision.ts` — 댓글 참여 확률에 attraction 반영:
-    - attraction > 0.3 → 댓글 확률 +15%
-    - attraction > 0.6 → 댓글 확률 +30%
-  - 좋아하는 페르소나의 포스트에 더 적극적으로 반응
-  - 단위 테스트: attraction별 확률 변화 검증
-  - 파일: `apps/engine-studio/src/lib/persona-world/interactions/engagement-decision.ts`
+- [x] **T438: engagement-decision에 attraction 부스트** ✅ 2026-03-13
+  - `engagement-decision.ts` — `getAttractionBoost()` + `decideEngagement()` attraction 파라미터 추가
+  - attraction>0.3 → +15%, attraction>0.6 → +30% (comment 확률 부스트, skip 감소)
+  - 단위 테스트 5건 (부스트 값 + Avoidant 고갈등 시나리오 + 기존 동작 유지)
+  - 파일: `engagement-decision.ts`, `rapport-engagement.test.ts`
 
-- [ ] **T439: 로맨틱 타입별 allowedTones 조정**
-  - `relationship-protocol.ts` — 로맨틱 타입별 톤 가중치 조정:
-    - CRUSH/SWEETHEART → `intimate_joke`, `empathetic`, `supportive` 가중치 상향
-    - LOVER/SOULMATE → `formal_analysis` 톤 제외
-    - OBSESSED → `paradox_response` 가중치 상향
-  - 단위 테스트: 로맨틱 타입별 allowedTones 내용 검증
-  - 파일: `apps/engine-studio/src/lib/persona-world/interactions/relationship-protocol.ts`
+- [x] **T439: 로맨틱 타입별 allowedTones 조정** ✅ 2026-03-13
+  - CRUSH/SWEETHEART → intimate_joke, supportive 추가 (따뜻한 톤 우선)
+  - LOVER/SOULMATE → excludeTones: ["formal_analysis"] (딱딱한 분석 톤 제외)
+  - OBSESSED → paradox_response 추가 (집착적 반응 패턴)
+  - TypeModifier에 `excludeTones?` 필드, buildProtocol에서 적용
+  - 단위 테스트 6건 (로맨틱 타입별 톤 포함/제외 검증)
+  - 파일: `relationship-protocol.ts`, `relationship-protocol.test.ts`
 
-- [ ] **T440: 테스트 + 전체 검증**
-  - T437 톤 매트릭스 단위 테스트
-  - T438 참여 확률 단위 테스트
-  - T439 로맨틱 타입 톤 단위 테스트
-  - 기존 comment-tone / engagement 테스트 regression 확인
-  - pnpm validate PASS
+- [x] **T440: 테스트 + 전체 검증** ✅ 2026-03-13
+  - 전체 256 테스트 PASS (기존 241 + 신규 15)
+  - 기존 comment-tone / engagement / protocol 테스트 regression 없음
 
 - **AC**:
   - CRUSH 관계 페르소나가 상대 포스트에 장난스럽고 애정 담긴 댓글 생성

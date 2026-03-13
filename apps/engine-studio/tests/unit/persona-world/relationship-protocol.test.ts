@@ -1402,3 +1402,46 @@ describe("updatePeakStage", () => {
     expect(updatePeakStage("INTIMATE", "ESTRANGED")).toBe("INTIMATE")
   })
 })
+
+// ═══ T439: 로맨틱 타입별 톤 조정 테스트 ═══
+
+describe("buildProtocol — T439 로맨틱 톤 조정", () => {
+  it("CRUSH: intimate_joke 톤이 포함된다", () => {
+    const protocol = buildProtocol("FAMILIAR", "CRUSH")
+    expect(protocol.allowedTones).toContain("intimate_joke")
+    expect(protocol.allowedTones).toContain("supportive")
+    expect(protocol.allowedTones).toContain("empathetic")
+  })
+
+  it("SWEETHEART: intimate_joke + supportive 포함", () => {
+    const protocol = buildProtocol("FAMILIAR", "SWEETHEART")
+    expect(protocol.allowedTones).toContain("intimate_joke")
+    expect(protocol.allowedTones).toContain("supportive")
+  })
+
+  it("LOVER: formal_analysis가 제외된다", () => {
+    const protocol = buildProtocol("INTIMATE", "LOVER")
+    expect(protocol.allowedTones).not.toContain("formal_analysis")
+    expect(protocol.allowedTones).toContain("intimate_joke")
+    expect(protocol.allowedTones).toContain("empathetic")
+  })
+
+  it("SOULMATE: formal_analysis가 제외된다", () => {
+    const protocol = buildProtocol("CLOSE", "SOULMATE")
+    expect(protocol.allowedTones).not.toContain("formal_analysis")
+    expect(protocol.allowedTones).toContain("deep_analysis")
+    expect(protocol.allowedTones).toContain("unique_perspective")
+  })
+
+  it("OBSESSED: paradox_response가 포함된다", () => {
+    const protocol = buildProtocol("REGULAR", "OBSESSED")
+    expect(protocol.allowedTones).toContain("paradox_response")
+    expect(protocol.allowedTones).toContain("supportive")
+  })
+
+  it("NEUTRAL: formal_analysis가 여전히 포함된다", () => {
+    // NEUTRAL 타입에는 excludeTones가 없으므로 stage가 허용하면 유지
+    const protocol = buildProtocol("STRANGER", "NEUTRAL")
+    expect(protocol.allowedTones).toContain("formal_analysis")
+  })
+})

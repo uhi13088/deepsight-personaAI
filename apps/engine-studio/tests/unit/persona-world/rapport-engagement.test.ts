@@ -5,7 +5,10 @@
 
 import { describe, it, expect } from "vitest"
 import { classifyL2Pattern } from "@/lib/persona-world/interactions/l2-pattern"
-import { decideEngagement } from "@/lib/persona-world/interactions/engagement-decision"
+import {
+  decideEngagement,
+  getAttractionBoost,
+} from "@/lib/persona-world/interactions/engagement-decision"
 import {
   computeVoiceAdjustment,
   mergeAllowedTones,
@@ -364,5 +367,44 @@ describe("mergeAllowedTones", () => {
   it("기존 빈 배열 → toneFilter 그대로", () => {
     const result = mergeAllowedTones([], { toneFilter: ["supportive"] })
     expect(result).toEqual(["supportive"])
+  })
+})
+
+// ═══ T438: attraction 부스트 테스트 ═══
+
+describe("getAttractionBoost (T438)", () => {
+  it("attraction > 0.6 → +0.3 부스트", () => {
+    expect(getAttractionBoost(0.7)).toBe(0.3)
+    expect(getAttractionBoost(0.9)).toBe(0.3)
+  })
+
+  it("attraction > 0.3 → +0.15 부스트", () => {
+    expect(getAttractionBoost(0.4)).toBe(0.15)
+    expect(getAttractionBoost(0.5)).toBe(0.15)
+  })
+
+  it("attraction ≤ 0.3 → 부스트 없음", () => {
+    expect(getAttractionBoost(0)).toBe(0)
+    expect(getAttractionBoost(0.2)).toBe(0)
+    expect(getAttractionBoost(0.3)).toBe(0)
+  })
+})
+
+describe("decideEngagement — attraction boost (T438)", () => {
+  it("attraction 높으면 Avoidant high-tension에서도 comment 확률 증가", () => {
+    // base: Avoidant high = [0.1, 0.2, 0.7] → skip 70%
+    // with boost 0.3: [0.4, 0.2, 0.4] → comment 40%
+    // rand=0.35 → without boost: skip, with boost: comment
+    const withoutAttraction = decideEngagement("Avoidant", 0.8, 0.35)
+    const withAttraction = decideEngagement("Avoidant", 0.8, 0.35, 0.7)
+
+    expect(withoutAttraction.action).not.toBe("comment")
+    expect(withAttraction.action).toBe("comment")
+  })
+
+  it("attraction 0이면 기존 동작 유지", () => {
+    const base = decideEngagement("Stable", 0.5, 0.5)
+    const withZero = decideEngagement("Stable", 0.5, 0.5, 0)
+    expect(base.action).toBe(withZero.action)
   })
 })
