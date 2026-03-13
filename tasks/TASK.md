@@ -1752,6 +1752,56 @@
 
 ---
 
+### Phase COLLAB-RELATIONSHIP: 협업포스트 관계 데이터 활용
+
+> **배경**: COLLAB 포스트 생성 시 관계 데이터(warmth/tension/depth/attraction)가
+> 전혀 사용되지 않음. 모든 활성 페르소나를 무순위로 나열하여 LLM에 전달하므로,
+> 앙숙 관계인 페르소나를 멘션하거나 친밀한 관계를 무시하는 비현실적 행동 발생.
+>
+> **설계**: 멘션 대상 관계 기반 필터링+랭킹, LLM 프롬프트에 관계 컨텍스트 주입,
+> 좋은 관계 존재 시 COLLAB 타입 확률 부스트.
+
+- [ ] **T441: getCollabCandidates() 관계 기반 필터+랭킹**
+  - `pw-scheduler-service.ts` — 기존 `getActivePersonaHandles()` 확장
+  - PersonaRelationship 조인하여 warmth/tension/depth/frequency/attraction 조회
+  - 필터: tension > 0.7인 상대 제외 (앙숙은 콜라보 안 함)
+  - 랭킹: warmth×0.4 + depth×0.3 + frequency×0.2 + attraction×0.1 순 정렬
+  - 상위 10명만 반환 (관계 점수 포함)
+  - 단위 테스트: 필터링/랭킹 검증, tension 높은 상대 제외 확인
+  - 파일: `apps/engine-studio/src/lib/persona-world/pw-scheduler-service.ts`
+
+- [ ] **T442: COLLAB LLM 프롬프트에 관계 컨텍스트 주입**
+  - `content-generator.ts` — COLLAB 포스트 생성 시 관계 정보 포함
+  - "[협업 후보]" 섹션에 관계 수준 힌트 추가 (가까운 사이/자주 교류/관심사 유사 등)
+  - "관계가 좋은 상대와 자연스러운 콜라보를 만들어주세요" 지침 추가
+  - 단위 테스트: 관계 컨텍스트 포함 여부 검증
+  - 파일: `apps/engine-studio/src/lib/persona-world/content-generator.ts`
+
+- [ ] **T443: COLLAB 타입 확률 관계 기반 부스트**
+  - `post-pipeline.ts` — COLLAB 타입 선정 시 관계 데이터 반영
+  - warmth > 0.6인 관계 2명 이상 → COLLAB affinity +0.15 부스트
+  - 관계 없으면 자연 감소 (기존 벡터 기반만 유지)
+  - `types.ts` — `PostGenerationInput`에 `collaborationScores` 필드 추가
+  - 단위 테스트: 관계 유무에 따른 COLLAB 확률 변화 검증
+  - 파일: `post-pipeline.ts`, `types.ts`
+
+- [ ] **T444: 테스트 + 전체 검증**
+  - T441 관계 기반 후보 필터링 단위 테스트
+  - T442 프롬프트 내용 단위 테스트
+  - T443 확률 부스트 단위 테스트
+  - 기존 post-pipeline 테스트 regression 확인
+  - pnpm validate PASS
+
+- **AC**:
+  - COLLAB 멘션 대상이 관계 품질 순으로 랭킹됨
+  - tension > 0.7인 앙숙 관계는 COLLAB 후보에서 자동 제외
+  - LLM이 관계 컨텍스트를 참고하여 자연스러운 협업 포스트 생성
+  - 좋은 관계가 많은 페르소나는 COLLAB 확률 자연 증가
+  - 관계 없는 페르소나도 기존대로 SOLO 포스트 정상 작동
+  - pnpm validate PASS
+
+---
+
 ## BLOCKED
 
 (없음)
