@@ -1645,6 +1645,61 @@
   - 친밀도 속도: 매일 대화해도 최소 수주 후 Lv5 (자연스러운 관계 발전)
   - pnpm validate PASS
 
+### Phase CHAT-FINALIZE: 채팅 대화 종료 기억 정리 (하이브리드)
+
+> **배경**: call-service는 `endCall()` → `finalizeConversation()` 호출로 대화 종료 시
+> Factbook 업데이트 + PersonaState 조정(소셜배터리/에너지 감소)을 하지만,
+> chat-service는 종료 개념 자체가 없어서 `finalizeConversation()`이 한 번도 호출되지 않음.
+> 결과: 채팅에서 나눈 대화의 핵심 내용이 Factbook에 반영되지 않고, 상태 변화도 없음.
+>
+> **설계**: 하이브리드 방식 — 명시적 종료 엔드포인트 + 시간 기반 자동 종료(30분 비활동).
+> 명시적 종료 후 재시작 시 자동 재활성화 (새 세션 생성, 대화 기록 유지).
+
+- [ ] **T433: chat-service 세션 만료 체크 + 자동 finalize**
+  - `sendMessage()` 진입 시 `lastMessageAt` 기준 30분 초과 여부 체크
+  - 초과 시: 이전 `InteractionSession` finalize (highlights 자동 추출) + `endedAt` 설정
+  - 새 `InteractionSession` 생성 → `ChatThread.sessionId` 교체
+  - `SESSION_TIMEOUT_MS = 30 * 60 * 1000` 상수화
+  - `ChatDataProvider`에 `getTopPoignancyLogs(sessionId, limit)` 메서드 추가
+  - highlights 자동 추출: 해당 세션 InteractionLog에서 poignancyScore 상위 3개
+  - 단위 테스트: 30분 초과/미초과 시나리오, highlights 추출 검증
+  - 파일: `apps/engine-studio/src/lib/persona-world/chat-service.ts`
+
+- [ ] **T434: chat-service 자동 재활성화**
+  - `sendMessage()` 진입 시 `thread.isActive === false`면 자동 재활성화
+  - 기존 `throw new Error("THREAD_INACTIVE")` → 재활성화 로직으로 교체
+  - 새 `InteractionSession` 생성 + `ChatThread.isActive = true` + `sessionId` 교체
+  - 대화 기록(ChatMessage)은 유지, 세션만 새로 시작
+  - 단위 테스트: 비활성 스레드 재활성화 시나리오
+  - 파일: `apps/engine-studio/src/lib/persona-world/chat-service.ts`
+
+- [ ] **T435: 명시적 채팅 종료 API 엔드포인트**
+  - `POST /api/persona-world/chat/threads/[threadId]/end`
+  - `endChatThread(provider, { threadId, userId, highlights? })` 서비스 함수 추가
+  - 처리: finalize(highlights 제공 시 사용, 없으면 자동 추출) → `isActive = false` → `endedAt` 설정
+  - 권한 체크: 해당 유저의 스레드인지 검증
+  - API 응답: `{ success: true, data: { totalTurns, highlights } }`
+  - `docs/api/public.md` + `public.openapi.yaml` 최신화
+  - 단위 테스트: 정상 종료, 권한 에러, 이미 종료된 스레드 처리
+  - 파일: `apps/engine-studio/src/app/api/persona-world/chat/threads/[threadId]/end/route.ts`
+
+- [ ] **T436: 테스트 + 전체 검증**
+  - T433 자동 finalize 단위 테스트 (mock provider + 시간 시뮬레이션)
+  - T434 재활성화 단위 테스트
+  - T435 API 엔드포인트 테스트
+  - 기존 chat-service 테스트 regression 확인
+  - pnpm validate PASS
+
+- **AC**:
+  - 30분+ 비활동 후 새 메시지 → 이전 세션 자동 finalize + 새 세션 시작
+  - 명시적 종료 → Factbook 업데이트 + PersonaState 조정 + isActive = false
+  - 종료된 스레드에 메시지 → 자동 재활성화 + 새 세션 (기존 대화 기록 유지)
+  - Factbook에 "유저와 채팅에서: [highlights]" 기록됨
+  - call-service와 동일한 finalizeConversation 파이프라인 사용
+  - pnpm validate PASS
+
+---
+
 ## BLOCKED
 
 (없음)
