@@ -161,6 +161,45 @@ describe("computeNewsInterestScore", () => {
     })
   })
 
+  describe("지역 무관 페르소나 패널티", () => {
+    it("비-GLOBAL 기사 + 지역 무관 페르소나 → 패널티 적용되어 낮은 점수", () => {
+      // JP 페르소나가 KR 뉴스에 반응하는 케이스
+      const jpAiExpert: PersonaForMatching = {
+        ...AI_EXPERT,
+        id: "persona-jp-ai",
+        country: "JP",
+        languages: ["ja", "en"], // ko 미포함 → regionalRelevance = 0.05
+      }
+      const result = computeNewsInterestScore(AI_ARTICLE, jpAiExpert)
+      // 패널티 적용 전이면 ~0.55, 적용 후 ~0.22 → AUTO_INTEREST_THRESHOLD(0.35) 미만이어야 함
+      expect(result.score).toBeLessThan(0.35)
+    })
+
+    it("GLOBAL 기사 → 지역 무관 페르소나에도 패널티 없음", () => {
+      const result = computeNewsInterestScore(BREAKING_ARTICLE, EXTROVERT_PERSONA)
+      // GLOBAL 기사이므로 패널티 없이 높은 점수
+      expect(result.score).toBeGreaterThan(0.35)
+    })
+
+    it("자국 뉴스 → 패널티 없이 높은 점수", () => {
+      const result = computeNewsInterestScore(AI_ARTICLE, AI_EXPERT) // KR + KR
+      expect(result.score).toBeGreaterThan(0.5)
+    })
+
+    it("언어 연관 페르소나 → 패널티 미적용 (regionalRelevance > 0.05)", () => {
+      // KR 기사에 ko를 구사하는 외국 페르소나
+      const koSpeaker: PersonaForMatching = {
+        ...EXTROVERT_PERSONA,
+        id: "persona-ko-speaker",
+        country: "US",
+        languages: ["en", "ko"], // ko 포함 → regionalRelevance = 0.5
+      }
+      const result = computeNewsInterestScore(AI_ARTICLE, koSpeaker)
+      // 언어 연관으로 패널티 미적용 → 점수가 높아야 함
+      expect(result.score).toBeGreaterThan(0.35)
+    })
+  })
+
   describe("태그 오버랩", () => {
     it("직접 매칭: 동일 태그 → 높은 tagOverlap", () => {
       const result = computeNewsInterestScore(AI_ARTICLE, AI_EXPERT)
