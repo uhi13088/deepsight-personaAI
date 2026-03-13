@@ -276,8 +276,11 @@ export async function sendMessage(
     source: input.source,
   })
 
-  // 10. 친밀도 업데이트 (T430)
-  await updateIntimacyAfterChat(provider, threadId, poignancy)
+  // 10. 친밀도 업데이트 (T430, T447: 페르소나 상태 반영)
+  await updateIntimacyAfterChat(provider, threadId, poignancy, {
+    personaMood: state.mood,
+    paradoxTension: state.paradoxTension,
+  })
 
   // 11. 대화방 메타데이터 업데이트
   await provider.updateThread(threadId, {
@@ -285,9 +288,9 @@ export async function sendMessage(
     totalMessages: thread.totalMessages + 2, // user + persona
   })
 
-  // 12. PersonaState 미세 조정 (간단한 감정 분류)
+  // 12. PersonaState 미세 조정 (간단한 감정 분류, T446: 친밀도 비례 영향력)
   const sentiment = classifyUserSentiment(content)
-  const updatedState = adjustStateForConversation(state, sentiment)
+  const updatedState = adjustStateForConversation(state, sentiment, thread.intimacyLevel)
   await provider.savePersonaState(thread.personaId, updatedState)
 
   // 13. 잔액 조회

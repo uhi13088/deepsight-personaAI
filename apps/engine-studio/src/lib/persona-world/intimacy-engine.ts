@@ -112,13 +112,42 @@ export interface UpdateIntimacyResult {
   levelUp: boolean
 }
 
+/** T447: 페르소나 상태가 친밀도 성장에 미치는 영향 */
+export interface PersonaStateModifiers {
+  personaMood?: number
+  paradoxTension?: number
+}
+
+/**
+ * T447: 페르소나 mood/paradoxTension → 친밀도 성장 속도 배율 계산.
+ * - mood > 0.7 → ×1.2 (기분 좋을 때 더 개방적)
+ * - mood < 0.3 → ×0.7 (기분 나쁠 때 방어적)
+ * - paradoxTension > 0.6 → ×0.5 (내적 갈등 시 관계 진전 둔화)
+ * 배율은 곱셈으로 적용 (예: mood 0.8 + paradoxTension 0.7 → 1.2 × 0.5 = 0.6)
+ */
+export function computePersonaStateMoodMultiplier(modifiers?: PersonaStateModifiers): number {
+  if (!modifiers) return 1.0
+  let multiplier = 1.0
+  const { personaMood, paradoxTension } = modifiers
+  if (personaMood !== undefined) {
+    if (personaMood > 0.7) multiplier *= 1.2
+    else if (personaMood < 0.3) multiplier *= 0.7
+  }
+  if (paradoxTension !== undefined && paradoxTension > 0.6) {
+    multiplier *= 0.5
+  }
+  return multiplier
+}
+
 /**
  * 채팅 응답 저장 후 호출. 친밀도를 증분 업데이트하고 레벨 업 시 Factbook에 기록.
+ * T447: personaMood/paradoxTension으로 성장 속도 조절.
  */
 export async function updateIntimacyAfterChat(
   provider: IntimacyDataProvider,
   threadId: string,
-  poignancyScore?: number
+  poignancyScore?: number,
+  stateModifiers?: PersonaStateModifiers
 ): Promise<UpdateIntimacyResult> {
   const thread = await provider.getThreadIntimacy(threadId)
   if (!thread) throw new Error("THREAD_NOT_FOUND")
@@ -133,7 +162,9 @@ export async function updateIntimacyAfterChat(
 
   // 증분 계산 + 일일 상한
   const rawDelta = computeIntimacyDelta(poignancyScore)
-  const delta = applyDailyCap(rawDelta, todayAccumulated)
+  // T447: 페르소나 상태 배율 적용
+  const stateMultiplier = computePersonaStateMoodMultiplier(stateModifiers)
+  const delta = applyDailyCap(rawDelta * stateMultiplier, todayAccumulated)
 
   const newScore = Math.min(MAX_SCORE, currentScore + delta)
   const newLevel = scoreToLevel(newScore)

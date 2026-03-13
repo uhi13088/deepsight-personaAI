@@ -389,14 +389,21 @@ export async function processCallTurn(
   }
   const { poignancy } = await recordConversationTurn(dp, turnInput)
 
-  // 9. 친밀도 업데이트 (ChatThread 기반)
+  // 9. 친밀도 업데이트 (ChatThread 기반, T447: 페르소나 상태 반영)
   if (intimacyData) {
-    await updateIntimacyAfterChat(dp, intimacyData.threadId, poignancy)
+    await updateIntimacyAfterChat(dp, intimacyData.threadId, poignancy, {
+      personaMood: currentState.mood,
+      paradoxTension: currentState.paradoxTension,
+    })
   }
 
-  // 10. 상태 조정 (유저 발화 감정 분류 반영)
+  // 10. 상태 조정 (유저 발화 감정 분류 반영, T446: 친밀도 비례 영향력)
   const userSentiment = classifyUserSentiment(sttResult.text)
-  const updatedState = adjustStateForConversation(currentState, userSentiment)
+  const updatedState = adjustStateForConversation(
+    currentState,
+    userSentiment,
+    intimacyData?.intimacyLevel
+  )
   await dp.savePersonaState(params.personaId, updatedState)
 
   // 10. CallSession 턴 수 업데이트

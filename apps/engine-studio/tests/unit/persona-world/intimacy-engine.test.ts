@@ -5,6 +5,7 @@ import {
   applyDailyCap,
   updateIntimacyAfterChat,
   INTIMACY_LEVELS,
+  computePersonaStateMoodMultiplier,
 } from "@/lib/persona-world/intimacy-engine"
 import type { IntimacyDataProvider } from "@/lib/persona-world/intimacy-engine"
 import { buildConversationSystemSuffix } from "@/lib/persona-world/conversation-engine"
@@ -237,6 +238,97 @@ describe("updateIntimacyAfterChat", () => {
     const result = await updateIntimacyAfterChat(provider, "thread-1", 1.0)
 
     expect(result.newScore).toBeLessThanOrEqual(1.0)
+  })
+})
+
+// ── T447: computePersonaStateMoodMultiplier 테스트 ─────────
+
+describe("computePersonaStateMoodMultiplier (T447)", () => {
+  it("modifiers 없으면 1.0 반환", () => {
+    expect(computePersonaStateMoodMultiplier()).toBe(1.0)
+    expect(computePersonaStateMoodMultiplier(undefined)).toBe(1.0)
+  })
+
+  it("mood > 0.7 → ×1.2", () => {
+    expect(computePersonaStateMoodMultiplier({ personaMood: 0.8 })).toBeCloseTo(1.2)
+  })
+
+  it("mood < 0.3 → ×0.7", () => {
+    expect(computePersonaStateMoodMultiplier({ personaMood: 0.2 })).toBeCloseTo(0.7)
+  })
+
+  it("mood 0.3~0.7 → ×1.0 (변화 없음)", () => {
+    expect(computePersonaStateMoodMultiplier({ personaMood: 0.5 })).toBe(1.0)
+  })
+
+  it("paradoxTension > 0.6 → ×0.5", () => {
+    expect(computePersonaStateMoodMultiplier({ paradoxTension: 0.7 })).toBeCloseTo(0.5)
+  })
+
+  it("paradoxTension ≤ 0.6 → ×1.0", () => {
+    expect(computePersonaStateMoodMultiplier({ paradoxTension: 0.5 })).toBe(1.0)
+  })
+
+  it("mood 높고 + paradoxTension 높으면 → 1.2 × 0.5 = 0.6", () => {
+    expect(
+      computePersonaStateMoodMultiplier({ personaMood: 0.8, paradoxTension: 0.7 })
+    ).toBeCloseTo(0.6)
+  })
+
+  it("mood 낮고 + paradoxTension 높으면 → 0.7 × 0.5 = 0.35", () => {
+    expect(
+      computePersonaStateMoodMultiplier({ personaMood: 0.2, paradoxTension: 0.7 })
+    ).toBeCloseTo(0.35)
+  })
+})
+
+// ── T447: updateIntimacyAfterChat with stateModifiers ─────
+
+describe("updateIntimacyAfterChat — stateModifiers (T447)", () => {
+  it("mood 높을 때 친밀도 성장 20% 빨라진다", async () => {
+    const baseProvider = createMockProvider()
+    const highMoodProvider = createMockProvider()
+
+    const baseResult = await updateIntimacyAfterChat(baseProvider, "thread-1", 0.5)
+    const highMoodResult = await updateIntimacyAfterChat(highMoodProvider, "thread-1", 0.5, {
+      personaMood: 0.8,
+    })
+
+    expect(highMoodResult.newScore).toBeCloseTo(baseResult.newScore * 1.2, 4)
+  })
+
+  it("mood 낮을 때 친밀도 성장 30% 둔화된다", async () => {
+    const baseProvider = createMockProvider()
+    const lowMoodProvider = createMockProvider()
+
+    const baseResult = await updateIntimacyAfterChat(baseProvider, "thread-1", 0.5)
+    const lowMoodResult = await updateIntimacyAfterChat(lowMoodProvider, "thread-1", 0.5, {
+      personaMood: 0.2,
+    })
+
+    expect(lowMoodResult.newScore).toBeCloseTo(baseResult.newScore * 0.7, 4)
+  })
+
+  it("paradoxTension 높을 때 친밀도 성장 50% 둔화된다", async () => {
+    const baseProvider = createMockProvider()
+    const tensionProvider = createMockProvider()
+
+    const baseResult = await updateIntimacyAfterChat(baseProvider, "thread-1", 0.5)
+    const tensionResult = await updateIntimacyAfterChat(tensionProvider, "thread-1", 0.5, {
+      paradoxTension: 0.7,
+    })
+
+    expect(tensionResult.newScore).toBeCloseTo(baseResult.newScore * 0.5, 4)
+  })
+
+  it("stateModifiers 미전달 시 기존 동작 유지", async () => {
+    const provider1 = createMockProvider()
+    const provider2 = createMockProvider()
+
+    const withoutModifiers = await updateIntimacyAfterChat(provider1, "thread-1", 0.5)
+    const withUndefined = await updateIntimacyAfterChat(provider2, "thread-1", 0.5, undefined)
+
+    expect(withoutModifiers.newScore).toBe(withUndefined.newScore)
   })
 })
 

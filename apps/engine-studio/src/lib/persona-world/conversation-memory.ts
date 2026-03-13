@@ -260,15 +260,28 @@ export function detectTextLanguage(text: string): string | undefined {
 
 // ── 대화 중 PersonaState 미니 업데이트 ──────────────────────
 
+/** T446: 친밀도 레벨별 mood 영향력 매핑 (Lv1~Lv5) */
+export const INTIMACY_MOOD_DELTA: Record<number, number> = {
+  1: 0.02, // STRANGER (기존 유지)
+  2: 0.025, // ACQUAINTANCE
+  3: 0.03, // FAMILIAR
+  4: 0.04, // FRIENDLY
+  5: 0.05, // CLOSE
+}
+
 /**
  * 대화 턴마다 PersonaState를 미세 조정.
  * 유저 감정(sentiment)에 따라 페르소나 mood가 약간 변동.
+ * T446: 친밀도 레벨에 비례하여 mood 변화량 증폭.
  */
 export function adjustStateForConversation(
   state: PersonaStateData,
-  userSentiment: "positive" | "neutral" | "negative"
+  userSentiment: "positive" | "neutral" | "negative",
+  intimacyLevel?: number
 ): PersonaStateData {
-  const delta = userSentiment === "positive" ? 0.02 : userSentiment === "negative" ? -0.02 : 0
+  const baseDelta = INTIMACY_MOOD_DELTA[intimacyLevel ?? 1] ?? 0.02
+  const delta =
+    userSentiment === "positive" ? baseDelta : userSentiment === "negative" ? -baseDelta : 0
   return {
     ...state,
     mood: Math.max(0, Math.min(1, state.mood + delta)),

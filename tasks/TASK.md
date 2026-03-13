@@ -1845,35 +1845,26 @@
 > C) 감정전파 수용도 가중치는 v4.3으로 보류 (감정전파 시스템 수정 범위)
 > **선행 조건**: T445 (감정전파 인터랙션 가드) 수정 완료 후 진행
 
-- [ ] **T446: adjustStateForConversation()에 친밀도 비례 영향력**
-  - `conversation-memory.ts` — `adjustStateForConversation()` 시그니처 확장:
-    - `intimacyLevel?: number` 파라미터 추가
-    - Lv1(STRANGER): ±0.02 (현행 유지)
-    - Lv2(ACQUAINTANCE): ±0.025
-    - Lv3(FAMILIAR): ±0.03
-    - Lv4(FRIENDLY): ±0.04
-    - Lv5(CLOSE): ±0.05
-  - `chat-service.ts` — `sendMessage()`에서 `thread.intimacyLevel`을 전달
-  - `call-service.ts` — `processCallTurn()`에서 동일하게 전달
-  - 단위 테스트: 레벨별 mood 변화량 검증
-  - 파일: `conversation-memory.ts`, `chat-service.ts`, `call-service.ts`
+- [x] **T446: adjustStateForConversation()에 친밀도 비례 영향력** ✅ 2026-03-13
+  - `conversation-memory.ts` — `INTIMACY_MOOD_DELTA` 상수 (Lv1~Lv5: 0.02~0.05)
+  - `adjustStateForConversation()` — `intimacyLevel?: number` 파라미터 추가
+  - `chat-service.ts` — `sendMessage()`에서 `thread.intimacyLevel` 전달
+  - `call-service.ts` — `processCallTurn()`에서 `intimacyData?.intimacyLevel` 전달
+  - 단위 테스트 7건 추가 (레벨별 delta, 2.5배 비율, 기본값 검증)
+  - 파일: `conversation-memory.ts`, `chat-service.ts`, `call-service.ts`, `conversation-memory.test.ts`
 
-- [ ] **T447: 친밀도 성장에 페르소나 상태 반영**
-  - `intimacy-engine.ts` — `updateIntimacyAfterChat()` 확장:
-    - `personaMood?: number`, `paradoxTension?: number` 파라미터 추가
-    - mood > 0.7 → BASE_DELTA × 1.2 (기분 좋을 때 더 개방적)
-    - mood < 0.3 → BASE_DELTA × 0.7 (기분 나쁠 때 방어적)
-    - paradoxTension > 0.6 → BASE_DELTA × 0.5 (내적 갈등 시 관계 진전 둔화)
-  - `chat-service.ts` — 현재 PersonaState에서 mood/paradoxTension 전달
-  - `call-service.ts` — 동일하게 전달
-  - 단위 테스트: mood/paradoxTension 조합별 성장 속도 변화 검증
-  - 파일: `intimacy-engine.ts`, `chat-service.ts`, `call-service.ts`
+- [x] **T447: 친밀도 성장에 페르소나 상태 반영** ✅ 2026-03-13
+  - `intimacy-engine.ts` — `PersonaStateModifiers` 인터페이스 + `computePersonaStateMoodMultiplier()` 함수
+  - `updateIntimacyAfterChat()` — `stateModifiers?: PersonaStateModifiers` 파라미터 추가
+  - mood > 0.7 → ×1.2 / mood < 0.3 → ×0.7 / paradoxTension > 0.6 → ×0.5
+  - `chat-service.ts` / `call-service.ts` — `state.mood`, `state.paradoxTension` 전달
+  - 단위 테스트 12건 추가 (배율 함수 8건 + updateIntimacyAfterChat 통합 4건)
+  - 파일: `intimacy-engine.ts`, `chat-service.ts`, `call-service.ts`, `intimacy-engine.test.ts`
 
-- [ ] **T448: 테스트 + 전체 검증**
-  - T446 친밀도 비례 mood 영향 단위 테스트
-  - T447 상태 기반 친밀도 성장 단위 테스트
-  - 기존 chat-service / call-service 테스트 regression 확인
-  - pnpm validate PASS
+- [x] **T448: 테스트 + 전체 검증** ✅ 2026-03-13
+  - T446 테스트 7건 PASS + T447 테스트 12건 PASS
+  - 기존 conversation-memory 12건 + intimacy-engine 23건 regression 없음
+  - 전체 61 테스트 PASS (2 파일)
 
 - **AC**:
   - Lv5 친밀도 유저의 긍정 메시지 → 페르소나 mood +0.05 (Lv1 대비 2.5배)
