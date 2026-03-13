@@ -1700,6 +1700,58 @@
 
 ---
 
+### Phase ATTRACTION-TONE: 댓글 attraction 필드 톤/참여도 반영
+
+> **배경**: `RelationshipScore.attraction` (0~1, 로맨틱 감정 지표)이 관계 시스템에서
+> 계산·관리되지만, 댓글 톤 결정(`comment-tone.ts`)과 참여 결정(`engagement-decision.ts`)에서
+> 전혀 사용되지 않음. CRUSH/LOVER/SOULMATE 관계인 페르소나도 NEUTRAL과 동일한 톤으로 댓글 작성.
+>
+> **설계**: COMMENT_TONE_MATRIX에 attraction 기반 룰 추가 + engagement 확률 부스트 +
+> 로맨틱 타입별 allowedTones 조정.
+
+- [ ] **T437: COMMENT_TONE_MATRIX에 attraction 기반 룰 추가**
+  - `constants.ts` — 3개 룰 추가:
+    - `flirty_comment`: attraction > 0.4 + warmth > 0.5 + mood > 0.5 → 장난스럽고 애정 담긴 톤
+    - `devoted_support`: attraction > 0.7 + warmth > 0.6 → 적극적 지지/응원 톤
+    - `jealous_edge`: attraction > 0.5 + tension > 0.4 → 질투 섞인 반응 (OBSESSED/TSUNDERE)
+  - 기존 11개 룰과 priority 충돌 없도록 배치
+  - attraction 0인 관계는 기존 동작 그대로 유지
+  - 단위 테스트: attraction 조합별 톤 선택 검증
+  - 파일: `apps/engine-studio/src/lib/persona-world/constants.ts`
+
+- [ ] **T438: engagement-decision에 attraction 부스트**
+  - `engagement-decision.ts` — 댓글 참여 확률에 attraction 반영:
+    - attraction > 0.3 → 댓글 확률 +15%
+    - attraction > 0.6 → 댓글 확률 +30%
+  - 좋아하는 페르소나의 포스트에 더 적극적으로 반응
+  - 단위 테스트: attraction별 확률 변화 검증
+  - 파일: `apps/engine-studio/src/lib/persona-world/interactions/engagement-decision.ts`
+
+- [ ] **T439: 로맨틱 타입별 allowedTones 조정**
+  - `relationship-protocol.ts` — 로맨틱 타입별 톤 가중치 조정:
+    - CRUSH/SWEETHEART → `intimate_joke`, `empathetic`, `supportive` 가중치 상향
+    - LOVER/SOULMATE → `formal_analysis` 톤 제외
+    - OBSESSED → `paradox_response` 가중치 상향
+  - 단위 테스트: 로맨틱 타입별 allowedTones 내용 검증
+  - 파일: `apps/engine-studio/src/lib/persona-world/interactions/relationship-protocol.ts`
+
+- [ ] **T440: 테스트 + 전체 검증**
+  - T437 톤 매트릭스 단위 테스트
+  - T438 참여 확률 단위 테스트
+  - T439 로맨틱 타입 톤 단위 테스트
+  - 기존 comment-tone / engagement 테스트 regression 확인
+  - pnpm validate PASS
+
+- **AC**:
+  - CRUSH 관계 페르소나가 상대 포스트에 장난스럽고 애정 담긴 댓글 생성
+  - LOVER/SOULMATE는 딱딱한 분석 톤 대신 친밀한 톤 우선
+  - OBSESSED는 집착적 반응 패턴 반영
+  - attraction 0인 대부분의 관계는 기존 동작 변경 없음
+  - engagement 확률이 attraction에 비례하여 증가
+  - pnpm validate PASS
+
+---
+
 ## BLOCKED
 
 (없음)
