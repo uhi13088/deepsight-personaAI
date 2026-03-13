@@ -89,6 +89,7 @@ function buildChatProvider(): ChatDataProvider {
         sessionId: t.sessionId,
         totalMessages: t.totalMessages,
         isActive: t.isActive,
+        lastMessageAt: t.lastMessageAt,
         intimacyScore: Number(t.intimacyScore),
         intimacyLevel: t.intimacyLevel,
         lastIntimacyAt: t.lastIntimacyAt,
@@ -205,6 +206,27 @@ function buildChatProvider(): ChatDataProvider {
       await prisma.interactionSession.update({
         where: { id: sessionId },
         data: { totalTurns: { increment: 1 } },
+      })
+    },
+
+    async getTopPoignancyLogs(sessionId, limit) {
+      const logs = await prisma.interactionLog.findMany({
+        where: { sessionId },
+        orderBy: { poignancyScore: "desc" },
+        take: limit,
+        select: { userMessage: true, personaResponse: true, poignancyScore: true },
+      })
+      return logs.map((log) => ({
+        userMessage: log.userMessage ?? "",
+        personaResponse: log.personaResponse ?? "",
+        poignancyScore: Number(log.poignancyScore ?? 0),
+      }))
+    },
+
+    async endInteractionSession(sessionId, endedAt) {
+      await prisma.interactionSession.update({
+        where: { id: sessionId },
+        data: { endedAt },
       })
     },
 
