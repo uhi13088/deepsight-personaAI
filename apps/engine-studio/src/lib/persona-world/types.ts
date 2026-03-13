@@ -464,6 +464,10 @@ export interface CommentQualityLogInput {
   memoryReference: boolean
   naturalness: number
   overallScore: number
+  /** T449: 관계 수치 (선택) */
+  warmth?: number
+  attraction?: number
+  rapportScore?: number
 }
 
 export type AnomalyType = "BOT_PATTERN" | "ENERGY_MISMATCH" | "SUDDEN_BURST" | "PROLONGED_SILENCE"

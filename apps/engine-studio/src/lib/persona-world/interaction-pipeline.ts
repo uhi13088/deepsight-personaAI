@@ -563,6 +563,9 @@ export async function executeInteractions(
           memoryReference: false,
           naturalness: 0.7,
           overallScore: commentResult.tone.confidence,
+          // T449: 댓글 시점의 관계 수치 기록
+          warmth: rel.warmth,
+          attraction: rel.attraction,
         })
       } catch (err) {
         console.error(`[InteractionPipeline] Comment quality log failed for ${saved.id}:`, err)

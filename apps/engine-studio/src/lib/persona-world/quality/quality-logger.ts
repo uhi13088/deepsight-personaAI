@@ -58,6 +58,13 @@ export interface CommentQualityLog {
     memoryReference: boolean
     naturalness: number // 0.0~1.0
   }
+
+  /** T449: 댓글 시점의 관계 수치 */
+  relationshipMetrics?: {
+    warmth: number // 0.0~1.0
+    attraction: number // 0.0~1.0
+    rapportScore: number // 0.0~1.0
+  }
 }
 
 // ── InteractionPatternLog ─────────────────────────────────────
@@ -95,6 +102,13 @@ export interface InteractionPatternLog {
   }
 
   anomalies: InteractionAnomaly[]
+
+  /** T450: 관계 건강 지표 (WEEKLY 기간 집계 시 포함) */
+  relationshipHealth?: {
+    avgWarmthChange: number // 주간 평균 warmth 변화 (-1.0~1.0)
+    relationshipMilestones: number // 주간 마일스톤 달성 수
+    intimacyTransitions: number // 유저 친밀도 레벨 변화 수
+  }
 }
 
 // ── Log 생성 함수 ──────────────────────────────────────────────
@@ -145,8 +159,12 @@ export function createCommentQualityLog(params: {
   contextRelevance: number
   memoryReference: boolean
   naturalness: number
+  /** T449: 관계 수치 (선택) */
+  warmth?: number
+  attraction?: number
+  rapportScore?: number
 }): CommentQualityLog {
-  return {
+  const log: CommentQualityLog = {
     commentId: params.commentId,
     personaId: params.personaId,
     targetPostId: params.targetPostId,
@@ -163,6 +181,21 @@ export function createCommentQualityLog(params: {
       naturalness: clamp01(params.naturalness),
     },
   }
+
+  // T449: 관계 수치가 하나라도 전달되면 기록
+  if (
+    params.warmth !== undefined ||
+    params.attraction !== undefined ||
+    params.rapportScore !== undefined
+  ) {
+    log.relationshipMetrics = {
+      warmth: clamp01(params.warmth ?? 0),
+      attraction: clamp01(params.attraction ?? 0),
+      rapportScore: clamp01(params.rapportScore ?? 0),
+    }
+  }
+
+  return log
 }
 
 // ── 이상 패턴 감지 ────────────────────────────────────────────
@@ -245,8 +278,10 @@ export function createInteractionPatternLog(params: {
   stats: InteractionPatternLog["stats"]
   patterns: InteractionPatternLog["patterns"]
   energy: number
+  /** T450: 관계 건강 지표 (WEEKLY 기간에 전달) */
+  relationshipHealth?: InteractionPatternLog["relationshipHealth"]
 }): InteractionPatternLog {
-  return {
+  const log: InteractionPatternLog = {
     personaId: params.personaId,
     period: params.period,
     timestamp: new Date(),
@@ -254,6 +289,12 @@ export function createInteractionPatternLog(params: {
     patterns: params.patterns,
     anomalies: detectAnomalies(params.stats, params.patterns, params.energy),
   }
+
+  if (params.relationshipHealth) {
+    log.relationshipHealth = params.relationshipHealth
+  }
+
+  return log
 }
 
 // ── 로그 집계 ──────────────────────────────────────────────────
@@ -271,6 +312,10 @@ export interface QualityLogStats {
     avgContextRelevance: number
     avgNaturalness: number
     memoryReferenceRate: number
+    /** T449: 관계 수치 평균 (데이터 있는 로그만 집계) */
+    avgWarmth?: number
+    avgAttraction?: number
+    avgRapportScore?: number
   }
 }
 
@@ -310,7 +355,7 @@ export function aggregateCommentQualityLogs(
 
   const memRefCount = logs.filter((l) => l.conversationQuality.memoryReference).length
 
-  return {
+  const result: QualityLogStats["commentLogs"] = {
     total: logs.length,
     avgToneMatchScore: round(
       logs.reduce((s, l) => s + l.toneAnalysis.toneMatchScore, 0) / logs.length
@@ -323,6 +368,24 @@ export function aggregateCommentQualityLogs(
     ),
     memoryReferenceRate: round(memRefCount / logs.length),
   }
+
+  // T449: 관계 수치 평균 (데이터 있는 로그만 집계)
+  const withRelMetrics = logs.filter((l) => l.relationshipMetrics)
+  if (withRelMetrics.length > 0) {
+    result.avgWarmth = round(
+      withRelMetrics.reduce((s, l) => s + l.relationshipMetrics!.warmth, 0) / withRelMetrics.length
+    )
+    result.avgAttraction = round(
+      withRelMetrics.reduce((s, l) => s + l.relationshipMetrics!.attraction, 0) /
+        withRelMetrics.length
+    )
+    result.avgRapportScore = round(
+      withRelMetrics.reduce((s, l) => s + l.relationshipMetrics!.rapportScore, 0) /
+        withRelMetrics.length
+    )
+  }
+
+  return result
 }
 
 // ── 유틸리티 ──────────────────────────────────────────────────

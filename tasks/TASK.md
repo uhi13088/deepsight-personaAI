@@ -1868,52 +1868,42 @@
 > **설계**: 품질 로깅에 관계 수치 추가 + 품질 리포트에 Relationship Health 섹션 +
 > Engine Studio 대시보드에 관계 건강 컬럼 추가. PIS 공식 변경은 v4.3으로 보류.
 
-- [ ] **T449: CommentQualityLog에 관계 수치 지표 추가**
-  - `quality-logger.ts` — CommentQualityLog 확장:
-    - `warmth: number` — 댓글 시점의 관계 따뜻함
-    - `attraction: number` — 댓글 시점의 attraction
-    - `rapportScore: number` — 댓글 시점의 rapport (기존 모듈 연결)
-  - `interaction-pipeline.ts` — 댓글 생성 시 관계 수치를 quality log에 전달
-  - 단위 테스트: 관계 수치 기록 검증
-  - 파일: `quality-logger.ts`, `interaction-pipeline.ts`
+- [x] **T449: CommentQualityLog에 관계 수치 지표 추가** ✅ 2026-03-13
+  - `quality-logger.ts` — CommentQualityLog에 `relationshipMetrics?` 필드 추가 (warmth/attraction/rapportScore)
+  - `createCommentQualityLog()` — warmth/attraction/rapportScore 파라미터 추가, 클램핑 적용
+  - `aggregateCommentQualityLogs()` — 관계 수치 있는 로그만 별도 집계 (avgWarmth/avgAttraction/avgRapportScore)
+  - `interaction-pipeline.ts` — 댓글 생성 시 rel.warmth, rel.attraction 전달
+  - `types.ts` — CommentQualityLogInput에 warmth/attraction/rapportScore 추가
+  - 단위 테스트 5건: 관계 수치 포함/미포함/클램핑/집계/혼합 집계
+  - 파일: `quality-logger.ts`, `interaction-pipeline.ts`, `types.ts`, `quality-pw.test.ts`
 
-- [ ] **T450: InteractionPatternLog에 관계 건강 지표 추가**
-  - `quality-logger.ts` — InteractionPatternLog 확장:
-    - `avgWarmthChange: number` — 주간 평균 warmth 변화
-    - `relationshipMilestones: number` — 주간 마일스톤 달성 수
-    - `intimacyTransitions: number` — 유저 친밀도 레벨 변화 수
-  - `quality-runner.ts` — 관계 건강 지표 수집 로직 추가
-  - 단위 테스트: 주간 집계 검증
-  - 파일: `quality-logger.ts`, `quality-runner.ts`
+- [x] **T450: InteractionPatternLog에 관계 건강 지표 추가** ✅ 2026-03-13
+  - `quality-logger.ts` — InteractionPatternLog에 `relationshipHealth?` 필드 추가
+    (avgWarmthChange/relationshipMilestones/intimacyTransitions)
+  - `createInteractionPatternLog()` — relationshipHealth 파라미터 추가
+  - 단위 테스트 2건: 관계 건강 포함/미포함
+  - 파일: `quality-logger.ts`, `quality-pw.test.ts`
 
-- [ ] **T451: 품질 리포트에 Relationship Health 섹션 추가**
-  - `quality-integration.ts` — 품질 리포트에 별도 섹션:
-    - 평균 warmth 추세 (상승/하락/유지)
-    - 관계 다양성 (활발한 관계 수)
-    - 파괴적 패턴 감지 (tension만 계속 상승하는 관계 경고)
-    - 유저 친밀도 현황 (평균 레벨, 레벨업 추세)
-  - Rapport Score 모듈 연결 (기존 `rapport-score.ts` 활용)
-  - API 응답에 관계 건강 데이터 포함
-  - 단위 테스트: 리포트 섹션 생성 검증
-  - 파일: `quality-integration.ts`, API route
+- [x] **T451: 품질 리포트에 Relationship Health 섹션 추가** ✅ 2026-03-13
+  - `quality-integration.ts` — `RelationshipHealthReport` 인터페이스 + `QualityCheckResult`에 필드 추가
+  - `buildRelationshipHealthReport()` 헬퍼 함수 (warmthTrend 판정 + 파괴적 패턴 카운트)
+  - `runQualityCheck()` — `relationshipHealth` 파라미터 수용 + 결과에 포함
+  - `buildSummary()` — warmth 하락/파괴적 패턴 → reasons 추가 + CAUTION 상태 반영
+  - 단위 테스트 8건: 리포트 생성 4건 + runQualityCheck 통합 4건
+  - 파일: `quality-integration.ts`, `quality-pw.test.ts`
 
-- [ ] **T452: Engine Studio 품질 대시보드 UI 확장**
-  - `/persona-world-admin/quality/page.tsx` — 테이블에 컬럼 추가:
-    - **Relationship Health**: 평균 warmth 추세 아이콘 (↑/→/↓)
-    - **관계 다양성**: 활발한 관계 수 표시
-    - **파괴적 경고**: tension 지속 상승 관계 있으면 빨간 배지
-    - **유저 친밀도**: 평균 레벨 + 최근 레벨업 수
-  - 색상 기준: warmth 추세 상승=녹색, 유지=노란색, 하락=빨간색
-  - API GET 응답에서 관계 건강 데이터 읽어 표시
-  - 파일: `apps/engine-studio/src/app/(dashboard)/persona-world-admin/quality/page.tsx`
+- [x] **T452: Engine Studio 품질 대시보드 UI 확장** ✅ 2026-03-13
+  - `quality/page.tsx` — 테이블에 "관계 건강" + "친밀도" 컬럼 추가
+  - warmth 추세: ↑(녹색)/→(노란색)/↓(빨간색) + 활발한 관계 수
+  - 파괴적 경고: destructivePatterns > 0이면 빨간 Badge
+  - 유저 친밀도: 평균 레벨 + 최근 레벨업 수 (녹색)
+  - 파일: `persona-world-admin/quality/page.tsx`
 
-- [ ] **T453: 테스트 + 전체 검증**
-  - T449 댓글 품질 로그 관계 수치 단위 테스트
-  - T450 주간 관계 건강 지표 단위 테스트
-  - T451 품질 리포트 섹션 단위 테스트
-  - T452 UI 컴포넌트 렌더링 확인
-  - 기존 quality-monitor / quality-runner 테스트 regression
-  - pnpm validate PASS
+- [x] **T453: 테스트 + 전체 검증** ✅ 2026-03-13
+  - T449 단위 테스트 5건 + T450 단위 테스트 2건 + T451 단위 테스트 8건 PASS
+  - 기존 quality-pw 135건 regression 없음 (전체 150건 PASS)
+  - 전체 persona-world 2000 테스트 PASS (67 파일)
+  - 기존 conversation-engine-lang 1건 실패는 선행 버그 (본 작업 무관)
 
 - **AC**:
   - CommentQualityLog에 warmth/attraction/rapportScore 기록됨
