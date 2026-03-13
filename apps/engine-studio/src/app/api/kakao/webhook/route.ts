@@ -509,7 +509,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(kakaoResponse("메시지가 너무 길어요. 2000자 이내로 보내주세요."))
     }
 
-    // 4. 대화방 조회/생성 + 메시지 전송
+    // 4. 유저 닉네임 조회
+    const pwUser = await prisma.personaWorldUser.findUnique({
+      where: { id: link.userId },
+      select: { nickname: true, name: true },
+    })
+    const userNickname = pwUser?.nickname ?? pwUser?.name ?? undefined
+
+    // 5. 대화방 조회/생성 + 메시지 전송
     const provider = buildChatProvider()
     const threadId = await getOrCreateThread(provider, link.userId, link.personaId)
 
@@ -518,6 +525,7 @@ export async function POST(request: NextRequest) {
       userId: link.userId,
       content: utterance,
       source: "KAKAO",
+      userNickname,
     })
 
     return NextResponse.json(kakaoResponse(result.personaResponse))

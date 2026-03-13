@@ -59,6 +59,9 @@ export type StateUpdateEvent =
       sentiment: "positive" | "neutral" | "negative" | "aggressive"
     }
   | { type: "like_received" }
+  | { type: "like_given"; count: number }
+  | { type: "repost_given"; count: number }
+  | { type: "follow_given"; count: number }
   | { type: "idle_period"; hours: number }
   | { type: "paradox_situation"; intensity: number }
   | { type: "paradox_resolved" }

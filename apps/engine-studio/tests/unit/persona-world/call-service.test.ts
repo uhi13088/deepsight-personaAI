@@ -29,6 +29,7 @@ vi.mock("@/lib/persona-world/conversation-memory", () => ({
   recordConversationTurn: vi.fn().mockResolvedValue({ poignancy: 0.3 }),
   finalizeConversation: vi.fn().mockResolvedValue(undefined),
   adjustStateForConversation: vi.fn().mockImplementation((state: PersonaStateData) => state),
+  classifyUserSentiment: vi.fn().mockReturnValue("neutral"),
 }))
 
 vi.mock("@/lib/persona-world/intimacy-engine", () => ({

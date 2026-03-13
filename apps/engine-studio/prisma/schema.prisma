@@ -2045,6 +2045,7 @@ enum InteractionSource {
   EXTERNAL_FEED
   SYSTEM
   KAKAO         // T370: 카카오톡 채널 대화
+  CALL          // 1:1 통화 대화
 }
 
 enum PostSource {

@@ -39,7 +39,7 @@ export interface ConversationMemoryProvider {
     personaResponse?: string
     responseLengthTokens?: number
     poignancyScore: number
-    source: "DIRECT" | "KAKAO"
+    source: "DIRECT" | "KAKAO" | "CALL"
   }): Promise<void>
 
   /** InteractionSession의 totalTurns 증가 */
@@ -76,7 +76,7 @@ export interface ConversationTurnInput {
   /** 페르소나 volatility (L3 narrative) */
   volatility: number
   /** 대화 출처 (기본: DIRECT) */
-  source?: "DIRECT" | "KAKAO"
+  source?: "DIRECT" | "KAKAO" | "CALL"
 }
 
 /** 대화 종료 시 입력 */
@@ -214,6 +214,48 @@ export async function finalizeConversation(
 
     await provider.savePersonaState(personaId, updatedState)
   }
+}
+
+// ── 유저 감정 분류 (간단한 regex 기반) ────────────────────────
+
+/**
+ * 유저 메시지에서 감정을 간단 분류.
+ * chat-service, call-service 등 대화 파이프라인에서 공용.
+ */
+export function classifyUserSentiment(text: string): "positive" | "neutral" | "negative" {
+  const positivePatterns = /좋|감사|행복|기쁘|사랑|최고|대박|귀엽|멋|ㅋㅋ|ㅎㅎ|😊|😍|❤️|👍/
+  const negativePatterns = /싫|슬프|힘들|짜증|화나|우울|ㅠㅠ|ㅜㅜ|😢|😭|💔|별로|최악/
+
+  if (positivePatterns.test(text)) return "positive"
+  if (negativePatterns.test(text)) return "negative"
+  return "neutral"
+}
+
+// ── 유저 메시지 언어 감지 (간단한 스크립트 기반) ──────────────
+
+/**
+ * 유저 메시지의 주요 언어를 감지.
+ * STT가 없는 채팅에서 userLanguage 필드를 채우기 위해 사용.
+ */
+export function detectTextLanguage(text: string): string | undefined {
+  // 한글이 50% 이상이면 한국어 (기본값이므로 undefined 반환 → suffix에서 스킵)
+  const koreanChars = text.match(/[\u3131-\u3163\uac00-\ud7a3]/g)
+  const totalChars = text.replace(/\s/g, "").length
+  if (!totalChars) return undefined
+
+  const koreanRatio = (koreanChars?.length ?? 0) / totalChars
+  if (koreanRatio > 0.3) return undefined // 한국어는 기본이므로 생략
+
+  // 일본어 (히라가나/카타카나)
+  if (/[\u3040-\u309f\u30a0-\u30ff]/.test(text)) return "ja"
+
+  // 중국어 (한자만, 히라가나 없음)
+  if (/[\u4e00-\u9fff]/.test(text) && !/[\u3040-\u309f\u30a0-\u30ff]/.test(text)) return "zh"
+
+  // 그 외 라틴 문자 기반
+  if (/[a-zA-Z]/.test(text)) return "en"
+
+  return undefined
 }
 
 // ── 대화 중 PersonaState 미니 업데이트 ──────────────────────

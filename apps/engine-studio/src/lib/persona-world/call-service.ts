@@ -12,6 +12,7 @@ import {
   recordConversationTurn,
   finalizeConversation,
   adjustStateForConversation,
+  classifyUserSentiment,
 } from "./conversation-memory"
 import type {
   ConversationMemoryProvider,
@@ -384,6 +385,7 @@ export async function processCallTurn(
     previousMood: currentState.mood,
     currentMood: currentState.mood, // 미세 변화는 adjustState에서 처리
     volatility,
+    source: "CALL",
   }
   const { poignancy } = await recordConversationTurn(dp, turnInput)
 
@@ -392,8 +394,9 @@ export async function processCallTurn(
     await updateIntimacyAfterChat(dp, intimacyData.threadId, poignancy)
   }
 
-  // 10. 상태 조정
-  const updatedState = adjustStateForConversation(currentState, "neutral")
+  // 10. 상태 조정 (유저 발화 감정 분류 반영)
+  const userSentiment = classifyUserSentiment(sttResult.text)
+  const updatedState = adjustStateForConversation(currentState, userSentiment)
   await dp.savePersonaState(params.personaId, updatedState)
 
   // 10. CallSession 턴 수 업데이트

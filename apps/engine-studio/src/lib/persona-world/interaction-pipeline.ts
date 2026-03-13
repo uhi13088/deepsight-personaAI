@@ -41,6 +41,9 @@ import type { ImmutableFact } from "@/types"
 import { runModerationPipeline } from "./moderation/auto-moderator"
 import { computeActivityTraits, computeInteractionLimits } from "./activity-mapper"
 import { computePressure } from "./pressure"
+import { calculateInteractionPoignancy } from "./poignancy"
+import { checkVoiceConsistency } from "./quality-monitor"
+import type { VoiceMonitorProvider } from "./quality-monitor"
 import { getWorldVFinalConfig } from "./vfinal-config"
 import { calculateVFinal, vFinalToVector } from "@/lib/vector/v-final"
 
@@ -123,6 +126,12 @@ export interface InteractionPipelineDataProvider {
 
   /** v4.0: 품질 로그 DB 저장 (T288) */
   saveCommentQualityLog?(input: CommentQualityLogInput): Promise<void>
+
+  /** 최근 N개 포스트 텍스트 조회 (댓글 voice consistency check용) */
+  getRecentPostTexts?(personaId: string, count: number): Promise<string[]>
+
+  /** 페르소나 소비 컨텍스트 조회 (댓글 RAG context용) */
+  getConsumptionContext?(personaId: string): Promise<string>
 }
 
 /** v4.0 보안 옵션 */
@@ -388,6 +397,15 @@ export async function executeInteractions(
       factbook: persona.factbook,
     }
 
+    // RAG 컨텍스트: consumptionMemory + interestContinuity 동기화
+    const consumptionMemory = dataProvider.getConsumptionContext
+      ? await dataProvider.getConsumptionContext(persona.id)
+      : ""
+    const interestContinuity =
+      post.content.length > 100
+        ? `댓글 대상 포스트 주제: ${post.content.slice(0, 100)}…`
+        : `댓글 대상 포스트 주제: ${post.content}`
+
     const commentInput: CommentGenerationInput = {
       commenterId: persona.id,
       postId: post.id,
@@ -396,8 +414,8 @@ export async function executeInteractions(
       ragContext: {
         voiceAnchor,
         relationMemory: summarizeRelationship(rel, relProfile),
-        interestContinuity: "",
-        consumptionMemory: "",
+        interestContinuity,
+        consumptionMemory,
       },
       commenterState: state,
       personaProfile,
@@ -419,12 +437,34 @@ export async function executeInteractions(
       continue
     }
 
-    const commentResult: CommentResult = await generateComment(
+    let commentResult: CommentResult = await generateComment(
       commentInput,
       effectiveVectors, // V_Final 적용된 벡터
       commentDataProvider,
       commentLLMProvider
     )
+
+    // Voice Consistency Check: 댓글도 포스트와 동일한 보이스 검증
+    if (dataProvider.getRecentPostTexts) {
+      const voiceProvider: VoiceMonitorProvider = {
+        getRecentPostTexts: (pid, count) => dataProvider.getRecentPostTexts!(pid, count),
+      }
+      const voiceCheck = await checkVoiceConsistency(
+        commentResult.content,
+        persona.id,
+        voiceProvider
+      )
+      // critical이면 댓글 스킵 (포스트와 달리 재생성하지 않음 — 비용 효율)
+      if (voiceCheck.status === "critical") {
+        await dataProvider.saveActivityLog({
+          personaId: persona.id,
+          activityType: "COMMENT_VOICE_INCONSISTENT",
+          targetId: post.id,
+          metadata: { similarity: voiceCheck.similarity },
+        })
+        continue
+      }
+    }
 
     // Output Sentinel: 댓글 생성 후 보안 검사 (T281)
     if (securityOptions?.securityProvider) {
@@ -502,6 +542,16 @@ export async function executeInteractions(
 
     await dataProvider.updateRelationship(persona.id, post.authorId, "comment")
 
+    // Poignancy 계산 (댓글의 감정적 중요도 기록)
+    const commentPoignancy = calculateInteractionPoignancy(
+      "comment_created",
+      state,
+      personaVectors.narrative?.volatility ?? 0.3,
+      state.mood,
+      state.mood
+    )
+    // poignancy는 ActivityLog 메타데이터에 포함 (아래 saveActivityLog에서)
+
     // 품질 로그 자동 생성 (T288 — side effect, 실패해도 댓글 중단 안 함)
     if (dataProvider.saveCommentQualityLog) {
       try {
@@ -527,6 +577,7 @@ export async function executeInteractions(
         commentId: saved.id,
         tone: commentResult.tone.tone,
         expressApplied: commentResult.expressApplied,
+        poignancyScore: commentPoignancy,
         provenance: commentProvenance,
         // Phase RA: engagement 결정 컨텍스트 메타데이터
         engagementContext: {
@@ -590,11 +641,30 @@ export async function executeInteractions(
     }
   }
 
-  // Step 5: PersonaState 업데이트 (댓글 작성마다 state 갱신)
+  // Step 5: PersonaState 업데이트 (모든 인터랙션 타입별 state 갱신)
   for (const _comment of comments) {
     await updatePersonaState(persona.id, {
       type: "comment_created",
       tokensUsed: 0,
+    })
+  }
+  // 좋아요/리포스트/팔로우도 소셜배터리·에너지에 영향
+  if (likes.length > 0) {
+    await updatePersonaState(persona.id, {
+      type: "like_given",
+      count: likes.length,
+    })
+  }
+  if (reposts.length > 0) {
+    await updatePersonaState(persona.id, {
+      type: "repost_given",
+      count: reposts.length,
+    })
+  }
+  if (follows.length > 0) {
+    await updatePersonaState(persona.id, {
+      type: "follow_given",
+      count: follows.length,
     })
   }
 

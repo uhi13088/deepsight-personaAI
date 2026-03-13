@@ -15,6 +15,8 @@ import {
   retrieveConversationMemories,
   recordConversationTurn,
   adjustStateForConversation,
+  classifyUserSentiment,
+  detectTextLanguage,
 } from "./conversation-memory"
 import type { ConversationMemoryProvider } from "./conversation-memory"
 import { spendCredits, getBalance } from "./credit-service"
@@ -220,6 +222,7 @@ export async function sendMessage(
   }))
 
   // 6. Conversation Engine 호출 (친밀도 주입 T431)
+  const userLanguage = detectTextLanguage(content)
   const conversationContext: ConversationContext = {
     persona: profile,
     personaId: thread.personaId,
@@ -229,6 +232,7 @@ export async function sendMessage(
     userNickname,
     intimacyLevel: thread.intimacyLevel,
     sharedMilestones: thread.sharedMilestones ?? undefined,
+    userLanguage,
   }
 
   const llmResult: ConversationResult = await generateConversationResponse({
@@ -347,13 +351,4 @@ export async function getMessages(
   })
 }
 
-// ── 유틸: 간단한 감정 분류 ──────────────────────────────────
-
-function classifyUserSentiment(text: string): "positive" | "neutral" | "negative" {
-  const positivePatterns = /좋|감사|행복|기쁘|사랑|최고|대박|귀엽|멋|ㅋㅋ|ㅎㅎ|😊|😍|❤️|👍/
-  const negativePatterns = /싫|슬프|힘들|짜증|화나|우울|ㅠㅠ|ㅜㅜ|😢|😭|💔|별로|최악/
-
-  if (positivePatterns.test(text)) return "positive"
-  if (negativePatterns.test(text)) return "negative"
-  return "neutral"
-}
+// classifyUserSentiment → conversation-memory.ts로 이동 (공용 함수)
