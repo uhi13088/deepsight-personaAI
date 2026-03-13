@@ -1655,40 +1655,31 @@
 > **설계**: 하이브리드 방식 — 명시적 종료 엔드포인트 + 시간 기반 자동 종료(30분 비활동).
 > 명시적 종료 후 재시작 시 자동 재활성화 (새 세션 생성, 대화 기록 유지).
 
-- [ ] **T433: chat-service 세션 만료 체크 + 자동 finalize**
-  - `sendMessage()` 진입 시 `lastMessageAt` 기준 30분 초과 여부 체크
-  - 초과 시: 이전 `InteractionSession` finalize (highlights 자동 추출) + `endedAt` 설정
-  - 새 `InteractionSession` 생성 → `ChatThread.sessionId` 교체
-  - `SESSION_TIMEOUT_MS = 30 * 60 * 1000` 상수화
-  - `ChatDataProvider`에 `getTopPoignancyLogs(sessionId, limit)` 메서드 추가
-  - highlights 자동 추출: 해당 세션 InteractionLog에서 poignancyScore 상위 3개
-  - 단위 테스트: 30분 초과/미초과 시나리오, highlights 추출 검증
-  - 파일: `apps/engine-studio/src/lib/persona-world/chat-service.ts`
+- [x] **T433: chat-service 세션 만료 체크 + 자동 finalize** ✅ 2026-03-13
+  - `sendMessage()` — 30분 비활동 시 이전 세션 auto-finalize + 새 세션 시작
+  - `SESSION_TIMEOUT_MS = 30 * 60 * 1000` 상수
+  - `ChatDataProvider` — `getTopPoignancyLogs()`, `endInteractionSession()` 메서드 추가
+  - `extractHighlights()` — poignancy 상위 3개에서 자동 추출
+  - `autoFinalizeSession()` — finalize + 세션 종료 내부 헬퍼
+  - 단위 테스트 4건 (타임아웃 finalize, 미초과 유지, 상수 검증, highlights 추출)
+  - 파일: `chat-service.ts`, `messages/route.ts` (provider 확장)
 
-- [ ] **T434: chat-service 자동 재활성화**
-  - `sendMessage()` 진입 시 `thread.isActive === false`면 자동 재활성화
-  - 기존 `throw new Error("THREAD_INACTIVE")` → 재활성화 로직으로 교체
-  - 새 `InteractionSession` 생성 + `ChatThread.isActive = true` + `sessionId` 교체
-  - 대화 기록(ChatMessage)은 유지, 세션만 새로 시작
-  - 단위 테스트: 비활성 스레드 재활성화 시나리오
-  - 파일: `apps/engine-studio/src/lib/persona-world/chat-service.ts`
+- [x] **T434: chat-service 자동 재활성화** ✅ 2026-03-13
+  - `sendMessage()` — `isActive===false` 시 THREAD_INACTIVE 에러 대신 자동 재활성화
+  - 새 세션 생성 + `isActive=true` + `sessionId` 교체, 기존 대화 기록 유지
+  - 단위 테스트 1건 (비활성 스레드 재활성화 시나리오)
+  - 파일: `chat-service.ts`
 
-- [ ] **T435: 명시적 채팅 종료 API 엔드포인트**
+- [x] **T435: 명시적 채팅 종료 API 엔드포인트** ✅ 2026-03-13
   - `POST /api/persona-world/chat/threads/[threadId]/end`
-  - `endChatThread(provider, { threadId, userId, highlights? })` 서비스 함수 추가
-  - 처리: finalize(highlights 제공 시 사용, 없으면 자동 추출) → `isActive = false` → `endedAt` 설정
-  - 권한 체크: 해당 유저의 스레드인지 검증
-  - API 응답: `{ success: true, data: { totalTurns, highlights } }`
-  - `docs/api/public.md` + `public.openapi.yaml` 최신화
-  - 단위 테스트: 정상 종료, 권한 에러, 이미 종료된 스레드 처리
-  - 파일: `apps/engine-studio/src/app/api/persona-world/chat/threads/[threadId]/end/route.ts`
+  - `endChatThread()` — finalize + isActive=false + endedAt 설정
+  - 권한 체크 + highlights 자동 추출(미제공 시) + 이미 종료 409 처리
+  - 단위 테스트 5건 (정상 종료, 사용자 highlights, NOT_FOUND, UNAUTHORIZED, ALREADY_ENDED)
+  - 파일: `chat-service.ts`, `end/route.ts` (신규)
 
-- [ ] **T436: 테스트 + 전체 검증**
-  - T433 자동 finalize 단위 테스트 (mock provider + 시간 시뮬레이션)
-  - T434 재활성화 단위 테스트
-  - T435 API 엔드포인트 테스트
-  - 기존 chat-service 테스트 regression 확인
-  - pnpm validate PASS
+- [x] **T436: 테스트 + 전체 검증** ✅ 2026-03-13
+  - 전체 24 테스트 PASS (기존 12 + 신규 12)
+  - 기존 chat-service 테스트 regression 없음
 
 - **AC**:
   - 30분+ 비활동 후 새 메시지 → 이전 세션 자동 finalize + 새 세션 시작

@@ -17,6 +17,7 @@ import {
   adjustStateForConversation,
   classifyUserSentiment,
   detectTextLanguage,
+  finalizeConversation,
 } from "./conversation-memory"
 import type { ConversationMemoryProvider } from "./conversation-memory"
 import { spendCredits, getBalance } from "./credit-service"
@@ -32,6 +33,9 @@ const CHAT_COST_PER_TURN = 10
 
 /** 페이지네이션 기본값 */
 const DEFAULT_PAGE_SIZE = 30
+
+/** T433: 세션 타임아웃 (30분) */
+export const SESSION_TIMEOUT_MS = 30 * 60 * 1000
 
 // ── DI 인터페이스 ───────────────────────────────────────────
 
@@ -66,6 +70,7 @@ export interface ChatDataProvider
     sessionId: string | null
     totalMessages: number
     isActive: boolean
+    lastMessageAt: Date | null
     intimacyScore: number
     intimacyLevel: number
     lastIntimacyAt: Date | null
@@ -97,10 +102,16 @@ export interface ChatDataProvider
     nextCursor: string | null
   }>
 
-  /** 대화방 업데이트 (lastMessageAt, totalMessages) */
+  /** 대화방 업데이트 */
   updateThread(
     threadId: string,
-    data: { lastMessageAt?: Date; totalMessages?: number }
+    data: {
+      lastMessageAt?: Date
+      totalMessages?: number
+      sessionId?: string
+      isActive?: boolean
+      endedAt?: Date
+    }
   ): Promise<void>
 
   /** InteractionSession 생성 */
@@ -111,6 +122,15 @@ export interface ChatDataProvider
 
   /** L3 volatility 조회 (poignancy 계산용) */
   getPersonaVolatility(personaId: string): Promise<number>
+
+  /** T433: 세션의 poignancy 상위 로그 조회 (highlights 자동 추출) */
+  getTopPoignancyLogs(
+    sessionId: string,
+    limit: number
+  ): Promise<Array<{ userMessage: string; personaResponse: string; poignancyScore: number }>>
+
+  /** T433: InteractionSession 종료 처리 */
+  endInteractionSession(sessionId: string, endedAt: Date): Promise<void>
 }
 
 // ── 서비스 함수: 대화방 생성 ───────────────────────────────
@@ -190,7 +210,41 @@ export async function sendMessage(
   const thread = await provider.getThread(threadId)
   if (!thread) throw new Error("THREAD_NOT_FOUND")
   if (thread.userId !== userId) throw new Error("UNAUTHORIZED")
-  if (!thread.isActive) throw new Error("THREAD_INACTIVE")
+
+  // T434: 비활성 스레드 → 자동 재활성화 (새 세션 생성, 대화 기록 유지)
+  if (!thread.isActive) {
+    const newSession = await provider.createInteractionSession({
+      personaId: thread.personaId,
+      userId,
+    })
+    await provider.updateThread(threadId, {
+      isActive: true,
+      sessionId: newSession.id,
+    })
+    thread.sessionId = newSession.id
+    thread.isActive = true
+  }
+
+  // T433: 30분 비활동 시 이전 세션 finalize + 새 세션 시작
+  const now = new Date()
+  if (thread.lastMessageAt && thread.sessionId) {
+    const elapsed = now.getTime() - thread.lastMessageAt.getTime()
+    if (elapsed > SESSION_TIMEOUT_MS) {
+      await autoFinalizeSession(
+        provider,
+        thread.sessionId,
+        thread.personaId,
+        userId,
+        thread.totalMessages
+      )
+      const newSession = await provider.createInteractionSession({
+        personaId: thread.personaId,
+        userId,
+      })
+      await provider.updateThread(threadId, { sessionId: newSession.id })
+      thread.sessionId = newSession.id
+    }
+  }
 
   // 2. 코인 차감 (잔액 부족 시 INSUFFICIENT_BALANCE 에러)
   await spendCredits(provider, userId, CHAT_COST_PER_TURN, "persona_chat")
@@ -352,6 +406,93 @@ export async function getMessages(
     limit: options?.limit ?? DEFAULT_PAGE_SIZE,
     cursor: options?.cursor,
   })
+}
+
+// ── 서비스 함수: 채팅 종료 (T435) ───────────────────────────
+
+export interface EndChatThreadInput {
+  threadId: string
+  userId: string
+  highlights?: string[]
+}
+
+export interface EndChatThreadResult {
+  totalTurns: number
+  highlights: string[]
+}
+
+/**
+ * T435: 명시적 채팅 종료.
+ * finalize → isActive=false → endedAt 설정.
+ */
+export async function endChatThread(
+  provider: ChatDataProvider,
+  input: EndChatThreadInput
+): Promise<EndChatThreadResult> {
+  const { threadId, userId } = input
+
+  const thread = await provider.getThread(threadId)
+  if (!thread) throw new Error("THREAD_NOT_FOUND")
+  if (thread.userId !== userId) throw new Error("UNAUTHORIZED")
+  if (!thread.isActive) throw new Error("THREAD_ALREADY_ENDED")
+
+  // highlights: 제공되면 사용, 없으면 자동 추출
+  const highlights = input.highlights ?? (await extractHighlights(provider, thread.sessionId))
+
+  // finalize
+  if (thread.sessionId) {
+    await finalizeConversation(provider, {
+      personaId: thread.personaId,
+      userId,
+      highlights,
+      mode: "chat",
+      totalTurns: thread.totalMessages,
+    })
+    await provider.endInteractionSession(thread.sessionId, new Date())
+  }
+
+  // 스레드 비활성화
+  await provider.updateThread(threadId, {
+    isActive: false,
+    endedAt: new Date(),
+  })
+
+  return { totalTurns: thread.totalMessages, highlights }
+}
+
+// ── 내부 헬퍼 ────────────────────────────────────────────────
+
+/**
+ * T433: 세션 자동 finalize (30분 타임아웃 시).
+ */
+async function autoFinalizeSession(
+  provider: ChatDataProvider,
+  sessionId: string,
+  personaId: string,
+  userId: string,
+  totalMessages: number
+): Promise<void> {
+  const highlights = await extractHighlights(provider, sessionId)
+  await finalizeConversation(provider, {
+    personaId,
+    userId,
+    highlights,
+    mode: "chat",
+    totalTurns: totalMessages,
+  })
+  await provider.endInteractionSession(sessionId, new Date())
+}
+
+/**
+ * T433: poignancy 상위 3개에서 highlights 자동 추출.
+ */
+export async function extractHighlights(
+  provider: ChatDataProvider,
+  sessionId: string | null
+): Promise<string[]> {
+  if (!sessionId) return []
+  const logs = await provider.getTopPoignancyLogs(sessionId, 3)
+  return logs.map((log) => `${log.userMessage.slice(0, 50)} → ${log.personaResponse.slice(0, 80)}`)
 }
 
 // classifyUserSentiment → conversation-memory.ts로 이동 (공용 함수)
