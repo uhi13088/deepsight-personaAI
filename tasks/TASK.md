@@ -1802,6 +1802,40 @@
 
 ---
 
+### 🚨 BUG-CRITICAL: 감정전파 무조건 실행 — 인터랙션 없이 mood 전파
+
+> **심각도**: CRITICAL
+> **발견**: 파이프라인 동기화 점검 중 발견
+>
+> **현상**: `emotional-contagion.ts`의 `computeSingleEffect()`가 최근 인터랙션 여부와
+> 관계없이 mood 차이만으로 전파 실행. cron 스케줄러가 돌 때마다 모든 관계 엣지에 대해
+> 전파가 일어남. frequency가 0이어도 warmth가 높으면 전파됨.
+>
+> **위험**: 아무 상호작용 없는 페르소나 간에 mood가 서서히 수렴 → 전체 페르소나 감정 균질화
+> → 개성 상실. 최악의 경우 집단 우울(mood ≤ 0.15) 시 Kill Switch 오작동 가능.
+>
+> **근본 원인**: 전파 조건에 "최근 인터랙션 존재" 가드가 없음.
+
+- [ ] **T445: 감정전파 인터랙션 가드 추가**
+  - `emotional-contagion.ts` → `computeSingleEffect()`에 가드 조건 추가:
+    - `edge.lastInteractionAt`이 7일 이내가 아니면 전파 스킵 (delta = 0)
+    - 또는 `edge.frequency < 0.05`이면 전파 스킵
+  - `ContagionEdge` 타입에 `lastInteractionAt` 필드 추가 (이미 RelationshipScore에 존재)
+  - `cron-scheduler-service.ts` → `getRelationshipEdges()`에서 `lastInteractionAt` 포함하여 조회
+  - 단위 테스트: 최근 인터랙션 없는 엣지 → delta 0 검증
+  - 단위 테스트: 7일 이내 인터랙션 있는 엣지 → 정상 전파 검증
+  - 기존 감정전파 테스트 regression 확인
+  - pnpm validate PASS
+  - 파일: `emotional-contagion.ts`, `cron-scheduler-service.ts`
+
+- **AC**:
+  - 최근 7일 내 인터랙션 없는 페르소나 간에는 감정전파 발생하지 않음
+  - 인터랙션 있는 페르소나 간에는 기존대로 정상 전파
+  - Kill Switch 안전 체크 기존 동작 유지
+  - pnpm validate PASS
+
+---
+
 ## BLOCKED
 
 (없음)
