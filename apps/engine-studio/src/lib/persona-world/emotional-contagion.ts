@@ -21,6 +21,8 @@ export interface ContagionEdge {
   warmth: number // 0.0~1.0: 친밀도
   tension: number // 0.0~1.0: 갈등
   frequency: number // 0.0~1.0: 상호작용 빈도
+  /** 최근 인터랙션 시각 (없으면 전파 스킵) */
+  lastInteractionAt: Date | null
 }
 
 /** 성격 기반 감수성 파라미터 */
@@ -124,6 +126,9 @@ export const DEFAULT_CONTAGION_CONFIG: ContagionConfig = {
   minSocialBatteryForReception: 0.1,
 } as const
 
+/** 전파 허용 최대 인터랙션 경과 일수 (이 기간 내 인터랙션이 없으면 전파 스킵) */
+export const CONTAGION_INTERACTION_WINDOW_DAYS = 7
+
 /** 관계 가중치 비율 */
 export const RELATIONSHIP_WEIGHTS = {
   /** warmth 기여도 */
@@ -165,6 +170,18 @@ export function computeResistance(
 
   const totalResistance = tensionResistance + agreeablenessResistance + socialResistance
   return Math.max(0, Math.min(1, totalResistance))
+}
+
+/** 엣지에 최근 인터랙션이 있는지 확인 (windowDays 이내) */
+export function hasRecentInteraction(
+  edge: ContagionEdge,
+  now: Date = new Date(),
+  windowDays: number = CONTAGION_INTERACTION_WINDOW_DAYS
+): boolean {
+  if (!edge.lastInteractionAt) return false
+  const diffMs = now.getTime() - edge.lastInteractionAt.getTime()
+  const diffDays = diffMs / (1000 * 60 * 60 * 24)
+  return diffDays <= windowDays
 }
 
 /** 수신자가 전파 수신 가능한 상태인지 확인 */
@@ -265,6 +282,9 @@ export function runContagionRound(params: {
     const source = personaMap.get(edge.sourceId)
     const target = personaMap.get(edge.targetId)
     if (!source || !target) continue
+
+    // T445: 최근 인터랙션 없는 엣지는 전파 스킵
+    if (!hasRecentInteraction(edge)) continue
 
     // 수신 가능 여부 확인
     if (!canReceiveContagion(target, config)) continue

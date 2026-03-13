@@ -7,9 +7,11 @@ import { describe, it, expect } from "vitest"
 import {
   DEFAULT_CONTAGION_CONFIG,
   RELATIONSHIP_WEIGHTS,
+  CONTAGION_INTERACTION_WINDOW_DAYS,
   computeRelationshipWeight,
   computeResistance,
   canReceiveContagion,
+  hasRecentInteraction,
   computeSingleEffect,
   runContagionRound,
   applyContagionResult,
@@ -47,6 +49,7 @@ function makeEdge(overrides: Partial<ContagionEdge> = {}): ContagionEdge {
     warmth: 0.7,
     tension: 0.2,
     frequency: 0.5,
+    lastInteractionAt: new Date(), // 기본: 최근 인터랙션 있음
     ...overrides,
   }
 }
@@ -163,6 +166,46 @@ describe("computeResistance", () => {
     const resistance = computeResistance(receiver, sensitivity, DEFAULT_CONTAGION_CONFIG)
     expect(resistance).toBeGreaterThanOrEqual(0)
     expect(resistance).toBeLessThanOrEqual(1)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// 3.5. hasRecentInteraction (T445)
+// ═══════════════════════════════════════════════════════════════
+
+describe("hasRecentInteraction", () => {
+  it("lastInteractionAt이 null이면 false", () => {
+    const edge = makeEdge({ lastInteractionAt: null })
+    expect(hasRecentInteraction(edge)).toBe(false)
+  })
+
+  it("7일 이내 인터랙션이면 true", () => {
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+    const edge = makeEdge({ lastInteractionAt: threeDaysAgo })
+    expect(hasRecentInteraction(edge)).toBe(true)
+  })
+
+  it("7일 초과 인터랙션이면 false", () => {
+    const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
+    const edge = makeEdge({ lastInteractionAt: tenDaysAgo })
+    expect(hasRecentInteraction(edge)).toBe(false)
+  })
+
+  it("정확히 7일 경계면 true", () => {
+    const exactlySevenDays = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const edge = makeEdge({ lastInteractionAt: exactlySevenDays })
+    expect(hasRecentInteraction(edge)).toBe(true)
+  })
+
+  it("커스텀 windowDays 적용", () => {
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+    const edge = makeEdge({ lastInteractionAt: threeDaysAgo })
+    expect(hasRecentInteraction(edge, new Date(), 2)).toBe(false) // 2일 윈도우
+    expect(hasRecentInteraction(edge, new Date(), 5)).toBe(true) // 5일 윈도우
+  })
+
+  it("CONTAGION_INTERACTION_WINDOW_DAYS 상수가 7", () => {
+    expect(CONTAGION_INTERACTION_WINDOW_DAYS).toBe(7)
   })
 })
 
@@ -444,6 +487,41 @@ describe("runContagionRound", () => {
     const result = runContagionRound(scenario)
     const p2Result = result.personaResults.find((r) => r.personaId === "p-2")
     expect(p2Result).toBeUndefined() // 에너지 부족으로 제외
+  })
+
+  it("T445: 최근 인터랙션 없는 엣지 → 전파 스킵", () => {
+    const scenario = makeSimpleScenario()
+    // 모든 엣지의 lastInteractionAt을 30일 전으로 설정
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    scenario.edges = scenario.edges.map((e) => ({ ...e, lastInteractionAt: thirtyDaysAgo }))
+    const result = runContagionRound(scenario)
+    expect(result.effects.length).toBe(0)
+    expect(result.affectedCount).toBe(0)
+  })
+
+  it("T445: lastInteractionAt이 null인 엣지 → 전파 스킵", () => {
+    const scenario = makeSimpleScenario()
+    scenario.edges = scenario.edges.map((e) => ({ ...e, lastInteractionAt: null }))
+    const result = runContagionRound(scenario)
+    expect(result.effects.length).toBe(0)
+    expect(result.affectedCount).toBe(0)
+  })
+
+  it("T445: 일부 엣지만 최근 인터랙션 → 해당 엣지만 전파", () => {
+    const scenario = makeSimpleScenario()
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    // p-1→p-2만 최근, 나머지는 오래됨
+    scenario.edges = scenario.edges.map((e) => {
+      if (e.sourceId === "p-1" && e.targetId === "p-2") {
+        return { ...e, lastInteractionAt: new Date() }
+      }
+      return { ...e, lastInteractionAt: thirtyDaysAgo }
+    })
+    const result = runContagionRound(scenario)
+    // p-1→p-2 엣지만 전파됨
+    expect(result.effects.length).toBe(1)
+    expect(result.effects[0].sourceId).toBe("p-1")
+    expect(result.effects[0].targetId).toBe("p-2")
   })
 
   it("빈 엣지 → 전파 없음", () => {

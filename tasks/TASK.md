@@ -1816,17 +1816,15 @@
 >
 > **근본 원인**: 전파 조건에 "최근 인터랙션 존재" 가드가 없음.
 
-- [ ] **T445: 감정전파 인터랙션 가드 추가**
-  - `emotional-contagion.ts` → `computeSingleEffect()`에 가드 조건 추가:
-    - `edge.lastInteractionAt`이 7일 이내가 아니면 전파 스킵 (delta = 0)
-    - 또는 `edge.frequency < 0.05`이면 전파 스킵
-  - `ContagionEdge` 타입에 `lastInteractionAt` 필드 추가 (이미 RelationshipScore에 존재)
+- [x] **T445: 감정전파 인터랙션 가드 추가** ✅ 2026-03-13
+  - `emotional-contagion.ts` → `runContagionRound()`에 `hasRecentInteraction()` 가드 추가
+    - `edge.lastInteractionAt`이 7일 이내가 아니면 전파 스킵
+    - `CONTAGION_INTERACTION_WINDOW_DAYS` 상수 (7일)
+  - `ContagionEdge` 타입에 `lastInteractionAt: Date | null` 필드 추가
   - `cron-scheduler-service.ts` → `getRelationshipEdges()`에서 `lastInteractionAt` 포함하여 조회
-  - 단위 테스트: 최근 인터랙션 없는 엣지 → delta 0 검증
-  - 단위 테스트: 7일 이내 인터랙션 있는 엣지 → 정상 전파 검증
-  - 기존 감정전파 테스트 regression 확인
-  - pnpm validate PASS
-  - 파일: `emotional-contagion.ts`, `cron-scheduler-service.ts`
+  - 단위 테스트 9건 추가: hasRecentInteraction 6건 + runContagionRound 가드 3건
+  - 62 테스트 PASS (기존 regression 없음)
+  - 파일: `emotional-contagion.ts`, `cron-scheduler-service.ts`, `emotional-contagion.test.ts`
 
 - **AC**:
   - 최근 7일 내 인터랙션 없는 페르소나 간에는 감정전파 발생하지 않음
