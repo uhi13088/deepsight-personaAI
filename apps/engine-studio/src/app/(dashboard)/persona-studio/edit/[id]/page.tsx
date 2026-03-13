@@ -45,6 +45,9 @@ export default function PersonaEditPage({ params }: { params: Promise<{ id: stri
   const [editName, setEditName] = useState<string | null>(null)
   const [editDescription, setEditDescription] = useState<string | null>(null)
   const [editPrompt, setEditPrompt] = useState<string | null>(null)
+  const [editProfileImageUrl, setEditProfileImageUrl] = useState<string | null | undefined>(
+    undefined
+  )
   // TTS edit state (undefined = not edited, null = cleared, string/number = changed)
   const [editTtsProvider, setEditTtsProvider] = useState<string | null | undefined>(undefined)
   const [editTtsVoiceId, setEditTtsVoiceId] = useState<string | null | undefined>(undefined)
@@ -96,7 +99,11 @@ export default function PersonaEditPage({ params }: { params: Promise<{ id: stri
     editTtsPitch !== undefined ||
     editTtsLanguage !== undefined
   const hasChanges =
-    editName !== null || editDescription !== null || editPrompt !== null || hasTtsChanges
+    editName !== null ||
+    editDescription !== null ||
+    editPrompt !== null ||
+    editProfileImageUrl !== undefined ||
+    hasTtsChanges
 
   // ── Save handler ────────────────────────────────────────────
   const handleSave = async () => {
@@ -117,6 +124,7 @@ export default function PersonaEditPage({ params }: { params: Promise<{ id: stri
       if (editName !== null) body.name = editName
       if (editDescription !== null) body.description = editDescription || null
       if (editPrompt !== null) body.basePrompt = editPrompt
+      if (editProfileImageUrl !== undefined) body.profileImageUrl = editProfileImageUrl
       if (editTtsProvider !== undefined) body.ttsProvider = editTtsProvider
       if (editTtsVoiceId !== undefined) body.ttsVoiceId = editTtsVoiceId
       if (editTtsSpeed !== undefined) body.ttsSpeed = editTtsSpeed
@@ -136,6 +144,7 @@ export default function PersonaEditPage({ params }: { params: Promise<{ id: stri
       setEditName(null)
       setEditDescription(null)
       setEditPrompt(null)
+      setEditProfileImageUrl(undefined)
       setEditTtsProvider(undefined)
       setEditTtsVoiceId(undefined)
       setEditTtsSpeed(undefined)
@@ -244,8 +253,12 @@ export default function PersonaEditPage({ params }: { params: Promise<{ id: stri
             editable={editable}
             currentName={currentName}
             currentDescription={currentDescription}
+            currentProfileImageUrl={
+              editProfileImageUrl !== undefined ? editProfileImageUrl : data.profileImageUrl
+            }
             onNameChange={setEditName}
             onDescriptionChange={setEditDescription}
+            onProfileImageUrlChange={setEditProfileImageUrl}
             ttsEdits={{
               provider: editTtsProvider,
               voiceId: editTtsVoiceId,
