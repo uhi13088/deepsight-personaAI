@@ -384,18 +384,77 @@ function createPostPipelineDataProvider(): PostPipelineDataProvider {
     },
 
     async getActivePersonaHandles(excludePersonaId) {
+      // T441: 관계 데이터 포함하여 COLLAB 후보 조회 + 랭킹
       const personas = await prisma.persona.findMany({
         where: {
           status: { in: ["ACTIVE", "STANDARD"] },
           id: { not: excludePersonaId },
           handle: { not: null },
         },
-        select: { handle: true, name: true },
+        select: { id: true, handle: true, name: true },
         take: 50,
       })
+
+      // 관계 데이터 조회
+      const relationships = await prisma.personaRelationship.findMany({
+        where: {
+          OR: [{ personaAId: excludePersonaId }, { personaBId: excludePersonaId }],
+        },
+        select: {
+          personaAId: true,
+          personaBId: true,
+          warmth: true,
+          tension: true,
+          depth: true,
+          frequency: true,
+          attraction: true,
+        },
+      })
+
+      // 관계 맵 생성 (상대 personaId → 관계 점수)
+      const relMap = new Map<
+        string,
+        { warmth: number; tension: number; depth: number; frequency: number; attraction: number }
+      >()
+      for (const r of relationships) {
+        const partnerId = r.personaAId === excludePersonaId ? r.personaBId : r.personaAId
+        relMap.set(partnerId, {
+          warmth: Number(r.warmth),
+          tension: Number(r.tension),
+          depth: Number(r.depth ?? 0),
+          frequency: Number(r.frequency ?? 0),
+          attraction: Number(r.attraction ?? 0),
+        })
+      }
+
       return personas
         .filter((p): p is typeof p & { handle: string } => p.handle !== null)
-        .map((p) => ({ handle: p.handle, name: p.name }))
+        .filter((p) => {
+          // T441: tension > 0.7인 앙숙 제외
+          const rel = relMap.get(p.id)
+          return !rel || rel.tension <= 0.7
+        })
+        .map((p) => {
+          const rel = relMap.get(p.id)
+          // T441: 관계 랭킹 점수 = warmth×0.4 + depth×0.3 + frequency×0.2 + attraction×0.1
+          const collabScore = rel
+            ? rel.warmth * 0.4 + rel.depth * 0.3 + rel.frequency * 0.2 + rel.attraction * 0.1
+            : 0
+          return {
+            handle: p.handle,
+            name: p.name,
+            collabScore,
+            relationshipHint: rel
+              ? rel.warmth > 0.7
+                ? "가까운 사이"
+                : rel.warmth > 0.4
+                  ? "자주 교류"
+                  : undefined
+              : undefined,
+          }
+        })
+        .sort((a, b) => b.collabScore - a.collabScore)
+        .slice(0, 10) // 상위 10명만 반환
     },
 
     async recordConsumption(personaId, record) {

@@ -5,6 +5,7 @@ import {
   applyStateModifiers,
   weightedRandomSelect,
   selectPostType,
+  computeCollabBoost,
 } from "@/lib/persona-world/post-type-selector"
 import type { PersonaStateData, PostTypeAffinity } from "@/lib/persona-world/types"
 import type { PersonaPostType } from "@/generated/prisma"
@@ -372,6 +373,67 @@ describe("selectPostType", () => {
     const result1 = selectPostType(vectors, 0.5, state, undefined, 0.1)
     const result2 = selectPostType(vectors, 0.5, state, undefined, 0.1)
     expect(result1.selectedType).toBe(result2.selectedType)
+  })
+
+  // ── T443: COLLAB 관계 기반 부스트 ──
+
+  it("collaborationScores에 warmth>0.6이 2명 이상이면 COLLAB +0.15 부스트", () => {
+    const customAffinities: PostTypeAffinity[] = [
+      {
+        type: "COLLAB" as PersonaPostType,
+        conditions: [
+          { layer: "L1", dimension: "sociability", operator: ">", threshold: 0.5, weight: 1.0 },
+        ],
+      },
+      {
+        type: "REVIEW" as PersonaPostType,
+        conditions: [
+          { layer: "L1", dimension: "depth", operator: ">", threshold: 0.5, weight: 1.0 },
+        ],
+      },
+    ]
+    const vectors = makeVectors({
+      social: {
+        depth: 0.7,
+        lens: 0.5,
+        stance: 0.5,
+        scope: 0.5,
+        taste: 0.5,
+        purpose: 0.5,
+        sociability: 0.7,
+      },
+    })
+    const state = makeState()
+
+    // Without collab boost
+    const resultWithout = selectPostType(vectors, 0.5, state, customAffinities, 0.0)
+    // With collab boost (3 warm relationships)
+    const resultWith = selectPostType(
+      vectors,
+      0.5,
+      state,
+      customAffinities,
+      0.0,
+      [],
+      [0.7, 0.8, 0.65]
+    )
+
+    expect(resultWith.scores.COLLAB).toBe(resultWithout.scores.COLLAB + 0.15)
+  })
+
+  it("collaborationScores에 warmth>0.6이 1명이면 COLLAB 부스트 없음", () => {
+    const vectors = makeVectors()
+    const state = makeState()
+
+    const result = selectPostType(vectors, 0.5, state, undefined, 0.5, [], [0.7, 0.3, 0.2])
+    // Only 1 warm relationship → no boost
+    // We just verify computeCollabBoost logic
+    expect(computeCollabBoost([0.7, 0.3, 0.2])).toBe(0)
+  })
+
+  it("collaborationScores 미전달 시 COLLAB 부스트 없음", () => {
+    expect(computeCollabBoost(undefined)).toBe(0)
+    expect(computeCollabBoost([])).toBe(0)
   })
 
   it("커스텀 affinities 지원", () => {

@@ -394,6 +394,14 @@ export function buildUserPrompt(input: PostGenerationInput): string {
       .map((p) => `@${p.handle} (${p.name})`)
       .join(", ")
     parts.push(`[멘션 가능 목록] ${handleList}`)
+
+    // T442: 관계 컨텍스트 주입 — 관계가 좋은 상대와 자연스러운 콜라보 유도
+    const withHints = input.availablePersonaHandles.filter((p) => p.relationshipHint)
+    if (withHints.length > 0) {
+      const hintList = withHints.map((p) => `@${p.handle}: ${p.relationshipHint}`).join(", ")
+      parts.push(`[관계 맥락] ${hintList}`)
+      parts.push(`- 관계가 좋은 상대와 자연스러운 콜라보를 만들어주세요`)
+    }
   }
 
   // 공통 지시
