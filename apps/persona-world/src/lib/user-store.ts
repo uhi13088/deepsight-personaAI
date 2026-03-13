@@ -130,6 +130,9 @@ interface UserState {
   disconnectSns: (provider: SnsProvider) => void
   setSnsAnalyzing: (provider: SnsProvider, analyzing: boolean) => void
 
+  // 잔액 동기화 — 서버 잔액으로 로컬 잔액을 갱신
+  syncCreditsBalance: (serverBalance: number) => void
+
   // 상점 — 구매한 아이템 ID 목록
   purchasedItems: string[]
   purchaseItem: (itemId: string, price: number) => boolean
@@ -509,6 +512,15 @@ export const useUserStore = create<UserState>()(
           snsConnections: state.snsConnections.map((c) =>
             c.provider === provider ? { ...c, analyzing } : c
           ),
+        })),
+
+      // 잔액 동기화 — 서버 잔액을 로컬에 반영
+      syncCreditsBalance: (serverBalance: number) =>
+        set((s) => ({
+          onboarding: {
+            ...s.onboarding,
+            creditsBalance: serverBalance,
+          },
         })),
 
       // 상점 — 구매

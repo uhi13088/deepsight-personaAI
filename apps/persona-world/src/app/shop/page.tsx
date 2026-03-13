@@ -33,7 +33,8 @@ const COIN_PACKAGES = [
 type ConfirmState = { item: ShopItem } | null
 
 export default function ShopPage() {
-  const { profile, onboarding, purchaseItem, hasPurchased, getPurchaseCount } = useUserStore()
+  const { profile, onboarding, purchaseItem, hasPurchased, getPurchaseCount, syncCreditsBalance } =
+    useUserStore()
   const [activeTab, setActiveTab] = useState<ShopCategory>("persona")
   const [confirm, setConfirm] = useState<ConfirmState>(null)
   const [coinLoading, setCoinLoading] = useState<string | null>(null)
@@ -42,21 +43,33 @@ export default function ShopPage() {
   const [couponCode, setCouponCode] = useState("")
   const [couponLoading, setCouponLoading] = useState(false)
   const [serverBalance, setServerBalance] = useState<number | null>(null)
-  // 서버 잔액과 로컬 잔액 중 큰 값을 사용
-  // (온보딩 크레딧은 로컬에만 존재, 결제 크레딧은 서버에만 존재할 수 있음)
-  const balance =
-    serverBalance !== null
-      ? Math.max(serverBalance, onboarding.creditsBalance)
-      : onboarding.creditsBalance
+  // 서버 잔액이 로딩되면 서버를 SSoT로 사용, 아직 로딩 전이면 로컬 잔액 표시
+  const balance = serverBalance ?? onboarding.creditsBalance
   const items = getShopItemsByCategory(activeTab)
 
-  // 서버에서 실제 잔액 fetch (결제 충전 반영)
+  // 서버에서 실제 잔액 fetch — 서버 잔액을 SSoT로 사용
+  // 온보딩 크레딧이 서버에 없으면 서버에 동기화 (최초 1회)
   useEffect(() => {
     const userId = profile?.id
     if (!userId) return
     clientApi
       .getCredits(userId, { limit: 1 })
-      .then((data) => setServerBalance(data.balance))
+      .then(async (data) => {
+        // 서버 잔액이 0이고 로컬에 온보딩 크레딧이 있으면 서버에 동기화
+        if (data.balance === 0 && onboarding.creditsBalance > 0) {
+          try {
+            const synced = await clientApi.syncOnboardingCredits(userId, onboarding.creditsBalance)
+            setServerBalance(synced.balance)
+            syncCreditsBalance(synced.balance)
+          } catch {
+            // 동기화 실패 시 로컬 잔액 유지
+            setServerBalance(onboarding.creditsBalance)
+          }
+        } else {
+          setServerBalance(data.balance)
+          syncCreditsBalance(data.balance)
+        }
+      })
       .catch(() => {})
   }, [profile?.id])
   const handleCouponRedeem = async () => {
@@ -75,6 +88,7 @@ export default function ShopPage() {
     try {
       const result = await clientApi.redeemCoupon(userId, code)
       setServerBalance(result.newBalance)
+      syncCreditsBalance(result.newBalance)
       setCouponCode("")
       toast.success(`${result.coinAmount} 코인이 지급되었습니다!`)
     } catch (error) {
@@ -127,6 +141,7 @@ export default function ShopPage() {
         paymentInfo.amount
       )
       setServerBalance(confirmed.balance)
+      syncCreditsBalance(confirmed.balance)
       toast.success(`${confirmed.coins} 코인이 충전되었습니다!`)
     } catch (error) {
       const msg = error instanceof Error ? error.message : "결제 실패"
