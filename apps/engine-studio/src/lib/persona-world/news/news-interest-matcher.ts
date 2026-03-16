@@ -219,7 +219,14 @@ export function computeNewsInterestScore(
   const extraversion = persona.temperament.extraversion
   const regionalRelevance = computeRegionalRelevance(article.region, persona)
 
-  const score = tagOverlap * 0.35 + openness * 0.25 + extraversion * 0.25 + regionalRelevance * 0.15
+  let score = tagOverlap * 0.35 + openness * 0.25 + extraversion * 0.25 + regionalRelevance * 0.15
+
+  // 비-GLOBAL 기사에 대해 지역 무관 페르소나 패널티:
+  // 자국도 아니고 언어 연관도 없는 경우 (regionalRelevance ≤ 0.05)
+  // → 60% 감점하여 openness/extraversion만으로 threshold 초과하는 것 방지
+  if (article.region !== "GLOBAL" && regionalRelevance <= 0.05) {
+    score *= 0.4
+  }
 
   return {
     personaId: persona.id,

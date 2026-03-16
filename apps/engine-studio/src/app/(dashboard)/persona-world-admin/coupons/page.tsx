@@ -23,10 +23,6 @@ interface CouponData {
 }
 
 interface CreateForm {
-  code: string
-  autoGenerate: boolean
-  prefix: string
-  type: CouponData["type"]
   coinAmount: number
   description: string
   maxRedemptions: number
@@ -34,10 +30,6 @@ interface CreateForm {
 }
 
 const INITIAL_FORM: CreateForm = {
-  code: "",
-  autoGenerate: false,
-  prefix: "",
-  type: "MANUAL",
   coinAmount: 100,
   description: "",
   maxRedemptions: 1,
@@ -96,17 +88,12 @@ export default function CouponManagementPage() {
     setError(null)
     try {
       const body: Record<string, unknown> = {
-        type: form.type,
+        type: "MANUAL",
+        autoGenerate: true,
         coinAmount: form.coinAmount,
         description: form.description || undefined,
         maxRedemptions: form.maxRedemptions,
         expiresAt: form.expiresAt || null,
-      }
-      if (form.autoGenerate) {
-        body.autoGenerate = true
-        if (form.prefix) body.prefix = form.prefix
-      } else {
-        body.code = form.code
       }
 
       const res = await fetch("/api/internal/persona-world-admin/coupons", {
@@ -161,7 +148,7 @@ export default function CouponManagementPage() {
       <Header title="Coupon Management" description="프로모션 쿠폰 생성 및 관리" />
 
       {error && (
-        <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <div className="bg-destructive/10 text-destructive rounded border border-red-200 p-3 text-sm dark:border-red-800">
           {error}
           <button onClick={() => setError(null)} className="ml-2 underline">
             닫기
@@ -174,7 +161,7 @@ export default function CouponManagementPage() {
         <select
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
-          className="rounded border px-2 py-1 text-sm"
+          className="border-border bg-background rounded border px-2 py-1 text-sm"
         >
           <option value="">전체 타입</option>
           <option value="MANUAL">MANUAL</option>
@@ -184,7 +171,7 @@ export default function CouponManagementPage() {
         <select
           value={filterActive}
           onChange={(e) => setFilterActive(e.target.value)}
-          className="rounded border px-2 py-1 text-sm"
+          className="border-border bg-background rounded border px-2 py-1 text-sm"
         >
           <option value="">전체 상태</option>
           <option value="true">활성</option>
@@ -195,9 +182,9 @@ export default function CouponManagementPage() {
           placeholder="코드/설명 검색..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="rounded border px-2 py-1 text-sm"
+          className="border-border bg-background rounded border px-2 py-1 text-sm"
         />
-        <span className="ml-auto text-sm text-gray-500">총 {total}개</span>
+        <span className="text-muted-foreground ml-auto text-sm">총 {total}개</span>
         <Button size="sm" onClick={() => setShowCreate(!showCreate)}>
           {showCreate ? <X className="mr-1 h-4 w-4" /> : <Plus className="mr-1 h-4 w-4" />}
           {showCreate ? "취소" : "새 쿠폰"}
@@ -206,104 +193,47 @@ export default function CouponManagementPage() {
 
       {/* Create Form */}
       {showCreate && (
-        <div className="space-y-3 rounded border bg-gray-50 p-4">
+        <div className="bg-muted/50 border-border space-y-3 rounded border p-4">
           <h3 className="text-sm font-semibold">쿠폰 생성</h3>
+          <p className="text-muted-foreground text-xs">쿠폰 코드는 자동으로 생성됩니다.</p>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-600">코드 생성 방식</label>
-              <div className="mt-1 flex gap-3">
-                <label className="flex items-center gap-1 text-sm">
-                  <input
-                    type="radio"
-                    checked={!form.autoGenerate}
-                    onChange={() => setForm({ ...form, autoGenerate: false })}
-                  />
-                  수동 입력
-                </label>
-                <label className="flex items-center gap-1 text-sm">
-                  <input
-                    type="radio"
-                    checked={form.autoGenerate}
-                    onChange={() => setForm({ ...form, autoGenerate: true })}
-                  />
-                  자동 생성
-                </label>
-              </div>
+              <label className="text-muted-foreground text-xs">쿠폰 이름</label>
+              <input
+                type="text"
+                value={form.description}
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="예: 신규가입 환영 쿠폰"
+                className="border-border bg-background mt-1 w-full rounded border px-2 py-1 text-sm"
+              />
             </div>
             <div>
-              {form.autoGenerate ? (
-                <>
-                  <label className="text-xs text-gray-600">접두사 (선택)</label>
-                  <input
-                    type="text"
-                    value={form.prefix}
-                    onChange={(e) => setForm({ ...form, prefix: e.target.value })}
-                    placeholder="예: EVENT"
-                    className="mt-1 w-full rounded border px-2 py-1 text-sm"
-                  />
-                </>
-              ) : (
-                <>
-                  <label className="text-xs text-gray-600">쿠폰 코드</label>
-                  <input
-                    type="text"
-                    value={form.code}
-                    onChange={(e) => setForm({ ...form, code: e.target.value })}
-                    placeholder="예: WELCOME100"
-                    className="mt-1 w-full rounded border px-2 py-1 text-sm uppercase"
-                  />
-                </>
-              )}
-            </div>
-            <div>
-              <label className="text-xs text-gray-600">타입</label>
-              <select
-                value={form.type}
-                onChange={(e) => setForm({ ...form, type: e.target.value as CouponData["type"] })}
-                className="mt-1 w-full rounded border px-2 py-1 text-sm"
-              >
-                <option value="MANUAL">MANUAL</option>
-                <option value="WELCOME">WELCOME</option>
-                <option value="REFERRAL">REFERRAL</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-600">지급 코인</label>
+              <label className="text-muted-foreground text-xs">지급 코인</label>
               <input
                 type="number"
                 value={form.coinAmount}
                 onChange={(e) => setForm({ ...form, coinAmount: Number(e.target.value) })}
                 min={1}
-                className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                className="border-border bg-background mt-1 w-full rounded border px-2 py-1 text-sm"
               />
             </div>
             <div>
-              <label className="text-xs text-gray-600">최대 사용 횟수</label>
+              <label className="text-muted-foreground text-xs">최대 사용 횟수</label>
               <input
                 type="number"
                 value={form.maxRedemptions}
                 onChange={(e) => setForm({ ...form, maxRedemptions: Number(e.target.value) })}
                 min={1}
-                className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                className="border-border bg-background mt-1 w-full rounded border px-2 py-1 text-sm"
               />
             </div>
             <div>
-              <label className="text-xs text-gray-600">만료일 (선택)</label>
+              <label className="text-muted-foreground text-xs">만료일 (선택)</label>
               <input
                 type="datetime-local"
                 value={form.expiresAt}
                 onChange={(e) => setForm({ ...form, expiresAt: e.target.value })}
-                className="mt-1 w-full rounded border px-2 py-1 text-sm"
-              />
-            </div>
-            <div className="col-span-2">
-              <label className="text-xs text-gray-600">설명 (선택)</label>
-              <input
-                type="text"
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="관리자 메모"
-                className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                className="border-border bg-background mt-1 w-full rounded border px-2 py-1 text-sm"
               />
             </div>
           </div>
@@ -319,15 +249,17 @@ export default function CouponManagementPage() {
       {/* Coupon Table */}
       {loading ? (
         <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+          <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
         </div>
       ) : coupons.length === 0 ? (
-        <div className="py-12 text-center text-sm text-gray-400">등록된 쿠폰이 없습니다</div>
+        <div className="text-muted-foreground py-12 text-center text-sm">
+          등록된 쿠폰이 없습니다
+        </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b text-left text-gray-500">
+              <tr className="text-muted-foreground border-b text-left">
                 <th className="pb-2 pr-3">코드</th>
                 <th className="pb-2 pr-3">타입</th>
                 <th className="pb-2 pr-3">코인</th>
@@ -340,15 +272,15 @@ export default function CouponManagementPage() {
             </thead>
             <tbody>
               {coupons.map((c) => (
-                <tr key={c.id} className="border-b hover:bg-gray-50">
+                <tr key={c.id} className="hover:bg-muted/50 border-b">
                   <td className="py-2 pr-3">
                     <div className="flex items-center gap-1">
-                      <code className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs">
+                      <code className="bg-muted rounded px-1.5 py-0.5 font-mono text-xs">
                         {c.code}
                       </code>
                       <button
                         onClick={() => copyCode(c.code, c.id)}
-                        className="text-gray-400 hover:text-gray-600"
+                        className="text-muted-foreground hover:text-foreground"
                         title="복사"
                       >
                         {copiedId === c.id ? (
@@ -368,7 +300,7 @@ export default function CouponManagementPage() {
                       {c.usedCount}/{c.maxRedemptions}
                     </span>
                   </td>
-                  <td className="py-2 pr-3 text-gray-500">
+                  <td className="text-muted-foreground py-2 pr-3">
                     {c.expiresAt ? formatDate(c.expiresAt) : "무기한"}
                   </td>
                   <td className="py-2 pr-3">
@@ -376,7 +308,7 @@ export default function CouponManagementPage() {
                       {c.isActive ? "활성" : "비활성"}
                     </Badge>
                   </td>
-                  <td className="max-w-[200px] truncate py-2 pr-3 text-gray-500">
+                  <td className="text-muted-foreground max-w-[200px] truncate py-2 pr-3">
                     {c.description ?? "-"}
                   </td>
                   <td className="py-2">
@@ -403,9 +335,9 @@ export default function CouponManagementPage() {
 
 function TypeBadge({ type }: { type: CouponData["type"] }) {
   const colors: Record<string, string> = {
-    MANUAL: "bg-blue-100 text-blue-700",
-    WELCOME: "bg-green-100 text-green-700",
-    REFERRAL: "bg-purple-100 text-purple-700",
+    MANUAL: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+    WELCOME: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+    REFERRAL: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
   }
   return (
     <span

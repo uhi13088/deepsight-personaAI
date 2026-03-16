@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState, useCallback, useRef } from "react"
-import { Loader2, Play, Square } from "lucide-react"
+import { Loader2, Play, Square, User, ImageOff } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -52,8 +52,10 @@ export interface OverviewTabProps {
   editable: boolean
   currentName: string
   currentDescription: string
+  currentProfileImageUrl: string | null
   onNameChange: (v: string) => void
   onDescriptionChange: (v: string) => void
+  onProfileImageUrlChange: (v: string | null) => void
   ttsEdits: TtsEdits
   onTtsChange: TtsChangeHandlers
 }
@@ -113,11 +115,15 @@ export function OverviewTab({
   editable,
   currentName,
   currentDescription,
+  currentProfileImageUrl,
   onNameChange,
   onDescriptionChange,
+  onProfileImageUrlChange,
   ttsEdits,
   onTtsChange,
 }: OverviewTabProps) {
+  const [imgError, setImgError] = useState(false)
+
   // TTS 현재값 (편집 override 우선)
   const currentTtsProvider = ttsEdits.provider !== undefined ? ttsEdits.provider : data.ttsProvider
   const currentTtsVoiceId = ttsEdits.voiceId !== undefined ? ttsEdits.voiceId : data.ttsVoiceId
@@ -130,33 +136,79 @@ export function OverviewTab({
       {/* Basic Info */}
       <section className="space-y-4">
         <h3 className="text-sm font-semibold">기본 정보</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-muted-foreground mb-1 block text-xs">이름</label>
-            {editable ? (
-              <Input value={currentName} onChange={(e) => onNameChange(e.target.value)} />
-            ) : (
-              <p className="text-sm">{currentName}</p>
+        <div className="flex gap-6">
+          {/* Profile Image */}
+          <div className="shrink-0">
+            <label className="text-muted-foreground mb-1 block text-xs">프로필 이미지</label>
+            <div className="bg-muted relative flex h-28 w-28 items-center justify-center overflow-hidden rounded-xl border">
+              {currentProfileImageUrl && !imgError ? (
+                <img
+                  src={currentProfileImageUrl}
+                  alt={currentName}
+                  className="h-full w-full object-cover"
+                  onError={() => setImgError(true)}
+                />
+              ) : (
+                <div className="flex flex-col items-center gap-1">
+                  {imgError ? (
+                    <ImageOff className="text-muted-foreground h-8 w-8" />
+                  ) : (
+                    <User className="text-muted-foreground h-8 w-8" />
+                  )}
+                  <span className="text-muted-foreground text-[10px]">
+                    {imgError ? "로드 실패" : "이미지 없음"}
+                  </span>
+                </div>
+              )}
+            </div>
+            {editable && (
+              <div className="mt-2 w-28">
+                <Input
+                  value={currentProfileImageUrl ?? ""}
+                  onChange={(e) => {
+                    setImgError(false)
+                    onProfileImageUrlChange(e.target.value || null)
+                  }}
+                  placeholder="이미지 URL"
+                  className="text-[10px]"
+                />
+              </div>
             )}
           </div>
-          <div>
-            <label className="text-muted-foreground mb-1 block text-xs">역할</label>
-            <p className="text-sm">
-              {PERSONA_ROLES.find((r) => r.value === data.role)?.label ?? data.role}
-            </p>
-          </div>
-          <div className="col-span-2">
-            <label className="text-muted-foreground mb-1 block text-xs">설명</label>
-            {editable ? (
-              <Input
-                value={currentDescription}
-                onChange={(e) => onDescriptionChange(e.target.value)}
-                placeholder="설명 (최대 100자)"
-                maxLength={100}
-              />
-            ) : (
-              <p className="text-muted-foreground text-sm">{currentDescription || "(설명 없음)"}</p>
-            )}
+
+          {/* Name / Role / Description */}
+          <div className="flex-1 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-muted-foreground mb-1 block text-xs">이름</label>
+                {editable ? (
+                  <Input value={currentName} onChange={(e) => onNameChange(e.target.value)} />
+                ) : (
+                  <p className="text-sm">{currentName}</p>
+                )}
+              </div>
+              <div>
+                <label className="text-muted-foreground mb-1 block text-xs">역할</label>
+                <p className="text-sm">
+                  {PERSONA_ROLES.find((r) => r.value === data.role)?.label ?? data.role}
+                </p>
+              </div>
+              <div className="col-span-2">
+                <label className="text-muted-foreground mb-1 block text-xs">설명</label>
+                {editable ? (
+                  <Input
+                    value={currentDescription}
+                    onChange={(e) => onDescriptionChange(e.target.value)}
+                    placeholder="설명 (최대 100자)"
+                    maxLength={100}
+                  />
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    {currentDescription || "(설명 없음)"}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </section>

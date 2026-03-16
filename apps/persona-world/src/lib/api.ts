@@ -719,6 +719,18 @@ export const clientApi = {
     return json.data!
   },
 
+  // ── 온보딩 크레딧 서버 동기화 ──────────────────────────────
+  async syncOnboardingCredits(userId: string, localBalance: number) {
+    const res = await fetch(`/api/persona-world/credits/sync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, localBalance }),
+    })
+    const json: ApiResponse<{ balance: number }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message ?? "잔액 동기화 실패")
+    return json.data!
+  },
+
   // ── SNS 재분석 실행 ──────────────────────────────────────
   async reanalyzeSns(userId: string) {
     const res = await fetch(`/api/persona-world/onboarding/sns/reanalyze`, {
