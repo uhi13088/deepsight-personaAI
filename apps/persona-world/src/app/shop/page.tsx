@@ -179,8 +179,11 @@ export default function ShopPage() {
     setConfirm(null)
   }
 
-  const getItemStatus = (item: ShopItem): "available" | "owned" | "insufficient" | "soon" => {
+  const getItemStatus = (
+    item: ShopItem
+  ): "available" | "owned" | "insufficient" | "soon" | "navigate" => {
     if (item.tag === "SOON") return "soon"
+    if (item.actionType === "navigate") return "navigate"
     if (!item.repeatable && hasPurchased(item.id)) return "owned"
     if (balance < item.price) return "insufficient"
     return "available"
@@ -325,7 +328,11 @@ export default function ShopPage() {
             const count = getPurchaseCount(item.id)
 
             return (
-              <PWCard key={item.id} hover={status === "available"} className="relative !p-4">
+              <PWCard
+                key={item.id}
+                hover={status === "available" || status === "navigate"}
+                className="relative !p-4"
+              >
                 {/* Tag Badge */}
                 {item.tag && (
                   <span
@@ -382,6 +389,12 @@ export default function ShopPage() {
                           <Lock className="h-3 w-3" />
                           준비 중
                         </button>
+                      ) : status === "navigate" ? (
+                        <Link href={item.navigateTo ?? "/"}>
+                          <PWButton size="sm" variant="gradient">
+                            이용하기
+                          </PWButton>
+                        </Link>
                       ) : status === "owned" ? (
                         <span className="rounded-full bg-gray-100 px-4 py-1.5 text-xs font-medium text-gray-400">
                           구매 완료
