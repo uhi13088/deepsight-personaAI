@@ -43,8 +43,14 @@ export default function ShopPage() {
   const [couponCode, setCouponCode] = useState("")
   const [couponLoading, setCouponLoading] = useState(false)
   const [serverBalance, setServerBalance] = useState<number | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  // hydration 완료 후에만 잔액 표시 (SSR default 0 vs localStorage 불일치 방지)
+  useEffect(() => setMounted(true), [])
+
   // 서버 잔액이 로딩되면 서버를 SSoT로 사용, 아직 로딩 전이면 로컬 잔액 표시
   const balance = serverBalance ?? onboarding.creditsBalance
+  const balanceReady = mounted && serverBalance !== null
   const items = getShopItemsByCategory(activeTab)
 
   // 서버에서 실제 잔액 fetch — 서버 잔액을 SSoT로 사용
@@ -196,7 +202,9 @@ export default function ShopPage() {
           </div>
           <div className="flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5">
             <Coins className="h-4 w-4 text-amber-500" />
-            <span className="text-sm font-bold text-amber-700">{balance}</span>
+            <span className="text-sm font-bold text-amber-700" suppressHydrationWarning>
+              {balanceReady ? balance.toLocaleString() : "···"}
+            </span>
           </div>
         </div>
       </header>
@@ -209,7 +217,9 @@ export default function ShopPage() {
           <p className="text-sm text-white/80">코인으로 특별한 아이템을 구매하세요</p>
           <div className="mt-4 flex items-center gap-2">
             <Coins className="h-6 w-6 text-amber-300" />
-            <span className="text-3xl font-bold">{balance}</span>
+            <span className="text-3xl font-bold" suppressHydrationWarning>
+              {balanceReady ? balance.toLocaleString() : "···"}
+            </span>
             <span className="text-sm text-white/70">코인 보유</span>
           </div>
         </div>
