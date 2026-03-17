@@ -37,40 +37,6 @@
 
 ## 📋 QUEUE (대기)
 
-### T45: 성향 초기화 기능 (profile_reset)
-
-> **배경**: 상점에서 100코인으로 성향 벡터를 초기화하고 온보딩을 다시 시작하는 기능.
-> **정책**: SNS 연동 삭제는 사용자 선택, 설문 이력 삭제, 크레딧 재지급 없음.
-
-- [ ] **T45-1: 백엔드 — 성향 초기화 API 엔드포인트**
-  - `POST /api/persona-world/users/profile/reset`
-  - PersonaWorldUser L1/L2 벡터 → NULL, profileLevel → BASIC, profileQuality → BASIC
-  - confidenceScore/snsExtendedData/preferences → NULL, hasOceanProfile → false
-  - PWUserSurveyResponse 삭제
-  - SNSConnection: `deleteSns` 파라미터에 따라 선택 삭제
-  - 코인 100 차감 (spendCredits)
-  - AC: API 호출 후 DB 벡터 NULL 확인, 설문 응답 삭제 확인
-
-- [ ] **T45-2: 클라이언트 — API 메서드 + Store 액션**
-  - `clientApi.resetProfile(userId, { deleteSns })` 추가
-  - `useUserStore.resetProfile()` 액션: profile.vector → null, completedOnboarding → false, onboarding 초기화
-  - AC: 스토어 초기화 후 온보딩 페이지 진입 가능
-
-- [ ] **T45-3: 상점 UI — 초기화 구매 플로우**
-  - `profile_reset` 아이템 SOON 태그 제거
-  - 구매 시 확인 다이얼로그 (경고 문구 + SNS 삭제 체크박스)
-  - 성공 → 온보딩 페이지 리다이렉트
-  - AC: 상점에서 초기화 구매 → 온보딩 재진행 가능
-
-- [ ] **T45-4: 재온보딩 크레딧 중복 지급 방지**
-  - 초기화 후 온보딩 완료 시 크레딧 미지급 (isReset 플래그 또는 이력 확인)
-  - AC: 초기화 후 재온보딩 완료 시 크레딧 0코인 확인
-
-- [ ] **T45-5: API 문서 업데이트 + 마이그레이션 SQL**
-  - `docs/api/public.md` + `public.openapi.yaml` 업데이트
-  - 마이그레이션 SQL (shop item tag 변경)
-  - AC: 문서와 실제 API 일치
-
 ### T44: 추가 질문 풀 126문항 SQL (일시 보류)
 
 - [ ] **T44: 추가 질문 풀 126문항 SQL** (일시 보류)
@@ -88,6 +54,23 @@ _현재 진행 중인 티켓 없음_
 > **최종 갱신: 2026-03-17**
 
 ## ✅ DONE (완료)
+
+### T45: 성향 초기화 기능 (profile_reset) ✅ 2026-03-17
+
+- [x] **T45-1**: 백엔드 — `POST /api/persona-world/users/profile/reset` (100코인 차감, 벡터 NULL, 설문 삭제, SNS 선택 삭제)
+- [x] **T45-2**: 클라이언트 — `clientApi.resetProfile()` + `useUserStore.resetProfile()` 액션
+- [x] **T45-3**: 상점 UI — 확인 다이얼로그 (경고 + SNS 삭제 체크박스) → 온보딩 리다이렉트
+- [x] **T45-4**: 재온보딩 크레딧 중복 지급 방지 (`isReOnboarding` 플래그)
+- [x] **T45-5**: API 문서 (`public.md` + `public.openapi.yaml`) + 마이그레이션 SQL (068)
+- 변경:
+  - `apps/engine-studio/src/app/api/persona-world/users/profile/reset/route.ts` (신규)
+  - `apps/engine-studio/prisma/migrations/068_shop_items_enable_profile_reset.sql` (신규)
+  - `apps/persona-world/src/lib/shop.ts` (actionType: "reset" 추가)
+  - `apps/persona-world/src/lib/api.ts` (resetProfile + 재온보딩 크레딧 방지)
+  - `apps/persona-world/src/lib/user-store.ts` (resetProfile 액션 + isReOnboarding)
+  - `apps/persona-world/src/app/shop/page.tsx` (초기화 다이얼로그)
+  - `docs/api/public.md`, `docs/api/public.openapi.yaml`
+- 테스트: TypeCheck PASS, Build PASS (engine-studio + persona-world)
 
 ### T445: 프로필 이미지 스토리지 Cloudflare R2 전환 ✅ 2026-03-17
 

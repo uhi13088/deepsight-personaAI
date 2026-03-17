@@ -23,8 +23,8 @@ export interface ShopItem {
   repeatable: boolean
   /** 아이템 태그 (UI 뱃지) */
   tag?: "NEW" | "HOT" | "SOON"
-  /** "purchase"(기본): 코인 차감 구매, "navigate": 기능 페이지로 이동 */
-  actionType?: "purchase" | "navigate"
+  /** "purchase"(기본): 코인 차감 구매, "navigate": 기능 페이지로 이동, "reset": 성향 초기화 */
+  actionType?: "purchase" | "navigate" | "reset"
   /** navigate 타입일 때 이동 경로 */
   navigateTo?: string
 }
@@ -85,7 +85,7 @@ const FALLBACK_ITEMS: ShopItem[] = [
     category: "profile",
     emoji: "\u{1F504}",
     repeatable: true,
-    tag: "SOON",
+    actionType: "reset",
   },
   {
     id: "badge_taste_expert",
@@ -215,14 +215,17 @@ const FALLBACK_ITEMS: ShopItem[] = [
 
 // ── API 데이터 → ShopItem 변환 ──────────────────────────────────
 
-/** 기능 페이지로 이동하는 아이템 매핑 (서버에서 관리하지 않는 클라이언트 라우팅) */
+/** 특수 액션 아이템 매핑 (서버에서 관리하지 않는 클라이언트 로직) */
 const NAVIGATE_ITEMS: Record<string, string> = {
   persona_chat: "/chat",
   persona_call_reservation: "/calls",
 }
 
+const RESET_ITEMS = new Set(["profile_reset"])
+
 function apiItemToShopItem(item: ShopItemFromAPI): ShopItem {
   const navigateTo = NAVIGATE_ITEMS[item.itemKey]
+  const isReset = RESET_ITEMS.has(item.itemKey)
   return {
     id: item.itemKey,
     name: item.name,
@@ -234,6 +237,7 @@ function apiItemToShopItem(item: ShopItemFromAPI): ShopItem {
     repeatable: item.repeatable,
     tag: (item.tag as ShopItem["tag"]) ?? undefined,
     ...(navigateTo ? { actionType: "navigate" as const, navigateTo } : {}),
+    ...(isReset ? { actionType: "reset" as const } : {}),
   }
 }
 

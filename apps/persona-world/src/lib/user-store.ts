@@ -60,6 +60,8 @@ export interface OnboardingState {
   completedPhases: number[]
   profileLevel: ProfileLevel
   creditsBalance: number
+  /** 성향 초기화 후 재온보딩 중 — 크레딧 미지급 */
+  isReOnboarding?: boolean
 }
 
 // NextAuth 세션 유저 타입 (next-auth/react)
@@ -78,6 +80,8 @@ interface UserState {
   setProfileFromSession: (sessionUser: SessionUser) => void
   updateVector: (vector: ThreeLayerVector, confidence: number) => void
   completeOnboarding: () => void
+  /** 성향 초기화 — 벡터/온보딩 상태를 초기값으로 복원 */
+  resetProfile: () => void
 
   // 온보딩
   onboarding: OnboardingState
@@ -246,6 +250,28 @@ export const useUserStore = create<UserState>()(
                 completedOnboarding: true,
                 createdAt: new Date().toISOString(),
               },
+          // 재온보딩 플래그 클리어
+          onboarding: { ...state.onboarding, isReOnboarding: undefined },
+        })),
+
+      resetProfile: () =>
+        set((state) => ({
+          profile: state.profile
+            ? {
+                ...state.profile,
+                vector: null,
+                vectorConfidence: null,
+                completedOnboarding: false,
+              }
+            : state.profile,
+          onboarding: {
+            currentPhase: 0 as const,
+            phaseAnswers: {},
+            completedPhases: [],
+            profileLevel: "BASIC" as ProfileLevel,
+            creditsBalance: state.onboarding.creditsBalance,
+            isReOnboarding: true,
+          },
         })),
 
       // 온보딩 관리
