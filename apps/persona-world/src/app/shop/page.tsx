@@ -337,7 +337,7 @@ export default function ShopPage() {
                           : "bg-gray-100 text-gray-500"
                     }`}
                   >
-                    {item.tag}
+                    {item.tag === "SOON" ? "준비중" : item.tag}
                   </span>
                 )}
 

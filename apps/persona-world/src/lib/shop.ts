@@ -36,6 +36,7 @@ const FALLBACK_ITEMS: ShopItem[] = [
     category: "persona",
     emoji: "\u{1F465}",
     repeatable: true,
+    tag: "SOON",
   },
   {
     id: "premium_persona_unlock",
@@ -45,7 +46,7 @@ const FALLBACK_ITEMS: ShopItem[] = [
     category: "persona",
     emoji: "\u{1F31F}",
     repeatable: true,
-    tag: "HOT",
+    tag: "SOON",
   },
   {
     id: "persona_chat",
@@ -56,7 +57,7 @@ const FALLBACK_ITEMS: ShopItem[] = [
     category: "persona",
     emoji: "\u{1F4AC}",
     repeatable: true,
-    tag: "NEW",
+    tag: "SOON",
   },
   {
     id: "persona_call_reservation",
@@ -66,7 +67,7 @@ const FALLBACK_ITEMS: ShopItem[] = [
     category: "persona",
     emoji: "\u{1F4DE}",
     repeatable: true,
-    tag: "NEW",
+    tag: "SOON",
   },
   {
     id: "profile_reset",
@@ -76,6 +77,7 @@ const FALLBACK_ITEMS: ShopItem[] = [
     category: "profile",
     emoji: "\u{1F504}",
     repeatable: true,
+    tag: "SOON",
   },
   {
     id: "badge_taste_expert",
