@@ -1,11 +1,9 @@
 // ═══════════════════════════════════════════════════════════════
 // 프로필 이미지 생성기
 // T441: FLUX.2 [pro]로 포토리얼리스틱 프로필 이미지 자동 생성
+// T445: 스토리지를 로컬 → Cloudflare R2로 전환
 // ═══════════════════════════════════════════════════════════════
 
-import { writeFile, mkdir } from "fs/promises"
-import path from "path"
-import crypto from "crypto"
 import {
   isImageGenerationConfigured,
   generateImageWithFlux,
@@ -15,10 +13,10 @@ import {
   buildQualityEnhancement,
   type ProfileImagePromptInput,
 } from "@/lib/image-generation/prompt-builder"
+import { isR2Configured, uploadImageToR2 } from "@/lib/image-generation/r2-storage"
 
 // ── 설정 ──────────────────────────────────────────────────────
 
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "images")
 const IMAGE_WIDTH = 1024
 const IMAGE_HEIGHT = 1024
 
@@ -39,7 +37,7 @@ export interface GenerateProfileImageInput {
 }
 
 export interface GenerateProfileImageResult {
-  /** 로컬 저장 URL (예: /uploads/images/2026/03/11/{uuid}.webp) */
+  /** R2 공개 URL (예: https://r2-public-url/profile-images/2026/03/17/{uuid}.webp) */
   profileImageUrl: string
   /** 사용된 모델 */
   model: string
@@ -57,38 +55,6 @@ function calculateAge(birthDate: Date): number {
   return age
 }
 
-function getDatePath(): string {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, "0")
-  const day = String(now.getDate()).padStart(2, "0")
-  return `${year}/${month}/${day}`
-}
-
-async function downloadAndSaveImage(imageUrl: string): Promise<string> {
-  const response = await fetch(imageUrl)
-  if (!response.ok) {
-    throw new Error(`Failed to download image: ${response.status} ${response.statusText}`)
-  }
-
-  const buffer = Buffer.from(await response.arrayBuffer())
-
-  // 저장 경로 생성
-  const datePath = getDatePath()
-  const dir = path.join(UPLOAD_DIR, datePath)
-  await mkdir(dir, { recursive: true })
-
-  // UUID 기반 파일명
-  const uuid = crypto.randomUUID()
-  const filename = `${uuid}.webp`
-  const filePath = path.join(dir, filename)
-
-  await writeFile(filePath, buffer)
-
-  // 상대 URL 반환
-  return `/uploads/images/${datePath}/${filename}`
-}
-
 // ── 메인 함수 ─────────────────────────────────────────────────
 
 /**
@@ -101,6 +67,13 @@ export async function generateProfileImage(
   if (!isImageGenerationConfigured()) {
     console.log(
       "[ImageGen] Skipping — no image generation API configured (FAL_KEY / REPLICATE_API_TOKEN)"
+    )
+    return null
+  }
+
+  if (!isR2Configured()) {
+    console.log(
+      "[ImageGen] Skipping — R2 storage not configured (R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET_NAME / R2_PUBLIC_URL)"
     )
     return null
   }
@@ -136,11 +109,11 @@ export async function generateProfileImage(
       return null
     }
 
-    // CDN URL에서 이미지를 다운로드하여 로컬 저장
-    const localUrl = await downloadAndSaveImage(result.imageUrl)
+    // FLUX CDN URL → R2 업로드
+    const r2Result = await uploadImageToR2(result.imageUrl)
 
-    console.log(`[ImageGen] Profile image saved: ${localUrl}`)
-    return { profileImageUrl: localUrl, model: result.model }
+    console.log(`[ImageGen] Profile image uploaded to R2: ${r2Result.publicUrl}`)
+    return { profileImageUrl: r2Result.publicUrl, model: result.model }
   } catch (error) {
     console.error("[ImageGen] Profile image generation failed:", error)
     return null

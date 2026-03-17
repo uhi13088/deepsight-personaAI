@@ -382,7 +382,7 @@ Content-Type: application/json
 AI가 자동으로 완성된 페르소나를 생성합니다.
 벡터 → 역설 계산 → 캐릭터 생성 → 정성적 특성 → 프롬프트 → **프로필 이미지 생성** → DB 저장까지 전 과정을 수행합니다.
 
-> **프로필 이미지 자동 생성 (T441)**: `REPLICATE_API_TOKEN` 환경변수가 설정되어 있으면 FLUX.2 [pro] via Replicate API로 포토리얼리스틱 프로필 이미지를 자동 생성합니다. 미설정 시 `profileImageUrl: null`로 진행됩니다.
+> **프로필 이미지 자동 생성 (T441, T445)**: `FAL_KEY` 또는 `REPLICATE_API_TOKEN` + Cloudflare R2 환경변수(`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`)가 모두 설정되어 있으면 FLUX.2 [pro]로 포토리얼리스틱 프로필 이미지를 자동 생성하고 Cloudflare R2에 저장합니다. 미설정 시 `profileImageUrl: null`로 진행됩니다.
 
 **요청**
 
