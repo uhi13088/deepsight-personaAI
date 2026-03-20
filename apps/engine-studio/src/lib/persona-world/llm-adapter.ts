@@ -113,13 +113,46 @@ function buildCommentRolePrefix(profile?: PersonaProfileSnapshot): string {
     parts.push(`[전문 분야] ${profile.expertise.slice(0, 4).join(", ")}`)
   }
 
-  // VoiceSpec에서 말투 추출
+  // VoiceSpec에서 말투 + 스타일 파라미터 추출
   const vs = safeParseCommentVoiceSpec(profile.voiceSpec)
   if (vs?.speechStyle) {
     parts.push(`\n[말투] ${vs.speechStyle}`)
   }
   if (vs?.habitualExpressions?.length) {
     parts.push(`[입버릇/습관 표현] ${vs.habitualExpressions.join(" / ")}`)
+  }
+
+  // styleParams — 페르소나 고유 목소리 수치 기반 지시
+  if (vs?.styleParams) {
+    const sp = vs.styleParams
+    const hints: string[] = []
+    if (sp.formality !== undefined) {
+      if (sp.formality < 0.3) hints.push("캐주얼한 구어체로")
+      else if (sp.formality > 0.7) hints.push("격식있는 문어체로")
+    }
+    if (sp.humor !== undefined) {
+      if (sp.humor > 0.7) hints.push("위트/유머를 섞어")
+      else if (sp.humor < 0.3) hints.push("진지한 톤 유지")
+    }
+    if (sp.emotionExpression !== undefined) {
+      if (sp.emotionExpression > 0.7) hints.push("감정을 풍부하게 드러내며")
+      else if (sp.emotionExpression < 0.3) hints.push("감정을 절제하며")
+    }
+    if (sp.assertiveness !== undefined) {
+      if (sp.assertiveness > 0.7) hints.push("확신을 갖고 단정적으로")
+      else if (sp.assertiveness < 0.3) hints.push("조심스럽게, 겸양하게")
+    }
+    if (sp.sentenceLength !== undefined) {
+      if (sp.sentenceLength < 0.3) hints.push("짧고 간결하게")
+      else if (sp.sentenceLength > 0.7) hints.push("길게 풀어서")
+    }
+    if (sp.vocabularyLevel !== undefined) {
+      if (sp.vocabularyLevel > 0.7) hints.push("전문 용어 활용")
+      else if (sp.vocabularyLevel < 0.3) hints.push("쉬운 용어 위주")
+    }
+    if (hints.length > 0) {
+      parts.push(`[말투 지침] ${hints.join(", ")}`)
+    }
   }
 
   // speechPatterns (voiceSpec과 별개 — DB 직접 저장된 말투 패턴)
@@ -145,9 +178,13 @@ function buildCommentRolePrefix(profile?: PersonaProfileSnapshot): string {
   return parts.join("\n")
 }
 
-function safeParseCommentVoiceSpec(
-  raw: unknown
-): { speechStyle?: string; habitualExpressions?: string[] } | null {
+interface ParsedCommentVoiceSpec {
+  speechStyle?: string
+  habitualExpressions?: string[]
+  styleParams?: Record<string, number>
+}
+
+function safeParseCommentVoiceSpec(raw: unknown): ParsedCommentVoiceSpec | null {
   if (!raw) return null
   const obj =
     typeof raw === "object"
@@ -171,6 +208,10 @@ function safeParseCommentVoiceSpec(
     habitualExpressions: Array.isArray(source.habitualExpressions)
       ? (source.habitualExpressions as string[])
       : undefined,
+    styleParams:
+      obj.styleParams && typeof obj.styleParams === "object"
+        ? (obj.styleParams as Record<string, number>)
+        : undefined,
   }
 }
 
