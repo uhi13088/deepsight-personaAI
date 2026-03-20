@@ -307,9 +307,15 @@ describe("buildVoiceStyleInstruction", () => {
     vocabularyLevel: 0.5,
   }
 
-  it("중간 범위 값 → 빈 문자열 (지시 없음)", () => {
+  it("중간 범위 값 → neutral 레벨 지시 생성", () => {
     const result = buildVoiceStyleInstruction(neutralVoice)
-    expect(result).toBe("")
+    expect(result).toContain("[말투 스타일]")
+    expect(result).toContain("구어체와 문어체를 자연스럽게 섞어")
+    expect(result).toContain("상황에 맞게 가볍거나 진지하게")
+    expect(result).toContain("자연스러운 길이로")
+    expect(result).toContain("감정을 적당히 표현")
+    expect(result).toContain("적당한 확신으로")
+    expect(result).toContain("일반적인 어휘 수준")
   })
 
   it("높은 formality → '격식있는 문어체' 포함", () => {
@@ -347,12 +353,12 @@ describe("buildVoiceStyleInstruction", () => {
     expect(result).toContain("감정")
   })
 
-  it("높은 vocabularyLevel → '전문용어' 포함", () => {
+  it("높은 vocabularyLevel → '전문 어휘' 포함", () => {
     const result = buildVoiceStyleInstruction({ ...neutralVoice, vocabularyLevel: 0.8 })
-    expect(result).toContain("전문용어")
+    expect(result).toContain("전문 어휘")
   })
 
-  it("복합: 격식적+진지+단정적 → 3개 지시 모두 포함", () => {
+  it("복합: 격식적+건조+단정적 → 3개 지시 모두 포함", () => {
     const result = buildVoiceStyleInstruction({
       ...neutralVoice,
       formality: 0.9,
@@ -360,13 +366,39 @@ describe("buildVoiceStyleInstruction", () => {
       assertiveness: 0.9,
     })
     expect(result).toContain("격식")
-    expect(result).toContain("진지")
+    expect(result).toContain("건조한 톤")
     expect(result).toContain("단정적")
   })
 
   it("[말투 스타일] 섹션 헤더 포함", () => {
     const result = buildVoiceStyleInstruction({ ...neutralVoice, formality: 0.9 })
     expect(result).toContain("[말투 스타일]")
+  })
+
+  it("extreme_low formality → '매우 캐주얼' 포함", () => {
+    const result = buildVoiceStyleInstruction({ ...neutralVoice, formality: 0.1 })
+    expect(result).toContain("매우 캐주얼")
+  })
+
+  it("extreme_high humor → '거의 모든 상황에 유머' 포함", () => {
+    const result = buildVoiceStyleInstruction({ ...neutralVoice, humor: 0.9 })
+    expect(result).toContain("거의 모든 상황에 유머")
+  })
+
+  it("extreme_low emotionExpression → '감정을 거의 드러내지 않음' 포함", () => {
+    const result = buildVoiceStyleInstruction({ ...neutralVoice, emotionExpression: 0.1 })
+    expect(result).toContain("감정을 거의 드러내지 않음")
+  })
+
+  it("extreme_high assertiveness → '극도로 단정적' 포함", () => {
+    const result = buildVoiceStyleInstruction({ ...neutralVoice, assertiveness: 0.9 })
+    expect(result).toContain("극도로 단정적")
+  })
+
+  it("항상 6개 지시 생성 (사각지대 없음)", () => {
+    const result = buildVoiceStyleInstruction(neutralVoice)
+    const lines = result.split("\n").filter((l) => l.startsWith("- "))
+    expect(lines).toHaveLength(6)
   })
 })
 
@@ -388,7 +420,7 @@ describe("buildSystemPrompt with voiceStyle", () => {
 
     expect(prompt).toContain("[말투 스타일]")
     expect(prompt).toContain("격식")
-    expect(prompt).toContain("진지")
+    expect(prompt).toContain("건조한 톤")
   })
 
   it("voiceStyle 미제공 시 말투 스타일 섹션 없음", () => {
@@ -398,7 +430,7 @@ describe("buildSystemPrompt with voiceStyle", () => {
     expect(prompt).not.toContain("[말투 스타일]")
   })
 
-  it("voiceStyle 중간 값만 → 말투 스타일 섹션 없음", () => {
+  it("voiceStyle 중간 값만 → neutral 말투 스타일 섹션 포함", () => {
     const input = makeInput({
       voiceStyle: {
         formality: 0.5,
@@ -411,7 +443,8 @@ describe("buildSystemPrompt with voiceStyle", () => {
     })
     const { prompt } = buildSystemPrompt(input)
 
-    expect(prompt).not.toContain("[말투 스타일]")
+    expect(prompt).toContain("[말투 스타일]")
+    expect(prompt).toContain("구어체와 문어체를 자연스럽게 섞어")
   })
 })
 

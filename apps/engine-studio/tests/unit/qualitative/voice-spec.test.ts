@@ -8,6 +8,7 @@ import {
   buildVoiceSpec,
   summarizeVoiceSpec,
   computeVoiceStyleParams,
+  contrastScale,
   DEFAULT_CONSISTENCY_CONFIG,
 } from "@/lib/qualitative/voice-spec"
 import type {
@@ -490,6 +491,40 @@ describe("computeVoiceStyleParams", () => {
       expect(val).toBeGreaterThanOrEqual(0)
       expect(val).toBeLessThanOrEqual(1)
     }
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════
+// contrastScale
+// ═══════════════════════════════════════════════════════════════
+
+describe("contrastScale", () => {
+  it("0.5 입력 → 0.5 출력 (중심 유지)", () => {
+    expect(contrastScale(0.5)).toBeCloseTo(0.5, 2)
+  })
+
+  it("0.5 이상 → 0.5 이상으로 증폭", () => {
+    expect(contrastScale(0.6)).toBeGreaterThan(0.6)
+  })
+
+  it("0.5 이하 → 0.5 이하로 감소", () => {
+    expect(contrastScale(0.4)).toBeLessThan(0.4)
+  })
+
+  it("출력이 항상 0~1 범위", () => {
+    for (const v of [0, 0.1, 0.3, 0.5, 0.7, 0.9, 1.0]) {
+      const result = contrastScale(v)
+      expect(result).toBeGreaterThanOrEqual(0)
+      expect(result).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it("대비 스케일링으로 formal vs casual 차이가 더 커짐", () => {
+    const formal = computeVoiceStyleParams(formalL1, introvertL2, stableL3)
+    const casual = computeVoiceStyleParams(casualL1, extrovertL2, volatileL3)
+    // 대비 스케일링으로 차이가 0.15 이상이어야 함
+    expect(Math.abs(formal.formality - casual.formality)).toBeGreaterThan(0.15)
+    expect(Math.abs(formal.humor - casual.humor)).toBeGreaterThan(0.15)
   })
 })
 
