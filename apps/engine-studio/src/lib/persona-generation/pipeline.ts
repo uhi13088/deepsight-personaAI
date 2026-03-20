@@ -70,6 +70,9 @@ interface VerifiedTTSResult {
   ttsVoiceId: string
   ttsSpeed: number
   ttsLanguage: string
+  ttsStability?: number | null
+  ttsSimilarityBoost?: number | null
+  ttsStyle?: number | null
   /** 검증 통과 여부 (TTS 미설정 시 null) */
   verified: boolean | null
 }
@@ -100,6 +103,9 @@ async function verifyTTSVoice(
       ttsVoiceId: tts.voiceId,
       ttsSpeed: tts.speed,
       ttsLanguage: tts.language,
+      ttsStability: tts.stability ?? null,
+      ttsSimilarityBoost: tts.similarityBoost ?? null,
+      ttsStyle: tts.style ?? null,
       verified: null,
     }
   }
@@ -126,6 +132,9 @@ async function verifyTTSVoice(
         ttsVoiceId: tts.voiceId,
         ttsSpeed: tts.speed,
         ttsLanguage: tts.language,
+        ttsStability: tts.stability ?? null,
+        ttsSimilarityBoost: tts.similarityBoost ?? null,
+        ttsStyle: tts.style ?? null,
         verified: true,
       }
     }
@@ -143,6 +152,9 @@ async function verifyTTSVoice(
     ttsVoiceId: fallbackTts.voiceId,
     ttsSpeed: fallbackTts.speed,
     ttsLanguage: fallbackTts.language,
+    ttsStability: fallbackTts.stability ?? null,
+    ttsSimilarityBoost: fallbackTts.similarityBoost ?? null,
+    ttsStyle: fallbackTts.style ?? null,
     verified: false,
   }
 }
@@ -282,6 +294,9 @@ interface SavePersonaParams {
   ttsVoiceId?: string
   ttsSpeed?: number
   ttsLanguage?: string
+  ttsStability?: number | null
+  ttsSimilarityBoost?: number | null
+  ttsStyle?: number | null
 }
 
 async function savePersonaToDb(params: SavePersonaParams) {
@@ -338,6 +353,9 @@ async function savePersonaToDb(params: SavePersonaParams) {
         ttsVoiceId: params.ttsVoiceId ?? undefined,
         ttsSpeed: params.ttsSpeed ?? undefined,
         ttsLanguage: params.ttsLanguage ?? "ko-KR",
+        ttsStability: params.ttsStability ?? undefined,
+        ttsSimilarityBoost: params.ttsSimilarityBoost ?? undefined,
+        ttsStyle: params.ttsStyle ?? undefined,
 
         // v3 호환: 기존 소비자가 직접 접근하는 필드 유지
         voiceProfile: params.qualitative.voice as unknown as Prisma.InputJsonValue,

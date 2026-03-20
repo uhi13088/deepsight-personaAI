@@ -158,6 +158,9 @@ export async function POST() {
         ttsVoiceId: ttsProfile.voiceId,
         ttsSpeed: finalSpeed,
         ttsLanguage: ttsProfile.language,
+        ttsStability: ttsProfile.stability ?? null,
+        ttsSimilarityBoost: ttsProfile.similarityBoost ?? null,
+        ttsStyle: ttsProfile.style ?? null,
       }
       const filledFields: string[] = ["tts"]
 
