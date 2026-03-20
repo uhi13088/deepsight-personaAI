@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import Script from "next/script"
 import { toast } from "sonner"
 import { ArrowLeft, Coins, Check, Lock, Zap, Ticket } from "lucide-react"
@@ -33,8 +34,16 @@ const COIN_PACKAGES = [
 type ConfirmState = { item: ShopItem } | null
 
 export default function ShopPage() {
-  const { profile, onboarding, purchaseItem, hasPurchased, getPurchaseCount, syncCreditsBalance } =
-    useUserStore()
+  const {
+    profile,
+    onboarding,
+    purchaseItem,
+    hasPurchased,
+    getPurchaseCount,
+    syncCreditsBalance,
+    resetProfile,
+  } = useUserStore()
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<ShopCategory>("persona")
   const [confirm, setConfirm] = useState<ConfirmState>(null)
   const [coinLoading, setCoinLoading] = useState<string | null>(null)
@@ -43,8 +52,19 @@ export default function ShopPage() {
   const [couponCode, setCouponCode] = useState("")
   const [couponLoading, setCouponLoading] = useState(false)
   const [serverBalance, setServerBalance] = useState<number | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  // 성향 초기화 다이얼로그
+  const [resetConfirm, setResetConfirm] = useState(false)
+  const [resetDeleteSns, setResetDeleteSns] = useState(false)
+  const [resetLoading, setResetLoading] = useState(false)
+
+  // hydration 완료 후에만 잔액 표시 (SSR default 0 vs localStorage 불일치 방지)
+  useEffect(() => setMounted(true), [])
+
   // 서버 잔액이 로딩되면 서버를 SSoT로 사용, 아직 로딩 전이면 로컬 잔액 표시
   const balance = serverBalance ?? onboarding.creditsBalance
+  const balanceReady = mounted && serverBalance !== null
   const items = getShopItemsByCategory(activeTab)
 
   // 서버에서 실제 잔액 fetch — 서버 잔액을 SSoT로 사용
@@ -158,7 +178,37 @@ export default function ShopPage() {
       toast.info("곧 출시됩니다!")
       return
     }
+    if (item.actionType === "reset") {
+      setResetConfirm(true)
+      return
+    }
     setConfirm({ item })
+  }
+
+  const handleResetConfirm = async () => {
+    const userId = profile?.id
+    if (!userId) {
+      toast.error("로그인이 필요합니다")
+      return
+    }
+    setResetLoading(true)
+    try {
+      await clientApi.resetProfile(userId, { deleteSns: resetDeleteSns })
+      resetProfile()
+      // 서버 잔액 갱신
+      const credits = await clientApi.getCredits(userId, { limit: 1 })
+      setServerBalance(credits.balance)
+      syncCreditsBalance(credits.balance)
+      toast.success("성향이 초기화되었습니다! 온보딩을 다시 시작해주세요.")
+      setResetConfirm(false)
+      setResetDeleteSns(false)
+      router.push("/onboarding")
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "초기화 실패"
+      toast.error(msg)
+    } finally {
+      setResetLoading(false)
+    }
   }
 
   const confirmPurchase = () => {
@@ -173,8 +223,15 @@ export default function ShopPage() {
     setConfirm(null)
   }
 
-  const getItemStatus = (item: ShopItem): "available" | "owned" | "insufficient" | "soon" => {
+  const getItemStatus = (
+    item: ShopItem
+  ): "available" | "owned" | "insufficient" | "soon" | "navigate" | "reset" => {
     if (item.tag === "SOON") return "soon"
+    if (item.actionType === "navigate") return "navigate"
+    if (item.actionType === "reset") {
+      if (balance < item.price) return "insufficient"
+      return "reset"
+    }
     if (!item.repeatable && hasPurchased(item.id)) return "owned"
     if (balance < item.price) return "insufficient"
     return "available"
@@ -196,7 +253,9 @@ export default function ShopPage() {
           </div>
           <div className="flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5">
             <Coins className="h-4 w-4 text-amber-500" />
-            <span className="text-sm font-bold text-amber-700">{balance}</span>
+            <span className="text-sm font-bold text-amber-700" suppressHydrationWarning>
+              {balanceReady ? balance.toLocaleString() : "···"}
+            </span>
           </div>
         </div>
       </header>
@@ -209,7 +268,9 @@ export default function ShopPage() {
           <p className="text-sm text-white/80">코인으로 특별한 아이템을 구매하세요</p>
           <div className="mt-4 flex items-center gap-2">
             <Coins className="h-6 w-6 text-amber-300" />
-            <span className="text-3xl font-bold">{balance}</span>
+            <span className="text-3xl font-bold" suppressHydrationWarning>
+              {balanceReady ? balance.toLocaleString() : "···"}
+            </span>
             <span className="text-sm text-white/70">코인 보유</span>
           </div>
         </div>
@@ -315,7 +376,11 @@ export default function ShopPage() {
             const count = getPurchaseCount(item.id)
 
             return (
-              <PWCard key={item.id} hover={status === "available"} className="relative !p-4">
+              <PWCard
+                key={item.id}
+                hover={status === "available" || status === "navigate" || status === "reset"}
+                className="relative !p-4"
+              >
                 {/* Tag Badge */}
                 {item.tag && (
                   <span
@@ -327,7 +392,7 @@ export default function ShopPage() {
                           : "bg-gray-100 text-gray-500"
                     }`}
                   >
-                    {item.tag}
+                    {item.tag === "SOON" ? "준비중" : item.tag}
                   </span>
                 )}
 
@@ -372,6 +437,21 @@ export default function ShopPage() {
                           <Lock className="h-3 w-3" />
                           준비 중
                         </button>
+                      ) : status === "navigate" ? (
+                        <Link href={item.navigateTo ?? "/"}>
+                          <PWButton size="sm" variant="gradient">
+                            이용하기
+                          </PWButton>
+                        </Link>
+                      ) : status === "reset" ? (
+                        <PWButton
+                          size="sm"
+                          variant="gradient"
+                          onClick={() => handlePurchase(item)}
+                          className="!from-red-500 !to-orange-500"
+                        >
+                          초기화
+                        </PWButton>
                       ) : status === "owned" ? (
                         <span className="rounded-full bg-gray-100 px-4 py-1.5 text-xs font-medium text-gray-400">
                           구매 완료
@@ -449,6 +529,71 @@ export default function ShopPage() {
                 className="flex-1 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
               >
                 구매하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Reset Confirmation Dialog */}
+      {resetConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6">
+            <div className="mb-4 text-center">
+              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-red-50 to-orange-50 text-3xl">
+                🔄
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">성향 초기화</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                취향 분석이 초기화되고 온보딩을 다시 진행합니다.
+                <br />이 작업은 되돌릴 수 없습니다.
+              </p>
+            </div>
+
+            <div className="mb-4 rounded-lg bg-red-50 p-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">비용</span>
+                <div className="flex items-center gap-1 font-bold text-amber-700">
+                  <Coins className="h-4 w-4 text-amber-500" />
+                  100 코인
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-red-600">
+                벡터·설문 응답이 삭제되며, 재온보딩 시 크레딧은 지급되지 않습니다.
+              </p>
+            </div>
+
+            <label className="mb-5 flex items-center gap-2 rounded-lg bg-gray-50 p-3 text-sm">
+              <input
+                type="checkbox"
+                checked={resetDeleteSns}
+                onChange={(e) => setResetDeleteSns(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-purple-500 focus:ring-purple-500"
+              />
+              <span className="text-gray-600">SNS 연동도 함께 삭제</span>
+            </label>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setResetConfirm(false)
+                  setResetDeleteSns(false)
+                }}
+                disabled={resetLoading}
+                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => void handleResetConfirm()}
+                disabled={resetLoading}
+                className="flex-1 rounded-xl bg-gradient-to-r from-red-500 to-orange-500 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {resetLoading ? (
+                  <div className="mx-auto h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  "초기화하기"
+                )}
               </button>
             </div>
           </div>

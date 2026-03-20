@@ -47,13 +47,44 @@
 
 ## 🔄 IN_PROGRESS (진행중)
 
-_v4.2.0 이미지 생성 티켓은 아래 DONE 섹션으로 이동_
+_현재 진행 중인 티켓 없음_
 
 ---
 
-> **최종 갱신: 2026-03-11**
+> **최종 갱신: 2026-03-17**
 
 ## ✅ DONE (완료)
+
+### T45: 성향 초기화 기능 (profile_reset) ✅ 2026-03-17
+
+- [x] **T45-1**: 백엔드 — `POST /api/persona-world/users/profile/reset` (100코인 차감, 벡터 NULL, 설문 삭제, SNS 선택 삭제)
+- [x] **T45-2**: 클라이언트 — `clientApi.resetProfile()` + `useUserStore.resetProfile()` 액션
+- [x] **T45-3**: 상점 UI — 확인 다이얼로그 (경고 + SNS 삭제 체크박스) → 온보딩 리다이렉트
+- [x] **T45-4**: 재온보딩 크레딧 중복 지급 방지 (`isReOnboarding` 플래그)
+- [x] **T45-5**: API 문서 (`public.md` + `public.openapi.yaml`) + 마이그레이션 SQL (068)
+- 변경:
+  - `apps/engine-studio/src/app/api/persona-world/users/profile/reset/route.ts` (신규)
+  - `apps/engine-studio/prisma/migrations/068_shop_items_enable_profile_reset.sql` (신규)
+  - `apps/persona-world/src/lib/shop.ts` (actionType: "reset" 추가)
+  - `apps/persona-world/src/lib/api.ts` (resetProfile + 재온보딩 크레딧 방지)
+  - `apps/persona-world/src/lib/user-store.ts` (resetProfile 액션 + isReOnboarding)
+  - `apps/persona-world/src/app/shop/page.tsx` (초기화 다이얼로그)
+  - `docs/api/public.md`, `docs/api/public.openapi.yaml`
+- 테스트: TypeCheck PASS, Build PASS (engine-studio + persona-world)
+
+### T445: 프로필 이미지 스토리지 Cloudflare R2 전환 ✅ 2026-03-17
+
+- [x] **T445-1: R2 업로드 클라이언트 구현** ✅
+  - 변경: `lib/image-generation/r2-storage.ts` — @aws-sdk/client-s3로 R2 업로드, 싱글턴 S3 클라이언트
+  - 환경변수: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`
+- [x] **T445-2: profile-image-generator 로컬저장→R2 전환** ✅
+  - 변경: `downloadAndSaveImage()` 제거 → `uploadImageToR2()` 호출, `fs/promises` import 제거
+  - R2 미설정 시 graceful skip (null 반환)
+- [x] **T445-3: 테스트 업데이트** ✅
+  - 변경: `r2-storage.test.ts` 신규 (7 tests), `profile-image-generator.test.ts` R2 mock 전환 (8 tests)
+  - 전체 40 tests PASS
+- [x] **T445-4: 문서 업데이트** ✅
+  - 변경: `docs/api/internal.md` — R2 환경변수 설명 추가
 
 ### Phase PROFILE-IMAGE: 페르소나 프로필 이미지 자동생성 (T440~T444) ✅ 2026-03-11
 

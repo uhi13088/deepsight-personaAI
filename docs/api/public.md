@@ -98,6 +98,7 @@ Public API 엔드포인트는 크게 두 종류로 나뉩니다.
     - [POST /persona-world/calls/sessions/:sessionId/end](#post-persona-worldcallssessionssessionidend)
 19. [User Profile API](#19-user-profile-api)
     - [PATCH /persona-world/users/profile](#patch-persona-worldusersprofile)
+    - [POST /persona-world/users/profile/reset](#post-persona-worldusersprofileresets)
 20. [Bookmarks API](#20-bookmarks-api)
     - [POST /public/bookmarks](#post-publicbookmarks)
 21. [User Posts API](#21-user-posts-api)
@@ -2593,6 +2594,41 @@ GET /api/persona-world/onboarding/sns/reanalyze?userId=user_001
 | ---------------- | ---- | -------------- |
 | `MISSING_FIELDS` | 400  | 필수 필드 누락 |
 | `INTERNAL_ERROR` | 500  | 종료 처리 실패 |
+
+### 19.2 POST /api/persona-world/users/profile/reset
+
+성향 초기화 — L1/L2 벡터 NULL, 설문 응답 삭제, 프로필 BASIC 복귀. 100 코인 차감.
+
+**인증**: Internal Token 필수
+
+**Request Body**
+
+| 필드        | 타입    | 필수 | 설명                         |
+| ----------- | ------- | ---- | ---------------------------- |
+| `userId`    | string  | O    | 유저 ID                      |
+| `deleteSns` | boolean | X    | SNS 연동도 삭제 (기본 false) |
+
+**응답**
+
+```json
+{
+  "success": true,
+  "data": {
+    "userId": "user-123",
+    "resetAt": "2026-03-17T09:00:00.000Z",
+    "deletedSns": false
+  }
+}
+```
+
+**에러 코드**
+
+| 코드                   | HTTP | 설명                 |
+| ---------------------- | ---- | -------------------- |
+| `INVALID_REQUEST`      | 400  | userId 누락          |
+| `USER_NOT_FOUND`       | 404  | 유저 없음            |
+| `INSUFFICIENT_BALANCE` | 402  | 코인 부족 (100 필요) |
+| `PROFILE_RESET_ERROR`  | 500  | 서버 에러            |
 
 ---
 

@@ -150,7 +150,12 @@ export const clientApi = {
       3: "DEEP",
     }
     const level = levelMap[phase] ?? "QUICK"
-    const creditsMap: Record<number, number> = { 1: 100, 2: 150, 3: 200 }
+    // 성향 초기화 후 재온보딩이면 크레딧 미지급
+    const { useUserStore } = await import("./user-store")
+    const isReOnboarding = useUserStore.getState().onboarding.isReOnboarding
+    const creditsMap: Record<number, number> = isReOnboarding
+      ? { 1: 0, 2: 0, 3: 0 }
+      : { 1: 100, 2: 150, 3: 200 }
 
     const res = await fetch(`/api/persona-world/onboarding/cold-start`, {
       method: "POST",
@@ -226,6 +231,27 @@ export const clientApi = {
     })
     if (!res.ok) throw new Error("Failed to update nickname")
     const json: ApiResponse<{ id: string; nickname: string }> = await res.json()
+    if (!json.success) throw new Error(json.error?.message || "Unknown error")
+    return json.data!
+  },
+
+  // ── 성향 초기화 ──────────────────────────────────────────
+
+  async resetProfile(userId: string, options?: { deleteSns?: boolean }) {
+    const res = await fetch(`/api/persona-world/users/profile/reset`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, deleteSns: options?.deleteSns ?? false }),
+    })
+    if (!res.ok) {
+      const json = await res.json().catch(() => null)
+      const msg = json?.error?.message || `Reset failed (${res.status})`
+      const err = new Error(msg)
+      ;(err as Error & { code?: string }).code = json?.error?.code
+      throw err
+    }
+    const json: ApiResponse<{ userId: string; resetAt: string; deletedSns: boolean }> =
+      await res.json()
     if (!json.success) throw new Error(json.error?.message || "Unknown error")
     return json.data!
   },

@@ -232,7 +232,9 @@ export default function ProfilePage() {
               className="flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-sm text-amber-600 transition-colors hover:bg-amber-100"
             >
               <Coins className="h-4 w-4" />
-              <span className="font-medium">{onboarding.creditsBalance} 코인</span>
+              <span className="font-medium" suppressHydrationWarning>
+                {onboarding.creditsBalance} 코인
+              </span>
               <ChevronRight className="h-3.5 w-3.5" />
             </Link>
           </div>

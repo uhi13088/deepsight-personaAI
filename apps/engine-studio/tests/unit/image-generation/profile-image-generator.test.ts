@@ -7,27 +7,22 @@ vi.mock("@/lib/image-generation/image-client", () => ({
   generateImageWithFlux: vi.fn(),
 }))
 
-vi.mock("fs/promises", () => ({
-  writeFile: vi.fn().mockResolvedValue(undefined),
-  mkdir: vi.fn().mockResolvedValue(undefined),
+vi.mock("@/lib/image-generation/r2-storage", () => ({
+  isR2Configured: vi.fn(),
+  uploadImageToR2: vi.fn(),
 }))
-
-// fetch mock for image download
-const mockFetchResponse = {
-  ok: true,
-  arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(1024)),
-}
-vi.stubGlobal("fetch", vi.fn().mockResolvedValue(mockFetchResponse))
 
 import { generateProfileImage } from "@/lib/image-generation/profile-image-generator"
 import {
   isImageGenerationConfigured,
   generateImageWithFlux,
 } from "@/lib/image-generation/image-client"
-import { writeFile, mkdir } from "fs/promises"
+import { isR2Configured, uploadImageToR2 } from "@/lib/image-generation/r2-storage"
 
 const mockedIsConfigured = vi.mocked(isImageGenerationConfigured)
+const mockedIsR2Configured = vi.mocked(isR2Configured)
 const mockedGenerateImage = vi.mocked(generateImageWithFlux)
+const mockedUploadToR2 = vi.mocked(uploadImageToR2)
 
 const DEFAULT_INPUT = {
   gender: "FEMALE",
@@ -48,7 +43,7 @@ describe("generateProfileImage", () => {
     vi.clearAllMocks()
   })
 
-  it("should return null when no provider is configured", async () => {
+  it("should return null when no image provider is configured", async () => {
     mockedIsConfigured.mockReturnValue(false)
 
     const result = await generateProfileImage(DEFAULT_INPUT)
@@ -56,45 +51,56 @@ describe("generateProfileImage", () => {
     expect(mockedGenerateImage).not.toHaveBeenCalled()
   })
 
-  it("should generate image and save locally when configured", async () => {
+  it("should return null when R2 is not configured", async () => {
     mockedIsConfigured.mockReturnValue(true)
+    mockedIsR2Configured.mockReturnValue(false)
+
+    const result = await generateProfileImage(DEFAULT_INPUT)
+    expect(result).toBeNull()
+    expect(mockedGenerateImage).not.toHaveBeenCalled()
+  })
+
+  it("should generate image and upload to R2 when configured", async () => {
+    mockedIsConfigured.mockReturnValue(true)
+    mockedIsR2Configured.mockReturnValue(true)
     mockedGenerateImage.mockResolvedValue({
       imageUrl: "https://fal.media/files/example/image.webp",
       provider: "fal",
       model: "fal-ai/flux-pro/v1.1",
     })
+    mockedUploadToR2.mockResolvedValue({
+      publicUrl: "https://pub-r2.example.com/profile-images/2026/03/17/abc.webp",
+      key: "profile-images/2026/03/17/abc.webp",
+    })
 
     const result = await generateProfileImage(DEFAULT_INPUT)
 
     expect(result).not.toBeNull()
-    expect(result?.profileImageUrl).toMatch(
-      /^\/uploads\/images\/\d{4}\/\d{2}\/\d{2}\/[\w-]+\.webp$/
+    expect(result?.profileImageUrl).toBe(
+      "https://pub-r2.example.com/profile-images/2026/03/17/abc.webp"
     )
     expect(result?.model).toBe("fal-ai/flux-pro/v1.1")
-    expect(mkdir).toHaveBeenCalled()
-    expect(writeFile).toHaveBeenCalled()
+    expect(mockedUploadToR2).toHaveBeenCalledWith("https://fal.media/files/example/image.webp")
   })
 
   it("should return null when FLUX returns null", async () => {
     mockedIsConfigured.mockReturnValue(true)
+    mockedIsR2Configured.mockReturnValue(true)
     mockedGenerateImage.mockResolvedValue(null)
 
     const result = await generateProfileImage(DEFAULT_INPUT)
     expect(result).toBeNull()
   })
 
-  it("should return null on download failure", async () => {
+  it("should return null on R2 upload failure", async () => {
     mockedIsConfigured.mockReturnValue(true)
+    mockedIsR2Configured.mockReturnValue(true)
     mockedGenerateImage.mockResolvedValue({
       imageUrl: "https://fal.media/files/example/image.webp",
       provider: "fal",
       model: "fal-ai/flux-pro/v1.1",
     })
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      statusText: "Internal Server Error",
-    } as Response)
+    mockedUploadToR2.mockRejectedValue(new Error("R2 upload failed"))
 
     const result = await generateProfileImage(DEFAULT_INPUT)
     expect(result).toBeNull()
@@ -102,6 +108,7 @@ describe("generateProfileImage", () => {
 
   it("should return null on unexpected error", async () => {
     mockedIsConfigured.mockReturnValue(true)
+    mockedIsR2Configured.mockReturnValue(true)
     mockedGenerateImage.mockRejectedValue(new Error("API timeout"))
 
     const result = await generateProfileImage(DEFAULT_INPUT)
@@ -110,10 +117,15 @@ describe("generateProfileImage", () => {
 
   it("should pass correct prompt input to FLUX", async () => {
     mockedIsConfigured.mockReturnValue(true)
+    mockedIsR2Configured.mockReturnValue(true)
     mockedGenerateImage.mockResolvedValue({
       imageUrl: "https://fal.media/files/example/image.webp",
       provider: "fal",
       model: "fal-ai/flux-pro/v1.1",
+    })
+    mockedUploadToR2.mockResolvedValue({
+      publicUrl: "https://pub-r2.example.com/profile-images/abc.webp",
+      key: "profile-images/abc.webp",
     })
 
     await generateProfileImage(DEFAULT_INPUT)
@@ -129,10 +141,15 @@ describe("generateProfileImage", () => {
 
   it("should include quality enhancement in prompt", async () => {
     mockedIsConfigured.mockReturnValue(true)
+    mockedIsR2Configured.mockReturnValue(true)
     mockedGenerateImage.mockResolvedValue({
       imageUrl: "https://fal.media/files/example/image.webp",
       provider: "fal",
       model: "fal-ai/flux-pro/v1.1",
+    })
+    mockedUploadToR2.mockResolvedValue({
+      publicUrl: "https://pub-r2.example.com/profile-images/abc.webp",
+      key: "profile-images/abc.webp",
     })
 
     await generateProfileImage(DEFAULT_INPUT)

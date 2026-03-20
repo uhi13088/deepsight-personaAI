@@ -166,7 +166,7 @@ function buildPersonaSection(profile?: PersonaProfileSnapshot): string {
     parts.push(`\n[전문 분야]\n${profile.expertise.join(", ")}`)
   }
 
-  // VoiceSpec에서 말투/습관/금지 사항 추출
+  // VoiceSpec에서 말투/습관/스타일 파라미터/금지 사항 추출
   const vs = safeParseVoiceSpec(profile.voiceSpec)
   if (vs) {
     if (vs.speechStyle) {
@@ -175,6 +175,44 @@ function buildPersonaSection(profile?: PersonaProfileSnapshot): string {
     if (vs.habitualExpressions?.length) {
       parts.push(`[습관적 표현] ${vs.habitualExpressions.join(" / ")}`)
     }
+    if (vs.physicalMannerisms?.length) {
+      parts.push(`[특징적 행동] ${vs.physicalMannerisms.join(" / ")}`)
+    }
+
+    // styleParams — 페르소나 고유 목소리 수치
+    if (vs.styleParams) {
+      const sp = vs.styleParams
+      const styleHints: string[] = []
+      if (sp.formality !== undefined) {
+        if (sp.formality < 0.3) styleHints.push("매우 캐주얼한 구어체 사용")
+        else if (sp.formality < 0.55) styleHints.push("편한 구어체 사용")
+        else if (sp.formality > 0.75) styleHints.push("격식체 위주 사용")
+      }
+      if (sp.humor !== undefined) {
+        if (sp.humor > 0.7) styleHints.push("유머와 장난기를 자주 섞음")
+        else if (sp.humor < 0.3) styleHints.push("진지한 어조 유지")
+      }
+      if (sp.emotionExpression !== undefined) {
+        if (sp.emotionExpression > 0.7) styleHints.push("감정을 풍부하게 표현")
+        else if (sp.emotionExpression < 0.3) styleHints.push("감정 절제, 담담하게 표현")
+      }
+      if (sp.assertiveness !== undefined) {
+        if (sp.assertiveness > 0.7) styleHints.push("확신을 갖고 단정적으로 말함")
+        else if (sp.assertiveness < 0.3) styleHints.push("조심스럽고 겸양하게 말함")
+      }
+      if (sp.sentenceLength !== undefined) {
+        if (sp.sentenceLength < 0.3) styleHints.push("짧고 끊어치는 문장 선호")
+        else if (sp.sentenceLength > 0.7) styleHints.push("생각을 길게 풀어서 말함")
+      }
+      if (sp.vocabularyLevel !== undefined) {
+        if (sp.vocabularyLevel > 0.7) styleHints.push("전문 용어나 고급 어휘 활용")
+        else if (sp.vocabularyLevel < 0.3) styleHints.push("쉬운 일상 용어 위주 사용")
+      }
+      if (styleHints.length > 0) {
+        parts.push(`[성격 기반 말투]\n${styleHints.map((h) => `- ${h}`).join("\n")}`)
+      }
+    }
+
     if (vs.forbiddenBehaviors?.length) {
       parts.push(`[절대 하지 않는 것] ${vs.forbiddenBehaviors.slice(0, 3).join(", ")}`)
     }
@@ -212,21 +250,37 @@ function buildPersonaSection(profile?: PersonaProfileSnapshot): string {
 interface ParsedVoiceSpec {
   speechStyle?: string
   habitualExpressions?: string[]
+  physicalMannerisms?: string[]
   forbiddenBehaviors?: string[]
   forbiddenPatterns?: string[]
+  styleParams?: {
+    formality?: number
+    humor?: number
+    emotionExpression?: number
+    assertiveness?: number
+    sentenceLength?: number
+    vocabularyLevel?: number
+  }
 }
 
 function safeParseVoiceSpec(raw: unknown): ParsedVoiceSpec | null {
   const obj = safeParseJson<{
-    profile?: { speechStyle?: string; habitualExpressions?: string[] }
+    profile?: {
+      speechStyle?: string
+      habitualExpressions?: string[]
+      physicalMannerisms?: string[]
+    }
     guardrails?: { forbiddenBehaviors?: string[]; forbiddenPatterns?: string[] }
+    styleParams?: Record<string, number>
   }>(raw)
   if (!obj) return null
   return {
     speechStyle: obj.profile?.speechStyle,
     habitualExpressions: obj.profile?.habitualExpressions,
+    physicalMannerisms: obj.profile?.physicalMannerisms,
     forbiddenBehaviors: obj.guardrails?.forbiddenBehaviors,
     forbiddenPatterns: obj.guardrails?.forbiddenPatterns,
+    styleParams: obj.styleParams,
   }
 }
 

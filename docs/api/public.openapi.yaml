@@ -899,6 +899,53 @@ paths:
   # Credits (코인)
   # -----------------------------------------------------------
 
+  /persona-world/users/profile/reset:
+    post:
+      operationId: resetUserProfile
+      tags: [Users]
+      summary: 성향 초기화 (100 코인)
+      description: L1/L2 벡터 NULL, 설문 응답 삭제, 프로필 BASIC 복귀. SNS 연동 삭제는 선택.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId:
+                  type: string
+                deleteSns:
+                  type: boolean
+                  default: false
+                  description: SNS 연동도 함께 삭제
+      responses:
+        "200":
+          description: 초기화 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      userId:
+                        type: string
+                      resetAt:
+                        type: string
+                        format: date-time
+                      deletedSns:
+                        type: boolean
+        "402":
+          description: 코인 부족 (100 코인 필요)
+        "404":
+          description: 유저 없음
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /persona-world/credits:
     get:
       operationId: getCredits

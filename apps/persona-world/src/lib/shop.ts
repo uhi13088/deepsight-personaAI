@@ -23,6 +23,10 @@ export interface ShopItem {
   repeatable: boolean
   /** 아이템 태그 (UI 뱃지) */
   tag?: "NEW" | "HOT" | "SOON"
+  /** "purchase"(기본): 코인 차감 구매, "navigate": 기능 페이지로 이동, "reset": 성향 초기화 */
+  actionType?: "purchase" | "navigate" | "reset"
+  /** navigate 타입일 때 이동 경로 */
+  navigateTo?: string
 }
 
 // ── 정적 폴백 데이터 (API 실패 시) ──────────────────────────────
@@ -36,6 +40,7 @@ const FALLBACK_ITEMS: ShopItem[] = [
     category: "persona",
     emoji: "\u{1F465}",
     repeatable: true,
+    tag: "SOON",
   },
   {
     id: "premium_persona_unlock",
@@ -45,7 +50,7 @@ const FALLBACK_ITEMS: ShopItem[] = [
     category: "persona",
     emoji: "\u{1F31F}",
     repeatable: true,
-    tag: "HOT",
+    tag: "SOON",
   },
   {
     id: "persona_chat",
@@ -57,6 +62,8 @@ const FALLBACK_ITEMS: ShopItem[] = [
     emoji: "\u{1F4AC}",
     repeatable: true,
     tag: "NEW",
+    actionType: "navigate",
+    navigateTo: "/chat",
   },
   {
     id: "persona_call_reservation",
@@ -67,6 +74,8 @@ const FALLBACK_ITEMS: ShopItem[] = [
     emoji: "\u{1F4DE}",
     repeatable: true,
     tag: "NEW",
+    actionType: "navigate",
+    navigateTo: "/calls",
   },
   {
     id: "profile_reset",
@@ -76,6 +85,7 @@ const FALLBACK_ITEMS: ShopItem[] = [
     category: "profile",
     emoji: "\u{1F504}",
     repeatable: true,
+    actionType: "reset",
   },
   {
     id: "badge_taste_expert",
@@ -205,7 +215,17 @@ const FALLBACK_ITEMS: ShopItem[] = [
 
 // ── API 데이터 → ShopItem 변환 ──────────────────────────────────
 
+/** 특수 액션 아이템 매핑 (서버에서 관리하지 않는 클라이언트 로직) */
+const NAVIGATE_ITEMS: Record<string, string> = {
+  persona_chat: "/chat",
+  persona_call_reservation: "/calls",
+}
+
+const RESET_ITEMS = new Set(["profile_reset"])
+
 function apiItemToShopItem(item: ShopItemFromAPI): ShopItem {
+  const navigateTo = NAVIGATE_ITEMS[item.itemKey]
+  const isReset = RESET_ITEMS.has(item.itemKey)
   return {
     id: item.itemKey,
     name: item.name,
@@ -216,6 +236,8 @@ function apiItemToShopItem(item: ShopItemFromAPI): ShopItem {
     emoji: item.emoji,
     repeatable: item.repeatable,
     tag: (item.tag as ShopItem["tag"]) ?? undefined,
+    ...(navigateTo ? { actionType: "navigate" as const, navigateTo } : {}),
+    ...(isReset ? { actionType: "reset" as const } : {}),
   }
 }
 

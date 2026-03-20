@@ -39,8 +39,51 @@ import {
 } from "./security/security-middleware"
 import { isFeatureEnabled, type PWKillSwitchConfig } from "./security/pw-kill-switch"
 import type { ImmutableFact } from "@/types"
-import type { PostQualityLogInput } from "./types"
+import type { PostQualityLogInput, VoiceStyleParams } from "./types"
 import { runModerationPipeline, type ModerationResult } from "./moderation/auto-moderator"
+
+// ── VoiceSpec → VoiceStyleParams 추출 헬퍼 ───────────────────
+
+/** DB에 저장된 voiceSpec JSON에서 styleParams를 안전하게 추출 */
+function extractVoiceStyle(voiceSpec: unknown): VoiceStyleParams | undefined {
+  if (!voiceSpec || typeof voiceSpec !== "object") return undefined
+  const spec = voiceSpec as Record<string, unknown>
+  const params = spec.styleParams as Record<string, unknown> | undefined
+  if (!params) return undefined
+
+  const f = (key: string): number | undefined => {
+    const v = params[key]
+    return typeof v === "number" ? v : undefined
+  }
+
+  const formality = f("formality")
+  const humor = f("humor")
+  const sentenceLength = f("sentenceLength")
+  const emotionExpression = f("emotionExpression")
+  const assertiveness = f("assertiveness")
+  const vocabularyLevel = f("vocabularyLevel")
+
+  // 최소 1개 이상의 유효한 파라미터가 있어야 의미 있음
+  if (
+    formality === undefined &&
+    humor === undefined &&
+    sentenceLength === undefined &&
+    emotionExpression === undefined &&
+    assertiveness === undefined &&
+    vocabularyLevel === undefined
+  ) {
+    return undefined
+  }
+
+  return {
+    formality: formality ?? 0.5,
+    humor: humor ?? 0.5,
+    sentenceLength: sentenceLength ?? 0.5,
+    emotionExpression: emotionExpression ?? 0.5,
+    assertiveness: assertiveness ?? 0.5,
+    vocabularyLevel: vocabularyLevel ?? 0.5,
+  }
+}
 
 // ── 타입 정의 ────────────────────────────────────────────────
 
@@ -208,6 +251,7 @@ export async function executePostCreation(
     },
     personaState: state,
     personaProfile,
+    voiceStyle: extractVoiceStyle(persona.voiceSpec),
     availablePersonaHandles,
     l1Vector: persona.vectors.social,
     hashtagRange: computeHashtagRange(
@@ -632,6 +676,7 @@ export async function generateImagePost(
     },
     personaState: state,
     personaProfile,
+    voiceStyle: extractVoiceStyle(persona.voiceSpec),
     l1Vector: persona.vectors.social,
     imageContext,
     hashtagRange: computeHashtagRange(
