@@ -77,19 +77,18 @@ Backend:
   runtime: Node.js 20 LTS
   framework: Next.js API Routes
   orm: Prisma 5
-  database: PostgreSQL (Supabase)
+  database: PostgreSQL (Neon)
   cache: Redis (Upstash)
   auth: NextAuth.js v5
 
 AI/ML:
-  llm: OpenAI GPT-4 / Claude API
-  vector: pgvector (Supabase)
+  llm: Anthropic Claude (Sonnet) — @anthropic-ai/sdk
+  vector: pgvector (Neon)
   embedding: OpenAI text-embedding-3-small
 
 Infrastructure:
   hosting: Vercel
-  database: Supabase
-  storage: Supabase Storage
+  database: Neon PostgreSQL
   monitoring: Vercel Analytics
 ```
 
@@ -899,14 +898,9 @@ export const LIKERT_LABELS = {
 ```env
 # .env.local (예시 - 실제 값은 절대 커밋하지 않음!)
 
-# Database (Supabase)
-DATABASE_URL="postgresql://postgres:password@db.xxx.supabase.co:5432/postgres"
-DIRECT_URL="postgresql://postgres:password@db.xxx.supabase.co:5432/postgres"
-
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL="https://xxx.supabase.co"
-NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJ..."
-SUPABASE_SERVICE_ROLE_KEY="eyJ..."
+# Database (Neon)
+DATABASE_URL="postgresql://neondb_owner:password@ep-xxx.neon.tech/neondb?sslmode=require"
+DIRECT_URL="postgresql://neondb_owner:password@ep-xxx.neon.tech/neondb?sslmode=require"
 
 # Auth
 NEXTAUTH_SECRET="your-secret-key-min-32-chars"
