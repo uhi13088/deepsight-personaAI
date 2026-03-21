@@ -1,5 +1,5 @@
 -- Developer Console Database Migration
--- Run this in Supabase SQL Editor
+-- Run this in Neon SQL Editor
 
 -- ============================================
 -- ENUMS

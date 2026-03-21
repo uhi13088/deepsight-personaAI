@@ -88,7 +88,7 @@ const DEFAULT_TONE_BOUNDARIES = {
 // 벡터 → VoiceStyleParams 계산
 // ══════════════════════════════════════════════════════════════
 
-/** 3-Layer 벡터에서 VoiceStyleParams 도출 */
+/** 3-Layer 벡터에서 VoiceStyleParams 도출 (대비 스케일링 적용) */
 export function computeVoiceStyleParams(
   l1: SocialPersonaVector,
   l2: CoreTemperamentVector,
@@ -96,33 +96,48 @@ export function computeVoiceStyleParams(
 ): VoiceStyleParams {
   return {
     // 격식도: 분석적(lens) + 성실성 → 격식, 외향적 + 사교적 → 구어
-    formality: clamp(l1.lens * 0.4 + l2.conscientiousness * 0.3 + (1 - l2.extraversion) * 0.3),
+    formality: clamp(
+      contrastScale(l1.lens * 0.4 + l2.conscientiousness * 0.3 + (1 - l2.extraversion) * 0.3)
+    ),
     // 유머: 외향성 + 개방성 → 유머, 깊이 + 신경성 → 진지
     humor: clamp(
-      l2.extraversion * 0.35 +
-        l2.openness * 0.25 +
-        (1 - l1.depth) * 0.2 +
-        (1 - l2.neuroticism) * 0.2
+      contrastScale(
+        l2.extraversion * 0.35 +
+          l2.openness * 0.25 +
+          (1 - l1.depth) * 0.2 +
+          (1 - l2.neuroticism) * 0.2
+      )
     ),
     // 문장 길이: 깊이 + 범위 → 만연, 외향성 + 변동성 → 간결
     sentenceLength: clamp(
-      l1.depth * 0.35 + l1.scope * 0.25 + l2.conscientiousness * 0.2 + (1 - l3.volatility) * 0.2
+      contrastScale(
+        l1.depth * 0.35 + l1.scope * 0.25 + l2.conscientiousness * 0.2 + (1 - l3.volatility) * 0.2
+      )
     ),
     // 감정 표현: 신경성 + 외향성 + 변동성 → 풍부, 분석적(lens) → 절제
     emotionExpression: clamp(
-      l2.neuroticism * 0.25 +
-        l2.extraversion * 0.25 +
-        l3.volatility * 0.2 +
-        (1 - l1.lens) * 0.15 +
-        l1.sociability * 0.15
+      contrastScale(
+        l2.neuroticism * 0.25 +
+          l2.extraversion * 0.25 +
+          l3.volatility * 0.2 +
+          (1 - l1.lens) * 0.15 +
+          l1.sociability * 0.15
+      )
     ),
     // 단정성: 입장(stance) + 성실성 → 단정, 친화성 → 겸양
     assertiveness: clamp(
-      l1.stance * 0.4 + l2.conscientiousness * 0.2 + (1 - l2.agreeableness) * 0.25 + l1.depth * 0.15
+      contrastScale(
+        l1.stance * 0.4 +
+          l2.conscientiousness * 0.2 +
+          (1 - l2.agreeableness) * 0.25 +
+          l1.depth * 0.15
+      )
     ),
     // 어휘 수준: 깊이 + 분석 + 개방성 → 전문, 사교성 + 외향성 → 쉬움
     vocabularyLevel: clamp(
-      l1.depth * 0.35 + l1.lens * 0.25 + l2.openness * 0.2 + (1 - l1.sociability) * 0.2
+      contrastScale(
+        l1.depth * 0.35 + l1.lens * 0.25 + l2.openness * 0.2 + (1 - l1.sociability) * 0.2
+      )
     ),
   }
 }
@@ -422,4 +437,10 @@ export function summarizeVoiceSpec(spec: VoiceSpec): string {
 
 function clamp(v: number): number {
   return Math.max(0, Math.min(1, v))
+}
+
+/** 중앙(0.5) 기준으로 대비를 강화하여 값 분산을 넓힘 */
+export function contrastScale(value: number, factor: number = 1.8): number {
+  const centered = (value - 0.5) * factor
+  return 1 / (1 + Math.exp(-centered * 4))
 }

@@ -1,6 +1,6 @@
 -- 005_sync_schema.sql
 -- Prisma 스키마와 DB 동기화 — 누락된 enum, 컬럼, 테이블 추가
--- Supabase SQL Editor에서 실행
+-- Neon SQL Editor에서 실행
 
 -- ============================================
 -- 1. 누락 enum 타입 생성

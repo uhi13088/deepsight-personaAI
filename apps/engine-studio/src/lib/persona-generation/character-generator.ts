@@ -454,19 +454,18 @@ function inferTTSVoice(
   gender: "MALE" | "FEMALE" | "NON_BINARY",
   preferredProvider: "openai" | "elevenlabs" = "openai"
 ): TTSVoiceProfile {
-  // 1. 성격 유형 → base voice ID
-  let personalityKey: "analytical" | "critical" | "social" | "emotional" | "default"
-  if (l1.lens > 0.6 && l1.depth > 0.6) {
-    personalityKey = "analytical"
-  } else if (l1.stance > 0.6) {
-    personalityKey = "critical"
-  } else if (l1.sociability > 0.6 || l2.extraversion > 0.6) {
-    personalityKey = "social"
-  } else if (l1.lens < 0.4) {
-    personalityKey = "emotional"
-  } else {
-    personalityKey = "default"
+  // 1. 성격 유형 → base voice ID (점수 기반 분류)
+  type PersonalityKey = "analytical" | "critical" | "social" | "emotional" | "default"
+  const scores: Record<PersonalityKey, number> = {
+    analytical: (l1.lens - 0.5) * 0.5 + (l1.depth - 0.5) * 0.5,
+    critical: (l1.stance - 0.5) * 0.7 + (l1.depth - 0.5) * 0.3,
+    social: (l1.sociability - 0.5) * 0.5 + (l2.extraversion - 0.5) * 0.5,
+    emotional: (0.5 - l1.lens) * 0.4 + (l2.neuroticism - 0.5) * 0.3 + (l2.openness - 0.5) * 0.3,
+    default: 0,
   }
+  const personalityKey = (Object.entries(scores) as [PersonalityKey, number][]).sort(
+    ([, a], [, b]) => b - a
+  )[0][0]
 
   const voiceId =
     preferredProvider === "elevenlabs"

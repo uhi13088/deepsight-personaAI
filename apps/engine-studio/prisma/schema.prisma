@@ -193,6 +193,9 @@ model Persona {
   ttsPitch            Decimal?          @db.Decimal(3, 2) // -1.0 ~ 1.0
   ttsSpeed            Decimal?          @db.Decimal(3, 2) // 0.5 ~ 2.0
   ttsLanguage         String?           @default("ko-KR")
+  ttsStability        Decimal?          @db.Decimal(3, 2) // ElevenLabs stability 0.0~1.0
+  ttsSimilarityBoost  Decimal?          @db.Decimal(3, 2) // ElevenLabs similarityBoost 0.0~1.0
+  ttsStyle            Decimal?          @db.Decimal(3, 2) // ElevenLabs style 0.0~1.0
 
   // === v3.0 NEW: Archetype & Scores ===
   archetypeId         String?

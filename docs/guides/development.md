@@ -77,7 +77,7 @@ Backend:
   runtime: Node.js 20 LTS
   framework: Next.js API Routes
   orm: Prisma 5
-  database: PostgreSQL (Supabase)
+  database: PostgreSQL (Neon)
   cache: Redis (Upstash)
   auth: NextAuth.js v5
 
@@ -87,8 +87,7 @@ AI/ML:
 
 Infrastructure:
   hosting: Vercel
-  database: Supabase
-  storage: Supabase Storage
+  database: Neon PostgreSQL
   monitoring: Vercel Analytics
 ```
 
@@ -674,22 +673,22 @@ NEXT_PUBLIC_DEVELOPER_CONSOLE_URL="https://console.deepsight.ai"
 ### 배포 플랫폼
 
 - **Hosting**: Vercel (권장)
-- **Database**: Supabase PostgreSQL
+- **Database**: Neon PostgreSQL
 - **Cache**: Upstash Redis (선택)
 
-### Supabase 설정
+### Neon 설정
 
-1. [Supabase Dashboard](https://supabase.com/dashboard) 접속
-2. "New Project" 클릭 → Region: `Northeast Asia (Seoul)` 권장
+1. [Neon Console](https://console.neon.tech) 접속
+2. 프로젝트 선택 → Connection Details 확인
 
-**Connection String** (Settings > Database > Connection string):
+**Connection String** (Dashboard > Connect):
 
 ```
-# Transaction mode (pgBouncer) - Serverless/Edge용
-postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres?pgbouncer=true
+# Connection pooling 비활성화 (Prisma용)
+postgresql://neondb_owner:[PASSWORD]@[ENDPOINT].neon.tech/neondb?sslmode=require
 
-# Session mode - Prisma 마이그레이션용
-postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres
+# Connection pooling 활성화 시 (-pooler 엔드포인트)
+postgresql://neondb_owner:[PASSWORD]@[ENDPOINT]-pooler.neon.tech/neondb?sslmode=require
 ```
 
 ### Vercel 배포
@@ -736,7 +735,7 @@ curl https://console.deepsight.ai/api/health
 ### 보안 체크리스트
 
 - [ ] `NEXTAUTH_SECRET` 32자 이상 랜덤 문자열
-- [ ] `SUPABASE_SERVICE_ROLE_KEY` Production에만 설정
+- [ ] `DATABASE_URL` Neon Connection String 설정
 - [ ] `.env.local` 파일 `.gitignore`에 포함
 - [ ] API Rate Limiting 설정
 - [ ] CORS 설정 확인

@@ -359,37 +359,79 @@ export function buildFewShotSnippet(l1: SocialPersonaVector): {
 /**
  * VoiceStyleParams → LLM에 주입할 구체적 말투 지시 문자열.
  *
- * 연속 벡터 값을 자연어 지시로 변환.
- * 중간 범위(0.3~0.7)는 언급하지 않아 불필요한 지시를 줄임.
+ * 연속 벡터 값을 5단계 자연어 지시로 변환.
+ * 모든 구간에서 지시를 생성하여 사각지대를 제거.
  */
+
+type StyleLevel = "extreme_low" | "low" | "neutral" | "high" | "extreme_high"
+
+function getStyleLevel(value: number): StyleLevel {
+  if (value < 0.2) return "extreme_low"
+  if (value < 0.4) return "low"
+  if (value < 0.6) return "neutral"
+  if (value < 0.8) return "high"
+  return "extreme_high"
+}
+
+const STYLE_TABLE: Record<string, Record<StyleLevel, string>> = {
+  formality: {
+    extreme_low: "매우 캐주얼한 구어체로, 친구에게 말하듯",
+    low: "구어체로, 편하게 말하듯이",
+    neutral: "구어체와 문어체를 자연스럽게 섞어",
+    high: "격식있는 문어체로",
+    extreme_high: "매우 격식있고 정중한 문어체로",
+  },
+  humor: {
+    extreme_low: "냉소적일 정도로 건조한 톤",
+    low: "진지하고 무거운 톤",
+    neutral: "상황에 맞게 가볍거나 진지하게",
+    high: "위트있고 가벼운 유머 섞어",
+    extreme_high: "거의 모든 상황에 유머를 넣어",
+  },
+  sentenceLength: {
+    extreme_low: "극도로 짧은 단문 위주",
+    low: "짧고 간결한 문장",
+    neutral: "자연스러운 길이로",
+    high: "길고 만연한 문장, 부연 설명 풍부",
+    extreme_high: "매우 긴 문장, 여러 수식어와 부연",
+  },
+  emotionExpression: {
+    extreme_low: "감정을 거의 드러내지 않음",
+    low: "감정을 절제하여 표현",
+    neutral: "감정을 적당히 표현",
+    high: "감정을 풍부하게, 감탄사나 느낌표",
+    extreme_high: "감정을 매우 적극적으로, 과장도 서슴지 않음",
+  },
+  assertiveness: {
+    extreme_low: "매우 조심스럽게, 확언을 피함",
+    low: "조심스럽게, ~일 수도 있다 식으로",
+    neutral: "적당한 확신으로",
+    high: "단정적으로, 확신을 가지고",
+    extreme_high: "극도로 단정적, 반박 여지 없이",
+  },
+  vocabularyLevel: {
+    extreme_low: "매우 쉬운 일상 용어만",
+    low: "쉬운 일상 용어 위주",
+    neutral: "일반적인 어휘 수준",
+    high: "전문용어나 고급 어휘 활용",
+    extreme_high: "학술적 수준의 전문 어휘 적극 사용",
+  },
+}
+
 export function buildVoiceStyleInstruction(voice: VoiceStyleParams): string {
-  const instructions: string[] = []
+  const dimensions = [
+    "formality",
+    "humor",
+    "sentenceLength",
+    "emotionExpression",
+    "assertiveness",
+    "vocabularyLevel",
+  ] as const
 
-  // formality
-  if (voice.formality < 0.3) instructions.push("구어체로, 편하게 말하듯이")
-  else if (voice.formality > 0.7) instructions.push("격식있는 문어체로")
-
-  // humor
-  if (voice.humor < 0.3) instructions.push("진지하고 무거운 톤")
-  else if (voice.humor > 0.7) instructions.push("위트있고 가벼운 유머 섞어")
-
-  // sentenceLength
-  if (voice.sentenceLength < 0.3) instructions.push("짧고 간결한 문장")
-  else if (voice.sentenceLength > 0.7) instructions.push("길고 만연한 문장, 부연 설명 풍부")
-
-  // emotionExpression
-  if (voice.emotionExpression < 0.3) instructions.push("감정을 절제하여 표현")
-  else if (voice.emotionExpression > 0.7) instructions.push("감정을 풍부하게, 감탄사나 느낌표 활용")
-
-  // assertiveness
-  if (voice.assertiveness < 0.3) instructions.push("조심스럽게, ~일 수도 있다 식으로")
-  else if (voice.assertiveness > 0.7) instructions.push("단정적으로, 확신을 가지고")
-
-  // vocabularyLevel
-  if (voice.vocabularyLevel < 0.3) instructions.push("쉬운 일상 용어 위주")
-  else if (voice.vocabularyLevel > 0.7) instructions.push("전문용어나 고급 어휘 활용")
-
-  if (instructions.length === 0) return ""
+  const instructions = dimensions.map((dim) => {
+    const level = getStyleLevel(voice[dim])
+    return STYLE_TABLE[dim][level]
+  })
 
   return `\n[말투 스타일]\n${instructions.map((i) => `- ${i}`).join("\n")}`
 }

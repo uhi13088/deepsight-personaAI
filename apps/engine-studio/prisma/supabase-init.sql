@@ -1,6 +1,6 @@
 -- DeepSight AI Engine Studio - Database Schema
 -- v3.0 - 6D Vector System
--- Supabase PostgreSQL 초기화 스크립트
+-- PostgreSQL 초기화 스크립트 (레거시: 원래 Supabase용으로 작성, 현재 Neon 사용)
 
 -- ============================================
 -- ENUMS
