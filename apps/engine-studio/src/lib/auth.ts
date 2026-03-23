@@ -7,6 +7,20 @@ import NextAuth from "next-auth"
 import Google from "next-auth/providers/google"
 import { prisma } from "@/lib/prisma"
 
+// Ensure auth URL has https:// protocol — Vercel may set values without it
+function ensureProtocol(url: string): string {
+  if (url.startsWith("http://") || url.startsWith("https://")) return url
+  return `https://${url}`
+}
+
+if (process.env.AUTH_URL) {
+  process.env.AUTH_URL = ensureProtocol(process.env.AUTH_URL)
+} else if (process.env.NEXTAUTH_URL) {
+  process.env.NEXTAUTH_URL = ensureProtocol(process.env.NEXTAUTH_URL)
+} else if (process.env.VERCEL_URL) {
+  process.env.AUTH_URL = `https://${process.env.VERCEL_URL}`
+}
+
 // ============================================================================
 // 초대제: 허용된 이메일 목록
 // 환경변수 ALLOWED_EMAILS에 쉼표로 구분하여 설정
