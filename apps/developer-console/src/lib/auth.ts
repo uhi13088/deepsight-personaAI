@@ -153,6 +153,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               },
             })
             console.info(`[Auth] OAuth new user created: ${email.substring(0, 3)}***`)
+
+            // 기본 조직 + OWNER 멤버십 자동 생성
+            const org = await prisma.organization.create({
+              data: {
+                name: `${dbUser.name || email.split("@")[0]}의 조직`,
+                slug: dbUser.id,
+              },
+            })
+            await prisma.organizationMember.create({
+              data: {
+                userId: dbUser.id,
+                organizationId: org.id,
+                role: "OWNER",
+                acceptedAt: new Date(),
+              },
+            })
+            console.info(`[Auth] Default org created for: ${email.substring(0, 3)}***`)
           } else {
             // 기존 사용자 업데이트
             await prisma.user.update({
@@ -163,6 +180,30 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 emailVerified: dbUser.emailVerified ?? new Date(),
               },
             })
+
+            // 조직이 없는 기존 사용자에게도 기본 조직 생성
+            const existingMembership = await prisma.organizationMember.findFirst({
+              where: { userId: dbUser.id },
+            })
+            if (!existingMembership) {
+              const org = await prisma.organization.create({
+                data: {
+                  name: `${dbUser.name || email.split("@")[0]}의 조직`,
+                  slug: dbUser.id,
+                },
+              })
+              await prisma.organizationMember.create({
+                data: {
+                  userId: dbUser.id,
+                  organizationId: org.id,
+                  role: "OWNER",
+                  acceptedAt: new Date(),
+                },
+              })
+              console.info(
+                `[Auth] Default org created for existing user: ${email.substring(0, 3)}***`
+              )
+            }
           }
 
           // Account 연결 (없으면 생성)
