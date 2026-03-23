@@ -6,8 +6,17 @@
 import NextAuth from "next-auth"
 import Google from "next-auth/providers/google"
 
-// Vercel sets VERCEL_URL without protocol — NextAuth v5 needs a full URL
-if (!process.env.AUTH_URL && !process.env.NEXTAUTH_URL && process.env.VERCEL_URL) {
+// Ensure auth URL has https:// protocol — Vercel may set values without it
+function ensureProtocol(url: string): string {
+  if (url.startsWith("http://") || url.startsWith("https://")) return url
+  return `https://${url}`
+}
+
+if (process.env.AUTH_URL) {
+  process.env.AUTH_URL = ensureProtocol(process.env.AUTH_URL)
+} else if (process.env.NEXTAUTH_URL) {
+  process.env.NEXTAUTH_URL = ensureProtocol(process.env.NEXTAUTH_URL)
+} else if (process.env.VERCEL_URL) {
   process.env.AUTH_URL = `https://${process.env.VERCEL_URL}`
 }
 
