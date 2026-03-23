@@ -7,6 +7,11 @@ import NextAuth from "next-auth"
 import Google from "next-auth/providers/google"
 import { prisma } from "@/lib/prisma"
 
+// Vercel sets VERCEL_URL without protocol — NextAuth v5 needs a full URL
+if (!process.env.AUTH_URL && !process.env.NEXTAUTH_URL && process.env.VERCEL_URL) {
+  process.env.AUTH_URL = `https://${process.env.VERCEL_URL}`
+}
+
 // ============================================================================
 // 초대제: 허용된 이메일 목록
 // 환경변수 ALLOWED_EMAILS에 쉼표로 구분하여 설정

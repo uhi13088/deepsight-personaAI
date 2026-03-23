@@ -10,6 +10,11 @@ import bcrypt from "bcryptjs"
 import prisma from "@/lib/prisma"
 import { SESSION_CONFIG, SECURITY_CONFIG } from "@/config/app.config"
 
+// Vercel sets VERCEL_URL without protocol — NextAuth v5 needs a full URL
+if (!process.env.AUTH_URL && !process.env.NEXTAUTH_URL && process.env.VERCEL_URL) {
+  process.env.AUTH_URL = `https://${process.env.VERCEL_URL}`
+}
+
 // ============================================================================
 // 입력 검증 스키마
 // ============================================================================
