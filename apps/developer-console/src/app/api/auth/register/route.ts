@@ -63,14 +63,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 비밀번호 해싱 + 사용자 생성
+    // 비밀번호 해싱 + 사용자 생성 + 기본 조직 생성
     const hashedPassword = await hashPassword(password)
 
-    await prisma.user.create({
+    const user = await prisma.user.create({
       data: {
         name,
         email: normalizedEmail,
         password: hashedPassword,
+      },
+    })
+
+    // 기본 조직 + OWNER 멤버십 자동 생성 (Google OAuth와 동일 로직)
+    const org = await prisma.organization.create({
+      data: {
+        name: company || `${name}의 조직`,
+        slug: user.id,
+      },
+    })
+    await prisma.organizationMember.create({
+      data: {
+        userId: user.id,
+        organizationId: org.id,
+        role: "OWNER",
+        acceptedAt: new Date(),
       },
     })
 
