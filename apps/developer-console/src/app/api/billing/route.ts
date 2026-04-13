@@ -45,6 +45,53 @@ export async function GET() {
     const limit = planInfo.calls || 3000
     const percentUsed = Math.round((usedCalls / limit) * 100 * 10) / 10
 
+    // PLAN_INFO → 프론트 Plan 타입 매핑
+    const planLimitsMap: Record<
+      string,
+      {
+        activePersonas: number
+        matchingApiCalls: number
+        rateLimit: number
+        apiKeys: number
+        teamMembers: number
+        sla: string
+      }
+    > = {
+      FREE: {
+        activePersonas: 10,
+        matchingApiCalls: 3000,
+        rateLimit: 10,
+        apiKeys: 2,
+        teamMembers: 1,
+        sla: "N/A",
+      },
+      STARTER: {
+        activePersonas: 50,
+        matchingApiCalls: 50000,
+        rateLimit: 100,
+        apiKeys: 5,
+        teamMembers: 3,
+        sla: "99.5%",
+      },
+      PRO: {
+        activePersonas: 100,
+        matchingApiCalls: 500000,
+        rateLimit: 500,
+        apiKeys: 10,
+        teamMembers: 5,
+        sla: "99.5%",
+      },
+      ENTERPRISE: {
+        activePersonas: -1,
+        matchingApiCalls: -1,
+        rateLimit: -1,
+        apiKeys: -1,
+        teamMembers: -1,
+        sla: "99.9%",
+      },
+    }
+    const planLimits = planLimitsMap[currentPlanKey] || planLimitsMap.FREE
+
     // 최근 청구서 조회
     const invoices = organization
       ? await prisma.invoice.findMany({
@@ -57,10 +104,19 @@ export async function GET() {
     const billingData = {
       currentPlan: {
         id: currentPlanKey.toLowerCase(),
-        ...planInfo,
+        name: planInfo.name,
+        description: planInfo.description,
+        price: planInfo.price ?? 0,
+        annualPrice: Math.round((planInfo.price ?? 0) * 0.8),
+        limits: planLimits,
+        overage: { matchApiPerCall: planInfo.pricePerCall ?? 0, personaPerUnit: 0 },
+        support: currentPlanKey === "ENTERPRISE" ? "전담 지원" : "셀프서비스",
+        features: planInfo.features.filter((f) => f.included).map((f) => f.name),
+        isEnterprise: currentPlanKey === "ENTERPRISE",
         recommended: false,
         current: true,
       },
+      billingCycle: "monthly" as const,
       usage: {
         used: usedCalls,
         limit,
@@ -68,6 +124,8 @@ export async function GET() {
         estimatedCost: 0,
         billingCycle: `${startOfMonth.toISOString().split("T")[0]} ~ ${endOfMonth.toISOString().split("T")[0]}`,
         daysRemaining: Math.ceil((endOfMonth.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+        activePersonas: 0,
+        activePersonasLimit: planLimits.activePersonas === -1 ? 9999 : planLimits.activePersonas,
       },
       invoices: invoices.map((inv) => ({
         id: inv.id,

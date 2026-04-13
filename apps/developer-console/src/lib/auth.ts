@@ -118,6 +118,30 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             data: { lastLoginAt: new Date() },
           })
 
+          // 조직이 없는 기존 사용자에게 기본 조직 자동 생성 (backfill)
+          const existingMembership = await prisma.organizationMember.findFirst({
+            where: { userId: user.id },
+          })
+          if (!existingMembership) {
+            const org = await prisma.organization.create({
+              data: {
+                name: `${user.name || email.split("@")[0]}의 조직`,
+                slug: user.id,
+              },
+            })
+            await prisma.organizationMember.create({
+              data: {
+                userId: user.id,
+                organizationId: org.id,
+                role: "OWNER",
+                acceptedAt: new Date(),
+              },
+            })
+            console.info(
+              `[Auth] Default org created for credentials user: ${email.substring(0, 3)}***`
+            )
+          }
+
           console.info(`[Auth] Login success: ${email.substring(0, 3)}***`)
 
           return {
